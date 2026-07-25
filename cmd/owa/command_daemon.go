@@ -165,7 +165,12 @@ func (command *daemonStopCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, result)
 	}
-	_, err = fmt.Fprintln(app.stdout, "OWA session owner is stopping.")
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err = view.printf(
+		"%s  %s\n",
+		view.success(),
+		view.strong("OWA session owner is stopping"),
+	)
 	return err
 }
 
@@ -196,10 +201,18 @@ func writeDaemonStatus(app *runtime, status daemonapi.Status, jsonOutput bool) e
 	if jsonOutput {
 		return writeJSON(app.stdout, status)
 	}
-	_, err := fmt.Fprintf(
-		app.stdout,
-		"OWA session owner %s is ready (PID %d, protocol %d, default account %s).\n",
-		status.Version, status.ProcessID, status.ProtocolVersion,
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err := view.printf(
+		"%s  %s\n\n  %-10s %s\n  %-10s %d\n  %-10s %d\n  %-10s %s\n",
+		view.success(),
+		view.strong("OWA session owner is ready"),
+		"Version",
+		status.Version,
+		"PID",
+		status.ProcessID,
+		"Protocol",
+		status.ProtocolVersion,
+		"Account",
 		sanitizeCell(string(status.DefaultAccount), 64),
 	)
 	return err

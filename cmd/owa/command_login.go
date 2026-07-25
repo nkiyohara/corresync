@@ -44,6 +44,12 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, result)
 	}
-	_, err = fmt.Fprintf(app.stdout, "Authenticated Outlook Web account %q.\n", accountID)
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err = view.printf(
+		"%s  %s\n   %s\n",
+		view.success(),
+		view.strong("Authenticated Outlook Web"),
+		view.muted(fmt.Sprintf("Account %s · captured %s", accountID, result.CapturedAt.UTC().Format("2006-01-02T15:04:05Z"))),
+	)
 	return err
 }

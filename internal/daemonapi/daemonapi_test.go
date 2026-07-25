@@ -39,6 +39,15 @@ type fakeBackend struct {
 }
 
 func (backend *fakeBackend) DefaultAccount() domain.AccountID { return "work" }
+
+func (backend *fakeBackend) SessionStatus(
+	context.Context,
+	domain.Caller,
+) (SessionStatusResult, error) {
+	return SessionStatusResult{
+		Accounts: []SessionStatus{{Account: "work", State: "signed_out"}},
+	}, nil
+}
 func (*fakeBackend) Login(_ context.Context, account domain.AccountID, _ domain.Caller) (LoginResult, error) {
 	return LoginResult{Account: account, Authenticated: true, CapturedAt: time.Unix(2, 0)}, nil
 }
@@ -198,6 +207,34 @@ func TestServerAuthenticatesBeforeDecoding(t *testing.T) {
 	}
 }
 
+func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
+	t.Parallel()
+
+	capturedAt := time.Unix(1, 0)
+	tests := []SessionStatusResult{
+		{Accounts: []SessionStatus{
+			{Account: "work", State: "signed_out"},
+			{Account: "work", State: "signed_out"},
+		}},
+		{Accounts: []SessionStatus{
+			{Account: "work", State: "signed_out"},
+			{Account: "personal", State: "signed_out"},
+		}},
+		{Accounts: []SessionStatus{{Account: "work", State: "unknown"}}},
+		{Accounts: []SessionStatus{{
+			Account: "work", State: "authenticated", Authenticated: true,
+		}}},
+		{Accounts: []SessionStatus{{
+			Account: "work", State: "signed_out", CapturedAt: &capturedAt,
+		}}},
+	}
+	for index, result := range tests {
+		if err := validateSessionStatusResult(result); err == nil {
+			t.Fatalf("case %d unexpectedly passed: %+v", index, result)
+		}
+	}
+}
+
 func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	t.Parallel()
 
@@ -241,6 +278,13 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	login, err := client.Login(t.Context(), "work", caller)
 	if err != nil || !login.Authenticated || login.Account != "work" {
 		t.Fatalf("Login() = %+v, %v", login, err)
+	}
+	sessions, err := client.SessionStatus(t.Context(), caller)
+	if err != nil ||
+		len(sessions.Accounts) != 1 ||
+		sessions.Accounts[0].Account != "work" ||
+		sessions.Accounts[0].State != "signed_out" {
+		t.Fatalf("SessionStatus() = %+v, %v", sessions, err)
 	}
 	terminalLogin, err := client.TerminalLogin(t.Context(), TerminalLoginInput{Account: "work"}, caller)
 	if err != nil || terminalLogin.Status != "pending" || terminalLogin.View == nil ||

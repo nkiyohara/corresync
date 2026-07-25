@@ -30,7 +30,14 @@ func Load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	return Parse(data)
+}
 
+// Parse decodes bounded strict TOML and validates the complete configuration.
+func Parse(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
 	var configuration Config
 	decoder := toml.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
@@ -85,7 +92,19 @@ func Save(path string, configuration Config) error {
 	if len(encoded) > maximumConfigBytes {
 		return fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
 	}
+	return writeConfigFile(path, encoded)
+}
 
+// SaveTOML validates and atomically preserves caller-provided TOML, including
+// comments and ordering.
+func SaveTOML(path string, encoded []byte) error {
+	if _, err := Parse(encoded); err != nil {
+		return err
+	}
+	return writeConfigFile(path, encoded)
+}
+
+func writeConfigFile(path string, encoded []byte) error {
 	directory := filepath.Dir(path)
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return fmt.Errorf("create config directory: %w", err)

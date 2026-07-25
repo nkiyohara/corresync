@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/mail"
@@ -19,42 +20,42 @@ const CurrentVersion = 1
 // Config is the complete persisted configuration. It intentionally has no
 // credential, cookie, token, canary, or password field.
 type Config struct {
-	Version        int                `toml:"version"`
-	DefaultAccount string             `toml:"default_account"`
-	Accounts       map[string]Account `toml:"accounts"`
-	Policy         Policy             `toml:"policy"`
-	Browser        Browser            `toml:"browser"`
-	Updates        Updates            `toml:"updates"`
+	Version        int                `json:"version" toml:"version"`
+	DefaultAccount string             `json:"defaultAccount" toml:"default_account"`
+	Accounts       map[string]Account `json:"accounts" toml:"accounts"`
+	Policy         Policy             `json:"policy" toml:"policy"`
+	Browser        Browser            `json:"browser" toml:"browser"`
+	Updates        Updates            `json:"updates" toml:"updates"`
 }
 
 // Account identifies one Outlook Web origin by a non-personal local alias.
 // Mailbox optionally selects a shared or delegated SMTP mailbox while keeping
 // authentication in the same browser-owned Outlook Web session.
 type Account struct {
-	Origin  string `toml:"origin"`
-	Mailbox string `toml:"mailbox,omitempty"`
+	Origin  string `json:"origin" toml:"origin"`
+	Mailbox string `json:"mailbox,omitempty" toml:"mailbox,omitempty"`
 }
 
 // Policy maps persisted settings into the deterministic policy core.
 type Policy struct {
-	Mode                    policy.Mode `toml:"mode"`
-	PreviewSensitiveReads   bool        `toml:"preview_sensitive_reads"`
-	PreviewReversibleWrites bool        `toml:"preview_reversible_writes"`
-	MaxRecipients           int         `toml:"max_recipients"`
-	MaxAttendees            int         `toml:"max_attendees"`
+	Mode                    policy.Mode `json:"mode" toml:"mode"`
+	PreviewSensitiveReads   bool        `json:"previewSensitiveReads" toml:"preview_sensitive_reads"`
+	PreviewReversibleWrites bool        `json:"previewReversibleWrites" toml:"preview_reversible_writes"`
+	MaxRecipients           int         `json:"maxRecipients" toml:"max_recipients"`
+	MaxAttendees            int         `json:"maxAttendees" toml:"max_attendees"`
 }
 
 // Browser controls the dedicated interactive browser process.
 type Browser struct {
-	Executable   string   `toml:"executable,omitempty"`
-	LoginTimeout Duration `toml:"login_timeout"`
+	Executable   string   `json:"executable,omitempty" toml:"executable,omitempty"`
+	LoginTimeout Duration `json:"loginTimeout" toml:"login_timeout"`
 }
 
 // Updates controls only opportunistic public release checks. Explicit
 // `owa update` and `owa update check` calls remain available when automatic
 // checks are disabled.
 type Updates struct {
-	DisableAutomaticChecks bool `toml:"disable_automatic_checks"`
+	DisableAutomaticChecks bool `json:"disableAutomaticChecks" toml:"disable_automatic_checks"`
 }
 
 // Duration encodes a human-readable Go duration such as "5m" in TOML.
@@ -63,6 +64,11 @@ type Duration time.Duration
 // MarshalText implements encoding.TextMarshaler.
 func (duration Duration) MarshalText() ([]byte, error) {
 	return []byte(time.Duration(duration).String()), nil
+}
+
+// MarshalJSON keeps the JSON configuration view human-readable.
+func (duration Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Duration(duration).String())
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.

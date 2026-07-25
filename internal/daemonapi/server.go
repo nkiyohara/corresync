@@ -182,6 +182,12 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.Login(ctx, input.Account, request.Caller)
+	case MethodSessionStatus:
+		var input struct{}
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		return server.backend.SessionStatus(ctx, request.Caller)
 	case MethodTerminalLogin:
 		var input TerminalLoginInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {

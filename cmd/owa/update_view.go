@@ -5,25 +5,15 @@ import (
 	"io"
 	"strings"
 
-	"charm.land/lipgloss/v2"
-
 	"github.com/nkiyohara/owa-bridge/internal/updatecheck"
 )
 
 type updateView struct {
-	writer      io.Writer
-	interactive bool
-	color       bool
+	consoleView
 }
 
 func newUpdateView(app *runtime, writer io.Writer, interactive bool) updateView {
-	color := false
-	if interactive {
-		_, noColor := app.lookupEnv("NO_COLOR")
-		term, _ := app.lookupEnv("TERM")
-		color = !noColor && term != "dumb"
-	}
-	return updateView{writer: writer, interactive: interactive, color: color}
+	return updateView{consoleView: newConsoleView(app, writer, interactive)}
 }
 
 func (view updateView) writeNotice(current, latest string) error {
@@ -133,59 +123,6 @@ func (view updateView) writeAction(report updateActionReport) error {
 	default:
 		return fmt.Errorf("unknown update action status %q", report.Status)
 	}
-}
-
-func (view updateView) printf(format string, values ...any) (int, error) {
-	if view.color {
-		return lipgloss.Fprintf(view.writer, format, values...)
-	}
-	return fmt.Fprintf(view.writer, format, values...)
-}
-
-func (view updateView) accent() string {
-	if !view.color {
-		return "↑"
-	}
-	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#5C7CFA")).
-		Bold(true).
-		Render("↑")
-}
-
-func (view updateView) success() string {
-	if !view.color {
-		return "✓"
-	}
-	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#04B575")).
-		Bold(true).
-		Render("✓")
-}
-
-func (view updateView) strong(value string) string {
-	if !view.color {
-		return value
-	}
-	return lipgloss.NewStyle().Bold(true).Render(value)
-}
-
-func (view updateView) muted(value string) string {
-	if !view.color {
-		return value
-	}
-	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#808080")).
-		Render(value)
-}
-
-func (view updateView) command(value string) string {
-	if !view.color {
-		return value
-	}
-	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#5C7CFA")).
-		Bold(true).
-		Render(value)
 }
 
 func versionPair(current, latest string) string {

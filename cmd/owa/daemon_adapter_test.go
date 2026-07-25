@@ -38,6 +38,15 @@ type adapterTestBackend struct {
 }
 
 func (*adapterTestBackend) DefaultAccount() domain.AccountID { return "work" }
+
+func (*adapterTestBackend) SessionStatus(
+	context.Context,
+	domain.Caller,
+) (daemonapi.SessionStatusResult, error) {
+	return daemonapi.SessionStatusResult{
+		Accounts: []daemonapi.SessionStatus{{Account: "work", State: "signed_out"}},
+	}, nil
+}
 func (*adapterTestBackend) Login(_ context.Context, account domain.AccountID, _ domain.Caller) (daemonapi.LoginResult, error) {
 	return daemonapi.LoginResult{
 		Account: account, Authenticated: true, CapturedAt: time.Unix(2, 0),

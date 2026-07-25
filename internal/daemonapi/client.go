@@ -65,6 +65,47 @@ func (client *Client) Login(ctx context.Context, account domain.AccountID, calle
 	return result, nil
 }
 
+// SessionStatus returns content-free in-memory authentication state.
+func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (SessionStatusResult, error) {
+	var result SessionStatusResult
+	if err := client.call(ctx, MethodSessionStatus, caller, struct{}{}, &result); err != nil {
+		return SessionStatusResult{}, err
+	}
+	if err := validateSessionStatusResult(result); err != nil {
+		return SessionStatusResult{}, err
+	}
+	return result, nil
+}
+
+func validateSessionStatusResult(result SessionStatusResult) error {
+	seen := make(map[domain.AccountID]struct{}, len(result.Accounts))
+	for index, account := range result.Accounts {
+		if err := account.Account.Validate(); err != nil {
+			return errors.New("daemon returned an invalid session account")
+		}
+		if _, exists := seen[account.Account]; exists {
+			return errors.New("daemon returned duplicate session accounts")
+		}
+		seen[account.Account] = struct{}{}
+		if index > 0 && result.Accounts[index-1].Account >= account.Account {
+			return errors.New("daemon returned unsorted session accounts")
+		}
+		switch account.State {
+		case "authenticated":
+			if !account.Authenticated || account.CapturedAt == nil || account.CapturedAt.IsZero() {
+				return errors.New("daemon returned invalid authenticated session state")
+			}
+		case "pending", "signed_out":
+			if account.Authenticated || account.CapturedAt != nil {
+				return errors.New("daemon returned invalid inactive session state")
+			}
+		default:
+			return errors.New("daemon returned unknown session state")
+		}
+	}
+	return nil
+}
+
 // TerminalLogin starts or advances a caller-bound text-only browser login.
 func (client *Client) TerminalLogin(
 	ctx context.Context,
