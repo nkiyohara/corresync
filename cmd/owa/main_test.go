@@ -54,7 +54,7 @@ func TestRootHelpCommandDescriptionsMatchCommandHelp(t *testing.T) {
 	commands := []string{
 		"config",
 		"doctor",
-		"login",
+		"auth",
 		"mail",
 		"calendar",
 		"daemon",
@@ -78,6 +78,44 @@ func TestRootHelpCommandDescriptionsMatchCommandHelp(t *testing.T) {
 				stdout.String(),
 			)
 		}
+	}
+}
+
+func TestRunSupportsConventionalVersionAndHelpForms(t *testing.T) {
+	t.Parallel()
+
+	for _, arguments := range [][]string{{"--version"}, {"-V"}} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		if code := run(context.Background(), arguments, &stdout, &stderr); code != 0 {
+			t.Fatalf("run(%q) code = %d, stderr = %q", arguments, code, stderr.String())
+		}
+		if !strings.HasPrefix(stdout.String(), "owa dev ") {
+			t.Fatalf("run(%q) stdout = %q", arguments, stdout.String())
+		}
+	}
+	for _, arguments := range [][]string{{"help"}, {"help", "config"}} {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		if code := run(context.Background(), arguments, &stdout, &stderr); code != 0 {
+			t.Fatalf("run(%q) code = %d, stderr = %q", arguments, code, stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "Usage:") {
+			t.Fatalf("run(%q) stdout = %q, want help", arguments, stdout.String())
+		}
+	}
+}
+
+func TestLegacyRootLoginHelpRemainsAvailable(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run(context.Background(), []string{"login", "--help"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("legacy login help code = %d, stderr = %q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Open the interactive Outlook Web sign-in") {
+		t.Fatalf("legacy login help is incomplete: %q", stdout.String())
 	}
 }
 

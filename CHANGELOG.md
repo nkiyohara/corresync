@@ -3,6 +3,30 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.0 - 2026-07-25
+
+### Complete command-line lifecycle
+
+- Add conventional `--version` and `-V` flags, `owa help <command>`, stable
+  usage exit code `2`, and keep the detailed `version --json` build record.
+- Add `owa auth login`, content-free `auth status`, and `auth logout`; retain
+  top-level `owa login` as a hidden compatibility alias.
+- Add validated `config show`, typed `config get` and `config set`, and safe
+  `config edit` with atomic replacement only after strict TOML validation.
+
+### Diagnostics and presentation
+
+- Make offline doctor inspect an existing session owner without repairing it,
+  report an absent owner as skipped, and fail clearly on an incompatible
+  daemon protocol.
+- Use one Lip Gloss visual language for root help, version, auth, config,
+  doctor, daemon, login, and update output while preserving unstyled pipes and
+  JSON and honoring `NO_COLOR` and `TERM=dumb`.
+- Advance authenticated local IPC to protocol version 11 for content-free
+  session status and cover the expanded lifecycle with deterministic tests.
+- Refresh the manual, shell completions, release documentation, and dependency
+  metadata.
+
 ## 0.5.0 - 2026-07-24
 
 ### Verified self-update

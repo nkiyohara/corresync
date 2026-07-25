@@ -125,7 +125,7 @@ automatically retried.
 
 `owa update check --json` returns `status`, `currentVersion`,
 `updateAvailable`, and `cached`; successful comparisons also include
-`latestVersion`, `releaseUrl`, `checkedAt`, `installMethod`, and `upgrade`.
+`latestVersion`, `releaseUrl`, and `checkedAt`.
 `status` is `current`, `available`, `development`, or `unavailable`. This
 content-free result is separate from the Outlook application result types.
 `installMethod` and `upgrade` appear only when `status` is `available`.
@@ -138,6 +138,36 @@ replacement uses `status: "updated"` and also returns `previousVersion`,
 `status: "action_required"` with the exact external `command`; `updated`
 remains false.
 Automatic human notices are never appended to JSON output.
+
+## Local CLI state
+
+`owa auth status --json` is deliberately content-free:
+
+```json
+{
+  "daemonVersion": "0.6.0",
+  "processId": 4242,
+  "accounts": [
+    {
+      "account": "work",
+      "state": "authenticated",
+      "authenticated": true,
+      "capturedAt": "2026-07-25T12:00:00Z"
+    }
+  ]
+}
+```
+
+State is `authenticated`, `pending`, or `signed_out`; `capturedAt` exists only
+for an authenticated session. `owa auth logout --json` returns
+`{"loggedOut":true,"scope":"all"}` after the owner has exited.
+
+`owa config show --json` serializes the validated secret-free configuration
+with lower-camel field names. `config get --json` returns `key` and typed
+`value`; `config set --json` additionally returns `updated: true`. Config
+initialization, validation, editing, and path inspection similarly emit one
+small action object. `owa version --json` returns version, commit, build time,
+Go version, operating system, and architecture.
 
 ## Compatibility policy
 

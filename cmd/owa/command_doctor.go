@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/nkiyohara/owa-bridge/internal/application"
 	"github.com/nkiyohara/owa-bridge/internal/browser"
 	"github.com/nkiyohara/owa-bridge/internal/config"
+	"github.com/nkiyohara/owa-bridge/internal/daemonapi"
 	"github.com/nkiyohara/owa-bridge/internal/updatecheck"
 )
 
@@ -72,6 +74,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 		report.add("local_ipc", "fail", doctorError(err))
 	} else {
 		report.add("local_ipc", "pass", "config-scoped no-TCP endpoint is available")
+		command.addDaemonStatus(app, configPath, &report)
 	}
 
 	if !command.Online {
@@ -85,11 +88,15 @@ func (command *doctorCommand) Run(app *runtime) error {
 
 	client, status, err := app.openDaemon(app.context)
 	if err != nil {
-		report.add("daemon", "fail", doctorError(err))
+		report.set("daemon", "fail", doctorError(err))
 		report.add("live_owa", "skip", "session owner is unavailable")
 		return command.finish(app, report)
 	}
-	report.add("daemon", "pass", fmt.Sprintf("protocol %d session owner is ready", status.ProtocolVersion))
+	report.set(
+		"daemon",
+		"pass",
+		fmt.Sprintf("protocol %d session owner is ready", status.ProtocolVersion),
+	)
 
 	if _, err := client.Login(app.context, accountID, app.caller()); err != nil {
 		report.add("session", "fail", doctorError(err))
@@ -156,6 +163,81 @@ func (command *doctorCommand) Run(app *runtime) error {
 	return command.finish(app, report)
 }
 
+func (command *doctorCommand) addDaemonStatus(
+	app *runtime,
+	configPath string,
+	report *doctorReport,
+) {
+	endpoint, err := app.endpoint(configPath)
+	if err != nil {
+		report.add("daemon", "fail", doctorError(err))
+		return
+	}
+	client, err := daemonapi.NewClient(endpoint)
+	if err != nil {
+		report.add("daemon", "fail", doctorError(err))
+		return
+	}
+	defer func() {
+		if err := client.Close(); err != nil {
+			report.add("daemon_close", "fail", doctorError(err))
+		}
+	}()
+	ctx, cancel := context.WithTimeout(app.context, daemonProbeTimeout)
+	defer cancel()
+	owner, statusErr := client.InspectOwner(ctx, app.caller())
+	status := owner.Status()
+	if status.ProcessID > 0 {
+		digest, fingerprintErr := config.Fingerprint(configPath)
+		if fingerprintErr == nil {
+			fingerprintErr = app.validateDaemonConfig(status, digest)
+		}
+		if fingerprintErr != nil {
+			report.add("daemon", "fail", doctorError(fingerprintErr))
+			return
+		}
+	}
+	if statusErr == nil {
+		if status.ProtocolVersion != daemonapi.ProtocolVersion ||
+			status.Version != app.info.Version {
+			report.add(
+				"daemon",
+				"fail",
+				fmt.Sprintf(
+					"running version %s uses protocol %d; run `owa daemon start` to replace it",
+					status.Version,
+					status.ProtocolVersion,
+				),
+			)
+			return
+		}
+		report.add(
+			"daemon",
+			"pass",
+			fmt.Sprintf("version %s protocol %d is ready", status.Version, status.ProtocolVersion),
+		)
+		return
+	}
+	var versionErr *daemonapi.ProtocolVersionError
+	if errors.As(statusErr, &versionErr) && status.ProcessID > 0 {
+		report.add(
+			"daemon",
+			"fail",
+			fmt.Sprintf(
+				"running version %s uses protocol %d; run `owa daemon start` to replace it",
+				status.Version,
+				status.ProtocolVersion,
+			),
+		)
+		return
+	}
+	if errors.Is(statusErr, os.ErrNotExist) {
+		report.add("daemon", "skip", "not running; it will start on the first Outlook command")
+		return
+	}
+	report.add("daemon", "fail", doctorError(statusErr))
+}
+
 func (command *doctorCommand) addUpdateStatus(app *runtime, configuration config.Config, report *doctorReport) {
 	if !app.automaticUpdateChecksEnabled(&configuration) {
 		report.add("update", "skip", "automatic stable-release checks are disabled")
@@ -187,22 +269,37 @@ func (report *doctorReport) add(name, status, detail string) {
 	}
 }
 
+func (report *doctorReport) set(name, status, detail string) {
+	for index := range report.Checks {
+		if report.Checks[index].Name == name {
+			report.Checks[index] = doctorCheck{Name: name, Status: status, Detail: detail}
+			if status == "fail" {
+				report.Healthy = false
+			}
+			return
+		}
+	}
+	report.add(name, status, detail)
+}
+
 func (command *doctorCommand) finish(app *runtime, report doctorReport) error {
 	var writeErr error
 	if command.JSON {
 		writeErr = writeJSON(app.stdout, report)
 	} else {
-		state := "healthy"
+		view := newConsoleView(app, app.stdout, app.interactiveStdout())
+		state := "Healthy"
+		icon := view.success()
 		if !report.Healthy {
-			state = "unhealthy"
+			state = "Needs attention"
+			icon = view.failure()
 		}
-		_, writeErr = fmt.Fprintf(app.stdout, "owa doctor: %s\n", state)
+		_, writeErr = view.printf("%s  %s\n", icon, view.strong("OWA Bridge · "+state))
 		for _, check := range report.Checks {
-			if _, err := fmt.Fprintf(
-				app.stdout,
-				"[%s] %s: %s\n",
-				check.Status,
-				sanitizeCell(check.Name, 40),
+			if _, err := view.printf(
+				"   %s  %s %s\n",
+				view.status(check.Status),
+				view.strong(fmt.Sprintf("%-16s", sanitizeCell(check.Name, 40))),
 				sanitizeCell(check.Detail, 240),
 			); err != nil {
 				writeErr = errors.Join(writeErr, err)

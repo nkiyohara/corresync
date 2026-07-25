@@ -12,6 +12,8 @@ Create the strict, secret-free default configuration:
 owa config init
 owa config validate
 owa config path
+owa config show
+owa config get policy.max_recipients
 ```
 
 Use `--config /absolute/path/config.toml` before the command, or set
@@ -19,8 +21,12 @@ Use `--config /absolute/path/config.toml` before the command, or set
 existing path unless `--force` is explicit. A symlink, directory, or other
 non-regular target is rejected even with `--force`.
 
-Edit account origins and policy in the generated TOML. See
-[configuration.md](configuration.md) for the schema.
+Use `owa config edit` to edit TOML through `VISUAL`, `EDITOR`, or the platform
+default. The original file is left unchanged if the editor fails or the result
+does not pass strict validation. `owa config set <key> <value>` supports only
+the typed keys documented in [configuration.md](configuration.md); it validates
+the complete configuration before atomically replacing the file. Stop a
+running session owner after a successful edit.
 
 For a shared or delegated mailbox that the same signed-in user already has
 permission to use in Outlook Web, add a separate account alias with
@@ -30,8 +36,9 @@ permissions.
 
 ## Diagnose and run the opt-in compatibility smoke test
 
-Check the strict config, selected account, Chromium-family executable, and
-config-scoped local IPC without opening a browser:
+Check the strict config, selected account, Chromium-family executable,
+config-scoped local IPC, and any already-running session owner without opening
+a browser:
 
 ```console
 owa doctor
@@ -51,6 +58,10 @@ emits no folder, message, event, recipient, mailbox-count, authorization, or
 response-body data. A failure is
 non-zero and identifies the local, session, mail-contract, or calendar-contract
 stage that failed.
+
+An offline report marks an absent daemon as `skip`. An incompatible running
+daemon is a failure with an explicit replacement command; diagnostics do not
+silently repair state.
 
 See [compatibility evidence](compatibility.md) for the live-test checklist and
 the data that is safe to include in a report.
@@ -84,9 +95,11 @@ rollback, opt-out, and package-manager details.
 ## Authenticate
 
 ```console
-owa login
-owa login --account work --json
-owa login --account work --terminal
+owa auth login
+owa auth login --account work --json
+owa auth login --account work --terminal
+owa auth status
+owa auth logout
 ```
 
 The command connects to the config-scoped session owner, starting it if needed.
@@ -101,6 +114,13 @@ forms but may require visible login for CAPTCHA, passkeys, security keys,
 client certificates, native dialogs, or custom graphical controls. JSON output
 from normal login contains only account alias, status, and capture time; the
 authorization snapshot remains in the daemon.
+
+`auth status` reports only configured aliases, the content-free state
+`authenticated`, `pending`, or `signed_out`, and a capture time when one
+exists. `auth logout` closes every dedicated browser and clears all in-memory
+sessions and pending approvals owned by that config-scoped daemon. Protected
+browser profiles remain on the device for the next interactive sign-in. The
+former top-level `owa login` spelling remains a hidden compatibility alias.
 
 ## Discover mail folders
 
@@ -318,9 +338,10 @@ owa daemon stop
 ```
 
 `start` launches one background process for the selected absolute config path
-and state directory. Ordinary `login`, mail, calendar, and MCP commands start it
-automatically when absent. `serve` runs the same process in the foreground for
-service managers and diagnostics. No TCP port is opened: Linux and macOS use an
+and state directory. Ordinary `auth login`, `auth status`, mail, calendar, and
+MCP commands start it automatically when absent. `serve` runs the same process
+in the foreground for service managers and diagnostics. No TCP port is opened:
+Linux and macOS use an
 owner-only Unix socket with same-effective-user peer verification, while Windows
 uses a local-only named pipe whose ACL grants the current user and SYSTEM.
 
@@ -491,5 +512,7 @@ model and performs no Outlook operation.
 ## Machine-readable behavior
 
 Commands with `--json` write one JSON value to stdout. Interactive progress and
-diagnostics go to stderr. Errors return a non-zero exit code and do not include
-authorization values or OWA response bodies.
+diagnostics go to stderr. Exit code `0` means success, `1` means an operation or
+diagnostic failed, and `2` means command-line usage was invalid. Errors do not
+include authorization values or OWA response bodies. Human output uses color
+only on an interactive terminal and honors `NO_COLOR` and `TERM=dumb`.

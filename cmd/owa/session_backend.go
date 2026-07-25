@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -128,6 +129,42 @@ func (backend *sessionBackend) Login(
 	return daemonapi.LoginResult{
 		Account: accountID, Authenticated: true, CapturedAt: account.captured,
 	}, nil
+}
+
+func (backend *sessionBackend) SessionStatus(
+	_ context.Context,
+	_ domain.Caller,
+) (daemonapi.SessionStatusResult, error) {
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	if backend.closed {
+		return daemonapi.SessionStatusResult{}, errors.New("session backend is closed")
+	}
+	aliases := make([]string, 0, len(backend.configuration.Accounts))
+	for alias := range backend.configuration.Accounts {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	result := daemonapi.SessionStatusResult{
+		Accounts: make([]daemonapi.SessionStatus, 0, len(aliases)),
+	}
+	for _, alias := range aliases {
+		accountID := domain.AccountID(alias)
+		state := daemonapi.SessionStatus{
+			Account: accountID,
+			State:   "signed_out",
+		}
+		if account, exists := backend.accounts[accountID]; exists {
+			capturedAt := account.captured.UTC()
+			state.State = "authenticated"
+			state.Authenticated = true
+			state.CapturedAt = &capturedAt
+		} else if _, exists := backend.terminalAccounts[accountID]; exists {
+			state.State = "pending"
+		}
+		result.Accounts = append(result.Accounts, state)
+	}
+	return result, nil
 }
 
 func (backend *sessionBackend) TerminalLogin(

@@ -54,6 +54,7 @@ func TestOpenDaemonReplacesOutdatedOwner(t *testing.T) {
 				t.Fatalf("ResolveInState() error = %v", err)
 			}
 			previous := startLifecycleTestDaemon(
+				t.Context(),
 				t,
 				endpoint,
 				protocolVersion,
@@ -73,12 +74,13 @@ func TestOpenDaemonReplacesOutdatedOwner(t *testing.T) {
 				buildinfo.Current(),
 			)
 			app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
-			app.startDaemon = func(_ context.Context, path string) error {
+			app.startDaemon = func(ctx context.Context, path string) error {
 				if path != configPath {
 					return fmt.Errorf("replacement config path = %q, want %q", path, configPath)
 				}
 				starts.Add(1)
 				replacement = startLifecycleTestDaemon(
+					ctx,
 					t,
 					endpoint,
 					daemonapi.ProtocolVersion,
@@ -137,6 +139,7 @@ func TestOpenDaemonDoesNotApplyChangedConfigDuringReplacement(t *testing.T) {
 				t.Fatalf("ResolveInState() error = %v", err)
 			}
 			previous := startLifecycleTestDaemon(
+				t.Context(),
 				t,
 				endpoint,
 				protocolVersion,
@@ -196,6 +199,7 @@ func TestReplaceDaemonDoesNotStopNewGeneration(t *testing.T) {
 		t.Fatalf("ResolveInState() error = %v", err)
 	}
 	previous := startLifecycleTestDaemon(
+		t.Context(),
 		t,
 		endpoint,
 		daemonapi.ProtocolVersion,
@@ -234,12 +238,13 @@ func TestReplaceDaemonDoesNotStopNewGeneration(t *testing.T) {
 	var starts atomic.Int32
 	var replacement lifecycleTestDaemon
 	var replacementMu sync.Mutex
-	callerApp.startDaemon = func(context.Context, string) error {
+	callerApp.startDaemon = func(ctx context.Context, _ string) error {
 		replacementMu.Lock()
 		defer replacementMu.Unlock()
 		if replacement.stop == nil {
 			starts.Add(1)
 			replacement = startLifecycleTestDaemon(
+				ctx,
 				t,
 				endpoint,
 				daemonapi.ProtocolVersion,
@@ -324,6 +329,7 @@ func TestWaitForDaemonPreservesLastFailure(t *testing.T) {
 }
 
 func startLifecycleTestDaemon(
+	ctx context.Context,
 	t *testing.T,
 	endpoint localipc.Endpoint,
 	protocolVersion int,
@@ -367,7 +373,9 @@ func startLifecycleTestDaemon(
 	var server *http.Server
 	stop := func() {
 		stopOnce.Do(func() {
-			_ = server.Close()
+			shutdownCtx, cancel := context.WithTimeout(ctx, time.Second)
+			_ = server.Shutdown(shutdownCtx)
+			cancel()
 			_ = listener.Close()
 			_ = credential.Close()
 			<-serveDone
@@ -419,6 +427,15 @@ func startLifecycleTestDaemon(
 					StartedAt:       time.Unix(1, 0).UTC(),
 					DefaultAccount:  "work",
 					ConfigDigest:    configDigest,
+				})
+				response.Result = encoded
+				responseErr = encodeErr
+			case envelope.Method == "session.status":
+				encoded, encodeErr := json.Marshal(daemonapi.SessionStatusResult{
+					Accounts: []daemonapi.SessionStatus{{
+						Account: "work",
+						State:   "signed_out",
+					}},
 				})
 				response.Result = encoded
 				responseErr = encodeErr

@@ -1,12 +1,15 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/nkiyohara/owa-bridge/internal/policy"
 )
@@ -62,6 +65,28 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		if gotPerm := info.Mode().Perm(); gotPerm != 0o600 {
 			t.Fatalf("config permissions = %o, want 600", gotPerm)
 		}
+	}
+}
+
+func TestSaveTOMLPreservesValidatedComments(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	encoded := []byte("# retained\nversion = 1\n")
+	defaultConfig, err := toml.Marshal(Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded = append(encoded, bytes.TrimPrefix(defaultConfig, []byte("version = 1\n"))...)
+	if err := SaveTOML(path, encoded); err != nil {
+		t.Fatalf("SaveTOML() error = %v", err)
+	}
+	saved, err := os.ReadFile(path) // #nosec G304 -- private test path.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(saved, encoded) {
+		t.Fatalf("saved TOML changed:\n%s", saved)
 	}
 }
 

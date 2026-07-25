@@ -80,7 +80,10 @@ func newRuntime(
 		endpoint:    localipc.Resolve,
 		startDaemon: startDetachedDaemon,
 		runCommand: func(ctx context.Context, stdout, stderr io.Writer, name string, args ...string) error {
-			command := exec.CommandContext(ctx, name, args...) // #nosec G204 -- name and args come from typed client setup plans.
+			// #nosec G204 -- name and args come from typed setup plans or the
+			// user's explicit editor selection.
+			command := exec.CommandContext(ctx, name, args...)
+			command.Stdin = os.Stdin
 			command.Stdout = stdout
 			command.Stderr = stderr
 			return command.Run()

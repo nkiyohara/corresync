@@ -19,17 +19,19 @@ import (
 )
 
 type cli struct {
-	ConfigPath string            `name:"config" type:"path" env:"OWA_CONFIG" help:"Path to config.toml."`
-	Version    versionCommand    `cmd:"" help:"Print version and build information."`
-	Config     configCommand     `cmd:"" help:"Initialize and inspect configuration."`
-	Doctor     doctorCommand     `cmd:"" help:"Diagnose local setup and opt-in OWA compatibility."`
-	Login      loginCommand      `cmd:"" help:"Open the interactive Outlook Web sign-in."`
-	Mail       mailCommand       `cmd:"" help:"Read and manage mail."`
-	Calendar   calendarCommand   `cmd:"" help:"Read and manage calendar events."`
-	Daemon     daemonCommand     `cmd:"" help:"Run and inspect the local session owner."`
-	MCP        mcpCommand        `cmd:"" help:"Expose guarded Outlook tools over MCP."`
-	Update     updateCommand     `cmd:"" help:"Install verified updates or show the package-manager command."`
-	Completion completionCommand `cmd:"" help:"Generate a shell completion script."`
+	ConfigPath  string            `name:"config" type:"path" env:"OWA_CONFIG" help:"Path to config.toml."`
+	VersionFlag kong.VersionFlag  `name:"version" short:"V" help:"Print version information and quit."`
+	Version     versionCommand    `cmd:"" help:"Print version and build information."`
+	Config      configCommand     `cmd:"" help:"Initialize and inspect configuration."`
+	Doctor      doctorCommand     `cmd:"" help:"Diagnose local setup and opt-in OWA compatibility."`
+	Auth        authCommand       `cmd:"" help:"Inspect and manage interactive sessions."`
+	Login       loginCommand      `cmd:"" hidden:"" help:"Open the interactive Outlook Web sign-in."`
+	Mail        mailCommand       `cmd:"" help:"Read and manage mail."`
+	Calendar    calendarCommand   `cmd:"" help:"Read and manage calendar events."`
+	Daemon      daemonCommand     `cmd:"" help:"Run and inspect the local session owner."`
+	MCP         mcpCommand        `cmd:"" help:"Expose guarded Outlook tools over MCP."`
+	Update      updateCommand     `cmd:"" help:"Install verified updates or show the package-manager command."`
+	Completion  completionCommand `cmd:"" help:"Generate a shell completion script."`
 }
 
 type versionCommand struct {
@@ -43,22 +45,36 @@ func (command *versionCommand) Run(app *runtime) error {
 		return encoder.Encode(app.info)
 	}
 
-	_, err := fmt.Fprintf(
-		app.stdout,
-		"owa %s (commit %s, built %s, %s)\n",
+	if !app.interactiveStdout() {
+		_, err := fmt.Fprintln(app.stdout, versionLine(app.info))
+		return err
+	}
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf(
+		"%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s · %s/%s\n",
+		view.info(),
+		view.strong("OWA Bridge"),
+		"Version",
 		app.info.Version,
+		"Commit",
 		app.info.Commit,
+		"Built",
 		app.info.BuildDate,
+		"Runtime",
 		app.info.GoVersion,
+		app.info.OS,
+		app.info.Arch,
 	)
 	return err
 }
 
 func run(executionContext context.Context, arguments []string, stdout, stderr io.Writer) int {
+	arguments = normalizeHelpArguments(arguments)
 	if !completionEnvironmentActive() && len(arguments) == 0 {
 		arguments = []string{"--help"}
 	}
 
+	info := buildinfo.Current()
 	var commandLine cli
 	exitCode := -1
 	parser, err := kong.New(
@@ -66,6 +82,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		kong.Name("owa"),
 		kong.Description("Local-first Outlook Web mail and calendar."),
 		kong.Help(compactHelpPrinter),
+		kong.Vars{"version": versionLine(info)},
 		kong.UsageOnError(),
 		kong.Writers(stdout, stderr),
 		kong.Exit(func(code int) { exitCode = code }),
@@ -97,7 +114,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		return 2
 	}
 
-	app := newRuntime(executionContext, commandLine.ConfigPath, stdout, stderr, buildinfo.Current())
+	app := newRuntime(executionContext, commandLine.ConfigPath, stdout, stderr, info)
 	if shouldOfferAutomaticUpdateNotice(arguments) {
 		app.maybeNotifyUpdate(executionContext)
 	}
@@ -118,28 +135,53 @@ func compactHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 			width = len(command.Name)
 		}
 	}
+	view := newConsoleViewWithEnvironment(ctx.Stdout, outputIsTerminal(ctx.Stdout), os.LookupEnv)
 	var help strings.Builder
-	_, _ = fmt.Fprintf(&help, "%s: %s\n\n", ctx.Model.Name, strings.TrimSuffix(ctx.Model.Help, "."))
+	_, _ = fmt.Fprintf(
+		&help,
+		"%s  %s\n%s\n\n",
+		view.info(),
+		view.strong("OWA Bridge"),
+		strings.TrimSuffix(ctx.Model.Help, "."),
+	)
 	_, _ = fmt.Fprintf(&help, "Usage:\n  %s <command> [flags]\n\nCommands:\n", ctx.Model.Name)
 	for _, command := range ctx.Model.Children {
 		if command.Hidden {
 			continue
 		}
+		name := view.command(fmt.Sprintf("%-*s", width, command.Name))
 		_, _ = fmt.Fprintf(
 			&help,
-			"  %-*s %s\n",
-			width,
-			command.Name,
+			"  %s %s\n",
+			name,
 			strings.TrimSuffix(command.Help, "."),
 		)
 	}
 	_, _ = fmt.Fprintf(
 		&help,
-		"\nRun %q for command-specific help.\n",
-		ctx.Model.Name+" <command> --help",
+		"\nFlags:\n  -h, --help           Show help\n  -V, --version        Print version information\n      --config <path>  Use a specific config.toml\n\nRun %s for command-specific help.\n",
+		view.command(ctx.Model.Name+" help <command>"),
 	)
 	_, err := io.WriteString(ctx.Stdout, help.String())
 	return err
+}
+
+func versionLine(info buildinfo.Info) string {
+	return fmt.Sprintf(
+		"owa %s (commit %s, built %s, %s)",
+		info.Version,
+		info.Commit,
+		info.BuildDate,
+		info.GoVersion,
+	)
+}
+
+func normalizeHelpArguments(arguments []string) []string {
+	if len(arguments) == 0 || arguments[0] != "help" {
+		return arguments
+	}
+	normalized := append([]string(nil), arguments[1:]...)
+	return append(normalized, "--help")
 }
 
 func outputIsTerminal(writer io.Writer) bool {

@@ -10,6 +10,7 @@ mailbox observations.
 
 | Boundary | Deterministic | Live | Status |
 | --- | --- | --- | --- |
+| CLI help/version/config/auth presentation | Unit/golden/NO_COLOR | Local terminal | Deterministic only |
 | Config, policy, audit | Unit/race | macOS arm64, Chrome | Observed |
 | Local session owner | Unix/Windows contracts | macOS arm64 | Observed |
 | Text-only SSH login relay | Unit/IPC/browser projection contracts | Linux amd64, Chrome, sign-in shell | Partial |

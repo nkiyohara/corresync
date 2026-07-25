@@ -13,7 +13,7 @@ where Graph application access is unavailable.
 [Feature matrix](docs/features.md) · [JSON contract](docs/json.md)
 
 > [!WARNING]
-> `owa-bridge` 0.5 is an early release over undocumented Outlook Web contracts.
+> `owa-bridge` 0.6 is an early release over undocumented Outlook Web contracts.
 > Use only an account you are authorized to access, review every write, and
 > keep Outlook available for reconciliation after an unknown outcome.
 
@@ -29,7 +29,8 @@ winget install --id nkiyohara.OWABridge --exact
 # First run on every platform
 owa config init
 owa config validate
-owa login
+owa auth login
+owa auth status
 owa doctor --online
 ```
 
@@ -44,6 +45,9 @@ installs verify signed provenance and update with a rollback copy, while
 package-managed installs print their exact owner-specific command. Use
 `owa update check` for read-only status; MCP, completion, pipes, and JSON output
 never receive an automatic notice or terminal styling.
+
+Run `owa --version` for the conventional one-line version, `owa version --json`
+for build metadata, and `owa help <command>` for command-specific help.
 
 ## Connect an AI agent
 

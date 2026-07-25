@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 10
+	ProtocolVersion   = 11
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -34,6 +34,7 @@ const (
 	MethodStatus               Method = "status"
 	MethodShutdown             Method = "shutdown"
 	MethodLogin                Method = "login"
+	MethodSessionStatus        Method = "session.status"
 	MethodTerminalLogin        Method = "login.terminal"
 	MethodMailFolders          Method = "mail.folders.list"
 	MethodMailList             Method = "mail.list"
@@ -175,6 +176,20 @@ type LoginResult struct {
 	CapturedAt    time.Time        `json:"capturedAt"`
 }
 
+// SessionStatus contains only local aliases and in-memory authentication
+// freshness. It never exposes account identities or authorization material.
+type SessionStatus struct {
+	Account       domain.AccountID `json:"account"`
+	State         string           `json:"state"`
+	Authenticated bool             `json:"authenticated"`
+	CapturedAt    *time.Time       `json:"capturedAt,omitempty"`
+}
+
+// SessionStatusResult reports every configured account in stable alias order.
+type SessionStatusResult struct {
+	Accounts []SessionStatus `json:"accounts"`
+}
+
 // TerminalLoginInput starts or advances one caller-bound text-only browser
 // interaction. A start request has only Account; subsequent requests include a
 // SessionID and one bounded action.
@@ -276,6 +291,7 @@ func (action TerminalLoginAction) validate() error {
 type Backend interface {
 	DefaultAccount() domain.AccountID
 	Login(context.Context, domain.AccountID, domain.Caller) (LoginResult, error)
+	SessionStatus(context.Context, domain.Caller) (SessionStatusResult, error)
 	ListMailFolders(context.Context, application.MailFolderListInput, domain.Caller) (application.MailFolderPage, error)
 	ListMail(context.Context, application.MailListInput, domain.Caller) (application.MailPage, error)
 	SearchMail(context.Context, application.MailSearchInput, domain.Caller) (application.MailPage, error)
@@ -310,7 +326,7 @@ type TerminalLoginBackend interface {
 
 func (method Method) valid() bool {
 	switch method {
-	case MethodStatus, MethodShutdown, MethodLogin, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailGetBody, MethodMailCommitBody,
+	case MethodStatus, MethodShutdown, MethodLogin, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailGetBody, MethodMailCommitBody,
 		MethodMailGetAttachment, MethodMailCommitAttachment,
 		MethodMailCreateDraft, MethodMailCommitDraft, MethodMailSend, MethodMailCommitSend,
 		MethodMailMove, MethodMailCommitMove,
