@@ -14,7 +14,7 @@ through an arbitrary protocol escape hatch.
 | List metadata | `owa mail list` | `mail_list` | `MailPage` | Observed |
 | Search metadata with AQS | `owa mail search` | `mail_search` | `MailPage` | Observed |
 | Read one plain-text body and attachment metadata | `owa mail body` | `mail_get_body` + commit when required | `MailBodyAccess` | Body observed; metadata contract-tested |
-| Retrieve one bounded file attachment | `owa mail attachment` | `mail_get_attachment` + commit when required | `MailAttachmentAccess` | Contract-tested; live unobserved |
+| Retrieve one bounded file attachment | `owa mail attachment` | `mail_get_attachment` + commit when required | `MailAttachmentAccess` | Observed |
 | Save a text/HTML new, reply, reply-all, or forward draft | `owa mail draft` | `mail_create_draft` + commit when required | `MailDraftAccess` | New text observed; extensions contract-tested |
 | Send a text/HTML new message, reply, reply-all, or forward | `owa mail send` + `--approve` | `mail_send` + `mail_send_commit` | `MailSendAccess` | New text self-send observed; extensions contract-tested |
 | Add bounded file attachments to a draft or send | `--attachment` | `attachments` | Attachment hashes in `MailReview` | Contract-tested; live unobserved |

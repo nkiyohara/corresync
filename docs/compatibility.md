@@ -19,7 +19,7 @@ mailbox observations.
 | Single-message read/unread | Preview/commit + JSON | Read and restore unread | Observed |
 | Draft and new send | Preview/commit contracts | Save-only and self-send | Observed |
 | Reply/forward/HTML/file attachments | Typed validation + OWA JSON contracts | Not run | Deterministic only |
-| Attachment metadata/content read | Bounded GetItem/GetAttachment contracts | Not run | Deterministic only |
+| Attachment metadata/content read | Bounded GetItem/GetAttachment contracts | Microsoft 365 work/school | Observed |
 | Message hard delete | Destructive preview/commit + JSON | Not run | Deterministic only |
 | Explicit shared/delegated mailbox routing | Config/header contracts | Not run | Deterministic only |
 | Calendar list | Two JSON shapes | Primary calendar | Observed |
@@ -38,9 +38,9 @@ mailbox observations.
 
 <!-- markdownlint-enable MD013 -->
 
-The live observations were made on 2026-07-18 and 2026-07-19 with synthetic
-content and no third-party recipient. They show one authorized environment
-working; they are not a universal tenant or protocol support claim.
+The live observations were made on 2026-07-18, 2026-07-19, and 2026-07-25 with
+synthetic content and no third-party recipient. They show one authorized
+environment working; they are not a universal tenant or protocol support claim.
 `SECURITY.md` remains the source of truth for supported release versions.
 
 On 2026-07-19, `owa login --terminal` launched headless Google Chrome on Linux
