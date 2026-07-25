@@ -145,7 +145,7 @@ Automatic human notices are never appended to JSON output.
 
 ```json
 {
-  "daemonVersion": "0.6.0",
+  "daemonVersion": "0.6.1",
   "processId": 4242,
   "accounts": [
     {

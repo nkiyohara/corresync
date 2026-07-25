@@ -45,7 +45,7 @@ a catalog yet, use the signed GitHub release directly.
 Use the release page in a browser or GitHub CLI. For example:
 
 ```console
-VERSION=v0.6.0
+VERSION=v0.6.1
 mkdir owa-release
 gh release download "$VERSION" \
   --repo nkiyohara/owa-bridge \

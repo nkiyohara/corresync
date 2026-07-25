@@ -3,6 +3,15 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.1 - 2026-07-25
+
+### Attachment compatibility
+
+- Use the current Outlook Web `GetAttachment` JSON contract so bounded file
+  attachment reads work against Microsoft 365 instead of returning HTTP 500.
+- Pin the exact request attachment type in deterministic coverage and record
+  the successful live metadata, body, and attachment-content observation.
+
 ## 0.6.0 - 2026-07-25
 
 ### Complete command-line lifecycle

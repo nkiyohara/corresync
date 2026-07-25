@@ -16,14 +16,9 @@ type getAttachmentEnvelope struct {
 }
 
 type getAttachmentRequest struct {
-	Type            string                  `json:"__type"`
-	AttachmentIDs   []itemID                `json:"AttachmentIds"`
-	AttachmentShape attachmentResponseShape `json:"AttachmentShape"`
-}
-
-type attachmentResponseShape struct {
-	Type               string `json:"__type"`
-	IncludeMimeContent bool   `json:"IncludeMimeContent"`
+	Type               string   `json:"__type"`
+	AttachmentIDs      []itemID `json:"AttachmentIds"`
+	IncludeMimeContent bool     `json:"IncludeMimeContent"`
 }
 
 type getAttachmentResponseBody struct {
@@ -99,11 +94,9 @@ func buildGetAttachmentEnvelope(input application.MailAttachmentInput) getAttach
 	return getAttachmentEnvelope{
 		Type: "GetAttachmentJsonRequest:#Exchange", Header: newRequestHeader(defaultZone),
 		Body: getAttachmentRequest{
-			Type:          "GetAttachmentRequest:#Exchange",
-			AttachmentIDs: []itemID{{Type: "AttachmentId:#Exchange", ID: input.AttachmentID}},
-			AttachmentShape: attachmentResponseShape{
-				Type: "AttachmentResponseShape:#Exchange", IncludeMimeContent: false,
-			},
+			Type:               "GetAttachmentRequest:#Exchange",
+			AttachmentIDs:      []itemID{{Type: "AttachmentIdType:#Exchange", ID: input.AttachmentID}},
+			IncludeMimeContent: false,
 		},
 	}
 }

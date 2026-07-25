@@ -1,10 +1,8 @@
 package owa
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -68,12 +66,14 @@ func TestGetMailAttachmentReturnsBoundedDecodedContent(t *testing.T) {
 		if request.URL.Query().Get("action") != "GetAttachment" {
 			t.Errorf("unexpected action %q", request.URL.Query().Get("action"))
 		}
-		body, err := io.ReadAll(request.Body)
-		if err != nil {
-			t.Errorf("read request: %v", err)
+		var payload getAttachmentEnvelope
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Errorf("decode request: %v", err)
 		}
-		if !bytes.Contains(body, []byte(`"Id":"attachment-1"`)) {
-			t.Errorf("request does not contain attachment ID: %s", body)
+		if len(payload.Body.AttachmentIDs) != 1 ||
+			payload.Body.AttachmentIDs[0].Type != "AttachmentIdType:#Exchange" ||
+			payload.Body.AttachmentIDs[0].ID != "attachment-1" {
+			t.Errorf("unexpected attachment IDs: %+v", payload.Body.AttachmentIDs)
 		}
 		_, _ = writer.Write([]byte(`{"Body":{"ResponseMessages":{"Items":[{
 			"ResponseClass":"Success","ResponseCode":"NoError","Attachments":[{
