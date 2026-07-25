@@ -1,6 +1,6 @@
 # Install and verify
 
-`owa-bridge` 0.5 is an early release over undocumented Outlook Web contracts.
+`owa-bridge` 0.6 is an early release over undocumented Outlook Web contracts.
 Use only an authorized account and review the
 [compatibility evidence](compatibility.md) before enabling writes.
 
@@ -45,7 +45,7 @@ a catalog yet, use the signed GitHub release directly.
 Use the release page in a browser or GitHub CLI. For example:
 
 ```console
-VERSION=v0.5.0
+VERSION=v0.6.0
 mkdir owa-release
 gh release download "$VERSION" \
   --repo nkiyohara/owa-bridge \
@@ -56,7 +56,8 @@ cd owa-release
 Choose the archive matching `darwin`, `linux`, or `windows` and `amd64` or
 `arm64`. Extract it, place `owa` or `owa.exe` on `PATH`, and run
 `owa version --json` to record the version, source commit, build time, Go
-version, operating system, and architecture.
+version, operating system, and architecture. Use `owa --version` for a
+conventional one-line check.
 
 On Linux, download the matching native package when preferred:
 
@@ -113,17 +114,20 @@ owa doctor
 ```
 
 Edit only the configured account alias and final HTTPS Outlook origin used
-after sign-in. `owa login` opens a dedicated browser profile. Sign-in, MFA, and
-Conditional Access remain inside that browser; the CLI does not accept a
-password or persist an authorization header.
+after sign-in. `owa config edit` validates changes before replacing the file;
+typed automation can use `owa config get` and `owa config set`. `owa auth
+login` opens a dedicated browser profile. Sign-in, MFA, and Conditional Access
+remain inside that browser; the CLI does not accept a password or persist an
+authorization header.
 
 ```console
-owa login
+owa auth login
+owa auth status
 owa doctor --online
 ```
 
 For an interactive SSH session without a display server, the experimental
-`owa login --terminal` command can relay ordinary text-based browser controls
+`owa auth login --terminal` command can relay ordinary text-based browser controls
 through the TTY. CAPTCHA, passkeys, security keys, client certificates, and
 native dialogs may still require visible login.
 

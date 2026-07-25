@@ -12,7 +12,7 @@ Initialize and sign in once:
 ```console
 owa config init
 owa config validate
-owa login
+owa auth login
 ```
 
 Register the client you use:
@@ -354,7 +354,7 @@ If an agent does not see the tools:
 6. If the tools exist but natural requests still miss them, install the Agent
    Skill and restart the session.
 
-For an interactive SSH session without a display server, `owa login --terminal`
-can relay ordinary text-based browser controls through the TTY. CAPTCHA,
-passkeys, security keys, client certificates, and native dialogs may still
-require a visible login.
+For an interactive SSH session without a display server,
+`owa auth login --terminal` can relay ordinary text-based browser controls
+through the TTY. CAPTCHA, passkeys, security keys, client certificates, and
+native dialogs may still require a visible login.

@@ -42,6 +42,23 @@ Unknown fields, non-HTTPS origins, URL credentials, unsupported policy modes,
 and out-of-range limits are errors. There is deliberately no unguarded-write
 mode.
 
+Use `owa config show` for a concise validated summary or `--json` for the full
+secret-free model. The following keys are available to `config get` and
+`config set`:
+
+- `default_account`;
+- `accounts.<alias>.origin` and `accounts.<alias>.mailbox`;
+- `policy.mode`, `policy.preview_sensitive_reads`,
+  `policy.preview_reversible_writes`, `policy.max_recipients`, and
+  `policy.max_attendees`;
+- `browser.executable` and `browser.login_timeout`;
+- `updates.disable_automatic_checks`.
+
+`version` can be read but not changed. Values are parsed as their declared
+boolean, integer, duration, or string type and the complete configuration is
+validated before an atomic save. `config set` writes normalized TOML; use
+`config edit` when comments or manual ordering should be retained.
+
 `origin` is an exact authorization boundary, not a discovery hint or wildcard.
 If a normal browser ends on a different Outlook host after sign-in, configure
 that final HTTPS origin with no path. Do not add the identity-provider origin,

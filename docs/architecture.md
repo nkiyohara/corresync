@@ -92,7 +92,7 @@ local release-management path.
 
 ## Session lifecycle
 
-1. `owa login` launches a dedicated browser profile visibly by default;
+1. `owa auth login` launches a dedicated browser profile visibly by default;
    `--terminal` explicitly selects a bounded text relay for an SSH TTY.
 2. The user completes the normal interactive sign-in flow in the browser or by
    relaying controls and individual keys to its headless page.
@@ -104,6 +104,9 @@ local release-management path.
    The terminal relay never receives a complete form value.
 6. Expiry causes an explicit transition back to `needs_login`; it never falls
    back to credential automation.
+7. `owa auth status` exposes only account aliases and content-free lifecycle
+   state. `owa auth logout` shuts down the config-scoped owner, closes all
+   browsers, and discards in-memory sessions and approvals.
 
 ## OWA transport
 

@@ -14,7 +14,7 @@ machine would also widen the trust boundary.
 ## Decision
 
 Keep visible browser login as the default and add an explicit experimental
-`owa login --terminal` mode. The session-owning daemon launches the same
+`owa auth login --terminal` mode. The session-owning daemon launches the same
 isolated Chromium profile headlessly and projects a bounded, sanitized view of
 visible page text and interactive controls over authenticated local IPC.
 

@@ -4,6 +4,7 @@ owa \- local-first Outlook Web mail and calendar CLI and MCP server
 .SH SYNOPSIS
 .B owa
 .RI [ --config " path" ]
+.RI [ --version ]
 .I command
 .RI [ options ]
 .SH DESCRIPTION
@@ -19,13 +20,15 @@ separate commit.
 .SH COMMANDS
 .TP
 .B config
-Create, locate, and strictly validate the secret-free configuration.
+Create, locate, show, read, update, edit, and strictly validate the secret-free
+configuration.
 .TP
 .B doctor
 Diagnose local prerequisites and optionally probe OWA compatibility.
 .TP
-.B login
-Open the interactive Outlook Web sign-in in the dedicated browser profile.
+.B auth
+Open interactive Outlook Web sign-in, inspect content-free session state, or
+close browsers and clear every in-memory session.
 .TP
 .B mail
 Discover folders; list, search, and read messages; create drafts; send reviewed
@@ -58,8 +61,12 @@ Print build and version information.
 .SH EXAMPLES
 .PP
 .nf
+owa --version
+owa help auth
 owa config init
-owa login
+owa config set accounts.work.origin https://outlook.cloud.microsoft
+owa auth login
+owa auth status
 owa mail list --limit 25
 owa calendar list --start 2026-07-17T00:00:00Z \
   --end 2026-07-18T00:00:00Z
@@ -80,6 +87,32 @@ owa mcp setup qoder
 owa update
 owa update check
 .fi
+.SH EXIT STATUS
+.TP
+.B 0
+The command completed successfully.
+.TP
+.B 1
+An operation or diagnostic failed.
+.TP
+.B 2
+The command line was invalid.
+.SH ENVIRONMENT
+.TP
+.B NO_COLOR
+Disable terminal color and styling when set to any value.
+.TP
+.B TERM=dumb
+Disable terminal color and styling.
+.TP
+.B VISUAL
+Editor command used by
+.BR "owa config edit" .
+.TP
+.B EDITOR
+Fallback editor command used when
+.B VISUAL
+is unset.
 .SH SECURITY
 Mail and calendar content is untrusted private input. Review exact previews
 before committing a write. Approval tokens are short-lived secret capabilities
@@ -110,6 +143,8 @@ must not contain passwords, cookies, bearer tokens, or canary values.
 .SH SEE ALSO
 .BR owa (1)
 command-specific help is available from
-.BR "owa command --help" .
+.BR "owa command --help"
+or
+.BR "owa help command" .
 Project documentation and the security policy are distributed with release
 archives and native packages.

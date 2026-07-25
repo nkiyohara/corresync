@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-17
-- Amended: 2026-07-24
+- Amended: 2026-07-25
 
 ## Context
 
@@ -51,6 +51,10 @@ method.
 Protocol version 8 adds the optional caller-bound `login.terminal` state
 machine. Its path-free page projection and one-key actions remain on the same
 owner-only authenticated IPC and never expose authorization material.
+Protocol version 10 adds bounded attachment reads, reviewed permanent deletion,
+and the expanded typed mail and calendar surface. Protocol version 11 adds
+content-free `session.status`; it exposes only configured aliases, lifecycle
+state, and an optional capture time.
 
 Keep `status` and `shutdown` as the only stable lifecycle controls across
 protocol versions. After an authenticated daemon proves that a request was

@@ -43,13 +43,14 @@ response bodies, and unrelated headers are not copied by the observer.
 
 ## Text-only SSH login
 
-`owa login --terminal` is an experimental fallback for an interactive SSH TTY
-without a display server. The daemon launches the dedicated Chromium profile
-headlessly. The CLI displays a bounded list of visible page controls and sends
-one activation or key event at a time over owner-only authenticated IPC.
+`owa auth login --terminal` is an experimental fallback for an interactive SSH
+TTY without a display server. The daemon launches the dedicated Chromium
+profile headlessly. The CLI displays a bounded list of visible page controls
+and sends one activation or key event at a time over owner-only authenticated
+IPC.
 
 ```console
-owa login --terminal
+owa auth login --terminal
 ```
 
 Piped input and `--json` are rejected. Password fields are identified only so
@@ -63,6 +64,15 @@ passkeys, security keys, client certificates, native browser dialogs, and some
 custom controls may not have a safe text representation. Use visible login for
 those cases. The relay does not make an incompatible server or browser satisfy
 device-compliance Conditional Access policy.
+
+## Inspect and clear sessions
+
+`owa auth status` returns content-free state for each configured account. It
+never returns a mailbox identity, cookie, token, captured header, browser page,
+or Outlook payload. `owa auth logout` closes the config-scoped daemon and all
+of its dedicated browsers, which discards captured authorization and pending
+approvals from memory. Chromium's protected profile remains for a later
+interactive login.
 
 ## Origin policy
 
