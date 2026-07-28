@@ -195,7 +195,7 @@ type AccountRepository interface {
 	ListAccounts(context.Context) (AccountCatalog, error)
 	AddAccount(context.Context, AccountRegistration) error
 	RenameAccount(context.Context, domain.AccountID, string) error
-	RemoveAccount(context.Context, domain.AccountID, string) error
+	RemoveAccount(context.Context, domain.AccountID, domain.AccountID) error
 }
 
 // AccountStatePurger removes Corresync-owned per-account state. It never reads
@@ -435,14 +435,18 @@ func (service *AccountService) Remove(
 	ctx context.Context,
 	input AccountRemoveInput,
 ) (AccountView, error) {
-	account, replacement, _, err := service.reviewRemove(ctx, input)
+	account, _, replacementAccount, err := service.reviewRemove(ctx, input)
 	if err != nil {
 		return AccountView{}, err
 	}
 	if err := service.purger.PurgeAccountState(ctx, account.ID); err != nil {
 		return AccountView{}, fmt.Errorf("purge account state: %w", err)
 	}
-	if err := service.repository.RemoveAccount(ctx, account.ID, replacement); err != nil {
+	if err := service.repository.RemoveAccount(
+		ctx,
+		account.ID,
+		replacementAccount,
+	); err != nil {
 		return AccountView{}, fmt.Errorf("remove account: %w", err)
 	}
 	return account, nil
@@ -518,7 +522,6 @@ func (service *AccountService) reviewRemove(
 				"replacement default must be a different account",
 			)
 		}
-		replacement = replacementAccount.Alias
 		replacementAccountID = replacementAccount.ID
 	} else if replacement != "" {
 		return AccountView{}, "", "", errors.New(

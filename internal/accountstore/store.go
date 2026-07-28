@@ -456,7 +456,7 @@ func (store Store) RenameAccount(
 func (store Store) RemoveAccount(
 	ctx context.Context,
 	accountID domain.AccountID,
-	replacementDefault string,
+	replacementDefault domain.AccountID,
 ) error {
 	return config.Update(ctx, store.ConfigPath, func(configuration *config.Config) error {
 		alias, _, exists := configuration.AccountByID(accountID)
@@ -467,16 +467,17 @@ func (store Store) RemoveAccount(
 			return errors.New("cannot remove the only configured account")
 		}
 		if alias == configuration.DefaultAccount {
-			if replacementDefault == "" || replacementDefault == alias {
+			if replacementDefault == "" || replacementDefault == accountID {
 				return errors.New("removing the default account requires a different replacement")
 			}
-			if _, exists := configuration.Accounts[replacementDefault]; !exists {
+			replacementAlias, _, exists := configuration.AccountByID(replacementDefault)
+			if !exists {
 				return fmt.Errorf(
-					"replacement default account %q is not configured",
+					"replacement default account ID %q is not configured",
 					replacementDefault,
 				)
 			}
-			configuration.DefaultAccount = replacementDefault
+			configuration.DefaultAccount = replacementAlias
 		} else if replacementDefault != "" {
 			return errors.New("replacement default is valid only for the default account")
 		}

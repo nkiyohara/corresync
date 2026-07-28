@@ -14,7 +14,7 @@ type accountRepositoryStub struct {
 	renamedID   domain.AccountID
 	renamed     string
 	removedID   domain.AccountID
-	replacement string
+	replacement domain.AccountID
 	err         error
 }
 
@@ -42,7 +42,7 @@ func (stub *accountRepositoryStub) RenameAccount(
 func (stub *accountRepositoryStub) RemoveAccount(
 	_ context.Context,
 	account domain.AccountID,
-	replacement string,
+	replacement domain.AccountID,
 ) error {
 	stub.removedID, stub.replacement = account, replacement
 	return stub.err
@@ -143,7 +143,7 @@ func TestAccountServiceLifecyclePreservesStableIdentity(t *testing.T) {
 		t.Fatalf("Remove() error = %v", err)
 	}
 	if removed.ID != work.ID || purger.account != work.ID ||
-		repository.removedID != work.ID || repository.replacement != personal.Alias {
+		repository.removedID != work.ID || repository.replacement != personal.ID {
 		t.Fatalf("removed = %#v, repository = %#v, purge = %#v", removed, repository, purger)
 	}
 }

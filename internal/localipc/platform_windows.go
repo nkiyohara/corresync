@@ -30,7 +30,7 @@ func Listen(endpoint Endpoint) (*Listener, error) {
 		return nil, fmt.Errorf("resolve current Windows user: %w", err)
 	}
 	sid := user.User.Sid.String()
-	descriptor := "D:P(A;;GA;;;SY)(A;;GA;;;" + sid + ")"
+	descriptor := "O:" + sid + "D:P(A;;GA;;;SY)(A;;GA;;;" + sid + ")"
 	base, err := winio.ListenPipe(endpoint.Address, &winio.PipeConfig{
 		SecurityDescriptor: descriptor,
 		MessageMode:        false,
@@ -250,7 +250,8 @@ func protectCredentialPath(path string) error {
 	}
 	return windows.SetNamedSecurityInfo(
 		path, windows.SE_FILE_OBJECT,
-		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
-		nil, nil, acl, nil,
+		windows.OWNER_SECURITY_INFORMATION|windows.DACL_SECURITY_INFORMATION|
+			windows.PROTECTED_DACL_SECURITY_INFORMATION,
+		user.User.Sid, nil, acl, nil,
 	)
 }

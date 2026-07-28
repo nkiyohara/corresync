@@ -62,6 +62,52 @@ func TestStoreLifecyclePreservesStableID(t *testing.T) {
 	}
 }
 
+func TestRemoveAccountPinsReplacementDefaultByStableID(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.Default()
+	replacement := configuration.Accounts["work"]
+	replacement.ID = "acc_00000000000000000000000000000002"
+	other := replacement
+	other.ID = "acc_00000000000000000000000000000003"
+	configuration.Accounts["replacement"] = replacement
+	configuration.Accounts["other"] = other
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	store := Store{ConfigPath: path}
+	if err := store.RenameAccount(
+		t.Context(),
+		replacement.ID,
+		"replacement-renamed",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RenameAccount(t.Context(), other.ID, "replacement"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RemoveAccount(
+		t.Context(),
+		configuration.Accounts["work"].ID,
+		replacement.ID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.DefaultAccount != "replacement-renamed" ||
+		updated.Accounts[updated.DefaultAccount].ID != replacement.ID {
+		t.Fatalf(
+			"default = %q/%q, want replacement-renamed/%q",
+			updated.DefaultAccount,
+			updated.Accounts[updated.DefaultAccount].ID,
+			replacement.ID,
+		)
+	}
+}
+
 func TestPurgeAccountStateRemovesOnlyDerivedRoots(t *testing.T) {
 	state := filepath.Join(t.TempDir(), "state")
 	t.Setenv("CORRESYNC_STATE_DIR", state)
@@ -181,7 +227,7 @@ func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	configuration := config.Default()
 	configuration.Credentials.Helper = []string{
-		"private-helper-command",
+		filepath.Join(t.TempDir(), "private-helper-command"),
 		"--private-profile",
 	}
 	configuration.Accounts["work"] = config.Account{
