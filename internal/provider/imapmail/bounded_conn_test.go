@@ -76,6 +76,89 @@ func TestBoundedIMAPConnRejectsAggregateLiteralBudget(t *testing.T) {
 	}
 }
 
+func TestBoundedIMAPConnRejectsStatusTextDesynchronization(t *testing.T) {
+	t.Parallel()
+	server, client := net.Pipe()
+	t.Cleanup(func() {
+		_ = server.Close()
+		_ = client.Close()
+	})
+	bounded, err := newBoundedIMAPConn(client, 8, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		inner := "* 1 FETCH (BODY[] {9}\r\n"
+		payload := inner + strings.Repeat("x", 40-len(inner))
+		_, _ = io.WriteString(server, "* OK x {40}\r\n"+payload)
+		_ = server.Close()
+	}()
+	_, err = io.ReadAll(bounded)
+	if err == nil || !strings.Contains(err.Error(), "exceeding") {
+		t.Fatalf("ReadAll() error = %v, want hidden literal limit", err)
+	}
+}
+
+func TestIMAPLiteralClassificationMatchesResponseGrammar(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		line    string
+		prefix  string
+		allowed bool
+		wantErr bool
+	}{
+		{line: "* OK text {4}\r\n"},
+		{line: "A1 NO text {4}\r\n"},
+		{line: "+ continue {4}\r\n"},
+		{line: "* 1 FETCH (BODY[] {4}\r\n", allowed: true},
+		{
+			line:    " BODY[2] {4}\r\n",
+			prefix:  "* 1 FETCH (BODY[1] {0}\r\n",
+			allowed: true,
+		},
+		{line: "* OK [SYNTHETIC {4}\r\n", allowed: true},
+		{line: "* 1 FETCH atom{4}\r\n", wantErr: true},
+		{line: "* 1 FETCH (\"open quote {4}\r\n", wantErr: true},
+	} {
+		allowed, _, err := imapLiteralAllowed(
+			[]byte(test.line),
+			[]byte(test.prefix),
+		)
+		if (err != nil) != test.wantErr || allowed != test.allowed {
+			t.Fatalf(
+				"imapLiteralAllowed(%q, %q) = %t, %v",
+				test.line,
+				test.prefix,
+				allowed,
+				err,
+			)
+		}
+	}
+}
+
+func TestBoundedIMAPConnTracksMultipleParserLiterals(t *testing.T) {
+	t.Parallel()
+	server, client := net.Pipe()
+	t.Cleanup(func() {
+		_ = server.Close()
+		_ = client.Close()
+	})
+	bounded, err := newBoundedIMAPConn(client, 8, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		_, _ = io.WriteString(
+			server,
+			"* 1 FETCH (BODY[1] {3}\r\nabc BODY[2] {9}\r\n",
+		)
+	}()
+	_, err = io.ReadAll(bounded)
+	if err == nil || !strings.Contains(err.Error(), "exceeding") {
+		t.Fatalf("ReadAll() error = %v, want second literal limit", err)
+	}
+}
+
 func TestBoundedIMAPConnDoesNotParseMarkersInsideLiteralData(t *testing.T) {
 	t.Parallel()
 	server, client := net.Pipe()

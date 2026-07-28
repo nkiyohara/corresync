@@ -10,14 +10,17 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/emersion/go-imap"
 	imapclient "github.com/emersion/go-imap/client"
 )
 
 const (
 	maximumIMAPControlLineBytes = 64 << 10
+	maximumIMAPResponseControl  = 1 << 20
 	maximumIMAPOperationBytes   = 32 << 20
 	maximumIMAPUpgradeLines     = 100
 	imapStartTLSTag             = "C0"
@@ -165,6 +168,7 @@ type boundedIMAPConn struct {
 	errorReturned    bool
 	maximumTotal     uint64
 	literalTotal     uint64
+	literalProbe     []byte
 }
 
 func newBoundedIMAPConn(
@@ -242,6 +246,16 @@ func (connection *boundedIMAPConn) inspect(input []byte) error {
 		if err != nil {
 			return err
 		}
+		var nextProbe []byte
+		if literal {
+			literal, nextProbe, err = imapLiteralAllowed(
+				connection.controlLine,
+				connection.literalProbe,
+			)
+			if err != nil {
+				return err
+			}
+		}
 		if literal && size > connection.maximumLiteral {
 			return fmt.Errorf(
 				"IMAP literal declares %d bytes, exceeding the %d-byte limit",
@@ -266,9 +280,73 @@ func (connection *boundedIMAPConn) inspect(input []byte) error {
 		if literal {
 			connection.literalTotal += size
 			connection.literalRemaining = size
+			connection.literalProbe = nextProbe
+		} else {
+			connection.literalProbe = nil
 		}
 	}
 	return nil
+}
+
+func imapLiteralAllowed(line, prefix []byte) (bool, []byte, error) {
+	limitedLine, err := replaceIMAPLiteralSize(line, "2")
+	if err != nil {
+		return false, nil, err
+	}
+	probe := make([]byte, 0, len(prefix)+len(limitedLine))
+	probe = append(probe, prefix...)
+	probe = append(probe, limitedLine...)
+	reader := imap.NewReader(bufio.NewReader(bytes.NewReader(probe)))
+	reader.MaxLiteralSize = 1
+	_, parseErr := imap.ReadResp(reader)
+	if parseErr == nil {
+		// Status and continuation response text is opaque to go-imap. A
+		// trailing {N} there is text, so the following bytes remain visible
+		// to this filter as a new response.
+		return false, nil, nil
+	}
+	if !strings.Contains(parseErr.Error(), "literal exceeding maximum size") {
+		return false, nil, fmt.Errorf(
+			"IMAP literal declaration disagrees with response grammar: %w",
+			parseErr,
+		)
+	}
+	zeroLine, err := replaceIMAPLiteralSize(line, "0")
+	if err != nil {
+		return false, nil, err
+	}
+	if len(prefix)+len(zeroLine) > maximumIMAPResponseControl {
+		return false, nil, errors.New(
+			"IMAP response control data exceeds its aggregate size bound",
+		)
+	}
+	next := make([]byte, 0, len(prefix)+len(zeroLine))
+	next = append(next, prefix...)
+	next = append(next, zeroLine...)
+	return true, next, nil
+}
+
+func replaceIMAPLiteralSize(line []byte, replacement string) ([]byte, error) {
+	end := len(line)
+	if end == 0 || line[end-1] != '\n' {
+		return nil, errors.New("IMAP literal declaration has no line terminator")
+	}
+	end--
+	if end > 0 && line[end-1] == '\r' {
+		end--
+	}
+	if end == 0 || line[end-1] != '}' {
+		return nil, errors.New("IMAP literal declaration has no closing brace")
+	}
+	open := bytes.LastIndexByte(line[:end], '{')
+	if open < 0 {
+		return nil, errors.New("IMAP literal declaration has no opening brace")
+	}
+	replaced := make([]byte, 0, open+len(replacement)+len(line)-end+1)
+	replaced = append(replaced, line[:open+1]...)
+	replaced = append(replaced, replacement...)
+	replaced = append(replaced, line[end-1:]...)
+	return replaced, nil
 }
 
 func imapLiteralSize(line []byte) (uint64, bool, error) {
