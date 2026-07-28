@@ -94,6 +94,9 @@ func TestAccountAddCreatesDistinctStableIsolationKeysWithoutAuthentication(t *te
 	if first.ID == second.ID || first.ID.ValidateOpaque() != nil || second.ID.ValidateOpaque() != nil {
 		t.Fatalf("account IDs are not distinct opaque values: %q %q", first.ID, second.ID)
 	}
+	if first.Monitor != nil || second.Monitor != nil {
+		t.Fatal("account add unexpectedly enabled monitoring")
+	}
 	firstProfile, err := paths.ProfileDir(first.ID)
 	if err != nil {
 		t.Fatal(err)

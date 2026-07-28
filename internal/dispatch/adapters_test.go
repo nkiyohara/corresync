@@ -1,0 +1,145 @@
+package dispatch
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"slices"
+	"testing"
+
+	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/config"
+	"github.com/nkiyohara/corresync/internal/domain"
+)
+
+const dispatchTestAccount domain.AccountID = "acc_00000000000000000000000000000001"
+
+func TestRunnerPassesBoundedReadOnlyJSONWithoutShell(t *testing.T) {
+	t.Parallel()
+	configured := config.NewRunner(
+		"/synthetic/runner",
+		[]string{"--literal", "$(not-a-shell)"},
+		[]string{"account", "event_id", "subject", "trust"},
+		"remote",
+		true,
+	)
+	var gotCommand string
+	var gotArguments []string
+	var gotRequest application.MonitorRunnerRequest
+	runner, err := NewRunner(func(account domain.AccountID) (config.Runner, error) {
+		if account != dispatchTestAccount {
+			t.Fatalf("lookup account = %q", account)
+		}
+		return configured, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner.run = func(
+		_ context.Context,
+		stdin []byte,
+		command string,
+		arguments ...string,
+	) error {
+		gotCommand = command
+		gotArguments = append([]string(nil), arguments...)
+		return json.Unmarshal(stdin, &gotRequest)
+	}
+	request := application.MonitorRunnerRequest{
+		SchemaVersion: 1, Account: dispatchTestAccount,
+		Trust:          application.MonitorTrustMarker,
+		AllowedEffects: []string{"read"},
+		Destination:    configured.Command, Egress: configured.Egress,
+		Fields: append([]string(nil), configured.Fields...),
+		Events: []map[string]any{{
+			"account":  dispatchTestAccount,
+			"event_id": "evt_synthetic",
+			"subject":  "Untrusted subject",
+			"trust":    application.MonitorTrustMarker,
+		}},
+	}
+	if err := runner.Run(t.Context(), request); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if gotCommand != configured.Command ||
+		!slices.Equal(gotArguments, configured.Arguments) {
+		t.Fatalf("command = %q %+v", gotCommand, gotArguments)
+	}
+	if len(gotRequest.AllowedEffects) != 1 ||
+		gotRequest.AllowedEffects[0] != "read" ||
+		gotRequest.Trust != application.MonitorTrustMarker {
+		t.Fatalf("runner request broadened policy: %+v", gotRequest)
+	}
+}
+
+func TestRunnerRejectsFieldsBroaderThanConfiguration(t *testing.T) {
+	t.Parallel()
+	configured := config.NewRunner(
+		"/synthetic/runner",
+		nil,
+		[]string{"event_id", "trust"},
+		"local",
+		false,
+	)
+	runner, err := NewRunner(func(domain.AccountID) (config.Runner, error) {
+		return configured, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner.run = func(context.Context, []byte, string, ...string) error {
+		t.Fatal("runner executed after disclosure mismatch")
+		return nil
+	}
+	err = runner.Run(t.Context(), application.MonitorRunnerRequest{
+		SchemaVersion: 1, Account: dispatchTestAccount,
+		Trust:          application.MonitorTrustMarker,
+		AllowedEffects: []string{"read"},
+		Destination:    configured.Command, Egress: configured.Egress,
+		Fields: []string{"event_id", "subject", "trust"},
+	})
+	if err == nil {
+		t.Fatal("Run() accepted broader fields")
+	}
+}
+
+func TestDesktopNotifierReleasesOnlyRenderedMetadata(t *testing.T) {
+	t.Parallel()
+	notifier := &DesktopNotifier{
+		goos: "linux",
+		lookPath: func(name string) (string, error) {
+			if name != "notify-send" {
+				return "", errors.New("unexpected utility")
+			}
+			return "/usr/bin/notify-send", nil
+		},
+	}
+	var arguments []string
+	notifier.run = func(
+		_ context.Context,
+		stdin []byte,
+		command string,
+		values ...string,
+	) error {
+		if len(stdin) != 0 || command != "/usr/bin/notify-send" {
+			t.Fatalf("notification command = %q stdin=%q", command, stdin)
+		}
+		arguments = append([]string(nil), values...)
+		return nil
+	}
+	err := notifier.Notify(t.Context(), application.MonitorRelease{
+		Destination: "desktop",
+		Fields:      []string{"sender", "subject", "trust"},
+		Event: map[string]any{
+			"sender":  application.MailAddress{Address: "sender@example.invalid"},
+			"subject": "Synthetic subject",
+			"trust":   application.MonitorTrustMarker,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Notify() error = %v", err)
+	}
+	if !slices.Contains(arguments, "sender@example.invalid — Synthetic subject") {
+		t.Fatalf("notification arguments = %+v", arguments)
+	}
+}

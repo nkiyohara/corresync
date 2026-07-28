@@ -12,14 +12,19 @@ import (
 
 type fakeMailReader struct {
 	page       MailPage
+	pages      []MailPage
 	folderPage MailFolderPage
 	err        error
 	calls      int
 }
 
 func (reader *fakeMailReader) ListMessages(context.Context, MailListInput) (MailPage, error) {
+	page := reader.page
+	if reader.calls < len(reader.pages) {
+		page = reader.pages[reader.calls]
+	}
 	reader.calls++
-	return reader.page, reader.err
+	return page, reader.err
 }
 
 func (reader *fakeMailReader) SearchMessages(context.Context, MailSearchInput) (MailPage, error) {

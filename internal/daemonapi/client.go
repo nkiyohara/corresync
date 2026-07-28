@@ -88,6 +88,81 @@ func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (
 	return result, nil
 }
 
+// MonitorStatus reads one account's consent and local queue health.
+func (client *Client) MonitorStatus(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (application.MonitorStatus, error) {
+	if err := account.ValidateOpaque(); err != nil {
+		return application.MonitorStatus{}, err
+	}
+	var result application.MonitorStatus
+	if err := client.call(
+		ctx,
+		MethodMonitorStatus,
+		caller,
+		MonitorStatusInput{Account: account},
+		&result,
+	); err != nil {
+		return application.MonitorStatus{}, err
+	}
+	if err := result.Validate(account); err != nil {
+		return application.MonitorStatus{}, fmt.Errorf(
+			"daemon returned invalid monitor status: %w",
+			err,
+		)
+	}
+	return result, nil
+}
+
+// ListMonitorEvents returns one bounded account-local queue page.
+func (client *Client) ListMonitorEvents(
+	ctx context.Context,
+	input application.MonitorEventListInput,
+	caller domain.Caller,
+) (application.MonitorEventPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MonitorEventPage{}, err
+	}
+	var result application.MonitorEventPage
+	if err := client.call(ctx, MethodEventsList, caller, input, &result); err != nil {
+		return application.MonitorEventPage{}, err
+	}
+	if err := result.Validate(input); err != nil {
+		return application.MonitorEventPage{}, fmt.Errorf(
+			"daemon returned invalid monitor event page: %w",
+			err,
+		)
+	}
+	return result, nil
+}
+
+// AcknowledgeMonitorEvent changes only one account-local queue item.
+func (client *Client) AcknowledgeMonitorEvent(
+	ctx context.Context,
+	input application.MonitorAcknowledgeInput,
+	caller domain.Caller,
+) (application.MonitorEvent, error) {
+	if err := input.Validate(); err != nil {
+		return application.MonitorEvent{}, err
+	}
+	var result application.MonitorEvent
+	if err := client.call(ctx, MethodEventAcknowledge, caller, input, &result); err != nil {
+		return application.MonitorEvent{}, err
+	}
+	if result.ID != input.EventID || result.State != "acknowledged" {
+		return application.MonitorEvent{}, errors.New("daemon returned invalid acknowledgement")
+	}
+	if err := result.Validate(input.Account); err != nil {
+		return application.MonitorEvent{}, fmt.Errorf(
+			"daemon returned invalid acknowledgement: %w",
+			err,
+		)
+	}
+	return result, nil
+}
+
 func validateSessionStatusResult(result SessionStatusResult) error {
 	seen := make(map[domain.AccountID]struct{}, len(result.Accounts))
 	for index, account := range result.Accounts {

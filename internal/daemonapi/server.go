@@ -188,6 +188,45 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.SessionStatus(ctx, request.Caller)
+	case MethodMonitorStatus:
+		var input MonitorStatusInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Account.ValidateOpaque(); err != nil {
+			return nil, err
+		}
+		backend, supported := server.backend.(MonitoringBackend)
+		if !supported {
+			return nil, errors.New("monitoring is not supported by this session owner")
+		}
+		return backend.MonitorStatus(ctx, input.Account, request.Caller)
+	case MethodEventsList:
+		var input application.MonitorEventListInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, supported := server.backend.(MonitoringBackend)
+		if !supported {
+			return nil, errors.New("monitoring is not supported by this session owner")
+		}
+		return backend.ListMonitorEvents(ctx, input, request.Caller)
+	case MethodEventAcknowledge:
+		var input application.MonitorAcknowledgeInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, supported := server.backend.(MonitoringBackend)
+		if !supported {
+			return nil, errors.New("monitoring is not supported by this session owner")
+		}
+		return backend.AcknowledgeMonitorEvent(ctx, input, request.Caller)
 	case MethodTerminalLogin:
 		var input TerminalLoginInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {

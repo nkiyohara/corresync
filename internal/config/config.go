@@ -39,6 +39,56 @@ type Account struct {
 	Address  string           `json:"address,omitempty" toml:"address,omitempty"`
 	Mail     *MailRoute       `json:"mail,omitempty" toml:"mail,omitempty"`
 	Calendar *CalendarRoute   `json:"calendar,omitempty" toml:"calendar,omitempty"`
+	Monitor  *Monitor         `json:"monitor,omitempty" toml:"monitor,omitempty"`
+}
+
+// Monitor is an explicit, account-local consent record. A nil value is always
+// equivalent to off, including for every older configuration and import.
+type Monitor struct {
+	Mode          domain.MonitorMode `json:"mode" toml:"mode"`
+	PollInterval  Duration           `json:"pollInterval" toml:"poll_interval"`
+	Debounce      Duration           `json:"debounce" toml:"debounce"`
+	Retention     Duration           `json:"retention" toml:"retention"`
+	RateLimitHour int                `json:"rateLimitHour" toml:"rate_limit_hour"`
+	QuietHours    *QuietHours        `json:"quietHours,omitempty" toml:"quiet_hours,omitempty"`
+	Filter        MonitorFilter      `json:"filter" toml:"filter"`
+	Notification  *Notification      `json:"notification,omitempty" toml:"notification,omitempty"`
+	Runner        *Runner            `json:"runner,omitempty" toml:"runner,omitempty"`
+}
+
+// MonitorFilter is deliberately metadata-only. It can never inspect a body or
+// attachment and matching cannot grant broader execution policy.
+type MonitorFilter struct {
+	SenderDomains   []string `json:"senderDomains,omitempty" toml:"sender_domains,omitempty"`
+	SubjectContains []string `json:"subjectContains,omitempty" toml:"subject_contains,omitempty"`
+	ImportantOnly   bool     `json:"importantOnly,omitempty" toml:"important_only,omitempty"`
+}
+
+// QuietHours suppresses notification and dispatch in one IANA time zone. Queue
+// collection may continue so restart recovery does not lose an event.
+type QuietHours struct {
+	Start    string `json:"start" toml:"start"`
+	End      string `json:"end" toml:"end"`
+	TimeZone string `json:"timeZone" toml:"time_zone"`
+}
+
+// Notification identifies a local-only adapter and the bounded metadata fields
+// it may display.
+type Notification struct {
+	Adapter string   `json:"adapter" toml:"adapter"`
+	Fields  []string `json:"fields" toml:"fields"`
+}
+
+// Runner is an explicitly selected local process. Egress is a human
+// declaration shown by status and audit; remote declarations require a second
+// affirmative field so a mode change cannot silently authorize disclosure.
+type Runner struct {
+	Command       string   `json:"command" toml:"command"`
+	Arguments     []string `json:"arguments,omitempty" toml:"arguments,omitempty"`
+	Egress        string   `json:"egress" toml:"egress"`
+	ApproveRemote bool     `json:"approveRemote,omitempty" toml:"approve_remote,omitempty"`
+	Fields        []string `json:"fields" toml:"fields"`
+	Timeout       Duration `json:"timeout" toml:"timeout"`
 }
 
 // Policy maps persisted settings into the deterministic policy core.

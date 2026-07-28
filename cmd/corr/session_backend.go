@@ -19,7 +19,9 @@ import (
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/credential"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
+	"github.com/nkiyohara/corresync/internal/dispatch"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/eventqueue"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
 	"github.com/nkiyohara/corresync/internal/paths"
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
@@ -95,6 +97,9 @@ type sessionBackend struct {
 	newCalDAV     func(context.Context, caldavprovider.Options) (*caldavprovider.Client, error)
 	newGoogle     func(context.Context, googleapi.Options) (*googleapi.Client, error)
 	newGraph      func(context.Context, graphapi.Options) (*graphapi.Client, error)
+	monitorStore  *eventqueue.Store
+	monitor       *application.MonitorService
+	monitorEngine *application.MonitorEngine
 
 	mu           sync.Mutex
 	activationMu sync.Mutex
@@ -109,6 +114,7 @@ type sessionBackend struct {
 
 	terminalSessions map[string]*terminalLoginSession
 	terminalAccounts map[domain.AccountID]string
+	monitorStarted   map[domain.AccountID]bool
 }
 
 func newSessionBackend(app *runtime) (*sessionBackend, error) {
@@ -156,7 +162,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		return nil, err
 	}
 	lifecycle, cancel := context.WithCancel(context.Background())
-	return &sessionBackend{
+	backend := &sessionBackend{
 		app:              app,
 		configuration:    configuration,
 		guard:            guard,
@@ -168,13 +174,41 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		newCalDAV:        caldavprovider.New,
 		newGoogle:        googleapi.New,
 		newGraph:         graphapi.New,
+		monitorStore:     eventqueue.New(),
 		accounts:         make(map[domain.AccountID]sessionAccount),
 		previews:         make(map[string]sessionPreview),
 		lifecycle:        lifecycle,
 		cancel:           cancel,
 		terminalSessions: make(map[string]*terminalLoginSession),
 		terminalAccounts: make(map[domain.AccountID]string),
-	}, nil
+		monitorStarted:   make(map[domain.AccountID]bool),
+	}
+	monitor, err := application.NewMonitorService(backend, backend.monitorStore, recorder)
+	if err != nil {
+		cancel()
+		_ = recorder.Close()
+		return nil, err
+	}
+	runner, err := dispatch.NewRunner(backend.runnerConfiguration)
+	if err != nil {
+		cancel()
+		_ = recorder.Close()
+		return nil, err
+	}
+	engine, err := application.NewMonitorEngine(
+		backend.monitorStore,
+		recorder,
+		dispatch.NewDesktopNotifier(),
+		runner,
+	)
+	if err != nil {
+		cancel()
+		_ = recorder.Close()
+		return nil, err
+	}
+	backend.monitor = monitor
+	backend.monitorEngine = engine
+	return backend, nil
 }
 
 func (backend *sessionBackend) DefaultAccount() domain.AccountID {
@@ -187,6 +221,70 @@ func (backend *sessionBackend) ResolveAccount(reference string) (domain.AccountI
 		return "", err
 	}
 	return account.ID, nil
+}
+
+func (backend *sessionBackend) MonitorPolicy(
+	ctx context.Context,
+	accountID domain.AccountID,
+) (application.MonitorPolicy, error) {
+	if err := ctx.Err(); err != nil {
+		return application.MonitorPolicy{}, err
+	}
+	alias, account, exists := backend.configuration.AccountByID(accountID)
+	if !exists {
+		return application.MonitorPolicy{}, fmt.Errorf("account %q is not configured", accountID)
+	}
+	policy := application.MonitorPolicy{
+		Account: accountID, Alias: alias, Address: account.Address,
+		Mode: domain.MonitorOff,
+	}
+	if policy.Address == "" {
+		if web, ok := account.OutlookWeb(); ok {
+			policy.Address = web.Mailbox
+		}
+	}
+	if account.Monitor == nil {
+		return policy, nil
+	}
+	configured := account.Monitor
+	policy.Mode = configured.Mode
+	policy.PollInterval = time.Duration(configured.PollInterval)
+	policy.Debounce = time.Duration(configured.Debounce)
+	policy.Retention = time.Duration(configured.Retention)
+	policy.RateLimitHour = configured.RateLimitHour
+	policy.SenderDomains = append([]string(nil), configured.Filter.SenderDomains...)
+	policy.SubjectContains = append([]string(nil), configured.Filter.SubjectContains...)
+	policy.ImportantOnly = configured.Filter.ImportantOnly
+	if configured.QuietHours != nil {
+		policy.QuietStart = configured.QuietHours.Start
+		policy.QuietEnd = configured.QuietHours.End
+		policy.QuietTimeZone = configured.QuietHours.TimeZone
+	}
+	if configured.Notification != nil {
+		policy.NotificationTarget = configured.Notification.Adapter
+		policy.NotificationFields = append(
+			[]string(nil),
+			configured.Notification.Fields...,
+		)
+	}
+	if configured.Runner != nil {
+		policy.RunnerTarget = configured.Runner.Command
+		policy.RunnerEgress = configured.Runner.Egress
+		policy.RunnerFields = append([]string(nil), configured.Runner.Fields...)
+	}
+	return policy, nil
+}
+
+func (backend *sessionBackend) runnerConfiguration(
+	accountID domain.AccountID,
+) (config.Runner, error) {
+	_, account, exists := backend.configuration.AccountByID(accountID)
+	if !exists || account.Monitor == nil ||
+		account.Monitor.Mode != domain.MonitorAgent ||
+		account.Monitor.Runner == nil {
+		return config.Runner{}, errors.New("account has no enabled monitor runner")
+	}
+	return *account.Monitor.Runner, nil
 }
 
 func (backend *sessionBackend) ProjectionAccounts(
@@ -319,6 +417,54 @@ func (backend *sessionBackend) SessionStatus(
 	return result, nil
 }
 
+func (backend *sessionBackend) MonitorStatus(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (application.MonitorStatus, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.MonitorStatus{}, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+	return backend.monitor.Status(ctx, account, caller)
+}
+
+func (backend *sessionBackend) ListMonitorEvents(
+	ctx context.Context,
+	input application.MonitorEventListInput,
+	caller domain.Caller,
+) (application.MonitorEventPage, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.MonitorEventPage{}, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+	return backend.monitor.List(ctx, input, caller)
+}
+
+func (backend *sessionBackend) AcknowledgeMonitorEvent(
+	ctx context.Context,
+	input application.MonitorAcknowledgeInput,
+	caller domain.Caller,
+) (application.MonitorEvent, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.MonitorEvent{}, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+	return backend.monitor.Acknowledge(ctx, input, caller)
+}
+
 func (backend *sessionBackend) TerminalLogin(
 	ctx context.Context,
 	input daemonapi.TerminalLoginInput,
@@ -388,6 +534,7 @@ func (backend *sessionBackend) TerminalLogin(
 		}
 		account = mergeSessionAccounts(account, standards)
 		backend.accounts[input.Account] = account
+		backend.startMonitorLocked(input.Account, account)
 		_ = backend.dropTerminalInteraction(interaction, false)
 		return authenticatedTerminalResult(input.Account, account.captured), nil
 	}
@@ -1352,7 +1499,52 @@ func (backend *sessionBackend) activateAccount(
 		)
 	}
 	backend.accounts[accountID] = services
+	backend.startMonitorLocked(accountID, services)
 	return services, nil
+}
+
+func (backend *sessionBackend) startMonitorLocked(
+	accountID domain.AccountID,
+	account sessionAccount,
+) {
+	if backend.monitorStarted[accountID] || account.mail == nil {
+		return
+	}
+	policy, err := backend.MonitorPolicy(backend.lifecycle, accountID)
+	if err != nil || !policy.Mode.Collects() {
+		return
+	}
+	backend.monitorStarted[accountID] = true
+	backend.active.Add(1)
+	go backend.monitorLoop(policy, account.mail)
+}
+
+func (backend *sessionBackend) monitorLoop(
+	policy application.MonitorPolicy,
+	mail *application.MailService,
+) {
+	defer backend.active.Done()
+	poll := func() {
+		if err := backend.monitorEngine.Poll(backend.lifecycle, policy, mail); err != nil &&
+			backend.lifecycle.Err() == nil {
+			_, _ = fmt.Fprintf(
+				backend.app.stderr,
+				"monitor %s paused after a safe failure; inspect monitor status and the local audit\n",
+				policy.Alias,
+			)
+		}
+	}
+	poll()
+	ticker := time.NewTicker(policy.PollInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-backend.lifecycle.Done():
+			return
+		case <-ticker.C:
+			poll()
+		}
+	}
 }
 
 func (backend *sessionBackend) outlookAccount(

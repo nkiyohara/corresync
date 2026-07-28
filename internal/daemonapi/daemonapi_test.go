@@ -41,6 +41,8 @@ type fakeBackend struct {
 	updateInput       application.CalendarUpdateInput
 	cancelInput       application.CalendarCancelInput
 	terminalInput     TerminalLoginInput
+	monitorListInput  application.MonitorEventListInput
+	monitorAckInput   application.MonitorAcknowledgeInput
 	commitToken       string
 	caller            domain.Caller
 }
@@ -57,6 +59,52 @@ func (backend *fakeBackend) SessionStatus(
 			Provider: domain.ProviderMicrosoftOWA, State: "signed_out",
 		}},
 	}, nil
+}
+
+func (backend *fakeBackend) MonitorStatus(
+	context.Context,
+	domain.AccountID,
+	domain.Caller,
+) (application.MonitorStatus, error) {
+	return application.MonitorStatus{
+		Account: testAccountID, Alias: "work", Mode: domain.MonitorOff,
+	}, nil
+}
+
+func (backend *fakeBackend) ListMonitorEvents(
+	_ context.Context,
+	input application.MonitorEventListInput,
+	caller domain.Caller,
+) (application.MonitorEventPage, error) {
+	backend.monitorListInput, backend.caller = input, caller
+	return application.MonitorEventPage{
+		Events: []application.MonitorEvent{monitorTestEvent("pending")},
+		Offset: input.Offset, Limit: input.Limit, Total: 1,
+	}, nil
+}
+
+func (backend *fakeBackend) AcknowledgeMonitorEvent(
+	_ context.Context,
+	input application.MonitorAcknowledgeInput,
+	caller domain.Caller,
+) (application.MonitorEvent, error) {
+	backend.monitorAckInput, backend.caller = input, caller
+	return monitorTestEvent("acknowledged"), nil
+}
+
+func monitorTestEvent(state string) application.MonitorEvent {
+	event := application.MonitorEvent{
+		ID:      "evt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Account: testAccountID, AccountAlias: "work",
+		Provider: domain.ProviderJMAP, SourceObjectID: "synthetic-message",
+		Trust: application.MonitorTrustMarker, State: state,
+		DeliveryCount: 1, DetectedAt: time.Unix(4, 0).UTC(),
+	}
+	if state == "acknowledged" {
+		acknowledged := time.Unix(5, 0).UTC()
+		event.AcknowledgedAt = &acknowledged
+	}
+	return event
 }
 func (*fakeBackend) Login(_ context.Context, account domain.AccountID, _ domain.Caller) (LoginResult, error) {
 	return LoginResult{Account: account, Authenticated: true, CapturedAt: time.Unix(2, 0)}, nil
@@ -362,6 +410,29 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 		sessions.Accounts[0].Account != testAccountID ||
 		sessions.Accounts[0].State != "signed_out" {
 		t.Fatalf("SessionStatus() = %+v, %v", sessions, err)
+	}
+	monitorStatus, err := client.MonitorStatus(t.Context(), testAccountID, caller)
+	if err != nil || monitorStatus.Mode != domain.MonitorOff {
+		t.Fatalf("MonitorStatus() = %+v, %v", monitorStatus, err)
+	}
+	monitorPage, err := client.ListMonitorEvents(
+		t.Context(),
+		application.MonitorEventListInput{Account: testAccountID, Limit: 50},
+		caller,
+	)
+	if err != nil || len(monitorPage.Events) != 1 {
+		t.Fatalf("ListMonitorEvents() = %+v, %v", monitorPage, err)
+	}
+	acknowledged, err := client.AcknowledgeMonitorEvent(
+		t.Context(),
+		application.MonitorAcknowledgeInput{
+			Account: testAccountID,
+			EventID: monitorPage.Events[0].ID,
+		},
+		caller,
+	)
+	if err != nil || acknowledged.State != "acknowledged" {
+		t.Fatalf("AcknowledgeMonitorEvent() = %+v, %v", acknowledged, err)
 	}
 	terminalLogin, err := client.TerminalLogin(t.Context(), TerminalLoginInput{Account: testAccountID}, caller)
 	if err != nil || terminalLogin.Status != "pending" || terminalLogin.View == nil ||

@@ -129,6 +129,14 @@ func (account Account) validate() error {
 			return fmt.Errorf("calendar: %w", err)
 		}
 	}
+	if account.Monitor != nil {
+		if err := account.Monitor.validate(); err != nil {
+			return fmt.Errorf("monitor: %w", err)
+		}
+		if account.Mail == nil && account.Monitor.Mode.Collects() {
+			return errors.New("monitoring requires a mail route")
+		}
+	}
 	return nil
 }
 

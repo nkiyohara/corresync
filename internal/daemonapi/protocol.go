@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 13
+	ProtocolVersion   = 14
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -62,6 +62,9 @@ const (
 	MethodCalendarCommitUpdate Method = "calendar.commit_update"
 	MethodCalendarCancel       Method = "calendar.cancel"
 	MethodCalendarCommitCancel Method = "calendar.commit_cancel"
+	MethodMonitorStatus        Method = "monitor.status"
+	MethodEventsList           Method = "events.list"
+	MethodEventAcknowledge     Method = "events.acknowledge"
 )
 
 var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{16,96}$`)
@@ -195,6 +198,11 @@ type SessionStatus struct {
 // SessionStatusResult reports every configured account in stable alias order.
 type SessionStatusResult struct {
 	Accounts []SessionStatus `json:"accounts"`
+}
+
+// MonitorStatusInput selects one stable account.
+type MonitorStatusInput struct {
+	Account domain.AccountID `json:"account"`
 }
 
 // TerminalLoginInput starts or advances one caller-bound text-only browser
@@ -333,6 +341,14 @@ type TerminalLoginBackend interface {
 	TerminalLogin(context.Context, TerminalLoginInput, domain.Caller) (TerminalLoginResult, error)
 }
 
+// MonitoringBackend is the optional local event extension. It has no method
+// for enabling monitoring, widening filters, configuring a runner, or purging.
+type MonitoringBackend interface {
+	MonitorStatus(context.Context, domain.AccountID, domain.Caller) (application.MonitorStatus, error)
+	ListMonitorEvents(context.Context, application.MonitorEventListInput, domain.Caller) (application.MonitorEventPage, error)
+	AcknowledgeMonitorEvent(context.Context, application.MonitorAcknowledgeInput, domain.Caller) (application.MonitorEvent, error)
+}
+
 func (method Method) valid() bool {
 	switch method {
 	case MethodStatus, MethodShutdown, MethodLogin, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
@@ -343,7 +359,8 @@ func (method Method) valid() bool {
 		MethodMailDelete, MethodMailCommitDelete,
 		MethodCalendarList, MethodAgendaList, MethodCalendarCreate, MethodCalendarCommit,
 		MethodCalendarUpdate, MethodCalendarCommitUpdate,
-		MethodCalendarCancel, MethodCalendarCommitCancel:
+		MethodCalendarCancel, MethodCalendarCommitCancel,
+		MethodMonitorStatus, MethodEventsList, MethodEventAcknowledge:
 		return true
 	default:
 		return false

@@ -94,6 +94,11 @@ type fakeBackend struct {
 	accountReference     string
 	accountCatalog       application.AccountCatalog
 	accountView          application.AccountView
+	monitorStatus        application.MonitorStatus
+	monitorListInput     application.MonitorEventListInput
+	monitorPage          application.MonitorEventPage
+	monitorAckInput      application.MonitorAcknowledgeInput
+	monitorEvent         application.MonitorEvent
 	err                  error
 }
 
@@ -125,6 +130,35 @@ func (backend *fakeBackend) ShowAccount(
 ) (application.AccountView, error) {
 	backend.accountReference = reference
 	return backend.accountView, backend.err
+}
+
+func (backend *fakeBackend) MonitorStatus(
+	_ context.Context,
+	_ domain.AccountID,
+	caller domain.Caller,
+) (application.MonitorStatus, error) {
+	backend.caller = caller
+	return backend.monitorStatus, backend.err
+}
+
+func (backend *fakeBackend) ListMonitorEvents(
+	_ context.Context,
+	input application.MonitorEventListInput,
+	caller domain.Caller,
+) (application.MonitorEventPage, error) {
+	backend.monitorListInput = input
+	backend.caller = caller
+	return backend.monitorPage, backend.err
+}
+
+func (backend *fakeBackend) AcknowledgeMonitorEvent(
+	_ context.Context,
+	input application.MonitorAcknowledgeInput,
+	caller domain.Caller,
+) (application.MonitorEvent, error) {
+	backend.monitorAckInput = input
+	backend.caller = caller
+	return backend.monitorEvent, backend.err
 }
 
 func (backend *fakeBackend) ListMail(
@@ -414,7 +448,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 29 || mailTool == nil {
+	if len(tools.Tools) != 32 || mailTool == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
@@ -445,6 +479,98 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 	structured, ok := result.StructuredContent.(map[string]any)
 	if !ok || structured["totalItemsInView"] != float64(1) {
 		t.Fatalf("unexpected structured output: %#v", result.StructuredContent)
+	}
+}
+
+func TestMonitoringToolsAndResourcesCannotEnableOrBroadenPolicy(t *testing.T) {
+	t.Parallel()
+	account := domain.AccountID("acc_00000000000000000000000000000001")
+	eventID := "evt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	backend := &fakeBackend{
+		monitorStatus: application.MonitorStatus{
+			Account: account, Alias: "work", Mode: domain.MonitorQueue,
+			CollectionEnabled: true,
+		},
+		monitorPage: application.MonitorEventPage{
+			Events: []application.MonitorEvent{{
+				ID: eventID, Account: account, AccountAlias: "work",
+				Provider: domain.ProviderJMAP, SourceObjectID: "synthetic",
+				Trust: application.MonitorTrustMarker, State: "pending",
+				DeliveryCount: 1,
+			}},
+			Limit: 50, Total: 1,
+		},
+		monitorEvent: application.MonitorEvent{
+			ID: eventID, Account: account, AccountAlias: "work",
+			Provider: domain.ProviderJMAP, SourceObjectID: "synthetic",
+			Trust: application.MonitorTrustMarker, State: "acknowledged",
+		},
+	}
+	server, err := New(
+		backend,
+		Options{Version: "v0.1.0", Instance: "test-server"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+	tools, err := client.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"monitor_status", "events_list", "event_acknowledge"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil {
+			t.Fatalf("missing tool %q", name)
+		}
+		schema, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, forbidden := range []string{"mode", "runner", "egress", "filter", "purge", "approve"} {
+			if strings.Contains(strings.ToLower(string(schema)), forbidden) {
+				t.Fatalf("tool %q exposes forbidden configuration input %q: %s", name, forbidden, schema)
+			}
+		}
+	}
+	if _, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "monitor_status", Arguments: map[string]any{"account": string(account)},
+	}); err != nil {
+		t.Fatalf("monitor_status error = %v", err)
+	}
+	if _, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "events_list", Arguments: map[string]any{"account": string(account)},
+	}); err != nil {
+		t.Fatalf("events_list error = %v", err)
+	}
+	if backend.monitorListInput.Limit != 50 {
+		t.Fatalf("events_list limit = %d", backend.monitorListInput.Limit)
+	}
+	if _, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "event_acknowledge",
+		Arguments: map[string]any{
+			"account": string(account),
+			"eventId": eventID,
+		},
+	}); err != nil {
+		t.Fatalf("event_acknowledge error = %v", err)
+	}
+	templates, err := client.ListResourceTemplates(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(templates.ResourceTemplates) != 2 {
+		t.Fatalf("resource templates = %+v", templates.ResourceTemplates)
+	}
+	resource, err := client.ReadResource(t.Context(), &mcp.ReadResourceParams{
+		URI: "corresync://events/" + string(account),
+	})
+	if err != nil {
+		t.Fatalf("ReadResource() error = %v", err)
+	}
+	if len(resource.Contents) != 1 ||
+		!strings.Contains(resource.Contents[0].Text, application.MonitorTrustMarker) {
+		t.Fatalf("resource contents = %+v", resource.Contents)
 	}
 }
 

@@ -36,6 +36,68 @@ func TestDefaultIsValidAndSecretFree(t *testing.T) {
 			t.Fatalf("saved config contains forbidden secret field %q: %s", forbidden, contents)
 		}
 	}
+	if configuration.Accounts[configuration.DefaultAccount].Monitor != nil {
+		t.Fatal("fresh configuration unexpectedly enabled monitoring")
+	}
+}
+
+func TestMonitorConsentBoundariesValidateIndependently(t *testing.T) {
+	t.Parallel()
+
+	configuration := Default()
+	account := configuration.Accounts["work"]
+
+	notify := NewMonitor(domain.MonitorNotify)
+	account.Monitor = &notify
+	configuration.Accounts["work"] = account
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("notify config error = %v", err)
+	}
+
+	queue := NewMonitor(domain.MonitorQueue)
+	account.Monitor = &queue
+	configuration.Accounts["work"] = account
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("queue config error = %v", err)
+	}
+
+	agent := NewMonitor(domain.MonitorAgent)
+	runner := NewRunner(
+		"/synthetic/runner",
+		[]string{"--json"},
+		[]string{"account", "event_id", "subject", "trust"},
+		"local",
+		false,
+	)
+	agent.Runner = &runner
+	account.Monitor = &agent
+	configuration.Accounts["work"] = account
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("agent config error = %v", err)
+	}
+
+	agent.Runner.Egress = "remote"
+	if err := configuration.Validate(); err == nil {
+		t.Fatal("remote runner unexpectedly validated without separate approval")
+	}
+	agent.Runner.ApproveRemote = true
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("approved remote runner config error = %v", err)
+	}
+}
+
+func TestMonitoringCannotBeEnabledForCalendarOnlyAccount(t *testing.T) {
+	t.Parallel()
+
+	configuration := Default()
+	account := configuration.Accounts["work"]
+	account.Mail = nil
+	monitor := NewMonitor(domain.MonitorQueue)
+	account.Monitor = &monitor
+	configuration.Accounts["work"] = account
+	if err := configuration.Validate(); err == nil {
+		t.Fatal("calendar-only monitoring unexpectedly validated")
+	}
 }
 
 func TestSaveAndLoadRoundTrip(t *testing.T) {
@@ -279,6 +341,8 @@ disable_automatic_checks = true
 		work.ID == personal.ID ||
 		work.ID.ValidateOpaque() != nil ||
 		personal.ID.ValidateOpaque() != nil ||
+		work.Monitor != nil ||
+		personal.Monitor != nil ||
 		!personalWeb ||
 		personalRoute.Mailbox != "shared@example.invalid" {
 		t.Fatalf("migrated accounts = %+v, %+v", work, personal)
@@ -323,6 +387,7 @@ login_timeout = "5m"
 		account.ID != "acc_00000000000000000000000000000001" ||
 		account.MailProvider() != domain.ProviderMicrosoftOWA ||
 		account.CalendarProvider() != domain.ProviderMicrosoftOWA ||
+		account.Monitor != nil ||
 		!ok ||
 		web.Mailbox != "shared@example.invalid" {
 		t.Fatalf("migrated v2 config = %+v", configuration)
