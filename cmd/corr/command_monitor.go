@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -12,6 +13,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/audit"
 	"github.com/nkiyohara/corresync/internal/config"
+	"github.com/nkiyohara/corresync/internal/dispatch"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/eventqueue"
 	"github.com/nkiyohara/corresync/internal/paths"
@@ -141,6 +143,12 @@ func (command *monitorEnableCommand) Run(app *runtime) error {
 		return errors.New(
 			"monitoring is disabled by default; review the account, mode, filters, fields, and egress, then pass --approve",
 		)
+	}
+	if err := validateMonitorNotificationPlatform(
+		domain.MonitorMode(command.Mode),
+		goruntime.GOOS,
+	); err != nil {
+		return err
 	}
 	if err := app.requireDaemonStopped(); err != nil {
 		return err
@@ -293,6 +301,16 @@ func (command *monitorEnableCommand) Run(app *runtime) error {
 		"Fields", sanitizeCell(strings.Join(result.Fields, ", "), 512),
 	)
 	return err
+}
+
+func validateMonitorNotificationPlatform(
+	mode domain.MonitorMode,
+	goos string,
+) error {
+	if mode != domain.MonitorNotify {
+		return nil
+	}
+	return dispatch.ValidateDesktopNotificationPlatform(goos)
 }
 
 func validMonitorTransition(current, requested domain.MonitorMode) bool {

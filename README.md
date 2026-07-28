@@ -179,7 +179,8 @@ can advance only one boundary at a time:
 off → notify → queue → agent
 ```
 
-- `notify` shows selected metadata through a local desktop adapter;
+- `notify` shows selected metadata through a local Linux or macOS desktop
+  adapter;
 - `queue` also creates a bounded, durable account-local event queue;
 - `agent` may invoke one absolute executable directly, without a shell, using
   bounded JSON on stdin.
@@ -187,6 +188,8 @@ off → notify → queue → agent
 Remote runner egress requires a separate explicit approval. Polling starts only
 after interactive authentication; quiet hours, debounce, hourly rate limits,
 deduplication, retention, loop prevention, and a circuit breaker are enforced.
+Windows currently rejects `notify` setup because Corresync does not install a
+registered AppUserModelID; `queue` and `agent` remain available.
 
 ```console
 corr monitor enable --mode notify \

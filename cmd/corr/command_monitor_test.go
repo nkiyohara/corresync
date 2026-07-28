@@ -8,6 +8,28 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 )
 
+func TestValidateMonitorNotificationPlatform(t *testing.T) {
+	t.Parallel()
+	if err := validateMonitorNotificationPlatform(
+		domain.MonitorNotify,
+		"windows",
+	); err == nil {
+		t.Fatal("notify mode unexpectedly accepted unavailable Windows adapter")
+	}
+	if err := validateMonitorNotificationPlatform(
+		domain.MonitorQueue,
+		"windows",
+	); err != nil {
+		t.Fatalf("queue mode inherited notification restriction: %v", err)
+	}
+	if err := validateMonitorNotificationPlatform(
+		domain.MonitorNotify,
+		"linux",
+	); err != nil {
+		t.Fatalf("notify mode rejected Linux: %v", err)
+	}
+}
+
 func TestMonitorEnableAndDisableAreExplicitAndAccountScoped(t *testing.T) {
 	app, path, _ := newAccountCommandRuntime(t, nil)
 	configuration, err := config.Load(path)

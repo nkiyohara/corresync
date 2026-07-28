@@ -46,8 +46,9 @@ All notable user-facing changes are recorded here. The project follows
 - Authenticate and pin Unix runtime directories, locks, sockets, identities,
   and peer UIDs before transmitting the rotating daemon bearer; reject
   symlinks, wrong types/owners/modes, squatters, and replacement races.
-- Keep attacker-controlled notification metadata out of PowerShell command
-  text and behind the Linux notification utility's option terminator.
+- Keep attacker-controlled notification metadata behind native argument
+  boundaries, reject NUL metadata, time-bound notification utilities, and
+  reject Windows `notify` setup until Corresync has a registered AppUserModelID.
 - Add `corr feedback`, an allowlisted deterministic report with an optional
   bounded generalized last-error record. Generation is local; copy/save/open
   actions occur only after full display, and GitHub is never submitted

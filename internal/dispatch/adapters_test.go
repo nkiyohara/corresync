@@ -2,7 +2,6 @@ package dispatch
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"slices"
@@ -118,13 +117,16 @@ func TestDesktopNotifierReleasesOnlyRenderedMetadata(t *testing.T) {
 	}
 	var arguments []string
 	notifier.run = func(
-		_ context.Context,
+		runContext context.Context,
 		stdin []byte,
 		command string,
 		values ...string,
 	) error {
 		if len(stdin) != 0 || command != "/usr/bin/notify-send" {
 			t.Fatalf("notification command = %q stdin=%q", command, stdin)
+		}
+		if _, ok := runContext.Deadline(); !ok {
+			t.Fatal("notification command has no timeout")
 		}
 		arguments = append([]string(nil), values...)
 		return nil
@@ -187,30 +189,31 @@ func TestDesktopNotifierSeparatesUntrustedLinuxOptions(t *testing.T) {
 	}
 }
 
-func TestDesktopNotifierKeepsWindowsMetadataOutOfCommandText(t *testing.T) {
+func TestDesktopNotifierPassesMacOSMetadataAsData(t *testing.T) {
 	t.Parallel()
 	notifier := &DesktopNotifier{
-		goos: "windows",
+		goos: "darwin",
 		lookPath: func(name string) (string, error) {
-			if name != "powershell.exe" {
+			if name != "osascript" {
 				return "", errors.New("unexpected utility")
 			}
-			return `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, nil
+			return "/usr/bin/osascript", nil
 		},
 	}
-	var stdin []byte
 	var arguments []string
 	notifier.run = func(
 		_ context.Context,
-		input []byte,
+		stdin []byte,
 		_ string,
 		values ...string,
 	) error {
-		stdin = append([]byte(nil), input...)
+		if len(stdin) != 0 {
+			t.Fatalf("notification stdin = %q", stdin)
+		}
 		arguments = append([]string(nil), values...)
 		return nil
 	}
-	const subject = `'); Start-Process calc; #`
+	const subject = `-e 'do shell script "open unsafe"'`
 	if err := notifier.Notify(t.Context(), application.MonitorRelease{
 		Destination: "desktop",
 		Event: map[string]any{
@@ -219,22 +222,38 @@ func TestDesktopNotifierKeepsWindowsMetadataOutOfCommandText(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Notify() error = %v", err)
 	}
-	if len(arguments) != 5 || arguments[3] != "-Command" ||
-		strings.Contains(arguments[4], subject) {
-		t.Fatalf("unsafe PowerShell arguments = %+v", arguments)
+	if len(arguments) != 4 || arguments[0] != "-e" ||
+		arguments[2] != "Corresync" || arguments[3] != subject ||
+		strings.Contains(arguments[1], subject) {
+		t.Fatalf("unsafe osascript arguments = %+v", arguments)
 	}
-	decoded, err := base64.StdEncoding.DecodeString(string(stdin))
-	if err != nil {
-		t.Fatalf("decode notification stdin: %v", err)
-	}
-	var payload struct {
-		Title   string `json:"title"`
-		Summary string `json:"summary"`
-	}
-	if err := json.Unmarshal(decoded, &payload); err != nil {
-		t.Fatalf("decode notification payload: %v", err)
-	}
-	if payload.Title != "Corresync" || payload.Summary != subject {
-		t.Fatalf("notification payload = %+v", payload)
+}
+
+func TestDesktopNotifierRejectsUnavailablePlatformsBeforeExecution(t *testing.T) {
+	t.Parallel()
+	for _, goos := range []string{"windows", "freebsd"} {
+		t.Run(goos, func(t *testing.T) {
+			t.Parallel()
+			notifier := &DesktopNotifier{
+				goos: goos,
+				lookPath: func(string) (string, error) {
+					t.Fatal("looked up a utility for an unavailable platform")
+					return "", nil
+				},
+				run: func(context.Context, []byte, string, ...string) error {
+					t.Fatal("executed a utility for an unavailable platform")
+					return nil
+				},
+			}
+			err := notifier.Notify(t.Context(), application.MonitorRelease{
+				Destination: "desktop",
+				Event: map[string]any{
+					"subject": `'); Start-Process calc; #`,
+				},
+			})
+			if err == nil || !strings.Contains(err.Error(), "unavailable") {
+				t.Fatalf("Notify() error = %v", err)
+			}
+		})
 	}
 }

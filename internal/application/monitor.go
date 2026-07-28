@@ -357,7 +357,11 @@ func (event MonitorEvent) Validate(expected domain.AccountID) error {
 	}
 	if len(event.Sender.Name) > 512 || len(event.Sender.Address) > 320 ||
 		len(event.Subject) > 2048 || len(event.ReceivedAt) > 128 ||
-		len(event.Importance) > 32 {
+		len(event.Importance) > 32 ||
+		strings.ContainsAny(
+			event.Sender.Name+event.Sender.Address+event.Subject,
+			"\x00",
+		) {
 		return errors.New("monitor event metadata exceeds its bounds")
 	}
 	if event.Trust != MonitorTrustMarker || event.DeliveryCount < 1 ||

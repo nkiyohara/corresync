@@ -195,6 +195,11 @@ quiet hours, notification fields, or an absolute runner executable. Agent
 mode's remote egress declaration requires `approve_remote = true`, which the
 CLI writes only after `--approve-remote-egress`.
 
+Desktop `notify` is available through `notify-send` on Linux and `osascript` on
+macOS. Windows setup fails before configuration changes because Corresync does
+not install a registered AppUserModelID; use `queue` or an explicitly
+configured local `agent` runner there.
+
 Old configs, imports, and account additions always default to off.
 
 ## Policy and updates

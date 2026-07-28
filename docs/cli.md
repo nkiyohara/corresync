@@ -283,6 +283,12 @@ corr events list --state all
 corr events acknowledge evt_0123456789abcdef0123456789abcdef
 ```
 
+`notify` invokes `notify-send` on Linux or `osascript` on macOS with a
+10-second bound and native argument separation. Windows rejects `notify`
+before changing configuration because Corresync does not install the registered
+AppUserModelID required for desktop toasts. Windows `queue` and `agent` modes
+remain available.
+
 To enable a local agent runner:
 
 ```console

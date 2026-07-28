@@ -355,6 +355,10 @@ corr monitor enable --account ALIAS --mode notify \
 corr events list --account ALIAS --state all
 ```
 
+On Windows, the `notify` command must fail before changing configuration with
+the registered-AppUserModelID explanation. Continue the queue/agent checks
+without claiming desktop-notification compatibility.
+
 Verify old/new/imported accounts begin `off`; collection starts only after
 authentication and approval; Sent/Drafts/self messages are suppressed where
 possible; restart recovery does not duplicate an event; notification values

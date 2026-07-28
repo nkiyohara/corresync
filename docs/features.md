@@ -136,9 +136,11 @@ its cursor. It ignores Sent and Drafts and suppresses self-message loops.
 Account-local state provides deterministic event IDs, deduplication, atomic
 cursor/event updates, acknowledgement, retention, quiet hours, debounce,
 hourly limits, batching, and a circuit breaker. Desktop notification adapters
-are local. Agent mode invokes one absolute executable directly—never through a
-shell—and sends bounded JSON on stdin. A runner claiming remote egress requires
-a separate explicit approval.
+are local and time-bound: Linux uses `notify-send`, macOS uses `osascript`, and
+Windows rejects `notify` until Corresync has a registered AppUserModelID. Agent
+mode invokes one absolute executable directly—never through a shell—and sends
+bounded JSON on stdin. A runner claiming remote egress requires a separate
+explicit approval.
 
 CLI exposes configuration, status, listing, acknowledgement, and purge. MCP
 exposes only `monitor_status`, `events_list`, and `event_acknowledge`, plus

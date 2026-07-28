@@ -256,6 +256,37 @@ func TestStoreRejectsSymlinkState(t *testing.T) {
 	}
 }
 
+func TestCommitScanRejectsNULInNotificationMetadata(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	for _, mutate := range []func(*application.MonitorDetection){
+		func(detection *application.MonitorDetection) {
+			detection.Subject = "unsafe\x00subject"
+		},
+		func(detection *application.MonitorDetection) {
+			detection.Sender.Name = "unsafe\x00sender"
+		},
+		func(detection *application.MonitorDetection) {
+			detection.Sender.Address = "unsafe\x00@example.invalid"
+		},
+	} {
+		detection := testDetection(testAccountA, "message", true)
+		mutate(&detection)
+		if _, err := NewAt(t.TempDir()).CommitScan(
+			t.Context(),
+			testScan(
+				testAccountA,
+				now,
+				false,
+				"unsafe",
+				[]application.MonitorDetection{detection},
+			),
+		); err == nil {
+			t.Fatal("CommitScan() accepted NUL notification metadata")
+		}
+	}
+}
+
 func testScan(
 	account domain.AccountID,
 	now time.Time,

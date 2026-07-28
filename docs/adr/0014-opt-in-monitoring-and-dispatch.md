@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-07-28
 
 ## Context
 
@@ -31,10 +32,14 @@ Modes are strictly ordered:
 off -> notify -> queue -> agent
 ```
 
-`off` collects nothing. `notify` emits a local notification. `queue` persists
-matching events in a durable local outbox. `agent` dispatches to an explicitly
-configured runner. `notify` and `queue` are fully functional with no AI provider
-configured, and neither implies that one exists.
+`off` collects nothing. `notify` emits a local notification on a platform with
+a validated adapter. `queue` persists matching events in a durable local
+outbox. `agent` dispatches to an explicitly configured runner. `notify` and
+`queue` require no AI provider, and neither implies that one exists. Linux uses
+`notify-send` and macOS uses `osascript`, with native argument separation and a
+short execution timeout. Windows `notify` is unavailable until the product
+installs a registered AppUserModelID, so setup fails before configuration
+changes while `queue` and `agent` remain usable.
 
 The pipeline is a provider watcher, cursor and watermark recovery,
 deduplication, a metadata-first policy filter, a durable local queue, and then

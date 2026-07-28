@@ -5,7 +5,6 @@ package dispatch
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +17,8 @@ import (
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
 )
+
+const desktopNotificationTimeout = 10 * time.Second
 
 type commandRunner func(context.Context, []byte, string, ...string) error
 
@@ -61,6 +62,25 @@ func NewDesktopNotifier() *DesktopNotifier {
 	return &DesktopNotifier{lookPath: exec.LookPath, run: runCommand, goos: runtime.GOOS}
 }
 
+// ValidateDesktopNotificationPlatform reports whether Corresync has a
+// fail-closed local notification adapter for the selected platform.
+func ValidateDesktopNotificationPlatform(goos string) error {
+	switch goos {
+	case "linux", "darwin":
+		return nil
+	case "windows":
+		return errors.New(
+			"desktop notifications are unavailable on Windows because " +
+				"Corresync has no registered AppUserModelID",
+		)
+	default:
+		return fmt.Errorf(
+			"desktop notifications are unavailable on platform %q",
+			goos,
+		)
+	}
+}
+
 func (notifier *DesktopNotifier) Notify(
 	ctx context.Context,
 	release application.MonitorRelease,
@@ -68,6 +88,11 @@ func (notifier *DesktopNotifier) Notify(
 	if release.Destination != "desktop" {
 		return errors.New("notification destination is not the configured desktop adapter")
 	}
+	if err := ValidateDesktopNotificationPlatform(notifier.goos); err != nil {
+		return err
+	}
+	notifyContext, cancel := context.WithTimeout(ctx, desktopNotificationTimeout)
+	defer cancel()
 	title := "Corresync"
 	summary := notificationSummary(release.Event)
 	switch notifier.goos {
@@ -77,7 +102,7 @@ func (notifier *DesktopNotifier) Notify(
 			return errors.New("desktop notification requires notify-send")
 		}
 		return notifier.run(
-			ctx,
+			notifyContext,
 			nil,
 			command,
 			"--app-name=Corresync",
@@ -91,7 +116,7 @@ func (notifier *DesktopNotifier) Notify(
 			return errors.New("desktop notification requires osascript")
 		}
 		return notifier.run(
-			ctx,
+			notifyContext,
 			nil,
 			command,
 			"-e",
@@ -101,39 +126,8 @@ end run`,
 			title,
 			summary,
 		)
-	case "windows":
-		command, err := notifier.lookPath("powershell.exe")
-		if err != nil {
-			return errors.New("desktop notification requires Windows PowerShell")
-		}
-		payload, err := json.Marshal(struct {
-			Title   string `json:"title"`
-			Summary string `json:"summary"`
-		}{Title: title, Summary: summary})
-		if err != nil {
-			return fmt.Errorf("encode desktop notification: %w", err)
-		}
-		return notifier.run(
-			ctx,
-			[]byte(base64.StdEncoding.EncodeToString(payload)),
-			command,
-			"-NoLogo",
-			"-NoProfile",
-			"-NonInteractive",
-			"-Command",
-			`$encoded=[Console]::In.ReadToEnd();`+
-				`$json=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded));`+
-				`$payload=$json|ConvertFrom-Json;`+
-				`$template=[Windows.UI.Notifications.ToastTemplateType]::ToastText02;`+
-				`$xml=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent($template);`+
-				`$nodes=$xml.GetElementsByTagName('text');`+
-				`[void]$nodes.Item(0).AppendChild($xml.CreateTextNode([string]$payload.title));`+
-				`[void]$nodes.Item(1).AppendChild($xml.CreateTextNode([string]$payload.summary));`+
-				`$toast=[Windows.UI.Notifications.ToastNotification]::new($xml);`+
-				`[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Corresync').Show($toast)`,
-		)
 	default:
-		return errors.New("desktop notification adapter is unavailable on this platform")
+		return ValidateDesktopNotificationPlatform(notifier.goos)
 	}
 }
 

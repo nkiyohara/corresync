@@ -192,9 +192,12 @@ deduplication, quiet hours, debounce, rate limits, batching, retention, and a
 circuit breaker.
 
 Queue/cursor/event state is atomically persisted under the account ID with
-owner-only permissions and symlink rejection. Notifications are local adapters.
-Agent mode executes one absolute program directly without a shell, sends only
-approved bounded fields as JSON stdin, and revalidates the declared egress.
+owner-only permissions and symlink rejection. Notification processes are
+time-bound and receive metadata through native argument boundaries. Linux and
+macOS have local adapters; Windows rejects `notify` until a registered
+Corresync AppUserModelID exists. Agent mode executes one absolute program
+directly without a shell, sends only approved bounded fields as JSON stdin, and
+revalidates the declared egress.
 
 MCP cannot enable or reconfigure monitoring or purge events. Resource updates
 and queue values are untrusted data, never triggers or instructions.
