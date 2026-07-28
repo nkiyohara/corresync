@@ -5,6 +5,7 @@ package dispatch
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -75,7 +76,15 @@ func (notifier *DesktopNotifier) Notify(
 		if err != nil {
 			return errors.New("desktop notification requires notify-send")
 		}
-		return notifier.run(ctx, nil, command, "--app-name=Corresync", title, summary)
+		return notifier.run(
+			ctx,
+			nil,
+			command,
+			"--app-name=Corresync",
+			"--",
+			title,
+			summary,
+		)
 	case "darwin":
 		command, err := notifier.lookPath("osascript")
 		if err != nil {
@@ -97,23 +106,31 @@ end run`,
 		if err != nil {
 			return errors.New("desktop notification requires Windows PowerShell")
 		}
+		payload, err := json.Marshal(struct {
+			Title   string `json:"title"`
+			Summary string `json:"summary"`
+		}{Title: title, Summary: summary})
+		if err != nil {
+			return fmt.Errorf("encode desktop notification: %w", err)
+		}
 		return notifier.run(
 			ctx,
-			nil,
+			[]byte(base64.StdEncoding.EncodeToString(payload)),
 			command,
 			"-NoLogo",
 			"-NoProfile",
 			"-NonInteractive",
 			"-Command",
-			`$template=[Windows.UI.Notifications.ToastTemplateType]::ToastText02;`+
+			`$encoded=[Console]::In.ReadToEnd();`+
+				`$json=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded));`+
+				`$payload=$json|ConvertFrom-Json;`+
+				`$template=[Windows.UI.Notifications.ToastTemplateType]::ToastText02;`+
 				`$xml=[Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent($template);`+
 				`$nodes=$xml.GetElementsByTagName('text');`+
-				`[void]$nodes.Item(0).AppendChild($xml.CreateTextNode($args[0]));`+
-				`[void]$nodes.Item(1).AppendChild($xml.CreateTextNode($args[1]));`+
+				`[void]$nodes.Item(0).AppendChild($xml.CreateTextNode([string]$payload.title));`+
+				`[void]$nodes.Item(1).AppendChild($xml.CreateTextNode([string]$payload.summary));`+
 				`$toast=[Windows.UI.Notifications.ToastNotification]::new($xml);`+
 				`[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Corresync').Show($toast)`,
-			title,
-			summary,
 		)
 	default:
 		return errors.New("desktop notification adapter is unavailable on this platform")

@@ -2,9 +2,11 @@ package dispatch
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -139,7 +141,100 @@ func TestDesktopNotifierReleasesOnlyRenderedMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Notify() error = %v", err)
 	}
-	if !slices.Contains(arguments, "sender@example.invalid — Synthetic subject") {
+	if !slices.Equal(arguments, []string{
+		"--app-name=Corresync",
+		"--",
+		"Corresync",
+		"sender@example.invalid — Synthetic subject",
+	}) {
 		t.Fatalf("notification arguments = %+v", arguments)
+	}
+}
+
+func TestDesktopNotifierSeparatesUntrustedLinuxOptions(t *testing.T) {
+	t.Parallel()
+	notifier := &DesktopNotifier{
+		goos: "linux",
+		lookPath: func(string) (string, error) {
+			return "/usr/bin/notify-send", nil
+		},
+	}
+	var arguments []string
+	notifier.run = func(
+		_ context.Context,
+		_ []byte,
+		_ string,
+		values ...string,
+	) error {
+		arguments = append([]string(nil), values...)
+		return nil
+	}
+	if err := notifier.Notify(t.Context(), application.MonitorRelease{
+		Destination: "desktop",
+		Event: map[string]any{
+			"subject": "--urgency=critical",
+		},
+	}); err != nil {
+		t.Fatalf("Notify() error = %v", err)
+	}
+	if !slices.Equal(arguments, []string{
+		"--app-name=Corresync",
+		"--",
+		"Corresync",
+		"--urgency=critical",
+	}) {
+		t.Fatalf("notification arguments = %+v", arguments)
+	}
+}
+
+func TestDesktopNotifierKeepsWindowsMetadataOutOfCommandText(t *testing.T) {
+	t.Parallel()
+	notifier := &DesktopNotifier{
+		goos: "windows",
+		lookPath: func(name string) (string, error) {
+			if name != "powershell.exe" {
+				return "", errors.New("unexpected utility")
+			}
+			return `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, nil
+		},
+	}
+	var stdin []byte
+	var arguments []string
+	notifier.run = func(
+		_ context.Context,
+		input []byte,
+		_ string,
+		values ...string,
+	) error {
+		stdin = append([]byte(nil), input...)
+		arguments = append([]string(nil), values...)
+		return nil
+	}
+	const subject = `'); Start-Process calc; #`
+	if err := notifier.Notify(t.Context(), application.MonitorRelease{
+		Destination: "desktop",
+		Event: map[string]any{
+			"subject": subject,
+		},
+	}); err != nil {
+		t.Fatalf("Notify() error = %v", err)
+	}
+	if len(arguments) != 5 || arguments[3] != "-Command" ||
+		strings.Contains(arguments[4], subject) {
+		t.Fatalf("unsafe PowerShell arguments = %+v", arguments)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(string(stdin))
+	if err != nil {
+		t.Fatalf("decode notification stdin: %v", err)
+	}
+	var payload struct {
+		Title   string `json:"title"`
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal(decoded, &payload); err != nil {
+		t.Fatalf("decode notification payload: %v", err)
+	}
+	if payload.Title != "Corresync" || payload.Summary != subject {
+		t.Fatalf("notification payload = %+v", payload)
 	}
 }
