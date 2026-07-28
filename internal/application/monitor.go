@@ -466,10 +466,6 @@ func (service *MonitorService) Status(
 		return MonitorStatus{}, err
 	}
 	queue, callErr := service.store.Status(ctx, account)
-	auditErr := service.auditExecuted(ctx, operation, caller, callErr)
-	if callErr != nil || auditErr != nil {
-		return MonitorStatus{}, errors.Join(callErr, auditErr)
-	}
 	status := MonitorStatus{
 		Account: account, Alias: policy.Alias, Mode: policy.Mode,
 		CollectionEnabled: policy.Mode.Collects(),
@@ -506,6 +502,13 @@ func (service *MonitorService) Status(
 			Fields:      append([]string(nil), policy.RunnerFields...),
 		}
 	}
+	if callErr == nil {
+		callErr = status.Validate(account)
+	}
+	auditErr := service.auditExecuted(ctx, operation, caller, callErr)
+	if callErr != nil || auditErr != nil {
+		return MonitorStatus{}, errors.Join(callErr, auditErr)
+	}
 	return status, nil
 }
 
@@ -530,6 +533,9 @@ func (service *MonitorService) List(
 		return MonitorEventPage{}, err
 	}
 	page, callErr := service.store.List(ctx, input)
+	if callErr == nil {
+		callErr = page.Validate(input)
+	}
 	auditErr := service.auditExecuted(ctx, operation, caller, callErr)
 	if callErr != nil || auditErr != nil {
 		return MonitorEventPage{}, errors.Join(callErr, auditErr)
@@ -559,6 +565,13 @@ func (service *MonitorService) Acknowledge(
 		return MonitorEvent{}, err
 	}
 	event, callErr := service.store.Acknowledge(ctx, input, service.now())
+	if callErr == nil {
+		if event.ID != input.EventID || event.State != "acknowledged" {
+			callErr = errors.New("monitor store returned an invalid acknowledgement")
+		} else {
+			callErr = event.Validate(input.Account)
+		}
+	}
 	auditErr := service.auditExecutedMonitor(
 		ctx,
 		operation,

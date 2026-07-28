@@ -3,6 +3,8 @@ package application
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,12 +47,21 @@ func (store *memoryMonitorStore) List(
 }
 
 func (store *memoryMonitorStore) Acknowledge(
-	context.Context,
-	MonitorAcknowledgeInput,
-	time.Time,
+	_ context.Context,
+	input MonitorAcknowledgeInput,
+	now time.Time,
 ) (MonitorEvent, error) {
 	store.acknowledged = true
-	return MonitorEvent{}, nil
+	for index := range store.events {
+		event := &store.events[index]
+		if event.Account != input.Account || event.ID != input.EventID {
+			continue
+		}
+		event.State = "acknowledged"
+		event.AcknowledgedAt = &now
+		return *event, nil
+	}
+	return MonitorEvent{}, errors.New("event not found")
 }
 
 func (store *memoryMonitorStore) Purge(
@@ -203,6 +214,17 @@ func TestMonitorEngineBootstrapsThenRecoversOnlyNewerMail(t *testing.T) {
 		len(store.events) != 1 {
 		t.Fatalf("recovered scan = %+v, events=%+v", store.lastScan, store.events)
 	}
+	stages := make([]string, 0, len(recorder.events))
+	for _, event := range recorder.events {
+		if event.Monitor != nil {
+			stages = append(stages, event.Monitor.Stage)
+		}
+	}
+	if !slices.Contains(stages, "detection") ||
+		!slices.Contains(stages, "filter") ||
+		!slices.Contains(stages, "queue") {
+		t.Fatalf("pipeline audit stages = %v", stages)
+	}
 }
 
 func TestMonitorEngineDoesNotAdvanceAnUnstableProviderWindow(t *testing.T) {
@@ -288,6 +310,68 @@ func TestAgentDispatchReleasesOnlyConfiguredFieldsAsReadOnlyData(t *testing.T) {
 	}
 	if len(store.dispatches) != 1 || store.status.Dispatched != 1 {
 		t.Fatalf("dispatch state = %+v, batches=%+v", store.status, store.dispatches)
+	}
+	last := recorder.events[len(recorder.events)-1]
+	if last.Monitor == nil || last.Monitor.Stage != "runner" ||
+		last.Monitor.Result != "completed" ||
+		last.Monitor.Destination == policy.RunnerTarget ||
+		!strings.HasPrefix(last.Monitor.Destination, "runner_") ||
+		!slices.Equal(
+			last.Monitor.Fields,
+			[]string{"event_id", "subject", "trust"},
+		) {
+		t.Fatalf("runner audit = %+v", last)
+	}
+}
+
+type monitorCatalogStub struct {
+	policy MonitorPolicy
+}
+
+func (catalog monitorCatalogStub) MonitorPolicy(
+	context.Context,
+	domain.AccountID,
+) (MonitorPolicy, error) {
+	return catalog.policy, nil
+}
+
+func TestMonitorServiceValidatesAndAuditsLocalAcknowledgement(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	const eventID = "evt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	store := &memoryMonitorStore{events: []MonitorEvent{{
+		ID: eventID, Account: monitorTestAccount, AccountAlias: "work",
+		Provider: domain.ProviderJMAP, SourceObjectID: "message-1",
+		Trust: MonitorTrustMarker, State: "pending", DeliveryCount: 1,
+		DetectedAt: now,
+	}}}
+	recorder := &memoryAudit{}
+	service, err := NewMonitorService(
+		monitorCatalogStub{policy: testMonitorPolicy(domain.MonitorQueue)},
+		store,
+		recorder,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.now = func() time.Time { return now }
+	event, err := service.Acknowledge(
+		t.Context(),
+		MonitorAcknowledgeInput{
+			Account: monitorTestAccount,
+			EventID: eventID,
+		},
+		domain.Caller{Surface: "mcp", Instance: "monitor-test"},
+	)
+	if err != nil || event.State != "acknowledged" {
+		t.Fatalf("Acknowledge() = %+v, %v", event, err)
+	}
+	if len(recorder.events) != 2 ||
+		recorder.events[1].Monitor == nil ||
+		recorder.events[1].Monitor.Stage != "acknowledgement" ||
+		recorder.events[1].Monitor.Result != "completed" {
+		t.Fatalf("acknowledgement audit = %+v", recorder.events)
 	}
 }
 
