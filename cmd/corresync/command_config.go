@@ -114,16 +114,21 @@ func (command *configShowCommand) Run(app *runtime) error {
 	aliases := sortedAccountAliases(configuration)
 	for _, alias := range aliases {
 		account := configuration.Accounts[alias]
+		web, _ := account.OutlookWeb()
 		mailbox := ""
-		if account.Mailbox != "" {
-			mailbox = " · " + account.Mailbox
+		if web.Mailbox != "" {
+			mailbox = " · " + web.Mailbox
+		}
+		route := string(account.MailProvider())
+		if account.CalendarProvider() != "" && account.CalendarProvider() != account.MailProvider() {
+			route += " + " + string(account.CalendarProvider())
 		}
 		if _, err := view.printf(
 			"  %s  %s %s · %s%s\n",
 			view.success(),
 			view.strong(fmt.Sprintf("%-16s", alias)),
-			account.Provider,
-			account.Origin,
+			route,
+			web.Origin,
 			view.muted(mailbox),
 		); err != nil {
 			return err
@@ -331,13 +336,21 @@ func getConfigValue(configuration config.Config, key string) (any, error) {
 		case "id":
 			return account.ID, nil
 		case "provider":
-			return account.Provider, nil
+			return account.PrimaryProvider(), nil
 		case "address":
 			return account.Address, nil
 		case "origin":
-			return account.Origin, nil
+			web, ok := account.OutlookWeb()
+			if !ok {
+				return nil, fmt.Errorf("account %q does not use one Outlook Web origin", alias)
+			}
+			return web.Origin, nil
 		case "mailbox":
-			return account.Mailbox, nil
+			web, ok := account.OutlookWeb()
+			if !ok {
+				return nil, fmt.Errorf("account %q does not use one Outlook Web mailbox", alias)
+			}
+			return web.Mailbox, nil
 		}
 	}
 	return nil, fmt.Errorf("unsupported configuration key %q", key)
@@ -404,28 +417,66 @@ func setConfigValue(configuration *config.Config, key, value string) error {
 				return err
 			}
 			account.ID = accountID
-			account.Provider = domain.ProviderMicrosoftOWA
 		}
 		switch field {
 		case "id":
 			return errors.New("account ID is read-only")
 		case "provider":
-			account.Provider = domain.ProviderID(value)
+			if domain.ProviderID(value) != domain.ProviderMicrosoftOWA {
+				return errors.New(
+					"non-Outlook providers require explicit nested mail/calendar route configuration",
+				)
+			}
+			if account.Mail == nil {
+				account.Mail = &config.MailRoute{
+					Provider:   domain.ProviderMicrosoftOWA,
+					OutlookWeb: &config.OutlookWebRoute{},
+				}
+			}
+			if account.Calendar == nil {
+				account.Calendar = &config.CalendarRoute{
+					Provider:   domain.ProviderMicrosoftOWA,
+					OutlookWeb: &config.OutlookWebRoute{},
+				}
+			}
 		case "address":
 			account.Address = value
 		case "origin":
-			account.Origin = value
+			ensureOutlookRoutes(&account)
+			account.Mail.OutlookWeb.Origin = value
+			account.Calendar.OutlookWeb.Origin = value
 		case "mailbox":
 			if !exists {
 				return fmt.Errorf("set accounts.%s.origin before its mailbox", alias)
 			}
-			account.Mailbox = value
+			web, ok := account.OutlookWeb()
+			if !ok {
+				return fmt.Errorf("account %q does not use one Outlook Web route", alias)
+			}
+			web.Mailbox = value
+			account.Mail.OutlookWeb.Mailbox = value
+			account.Calendar.OutlookWeb.Mailbox = value
 		default:
 			return fmt.Errorf("unsupported configuration key %q", key)
 		}
 		configuration.Accounts[alias] = account
 	}
 	return configuration.Validate()
+}
+
+func ensureOutlookRoutes(account *config.Account) {
+	if account.Mail == nil {
+		account.Mail = &config.MailRoute{
+			Provider:   domain.ProviderMicrosoftOWA,
+			OutlookWeb: &config.OutlookWebRoute{},
+		}
+	}
+	if account.Calendar == nil {
+		account.Calendar = &config.CalendarRoute{
+			Provider:   domain.ProviderMicrosoftOWA,
+			OutlookWeb: &config.OutlookWebRoute{},
+		}
+	}
 }
 
 func accountConfigKey(key string) (alias, field string, ok bool) {

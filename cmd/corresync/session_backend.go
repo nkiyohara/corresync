@@ -161,7 +161,7 @@ func (backend *sessionBackend) SessionStatus(
 		configured := backend.configuration.Accounts[alias]
 		accountID := configured.ID
 		state := daemonapi.SessionStatus{
-			Account: accountID, Alias: alias, Provider: configured.Provider,
+			Account: accountID, Alias: alias, Provider: configured.PrimaryProvider(),
 			State: "signed_out",
 		}
 		if account, exists := backend.accounts[accountID]; exists {
@@ -287,8 +287,12 @@ func (backend *sessionBackend) terminalInteraction(
 	if err != nil {
 		return nil, err
 	}
+	web, ok := configured.OutlookWeb()
+	if !ok {
+		return nil, errors.New("terminal login is available only for Outlook Web routes")
+	}
 	handle, err := backend.app.launch(backend.lifecycle, browser.Options{
-		Origin: configured.Origin, ProfileDir: profileDirectory,
+		Origin: web.Origin, ProfileDir: profileDirectory,
 		Executable: backend.configuration.Browser.Executable, Headless: true,
 	})
 	if err != nil {
@@ -1045,9 +1049,13 @@ func (backend *sessionBackend) accountFromHandle(
 	handle browserHandle,
 	credentials session.Credentials,
 ) (sessionAccount, error) {
+	web, ok := configured.OutlookWeb()
+	if !ok {
+		return sessionAccount{}, errors.New("account is not an Outlook Web route")
+	}
 	client, err := outlookweb.NewClient(outlookweb.Options{
-		Origin:     configured.Origin,
-		Mailbox:    configured.Mailbox,
+		Origin:     web.Origin,
+		Mailbox:    web.Mailbox,
 		Authorizer: handle,
 		UserAgent:  "corresync/" + backend.app.info.Version,
 	})
@@ -1058,7 +1066,7 @@ func (backend *sessionBackend) accountFromHandle(
 		MaxRecipients: backend.configuration.Policy.MaxRecipients,
 		Provenance: domain.Provenance{
 			AccountID: configured.ID,
-			Provider:  configured.Provider,
+			Provider:  configured.MailProvider(),
 			MailboxID: "configured-mailbox",
 		},
 	})
@@ -1072,7 +1080,7 @@ func (backend *sessionBackend) accountFromHandle(
 			MaxAttendees: backend.configuration.Policy.MaxAttendees,
 			Provenance: domain.Provenance{
 				AccountID:  configured.ID,
-				Provider:   configured.Provider,
+				Provider:   configured.CalendarProvider(),
 				CalendarID: "calendar",
 			},
 		},

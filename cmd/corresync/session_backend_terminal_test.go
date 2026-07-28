@@ -72,7 +72,8 @@ func TestSessionBackendTerminalLoginStartsHeadlessAndBindsCaller(t *testing.T) {
 	if err != nil || result.Status != "pending" || result.View == nil {
 		t.Fatalf("TerminalLogin(start) = %+v, %v", result, err)
 	}
-	if !launched.Headless || launched.Origin != config.Default().Accounts["work"].Origin {
+	web, _ := config.Default().Accounts["work"].OutlookWeb()
+	if !launched.Headless || launched.Origin != web.Origin {
 		t.Fatalf("browser options = %+v", launched)
 	}
 

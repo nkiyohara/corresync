@@ -380,6 +380,12 @@ func (app *runtime) authenticate(
 	accountID domain.AccountID,
 	account config.Account,
 ) (browserHandle, session.Credentials, error) {
+	web, ok := account.OutlookWeb()
+	if !ok {
+		return nil, session.Credentials{}, errors.New(
+			"account routes do not use one shared Outlook Web browser session",
+		)
+	}
 	profileDirectory, err := paths.ProfileDir(accountID)
 	if err != nil {
 		return nil, session.Credentials{}, err
@@ -388,7 +394,7 @@ func (app *runtime) authenticate(
 		return nil, session.Credentials{}, err
 	}
 	handle, err := app.launch(ctx, browser.Options{
-		Origin:     account.Origin,
+		Origin:     web.Origin,
 		ProfileDir: profileDirectory,
 		Executable: configuration.Browser.Executable,
 	})

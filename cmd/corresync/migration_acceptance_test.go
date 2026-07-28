@@ -72,7 +72,7 @@ func TestDefaultLoadMigratesV06ConfigAndStateOnce(t *testing.T) {
 		t.Fatalf("loadConfig() = version %d path %q, want version %d path %q", configuration.Version, path, config.CurrentVersion, wantPath)
 	}
 	account := configuration.Accounts["work"]
-	if account.Provider != domain.ProviderMicrosoftOWA || account.ID.ValidateOpaque() != nil {
+	if account.PrimaryProvider() != domain.ProviderMicrosoftOWA || account.ID.ValidateOpaque() != nil {
 		t.Fatalf("migrated account = %+v", account)
 	}
 	if original, readErr := os.ReadFile(legacyConfigPath); readErr != nil || !bytes.Equal(original, legacyConfig) { // #nosec G304 -- test path is below t.TempDir.

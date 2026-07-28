@@ -15,7 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CurrentVersion = 2
+const CurrentVersion = 3
 
 const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
@@ -27,6 +27,7 @@ type Config struct {
 	Accounts       map[string]Account `json:"accounts" toml:"accounts"`
 	Policy         Policy             `json:"policy" toml:"policy"`
 	Browser        Browser            `json:"browser" toml:"browser"`
+	Credentials    Credentials        `json:"credentials,omitempty" toml:"credentials,omitempty"`
 	Updates        Updates            `json:"updates" toml:"updates"`
 }
 
@@ -34,11 +35,10 @@ type Config struct {
 // Config.Accounts is its mutable local alias; ID is an opaque, stable storage
 // and policy key that does not change when the alias or address changes.
 type Account struct {
-	ID       domain.AccountID  `json:"id" toml:"id"`
-	Provider domain.ProviderID `json:"provider" toml:"provider"`
-	Address  string            `json:"address,omitempty" toml:"address,omitempty"`
-	Origin   string            `json:"origin" toml:"origin"`
-	Mailbox  string            `json:"mailbox,omitempty" toml:"mailbox,omitempty"`
+	ID       domain.AccountID `json:"id" toml:"id"`
+	Address  string           `json:"address,omitempty" toml:"address,omitempty"`
+	Mail     *MailRoute       `json:"mail,omitempty" toml:"mail,omitempty"`
+	Calendar *CalendarRoute   `json:"calendar,omitempty" toml:"calendar,omitempty"`
 }
 
 // Policy maps persisted settings into the deterministic policy core.
@@ -93,9 +93,19 @@ func Default() Config {
 		DefaultAccount: "work",
 		Accounts: map[string]Account{
 			"work": {
-				ID:       defaultAccountID,
-				Provider: domain.ProviderMicrosoftOWA,
-				Origin:   "https://outlook.cloud.microsoft",
+				ID: defaultAccountID,
+				Mail: &MailRoute{
+					Provider: domain.ProviderMicrosoftOWA,
+					OutlookWeb: &OutlookWebRoute{
+						Origin: "https://outlook.cloud.microsoft",
+					},
+				},
+				Calendar: &CalendarRoute{
+					Provider: domain.ProviderMicrosoftOWA,
+					OutlookWeb: &OutlookWebRoute{
+						Origin: "https://outlook.cloud.microsoft",
+					},
+				},
 			},
 		},
 		Policy: Policy{
@@ -160,24 +170,11 @@ func (configuration Config) Validate() error {
 			)
 		}
 		accountIDs[account.ID] = alias
-		if err := account.Provider.Validate(); err != nil {
-			return fmt.Errorf("validate account %q provider: %w", alias, err)
-		}
-		if account.Provider != domain.ProviderMicrosoftOWA {
-			return fmt.Errorf(
-				"validate account %q: provider %q is not available in this release",
-				alias,
-				account.Provider,
-			)
-		}
 		if err := validateAddress(account.Address); err != nil {
 			return fmt.Errorf("validate account %q: %w", alias, err)
 		}
-		if err := validateOrigin(account.Origin); err != nil {
-			return fmt.Errorf("validate account %q: %w", alias, err)
-		}
-		if err := validateMailbox(account.Mailbox); err != nil {
-			return fmt.Errorf("validate account %q: %w", alias, err)
+		if err := account.validate(); err != nil {
+			return fmt.Errorf("validate account %q routes: %w", alias, err)
 		}
 	}
 
@@ -196,6 +193,9 @@ func (configuration Config) Validate() error {
 	}
 	if strings.ContainsAny(configuration.Browser.Executable, "\r\n\x00") {
 		return errors.New("browser executable contains a forbidden character")
+	}
+	if err := configuration.Credentials.validate(); err != nil {
+		return err
 	}
 	return nil
 }

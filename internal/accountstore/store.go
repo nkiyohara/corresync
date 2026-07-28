@@ -27,9 +27,10 @@ func (store Store) ListAccounts(context.Context) (application.AccountCatalog, er
 	}
 	accounts := make([]application.AccountView, 0, len(configuration.Accounts))
 	for alias, account := range configuration.Accounts {
+		web, _ := account.OutlookWeb()
 		accounts = append(accounts, application.AccountView{
 			ID: account.ID, Alias: alias, Address: account.Address,
-			Provider: account.Provider, Origin: account.Origin, Mailbox: account.Mailbox,
+			Provider: account.PrimaryProvider(), Origin: web.Origin, Mailbox: web.Mailbox,
 			IsDefault: alias == configuration.DefaultAccount,
 		})
 	}
@@ -50,9 +51,21 @@ func (store Store) AddAccount(ctx context.Context, account application.AccountVi
 				return fmt.Errorf("account ID already belongs to alias %q", alias)
 			}
 		}
+		if account.Provider != domain.ProviderMicrosoftOWA {
+			return fmt.Errorf("provider %q needs an explicit route definition", account.Provider)
+		}
+		web := config.OutlookWebRoute{Origin: account.Origin, Mailbox: account.Mailbox}
 		configuration.Accounts[account.Alias] = config.Account{
-			ID: account.ID, Provider: account.Provider, Address: account.Address,
-			Origin: account.Origin, Mailbox: account.Mailbox,
+			ID: account.ID, Address: account.Address,
+			Mail: &config.MailRoute{
+				Provider: domain.ProviderMicrosoftOWA, OutlookWeb: &web,
+			},
+			Calendar: &config.CalendarRoute{
+				Provider: domain.ProviderMicrosoftOWA,
+				OutlookWeb: &config.OutlookWebRoute{
+					Origin: account.Origin, Mailbox: account.Mailbox,
+				},
+			},
 		}
 		if account.IsDefault {
 			configuration.DefaultAccount = account.Alias
