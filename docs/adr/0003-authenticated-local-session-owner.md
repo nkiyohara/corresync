@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-17
-- Amended: 2026-07-25
+- Amended: 2026-07-28
 
 ## Context
 
@@ -54,7 +54,10 @@ owner-only authenticated IPC and never expose authorization material.
 Protocol version 10 adds bounded attachment reads, reviewed permanent deletion,
 and the expanded typed mail and calendar surface. Protocol version 11 adds
 content-free `session.status`; it exposes only configured aliases, lifecycle
-state, and an optional capture time.
+state, and an optional capture time. Protocol version 12 replaces editable
+aliases in routing contracts with stable opaque account IDs, carries provider
+capabilities and provenance, and binds consequential operations to explicit
+mailbox or calendar targets.
 
 Keep `status` and `shutdown` as the only stable lifecycle controls across
 protocol versions. After an authenticated daemon proves that a request was

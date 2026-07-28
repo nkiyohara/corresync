@@ -10,7 +10,7 @@ var (
 	buildDate = "unknown"
 )
 
-// Info describes the exact owa binary currently running.
+// Info describes the exact Corresync binary currently running.
 type Info struct {
 	Version   string `json:"version"`
 	Commit    string `json:"commit"`

@@ -10,7 +10,7 @@ decision remains auditable as those projects evolve.
 | [Owl for Exchange](https://addons.thunderbird.net/thunderbird/addon/owl-for-exchange/) | 1.5.2 | Mature OWA integration with mail and calendar | Proprietary, no source license, Thunderbird-specific product |
 | [johnkil/outlook-agent](https://github.com/johnkil/outlook-agent) | `bedf89f` | Broad Apache-2.0 CLI/MCP, policy gates, many tests, Graph/EWS/OWA backends | Graph-first and intentionally broad; includes persisted secret providers and a guarded raw-action escape hatch |
 | [jlentink/outlook-web-mcp](https://github.com/jlentink/outlook-web-mcp) | `04d3509` | Focused OWA mail/calendar MCP with wide action coverage | No repository license; persists OAuth tokens and uses a local TLS interception login design |
-| [okms/m365-owa-cli](https://github.com/okms/m365-owa-cli) | `e7bb9e8` | Focused calendar CLI and useful OWA contract fixtures | No repository license, no MCP, and plaintext token persistence |
+| [okms/m365-corresync-cli](https://github.com/okms/m365-corresync-cli) | `e7bb9e8` | Focused calendar CLI and useful OWA contract fixtures | No repository license, no MCP, and plaintext token persistence |
 | [ladifire-opensource/outlook.live.com_modules](https://github.com/ladifire-opensource/outlook.live.com_modules) | `fef0574` | Historical names and shapes from Outlook Web modules | No repository license and old generated/extracted source |
 
 No-license repositories are useful public observations, but their code is not
@@ -25,7 +25,7 @@ Graph, EWS, OWA, setup plugins, skills, raw actions, and enterprise rollout
 machinery at the reviewed revision. Removing most of that surface would produce
 a harder-to-review fork than a small OWA-only core.
 
-`owa-bridge` therefore starts independently and keeps these non-negotiable
+`Corresync` therefore starts independently and keeps these non-negotiable
 invariants:
 
 - a visible browser owns the Outlook session;

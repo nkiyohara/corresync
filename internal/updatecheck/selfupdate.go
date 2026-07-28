@@ -160,7 +160,7 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 		return InstallResult{}, err
 	}
 
-	temporaryDirectory, err := os.MkdirTemp("", "owa-update-*")
+	temporaryDirectory, err := os.MkdirTemp("", "corresync-update-*")
 	if err != nil {
 		return InstallResult{}, fmt.Errorf("create private update directory: %w", err)
 	}
@@ -374,7 +374,7 @@ func (installer Installer) fetchRelease(
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
 	request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	request.Header.Set("User-Agent", "owa-bridge/"+installer.CurrentVersion)
+	request.Header.Set("User-Agent", "corresync/"+installer.CurrentVersion)
 	response, err := client.Do(request)
 	if err != nil {
 		return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf("fetch release metadata: %w", err)
@@ -545,7 +545,7 @@ func downloadAsset(
 	}
 	request.Header.Set("Accept", "application/octet-stream")
 	request.Header.Set("Accept-Encoding", "identity")
-	request.Header.Set("User-Agent", "owa-bridge-self-update")
+	request.Header.Set("User-Agent", "corresync-self-update")
 	response, err := restrictedHTTPClient(client, endpoint).Do(request)
 	if err != nil {
 		return fmt.Errorf("download release asset %q: %w", asset.Name, err)
@@ -862,6 +862,6 @@ func validateCandidate(
 }
 
 func canonicalReleaseURL(version semanticVersion) string {
-	return "https://github.com/nkiyohara/owa-bridge/releases/tag/" +
+	return "https://github.com/nkiyohara/corresync/releases/tag/" +
 		url.PathEscape(version.String())
 }

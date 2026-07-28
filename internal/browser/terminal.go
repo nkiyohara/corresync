@@ -98,7 +98,7 @@ func (browser *Browser) TerminalAct(ctx context.Context, action TerminalAction) 
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
 
-	selector := `[data-owa-terminal-control="` + action.ElementID + `"]`
+	selector := `[data-corresync-terminal-control="` + action.ElementID + `"]`
 	var run chromedp.Action
 	switch action.Kind {
 	case TerminalActivate:
@@ -225,7 +225,7 @@ func sanitizeTerminalText(value string, maximum int) string {
 }
 
 const terminalSnapshotScript = `(() => {
-  const marker = "data-owa-terminal-control";
+  const marker = "data-corresync-terminal-control";
   document.querySelectorAll("[" + marker + "]").forEach((node) => node.removeAttribute(marker));
   const visible = (node) => {
     const style = window.getComputedStyle(node);

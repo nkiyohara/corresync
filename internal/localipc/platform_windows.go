@@ -14,8 +14,11 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func platformEndpoint(id string) (address, runtimeDirectory, lockPath string, err error) {
-	return `\\.\pipe\owa-bridge-` + id, "", "", nil
+func platformEndpoint(
+	id,
+	runtimeName string,
+) (address, runtimeDirectory, lockPath string, err error) {
+	return `\\.\pipe\` + runtimeName + `-` + id, "", "", nil
 }
 
 // Listen creates a byte-mode named pipe restricted to SYSTEM and the current

@@ -1,4 +1,1 @@
-# Synthetic, non-secret approval-token fixtures from pre-scanner history.
-d815acbf0dcf14d3a07018f328819e06f9384369:cmd/owa/daemon_adapter_test.go:generic-api-key:57
-d815acbf0dcf14d3a07018f328819e06f9384369:internal/mcpserver/server_test.go:generic-api-key:308
-3405d267123594d032bfeec411eb93a7e85e60bc:internal/mcpserver/server_test.go:generic-api-key:185
+# Synthetic fixtures use inline, reviewable allowlist comments at their source.

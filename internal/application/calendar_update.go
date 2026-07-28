@@ -8,12 +8,12 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CalendarMeetingUpdateModeOWADefault = "owa_default"
+const CalendarMeetingUpdateModeProviderDefault = "provider_default"
 
 // CalendarUpdateInput applies a closed patch to one exact event version.
 // Nil fields remain unchanged; an empty pointed-to string clears that field.
@@ -57,8 +57,9 @@ type CalendarUpdateReview struct {
 
 // CalendarUpdateResult contains a refreshed identity when OWA returns one.
 type CalendarUpdateResult struct {
-	ID        string `json:"id,omitempty"`
-	ChangeKey string `json:"changeKey,omitempty"`
+	ID         string            `json:"id,omitempty"`
+	ChangeKey  string            `json:"changeKey,omitempty"`
+	Provenance domain.Provenance `json:"provenance,omitempty"`
 }
 
 // CalendarUpdateAccess is an immutable preview or a completed update.
@@ -83,8 +84,12 @@ func (service *CalendarService) Update(
 	if err := input.ValidateWithAttendeeLimit(service.maxAttendees); err != nil {
 		return CalendarUpdateAccess{}, err
 	}
-	operation, err := domain.NewOperation(
-		"calendar.update", domain.EffectExternalWrite, input.Account, input,
+	operation, err := domain.NewTargetedOperation(
+		"calendar.update",
+		domain.EffectExternalWrite,
+		input.Account,
+		calendarEventTarget(input.EventID),
+		input,
 	)
 	if err != nil {
 		return CalendarUpdateAccess{}, fmt.Errorf("create calendar update operation: %w", err)
@@ -141,6 +146,9 @@ func (service *CalendarService) executeUpdate(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (CalendarUpdateResult, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return CalendarUpdateResult{}, err
+	}
 	updated, callErr := service.updater.UpdateCalendarEvent(ctx, input)
 	outcome, reason := calendarWriteAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{
@@ -149,6 +157,9 @@ func (service *CalendarService) executeUpdate(
 	})
 	if callErr != nil || auditErr != nil {
 		return CalendarUpdateResult{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		updated.Provenance = service.calendarProvenance(updated.ID)
 	}
 	return updated, nil
 }
@@ -274,7 +285,7 @@ func (input CalendarUpdateInput) Review() CalendarUpdateReview {
 		RequiredAttendees:      append([]string(nil), input.RequiredAttendees...),
 		OptionalAttendees:      append([]string(nil), input.OptionalAttendees...),
 		AttendeeUpdatesMaySend: input.ReplaceAttendees,
-		MeetingUpdateMode:      CalendarMeetingUpdateModeOWADefault,
+		MeetingUpdateMode:      CalendarMeetingUpdateModeProviderDefault,
 	}
 	if input.Body != nil {
 		body := reviewCalendarBody(*input.Body)

@@ -9,8 +9,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/nkiyohara/owa-bridge/internal/application"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 func TestDecodeMailAttachmentsRejectsAggregateBeforeApplicationUse(t *testing.T) {
@@ -59,6 +59,12 @@ type fakeBackend struct {
 }
 
 func (backend *fakeBackend) DefaultAccount() domain.AccountID { return "work" }
+func (backend *fakeBackend) ResolveAccount(reference string) (domain.AccountID, error) {
+	if reference == "" {
+		return backend.DefaultAccount(), nil
+	}
+	return domain.AccountID(reference), nil
+}
 
 func (backend *fakeBackend) ListMail(
 	_ context.Context,
@@ -317,9 +323,9 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = clientSession.Close() })
 	initializeResult := clientSession.InitializeResult()
-	if initializeResult == nil || !strings.Contains(initializeResult.Instructions, "inbox or mailbox") ||
+	if initializeResult == nil || !strings.Contains(initializeResult.Instructions, "check, find, read") ||
 		!strings.Contains(initializeResult.Instructions, "mail_list") {
-		t.Fatalf("server instructions do not describe Outlook discovery: %+v", initializeResult)
+		t.Fatalf("server instructions do not describe mail discovery: %+v", initializeResult)
 	}
 
 	tools, err := clientSession.ListTools(t.Context(), nil)
@@ -552,7 +558,7 @@ func TestCalendarCreateToolsKeepMandatoryPreviewAndCommitSeparate(t *testing.T) 
 		}
 	}
 	commitTool := toolNamed(tools.Tools, "calendar_create_commit")
-	if classification := commitTool.Meta["io.github.nkiyohara.owa-bridge/data-classification"]; classification != "private-untrusted-sensitive" {
+	if classification := commitTool.Meta["io.github.nkiyohara.corresync/data-classification"]; classification != "private-untrusted-sensitive" {
 		t.Fatalf("calendar create commit classification = %v", classification)
 	}
 	result, err := clientSession.CallTool(t.Context(), &mcp.CallToolParams{

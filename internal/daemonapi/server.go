@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nkiyohara/owa-bridge/internal/application"
-	"github.com/nkiyohara/owa-bridge/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/localipc"
 )
 
 const maxConcurrentCalls = 32

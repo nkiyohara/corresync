@@ -19,7 +19,7 @@ func TestCheckerCachesSuccessfulResultForTwentyFourHours(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		requests++
 		if request.Header.Get("Accept") != "application/vnd.github+json" ||
-			request.Header.Get("User-Agent") != "owa-bridge/1.0.0" || request.URL.RawQuery != "" {
+			request.Header.Get("User-Agent") != "corresync/1.0.0" || request.URL.RawQuery != "" {
 			t.Errorf("unexpected release request: headers=%v URL=%s", request.Header, request.URL)
 		}
 		version := "v1.1.0"

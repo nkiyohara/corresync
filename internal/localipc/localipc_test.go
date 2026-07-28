@@ -13,11 +13,15 @@ import (
 func TestDeriveEndpointNamespacesConfigAndState(t *testing.T) {
 	t.Parallel()
 
-	first, err := deriveEndpoint("/synthetic/config-a.toml", "/synthetic/state")
+	first, err := deriveEndpoint(
+		"/synthetic/config-a.toml", "/synthetic/state", namespaceVersion, "corresync",
+	)
 	if err != nil {
 		t.Fatalf("deriveEndpoint() error = %v", err)
 	}
-	second, err := deriveEndpoint("/synthetic/config-b.toml", "/synthetic/state")
+	second, err := deriveEndpoint(
+		"/synthetic/config-b.toml", "/synthetic/state", namespaceVersion, "corresync",
+	)
 	if err != nil {
 		t.Fatalf("deriveEndpoint() error = %v", err)
 	}
@@ -58,6 +62,7 @@ func TestListenerIsSingletonAndDialable(t *testing.T) {
 
 	endpoint, err := deriveEndpoint(
 		filepath.Join(t.TempDir(), "config.toml"), filepath.Join(t.TempDir(), "state"),
+		namespaceVersion, "corresync",
 	)
 	if err != nil {
 		t.Fatalf("deriveEndpoint() error = %v", err)

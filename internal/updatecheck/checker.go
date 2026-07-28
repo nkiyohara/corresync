@@ -19,7 +19,7 @@ import (
 
 const (
 	// DefaultEndpoint returns the latest published non-prerelease GitHub release.
-	DefaultEndpoint = "https://api.github.com/repos/nkiyohara/owa-bridge/releases/latest"
+	DefaultEndpoint = "https://api.github.com/repos/nkiyohara/corresync/releases/latest"
 	cacheFormat     = 1
 	cacheLifetime   = 24 * time.Hour
 	maximumBody     = 1 << 20
@@ -183,7 +183,7 @@ func (checker Checker) fetchLatest(ctx context.Context) (string, error) {
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
 	request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	request.Header.Set("User-Agent", "owa-bridge/"+checker.CurrentVersion)
+	request.Header.Set("User-Agent", "corresync/"+checker.CurrentVersion)
 	response, err := client.Do(request)
 	if err != nil {
 		return "", fmt.Errorf("fetch release metadata: %w", err)
@@ -227,7 +227,7 @@ func resultFromRecord(currentRaw string, current semanticVersion, record cacheRe
 		return result, ErrUnavailable
 	}
 	result.LatestVersion = latest.String()
-	result.ReleaseURL = "https://github.com/nkiyohara/owa-bridge/releases/tag/" + url.PathEscape(latest.String())
+	result.ReleaseURL = "https://github.com/nkiyohara/corresync/releases/tag/" + url.PathEscape(latest.String())
 	comparison := current.Compare(latest)
 	if comparison < 0 {
 		result.Status = StatusAvailable

@@ -1,4 +1,4 @@
-// Package daemonapi defines the private, versioned API between owa-bridge
+// Package daemonapi defines the private, versioned API between Corresync
 // adapters and the local session-owning daemon.
 package daemonapi
 
@@ -13,17 +13,17 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/nkiyohara/owa-bridge/internal/application"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 const (
-	ProtocolVersion   = 11
+	ProtocolVersion   = 12
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
 	requestPath       = "/v1/call"
-	requestHost       = "owa.local"
+	requestHost       = "corresync.local"
 	authorizationType = "Bearer "
 )
 
@@ -176,13 +176,17 @@ type LoginResult struct {
 	CapturedAt    time.Time        `json:"capturedAt"`
 }
 
-// SessionStatus contains only local aliases and in-memory authentication
-// freshness. It never exposes account identities or authorization material.
+// SessionStatus contains only local routing metadata, observed capabilities,
+// and in-memory authentication freshness. It never exposes remote identities
+// or authorization material.
 type SessionStatus struct {
-	Account       domain.AccountID `json:"account"`
-	State         string           `json:"state"`
-	Authenticated bool             `json:"authenticated"`
-	CapturedAt    *time.Time       `json:"capturedAt,omitempty"`
+	Account       domain.AccountID     `json:"account"`
+	Alias         string               `json:"alias"`
+	Provider      domain.ProviderID    `json:"provider"`
+	State         string               `json:"state"`
+	Authenticated bool                 `json:"authenticated"`
+	CapturedAt    *time.Time           `json:"capturedAt,omitempty"`
+	Capabilities  *domain.Capabilities `json:"capabilities,omitempty"`
 }
 
 // SessionStatusResult reports every configured account in stable alias order.

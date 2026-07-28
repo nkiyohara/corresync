@@ -1,16 +1,16 @@
 version: 2
 
-project_name: owa-bridge
+project_name: corresync
 
 before:
   hooks:
     - go mod vendor
     - >-
-        go-licenses check ./cmd/owa
-        --ignore github.com/nkiyohara/owa-bridge
+        go-licenses check ./cmd/corresync
+        --ignore github.com/nkiyohara/corresync
     - >-
-        go-licenses save ./cmd/owa
-        --ignore github.com/nkiyohara/owa-bridge
+        go-licenses save ./cmd/corresync
+        --ignore github.com/nkiyohara/corresync
         --save_path .release/third_party_licenses
         --force
     - >-
@@ -24,9 +24,9 @@ before:
         ./tools/syftreproducible
 
 builds:
-  - id: owa
-    main: ./cmd/owa
-    binary: owa
+  - id: corresync
+    main: ./cmd/corresync
+    binary: corresync
     env:
       - CGO_ENABLED=0
       - GOFLAGS=-mod=readonly
@@ -44,14 +44,14 @@ builds:
     ldflags:
       - >-
         -s -w -buildid=
-        -X github.com/nkiyohara/owa-bridge/internal/buildinfo.version={{ .Version }}
-        -X github.com/nkiyohara/owa-bridge/internal/buildinfo.commit={{ .Commit }}
-        -X github.com/nkiyohara/owa-bridge/internal/buildinfo.buildDate={{ .CommitDate }}
+        -X github.com/nkiyohara/corresync/internal/buildinfo.version={{ .Version }}
+        -X github.com/nkiyohara/corresync/internal/buildinfo.commit={{ .Commit }}
+        -X github.com/nkiyohara/corresync/internal/buildinfo.buildDate={{ .CommitDate }}
 
 archives:
   - id: release
     ids:
-      - owa
+      - corresync
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     formats:
@@ -88,11 +88,11 @@ archives:
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: plugins/owa-bridge/README.md
+      - src: plugins/corresync/README.md
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: plugins/owa-bridge/**/*
+      - src: plugins/corresync/**/*
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
@@ -104,19 +104,19 @@ archives:
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/owa.bash
+      - src: completions/corresync.bash
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/_owa
+      - src: completions/_corresync
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/owa.fish
+      - src: completions/corresync.fish
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: manpages/owa.1
+      - src: manpages/corresync.1
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
@@ -129,17 +129,16 @@ archives:
 nfpms:
   - id: linux-packages
     ids:
-      - owa
-    package_name: owa-bridge
+      - corresync
+    package_name: corresync
     # GitHub rewrites '~' in release asset names, which otherwise makes the
     # checksum manifest unverifiable for prerelease deb and RPM packages.
     file_name_template: '{{ replace .ConventionalFileName "~" "_" }}'
-    vendor: owa-bridge contributors
-    homepage: https://github.com/nkiyohara/owa-bridge
-    maintainer: owa-bridge maintainers <nkiyohara@users.noreply.github.com>
+    vendor: Corresync contributors
+    homepage: https://github.com/nkiyohara/corresync
+    maintainer: Corresync maintainers <nkiyohara@users.noreply.github.com>
     description: >-
-      Local-first Outlook Web mail and calendar CLI, session owner, and MCP
-      server.
+      Local-first guarded mail and calendar CLI, session owner, and MCP server.
     license: Apache-2.0
     formats:
       - apk
@@ -152,58 +151,58 @@ nfpms:
     release: "1"
     contents:
       - src: LICENSE
-        dst: /usr/share/doc/owa-bridge/LICENSE
+        dst: /usr/share/doc/corresync/LICENSE
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
       - src: README.md
-        dst: /usr/share/doc/owa-bridge/README.md
+        dst: /usr/share/doc/corresync/README.md
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
       - src: CHANGELOG.md
-        dst: /usr/share/doc/owa-bridge/CHANGELOG.md
+        dst: /usr/share/doc/corresync/CHANGELOG.md
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/owa.bash
-        dst: /usr/share/bash-completion/completions/owa
+      - src: completions/corresync.bash
+        dst: /usr/share/bash-completion/completions/corresync
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/_owa
-        dst: /usr/share/zsh/site-functions/_owa
+      - src: completions/_corresync
+        dst: /usr/share/zsh/site-functions/_corresync
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/owa.fish
-        dst: /usr/share/fish/vendor_completions.d/owa.fish
+      - src: completions/corresync.fish
+        dst: /usr/share/fish/vendor_completions.d/corresync.fish
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: manpages/owa.1
-        dst: /usr/share/man/man1/owa.1
+      - src: manpages/corresync.1
+        dst: /usr/share/man/man1/corresync.1
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: plugins/owa-bridge/
-        dst: /usr/share/owa-bridge/plugins/owa-bridge
+      - src: plugins/corresync/
+        dst: /usr/share/corresync/plugins/corresync
         type: tree
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
       - src: .agents/plugins/marketplace.json
-        dst: /usr/share/owa-bridge/.agents/plugins/marketplace.json
+        dst: /usr/share/corresync/.agents/plugins/marketplace.json
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
       - src: .claude-plugin/marketplace.json
-        dst: /usr/share/owa-bridge/.claude-plugin/marketplace.json
+        dst: /usr/share/corresync/.claude-plugin/marketplace.json
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
       - src: .release/third_party_licenses/
-        dst: /usr/share/doc/owa-bridge/third_party_licenses
+        dst: /usr/share/doc/corresync/third_party_licenses
         type: tree
         file_info:
           mode: 0644
@@ -313,7 +312,7 @@ release:
   replace_existing_draft: false
   prerelease: auto
   make_latest: false
-  name_template: "owa-bridge {{ .Tag }}"
+  name_template: "corresync {{ .Tag }}"
   header: |
     Local-first Outlook Web mail and calendar for humans, scripts, and AI
     agents. Verify the checksum and review the compatibility notes before using

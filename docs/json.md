@@ -123,14 +123,14 @@ automatically retried.
 
 ## Update status
 
-`owa update check --json` returns `status`, `currentVersion`,
+`corresync update check --json` returns `status`, `currentVersion`,
 `updateAvailable`, and `cached`; successful comparisons also include
 `latestVersion`, `releaseUrl`, and `checkedAt`.
 `status` is `current`, `available`, `development`, or `unavailable`. This
 content-free result is separate from the Outlook application result types.
 `installMethod` and `upgrade` appear only when `status` is `available`.
 
-`owa update --json` returns the explicit action result. It always includes
+`corresync update --json` returns the explicit action result. It always includes
 `status`, `currentVersion`, `updated`, and `installMethod`. A direct successful
 replacement uses `status: "updated"` and also returns `previousVersion`,
 `latestVersion`, `releaseUrl`, `archive`, `backupPath`, and the completed
@@ -141,32 +141,49 @@ Automatic human notices are never appended to JSON output.
 
 ## Local CLI state
 
-`owa auth status --json` is deliberately content-free:
+`corresync auth status --json` is deliberately content-free:
 
 ```json
 {
-  "daemonVersion": "0.6.1",
+  "daemonVersion": "0.7.0",
   "processId": 4242,
   "accounts": [
     {
-      "account": "work",
+      "account": "acc_0123456789abcdef0123456789abcdef",
+      "alias": "work",
+      "provider": "microsoft-owa",
       "state": "authenticated",
       "authenticated": true,
-      "capturedAt": "2026-07-25T12:00:00Z"
+      "capturedAt": "2026-07-28T12:00:00Z",
+      "capabilities": {
+        "mail": true,
+        "calendar": true,
+        "folders": true,
+        "labels": false,
+        "push": false,
+        "freeBusy": false,
+        "onlineMeeting": "teams",
+        "incrementalSync": false,
+        "scheduledSend": false,
+        "sharedMailboxes": true,
+        "sharedCalendars": false,
+        "attachmentReads": true,
+        "attachmentWrites": true
+      }
     }
   ]
 }
 ```
 
 State is `authenticated`, `pending`, or `signed_out`; `capturedAt` exists only
-for an authenticated session. `owa auth logout --json` returns
+for an authenticated session. `corresync auth logout --json` returns
 `{"loggedOut":true,"scope":"all"}` after the owner has exited.
 
-`owa config show --json` serializes the validated secret-free configuration
+`corresync config show --json` serializes the validated secret-free configuration
 with lower-camel field names. `config get --json` returns `key` and typed
 `value`; `config set --json` additionally returns `updated: true`. Config
 initialization, validation, editing, and path inspection similarly emit one
-small action object. `owa version --json` returns version, commit, build time,
+small action object. `corresync version --json` returns version, commit, build time,
 Go version, operating system, and architecture.
 
 ## Compatibility policy

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 const CalendarCancellationModeAll = "all_attendees_and_save_copy"
@@ -30,7 +30,8 @@ type CalendarCancelReview struct {
 
 // CalendarCancelResult identifies the event requested for cancellation.
 type CalendarCancelResult struct {
-	ID string `json:"id"`
+	ID         string            `json:"id"`
+	Provenance domain.Provenance `json:"provenance,omitempty"`
 }
 
 // CalendarCancelAccess is a destructive preview or completed cancellation.
@@ -55,8 +56,12 @@ func (service *CalendarService) Cancel(
 	if err := input.Validate(); err != nil {
 		return CalendarCancelAccess{}, err
 	}
-	operation, err := domain.NewOperation(
-		"calendar.cancel", domain.EffectDestructiveWrite, input.Account, input,
+	operation, err := domain.NewTargetedOperation(
+		"calendar.cancel",
+		domain.EffectDestructiveWrite,
+		input.Account,
+		calendarEventTarget(input.EventID),
+		input,
 	)
 	if err != nil {
 		return CalendarCancelAccess{}, fmt.Errorf("create calendar cancel operation: %w", err)
@@ -102,7 +107,10 @@ func (service *CalendarService) CommitCancel(
 		return CalendarCancelAccess{}, err
 	}
 	return CalendarCancelAccess{
-		Status: "cancelled", Cancelled: &CalendarCancelResult{ID: input.EventID},
+		Status: "cancelled",
+		Cancelled: &CalendarCancelResult{
+			ID: input.EventID, Provenance: service.calendarProvenance(input.EventID),
+		},
 		Review: input.Review(),
 	}, nil
 }
@@ -113,6 +121,9 @@ func (service *CalendarService) executeCancel(
 	caller domain.Caller,
 	operation domain.Operation,
 ) error {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return err
+	}
 	callErr := service.canceller.CancelCalendarEvent(ctx, input)
 	outcome, reason := calendarWriteAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{

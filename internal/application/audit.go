@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 // ErrWriteOutcomeUnknown means a remote write may have committed before its

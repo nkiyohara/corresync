@@ -86,6 +86,110 @@ func TestNewOperationRejectsInvalidBoundaries(t *testing.T) {
 	}
 }
 
+func TestTargetedOperationDigestBindsExactTarget(t *testing.T) {
+	t.Parallel()
+
+	payload := map[string]string{"subject": "Quarterly plan"}
+	workCalendar, err := NewTargetedOperation(
+		"calendar.create",
+		EffectExternalWrite,
+		"acc_00112233445566778899aabbccddeeff",
+		TargetRef{Kind: TargetCalendar, ID: "calendar-primary"},
+		payload,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sharedCalendar, err := NewTargetedOperation(
+		"calendar.create",
+		EffectExternalWrite,
+		"acc_00112233445566778899aabbccddeeff",
+		TargetRef{Kind: TargetCalendar, ID: "calendar-shared"},
+		payload,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherAccount, err := NewTargetedOperation(
+		"calendar.create",
+		EffectExternalWrite,
+		"acc_ffeeddccbbaa99887766554433221100",
+		TargetRef{Kind: TargetCalendar, ID: "calendar-primary"},
+		payload,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	workView := workCalendar.View()
+	if workView.Target == nil ||
+		workView.Target.Kind != TargetCalendar ||
+		workView.Target.ID != "calendar-primary" {
+		t.Fatalf("targeted view = %+v", workView)
+	}
+	if workView.Digest == sharedCalendar.View().Digest {
+		t.Fatal("different calendars produced the same operation digest")
+	}
+	if workView.Digest == otherAccount.View().Digest {
+		t.Fatal("different accounts produced the same operation digest")
+	}
+}
+
+func TestGeneratedAccountIDsAreOpaqueAndUnique(t *testing.T) {
+	t.Parallel()
+
+	first, err := NewAccountID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := NewAccountID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.ValidateOpaque(); err != nil {
+		t.Fatalf("generated account ID rejected: %v", err)
+	}
+	if first == second {
+		t.Fatalf("generated duplicate account ID %q", first)
+	}
+	for _, invalid := range []AccountID{
+		"work",
+		"acc_work",
+		"acc_00112233445566778899AABBCCDDEEFF",
+		"acc_00112233445566778899aabbccddee",
+	} {
+		if err := invalid.ValidateOpaque(); err == nil {
+			t.Fatalf("non-opaque account ID %q accepted", invalid)
+		}
+	}
+}
+
+func TestCapabilitiesAndProvenanceValidation(t *testing.T) {
+	t.Parallel()
+
+	if err := (Capabilities{Mail: true, Calendar: true, OnlineMeeting: "teams"}).Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := (Capabilities{OnlineMeeting: "arbitrary-provider-value"}).Validate(); err == nil {
+		t.Fatal("open-ended online meeting capability accepted")
+	}
+	if err := (Provenance{
+		AccountID:      "acc_00112233445566778899aabbccddeeff",
+		Provider:       ProviderMicrosoftOWA,
+		MailboxID:      "primary",
+		SourceObjectID: "opaque-item",
+	}).Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if err := (Provenance{
+		AccountID:  "acc_00112233445566778899aabbccddeeff",
+		Provider:   ProviderMicrosoftOWA,
+		MailboxID:  "primary",
+		CalendarID: "calendar",
+	}).Validate(); err == nil {
+		t.Fatal("ambiguous provenance accepted")
+	}
+}
+
 func TestCallerValidation(t *testing.T) {
 	t.Parallel()
 

@@ -6,7 +6,7 @@ import (
 
 	"github.com/chromedp/cdproto/network"
 
-	"github.com/nkiyohara/owa-bridge/internal/session"
+	"github.com/nkiyohara/corresync/internal/session"
 )
 
 const observerSyntheticBearer = "observer-synthetic-token-0123456789abcdef"

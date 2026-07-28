@@ -3,6 +3,44 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.0 - 2026-07-28
+
+### Corresync
+
+- Rename the product, repository, Go module, executable, release artifacts,
+  package catalogs, configuration and state roots, MCP identity, plugin, Skill,
+  completions, manual, and Pages site to Corresync in one coordinated release.
+- Keep old names only as exact migration inputs for v0.6 config, state, daemon,
+  installation detection, release artifacts, and signed workflow identity; the
+  canonical release publishes no legacy command or directory aliases.
+- Add the v0.6.2 bridge path and a rollback-aware v0.7 migration guide. Config
+  v1 is copied to schema v2 while the original remains byte-exact; browser
+  profiles move into the stable account-ID namespace after the old daemon
+  stops, and IPC credentials are never copied.
+
+### Provider-neutral safety core
+
+- Give every configured account a stable opaque ID and explicit provider ID,
+  independent of its editable alias or address.
+- Bind every consequential preview and commit digest to one account, provider,
+  mailbox or calendar target, and expose capability and provenance metadata
+  through the shared application, daemon, CLI, and MCP paths.
+- Accept the provider-neutral scope, capability/degradation, account isolation,
+  discovery, import, and monitoring architecture while clearly shipping only
+  the Outlook Web adapter in this release.
+- Advance the private authenticated daemon protocol to version 12 and isolate
+  the v0.6 shutdown protocol behind a migration-only client.
+
+### Experience and documentation
+
+- Add `corresync completion install` with Bash, Zsh, and Fish detection,
+  idempotent no-op behavior, explicit safe replacement, and symlink rejection.
+- Redesign Pages as a static, accessible light/dark site with the Corresync
+  icon system, one-core/two-interface mental model, explicit shipped-versus-
+  planned scope, and a careful explanation of the no-Graph-app use case.
+- Regenerate package manifests, release verification, completions, plugin
+  metadata, manuals, examples, and security guidance for the canonical names.
+
 ## 0.6.2 - 2026-07-28
 
 ### Corresync update bridge

@@ -1,4 +1,0 @@
-#compdef owa
-# zsh completion for owa through its bash-compatible completion protocol.
-autoload -U +X bashcompinit && bashcompinit
-complete -o default -o bashdefault -C owa owa

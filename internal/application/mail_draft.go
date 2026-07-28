@@ -10,9 +10,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 const (
@@ -79,8 +79,9 @@ type MailDraftInput struct {
 
 // MailDraft identifies the saved draft returned by OWA.
 type MailDraft struct {
-	ID        string `json:"id"`
-	ChangeKey string `json:"changeKey,omitempty"`
+	ID         string            `json:"id"`
+	ChangeKey  string            `json:"changeKey,omitempty"`
+	Provenance domain.Provenance `json:"provenance,omitempty"`
 }
 
 // MailReview is safe to show before saving or sending an exact composition.
@@ -122,7 +123,13 @@ func (service *MailService) CreateDraft(
 		return MailDraftAccess{}, err
 	}
 	review := input.Review()
-	operation, err := domain.NewOperation("mail.create_draft", domain.EffectReversibleWrite, input.Account, input)
+	operation, err := domain.NewTargetedOperation(
+		"mail.create_draft",
+		domain.EffectReversibleWrite,
+		input.Account,
+		configuredMailboxTarget(),
+		input,
+	)
 	if err != nil {
 		return MailDraftAccess{}, fmt.Errorf("create mail draft operation: %w", err)
 	}
@@ -178,6 +185,9 @@ func (service *MailService) executeDraft(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailDraft, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailDraft{}, err
+	}
 	draft, callErr := service.draftWriter.CreateMailDraft(ctx, input)
 	outcome := AuditOutcomeSuccess
 	reason := "completed"
@@ -198,6 +208,9 @@ func (service *MailService) executeDraft(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailDraft{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		draft.Provenance = service.mailProvenance(draft.ID)
 	}
 	return draft, nil
 }

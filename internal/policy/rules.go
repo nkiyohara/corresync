@@ -4,7 +4,7 @@ package policy
 import (
 	"fmt"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 // Mode selects the maximum authority available to callers.

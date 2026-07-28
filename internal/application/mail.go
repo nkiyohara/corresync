@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 const MaxMailPageSize = 100
@@ -43,14 +43,15 @@ type MailAddress struct {
 
 // MailSummary intentionally excludes the message body and attachment content.
 type MailSummary struct {
-	ID             string      `json:"id"`
-	ChangeKey      string      `json:"changeKey,omitempty"`
-	Subject        string      `json:"subject,omitempty"`
-	From           MailAddress `json:"from,omitempty"`
-	ReceivedAt     string      `json:"receivedAt,omitempty"`
-	Importance     string      `json:"importance,omitempty"`
-	IsRead         bool        `json:"isRead"`
-	HasAttachments bool        `json:"hasAttachments"`
+	ID             string            `json:"id"`
+	ChangeKey      string            `json:"changeKey,omitempty"`
+	Subject        string            `json:"subject,omitempty"`
+	From           MailAddress       `json:"from,omitempty"`
+	ReceivedAt     string            `json:"receivedAt,omitempty"`
+	Importance     string            `json:"importance,omitempty"`
+	IsRead         bool              `json:"isRead"`
+	HasAttachments bool              `json:"hasAttachments"`
+	Provenance     domain.Provenance `json:"provenance,omitempty"`
 }
 
 // MailPage is the stable output contract exposed by both adapters.
@@ -88,6 +89,7 @@ type MailPort interface {
 // MailOptions applies configured limits at the application boundary.
 type MailOptions struct {
 	MaxRecipients int
+	Provenance    domain.Provenance
 }
 
 // MailService applies policy and audit around mail use cases.
@@ -104,6 +106,7 @@ type MailService struct {
 	readState        MailReadStateWriter
 	deleter          MailDeleter
 	maxRecipients    int
+	provenance       domain.Provenance
 }
 
 // NewMailService requires the shared guard and a transport port.
@@ -121,8 +124,16 @@ func NewMailService(guard *Guard, reader MailPort, options MailOptions) (*MailSe
 		guard: guard, reader: reader, searcher: reader, folderReader: reader,
 		bodyReader: reader, attachmentReader: reader, draftWriter: reader,
 		sender: reader, mover: reader, readState: reader, deleter: reader,
-		maxRecipients: options.MaxRecipients,
+		maxRecipients: options.MaxRecipients, provenance: options.Provenance,
 	}, nil
+}
+
+func (service *MailService) validateExecutionAccount(operation domain.Operation) error {
+	expected := service.provenance.AccountID
+	if expected != "" && operation.Account() != expected {
+		return errors.New("mail operation account does not match the routed service")
+	}
+	return nil
 }
 
 // List returns metadata only through the shared policy and audit boundary.
@@ -163,6 +174,7 @@ func (service *MailService) List(
 	if callErr != nil || auditErr != nil {
 		return MailPage{}, errors.Join(callErr, auditErr)
 	}
+	service.applyMailPage(&page)
 	return page, nil
 }
 
@@ -213,4 +225,26 @@ func validateOpaqueValue(name, value string) error {
 		return fmt.Errorf("%s is malformed", name)
 	}
 	return nil
+}
+
+func configuredMailboxTarget() domain.TargetRef {
+	return domain.TargetRef{Kind: domain.TargetMailbox, ID: "configured-mailbox"}
+}
+
+func (service *MailService) mailProvenance(sourceObjectID string) domain.Provenance {
+	provenance := service.provenance
+	if provenance.AccountID == "" {
+		return domain.Provenance{}
+	}
+	provenance.SourceObjectID = sourceObjectID
+	return provenance
+}
+
+func (service *MailService) applyMailPage(page *MailPage) {
+	if service.provenance.AccountID == "" {
+		return
+	}
+	for index := range page.Messages {
+		page.Messages[index].Provenance = service.mailProvenance(page.Messages[index].ID)
+	}
 }

@@ -10,24 +10,51 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 // StateDir returns the private application state directory for this platform.
 func StateDir() (string, error) {
+	if override := os.Getenv("CORRESYNC_STATE_DIR"); override != "" {
+		if !filepath.IsAbs(override) {
+			return "", errors.New("CORRESYNC_STATE_DIR must be absolute")
+		}
+		return filepath.Clean(override), nil
+	}
+	// OWA_STATE_DIR remains an explicit compatibility override. It is never
+	// silently copied or renamed because callers may intentionally share it.
 	if override := os.Getenv("OWA_STATE_DIR"); override != "" {
 		if !filepath.IsAbs(override) {
 			return "", errors.New("OWA_STATE_DIR must be absolute")
 		}
 		return filepath.Clean(override), nil
 	}
+	return defaultStateDir("corresync")
+}
+
+// LegacyStateDir returns the default owa-bridge v0.6.x state path. Explicit
+// state overrides are intentionally excluded from automatic migration.
+func LegacyStateDir() (string, error) {
+	return defaultStateDir("owa-bridge")
+}
+
+func defaultStateDir(applicationName string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve user home: %w", err)
 	}
 	configDirectory, configErr := os.UserConfigDir()
 	cacheDirectory, cacheErr := os.UserCacheDir()
-	return stateDir(runtime.GOOS, home, configDirectory, cacheDirectory, configErr, cacheErr, os.Getenv("XDG_STATE_HOME"))
+	return stateDir(
+		runtime.GOOS,
+		home,
+		configDirectory,
+		cacheDirectory,
+		configErr,
+		cacheErr,
+		os.Getenv("XDG_STATE_HOME"),
+		applicationName,
+	)
 }
 
 // ProfileDir uses a digest so an account alias can never become a path.
@@ -39,9 +66,12 @@ func ProfileDir(account domain.AccountID) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	digest := sha256.Sum256([]byte(account))
-	key := hex.EncodeToString(digest[:16])
-	return filepath.Join(state, "profiles", key), nil
+	return filepath.Join(state, "profiles", profileKey(string(account))), nil
+}
+
+func profileKey(value string) string {
+	digest := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(digest[:16])
 }
 
 // AuditPath returns the content-free JSONL audit path.
@@ -76,6 +106,7 @@ func stateDir(
 	goos, home, configDirectory, cacheDirectory string,
 	configErr, cacheErr error,
 	xdgStateHome string,
+	applicationName string,
 ) (string, error) {
 	switch goos {
 	case "linux":
@@ -83,26 +114,26 @@ func stateDir(
 			if !filepath.IsAbs(xdgStateHome) {
 				return "", errors.New("XDG_STATE_HOME must be absolute")
 			}
-			return filepath.Join(xdgStateHome, "owa-bridge"), nil
+			return filepath.Join(xdgStateHome, applicationName), nil
 		}
 		if home == "" {
 			return "", errors.New("user home is empty")
 		}
-		return filepath.Join(home, ".local", "state", "owa-bridge"), nil
+		return filepath.Join(home, ".local", "state", applicationName), nil
 	case "darwin":
 		if configErr != nil {
 			return "", fmt.Errorf("resolve application support directory: %w", configErr)
 		}
-		return filepath.Join(configDirectory, "owa-bridge"), nil
+		return filepath.Join(configDirectory, applicationName), nil
 	case "windows":
 		if cacheErr != nil {
 			return "", fmt.Errorf("resolve local application data: %w", cacheErr)
 		}
-		return filepath.Join(cacheDirectory, "owa-bridge"), nil
+		return filepath.Join(cacheDirectory, applicationName), nil
 	default:
 		if cacheErr != nil {
 			return "", fmt.Errorf("resolve state directory: %w", cacheErr)
 		}
-		return filepath.Join(cacheDirectory, "owa-bridge"), nil
+		return filepath.Join(cacheDirectory, applicationName), nil
 	}
 }

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 // MailFolderTraversal controls whether FindFolder returns direct children or
@@ -33,15 +33,16 @@ type MailFolderListInput struct {
 // MailFolderSummary contains folder metadata only. It never includes item
 // content, permissions, rules, delegates, or mailbox identities.
 type MailFolderSummary struct {
-	ID               string `json:"id"`
-	ChangeKey        string `json:"changeKey,omitempty"`
-	ParentID         string `json:"parentId,omitempty"`
-	DisplayName      string `json:"displayName,omitempty"`
-	Class            string `json:"class,omitempty"`
-	DistinguishedID  string `json:"distinguishedId,omitempty"`
-	ChildFolderCount int    `json:"childFolderCount"`
-	TotalItemCount   int    `json:"totalItemCount"`
-	UnreadItemCount  int    `json:"unreadItemCount"`
+	ID               string            `json:"id"`
+	ChangeKey        string            `json:"changeKey,omitempty"`
+	ParentID         string            `json:"parentId,omitempty"`
+	DisplayName      string            `json:"displayName,omitempty"`
+	Class            string            `json:"class,omitempty"`
+	DistinguishedID  string            `json:"distinguishedId,omitempty"`
+	ChildFolderCount int               `json:"childFolderCount"`
+	TotalItemCount   int               `json:"totalItemCount"`
+	UnreadItemCount  int               `json:"unreadItemCount"`
+	Provenance       domain.Provenance `json:"provenance,omitempty"`
 }
 
 // MailFolderPage is the stable folder-discovery result shared by CLI and MCP.
@@ -94,6 +95,11 @@ func (service *MailService) ListFolders(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailFolderPage{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		for index := range page.Folders {
+			page.Folders[index].Provenance = service.mailProvenance(page.Folders[index].ID)
+		}
 	}
 	return page, nil
 }

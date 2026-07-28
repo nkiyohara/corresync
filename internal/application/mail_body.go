@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 const MaxMailBodyBytes = 1 << 20
@@ -25,6 +25,7 @@ type MailBody struct {
 	ChangeKey   string                   `json:"changeKey,omitempty"`
 	Text        string                   `json:"text"`
 	Attachments []MailAttachmentMetadata `json:"attachments,omitempty"`
+	Provenance  domain.Provenance        `json:"provenance,omitempty"`
 }
 
 // MailBodyAccess represents either completed content or an approval preview.
@@ -106,6 +107,9 @@ func (service *MailService) executeBody(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailBody, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailBody{}, err
+	}
 	body, callErr := service.bodyReader.GetMessageBody(ctx, input)
 	outcome := AuditOutcomeSuccess
 	reason := "completed"
@@ -122,6 +126,14 @@ func (service *MailService) executeBody(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailBody{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		body.Provenance = service.mailProvenance(body.ID)
+		for index := range body.Attachments {
+			body.Attachments[index].Provenance = service.mailProvenance(
+				body.Attachments[index].ID,
+			)
+		}
 	}
 	return body, nil
 }

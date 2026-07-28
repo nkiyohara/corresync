@@ -10,9 +10,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 const (
@@ -98,11 +98,12 @@ type CalendarBodyReview struct {
 
 // CalendarCreateResult identifies the created event returned by OWA.
 type CalendarCreateResult struct {
-	ID                    string `json:"id"`
-	ChangeKey             string `json:"changeKey,omitempty"`
-	IsOnlineMeeting       bool   `json:"isOnlineMeeting"`
-	OnlineMeetingProvider string `json:"onlineMeetingProvider,omitempty"`
-	OnlineMeetingJoinURL  string `json:"onlineMeetingJoinUrl,omitempty"`
+	ID                    string            `json:"id"`
+	ChangeKey             string            `json:"changeKey,omitempty"`
+	IsOnlineMeeting       bool              `json:"isOnlineMeeting"`
+	OnlineMeetingProvider string            `json:"onlineMeetingProvider,omitempty"`
+	OnlineMeetingJoinURL  string            `json:"onlineMeetingJoinUrl,omitempty"`
+	Provenance            domain.Provenance `json:"provenance,omitempty"`
 }
 
 // CalendarCreateAccess is either an immutable preview or a created event.
@@ -128,8 +129,12 @@ func (service *CalendarService) Create(
 	if err := input.Validate(service.maxAttendees); err != nil {
 		return CalendarCreateAccess{}, err
 	}
-	operation, err := domain.NewOperation(
-		"calendar.create", domain.EffectExternalWrite, input.Account, input,
+	operation, err := domain.NewTargetedOperation(
+		"calendar.create",
+		domain.EffectExternalWrite,
+		input.Account,
+		calendarFolderTarget(input.Calendar),
+		input,
 	)
 	if err != nil {
 		return CalendarCreateAccess{}, fmt.Errorf("create calendar operation: %w", err)
@@ -187,6 +192,9 @@ func (service *CalendarService) executeCreate(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (CalendarCreateResult, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return CalendarCreateResult{}, err
+	}
 	created, callErr := service.creator.CreateCalendarEvent(ctx, input)
 	outcome, reason := calendarWriteAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{
@@ -195,6 +203,9 @@ func (service *CalendarService) executeCreate(
 	})
 	if callErr != nil || auditErr != nil {
 		return CalendarCreateResult{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		created.Provenance = service.calendarProvenance(created.ID)
 	}
 	return created, nil
 }

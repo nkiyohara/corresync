@@ -18,19 +18,73 @@ type Operation struct {
 	name    string
 	effect  Effect
 	account AccountID
+	target  TargetRef
 	payload json.RawMessage
+}
+
+// TargetKind identifies the exact writable object collection selected by a
+// preview. A commit token is bound to this target independently of payload
+// serialization.
+type TargetKind string
+
+const (
+	TargetMailbox    TargetKind = "mailbox"
+	TargetCalendar   TargetKind = "calendar"
+	TargetLocalQueue TargetKind = "local_queue"
+)
+
+// TargetRef is an immutable mutation-routing boundary.
+type TargetRef struct {
+	Kind TargetKind `json:"kind"`
+	ID   string     `json:"id"`
+}
+
+// Validate rejects open-ended or ambiguous target references.
+func (target TargetRef) Validate() error {
+	switch target.Kind {
+	case TargetMailbox, TargetCalendar, TargetLocalQueue:
+	default:
+		return fmt.Errorf("invalid target kind %q", target.Kind)
+	}
+	return validateIdentifier("target ID", target.ID, 4096)
 }
 
 // OperationView is the non-secret metadata safe to return in a preview.
 type OperationView struct {
-	Name    string    `json:"name"`
-	Effect  Effect    `json:"effect"`
-	Account AccountID `json:"account"`
-	Digest  string    `json:"digest"`
+	Name    string     `json:"name"`
+	Effect  Effect     `json:"effect"`
+	Account AccountID  `json:"account"`
+	Target  *TargetRef `json:"target,omitempty"`
+	Digest  string     `json:"digest"`
 }
 
 // NewOperation validates and snapshots a typed operation payload.
 func NewOperation(name string, effect Effect, account AccountID, payload any) (Operation, error) {
+	return newOperation(name, effect, account, TargetRef{}, payload)
+}
+
+// NewTargetedOperation binds a write preview to one exact mailbox, calendar,
+// or local queue target in addition to the account and immutable payload.
+func NewTargetedOperation(
+	name string,
+	effect Effect,
+	account AccountID,
+	target TargetRef,
+	payload any,
+) (Operation, error) {
+	if err := target.Validate(); err != nil {
+		return Operation{}, err
+	}
+	return newOperation(name, effect, account, target, payload)
+}
+
+func newOperation(
+	name string,
+	effect Effect,
+	account AccountID,
+	target TargetRef,
+	payload any,
+) (Operation, error) {
 	if !operationNamePattern.MatchString(name) || len(name) > 96 {
 		return Operation{}, fmt.Errorf("invalid operation name %q", name)
 	}
@@ -53,6 +107,7 @@ func NewOperation(name string, effect Effect, account AccountID, payload any) (O
 		name:    name,
 		effect:  effect,
 		account: account,
+		target:  target,
 		payload: encoded,
 	}, nil
 }
@@ -83,12 +138,17 @@ func (operation Operation) DecodePayload(destination any) error {
 // View returns metadata and a digest without exposing operation content.
 func (operation Operation) View() OperationView {
 	digest := operation.digest()
-	return OperationView{
+	view := OperationView{
 		Name:    operation.name,
 		Effect:  operation.effect,
 		Account: operation.account,
 		Digest:  hex.EncodeToString(digest[:]),
 	}
+	if operation.target.Kind != "" {
+		target := operation.target
+		view.Target = &target
+	}
+	return view
 }
 
 // Validate rejects fabricated or incomplete operation metadata.
@@ -101,6 +161,11 @@ func (view OperationView) Validate() error {
 	}
 	if err := view.Account.Validate(); err != nil {
 		return err
+	}
+	if view.Target != nil {
+		if err := view.Target.Validate(); err != nil {
+			return err
+		}
 	}
 	if len(view.Digest) != 2*sha256.Size {
 		return errors.New("operation view digest must be a SHA-256 hex string")
@@ -117,12 +182,14 @@ func (operation Operation) digest() [sha256.Size]byte {
 		Name    string          `json:"name"`
 		Effect  Effect          `json:"effect"`
 		Account AccountID       `json:"account"`
+		Target  TargetRef       `json:"target,omitempty"`
 		Payload json.RawMessage `json:"payload"`
 	}{
-		Version: 1,
+		Version: 2,
 		Name:    operation.name,
 		Effect:  operation.effect,
 		Account: operation.account,
+		Target:  operation.target,
 		Payload: operation.payload,
 	})
 	if err != nil {

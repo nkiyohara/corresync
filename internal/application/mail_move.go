@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 // MailMoveInput moves exactly one versioned message to one folder.
@@ -27,8 +27,9 @@ type MailMoveReview struct {
 
 // MailMoveResult identifies the moved item when OWA returns its new identity.
 type MailMoveResult struct {
-	ID        string `json:"id,omitempty"`
-	ChangeKey string `json:"changeKey,omitempty"`
+	ID         string            `json:"id,omitempty"`
+	ChangeKey  string            `json:"changeKey,omitempty"`
+	Provenance domain.Provenance `json:"provenance,omitempty"`
 }
 
 // MailMoveAccess is either a completed move or an exact approval preview.
@@ -53,7 +54,13 @@ func (service *MailService) Move(
 	if err := input.Validate(); err != nil {
 		return MailMoveAccess{}, err
 	}
-	operation, err := domain.NewOperation("mail.move", domain.EffectReversibleWrite, input.Account, input)
+	operation, err := domain.NewTargetedOperation(
+		"mail.move",
+		domain.EffectReversibleWrite,
+		input.Account,
+		configuredMailboxTarget(),
+		input,
+	)
 	if err != nil {
 		return MailMoveAccess{}, fmt.Errorf("create mail move operation: %w", err)
 	}
@@ -109,6 +116,9 @@ func (service *MailService) executeMove(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailMoveResult, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailMoveResult{}, err
+	}
 	moved, callErr := service.mover.MoveMail(ctx, input)
 	outcome := AuditOutcomeSuccess
 	reason := "completed"
@@ -126,6 +136,9 @@ func (service *MailService) executeMove(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailMoveResult{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		moved.Provenance = service.mailProvenance(moved.ID)
 	}
 	return moved, nil
 }

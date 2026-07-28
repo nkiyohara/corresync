@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nkiyohara/owa-bridge/internal/application"
+	"github.com/nkiyohara/corresync/internal/application"
 )
 
 const eventIDBytes = 16

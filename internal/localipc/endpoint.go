@@ -1,5 +1,5 @@
 // Package localipc provides authenticated, same-user local transports for the
-// owa-bridge session owner. It never opens a TCP listener.
+// Corresync session owner. It never opens a TCP listener.
 package localipc
 
 import (
@@ -10,10 +10,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/nkiyohara/owa-bridge/internal/paths"
+	"github.com/nkiyohara/corresync/internal/paths"
 )
 
-const namespaceVersion = "owa-bridge-ipc-v1"
+const (
+	namespaceVersion       = "corresync-ipc-v1"
+	legacyNamespaceVersion = "owa-bridge-ipc-v1"
+)
 
 // Endpoint identifies one daemon namespace without exposing configuration
 // content. Different config paths and state directories cannot collide.
@@ -34,24 +37,51 @@ func Resolve(configPath string) (Endpoint, error) {
 	if err != nil {
 		return Endpoint{}, err
 	}
-	return deriveEndpoint(filepath.Clean(configPath), stateDirectory)
+	return deriveEndpoint(
+		filepath.Clean(configPath),
+		stateDirectory,
+		namespaceVersion,
+		"corresync",
+	)
 }
 
 // ResolveInState derives an endpoint with an explicit absolute state directory.
 // It is useful to isolate embedded runtimes and contract tests.
 func ResolveInState(configPath, stateDirectory string) (Endpoint, error) {
-	return deriveEndpoint(filepath.Clean(configPath), filepath.Clean(stateDirectory))
+	return deriveEndpoint(
+		filepath.Clean(configPath),
+		filepath.Clean(stateDirectory),
+		namespaceVersion,
+		"corresync",
+	)
 }
 
-func deriveEndpoint(configPath, stateDirectory string) (Endpoint, error) {
+// ResolveLegacyInState derives the exact endpoint namespace used by v0.6.x.
+// It exists only so coordinated migration can stop the authenticated owner
+// before moving browser profiles.
+func ResolveLegacyInState(configPath, stateDirectory string) (Endpoint, error) {
+	return deriveEndpoint(
+		filepath.Clean(configPath),
+		filepath.Clean(stateDirectory),
+		legacyNamespaceVersion,
+		"owa-bridge",
+	)
+}
+
+func deriveEndpoint(
+	configPath,
+	stateDirectory,
+	namespace,
+	runtimeName string,
+) (Endpoint, error) {
 	if !filepath.IsAbs(configPath) || !filepath.IsAbs(stateDirectory) {
 		return Endpoint{}, errors.New("IPC inputs must be absolute")
 	}
 	digest := sha256.Sum256([]byte(
-		namespaceVersion + "\x00" + filepath.Clean(configPath) + "\x00" + filepath.Clean(stateDirectory),
+		namespace + "\x00" + filepath.Clean(configPath) + "\x00" + filepath.Clean(stateDirectory),
 	))
 	id := hex.EncodeToString(digest[:16])
-	address, runtimeDirectory, lockPath, err := platformEndpoint(id)
+	address, runtimeDirectory, lockPath, err := platformEndpoint(id, runtimeName)
 	if err != nil {
 		return Endpoint{}, fmt.Errorf("resolve local IPC endpoint: %w", err)
 	}

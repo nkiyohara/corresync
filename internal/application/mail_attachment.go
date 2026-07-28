@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 const MaxMailAttachmentMetadata = 100
@@ -15,13 +15,14 @@ const MaxMailAttachmentMetadata = 100
 // MailAttachmentMetadata is bounded attachment metadata returned with an
 // explicitly requested message body.
 type MailAttachmentMetadata struct {
-	ID          string `json:"id"`
-	Kind        string `json:"kind"`
-	Name        string `json:"name,omitempty"`
-	ContentType string `json:"contentType,omitempty"`
-	Size        int    `json:"size"`
-	IsInline    bool   `json:"isInline"`
-	ContentID   string `json:"contentId,omitempty"`
+	ID          string            `json:"id"`
+	Kind        string            `json:"kind"`
+	Name        string            `json:"name,omitempty"`
+	ContentType string            `json:"contentType,omitempty"`
+	Size        int               `json:"size"`
+	IsInline    bool              `json:"isInline"`
+	ContentID   string            `json:"contentId,omitempty"`
+	Provenance  domain.Provenance `json:"provenance,omitempty"`
 }
 
 // MailAttachmentInput names one exact attachment returned with a body read.
@@ -117,6 +118,9 @@ func (service *MailService) executeAttachment(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailAttachment, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailAttachment{}, err
+	}
 	attachment, callErr := service.attachmentReader.GetMailAttachment(ctx, input)
 	outcome, reason := AuditOutcomeSuccess, "completed"
 	if callErr != nil {
@@ -128,6 +132,9 @@ func (service *MailService) executeAttachment(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailAttachment{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		attachment.Provenance = service.mailProvenance(attachment.ID)
 	}
 	return attachment, nil
 }

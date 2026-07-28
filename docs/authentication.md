@@ -1,14 +1,14 @@
 # Interactive authentication
 
-`owa-bridge` never accepts a Microsoft username, password, MFA code, OAuth
+`Corresync` never accepts a Microsoft username, password, MFA code, OAuth
 client secret, or tenant consent as a command argument, configuration value, or
 structured API field. Authentication belongs to a browser flow controlled by
 the user.
 
 Google Chrome, Chromium, and Microsoft Edge are supported. An explicit
 `browser.executable` is resolved exactly and never falls back to a different
-browser; otherwise `owa-bridge` discovers a platform-native installation and
-reports a clear prerequisite failure through `owa doctor`.
+browser; otherwise `Corresync` discovers a platform-native installation and
+reports a clear prerequisite failure through `corresync doctor`.
 
 ## Lifecycle
 
@@ -33,7 +33,7 @@ early-event memory.
 ## Stored state
 
 Chromium may persist its own browser session in the dedicated profile using the
-platform browser's protections. `owa-bridge` does not create a token cache. The
+platform browser's protections. `Corresync` does not create a token cache. The
 captured bearer value and selected routing headers exist only in the session
 owner's memory and have no JSON, text, or logging representation.
 
@@ -43,14 +43,14 @@ response bodies, and unrelated headers are not copied by the observer.
 
 ## Text-only SSH login
 
-`owa auth login --terminal` is an experimental fallback for an interactive SSH
-TTY without a display server. The daemon launches the dedicated Chromium
-profile headlessly. The CLI displays a bounded list of visible page controls
-and sends one activation or key event at a time over owner-only authenticated
-IPC.
+`corresync auth login --terminal` is an experimental fallback for an
+interactive SSH TTY without a display server. The daemon launches the
+dedicated Chromium profile headlessly. The CLI displays a bounded list of
+visible page controls and sends one activation or key event at a time over
+owner-only authenticated IPC.
 
 ```console
-owa auth login --terminal
+corresync auth login --terminal
 ```
 
 Piped input and `--json` are rejected. Password fields are identified only so
@@ -67,12 +67,12 @@ device-compliance Conditional Access policy.
 
 ## Inspect and clear sessions
 
-`owa auth status` returns content-free state for each configured account. It
-never returns a mailbox identity, cookie, token, captured header, browser page,
-or Outlook payload. `owa auth logout` closes the config-scoped daemon and all
-of its dedicated browsers, which discards captured authorization and pending
-approvals from memory. Chromium's protected profile remains for a later
-interactive login.
+`corresync auth status` returns content-free state for each configured account.
+It never returns a mailbox identity, cookie, token, captured header, browser
+page, or Outlook payload. `corresync auth logout` closes the config-scoped
+daemon and all of its dedicated browsers, which discards captured authorization
+and pending approvals from memory. Chromium's protected profile remains for a
+later interactive login.
 
 ## Origin policy
 
@@ -90,5 +90,6 @@ an explicit configuration and a separate session boundary.
 
 Default tests exercise header filtering, origin confusion, malformed bearer
 values, event ordering, lifecycle, and concurrent access with synthetic data.
-They never start a browser or access a live mailbox. `owa doctor --online` is
-the explicit opt-in browser and mailbox contract smoke test.
+They never start a browser or access a live mailbox.
+`corresync doctor --online` is the explicit opt-in browser and mailbox contract
+smoke test.

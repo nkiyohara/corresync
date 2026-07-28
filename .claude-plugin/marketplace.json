@@ -1,22 +1,22 @@
 {
-  "name": "owa-bridge",
+  "name": "corresync",
   "owner": {
-    "name": "owa-bridge contributors"
+    "name": "Corresync contributors"
   },
-  "description": "Natural-language discovery for the local owa-bridge Outlook MCP server.",
-  "version": "0.4.0",
+  "description": "Natural-language discovery for the guarded local Corresync MCP server.",
+  "version": "0.7.0",
   "plugins": [
     {
-      "name": "owa-bridge",
-      "displayName": "OWA Bridge",
-      "source": "./plugins/owa-bridge",
-      "description": "Recognize Outlook mail and calendar requests and route them to owa-bridge.",
-      "version": "0.4.0",
+      "name": "corresync",
+      "displayName": "Corresync — Mail & Calendar",
+      "source": "./plugins/corresync",
+      "description": "Recognize mail and calendar requests and route them to Corresync.",
+      "version": "0.7.0",
       "author": {
-        "name": "owa-bridge contributors"
+        "name": "Corresync contributors"
       },
-      "homepage": "https://nkiyohara.github.io/owa-bridge/",
-      "repository": "https://github.com/nkiyohara/owa-bridge",
+      "homepage": "https://nkiyohara.github.io/corresync/",
+      "repository": "https://github.com/nkiyohara/corresync",
       "license": "Apache-2.0",
       "category": "productivity",
       "tags": ["outlook", "email", "calendar", "mcp"]

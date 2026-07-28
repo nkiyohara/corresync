@@ -1,4 +1,4 @@
-module github.com/nkiyohara/owa-bridge
+module github.com/nkiyohara/corresync
 
 go 1.26
 

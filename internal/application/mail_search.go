@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 const (
@@ -69,6 +69,7 @@ func (service *MailService) Search(
 	if callErr != nil || auditErr != nil {
 		return MailPage{}, errors.Join(callErr, auditErr)
 	}
+	service.applyMailPage(&page)
 	return page, nil
 }
 

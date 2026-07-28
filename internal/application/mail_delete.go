@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 // MailDeleteInput permanently deletes one exact message version. It is kept
@@ -26,7 +26,8 @@ type MailDeleteReview struct {
 }
 
 type MailDeleteResult struct {
-	ID string `json:"id"`
+	ID         string            `json:"id"`
+	Provenance domain.Provenance `json:"provenance,omitempty"`
 }
 
 type MailDeleteAccess struct {
@@ -50,7 +51,13 @@ func (service *MailService) Delete(
 	if err := input.Validate(); err != nil {
 		return MailDeleteAccess{}, err
 	}
-	operation, err := domain.NewOperation("mail.delete", domain.EffectDestructiveWrite, input.Account, input)
+	operation, err := domain.NewTargetedOperation(
+		"mail.delete",
+		domain.EffectDestructiveWrite,
+		input.Account,
+		configuredMailboxTarget(),
+		input,
+	)
 	if err != nil {
 		return MailDeleteAccess{}, fmt.Errorf("create mail delete operation: %w", err)
 	}
@@ -88,6 +95,9 @@ func (service *MailService) CommitDelete(
 	if err := input.Validate(); err != nil {
 		return MailDeleteAccess{}, err
 	}
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailDeleteAccess{}, err
+	}
 	callErr := service.deleter.DeleteMail(ctx, input)
 	outcome, reason := mailWriteAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{
@@ -98,7 +108,11 @@ func (service *MailService) CommitDelete(
 		return MailDeleteAccess{}, errors.Join(callErr, auditErr)
 	}
 	return MailDeleteAccess{
-		Status: "deleted", Deleted: &MailDeleteResult{ID: input.MessageID}, Review: input.Review(),
+		Status: "deleted",
+		Deleted: &MailDeleteResult{
+			ID: input.MessageID, Provenance: service.mailProvenance(input.MessageID),
+		},
+		Review: input.Review(),
 	}, nil
 }
 

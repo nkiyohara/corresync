@@ -11,7 +11,8 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 func TestDefaultIsValidAndSecretFree(t *testing.T) {
@@ -43,7 +44,10 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	want := Default()
 	want.Policy.PreviewSensitiveReads = true
 	want.Accounts["personal"] = Account{
-		Origin: "https://outlook.office.com/", Mailbox: "shared@example.invalid",
+		ID:       "acc_00000000000000000000000000000002",
+		Provider: domain.ProviderMicrosoftOWA,
+		Origin:   "https://outlook.office.com/",
+		Mailbox:  "shared@example.invalid",
 	}
 	if err := Save(path, want); err != nil {
 		t.Fatalf("Save() error = %v", err)
@@ -72,12 +76,12 @@ func TestSaveTOMLPreservesValidatedComments(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	encoded := []byte("# retained\nversion = 1\n")
+	encoded := []byte("# retained\nversion = 2\n")
 	defaultConfig, err := toml.Marshal(Default())
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded = append(encoded, bytes.TrimPrefix(defaultConfig, []byte("version = 1\n"))...)
+	encoded = append(encoded, bytes.TrimPrefix(defaultConfig, []byte("version = 2\n"))...)
 	if err := SaveTOML(path, encoded); err != nil {
 		t.Fatalf("SaveTOML() error = %v", err)
 	}
@@ -147,7 +151,7 @@ func TestValidateRejectsUnsafeValues(t *testing.T) {
 	t.Parallel()
 
 	tests := []func(*Config){
-		func(configuration *Config) { configuration.Version = 2 },
+		func(configuration *Config) { configuration.Version = 1 },
 		func(configuration *Config) { configuration.Accounts = nil },
 		func(configuration *Config) { configuration.DefaultAccount = "missing" },
 		func(configuration *Config) {
@@ -176,6 +180,95 @@ func TestValidateRejectsUnsafeValues(t *testing.T) {
 		if err := configuration.Validate(); err == nil {
 			t.Fatalf("case %d unexpectedly passed validation: %+v", index, configuration)
 		}
+	}
+}
+
+func TestNewDefaultUsesFreshOpaqueAccountID(t *testing.T) {
+	t.Parallel()
+
+	first, err := NewDefault()
+	if err != nil {
+		t.Fatalf("NewDefault() error = %v", err)
+	}
+	second, err := NewDefault()
+	if err != nil {
+		t.Fatalf("NewDefault() second error = %v", err)
+	}
+	firstID := first.Accounts[first.DefaultAccount].ID
+	secondID := second.Accounts[second.DefaultAccount].ID
+	if err := firstID.ValidateOpaque(); err != nil {
+		t.Fatalf("first ID = %q: %v", firstID, err)
+	}
+	if firstID == secondID {
+		t.Fatalf("NewDefault() repeated account ID %q", firstID)
+	}
+}
+
+func TestResolveAccountSupportsAliasAndStableID(t *testing.T) {
+	t.Parallel()
+
+	configuration := Default()
+	want := configuration.Accounts["work"]
+	for _, reference := range []string{"", "work", string(want.ID)} {
+		alias, got, err := configuration.ResolveAccount(reference)
+		if err != nil {
+			t.Fatalf("ResolveAccount(%q) error = %v", reference, err)
+		}
+		if alias != "work" || got != want {
+			t.Fatalf("ResolveAccount(%q) = %q, %+v", reference, alias, got)
+		}
+	}
+	if _, _, err := configuration.ResolveAccount("missing"); err == nil {
+		t.Fatal("ResolveAccount(missing) unexpectedly succeeded")
+	}
+}
+
+func TestMigrateV1AssignsStableOpaqueIDsAndPreservesLegacy(t *testing.T) {
+	t.Parallel()
+
+	legacy := []byte(`
+version = 1
+default_account = "work"
+
+[accounts.work]
+origin = "https://outlook.cloud.microsoft"
+
+[accounts.personal]
+origin = "https://outlook.office.com/"
+mailbox = "shared@example.invalid"
+
+[policy]
+mode = "guarded"
+max_recipients = 20
+max_attendees = 50
+
+[browser]
+login_timeout = "5m"
+
+[updates]
+disable_automatic_checks = true
+`)
+	configuration, err := MigrateV1(legacy)
+	if err != nil {
+		t.Fatalf("MigrateV1() error = %v", err)
+	}
+	if configuration.Version != CurrentVersion ||
+		configuration.DefaultAccount != "work" ||
+		!configuration.Updates.DisableAutomaticChecks {
+		t.Fatalf("MigrateV1() = %+v", configuration)
+	}
+	work := configuration.Accounts["work"]
+	personal := configuration.Accounts["personal"]
+	if work.Provider != domain.ProviderMicrosoftOWA ||
+		personal.Provider != domain.ProviderMicrosoftOWA ||
+		work.ID == personal.ID ||
+		work.ID.ValidateOpaque() != nil ||
+		personal.ID.ValidateOpaque() != nil ||
+		personal.Mailbox != "shared@example.invalid" {
+		t.Fatalf("migrated accounts = %+v, %+v", work, personal)
+	}
+	if !bytes.Contains(legacy, []byte("version = 1")) {
+		t.Fatal("legacy input was modified")
 	}
 }
 

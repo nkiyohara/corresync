@@ -1,14 +1,14 @@
 {
-  "name": "owa-bridge",
+  "name": "corresync",
   "interface": {
-    "displayName": "OWA Bridge"
+    "displayName": "Corresync — Mail & Calendar"
   },
   "plugins": [
     {
-      "name": "owa-bridge",
+      "name": "corresync",
       "source": {
         "source": "local",
-        "path": "./plugins/owa-bridge"
+        "path": "./plugins/corresync"
       },
       "policy": {
         "installation": "AVAILABLE",

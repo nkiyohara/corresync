@@ -14,7 +14,7 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
 
-	"github.com/nkiyohara/owa-bridge/internal/session"
+	"github.com/nkiyohara/corresync/internal/session"
 )
 
 // Options define the browser-owned authentication boundary.

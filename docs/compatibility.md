@@ -43,7 +43,7 @@ synthetic content and no third-party recipient. They show one authorized
 environment working; they are not a universal tenant or protocol support claim.
 `SECURITY.md` remains the source of truth for supported release versions.
 
-On 2026-07-19, `owa login --terminal` launched headless Google Chrome on Linux
+On 2026-07-19, `corresync login --terminal` launched headless Google Chrome on Linux
 amd64, rendered the Microsoft sign-in text and eight numbered controls, focused
 the email field, returned to the control list with Escape, and cancelled
 cleanly. No credential or MFA value was entered, so completion of
@@ -80,12 +80,12 @@ write gates on another computer, follow the
 1. Verify the release checksum before extracting or installing it.
 2. Set the account origin to the final Outlook origin shown after sign-in. Do
    not add identity-provider origins or URL paths.
-3. Run `owa doctor` and resolve every local failure.
-4. Run `owa doctor --online --json`, completing SSO, MFA, notices, and
+3. Run `corresync doctor` and resolve every local failure.
+4. Run `corresync doctor --online --json`, completing SSO, MFA, notices, and
    Conditional Access only in the visible browser.
 5. Confirm that `session`, `folder_contract`, `mail_contract`, and
    `calendar_contract` pass.
-6. Stop the daemon with `owa daemon stop` when the observation is complete.
+6. Stop the daemon with `corresync daemon stop` when the observation is complete.
 
 The online doctor requests at most one folder metadata row, one inbox metadata
 row, and a one-hour calendar window, then discards the results. Its report
@@ -123,11 +123,11 @@ not treated as a server compatibility failure.
 
 A useful compatibility observation contains only:
 
-- exact `owa version --json` output;
+- exact `corresync version --json` output;
 - operating system and architecture;
 - browser family and version;
 - deployment class, such as Microsoft 365 work/school or Outlook.com;
-- success or the content-free `owa doctor --online --json` failure stage;
+- success or the content-free `corresync doctor --online --json` failure stage;
 - observation date.
 
 Do not include tenant names, mailbox addresses, account IDs, message or event

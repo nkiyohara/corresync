@@ -46,7 +46,7 @@ Prerequisites:
 - Codex CLI and/or Claude Code only when testing that MCP client.
 
 Prefer a disposable operating-system user or a computer without an existing
-`owa-bridge` profile. Do not run two releases against the same config
+`Corresync` profile. Do not run two releases against the same config
 and daemon state at once.
 
 Record locally, without committing the result file:
@@ -69,7 +69,7 @@ request ID, subject, recipient, body, token, or screenshot.
 
 ## 2. Download the release
 
-The current supported release is `v0.6.1`. Change both variables together when
+The current supported release is `v0.7.0`. Change both variables together when
 testing another version.
 
 ### macOS or Linux download
@@ -77,13 +77,13 @@ testing another version.
 Run from a new empty directory:
 
 ```console
-VERSION=v0.6.1
-RELEASE=0.6.1
-mkdir owa-test-assets
+VERSION=v0.7.0
+RELEASE=0.7.0
+mkdir corresync-test-assets
 gh release download "$VERSION" \
-  --repo nkiyohara/owa-bridge \
-  --dir owa-test-assets
-cd owa-test-assets
+  --repo nkiyohara/corresync \
+  --dir corresync-test-assets
+cd corresync-test-assets
 ```
 
 ### Windows PowerShell download
@@ -91,13 +91,13 @@ cd owa-test-assets
 Run from a new empty directory:
 
 ```powershell
-$Version = "v0.6.1"
-$Release = "0.6.1"
-New-Item -ItemType Directory -Path owa-test-assets | Out-Null
+$Version = "v0.7.0"
+$Release = "0.7.0"
+New-Item -ItemType Directory -Path corresync-test-assets | Out-Null
 gh release download $Version `
-  --repo nkiyohara/owa-bridge `
-  --dir owa-test-assets
-Set-Location owa-test-assets
+  --repo nkiyohara/corresync `
+  --dir corresync-test-assets
+Set-Location corresync-test-assets
 ```
 
 Expected inventory: 41 files consisting of `checksums.txt`, its Sigstore
@@ -146,7 +146,7 @@ file or mismatch.
 Verify that the checksum manifest came from the tagged release workflow:
 
 ```console
-WORKFLOW_ID="https://github.com/nkiyohara/owa-bridge/"
+WORKFLOW_ID="https://github.com/nkiyohara/corresync/"
 WORKFLOW_ID="${WORKFLOW_ID}.github/workflows/release.yml@refs/tags/${VERSION}"
 cosign verify-blob \
   --bundle checksums.txt.sigstore.json \
@@ -167,12 +167,12 @@ tested. Select the filename matching the actual computer.
 Example for Linux amd64:
 
 ```console
-ASSET="owa-bridge_${RELEASE}_linux_amd64.tar.gz"
-mkdir ../owa-under-test
-tar -xzf "$ASSET" -C ../owa-under-test
-export PATH="$(cd ../owa-under-test && pwd):$PATH"
-owa version --json
-owa --help
+ASSET="corresync_${RELEASE}_linux_amd64.tar.gz"
+mkdir ../corresync-under-test
+tar -xzf "$ASSET" -C ../corresync-under-test
+export PATH="$(cd ../corresync-under-test && pwd):$PATH"
+corresync version --json
+corresync --help
 ```
 
 Use `darwin_amd64`, `darwin_arm64`, `linux_amd64`, or `linux_arm64` as
@@ -185,18 +185,18 @@ removing quarantine metadata or weakening system policy.
 Example for Windows amd64:
 
 ```powershell
-$Asset = "owa-bridge_${Release}_windows_amd64.zip"
-New-Item -ItemType Directory -Path ..\owa-under-test | Out-Null
-Expand-Archive -LiteralPath $Asset -DestinationPath ..\owa-under-test
-$Owa = (Resolve-Path ..\owa-under-test\owa.exe).Path
-& $Owa version --json
-& $Owa --help
+$Asset = "corresync_${Release}_windows_amd64.zip"
+New-Item -ItemType Directory -Path ..\corresync-under-test | Out-Null
+Expand-Archive -LiteralPath $Asset -DestinationPath ..\corresync-under-test
+$Corresync = (Resolve-Path ..\corresync-under-test\corresync.exe).Path
+& $Corresync version --json
+& $Corresync --help
 ```
 
 Use `windows_amd64` or `windows_arm64` as appropriate. Record a
 SmartScreen or application-control failure; do not bypass organization policy.
-In later PowerShell examples, replace `owa` with `& $Owa` when it is not on
-`PATH`.
+In later PowerShell examples, replace `corresync` with `& $Corresync` when it
+is not on `PATH`.
 
 ## 5. Optionally test a native Linux package
 
@@ -205,22 +205,22 @@ compatible disposable host:
 
 ```console
 # Debian or Ubuntu
-sudo apt install ./owa-bridge_0.6.1-1_amd64.deb
-dpkg -L owa-bridge
+sudo apt install ./corresync_0.7.0-1_amd64.deb
+dpkg -L corresync
 
 # Fedora or another RPM-based distribution
-sudo dnf install ./owa-bridge-0.6.1-1.x86_64.rpm
-rpm -ql owa-bridge
+sudo dnf install ./corresync-0.7.0-1.x86_64.rpm
+rpm -ql corresync
 
 # Alpine
-sudo apk add ./owa-bridge_0.6.1-r1_x86_64.apk
-apk info -L owa-bridge
+sudo apk add ./corresync_0.7.0-r1_x86_64.apk
+apk info -L corresync
 ```
 
-Confirm that the package installs `owa`, the `owa(1)` manual, shell
+Confirm that the package installs `corresync`, the `corresync(1)` manual, shell
 completions, the project license, `third_party_licenses`, and the agent plugin
-under `/usr/share/owa-bridge`. Then run `owa version --json`. Adjust only the
-architecture suffix, not the release number, for arm64.
+under `/usr/share/corresync`. Then run `corresync version --json`. Adjust only
+the architecture suffix, not the release number, for arm64.
 
 ## 6. Initialize without Outlook access
 
@@ -228,15 +228,15 @@ These commands must not open a browser or contact Outlook. The offline doctor
 may read bounded public release metadata unless update checks are disabled:
 
 ```console
-owa config init
-owa config path
-owa config validate
-owa --version
-owa help auth
-owa doctor --json
-owa daemon start
-owa daemon status --json
-owa daemon stop
+corresync config init
+corresync config path
+corresync config validate
+corresync --version
+corresync help auth
+corresync doctor --json
+corresync daemon start
+corresync daemon status --json
+corresync daemon stop
 ```
 
 Expected results:
@@ -256,9 +256,9 @@ the daemon after every config edit.
 ### 6.1 Verify update-check isolation
 
 ```console
-owa update check
-owa update check --json
-owa update --json
+corresync update check
+corresync update check --json
+corresync update --json
 ```
 
 The first command should report the current stable release or an
@@ -282,10 +282,10 @@ This is the first step that accesses a live mailbox. Confirm authorization
 before continuing.
 
 ```console
-owa auth login --json
-owa auth status --json
-owa doctor --online --json
-owa daemon status --json
+corresync auth login --json
+corresync auth status --json
+corresync doctor --online --json
+corresync daemon status --json
 ```
 
 For the default path, complete sign-in, MFA, notices, and Conditional Access in
@@ -301,8 +301,8 @@ Pass criteria:
   OWA response body;
 - no Outlook item changes.
 
-For the optional SSH relay check, run `owa auth login --terminal` instead of
-`owa auth login --json`. Enter browser-field keystrokes only while its
+For the optional SSH relay check, run `corresync auth login --terminal` instead
+of `corresync auth login --json`. Enter browser-field keystrokes only while its
 interactive relay is active; piped input is rejected. Record only whether the
 flow passed, not identity-provider page text or entered values. Then run the
 remaining JSON commands unchanged.
@@ -315,22 +315,22 @@ local paths before sharing it.
 Keep all output on the test computer. Use small limits first:
 
 ```console
-owa mail folders --json
-owa mail list --limit 5 --json
-owa mail search --query 'kind:email' --limit 5 --json
+corresync mail folders --json
+corresync mail list --limit 5 --json
+corresync mail search --query 'kind:email' --limit 5 --json
 ```
 
 Choose one harmless message from the local output and test its bounded
 plain-text body without copying its ID into the result memo:
 
 ```console
-owa mail body --message-id 'opaque-message-id' --json
+corresync mail body --message-id 'opaque-message-id' --json
 ```
 
 Choose an authorized one-hour calendar window and replace both example values:
 
 ```console
-owa calendar list \
+corresync calendar list \
   --start 2026-07-20T09:00:00Z \
   --end 2026-07-20T10:00:00Z \
   --json
@@ -352,29 +352,29 @@ names, counts, IDs, change keys, subjects, senders, times, or bodies.
 Skip this section when Codex is not installed. Review before registration:
 
 ```console
-owa mcp setup codex --dry-run
-owa mcp config codex
+corresync mcp setup codex --dry-run
+corresync mcp config codex
 ```
 
 Register through the official client CLI and inspect the entry:
 
 ```console
-owa mcp setup codex
-codex mcp get outlook-web
+corresync mcp setup codex
+codex mcp get corresync
 ```
 
 In a new Codex session, ask it to perform only these read-only operations, one
 at a time:
 
 ```text
-Use only the owa mail_list_folders tool. Do not read message bodies or write.
-Use only the owa mail_list tool with limit 5. Do not write.
-Use only the owa calendar_list tool for this one-hour RFC3339 window. Do not write.
+Use corresync mail_list_folders only. Read no bodies; make no writes.
+Use only the corresync mail_list tool with limit 5. Do not write.
+Use corresync calendar_list for a one-hour RFC3339 window. Make no writes.
 ```
 
-Pass criteria: Codex starts `owa mcp serve`, the first account call can reuse or
-open the visible browser session, structured results return, and no Outlook
-write or authorization material enters the client logs.
+Pass criteria: Codex starts `corresync mcp serve`, the first account call can
+reuse or open the visible browser session, structured results return, and no
+Outlook write or authorization material enters the client logs.
 
 ## 10. Test Claude Code MCP
 
@@ -382,15 +382,15 @@ Skip this section when Claude Code is not installed. Review before
 registration:
 
 ```console
-owa mcp setup claude-code --dry-run
-owa mcp config claude-code
+corresync mcp setup claude-code --dry-run
+corresync mcp config claude-code
 ```
 
 Register and inspect the entry:
 
 ```console
-owa mcp setup claude-code --scope user
-claude mcp get outlook-web
+corresync mcp setup claude-code --scope user
+claude mcp get corresync
 ```
 
 In a new Claude Code session, use the same three read-only prompts from the
@@ -413,8 +413,8 @@ preview_reversible_writes = true
 ```
 
 ```console
-owa config validate
-owa daemon stop
+corresync config validate
+corresync daemon stop
 ```
 
 Every first call below must be treated as a preview. Review it, then repeat the
@@ -427,9 +427,9 @@ folder or calendar first.
 Use a controlled address and a synthetic body file:
 
 ```console
-owa mail draft \
+corresync mail draft \
   --to tester-controlled@example.com \
-  --subject 'owa-bridge synthetic draft' \
+  --subject 'Corresync synthetic draft' \
   --body-file ./synthetic-body.txt
 ```
 
@@ -442,7 +442,7 @@ another attempt.
 Select one dedicated test message and use its current ID and change key:
 
 ```console
-owa mail mark \
+corresync mail mark \
   --message-id 'opaque-test-message-id' \
   --change-key 'opaque-current-change-key' \
   --state read
@@ -457,7 +457,7 @@ Discover a harmless destination folder ID first, then preview one dedicated
 test-message move:
 
 ```console
-owa mail move \
+corresync mail move \
   --message-id 'opaque-test-message-id' \
   --change-key 'opaque-current-change-key' \
   --destination-id 'opaque-test-folder-id'
@@ -471,9 +471,9 @@ unknown outcome without checking both folders.
 Use only a recipient you control:
 
 ```console
-owa mail send \
+corresync mail send \
   --to tester-controlled@example.com \
-  --subject 'owa-bridge synthetic self-send' \
+  --subject 'Corresync synthetic self-send' \
   --body-file ./synthetic-body.txt
 ```
 
@@ -487,8 +487,8 @@ before doing anything else.
 First test an appointment that cannot notify another person:
 
 ```console
-owa calendar create \
-  --subject 'owa-bridge synthetic appointment' \
+corresync calendar create \
+  --subject 'Corresync synthetic appointment' \
   --start 2026-07-20T09:00:00Z \
   --end 2026-07-20T09:15:00Z \
   --body-file ./synthetic-body.txt
@@ -498,17 +498,17 @@ Repeat with `--approve`, list that window, and capture the ID and change key
 only in the local terminal. Then preview an update:
 
 ```console
-owa calendar update \
+corresync calendar update \
   --event-id 'opaque-test-event-id' \
   --change-key 'opaque-current-change-key' \
-  --subject 'owa-bridge synthetic appointment updated'
+  --subject 'Corresync synthetic appointment updated'
 ```
 
 Repeat with `--approve`, list again to obtain the refreshed change key, then
 preview cancellation:
 
 ```console
-owa calendar cancel \
+corresync calendar cancel \
   --event-id 'opaque-test-event-id' \
   --change-key 'opaque-refreshed-change-key'
 ```
@@ -523,8 +523,8 @@ Only when the organizer address is also a recipient you control, prepare a
 second event with that address as the sole attendee:
 
 ```console
-owa calendar create \
-  --subject 'owa-bridge synthetic Teams appointment' \
+corresync calendar create \
+  --subject 'Corresync synthetic Teams appointment' \
   --start 2026-07-21T09:00:00Z \
   --end 2026-07-21T09:15:00Z \
   --required-attendee tester-controlled@example.com \
@@ -542,8 +542,8 @@ third-party attendee merely to test delivery.
 ## 12. Stop and record content-free evidence
 
 ```console
-owa daemon status --json
-owa daemon stop
+corresync daemon status --json
+corresync daemon stop
 ```
 
 Complete this table locally:
@@ -568,9 +568,10 @@ Complete this table locally:
 | Controlled send or SKIP                   |        |                   |
 | Calendar create/update/cancel or SKIP     |        |                   |
 
-A shareable report contains only `owa version --json`, OS and architecture,
-browser family and version, deployment class, observation date, and the
-content-free pass/fail stages above. Review even those files before sharing.
+A shareable report contains only `corresync version --json`, OS and
+architecture, browser family and version, deployment class, observation date,
+and the content-free pass/fail stages above. Review even those files before
+sharing.
 Do not upload the dedicated browser profile, config directory, state directory,
 audit log, screenshots, raw stdout from mailbox commands, or MCP transcripts.
 

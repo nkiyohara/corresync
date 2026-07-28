@@ -3,7 +3,7 @@ version: "3"
 set: [errexit, nounset, pipefail]
 
 vars:
-  BINARY: bin/owa
+  BINARY: bin/corresync
 
 tasks:
   default:
@@ -60,8 +60,8 @@ tasks:
     desc: Check licenses of dependencies linked into the release binary
     cmds:
       - >-
-        go-licenses check ./cmd/owa
-        --ignore github.com/nkiyohara/owa-bridge
+        go-licenses check ./cmd/corresync
+        --ignore github.com/nkiyohara/corresync
 
   secrets:
     desc: Scan repository history and the working tree for committed secrets
@@ -73,7 +73,7 @@ tasks:
     desc: Build the local CLI
     cmds:
       - mkdir -p bin
-      - go build -trimpath -o {{.BINARY}} ./cmd/owa
+      - go build -trimpath -o {{.BINARY}} ./cmd/corresync
 
   release:check:
     desc: Validate the GoReleaser configuration

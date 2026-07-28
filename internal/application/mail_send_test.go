@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 func validSendInput() MailSendInput {
@@ -92,6 +92,38 @@ func TestMailSendRejectsMissingRecipientAndWrongCaller(t *testing.T) {
 	wrongCaller := domain.Caller{Surface: "cli", Instance: "process-2"}
 	if _, err := service.CommitSend(t.Context(), access.Preview.Token, wrongCaller); err == nil {
 		t.Fatal("CommitSend() accepted a different caller")
+	}
+	if port.calls != 0 {
+		t.Fatalf("send calls = %d, want 0", port.calls)
+	}
+}
+
+func TestMailSendRejectsCommitRoutedToAnotherAccountService(t *testing.T) {
+	t.Parallel()
+
+	store, err := approval.NewStore(approval.Options{})
+	if err != nil {
+		t.Fatalf("NewStore() error = %v", err)
+	}
+	guard, err := NewGuard(policy.DefaultRules(), store, &memoryAudit{})
+	if err != nil {
+		t.Fatalf("NewGuard() error = %v", err)
+	}
+	port := &fakeMailReader{}
+	service, err := NewMailService(guard, port, MailOptions{
+		MaxRecipients: 20,
+		Provenance:    domain.Provenance{AccountID: "personal"},
+	})
+	if err != nil {
+		t.Fatalf("NewMailService() error = %v", err)
+	}
+	caller := domain.Caller{Surface: "mcp", Instance: "session-1"}
+	access, err := service.Send(t.Context(), validSendInput(), caller)
+	if err != nil {
+		t.Fatalf("Send() error = %v", err)
+	}
+	if _, err := service.CommitSend(t.Context(), access.Preview.Token, caller); err == nil {
+		t.Fatal("CommitSend() accepted a preview routed to another account service")
 	}
 	if port.calls != 0 {
 		t.Fatalf("send calls = %d, want 0", port.calls)

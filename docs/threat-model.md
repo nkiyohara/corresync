@@ -1,6 +1,6 @@
 # Threat model
 
-`owa-bridge` handles email, calendar data, and a live Outlook Web session. Its
+`Corresync` handles email, calendar data, and a live Outlook Web session. Its
 security boundary is intentionally narrower than that of a general browser
 automation framework.
 

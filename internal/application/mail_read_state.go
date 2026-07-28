@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 // MailReadState is a closed message state, not an arbitrary property name.
@@ -35,9 +35,10 @@ type MailReadStateReview struct {
 
 // MailReadStateResult contains a refreshed identity when OWA returns one.
 type MailReadStateResult struct {
-	ID        string        `json:"id,omitempty"`
-	ChangeKey string        `json:"changeKey,omitempty"`
-	State     MailReadState `json:"state"`
+	ID         string            `json:"id,omitempty"`
+	ChangeKey  string            `json:"changeKey,omitempty"`
+	State      MailReadState     `json:"state"`
+	Provenance domain.Provenance `json:"provenance,omitempty"`
 }
 
 // MailReadStateAccess is a completed update or a caller-bound preview.
@@ -62,7 +63,13 @@ func (service *MailService) SetReadState(
 	if err := input.Validate(); err != nil {
 		return MailReadStateAccess{}, err
 	}
-	operation, err := domain.NewOperation("mail.set_read_state", domain.EffectReversibleWrite, input.Account, input)
+	operation, err := domain.NewTargetedOperation(
+		"mail.set_read_state",
+		domain.EffectReversibleWrite,
+		input.Account,
+		configuredMailboxTarget(),
+		input,
+	)
 	if err != nil {
 		return MailReadStateAccess{}, fmt.Errorf("create mail read-state operation: %w", err)
 	}
@@ -118,6 +125,9 @@ func (service *MailService) executeReadState(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailReadStateResult, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailReadStateResult{}, err
+	}
 	updated, callErr := service.readState.SetMailReadState(ctx, input)
 	outcome := AuditOutcomeSuccess
 	reason := "completed"
@@ -135,6 +145,9 @@ func (service *MailService) executeReadState(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailReadStateResult{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		updated.Provenance = service.mailProvenance(updated.ID)
 	}
 	return updated, nil
 }
