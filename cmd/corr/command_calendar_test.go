@@ -109,8 +109,8 @@ func TestWriteCalendarCancelReviewIsExplicitAndSanitized(t *testing.T) {
 	}
 	if strings.Contains(output.String(), "\x1b") ||
 		!strings.Contains(output.String(), "nothing was cancelled") ||
-		!strings.Contains(output.String(), "Deleted Items") ||
-		!strings.Contains(output.String(), "notify attendees") {
+		!strings.Contains(output.String(), "move_to_deleted_items") ||
+		!strings.Contains(output.String(), "Attendee notifications may be sent: no") {
 		t.Fatalf("unsafe or incomplete cancel review: %q", output.String())
 	}
 }

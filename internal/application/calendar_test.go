@@ -70,7 +70,16 @@ func (reader *fakeCalendarReader) CreateCalendarEvent(
 func testCalendarService(t *testing.T, reader CalendarPort) (*CalendarService, *memoryAudit) {
 	t.Helper()
 	guard, recorder := newTestGuard(t, policy.DefaultRules())
-	service, err := NewCalendarService(guard, reader, CalendarOptions{MaxAttendees: 50})
+	service, err := NewCalendarService(guard, reader, CalendarOptions{
+		MaxAttendees: 50,
+		Effects: CalendarEffects{
+			CreateAttendeeNotifications: true,
+			UpdateAttendeeNotifications: true,
+			CancelAttendeeNotifications: true,
+			CancellationMode:            CalendarCancellationModeAll,
+			CancellationDisposition:     CalendarDispositionDeletedItems,
+		},
+	})
 	if err != nil {
 		t.Fatalf("NewCalendarService() error = %v", err)
 	}
@@ -165,5 +174,25 @@ func TestNewCalendarServiceRequiresDependencies(t *testing.T) {
 	}
 	if _, err := NewCalendarService(guard, reader, CalendarOptions{}); err == nil {
 		t.Fatal("NewCalendarService() unexpectedly accepted an invalid attendee limit")
+	}
+	if _, err := NewCalendarService(
+		guard,
+		reader,
+		CalendarOptions{MaxAttendees: 50},
+	); err == nil {
+		t.Fatal("NewCalendarService() unexpectedly accepted missing effect semantics")
+	}
+	if _, err := NewCalendarService(
+		guard,
+		reader,
+		CalendarOptions{
+			MaxAttendees: 50,
+			Effects: CalendarEffects{
+				CancellationMode:        CalendarCancellationNoScheduling,
+				CancellationDisposition: CalendarDispositionDeletedItems,
+			},
+		},
+	); err == nil {
+		t.Fatal("NewCalendarService() unexpectedly accepted inconsistent effects")
 	}
 }

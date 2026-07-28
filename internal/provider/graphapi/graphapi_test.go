@@ -215,8 +215,8 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			MessageID: messages.Messages[0].ID,
 			ChangeKey: messages.Messages[0].ChangeKey,
 		},
-	); err != nil {
-		t.Fatal(err)
+	); err == nil || !strings.Contains(err.Error(), "permanent") {
+		t.Fatalf("delete degradation = %v", err)
 	}
 
 	calendar, err := client.ListCalendarEvents(

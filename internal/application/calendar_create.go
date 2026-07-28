@@ -50,8 +50,8 @@ type CalendarRecurrence struct {
 	NumberOfOccurrences int                       `json:"numberOfOccurrences,omitempty"`
 }
 
-// CalendarCreateInput creates one bounded calendar item. Required and optional
-// attendees turn it into a meeting invitation.
+// CalendarCreateInput creates one bounded calendar item. Whether attendees
+// receive provider notifications is described by CalendarEffects.
 type CalendarCreateInput struct {
 	Account           domain.AccountID    `json:"account"`
 	Calendar          CalendarFolder      `json:"calendar"`
@@ -96,7 +96,7 @@ type CalendarBodyReview struct {
 	SHA256  string `json:"sha256"`
 }
 
-// CalendarCreateResult identifies the created event returned by OWA.
+// CalendarCreateResult identifies the event returned by the selected provider.
 type CalendarCreateResult struct {
 	ID                    string            `json:"id"`
 	ChangeKey             string            `json:"changeKey,omitempty"`
@@ -114,7 +114,7 @@ type CalendarCreateAccess struct {
 	Preview *approval.Preview     `json:"preview,omitempty"`
 }
 
-// CalendarCreator is the narrow OWA port for one new event.
+// CalendarCreator is the narrow provider-neutral port for one new event.
 type CalendarCreator interface {
 	CreateCalendarEvent(context.Context, CalendarCreateInput) (CalendarCreateResult, error)
 }
@@ -146,7 +146,8 @@ func (service *CalendarService) Create(
 	switch prepared.Decision.Verdict {
 	case policy.VerdictPreview:
 		return CalendarCreateAccess{
-			Status: "approval_required", Review: input.Review(), Preview: prepared.Preview,
+			Status: "approval_required",
+			Review: input.reviewWithEffects(service.effects), Preview: prepared.Preview,
 		}, nil
 	case policy.VerdictDeny:
 		return CalendarCreateAccess{}, errors.New("calendar create operation was denied")
@@ -182,7 +183,8 @@ func (service *CalendarService) CommitCreate(
 		return CalendarCreateAccess{}, err
 	}
 	return CalendarCreateAccess{
-		Status: "created", Created: &created, Review: input.Review(),
+		Status: "created", Created: &created,
+		Review: input.reviewWithEffects(service.effects),
 	}, nil
 }
 
@@ -292,19 +294,30 @@ func (input CalendarCreateInput) Validate(maxAttendees int) error {
 
 // Review binds the complete body while limiting visible preview text.
 func (input CalendarCreateInput) Review() CalendarCreateReview {
+	return input.reviewWithEffects(CalendarEffects{
+		CreateAttendeeNotifications: true,
+		CancellationMode:            CalendarCancellationProviderManaged,
+		CancellationDisposition:     CalendarDispositionRemoteDelete,
+	})
+}
+
+func (input CalendarCreateInput) reviewWithEffects(
+	effects CalendarEffects,
+) CalendarCreateReview {
 	body := reviewCalendarBody(input.Body)
 	return CalendarCreateReview{
 		Calendar: input.Calendar, Subject: input.Subject,
 		BodyPreview: body.Preview, BodyBytes: body.Bytes, BodySHA256: body.SHA256,
 		Start: input.Start, End: input.End, Location: input.Location,
-		RequiredAttendees:     append([]string(nil), input.RequiredAttendees...),
-		OptionalAttendees:     append([]string(nil), input.OptionalAttendees...),
-		InvitationsWillBeSent: len(input.RequiredAttendees)+len(input.OptionalAttendees) > 0,
-		TeamsMeeting:          input.TeamsMeeting,
-		AllDay:                input.AllDay,
-		TimeZone:              effectiveCalendarTimeZone(input.TimeZone),
-		Reminder:              cloneCalendarReminder(input.Reminder),
-		Recurrence:            cloneCalendarRecurrence(input.Recurrence),
+		RequiredAttendees: append([]string(nil), input.RequiredAttendees...),
+		OptionalAttendees: append([]string(nil), input.OptionalAttendees...),
+		InvitationsWillBeSent: effects.CreateAttendeeNotifications &&
+			len(input.RequiredAttendees)+len(input.OptionalAttendees) > 0,
+		TeamsMeeting: input.TeamsMeeting,
+		AllDay:       input.AllDay,
+		TimeZone:     effectiveCalendarTimeZone(input.TimeZone),
+		Reminder:     cloneCalendarReminder(input.Reminder),
+		Recurrence:   cloneCalendarRecurrence(input.Recurrence),
 	}
 }
 

@@ -1590,6 +1590,7 @@ func (backend *sessionBackend) outlookAccount(
 			client,
 			application.CalendarOptions{
 				MaxAttendees: backend.configuration.Policy.MaxAttendees,
+				Effects:      providerCalendarEffects(domain.ProviderMicrosoftOWA),
 				Provenance: domain.Provenance{
 					AccountID:  configured.ID,
 					Provider:   configured.CalendarProvider(),
@@ -1769,6 +1770,7 @@ func (backend *sessionBackend) calDAVAccount(
 		client,
 		application.CalendarOptions{
 			MaxAttendees: backend.configuration.Policy.MaxAttendees,
+			Effects:      providerCalendarEffects(domain.ProviderCalDAV),
 			Provenance: domain.Provenance{
 				AccountID: configured.ID, Provider: domain.ProviderCalDAV,
 				CalendarID: "configured-caldav-calendar",
@@ -1901,6 +1903,7 @@ func (backend *sessionBackend) googleAPIAccount(
 			client,
 			application.CalendarOptions{
 				MaxAttendees: backend.configuration.Policy.MaxAttendees,
+				Effects:      providerCalendarEffects(domain.ProviderGoogleAPI),
 				Provenance: domain.Provenance{
 					AccountID:  configured.ID,
 					Provider:   domain.ProviderGoogleAPI,
@@ -1980,6 +1983,10 @@ func (backend *sessionBackend) graphAPIAccount(
 				Reason:  "Graph message move exposes no atomic source ETag precondition",
 			},
 			domain.Degradation{
+				Feature: "mail.delete",
+				Reason:  "Graph permanentDelete exposes no atomic ETag precondition",
+			},
+			domain.Degradation{
 				Feature: "mail.send_identity",
 				Reason:  "Graph accepts sends asynchronously without returning a sent item identity",
 				Lossy:   true,
@@ -2012,6 +2019,9 @@ func (backend *sessionBackend) graphAPIAccount(
 			client,
 			application.CalendarOptions{
 				MaxAttendees: backend.configuration.Policy.MaxAttendees,
+				Effects: providerCalendarEffects(
+					domain.ProviderMicrosoftGraph,
+				),
 				Provenance: domain.Provenance{
 					AccountID:  configured.ID,
 					Provider:   domain.ProviderMicrosoftGraph,
@@ -2185,6 +2195,37 @@ func hasOutlookRoute(account config.Account) bool {
 		account.Mail.Provider == domain.ProviderMicrosoftOWA ||
 		account.Calendar != nil &&
 			account.Calendar.Provider == domain.ProviderMicrosoftOWA
+}
+
+func providerCalendarEffects(provider domain.ProviderID) application.CalendarEffects {
+	switch provider {
+	case domain.ProviderMicrosoftOWA:
+		return application.CalendarEffects{
+			CreateAttendeeNotifications: true,
+			UpdateAttendeeNotifications: true,
+			CancelAttendeeNotifications: true,
+			CancellationMode:            application.CalendarCancellationModeAll,
+			CancellationDisposition:     application.CalendarDispositionDeletedItems,
+		}
+	case domain.ProviderGoogleAPI, domain.ProviderMicrosoftGraph:
+		return application.CalendarEffects{
+			CreateAttendeeNotifications: true,
+			UpdateAttendeeNotifications: true,
+			CancelAttendeeNotifications: true,
+			CancellationMode:            application.CalendarCancellationProviderManaged,
+			CancellationDisposition:     application.CalendarDispositionRemoteDelete,
+		}
+	case domain.ProviderCalDAV:
+		return application.CalendarEffects{
+			CancellationMode:        application.CalendarCancellationNoScheduling,
+			CancellationDisposition: application.CalendarDispositionCalendarObject,
+		}
+	case domain.ProviderGoogleWeb, domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP, domain.ProviderPOP3:
+		return application.CalendarEffects{}
+	default:
+		return application.CalendarEffects{}
+	}
 }
 
 func mergeSessionAccounts(

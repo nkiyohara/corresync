@@ -369,7 +369,7 @@ func (command *calendarCancelCommand) Run(app *runtime) (returnErr error) {
 	}
 	_, err = fmt.Fprintf(
 		app.stdout,
-		"Cancelled calendar event %s and moved it to Deleted Items; the network request was attempted once.\n",
+		"Cancelled calendar event %s using the reviewed provider semantics; the network request was attempted once.\n",
 		sanitizeCell(access.Cancelled.ID, 4096),
 	)
 	return err
@@ -556,11 +556,16 @@ func writeCalendarCancelReview(
 	if committing {
 		action = "Committing this destructive calendar cancellation now."
 	}
+	attendeeNotifications := "no"
+	if review.AttendeeNotificationsMaySend {
+		attendeeNotifications = "yes"
+	}
 	_, err := fmt.Fprintf(
 		writer,
-		"%s\nEvent ID: %s\nChange key: %s\nDelete type: %s\nCancellation mode: %s\nThe event will move to Deleted Items and Outlook will notify attendees when it is a meeting.\n",
+		"%s\nEvent ID: %s\nChange key: %s\nProvider disposition: %s\nCancellation mode: %s\nAttendee notifications may be sent: %s\n",
 		action, sanitizeCell(review.EventID, 4096), sanitizeCell(review.ChangeKey, 4096),
 		sanitizeCell(review.DeleteType, 64), sanitizeCell(review.CancellationMode, 64),
+		attendeeNotifications,
 	)
 	return err
 }

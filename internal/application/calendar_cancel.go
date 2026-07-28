@@ -12,8 +12,8 @@ import (
 
 const CalendarCancellationModeAll = "all_attendees_and_save_copy"
 
-// CalendarCancelInput cancels one exact event version and moves it to Deleted
-// Items. Outlook sends cancellations when the item is a meeting.
+// CalendarCancelInput cancels one exact event version using the selected
+// provider's reviewed disposition and attendee-notification semantics.
 type CalendarCancelInput struct {
 	Account   domain.AccountID `json:"account"`
 	EventID   string           `json:"eventId"`
@@ -22,10 +22,11 @@ type CalendarCancelInput struct {
 
 // CalendarCancelReview is the immutable destructive-operation review.
 type CalendarCancelReview struct {
-	EventID          string `json:"eventId"`
-	ChangeKey        string `json:"changeKey"`
-	CancellationMode string `json:"cancellationMode"`
-	DeleteType       string `json:"deleteType"`
+	EventID                      string `json:"eventId"`
+	ChangeKey                    string `json:"changeKey"`
+	CancellationMode             string `json:"cancellationMode"`
+	DeleteType                   string `json:"deleteType"`
+	AttendeeNotificationsMaySend bool   `json:"attendeeNotificationsMaySend"`
 }
 
 // CalendarCancelResult identifies the event requested for cancellation.
@@ -42,7 +43,7 @@ type CalendarCancelAccess struct {
 	Preview   *approval.Preview     `json:"preview,omitempty"`
 }
 
-// CalendarCanceller is the narrow OWA port for one exact cancellation.
+// CalendarCanceller is the narrow provider-neutral port for one cancellation.
 type CalendarCanceller interface {
 	CancelCalendarEvent(context.Context, CalendarCancelInput) error
 }
@@ -73,7 +74,8 @@ func (service *CalendarService) Cancel(
 	switch prepared.Decision.Verdict {
 	case policy.VerdictPreview:
 		return CalendarCancelAccess{
-			Status: "approval_required", Review: input.Review(), Preview: prepared.Preview,
+			Status: "approval_required",
+			Review: input.reviewWithEffects(service.effects), Preview: prepared.Preview,
 		}, nil
 	case policy.VerdictDeny:
 		return CalendarCancelAccess{}, errors.New("calendar cancel operation was denied")
@@ -111,7 +113,7 @@ func (service *CalendarService) CommitCancel(
 		Cancelled: &CalendarCancelResult{
 			ID: input.EventID, Provenance: service.calendarProvenance(input.EventID),
 		},
-		Review: input.Review(),
+		Review: input.reviewWithEffects(service.effects),
 	}, nil
 }
 
@@ -146,9 +148,20 @@ func (input CalendarCancelInput) Validate() error {
 
 // Review describes the exact cancellation and deletion behavior.
 func (input CalendarCancelInput) Review() CalendarCancelReview {
+	return input.reviewWithEffects(CalendarEffects{
+		CancelAttendeeNotifications: true,
+		CancellationMode:            CalendarCancellationProviderManaged,
+		CancellationDisposition:     CalendarDispositionRemoteDelete,
+	})
+}
+
+func (input CalendarCancelInput) reviewWithEffects(
+	effects CalendarEffects,
+) CalendarCancelReview {
 	return CalendarCancelReview{
 		EventID: input.EventID, ChangeKey: input.ChangeKey,
-		CancellationMode: CalendarCancellationModeAll,
-		DeleteType:       "move_to_deleted_items",
+		CancellationMode:             effects.CancellationMode,
+		DeleteType:                   effects.CancellationDisposition,
+		AttendeeNotificationsMaySend: effects.CancelAttendeeNotifications,
 	}
 }

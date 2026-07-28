@@ -193,28 +193,12 @@ func (*Client) MoveMail(
 	)
 }
 
-func (client *Client) DeleteMail(
-	ctx context.Context,
-	input application.MailDeleteInput,
+func (*Client) DeleteMail(
+	context.Context,
+	application.MailDeleteInput,
 ) error {
-	reference, etag, err := client.exactMessage(
-		ctx,
-		input.MessageID,
-		input.ChangeKey,
+	return errors.New(
+		"graph permanentDelete exposes no atomic ETag precondition; " +
+			"permanent mail deletion is unavailable",
 	)
-	if err != nil {
-		return err
-	}
-	_, err = client.api.DoJSON(
-		ctx,
-		http.MethodDelete,
-		"me/messages/"+escaped(reference.ID),
-		nil,
-		nil,
-		nil,
-		true,
-		http.Header{"If-Match": {etag}},
-		http.StatusNoContent,
-	)
-	return err
 }

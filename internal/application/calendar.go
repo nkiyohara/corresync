@@ -26,8 +26,8 @@ type CalendarFolder struct {
 	ID   string             `json:"id"`
 }
 
-// CalendarListInput selects a bounded absolute time window. RFC3339 inputs are
-// normalized to UTC at the OWA boundary.
+// CalendarListInput selects a bounded absolute time window. Provider adapters
+// normalize RFC3339 inputs without changing the absolute instants.
 type CalendarListInput struct {
 	Account  domain.AccountID `json:"account"`
 	Calendar CalendarFolder   `json:"calendar"`
@@ -67,7 +67,7 @@ type CalendarPage struct {
 	End    string          `json:"end"`
 }
 
-// CalendarReader is the application port implemented by the OWA adapter.
+// CalendarReader is the provider-neutral application read port.
 type CalendarReader interface {
 	ListCalendarEvents(context.Context, CalendarListInput) (CalendarPage, error)
 }
@@ -85,6 +85,43 @@ type CalendarPort interface {
 type CalendarOptions struct {
 	MaxAttendees int
 	Provenance   domain.Provenance
+	Effects      CalendarEffects
+}
+
+// CalendarEffects describes externally visible provider behavior that must be
+// shown in a review. It contains no provider wire type or policy decision.
+type CalendarEffects struct {
+	CreateAttendeeNotifications bool
+	UpdateAttendeeNotifications bool
+	CancelAttendeeNotifications bool
+	CancellationMode            string
+	CancellationDisposition     string
+}
+
+const (
+	CalendarCancellationProviderManaged = "provider_managed"
+	CalendarCancellationNoScheduling    = "no_scheduling"
+	CalendarDispositionRemoteDelete     = "remote_delete"
+	CalendarDispositionCalendarObject   = "delete_calendar_object"
+	CalendarDispositionDeletedItems     = "move_to_deleted_items"
+)
+
+func (effects CalendarEffects) validate() error {
+	switch {
+	case effects.CancellationMode == CalendarCancellationModeAll &&
+		effects.CancellationDisposition == CalendarDispositionDeletedItems:
+	case effects.CancellationMode == CalendarCancellationProviderManaged &&
+		effects.CancellationDisposition == CalendarDispositionRemoteDelete:
+	case effects.CancellationMode == CalendarCancellationNoScheduling &&
+		effects.CancellationDisposition == CalendarDispositionCalendarObject:
+	default:
+		return errors.New("calendar cancellation effects are inconsistent")
+	}
+	if effects.CancellationMode == CalendarCancellationNoScheduling &&
+		effects.CancelAttendeeNotifications {
+		return errors.New("calendar cancellation without scheduling cannot notify attendees")
+	}
+	return nil
 }
 
 // CalendarService applies policy and audit around calendar use cases.
@@ -96,6 +133,7 @@ type CalendarService struct {
 	canceller    CalendarCanceller
 	maxAttendees int
 	provenance   domain.Provenance
+	effects      CalendarEffects
 }
 
 // NewCalendarService requires the shared guard and a transport port.
@@ -113,9 +151,13 @@ func NewCalendarService(
 	if options.MaxAttendees < 1 || options.MaxAttendees > MaxCalendarAttendees {
 		return nil, fmt.Errorf("max calendar attendees must be between 1 and %d", MaxCalendarAttendees)
 	}
+	if err := options.Effects.validate(); err != nil {
+		return nil, err
+	}
 	return &CalendarService{
 		guard: guard, reader: port, creator: port, updater: port, canceller: port,
 		maxAttendees: options.MaxAttendees, provenance: options.Provenance,
+		effects: options.Effects,
 	}, nil
 }
 

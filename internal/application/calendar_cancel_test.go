@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 func validCalendarCancelInput() CalendarCancelInput {
@@ -25,7 +26,8 @@ func TestCalendarCancelAlwaysPreviewsThenCommitsExactVersion(t *testing.T) {
 	if access.Status != "approval_required" || access.Preview == nil || port.cancelCalls != 0 ||
 		access.Preview.Operation.Name != "calendar.cancel" ||
 		access.Preview.Operation.Effect != domain.EffectDestructiveWrite ||
-		access.Review.CancellationMode != CalendarCancellationModeAll {
+		access.Review.CancellationMode != CalendarCancellationModeAll ||
+		!access.Review.AttendeeNotificationsMaySend {
 		t.Fatalf("unsafe preview: %+v calls=%d", access, port.cancelCalls)
 	}
 	committed, err := service.CommitCancel(t.Context(), access.Preview.Token, caller)
@@ -39,6 +41,50 @@ func TestCalendarCancelAlwaysPreviewsThenCommitsExactVersion(t *testing.T) {
 	}
 	if len(recorder.events) != 3 || recorder.events[2].Outcome != AuditOutcomeSuccess {
 		t.Fatalf("unexpected audit events: %+v", recorder.events)
+	}
+}
+
+func TestCalendarReviewsUseConfiguredProviderEffects(t *testing.T) {
+	t.Parallel()
+
+	port := &fakeCalendarReader{}
+	guard, _ := newTestGuard(t, policy.DefaultRules())
+	service, err := NewCalendarService(guard, port, CalendarOptions{
+		MaxAttendees: 50,
+		Effects: CalendarEffects{
+			CancellationMode:        CalendarCancellationNoScheduling,
+			CancellationDisposition: CalendarDispositionCalendarObject,
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewCalendarService() error = %v", err)
+	}
+	caller := domain.Caller{Surface: "cli", Instance: "process-1"}
+	create, err := service.Create(t.Context(), validCalendarCreateInput(), caller)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if create.Review.InvitationsWillBeSent {
+		t.Fatalf("create review claimed attendee notification: %+v", create.Review)
+	}
+	updateInput := validCalendarUpdateInput()
+	updateInput.ReplaceAttendees = true
+	updateInput.RequiredAttendees = []string{"reader@example.invalid"}
+	update, err := service.Update(t.Context(), updateInput, caller)
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if update.Review.AttendeeUpdatesMaySend {
+		t.Fatalf("update review claimed attendee notification: %+v", update.Review)
+	}
+	cancel, err := service.Cancel(t.Context(), validCalendarCancelInput(), caller)
+	if err != nil {
+		t.Fatalf("Cancel() error = %v", err)
+	}
+	if cancel.Review.AttendeeNotificationsMaySend ||
+		cancel.Review.CancellationMode != CalendarCancellationNoScheduling ||
+		cancel.Review.DeleteType != CalendarDispositionCalendarObject {
+		t.Fatalf("cancel review does not reflect configured effects: %+v", cancel.Review)
 	}
 }
 

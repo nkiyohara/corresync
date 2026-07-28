@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-07-28
 
 ## Context
 
@@ -55,15 +56,23 @@ would differ is rejected like any other mismatch under
 Degradation reasons are bounded, single-line, and content-free. They explain a
 mapping, never quote a message body, subject, address, or provider payload.
 
+Provider-visible write effects are typed as well. The composition root supplies
+closed calendar notification and cancellation-disposition semantics to the
+application service, so a CalDAV object deletion cannot inherit Outlook
+“Deleted Items” or attendee-notification wording. These semantics are part of
+the review and remain fixed for its commit lifetime.
+
 Capability discovery must be free of side effects. Probing may not send a
 message, create an item, alter server state, or request an authorization or
 consent the user has not already granted; that constraint is the subject of
 [ADR 0012](0012-credential-free-discovery-and-explicit-selection.md).
 
 Each adapter ships redacted synthetic fixtures with contract tests and has a
-documented opt-in live smoke test. A capability appears in public documentation
-only with both, and the distinction between deterministic coverage and live
-observation stays visible.
+documented opt-in live smoke-test path. Public documentation may describe a
+deterministically implemented candidate before a live observation only when it
+states that the route is synthetic-only and not yet available as a stable
+compatibility claim. “Implemented,” “live-observed,” and “released” remain
+distinct claims.
 
 ## Consequences
 
