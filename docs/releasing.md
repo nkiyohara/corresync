@@ -104,6 +104,11 @@ Configure these repository secrets before publishing a stable tag:
   exposes it only to the manifest-submission step; duplicate-PR discovery uses
   the job-scoped `GITHUB_TOKEN`.
 
+Set the repository variable `WINGET_PR_AUTHOR` to the exact GitHub login that
+owns `WINGET_CREATE_GITHUB_TOKEN`. The duplicate-PR guard validates the login
+and scopes its search to that author so unrelated upstream submissions cannot
+block a release.
+
 The owned catalogs update idempotently and run their own installation tests on
 push. WinGet remains available only after Microsoft's validation and review of
 the submitted pull request. A rerun skips submission when the same version's
