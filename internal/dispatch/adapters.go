@@ -18,7 +18,10 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 )
 
-const desktopNotificationTimeout = 10 * time.Second
+const (
+	desktopNotificationTimeout = 10 * time.Second
+	commandWaitDelay           = 5 * time.Second
+)
 
 type commandRunner func(context.Context, []byte, string, ...string) error
 
@@ -27,6 +30,7 @@ func runCommand(ctx context.Context, stdin []byte, command string, arguments ...
 	// the local user, validated, and never derived from mailbox content.
 	process := exec.CommandContext(ctx, command, arguments...)
 	process.Stdin = bytes.NewReader(stdin)
+	process.WaitDelay = commandWaitDelay
 	var stderr bytes.Buffer
 	process.Stderr = &limitedWriter{target: &stderr, remaining: 4096}
 	if err := process.Run(); err != nil {

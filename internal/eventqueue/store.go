@@ -479,7 +479,8 @@ func validateScan(scan application.MonitorScan) error {
 			len(detection.Importance) > 32 ||
 			strings.ContainsAny(
 				detection.Sender.Name+detection.Sender.Address+
-					detection.Subject,
+					detection.Subject+detection.ReceivedAt+
+					detection.Importance,
 				"\x00",
 			) {
 			return errors.New("monitor detection metadata exceeds its bounds")

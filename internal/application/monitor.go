@@ -359,7 +359,8 @@ func (event MonitorEvent) Validate(expected domain.AccountID) error {
 		len(event.Subject) > 2048 || len(event.ReceivedAt) > 128 ||
 		len(event.Importance) > 32 ||
 		strings.ContainsAny(
-			event.Sender.Name+event.Sender.Address+event.Subject,
+			event.Sender.Name+event.Sender.Address+event.Subject+
+				event.ReceivedAt+event.Importance,
 			"\x00",
 		) {
 		return errors.New("monitor event metadata exceeds its bounds")

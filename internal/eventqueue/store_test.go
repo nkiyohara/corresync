@@ -269,6 +269,12 @@ func TestCommitScanRejectsNULInNotificationMetadata(t *testing.T) {
 		func(detection *application.MonitorDetection) {
 			detection.Sender.Address = "unsafe\x00@example.invalid"
 		},
+		func(detection *application.MonitorDetection) {
+			detection.ReceivedAt = "2026-07-28T12:00:00Z\x00"
+		},
+		func(detection *application.MonitorDetection) {
+			detection.Importance = "high\x00"
+		},
 	} {
 		detection := testDetection(testAccountA, "message", true)
 		mutate(&detection)
