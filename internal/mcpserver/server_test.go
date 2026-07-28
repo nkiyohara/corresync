@@ -55,6 +55,11 @@ type fakeBackend struct {
 	calendarAccess       application.CalendarCreateAccess
 	calendarUpdateAccess application.CalendarUpdateAccess
 	calendarCancelAccess application.CalendarCancelAccess
+	discoveryAddress     string
+	discoveryResult      application.AccountDiscoveryResult
+	accountReference     string
+	accountCatalog       application.AccountCatalog
+	accountView          application.AccountView
 	err                  error
 }
 
@@ -64,6 +69,28 @@ func (backend *fakeBackend) ResolveAccount(reference string) (domain.AccountID, 
 		return backend.DefaultAccount(), nil
 	}
 	return domain.AccountID(reference), nil
+}
+
+func (backend *fakeBackend) DiscoverAccounts(
+	_ context.Context,
+	address string,
+) (application.AccountDiscoveryResult, error) {
+	backend.discoveryAddress = address
+	return backend.discoveryResult, backend.err
+}
+
+func (backend *fakeBackend) ListAccounts(
+	context.Context,
+) (application.AccountCatalog, error) {
+	return backend.accountCatalog, backend.err
+}
+
+func (backend *fakeBackend) ShowAccount(
+	_ context.Context,
+	reference string,
+) (application.AccountView, error) {
+	backend.accountReference = reference
+	return backend.accountView, backend.err
 }
 
 func (backend *fakeBackend) ListMail(
@@ -333,7 +360,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 24 || mailTool == nil {
+	if len(tools.Tools) != 27 || mailTool == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
@@ -877,6 +904,62 @@ func TestMailListToolPropagatesApplicationErrorsAsToolErrors(t *testing.T) {
 	}
 	if !result.IsError {
 		t.Fatalf("CallTool() IsError = false, want true: %+v", result)
+	}
+}
+
+func TestAccountToolsUseTypedReadOnlyBackend(t *testing.T) {
+	t.Parallel()
+	account := application.AccountView{
+		ID: "acc_00000000000000000000000000000001", Alias: "work",
+		Address: "reader@example.invalid", Provider: domain.ProviderMicrosoftOWA,
+		Origin: "https://outlook.example.invalid", IsDefault: true,
+	}
+	backend := &fakeBackend{
+		discoveryResult: application.AccountDiscoveryResult{
+			Address: "reader@example.invalid",
+			Domain:  "example.invalid",
+		},
+		accountCatalog: application.AccountCatalog{Accounts: []application.AccountView{account}},
+		accountView:    account,
+	}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+
+	for _, call := range []struct {
+		name      string
+		arguments map[string]any
+	}{
+		{"account_discover", map[string]any{"address": "reader@example.invalid"}},
+		{"account_list", map[string]any{}},
+		{"account_show", map[string]any{"account": "work"}},
+	} {
+		result, callErr := client.CallTool(t.Context(), &mcp.CallToolParams{
+			Name: call.name, Arguments: call.arguments,
+		})
+		if callErr != nil || result.IsError {
+			t.Fatalf("%s failed: result=%+v error=%v", call.name, result, callErr)
+		}
+	}
+	if backend.discoveryAddress != "reader@example.invalid" ||
+		backend.accountReference != "work" {
+		t.Fatalf(
+			"typed account inputs were not forwarded: address=%q reference=%q",
+			backend.discoveryAddress,
+			backend.accountReference,
+		)
+	}
+	tools, err := client.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"account_discover", "account_list", "account_show"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
+			t.Fatalf("%s is missing read-only annotations: %+v", name, tool)
+		}
 	}
 }
 

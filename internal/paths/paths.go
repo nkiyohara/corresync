@@ -69,6 +69,20 @@ func ProfileDir(account domain.AccountID) (string, error) {
 	return filepath.Join(state, "profiles", profileKey(string(account))), nil
 }
 
+// AccountStateDir contains provider cursors, caches, import plans, and monitor
+// state owned by one stable account. It never uses an alias or address as a
+// path component.
+func AccountStateDir(account domain.AccountID) (string, error) {
+	if err := account.ValidateOpaque(); err != nil {
+		return "", err
+	}
+	state, err := StateDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(state, "accounts", profileKey(string(account))), nil
+}
+
 func profileKey(value string) string {
 	digest := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(digest[:16])

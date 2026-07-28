@@ -13,10 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nkiyohara/corresync/internal/accountstore"
+	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
+	"github.com/nkiyohara/corresync/internal/discovery"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/localipc"
 	"github.com/nkiyohara/corresync/internal/paths"
@@ -60,6 +63,7 @@ type runtime struct {
 	interactiveOutput func() bool
 	interactiveStdout func() bool
 	lookupEnv         func(string) (string, bool)
+	accountDiscoverer application.AccountDiscoverer
 	migrationOnce     sync.Once
 	migrationErr      error
 }
@@ -91,8 +95,9 @@ func newRuntime(
 			command.Stderr = stderr
 			return command.Run()
 		},
-		processID: os.Getpid(),
-		lookupEnv: os.LookupEnv,
+		processID:         os.Getpid(),
+		lookupEnv:         os.LookupEnv,
+		accountDiscoverer: discovery.New(discovery.Options{}),
 	}
 	app.checkUpdate = func(ctx context.Context) (updatecheck.Result, error) {
 		cachePath, err := paths.UpdateCachePath()
@@ -149,6 +154,68 @@ func newRuntime(
 	app.interactiveOutput = func() bool { return outputIsTerminal(app.stderr) }
 	app.interactiveStdout = func() bool { return outputIsTerminal(app.stdout) }
 	return app
+}
+
+func (app *runtime) accountServices() (
+	*application.AccountService,
+	*application.AccountDiscoveryService,
+	error,
+) {
+	path, err := app.resolvedConfigPath()
+	if err != nil {
+		return nil, nil, err
+	}
+	store := accountstore.Store{ConfigPath: path}
+	accounts, err := application.NewAccountService(
+		store,
+		store,
+		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	discoverer, err := application.NewAccountDiscoveryService(
+		app.accountDiscoverer,
+		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return accounts, discoverer, nil
+}
+
+func (app *runtime) requireDaemonStopped() error {
+	path, err := app.resolvedConfigPath()
+	if err != nil {
+		return err
+	}
+	endpoint, err := app.endpoint(path)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Lstat(endpoint.CredentialPath); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("inspect session owner credential: %w", err)
+	}
+	client, err := daemonapi.NewClient(endpoint)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+	ctx, cancel := context.WithTimeout(app.context, daemonProbeTimeout)
+	defer cancel()
+	owner, inspectErr := client.InspectOwner(ctx, app.caller())
+	if owner.Status().ProcessID > 0 {
+		return errors.New("account changes require a stopped session owner; run `corresync daemon stop`")
+	}
+	if inspectErr != nil {
+		return fmt.Errorf(
+			"cannot safely determine whether the session owner is stopped; run `corresync daemon stop`: %w",
+			inspectErr,
+		)
+	}
+	return nil
 }
 
 // openDaemon connects to the config-scoped session owner, starting it when

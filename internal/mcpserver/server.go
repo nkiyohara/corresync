@@ -26,6 +26,9 @@ const (
 type Backend interface {
 	DefaultAccount() domain.AccountID
 	ResolveAccount(string) (domain.AccountID, error)
+	DiscoverAccounts(context.Context, string) (application.AccountDiscoveryResult, error)
+	ListAccounts(context.Context) (application.AccountCatalog, error)
+	ShowAccount(context.Context, string) (application.AccountView, error)
 	ListMailFolders(context.Context, application.MailFolderListInput, domain.Caller) (application.MailFolderPage, error)
 	ListMail(context.Context, application.MailListInput, domain.Caller) (application.MailPage, error)
 	SearchMail(context.Context, application.MailSearchInput, domain.Caller) (application.MailPage, error)
@@ -61,6 +64,16 @@ type MailFolderListInput struct {
 	Offset    int    `json:"offset,omitempty" jsonschema:"Zero-based page offset"`
 	Limit     int    `json:"limit,omitempty" jsonschema:"Folders to return from 1 through 100; omit for 100"`
 	TimeZone  string `json:"timeZone,omitempty" jsonschema:"OWA time-zone identifier; omit for UTC"`
+}
+
+// AccountDiscoverInput starts credential-free evidence collection only.
+type AccountDiscoverInput struct {
+	Address string `json:"address" jsonschema:"Bare email address to inspect without authenticating"`
+}
+
+// AccountShowInput resolves a mutable alias or stable opaque account ID.
+type AccountShowInput struct {
+	Account string `json:"account" jsonschema:"Configured account alias or stable opaque ID"`
 }
 
 // Options identifies one MCP server process.
@@ -263,6 +276,61 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	nonDestructive := false
 	destructive := true
 	openWorld := true
+	closedWorld := false
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "account_discover",
+		Title:       "Discover mail and calendar provider candidates",
+		Description: "Collect bounded, explainable DNS and HTTPS well-known evidence for one email address. This read-only tool never authenticates, requests consent, transmits a credential, or changes configuration; candidates are hints and manual override remains available.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Discover provider candidates without credentials",
+			ReadOnlyHint:    readOnly,
+			DestructiveHint: &nonDestructive,
+			OpenWorldHint:   &openWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "private-user-supplied",
+			"io.github.nkiyohara.corresync/effect":              "read",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input AccountDiscoverInput) (*mcp.CallToolResult, application.AccountDiscoveryResult, error) {
+		result, err := backend.DiscoverAccounts(ctx, input.Address)
+		return nil, result, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "account_list",
+		Title:       "List configured accounts",
+		Description: "List secret-free local account routes, stable opaque IDs, providers, and the default account. The tool cannot add, rename, remove, authenticate, or enable monitoring.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "List configured accounts",
+			ReadOnlyHint:    readOnly,
+			DestructiveHint: &nonDestructive,
+			OpenWorldHint:   &closedWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "private-account-metadata",
+			"io.github.nkiyohara.corresync/effect":              "read",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, application.AccountCatalog, error) {
+		result, err := backend.ListAccounts(ctx)
+		return nil, result, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "account_show",
+		Title:       "Show one configured account",
+		Description: "Resolve one account alias or stable opaque ID and return its secret-free local provider route and default status. The tool cannot mutate or authenticate the account.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Show one configured account",
+			ReadOnlyHint:    readOnly,
+			DestructiveHint: &nonDestructive,
+			OpenWorldHint:   &closedWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "private-account-metadata",
+			"io.github.nkiyohara.corresync/effect":              "read",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input AccountShowInput) (*mcp.CallToolResult, application.AccountView, error) {
+		result, err := backend.ShowAccount(ctx, input.Account)
+		return nil, result, err
+	})
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "calendar_list",
 		Title:       "List Outlook calendar events",

@@ -23,6 +23,7 @@ type cli struct {
 	VersionFlag kong.VersionFlag  `name:"version" short:"V" help:"Print version information and quit."`
 	Version     versionCommand    `cmd:"" help:"Print version and build information."`
 	Config      configCommand     `cmd:"" help:"Initialize and inspect configuration."`
+	Account     accountCommand    `cmd:"" help:"Discover and manage isolated accounts."`
 	Doctor      doctorCommand     `cmd:"" help:"Diagnose local setup and opt-in provider compatibility."`
 	Auth        authCommand       `cmd:"" help:"Inspect and manage interactive sessions."`
 	Login       loginCommand      `cmd:"" hidden:"" help:"Open the interactive provider sign-in."`

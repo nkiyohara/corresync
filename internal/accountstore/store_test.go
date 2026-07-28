@@ -1,0 +1,107 @@
+package accountstore
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/config"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/paths"
+)
+
+func TestStoreLifecyclePreservesStableID(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.Default()
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	store := Store{ConfigPath: path}
+	account := application.AccountView{
+		ID: "acc_00000000000000000000000000000002", Alias: "personal",
+		Address: "reader@example.invalid", Provider: domain.ProviderMicrosoftOWA,
+		Origin: "https://outlook.example.invalid",
+	}
+	if err := store.AddAccount(context.Background(), account); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RenameAccount(context.Background(), account.ID, "home"); err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := store.ListAccounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, current := range catalog.Accounts {
+		if current.ID == account.ID {
+			found = current.Alias == "home"
+		}
+	}
+	if !found {
+		t.Fatalf("catalog = %#v", catalog)
+	}
+	if err := store.RemoveAccount(context.Background(), account.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPurgeAccountStateRemovesOnlyDerivedRoots(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "state")
+	t.Setenv("CORRESYNC_STATE_DIR", state)
+	accountID := domain.AccountID("acc_00000000000000000000000000000001")
+	profile, err := paths.ProfileDir(accountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accountState, err := paths.AccountStateDir(accountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, directory := range []string{profile, accountState} {
+		if err := os.MkdirAll(directory, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "synthetic"), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	keep := filepath.Join(state, "keep")
+	if err := os.WriteFile(keep, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := (Store{}).PurgeAccountState(context.Background(), accountID); err != nil {
+		t.Fatal(err)
+	}
+	for _, directory := range []string{profile, accountState} {
+		if _, err := os.Lstat(directory); !os.IsNotExist(err) {
+			t.Fatalf("%s still exists: %v", directory, err)
+		}
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Fatalf("unrelated state was removed: %v", err)
+	}
+}
+
+func TestPurgeAccountStateRejectsSymlinkRoot(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "state")
+	t.Setenv("CORRESYNC_STATE_DIR", state)
+	accountID := domain.AccountID("acc_00000000000000000000000000000001")
+	profile, err := paths.ProfileDir(accountID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(profile), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	target := t.TempDir()
+	if err := os.Symlink(target, profile); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if err := (Store{}).PurgeAccountState(context.Background(), accountID); err == nil {
+		t.Fatal("PurgeAccountState() accepted a symlink root")
+	}
+}

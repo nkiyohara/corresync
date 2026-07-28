@@ -1,0 +1,164 @@
+package application
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"github.com/nkiyohara/corresync/internal/domain"
+)
+
+type accountRepositoryStub struct {
+	catalog     AccountCatalog
+	added       AccountView
+	renamedID   domain.AccountID
+	renamed     string
+	removedID   domain.AccountID
+	replacement string
+	err         error
+}
+
+func (stub *accountRepositoryStub) ListAccounts(context.Context) (AccountCatalog, error) {
+	return stub.catalog, stub.err
+}
+
+func (stub *accountRepositoryStub) AddAccount(_ context.Context, account AccountView) error {
+	stub.added = account
+	return stub.err
+}
+
+func (stub *accountRepositoryStub) RenameAccount(
+	_ context.Context,
+	account domain.AccountID,
+	alias string,
+) error {
+	stub.renamedID, stub.renamed = account, alias
+	return stub.err
+}
+
+func (stub *accountRepositoryStub) RemoveAccount(
+	_ context.Context,
+	account domain.AccountID,
+	replacement string,
+) error {
+	stub.removedID, stub.replacement = account, replacement
+	return stub.err
+}
+
+type accountPurgerStub struct {
+	account domain.AccountID
+	err     error
+}
+
+func (stub *accountPurgerStub) PurgeAccountState(
+	_ context.Context,
+	account domain.AccountID,
+) error {
+	stub.account = account
+	return stub.err
+}
+
+func accountFixture(alias, id string, isDefault bool) AccountView {
+	return AccountView{
+		ID: domain.AccountID(id), Alias: alias, Address: alias + "@example.invalid",
+		Provider: domain.ProviderMicrosoftOWA,
+		Origin:   "https://outlook.example.invalid", IsDefault: isDefault,
+	}
+}
+
+func TestAccountServiceLifecyclePreservesStableIdentity(t *testing.T) {
+	t.Parallel()
+	work := accountFixture("work", "acc_00000000000000000000000000000001", true)
+	personal := accountFixture("personal", "acc_00000000000000000000000000000002", false)
+	repository := &accountRepositoryStub{
+		catalog: AccountCatalog{Accounts: []AccountView{work, personal}},
+	}
+	purger := &accountPurgerStub{}
+	service, err := NewAccountService(
+		repository,
+		purger,
+		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.newID = func() (domain.AccountID, error) {
+		return "acc_00000000000000000000000000000003", nil
+	}
+
+	added, err := service.Add(context.Background(), AccountAddInput{
+		Alias: "team", Address: "reader@EXAMPLE.invalid",
+		Provider: domain.ProviderMicrosoftOWA,
+		Origin:   "https://outlook.example.invalid",
+	})
+	if err != nil {
+		t.Fatalf("Add() error = %v", err)
+	}
+	if added.ID != "acc_00000000000000000000000000000003" ||
+		added.Address != "reader@example.invalid" ||
+		repository.added != added {
+		t.Fatalf("added = %#v, repository = %#v", added, repository.added)
+	}
+
+	renamed, err := service.Rename(context.Background(), AccountRenameInput{
+		Account: work.Alias, NewAlias: "office",
+	})
+	if err != nil {
+		t.Fatalf("Rename() error = %v", err)
+	}
+	if renamed.ID != work.ID || renamed.Alias != "office" ||
+		repository.renamedID != work.ID || repository.renamed != "office" {
+		t.Fatalf("renamed = %#v, repository = %#v", renamed, repository)
+	}
+
+	removed, err := service.Remove(context.Background(), AccountRemoveInput{
+		Account: work.Alias, ReplacementDefault: personal.Alias,
+	})
+	if err != nil {
+		t.Fatalf("Remove() error = %v", err)
+	}
+	if removed.ID != work.ID || purger.account != work.ID ||
+		repository.removedID != work.ID || repository.replacement != personal.Alias {
+		t.Fatalf("removed = %#v, repository = %#v, purge = %#v", removed, repository, purger)
+	}
+}
+
+func TestAccountServiceFailsClosed(t *testing.T) {
+	t.Parallel()
+	work := accountFixture("work", "acc_00000000000000000000000000000001", true)
+	repository := &accountRepositoryStub{
+		catalog: AccountCatalog{Accounts: []AccountView{work}},
+	}
+	purger := &accountPurgerStub{}
+	service, err := NewAccountService(
+		repository,
+		purger,
+		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Add(context.Background(), AccountAddInput{
+		Alias: "gmail", Address: "reader@gmail.com",
+		Provider: domain.ProviderGoogleAPI, Origin: "https://gmail.googleapis.com",
+	}); err == nil {
+		t.Fatal("Add() accepted an unavailable provider")
+	}
+	if _, err := service.Remove(
+		context.Background(),
+		AccountRemoveInput{Account: "work"},
+	); err == nil {
+		t.Fatal("Remove() accepted the only account")
+	}
+
+	repository.catalog.Accounts = append(
+		repository.catalog.Accounts,
+		accountFixture("other", "acc_00000000000000000000000000000002", false),
+	)
+	purger.err = errors.New("synthetic purge failure")
+	if _, err := service.Remove(context.Background(), AccountRemoveInput{
+		Account: "work", ReplacementDefault: "other",
+	}); err == nil || repository.removedID != "" {
+		t.Fatalf("Remove() did not fail before config removal: err=%v repo=%#v", err, repository)
+	}
+}
