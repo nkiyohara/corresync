@@ -73,7 +73,7 @@ func TestInstallerVerifiesAndReplacesDirectRelease(t *testing.T) {
 		result.Archive != "owa-bridge_1.1.0_linux_amd64.tar.gz" {
 		t.Fatalf("Install() = %+v", result)
 	}
-	if verifiedIdentity != "https://github.com/nkiyohara/owa-bridge/.github/workflows/release.yml@refs/tags/v1.1.0" {
+	if verifiedIdentity != "https://github.com/nkiyohara/corresync/.github/workflows/release.yml@refs/tags/v1.1.0" {
 		t.Fatalf("verified identity = %q", verifiedIdentity)
 	}
 	if got, err := os.ReadFile(target); err != nil || !bytes.Equal(got, candidate) { // #nosec G304 -- test-controlled path.
@@ -154,7 +154,7 @@ func TestInstallerFailsClosedBeforeReplacement(t *testing.T) {
 	}
 }
 
-func TestInstallerAcceptsExactCorresyncWorkflowIdentity(t *testing.T) {
+func TestInstallerPrefersExactCorresyncWorkflowIdentity(t *testing.T) {
 	target := filepath.Join(secureTempDir(t), "owa")
 	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
 		t.Fatal(err)
@@ -189,11 +189,84 @@ func TestInstallerAcceptsExactCorresyncWorkflowIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"https://github.com/nkiyohara/owa-bridge/.github/workflows/release.yml@refs/tags/v1.1.0",
 		"https://github.com/nkiyohara/corresync/.github/workflows/release.yml@refs/tags/v1.1.0",
 	}
 	if fmt.Sprint(identities) != fmt.Sprint(want) {
 		t.Fatalf("verified identities = %v, want %v", identities, want)
+	}
+}
+
+func TestInstallerFallsBackToExactLegacyWorkflowIdentity(t *testing.T) {
+	target := filepath.Join(secureTempDir(t), "owa")
+	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
+		t.Fatal(err)
+	}
+	release := newSyntheticUpdateRelease(t, syntheticCandidate(), "")
+	defer release.server.Close()
+
+	var identities []string
+	installer := Installer{
+		CurrentVersion: "1.0.0",
+		Executable:     target,
+		Endpoint:       release.server.URL + "/latest",
+		Client:         release.server.Client(),
+		GOOS:           "linux",
+		GOARCH:         "amd64",
+		VerifyProvenance: func(
+			_ context.Context,
+			_, _, identity, _ string,
+		) error {
+			identities = append(identities, identity)
+			if strings.Contains(identity, "/nkiyohara/owa-bridge/") {
+				return nil
+			}
+			return errors.New("certificate identity mismatch")
+		},
+	}
+	if _, err := installer.Install(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"https://github.com/nkiyohara/corresync/.github/workflows/release.yml@refs/tags/v1.1.0",
+		"https://github.com/nkiyohara/owa-bridge/.github/workflows/release.yml@refs/tags/v1.1.0",
+	}
+	if fmt.Sprint(identities) != fmt.Sprint(want) {
+		t.Fatalf("verified identities = %v, want %v", identities, want)
+	}
+}
+
+func TestInstallerAcceptsCorresyncReleaseArtifacts(t *testing.T) {
+	target := filepath.Join(secureTempDir(t), "owa")
+	oldBinary := []byte("#!/bin/sh\nprintf old\n")
+	if err := os.WriteFile(target, oldBinary, 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
+		t.Fatal(err)
+	}
+	candidate := syntheticCandidate()
+	release := newSyntheticCorresyncUpdateRelease(t, candidate)
+	defer release.server.Close()
+
+	result, err := (Installer{
+		CurrentVersion: "1.0.0",
+		Executable:     target,
+		Endpoint:       release.server.URL + "/latest",
+		Client:         release.server.Client(),
+		GOOS:           "linux",
+		GOARCH:         "amd64",
+		VerifyProvenance: func(
+			context.Context,
+			string, string, string, string,
+		) error {
+			return nil
+		},
+	}).Install(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Archive != "corresync_1.1.0_linux_amd64.tar.gz" {
+		t.Fatalf("selected archive = %q", result.Archive)
+	}
+	if got, err := os.ReadFile(target); err != nil || !bytes.Equal(got, candidate) { // #nosec G304 -- test-controlled path.
+		t.Fatalf("updated target = %q, %v", got, err)
 	}
 }
 
@@ -261,29 +334,61 @@ func secureTempDir(t *testing.T) string {
 	return directory
 }
 
-func TestReleaseArtifactNamesCoverPublishedPlatforms(t *testing.T) {
+func TestReleaseArtifactCandidatesCoverPublishedPlatforms(t *testing.T) {
 	version, ok := parseVersion("v1.2.3")
 	if !ok {
 		t.Fatal("version did not parse")
 	}
 	tests := []struct {
 		goos, goarch string
-		archive      string
-		executable   string
+		archives     []string
+		executables  []string
 	}{
-		{"linux", "amd64", "owa-bridge_1.2.3_linux_amd64.tar.gz", "owa"},
-		{"darwin", "arm64", "owa-bridge_1.2.3_darwin_arm64.tar.gz", "owa"},
-		{"windows", "amd64", "owa-bridge_1.2.3_windows_amd64.zip", "owa.exe"},
+		{
+			"linux",
+			"amd64",
+			[]string{
+				"corresync_1.2.3_linux_amd64.tar.gz",
+				"owa-bridge_1.2.3_linux_amd64.tar.gz",
+			},
+			[]string{"corresync", "owa"},
+		},
+		{
+			"darwin",
+			"arm64",
+			[]string{
+				"corresync_1.2.3_darwin_arm64.tar.gz",
+				"owa-bridge_1.2.3_darwin_arm64.tar.gz",
+			},
+			[]string{"corresync", "owa"},
+		},
+		{
+			"windows",
+			"amd64",
+			[]string{
+				"corresync_1.2.3_windows_amd64.zip",
+				"owa-bridge_1.2.3_windows_amd64.zip",
+			},
+			[]string{"corresync.exe", "owa.exe"},
+		},
 	}
 	for _, test := range tests {
-		archive, executable, err := releaseArtifactNames(version, test.goos, test.goarch)
-		if err != nil || archive != test.archive || executable != test.executable {
+		candidates, err := releaseArtifactCandidates(version, test.goos, test.goarch)
+		var archives []string
+		var executables []string
+		for _, candidate := range candidates {
+			archives = append(archives, candidate.Archive)
+			executables = append(executables, candidate.Executable)
+		}
+		if err != nil ||
+			fmt.Sprint(archives) != fmt.Sprint(test.archives) ||
+			fmt.Sprint(executables) != fmt.Sprint(test.executables) {
 			t.Errorf(
-				"releaseArtifactNames(%q, %q) = %q, %q, %v",
+				"releaseArtifactCandidates(%q, %q) = %q, %q, %v",
 				test.goos,
 				test.goarch,
-				archive,
-				executable,
+				archives,
+				executables,
 				err,
 			)
 		}
@@ -303,8 +408,35 @@ func newSyntheticUpdateRelease(
 	candidate []byte,
 	checksumOverride string,
 ) *syntheticUpdateRelease {
+	return newSyntheticNamedUpdateRelease(
+		t,
+		candidate,
+		checksumOverride,
+		"owa-bridge_1.1.0_linux_amd64.tar.gz",
+		"owa",
+	)
+}
+
+func newSyntheticCorresyncUpdateRelease(
+	t *testing.T,
+	candidate []byte,
+) *syntheticUpdateRelease {
+	return newSyntheticNamedUpdateRelease(
+		t,
+		candidate,
+		"",
+		"corresync_1.1.0_linux_amd64.tar.gz",
+		"corresync",
+	)
+}
+
+func newSyntheticNamedUpdateRelease(
+	t *testing.T,
+	candidate []byte,
+	checksumOverride, archiveName, executableName string,
+) *syntheticUpdateRelease {
 	t.Helper()
-	archive := tarCandidate(t, candidate)
+	archive := tarCandidate(t, candidate, executableName)
 	checksum := sha256.Sum256(archive)
 	checksumText := hex.EncodeToString(checksum[:])
 	if checksumOverride != "" {
@@ -312,7 +444,7 @@ func newSyntheticUpdateRelease(
 	}
 	result := &syntheticUpdateRelease{
 		archive:  archive,
-		manifest: []byte(checksumText + "  owa-bridge_1.1.0_linux_amd64.tar.gz\n"),
+		manifest: []byte(checksumText + "  " + archiveName + "\n"),
 		bundle:   []byte(`{"synthetic":"bundle"}`),
 	}
 	var server *httptest.Server
@@ -331,7 +463,7 @@ func newSyntheticUpdateRelease(
 					Size:               int64(len(result.bundle)),
 				},
 				{
-					Name:               "owa-bridge_1.1.0_linux_amd64.tar.gz",
+					Name:               archiveName,
 					BrowserDownloadURL: server.URL + "/assets/archive",
 					Size:               int64(len(result.archive)),
 				},
@@ -359,13 +491,13 @@ func newSyntheticUpdateRelease(
 	return result
 }
 
-func tarCandidate(t *testing.T, candidate []byte) []byte {
+func tarCandidate(t *testing.T, candidate []byte, executableName string) []byte {
 	t.Helper()
 	var archive bytes.Buffer
 	compressed := gzip.NewWriter(&archive)
 	tarWriter := tar.NewWriter(compressed)
 	if err := tarWriter.WriteHeader(&tar.Header{
-		Name: "owa",
+		Name: executableName,
 		Mode: 0o755,
 		Size: int64(len(candidate)),
 	}); err != nil {
