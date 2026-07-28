@@ -64,12 +64,12 @@ func TestReadCalendarBodyBoundsStdin(t *testing.T) {
 
 	app := newRuntime(t.Context(), "", &bytes.Buffer{}, &bytes.Buffer{}, buildinfo.Current())
 	app.stdin = strings.NewReader("calendar body")
-	body, err := readPlainTextBody(app, "-", application.MaxCalendarBodyBytes, "calendar event")
+	body, err := readPlainTextBody(app, "-", "calendar event")
 	if err != nil || body != "calendar body" {
 		t.Fatalf("readPlainTextBody() = %q, %v", body, err)
 	}
 	app.stdin = strings.NewReader(strings.Repeat("x", application.MaxCalendarBodyBytes+1))
-	if _, err := readPlainTextBody(app, "-", application.MaxCalendarBodyBytes, "calendar event"); err == nil {
+	if _, err := readPlainTextBody(app, "-", "calendar event"); err == nil {
 		t.Fatal("readPlainTextBody() unexpectedly accepted an oversized calendar body")
 	}
 }
