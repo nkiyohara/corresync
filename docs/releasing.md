@@ -97,8 +97,12 @@ Configure these repository secrets before publishing a stable tag:
   only to `nkiyohara/homebrew-corresync`.
 - `SCOOP_BUCKET_DEPLOY_KEY`: private half of a write-enabled deploy key scoped
   only to `nkiyohara/scoop-corresync`.
-- `WINGET_CREATE_GITHUB_TOKEN`: dedicated classic GitHub token with only the
-  `public_repo` scope. WinGetCreate does not support fine-grained tokens.
+- `WINGET_CREATE_GITHUB_TOKEN`: classic GitHub token with only the
+  `public_repo` scope. WinGetCreate does not support fine-grained tokens. Use
+  a dedicated machine account that has no write access beyond its
+  `microsoft/winget-pkgs` fork, and rotate the token regularly. The workflow
+  exposes it only to the manifest-submission step; duplicate-PR discovery uses
+  the job-scoped `GITHUB_TOKEN`.
 
 The owned catalogs update idempotently and run their own installation tests on
 push. WinGet remains available only after Microsoft's validation and review of

@@ -192,6 +192,9 @@ func (service *CalendarService) executeCreate(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (CalendarCreateResult, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return CalendarCreateResult{}, err
+	}
 	created, callErr := service.creator.CreateCalendarEvent(ctx, input)
 	outcome, reason := calendarWriteAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{

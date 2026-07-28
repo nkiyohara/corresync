@@ -113,6 +113,14 @@ func NewCalendarService(
 	}, nil
 }
 
+func (service *CalendarService) validateExecutionAccount(operation domain.Operation) error {
+	expected := service.provenance.AccountID
+	if expected != "" && operation.Account() != expected {
+		return errors.New("calendar operation account does not match the routed service")
+	}
+	return nil
+}
+
 // List returns event metadata through the shared policy and audit boundary.
 func (service *CalendarService) List(
 	ctx context.Context,

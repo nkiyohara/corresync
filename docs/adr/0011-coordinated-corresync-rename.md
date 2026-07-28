@@ -84,6 +84,13 @@ v0.6 installation from becoming stranded when the repository and assets move.
 The v0.7 migration guide is the only user-facing document that names the old
 commands and paths.
 
+The compatibility window includes the complete v0.7 and v0.8 release lines.
+Migration-only legacy inputs and the old release-workflow identity may be
+removed no earlier than v0.9.0, after at least one stable release has announced
+their removal. Historical documentation and wire identifiers that still
+describe the Outlook Web provider are not compatibility aliases and remain
+when technically accurate.
+
 The release must include an end-to-end upgrade test from the last `owa-bridge`
 release to the first Corresync release, and one migration guide covering
 repository redirects, Pages URLs, package-manager changes, configuration

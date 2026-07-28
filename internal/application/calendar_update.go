@@ -146,6 +146,9 @@ func (service *CalendarService) executeUpdate(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (CalendarUpdateResult, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return CalendarUpdateResult{}, err
+	}
 	updated, callErr := service.updater.UpdateCalendarEvent(ctx, input)
 	outcome, reason := calendarWriteAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{

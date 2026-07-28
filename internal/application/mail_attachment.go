@@ -118,6 +118,9 @@ func (service *MailService) executeAttachment(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailAttachment, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailAttachment{}, err
+	}
 	attachment, callErr := service.attachmentReader.GetMailAttachment(ctx, input)
 	outcome, reason := AuditOutcomeSuccess, "completed"
 	if callErr != nil {

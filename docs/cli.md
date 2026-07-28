@@ -17,7 +17,7 @@ corresync config get policy.max_recipients
 ```
 
 Use `--config /absolute/path/config.toml` before the command, or set
-`OWA_CONFIG`, to select another file. Initialization refuses to replace an
+`CORRESYNC_CONFIG`, to select another file. Initialization refuses to replace an
 existing path unless `--force` is explicit. A symlink, directory, or other
 non-regular target is rejected even with `--force`.
 

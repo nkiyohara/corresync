@@ -116,6 +116,9 @@ func (service *MailService) executeMove(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailMoveResult, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailMoveResult{}, err
+	}
 	moved, callErr := service.mover.MoveMail(ctx, input)
 	outcome := AuditOutcomeSuccess
 	reason := "completed"

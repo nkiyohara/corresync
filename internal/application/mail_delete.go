@@ -95,6 +95,9 @@ func (service *MailService) CommitDelete(
 	if err := input.Validate(); err != nil {
 		return MailDeleteAccess{}, err
 	}
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailDeleteAccess{}, err
+	}
 	callErr := service.deleter.DeleteMail(ctx, input)
 	outcome, reason := mailWriteAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{

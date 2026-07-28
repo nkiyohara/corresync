@@ -119,6 +119,9 @@ func (service *MailService) executeSend(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailSendResult, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailSendResult{}, err
+	}
 	sent, callErr := service.sender.SendMail(ctx, input)
 	outcome := AuditOutcomeSuccess
 	reason := "completed"

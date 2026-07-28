@@ -41,11 +41,22 @@ scoop install corresync/corresync
 # WinGet
 winget uninstall --id nkiyohara.OWABridge --exact
 winget install --id nkiyohara.Corresync --exact
+
+# Debian or Ubuntu
+sudo apt remove owa-bridge
+
+# Fedora or RHEL
+sudo dnf remove owa-bridge
+
+# Alpine
+sudo apk del owa-bridge
 ```
 
-For a direct archive, extract the new release and put `corresync` or
-`corresync.exe` on `PATH`. If v0.6.2 updated an existing executable in place,
-rename that file to the canonical executable name after it exits.
+Then install the Corresync `.deb`, `.rpm`, or `.apk` from the matching release
+when using a native Linux package. For a direct archive, extract the new
+release and put `corresync` or `corresync.exe` on `PATH`. If v0.6.2 updated an
+existing executable in place, rename that file to the canonical executable
+name after it exits.
 
 Confirm that the canonical command resolves before removing any rollback copy:
 

@@ -185,6 +185,9 @@ func (service *MailService) executeDraft(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailDraft, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailDraft{}, err
+	}
 	draft, callErr := service.draftWriter.CreateMailDraft(ctx, input)
 	outcome := AuditOutcomeSuccess
 	reason := "completed"

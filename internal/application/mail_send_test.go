@@ -98,6 +98,38 @@ func TestMailSendRejectsMissingRecipientAndWrongCaller(t *testing.T) {
 	}
 }
 
+func TestMailSendRejectsCommitRoutedToAnotherAccountService(t *testing.T) {
+	t.Parallel()
+
+	store, err := approval.NewStore(approval.Options{})
+	if err != nil {
+		t.Fatalf("NewStore() error = %v", err)
+	}
+	guard, err := NewGuard(policy.DefaultRules(), store, &memoryAudit{})
+	if err != nil {
+		t.Fatalf("NewGuard() error = %v", err)
+	}
+	port := &fakeMailReader{}
+	service, err := NewMailService(guard, port, MailOptions{
+		MaxRecipients: 20,
+		Provenance:    domain.Provenance{AccountID: "personal"},
+	})
+	if err != nil {
+		t.Fatalf("NewMailService() error = %v", err)
+	}
+	caller := domain.Caller{Surface: "mcp", Instance: "session-1"}
+	access, err := service.Send(t.Context(), validSendInput(), caller)
+	if err != nil {
+		t.Fatalf("Send() error = %v", err)
+	}
+	if _, err := service.CommitSend(t.Context(), access.Preview.Token, caller); err == nil {
+		t.Fatal("CommitSend() accepted a preview routed to another account service")
+	}
+	if port.calls != 0 {
+		t.Fatalf("send calls = %d, want 0", port.calls)
+	}
+}
+
 func TestMailSendReviewBindsResponseAndAttachment(t *testing.T) {
 	t.Parallel()
 

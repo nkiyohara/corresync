@@ -107,6 +107,9 @@ func (service *MailService) executeBody(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailBody, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailBody{}, err
+	}
 	body, callErr := service.bodyReader.GetMessageBody(ctx, input)
 	outcome := AuditOutcomeSuccess
 	reason := "completed"

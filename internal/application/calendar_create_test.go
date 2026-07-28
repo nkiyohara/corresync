@@ -119,6 +119,25 @@ func TestCalendarCreateRejectsWrongCallerWithoutConsumingPreview(t *testing.T) {
 	}
 }
 
+func TestCalendarCreateRejectsCommitRoutedToAnotherAccountService(t *testing.T) {
+	t.Parallel()
+
+	port := &fakeCalendarReader{}
+	service, _ := testCalendarService(t, port)
+	service.provenance.AccountID = "personal"
+	caller := domain.Caller{Surface: "mcp", Instance: "session-1"}
+	access, err := service.Create(t.Context(), validCalendarCreateInput(), caller)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if _, err := service.CommitCreate(t.Context(), access.Preview.Token, caller); err == nil {
+		t.Fatal("CommitCreate() accepted a preview routed to another account service")
+	}
+	if port.createCalls != 0 {
+		t.Fatalf("create calls = %d, want 0", port.createCalls)
+	}
+}
+
 func TestCalendarCreateAuditsAmbiguousOutcome(t *testing.T) {
 	t.Parallel()
 

@@ -125,6 +125,9 @@ func (service *MailService) executeReadState(
 	caller domain.Caller,
 	operation domain.Operation,
 ) (MailReadStateResult, error) {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return MailReadStateResult{}, err
+	}
 	updated, callErr := service.readState.SetMailReadState(ctx, input)
 	outcome := AuditOutcomeSuccess
 	reason := "completed"

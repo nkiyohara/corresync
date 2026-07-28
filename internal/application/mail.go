@@ -128,6 +128,14 @@ func NewMailService(guard *Guard, reader MailPort, options MailOptions) (*MailSe
 	}, nil
 }
 
+func (service *MailService) validateExecutionAccount(operation domain.Operation) error {
+	expected := service.provenance.AccountID
+	if expected != "" && operation.Account() != expected {
+		return errors.New("mail operation account does not match the routed service")
+	}
+	return nil
+}
+
 // List returns metadata only through the shared policy and audit boundary.
 func (service *MailService) List(
 	ctx context.Context,

@@ -121,6 +121,9 @@ func (service *CalendarService) executeCancel(
 	caller domain.Caller,
 	operation domain.Operation,
 ) error {
+	if err := service.validateExecutionAccount(operation); err != nil {
+		return err
+	}
 	callErr := service.canceller.CancelCalendarEvent(ctx, input)
 	outcome, reason := calendarWriteAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{
