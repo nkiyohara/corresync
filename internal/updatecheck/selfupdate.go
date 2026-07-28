@@ -30,6 +30,8 @@ const (
 	maximumReleaseBinary    = 64 << 20
 	maximumArchiveEntries   = 4096
 	sigstoreOIDCIssuer      = "https://token.actions.githubusercontent.com"
+	legacyRepository        = "nkiyohara/owa-bridge"
+	currentRepository       = "nkiyohara/corresync"
 )
 
 // InstallStatus describes the result of an explicit direct self-update.
@@ -105,6 +107,11 @@ type releaseAsset struct {
 	Size               int64  `json:"size"`
 }
 
+type releaseArtifact struct {
+	Archive    string
+	Executable string
+}
+
 // Install fetches the latest stable release, verifies its signed checksum
 // inventory and candidate metadata, then replaces a direct executable with
 // rollback support. It never installs a prerelease or downgrade.
@@ -133,10 +140,16 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	installer.progress(InstallStageRelease, "Found stable release "+latest.String())
 
 	goos, goarch := installer.platform()
-	archiveName, executableName, err := releaseArtifactNames(latest, goos, goarch)
+	artifactCandidates, err := releaseArtifactCandidates(latest, goos, goarch)
 	if err != nil {
 		return InstallResult{}, err
 	}
+	artifact, err := selectReleaseArtifact(release.Assets, artifactCandidates)
+	if err != nil {
+		return InstallResult{}, err
+	}
+	archiveName := artifact.Archive
+	executableName := artifact.Executable
 	assets, err := exactReleaseAssets(
 		release.Assets,
 		archiveName,
@@ -179,18 +192,17 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	}
 	installer.progress(InstallStageDownload, "Downloaded the signed release inventory and "+archiveName)
 
-	workflowIdentity := "https://github.com/nkiyohara/owa-bridge/" +
-		".github/workflows/release.yml@refs/tags/" + latest.String()
 	verifyProvenance := installer.VerifyProvenance
 	if verifyProvenance == nil {
 		verifyProvenance = VerifyProvenance
 	}
-	if err := verifyProvenance(
+	if err := verifyReleaseProvenance(
 		ctx,
 		manifestPath,
 		bundlePath,
-		workflowIdentity,
 		installer.TrustCachePath,
+		latest,
+		verifyProvenance,
 	); err != nil {
 		return InstallResult{}, fmt.Errorf("verify release provenance: %w", err)
 	}
@@ -269,6 +281,36 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 		Archive:         archiveName,
 		BackupPath:      backupPath,
 	}, nil
+}
+
+func verifyReleaseProvenance(
+	ctx context.Context,
+	manifestPath, bundlePath, trustCachePath string,
+	version semanticVersion,
+	verify func(context.Context, string, string, string, string) error,
+) error {
+	repositories := []string{currentRepository, legacyRepository}
+	var verificationErrors []error
+	for _, repository := range repositories {
+		identity := "https://github.com/" + repository +
+			"/.github/workflows/release.yml@refs/tags/" + version.String()
+		err := verify(
+			ctx,
+			manifestPath,
+			bundlePath,
+			identity,
+			trustCachePath,
+		)
+		if err != nil {
+			verificationErrors = append(
+				verificationErrors,
+				fmt.Errorf("%s: %w", repository, err),
+			)
+			continue
+		}
+		return nil
+	}
+	return errors.Join(verificationErrors...)
 }
 
 func (installer Installer) validateExecutable(ctx context.Context) (string, os.FileInfo, error) {
@@ -388,22 +430,69 @@ func (installer Installer) progress(stage InstallStage, detail string) {
 	}
 }
 
-func releaseArtifactNames(
+func releaseArtifactCandidates(
 	version semanticVersion,
 	goos, goarch string,
-) (string, string, error) {
+) ([]releaseArtifact, error) {
 	if goarch != "amd64" && goarch != "arm64" {
-		return "", "", fmt.Errorf("direct self-update does not support architecture %q", goarch)
+		return nil, fmt.Errorf("direct self-update does not support architecture %q", goarch)
 	}
 	versionText := strings.TrimPrefix(version.String(), "v")
 	switch goos {
 	case "linux", "darwin":
-		return fmt.Sprintf("owa-bridge_%s_%s_%s.tar.gz", versionText, goos, goarch), "owa", nil
+		return []releaseArtifact{
+			{
+				Archive:    fmt.Sprintf("corresync_%s_%s_%s.tar.gz", versionText, goos, goarch),
+				Executable: "corresync",
+			},
+			{
+				Archive:    fmt.Sprintf("owa-bridge_%s_%s_%s.tar.gz", versionText, goos, goarch),
+				Executable: "owa",
+			},
+		}, nil
 	case "windows":
-		return fmt.Sprintf("owa-bridge_%s_windows_%s.zip", versionText, goarch), "owa.exe", nil
+		return []releaseArtifact{
+			{
+				Archive:    fmt.Sprintf("corresync_%s_windows_%s.zip", versionText, goarch),
+				Executable: "corresync.exe",
+			},
+			{
+				Archive:    fmt.Sprintf("owa-bridge_%s_windows_%s.zip", versionText, goarch),
+				Executable: "owa.exe",
+			},
+		}, nil
 	default:
-		return "", "", fmt.Errorf("direct self-update does not support operating system %q", goos)
+		return nil, fmt.Errorf("direct self-update does not support operating system %q", goos)
 	}
+}
+
+func selectReleaseArtifact(
+	assets []releaseAsset,
+	candidates []releaseArtifact,
+) (releaseArtifact, error) {
+	counts := make(map[string]int, len(candidates))
+	for _, asset := range assets {
+		counts[asset.Name]++
+	}
+	names := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		names = append(names, candidate.Archive)
+		switch counts[candidate.Archive] {
+		case 1:
+			return candidate, nil
+		case 0:
+			continue
+		default:
+			return releaseArtifact{}, fmt.Errorf(
+				"release contains duplicate asset %q",
+				candidate.Archive,
+			)
+		}
+	}
+	return releaseArtifact{}, fmt.Errorf(
+		"release is missing a supported archive; expected one of %q",
+		names,
+	)
 }
 
 func exactReleaseAssets(assets []releaseAsset, names ...string) (map[string]releaseAsset, error) {

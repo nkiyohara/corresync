@@ -3,6 +3,19 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.2 - 2026-07-28
+
+### Corresync update bridge
+
+- Preserve verified direct updates across the coordinated repository rename by
+  accepting only the exact tagged release-workflow identities for
+  `nkiyohara/owa-bridge` and `nkiyohara/corresync`.
+- Select signed Corresync release archives and their renamed executable while
+  retaining exact legacy-archive support for the compatibility window.
+- Keep the existing checksum, transparency-log, platform, version, and
+  rollback checks unchanged; the migration uses a finite identity allowlist,
+  never a wildcard.
+
 ## 0.6.1 - 2026-07-25
 
 ### Attachment compatibility

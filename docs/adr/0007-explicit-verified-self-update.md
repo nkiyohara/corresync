@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-24
+- Amended: 2026-07-28
 
 ## Context
 
@@ -49,6 +50,13 @@ installed executable unchanged. The implementation uses the official
 `sigstore-go` verifier, `minio/selfupdate` for cross-platform rollback, and
 TTY-only Lip Gloss styling. `--json`, pipes, MCP, daemon, and completion
 surfaces remain stable and unstyled.
+
+During the coordinated repository rename, provenance verification accepts only
+two enumerated exact workflow identities: `nkiyohara/owa-bridge` and
+`nkiyohara/corresync`, each bound to the requested tag and
+`.github/workflows/release.yml`. This finite migration allowlist is not a
+repository-name pattern. The legacy identity may be removed only after the
+documented compatibility window ends.
 
 ## Consequences
 
