@@ -16,6 +16,8 @@ import (
 	"golang.org/x/term"
 
 	"github.com/nkiyohara/corresync/internal/buildinfo"
+	"github.com/nkiyohara/corresync/internal/feedback"
+	"github.com/nkiyohara/corresync/internal/paths"
 )
 
 type cli struct {
@@ -37,6 +39,7 @@ type cli struct {
 	MCP         mcpCommand        `cmd:"" help:"Expose guarded mail and calendar tools over MCP."`
 	Update      updateCommand     `cmd:"" help:"Install verified updates or show the package-manager command."`
 	Completion  completionCommand `cmd:"" help:"Generate or install shell completion."`
+	Feedback    feedbackCommand   `cmd:"" help:"Review privacy-preserving local diagnostics and choose any external action."`
 }
 
 type versionCommand struct {
@@ -132,10 +135,23 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		app.maybeNotifyUpdate(executionContext)
 	}
 	if err := parsed.Run(app); err != nil {
+		if rootCommand(arguments) != "feedback" {
+			recordExecutionFailure(err, parsed.Command(), arguments)
+		}
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
 	return 0
+}
+
+func recordExecutionFailure(err error, command string, arguments []string) {
+	path, pathErr := paths.FeedbackErrorPath()
+	if pathErr != nil {
+		return
+	}
+	_ = (feedback.Store{Path: path}).Save(
+		feedback.NewErrorRecord(err, command, arguments),
+	)
 }
 
 func compactHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {

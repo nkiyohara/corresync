@@ -45,6 +45,15 @@ type browserLauncher func(context.Context, browser.Options) (browserHandle, erro
 
 type commandRunner func(context.Context, io.Writer, io.Writer, string, ...string) error
 
+type inputCommandRunner func(
+	context.Context,
+	io.Reader,
+	io.Writer,
+	io.Writer,
+	string,
+	...string,
+) error
+
 type runtime struct {
 	context           context.Context
 	configPath        string
@@ -56,6 +65,7 @@ type runtime struct {
 	endpoint          func(string) (localipc.Endpoint, error)
 	startDaemon       func(context.Context, string) error
 	runCommand        commandRunner
+	runInputCommand   inputCommandRunner
 	processID         int
 	checkUpdate       func(context.Context) (updatecheck.Result, error)
 	checkUpdateFresh  func(context.Context) (updatecheck.Result, error)
@@ -92,6 +102,21 @@ func newRuntime(
 			// user's explicit editor selection.
 			command := exec.CommandContext(ctx, name, args...)
 			command.Stdin = os.Stdin
+			command.Stdout = stdout
+			command.Stderr = stderr
+			return command.Run()
+		},
+		runInputCommand: func(
+			ctx context.Context,
+			stdin io.Reader,
+			stdout, stderr io.Writer,
+			name string,
+			args ...string,
+		) error {
+			// #nosec G204 -- feedback actions use fixed platform commands and
+			// arguments derived only from the already reviewed redacted report.
+			command := exec.CommandContext(ctx, name, args...)
+			command.Stdin = stdin
 			command.Stdout = stdout
 			command.Stderr = stderr
 			return command.Run()

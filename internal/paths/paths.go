@@ -116,6 +116,15 @@ func UpdateTrustCachePath() (string, error) {
 	return filepath.Join(state, "updates", "sigstore"), nil
 }
 
+// FeedbackErrorPath returns the single replace-in-place sanitized error record.
+func FeedbackErrorPath() (string, error) {
+	state, err := StateDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(state, "diagnostics", "last-error.json"), nil
+}
+
 func stateDir(
 	goos, home, configDirectory, cacheDirectory string,
 	configErr, cacheErr error,
