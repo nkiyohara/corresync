@@ -43,6 +43,11 @@ type accountAddCommand struct {
 	Origin                    string `help:"Outlook Web HTTPS origin override."`
 	Mailbox                   string `help:"Optional Outlook mailbox identity."`
 	SessionURL                string `help:"JMAP HTTPS session resource."`
+	APIBase                   string `help:"Google or Microsoft API HTTPS base override."`
+	OAuthClientID             string `help:"BYO OAuth public-client ID."`
+	OAuthRedirectURI          string `help:"Registered http://127.0.0.1 loopback redirect URI."`
+	AuthorizationKey          string `help:"OS-keyring handle for the OAuth grant."`
+	ApproveOAuth              bool   `help:"Confirm explicit OAuth authorization when no valid grant exists."`
 	Username                  string `help:"Standards mail login identity; defaults to the address."`
 	CredentialBackend         string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
 	CredentialKey             string `help:"External standards credential lookup key."`
@@ -232,10 +237,18 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		}
 	case domain.ProviderCalDAV:
 		endpointOverride = command.CalDAVEndpoint
+	case domain.ProviderGoogleAPI:
+		endpointOverride = command.APIBase
+		if endpointOverride == "" {
+			endpointOverride = "https://www.googleapis.com"
+		}
+	case domain.ProviderMicrosoftGraph:
+		endpointOverride = command.APIBase
+		if endpointOverride == "" {
+			endpointOverride = "https://graph.microsoft.com/v1.0"
+		}
 	case "",
 		domain.ProviderMicrosoftOWA,
-		domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
 		domain.ProviderGoogleWeb,
 		domain.ProviderPOP3:
 		endpointOverride = command.Origin
@@ -389,8 +402,55 @@ func (command accountAddCommand) routes(
 		), selected, discovery)
 	case domain.ProviderCalDAV:
 		return command.finishRoutes(nil, nil, "", selected, discovery)
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
+	case domain.ProviderGoogleAPI:
+		oauth, err := command.oauthRoute(
+			domain.ProviderGoogleAPI,
+			selected,
+			"https://www.googleapis.com",
+		)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		return command.finishRoutes(
+			&application.AccountMailRouteInput{
+				Provider: domain.ProviderGoogleAPI, GoogleAPI: oauth,
+			},
+			&application.AccountCalendarRouteInput{
+				Provider: domain.ProviderGoogleAPI,
+				GoogleAPI: &application.AccountOAuthInput{
+					APIBase: oauth.APIBase, ClientID: oauth.ClientID,
+					RedirectURI: oauth.RedirectURI, Authorization: oauth.Authorization,
+				},
+			},
+			oauth.APIBase,
+			selected,
+			discovery,
+		)
+	case domain.ProviderMicrosoftGraph:
+		oauth, err := command.oauthRoute(
+			domain.ProviderMicrosoftGraph,
+			selected,
+			"https://graph.microsoft.com/v1.0",
+		)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		return command.finishRoutes(
+			&application.AccountMailRouteInput{
+				Provider: domain.ProviderMicrosoftGraph, MicrosoftGraph: oauth,
+			},
+			&application.AccountCalendarRouteInput{
+				Provider: domain.ProviderMicrosoftGraph,
+				MicrosoftGraph: &application.AccountOAuthInput{
+					APIBase: oauth.APIBase, ClientID: oauth.ClientID,
+					RedirectURI: oauth.RedirectURI, Authorization: oauth.Authorization,
+				},
+			},
+			oauth.APIBase,
+			selected,
+			discovery,
+		)
+	case
 		domain.ProviderGoogleWeb,
 		domain.ProviderPOP3:
 		return nil, nil, "", fmt.Errorf(
@@ -400,6 +460,37 @@ func (command accountAddCommand) routes(
 	default:
 		return nil, nil, "", fmt.Errorf("unknown provider %q", selected.Provider)
 	}
+}
+
+func (command accountAddCommand) oauthRoute(
+	provider domain.ProviderID,
+	selected application.ProviderCandidate,
+	defaultBase string,
+) (*application.AccountOAuthInput, error) {
+	apiBase := command.APIBase
+	if apiBase == "" {
+		apiBase = candidateHTTPSEndpoint(selected, "api")
+	}
+	if apiBase == "" {
+		apiBase = defaultBase
+	}
+	if command.OAuthClientID == "" ||
+		command.OAuthRedirectURI == "" ||
+		command.AuthorizationKey == "" ||
+		!command.ApproveOAuth {
+		return nil, fmt.Errorf(
+			"%s requires --oauth-client-id, --oauth-redirect-uri, "+
+				"--authorization-key, and --approve-oauth",
+			provider,
+		)
+	}
+	return &application.AccountOAuthInput{
+		APIBase: apiBase, ClientID: command.OAuthClientID,
+		RedirectURI: command.OAuthRedirectURI,
+		Authorization: application.AccountCredentialInput{
+			Backend: "os-keyring", Key: command.AuthorizationKey, Consent: true,
+		},
+	}, nil
 }
 
 func (command accountAddCommand) finishRoutes(
@@ -587,7 +678,9 @@ func selectAccountCandidate(
 		if provider != domain.ProviderMicrosoftOWA &&
 			provider != domain.ProviderJMAP &&
 			provider != domain.ProviderIMAPSMTP &&
-			provider != domain.ProviderCalDAV {
+			provider != domain.ProviderCalDAV &&
+			provider != domain.ProviderGoogleAPI &&
+			provider != domain.ProviderMicrosoftGraph {
 			return application.ProviderCandidate{}, fmt.Errorf(
 				"provider %q is not available in this build",
 				provider,
@@ -612,6 +705,9 @@ func selectAccountCandidate(
 		}
 		if standardsKind, isStandards := standards[provider]; isStandards {
 			authentication, kind = application.DiscoveryExternalCredential, standardsKind
+		} else if provider == domain.ProviderGoogleAPI ||
+			provider == domain.ProviderMicrosoftGraph {
+			authentication, kind = application.DiscoveryExplicitOAuth, "api"
 		}
 		return application.ProviderCandidate{
 			Provider: provider, Confidence: 0,

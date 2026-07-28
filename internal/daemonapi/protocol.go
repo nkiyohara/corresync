@@ -187,6 +187,7 @@ type SessionStatus struct {
 	Authenticated bool                 `json:"authenticated"`
 	CapturedAt    *time.Time           `json:"capturedAt,omitempty"`
 	Capabilities  *domain.Capabilities `json:"capabilities,omitempty"`
+	Degradations  []domain.Degradation `json:"degradations,omitempty"`
 }
 
 // SessionStatusResult reports every configured account in stable alias order.

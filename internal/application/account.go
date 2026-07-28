@@ -90,19 +90,39 @@ type AccountCalDAVInput struct {
 	Credential   AccountCredentialInput `json:"credential"`
 }
 
+// AccountOAuthInput configures one BYO public client and an OS-keyring grant
+// handle. It cannot represent a client secret or token.
+type AccountOAuthInput struct {
+	APIBase       string                 `json:"apiBase"`
+	ClientID      string                 `json:"clientId"`
+	RedirectURI   string                 `json:"redirectUri"`
+	Authorization AccountCredentialInput `json:"authorization"`
+}
+
+// AccountWebInput identifies a provider-owned interactive browser origin.
+type AccountWebInput struct {
+	Origin string `json:"origin"`
+}
+
 // AccountMailRouteInput is a closed selection for shipped mail adapters.
 type AccountMailRouteInput struct {
-	Provider   domain.ProviderID       `json:"provider"`
-	OutlookWeb *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
-	JMAP       *AccountJMAPInput       `json:"jmap,omitempty"`
-	IMAPSMTP   *AccountIMAPSMTPInput   `json:"imapSmtp,omitempty"`
+	Provider       domain.ProviderID       `json:"provider"`
+	OutlookWeb     *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
+	JMAP           *AccountJMAPInput       `json:"jmap,omitempty"`
+	IMAPSMTP       *AccountIMAPSMTPInput   `json:"imapSmtp,omitempty"`
+	GoogleAPI      *AccountOAuthInput      `json:"googleApi,omitempty"`
+	GoogleWeb      *AccountWebInput        `json:"googleWeb,omitempty"`
+	MicrosoftGraph *AccountOAuthInput      `json:"microsoftGraph,omitempty"`
 }
 
 // AccountCalendarRouteInput is the corresponding calendar selection.
 type AccountCalendarRouteInput struct {
-	Provider   domain.ProviderID       `json:"provider"`
-	OutlookWeb *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
-	CalDAV     *AccountCalDAVInput     `json:"caldav,omitempty"`
+	Provider       domain.ProviderID       `json:"provider"`
+	OutlookWeb     *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
+	CalDAV         *AccountCalDAVInput     `json:"caldav,omitempty"`
+	GoogleAPI      *AccountOAuthInput      `json:"googleApi,omitempty"`
+	GoogleWeb      *AccountWebInput        `json:"googleWeb,omitempty"`
+	MicrosoftGraph *AccountOAuthInput      `json:"microsoftGraph,omitempty"`
 }
 
 // AccountAddInput explicitly selects service routes to persist. Discovery
@@ -444,6 +464,15 @@ func (service *AccountService) validateMailRoute(route AccountMailRouteInput) er
 	if route.IMAPSMTP != nil {
 		present++
 	}
+	if route.GoogleAPI != nil {
+		present++
+	}
+	if route.GoogleWeb != nil {
+		present++
+	}
+	if route.MicrosoftGraph != nil {
+		present++
+	}
 	if present != 1 {
 		return errors.New("exactly one provider-specific mail route is required")
 	}
@@ -463,9 +492,25 @@ func (service *AccountService) validateMailRoute(route AccountMailRouteInput) er
 			return errors.New("imap-smtp requires IMAP/SMTP settings")
 		}
 		return validateIMAPSMTPInput(*route.IMAPSMTP)
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
-		domain.ProviderGoogleWeb,
+	case domain.ProviderGoogleAPI:
+		if route.GoogleAPI == nil {
+			return errors.New("google-api requires Google API settings")
+		}
+		return validateOAuthInput(domain.ProviderGoogleAPI, *route.GoogleAPI)
+	case domain.ProviderGoogleWeb:
+		if route.GoogleWeb == nil {
+			return errors.New("google-web requires Google Web settings")
+		}
+		return validateAccountOrigin(route.GoogleWeb.Origin)
+	case domain.ProviderMicrosoftGraph:
+		if route.MicrosoftGraph == nil {
+			return errors.New("microsoft-graph requires Microsoft Graph settings")
+		}
+		return validateOAuthInput(
+			domain.ProviderMicrosoftGraph,
+			*route.MicrosoftGraph,
+		)
+	case
 		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return fmt.Errorf("provider %q cannot supply a configured mail route", route.Provider)
@@ -520,6 +565,15 @@ func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteI
 	if route.CalDAV != nil {
 		present++
 	}
+	if route.GoogleAPI != nil {
+		present++
+	}
+	if route.GoogleWeb != nil {
+		present++
+	}
+	if route.MicrosoftGraph != nil {
+		present++
+	}
 	if present != 1 {
 		return errors.New("exactly one provider-specific calendar route is required")
 	}
@@ -534,9 +588,25 @@ func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteI
 			return errors.New("caldav requires CalDAV settings")
 		}
 		return validateCalDAVInput(*route.CalDAV)
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
-		domain.ProviderGoogleWeb,
+	case domain.ProviderGoogleAPI:
+		if route.GoogleAPI == nil {
+			return errors.New("google-api requires Google API settings")
+		}
+		return validateOAuthInput(domain.ProviderGoogleAPI, *route.GoogleAPI)
+	case domain.ProviderGoogleWeb:
+		if route.GoogleWeb == nil {
+			return errors.New("google-web requires Google Web settings")
+		}
+		return validateAccountOrigin(route.GoogleWeb.Origin)
+	case domain.ProviderMicrosoftGraph:
+		if route.MicrosoftGraph == nil {
+			return errors.New("microsoft-graph requires Microsoft Graph settings")
+		}
+		return validateOAuthInput(
+			domain.ProviderMicrosoftGraph,
+			*route.MicrosoftGraph,
+		)
+	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
 		domain.ProviderPOP3:
@@ -547,6 +617,55 @@ func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteI
 	default:
 		return fmt.Errorf("unknown calendar provider %q", route.Provider)
 	}
+}
+
+func validateOAuthInput(
+	provider domain.ProviderID,
+	route AccountOAuthInput,
+) error {
+	if err := validateAccountHTTPSURL("API base", route.APIBase, true); err != nil {
+		return err
+	}
+	apiBase, _ := url.Parse(route.APIBase)
+	switch provider {
+	case domain.ProviderGoogleAPI:
+		if apiBase.Host != "www.googleapis.com" || apiBase.RawQuery != "" ||
+			apiBase.EscapedPath() != "" && apiBase.EscapedPath() != "/" {
+			return errors.New("google API base must be https://www.googleapis.com")
+		}
+	case domain.ProviderMicrosoftGraph:
+		if apiBase.Host != "graph.microsoft.com" || apiBase.RawQuery != "" ||
+			strings.TrimSuffix(apiBase.EscapedPath(), "/") != "/v1.0" {
+			return errors.New(
+				"microsoft Graph API base must be https://graph.microsoft.com/v1.0",
+			)
+		}
+	case domain.ProviderMicrosoftOWA,
+		domain.ProviderGoogleWeb,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderCalDAV,
+		domain.ProviderPOP3:
+		return fmt.Errorf("provider %q has no OAuth API base policy", provider)
+	default:
+		return fmt.Errorf("unknown OAuth API provider %q", provider)
+	}
+	if route.ClientID == "" || len(route.ClientID) > 512 ||
+		strings.TrimSpace(route.ClientID) != route.ClientID ||
+		strings.ContainsAny(route.ClientID, "\r\n\x00") {
+		return errors.New("OAuth client ID is malformed")
+	}
+	redirect, err := url.Parse(route.RedirectURI)
+	if err != nil || redirect.Scheme != "http" ||
+		redirect.Hostname() != "127.0.0.1" ||
+		redirect.User != nil || redirect.Fragment != "" ||
+		redirect.RawQuery != "" || redirect.Port() == "" {
+		return errors.New("OAuth redirect URI must use an explicit loopback port")
+	}
+	if route.Authorization.Backend != "os-keyring" {
+		return errors.New("OAuth authorization must use the OS keyring")
+	}
+	return validateAccountCredential(route.Authorization)
 }
 
 func validateCalDAVInput(route AccountCalDAVInput) error {
@@ -708,9 +827,13 @@ func mailRouteView(route *AccountMailRouteInput) *AccountRouteView {
 				Consented: route.IMAPSMTP.Credential.Consent,
 			},
 		}
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
-		domain.ProviderGoogleWeb,
+	case domain.ProviderGoogleAPI:
+		return oauthRouteView(route.Provider, route.GoogleAPI)
+	case domain.ProviderGoogleWeb:
+		return webRouteView(route.Provider, route.GoogleWeb)
+	case domain.ProviderMicrosoftGraph:
+		return oauthRouteView(route.Provider, route.MicrosoftGraph)
+	case
 		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return &AccountRouteView{Provider: route.Provider}
@@ -750,15 +873,49 @@ func calendarRouteView(route *AccountCalendarRouteInput) *AccountRouteView {
 				Consented: route.CalDAV.Credential.Consent,
 			},
 		}
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
-		domain.ProviderGoogleWeb,
+	case domain.ProviderGoogleAPI:
+		return oauthRouteView(route.Provider, route.GoogleAPI)
+	case domain.ProviderGoogleWeb:
+		return webRouteView(route.Provider, route.GoogleWeb)
+	case domain.ProviderMicrosoftGraph:
+		return oauthRouteView(route.Provider, route.MicrosoftGraph)
+	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
 		domain.ProviderPOP3:
 		return &AccountRouteView{Provider: route.Provider}
 	default:
 		return &AccountRouteView{Provider: route.Provider}
+	}
+}
+
+func oauthRouteView(
+	provider domain.ProviderID,
+	route *AccountOAuthInput,
+) *AccountRouteView {
+	if route == nil {
+		return &AccountRouteView{Provider: provider}
+	}
+	return &AccountRouteView{
+		Provider:  provider,
+		Endpoints: []DiscoveredEndpoint{{Kind: "api", Value: route.APIBase}},
+		Credential: &AccountCredentialView{
+			Configured: true, Backend: route.Authorization.Backend,
+			Consented: route.Authorization.Consent,
+		},
+	}
+}
+
+func webRouteView(
+	provider domain.ProviderID,
+	route *AccountWebInput,
+) *AccountRouteView {
+	if route == nil {
+		return &AccountRouteView{Provider: provider}
+	}
+	return &AccountRouteView{
+		Provider:  provider,
+		Endpoints: []DiscoveredEndpoint{{Kind: "origin", Value: route.Origin}},
 	}
 }
 
@@ -793,6 +950,18 @@ func cloneMailRoute(route *AccountMailRouteInput) *AccountMailRouteInput {
 		value := *route.IMAPSMTP
 		cloned.IMAPSMTP = &value
 	}
+	if route.GoogleAPI != nil {
+		value := *route.GoogleAPI
+		cloned.GoogleAPI = &value
+	}
+	if route.GoogleWeb != nil {
+		value := *route.GoogleWeb
+		cloned.GoogleWeb = &value
+	}
+	if route.MicrosoftGraph != nil {
+		value := *route.MicrosoftGraph
+		cloned.MicrosoftGraph = &value
+	}
 	return &cloned
 }
 
@@ -808,6 +977,18 @@ func cloneCalendarRoute(route *AccountCalendarRouteInput) *AccountCalendarRouteI
 	if route.CalDAV != nil {
 		value := *route.CalDAV
 		cloned.CalDAV = &value
+	}
+	if route.GoogleAPI != nil {
+		value := *route.GoogleAPI
+		cloned.GoogleAPI = &value
+	}
+	if route.GoogleWeb != nil {
+		value := *route.GoogleWeb
+		cloned.GoogleWeb = &value
+	}
+	if route.MicrosoftGraph != nil {
+		value := *route.MicrosoftGraph
+		cloned.MicrosoftGraph = &value
 	}
 	return &cloned
 }

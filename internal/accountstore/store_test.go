@@ -119,6 +119,62 @@ func TestPurgeAccountStateRejectsSymlinkRoot(t *testing.T) {
 	}
 }
 
+func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "state")
+	t.Setenv("CORRESYNC_STATE_DIR", state)
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.Default()
+	route := func(key string) *config.OAuthRoute {
+		return &config.OAuthRoute{
+			APIBase:     "https://www.googleapis.com",
+			ClientID:    "synthetic-public-client.apps.googleusercontent.com",
+			RedirectURI: "http://127.0.0.1:43123/callback",
+			Authorization: config.CredentialRef{
+				Backend: config.CredentialOSKeyring,
+				Key:     key,
+				Consent: true,
+			},
+		}
+	}
+	const targetID domain.AccountID = "acc_00000000000000000000000000000002"
+	configuration.Accounts["target"] = config.Account{
+		ID: targetID, Address: "target@example.test",
+		Mail: &config.MailRoute{
+			Provider:  domain.ProviderGoogleAPI,
+			GoogleAPI: route("target-only"),
+		},
+		Calendar: &config.CalendarRoute{
+			Provider:  domain.ProviderGoogleAPI,
+			GoogleAPI: route("shared"),
+		},
+	}
+	configuration.Accounts["other"] = config.Account{
+		ID:      "acc_00000000000000000000000000000003",
+		Address: "other@example.test",
+		Calendar: &config.CalendarRoute{
+			Provider:  domain.ProviderGoogleAPI,
+			GoogleAPI: route("shared"),
+		},
+	}
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	deleted := make([]string, 0, 1)
+	store := Store{
+		ConfigPath: path,
+		DeleteOAuthAuthorization: func(key string) error {
+			deleted = append(deleted, key)
+			return nil
+		},
+	}
+	if err := store.PurgeAccountState(t.Context(), targetID); err != nil {
+		t.Fatal(err)
+	}
+	if len(deleted) != 1 || deleted[0] != "target-only" {
+		t.Fatalf("deleted OAuth keys = %#v", deleted)
+	}
+}
+
 func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 	t.Parallel()
 

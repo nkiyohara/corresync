@@ -32,6 +32,7 @@ type sessionStatusView struct {
 	Authenticated bool                 `json:"authenticated"`
 	CapturedAt    string               `json:"capturedAt,omitempty"`
 	Capabilities  *domain.Capabilities `json:"capabilities,omitempty"`
+	Degradations  []domain.Degradation `json:"degradations,omitempty"`
 }
 
 func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
@@ -72,6 +73,7 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 			State:         account.State,
 			Authenticated: account.Authenticated,
 			Capabilities:  account.Capabilities,
+			Degradations:  account.Degradations,
 		}
 		if account.CapturedAt != nil {
 			item.CapturedAt = account.CapturedAt.UTC().Format("2006-01-02T15:04:05Z")
@@ -108,6 +110,16 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 			view.muted(detail),
 		); err != nil {
 			return err
+		}
+		for _, degradation := range account.Degradations {
+			if _, err := view.printf(
+				"      %s  %s: %s\n",
+				view.warning(),
+				sanitizeCell(degradation.Feature, 96),
+				sanitizeCell(degradation.Reason, 512),
+			); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

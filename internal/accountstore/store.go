@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
@@ -16,7 +17,8 @@ import (
 
 // Store persists account definitions in one explicit config file.
 type Store struct {
-	ConfigPath string
+	ConfigPath               string
+	DeleteOAuthAuthorization func(string) error
 }
 
 // ListAccounts returns a detached account catalog.
@@ -129,9 +131,13 @@ func mailRouteView(route *config.MailRoute) *application.AccountRouteView {
 				Consented:  route.IMAPSMTP.Credential.Consent,
 			},
 		}
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
-		domain.ProviderGoogleWeb,
+	case domain.ProviderGoogleAPI:
+		return oauthRouteView(route.Provider, route.GoogleAPI)
+	case domain.ProviderGoogleWeb:
+		return webRouteView(route.Provider, route.GoogleWeb)
+	case domain.ProviderMicrosoftGraph:
+		return oauthRouteView(route.Provider, route.MicrosoftGraph)
+	case
 		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return &application.AccountRouteView{
@@ -173,9 +179,13 @@ func calendarRouteView(route *config.CalendarRoute) *application.AccountRouteVie
 				Consented:  route.CalDAV.Credential.Consent,
 			},
 		}
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
-		domain.ProviderGoogleWeb,
+	case domain.ProviderGoogleAPI:
+		return oauthRouteView(route.Provider, route.GoogleAPI)
+	case domain.ProviderGoogleWeb:
+		return webRouteView(route.Provider, route.GoogleWeb)
+	case domain.ProviderMicrosoftGraph:
+		return oauthRouteView(route.Provider, route.MicrosoftGraph)
+	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
 		domain.ProviderPOP3:
@@ -187,6 +197,41 @@ func calendarRouteView(route *config.CalendarRoute) *application.AccountRouteVie
 		}
 	default:
 		return &application.AccountRouteView{Provider: route.Provider}
+	}
+}
+
+func oauthRouteView(
+	provider domain.ProviderID,
+	route *config.OAuthRoute,
+) *application.AccountRouteView {
+	if route == nil {
+		return &application.AccountRouteView{Provider: provider}
+	}
+	return &application.AccountRouteView{
+		Provider: provider,
+		Endpoints: []application.DiscoveredEndpoint{
+			{Kind: "api", Value: route.APIBase},
+		},
+		Credential: &application.AccountCredentialView{
+			Configured: true,
+			Backend:    string(route.Authorization.Backend),
+			Consented:  route.Authorization.Consent,
+		},
+	}
+}
+
+func webRouteView(
+	provider domain.ProviderID,
+	route *config.WebRoute,
+) *application.AccountRouteView {
+	if route == nil {
+		return &application.AccountRouteView{Provider: provider}
+	}
+	return &application.AccountRouteView{
+		Provider: provider,
+		Endpoints: []application.DiscoveredEndpoint{
+			{Kind: "origin", Value: route.Origin},
+		},
 	}
 }
 
@@ -265,9 +310,29 @@ func mailRouteConfig(
 				},
 			},
 		}, nil
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
-		domain.ProviderGoogleWeb,
+	case domain.ProviderGoogleAPI:
+		oauth, err := oauthRouteConfig(route.GoogleAPI)
+		if err != nil {
+			return nil, err
+		}
+		return &config.MailRoute{Provider: route.Provider, GoogleAPI: oauth}, nil
+	case domain.ProviderGoogleWeb:
+		if route.GoogleWeb == nil {
+			return nil, errors.New("google Web mail settings are missing")
+		}
+		return &config.MailRoute{
+			Provider:  route.Provider,
+			GoogleWeb: &config.WebRoute{Origin: route.GoogleWeb.Origin},
+		}, nil
+	case domain.ProviderMicrosoftGraph:
+		oauth, err := oauthRouteConfig(route.MicrosoftGraph)
+		if err != nil {
+			return nil, err
+		}
+		return &config.MailRoute{
+			Provider: route.Provider, MicrosoftGraph: oauth,
+		}, nil
+	case
 		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return nil, fmt.Errorf("mail provider %q is not accepted by account add", route.Provider)
@@ -309,9 +374,29 @@ func calendarRouteConfig(
 				},
 			},
 		}, nil
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
-		domain.ProviderGoogleWeb,
+	case domain.ProviderGoogleAPI:
+		oauth, err := oauthRouteConfig(route.GoogleAPI)
+		if err != nil {
+			return nil, err
+		}
+		return &config.CalendarRoute{Provider: route.Provider, GoogleAPI: oauth}, nil
+	case domain.ProviderGoogleWeb:
+		if route.GoogleWeb == nil {
+			return nil, errors.New("google Web calendar settings are missing")
+		}
+		return &config.CalendarRoute{
+			Provider:  route.Provider,
+			GoogleWeb: &config.WebRoute{Origin: route.GoogleWeb.Origin},
+		}, nil
+	case domain.ProviderMicrosoftGraph:
+		oauth, err := oauthRouteConfig(route.MicrosoftGraph)
+		if err != nil {
+			return nil, err
+		}
+		return &config.CalendarRoute{
+			Provider: route.Provider, MicrosoftGraph: oauth,
+		}, nil
+	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
 		domain.ProviderPOP3:
@@ -325,6 +410,23 @@ func calendarRouteConfig(
 			route.Provider,
 		)
 	}
+}
+
+func oauthRouteConfig(
+	route *application.AccountOAuthInput,
+) (*config.OAuthRoute, error) {
+	if route == nil {
+		return nil, errors.New("OAuth route settings are missing")
+	}
+	return &config.OAuthRoute{
+		APIBase: route.APIBase, ClientID: route.ClientID,
+		RedirectURI: route.RedirectURI,
+		Authorization: config.CredentialRef{
+			Backend: config.CredentialBackend(route.Authorization.Backend),
+			Key:     route.Authorization.Key,
+			Consent: route.Authorization.Consent,
+		},
+	}, nil
 }
 
 // RenameAccount atomically changes only the mutable alias.
@@ -385,7 +487,10 @@ func (store Store) RemoveAccount(
 
 // PurgeAccountState removes only Corresync-owned state derived from the stable
 // opaque account ID. It refuses symlinked roots rather than following them.
-func (Store) PurgeAccountState(_ context.Context, accountID domain.AccountID) error {
+func (store Store) PurgeAccountState(
+	ctx context.Context,
+	accountID domain.AccountID,
+) error {
 	if err := accountID.ValidateOpaque(); err != nil {
 		return err
 	}
@@ -402,7 +507,65 @@ func (Store) PurgeAccountState(_ context.Context, accountID domain.AccountID) er
 			return err
 		}
 	}
+	if store.ConfigPath == "" || store.DeleteOAuthAuthorization == nil {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	configuration, err := config.Load(store.ConfigPath)
+	if err != nil {
+		return fmt.Errorf("load OAuth authorization ownership: %w", err)
+	}
+	_, account, exists := configuration.AccountByID(accountID)
+	if !exists {
+		return fmt.Errorf("account ID %q is not configured", accountID)
+	}
+	targetKeys := accountOAuthAuthorizationKeys(account)
+	sharedKeys := make(map[string]struct{})
+	for _, other := range configuration.Accounts {
+		if other.ID == accountID {
+			continue
+		}
+		for _, key := range accountOAuthAuthorizationKeys(other) {
+			sharedKeys[key] = struct{}{}
+		}
+	}
+	for _, key := range targetKeys {
+		if _, shared := sharedKeys[key]; shared {
+			continue
+		}
+		if err := store.DeleteOAuthAuthorization(key); err != nil {
+			return fmt.Errorf("delete account OAuth authorization: %w", err)
+		}
+	}
 	return nil
+}
+
+func accountOAuthAuthorizationKeys(account config.Account) []string {
+	keys := make([]string, 0, 2)
+	if account.Mail != nil {
+		for _, route := range []*config.OAuthRoute{
+			account.Mail.GoogleAPI,
+			account.Mail.MicrosoftGraph,
+		} {
+			if route != nil {
+				keys = append(keys, route.Authorization.Key)
+			}
+		}
+	}
+	if account.Calendar != nil {
+		for _, route := range []*config.OAuthRoute{
+			account.Calendar.GoogleAPI,
+			account.Calendar.MicrosoftGraph,
+		} {
+			if route != nil {
+				keys = append(keys, route.Authorization.Key)
+			}
+		}
+	}
+	slices.Sort(keys)
+	return slices.Compact(keys)
 }
 
 func removeOwnedTree(path string) error {

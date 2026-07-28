@@ -22,6 +22,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/discovery"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/oauthlocal"
 	"github.com/nkiyohara/corresync/internal/paths"
 	"github.com/nkiyohara/corresync/internal/session"
 	"github.com/nkiyohara/corresync/internal/updatecheck"
@@ -165,7 +166,10 @@ func (app *runtime) accountServices() (
 	if err != nil {
 		return nil, nil, err
 	}
-	store := accountstore.Store{ConfigPath: path}
+	store := accountstore.Store{
+		ConfigPath:               path,
+		DeleteOAuthAuthorization: oauthlocal.DeleteAuthorization,
+	}
 	accounts, err := application.NewAccountService(
 		store,
 		store,
@@ -174,6 +178,8 @@ func (app *runtime) accountServices() (
 			domain.ProviderJMAP,
 			domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV,
+			domain.ProviderGoogleAPI,
+			domain.ProviderMicrosoftGraph,
 		},
 	)
 	if err != nil {
@@ -186,6 +192,8 @@ func (app *runtime) accountServices() (
 			domain.ProviderJMAP,
 			domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV,
+			domain.ProviderGoogleAPI,
+			domain.ProviderMicrosoftGraph,
 		},
 	)
 	if err != nil {

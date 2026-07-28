@@ -163,7 +163,7 @@ func (route MailRoute) validate() error {
 		if route.GoogleAPI == nil {
 			return errors.New("google-api requires google_api settings")
 		}
-		return route.GoogleAPI.validate()
+		return route.GoogleAPI.validateFor(domain.ProviderGoogleAPI)
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires google_web settings")
@@ -173,7 +173,7 @@ func (route MailRoute) validate() error {
 		if route.MicrosoftGraph == nil {
 			return errors.New("microsoft-graph requires microsoft_graph settings")
 		}
-		return route.MicrosoftGraph.validate()
+		return route.MicrosoftGraph.validateFor(domain.ProviderMicrosoftGraph)
 	case domain.ProviderCalDAV, domain.ProviderPOP3:
 		return fmt.Errorf("provider %q cannot supply a mail route", route.Provider)
 	default:
@@ -207,7 +207,7 @@ func (route CalendarRoute) validate() error {
 		if route.GoogleAPI == nil {
 			return errors.New("google-api requires google_api settings")
 		}
-		return route.GoogleAPI.validate()
+		return route.GoogleAPI.validateFor(domain.ProviderGoogleAPI)
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires google_web settings")
@@ -217,7 +217,7 @@ func (route CalendarRoute) validate() error {
 		if route.MicrosoftGraph == nil {
 			return errors.New("microsoft-graph requires microsoft_graph settings")
 		}
-		return route.MicrosoftGraph.validate()
+		return route.MicrosoftGraph.validateFor(domain.ProviderMicrosoftGraph)
 	case domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3:
 		return fmt.Errorf("provider %q cannot supply a calendar route", route.Provider)
 	default:
@@ -312,13 +312,45 @@ func (route OAuthRoute) validate() error {
 	}
 	redirect, err := url.Parse(route.RedirectURI)
 	if err != nil || redirect.Scheme != "http" || redirect.Hostname() != "127.0.0.1" ||
-		redirect.User != nil || redirect.Fragment != "" {
-		return errors.New("OAuth redirect URI must use loopback http://127.0.0.1")
+		redirect.User != nil || redirect.Fragment != "" || redirect.RawQuery != "" ||
+		redirect.Port() == "" {
+		return errors.New("OAuth redirect URI must use an explicit loopback port")
 	}
 	if route.Authorization.Backend != CredentialOSKeyring {
 		return errors.New("OAuth authorization must use the OS keyring")
 	}
 	return route.Authorization.validate(true)
+}
+
+func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
+	if err := route.validate(); err != nil {
+		return err
+	}
+	parsed, _ := url.Parse(route.APIBase)
+	switch provider {
+	case domain.ProviderGoogleAPI:
+		if parsed.Host != "www.googleapis.com" || parsed.RawQuery != "" ||
+			parsed.EscapedPath() != "" && parsed.EscapedPath() != "/" {
+			return errors.New("google API base must be https://www.googleapis.com")
+		}
+	case domain.ProviderMicrosoftGraph:
+		if parsed.Host != "graph.microsoft.com" || parsed.RawQuery != "" ||
+			strings.TrimSuffix(parsed.EscapedPath(), "/") != "/v1.0" {
+			return errors.New(
+				"microsoft Graph API base must be https://graph.microsoft.com/v1.0",
+			)
+		}
+	case domain.ProviderMicrosoftOWA,
+		domain.ProviderGoogleWeb,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderCalDAV,
+		domain.ProviderPOP3:
+		return fmt.Errorf("provider %q has no OAuth API base policy", provider)
+	default:
+		return fmt.Errorf("unknown OAuth API provider %q", provider)
+	}
+	return nil
 }
 
 func (route WebRoute) validate() error {

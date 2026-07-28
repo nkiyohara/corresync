@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,8 +20,11 @@ import (
 	"github.com/nkiyohara/corresync/internal/credential"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/oauthlocal"
 	"github.com/nkiyohara/corresync/internal/paths"
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
+	"github.com/nkiyohara/corresync/internal/provider/googleapi"
+	"github.com/nkiyohara/corresync/internal/provider/graphapi"
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
 	"github.com/nkiyohara/corresync/internal/provider/outlookweb"
@@ -30,12 +35,21 @@ type sessionCloser interface {
 	Close() error
 }
 
+type oauthClientManager interface {
+	Client(
+		context.Context,
+		config.OAuthRoute,
+		oauthlocal.Provider,
+	) (*http.Client, error)
+}
+
 type sessionAccount struct {
 	closers      []sessionCloser
 	mail         *application.MailService
 	calendar     *application.CalendarService
 	captured     time.Time
 	capabilities domain.Capabilities
+	degradations []domain.Degradation
 }
 
 func (account sessionAccount) mailService() (*application.MailService, error) {
@@ -75,9 +89,12 @@ type sessionBackend struct {
 	guard         *application.Guard
 	recorder      *audit.FileRecorder
 	credentials   *credential.Resolver
+	oauth         oauthClientManager
 	newJMAP       func(context.Context, jmap.Options) (*jmap.Client, error)
 	newIMAP       func(context.Context, imapmail.Options) (*imapmail.Client, error)
 	newCalDAV     func(context.Context, caldavprovider.Options) (*caldavprovider.Client, error)
+	newGoogle     func(context.Context, googleapi.Options) (*googleapi.Client, error)
+	newGraph      func(context.Context, graphapi.Options) (*graphapi.Client, error)
 
 	mu           sync.Mutex
 	activationMu sync.Mutex
@@ -124,6 +141,20 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		_ = recorder.Close()
 		return nil, err
 	}
+	oauth, err := oauthlocal.New(oauthlocal.Options{
+		BeforeOpen: func(provider oauthlocal.Provider) {
+			_, _ = fmt.Fprintf(
+				app.stderr,
+				"Opening %s authorization for scopes: %s\n",
+				provider.ID,
+				strings.Join(provider.Scopes, ", "),
+			)
+		},
+	})
+	if err != nil {
+		_ = recorder.Close()
+		return nil, err
+	}
 	lifecycle, cancel := context.WithCancel(context.Background())
 	return &sessionBackend{
 		app:              app,
@@ -131,9 +162,12 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		guard:            guard,
 		recorder:         recorder,
 		credentials:      credentials,
+		oauth:            oauth,
 		newJMAP:          jmap.New,
 		newIMAP:          imapmail.New,
 		newCalDAV:        caldavprovider.New,
+		newGoogle:        googleapi.New,
+		newGraph:         graphapi.New,
 		accounts:         make(map[domain.AccountID]sessionAccount),
 		previews:         make(map[string]sessionPreview),
 		lifecycle:        lifecycle,
@@ -217,6 +251,10 @@ func (backend *sessionBackend) SessionStatus(
 			state.CapturedAt = &capturedAt
 			capabilities := account.capabilities
 			state.Capabilities = &capabilities
+			state.Degradations = append(
+				[]domain.Degradation(nil),
+				account.degradations...,
+			)
 		} else if _, exists := backend.terminalAccounts[accountID]; exists {
 			state.State = "pending"
 		}
@@ -1446,11 +1484,298 @@ func (backend *sessionBackend) calDAVAccount(
 	}, nil
 }
 
+func (backend *sessionBackend) googleAPIAccount(
+	ctx context.Context,
+	configured config.Account,
+	route config.OAuthRoute,
+	mailEnabled, calendarEnabled bool,
+) (sessionAccount, error) {
+	provider, err := oauthlocal.ProviderFor(
+		domain.ProviderGoogleAPI,
+		mailEnabled,
+		calendarEnabled,
+	)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	manager := backend.oauth
+	if manager == nil {
+		manager, err = oauthlocal.New(oauthlocal.Options{})
+		if err != nil {
+			return sessionAccount{}, err
+		}
+	}
+	authorizedHTTP, err := manager.Client(ctx, route, provider)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	factory := backend.newGoogle
+	if factory == nil {
+		factory = googleapi.New
+	}
+	client, err := factory(ctx, googleapi.Options{
+		APIBase: route.APIBase,
+		Address: configured.Address,
+		Mail:    mailEnabled, Calendar: calendarEnabled,
+		HTTP: authorizedHTTP,
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	result := sessionAccount{
+		closers:  []sessionCloser{client},
+		captured: time.Now().UTC(),
+		capabilities: domain.Capabilities{
+			Mail: mailEnabled, Calendar: calendarEnabled,
+			Folders: mailEnabled, Labels: mailEnabled,
+			AttachmentReads: mailEnabled, AttachmentWrites: mailEnabled,
+		},
+	}
+	if mailEnabled {
+		result.degradations = append(
+			result.degradations,
+			domain.Degradation{
+				Feature: "mail.search",
+				Reason:  "Gmail search syntax differs from Outlook AQS",
+				Lossy:   true,
+			},
+			domain.Degradation{
+				Feature: "mail.state",
+				Reason:  "Gmail exposes no atomic historyId precondition for label updates",
+			},
+			domain.Degradation{
+				Feature: "mail.move",
+				Reason:  "Gmail exposes no atomic historyId precondition for moves",
+			},
+			domain.Degradation{
+				Feature: "mail.delete",
+				Reason:  "the least-privilege Gmail scope excludes permanent deletion",
+			},
+			domain.Degradation{
+				Feature: "mail.push_history",
+				Reason:  "the Google API route does not register push watches or expose history cursors",
+			},
+			domain.Degradation{
+				Feature: "mail.scheduled_send",
+				Reason:  "the Gmail API does not expose scheduled sending",
+			},
+		)
+	}
+	if calendarEnabled {
+		result.degradations = append(
+			result.degradations,
+			domain.Degradation{
+				Feature: "calendar.selection",
+				Reason:  "the Google API route currently exposes the primary calendar only",
+			},
+			domain.Degradation{
+				Feature: "calendar.online_meeting_create",
+				Reason:  "the Google API route does not provision online meetings",
+			},
+		)
+	}
+	if mailEnabled {
+		result.mail, err = application.NewMailService(
+			backend.guard,
+			client,
+			application.MailOptions{
+				MaxRecipients: backend.configuration.Policy.MaxRecipients,
+				Provenance: domain.Provenance{
+					AccountID: configured.ID,
+					Provider:  domain.ProviderGoogleAPI,
+					MailboxID: "gmail-me",
+				},
+			},
+		)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, client.Close())
+		}
+	}
+	if calendarEnabled {
+		result.calendar, err = application.NewCalendarService(
+			backend.guard,
+			client,
+			application.CalendarOptions{
+				MaxAttendees: backend.configuration.Policy.MaxAttendees,
+				Provenance: domain.Provenance{
+					AccountID:  configured.ID,
+					Provider:   domain.ProviderGoogleAPI,
+					CalendarID: "primary",
+				},
+			},
+		)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, client.Close())
+		}
+	}
+	return result, nil
+}
+
+func (backend *sessionBackend) graphAPIAccount(
+	ctx context.Context,
+	configured config.Account,
+	route config.OAuthRoute,
+	mailEnabled, calendarEnabled bool,
+) (sessionAccount, error) {
+	provider, err := oauthlocal.ProviderFor(
+		domain.ProviderMicrosoftGraph,
+		mailEnabled,
+		calendarEnabled,
+	)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	manager := backend.oauth
+	if manager == nil {
+		manager, err = oauthlocal.New(oauthlocal.Options{})
+		if err != nil {
+			return sessionAccount{}, err
+		}
+	}
+	authorizedHTTP, err := manager.Client(ctx, route, provider)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	factory := backend.newGraph
+	if factory == nil {
+		factory = graphapi.New
+	}
+	client, err := factory(ctx, graphapi.Options{
+		APIBase: route.APIBase,
+		Address: configured.Address,
+		Mail:    mailEnabled, Calendar: calendarEnabled,
+		HTTP: authorizedHTTP,
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	result := sessionAccount{
+		closers:  []sessionCloser{client},
+		captured: time.Now().UTC(),
+		capabilities: domain.Capabilities{
+			Mail: mailEnabled, Calendar: calendarEnabled,
+			Folders:          mailEnabled,
+			AttachmentReads:  mailEnabled,
+			AttachmentWrites: mailEnabled,
+		},
+	}
+	if mailEnabled {
+		result.degradations = append(
+			result.degradations,
+			domain.Degradation{
+				Feature: "mail.search",
+				Reason:  "Microsoft Graph search syntax differs from Outlook AQS",
+				Lossy:   true,
+			},
+			domain.Degradation{
+				Feature: "mail.reply_forward",
+				Reason:  "Graph reply and forward actions expose no atomic source ETag precondition",
+			},
+			domain.Degradation{
+				Feature: "mail.move",
+				Reason:  "Graph message move exposes no atomic source ETag precondition",
+			},
+			domain.Degradation{
+				Feature: "mail.send_identity",
+				Reason:  "Graph accepts sends asynchronously without returning a sent item identity",
+				Lossy:   true,
+			},
+		)
+	}
+	if calendarEnabled {
+		result.capabilities.OnlineMeeting = "teams"
+	}
+	if mailEnabled {
+		result.mail, err = application.NewMailService(
+			backend.guard,
+			client,
+			application.MailOptions{
+				MaxRecipients: backend.configuration.Policy.MaxRecipients,
+				Provenance: domain.Provenance{
+					AccountID: configured.ID,
+					Provider:  domain.ProviderMicrosoftGraph,
+					MailboxID: "graph-me",
+				},
+			},
+		)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, client.Close())
+		}
+	}
+	if calendarEnabled {
+		result.calendar, err = application.NewCalendarService(
+			backend.guard,
+			client,
+			application.CalendarOptions{
+				MaxAttendees: backend.configuration.Policy.MaxAttendees,
+				Provenance: domain.Provenance{
+					AccountID:  configured.ID,
+					Provider:   domain.ProviderMicrosoftGraph,
+					CalendarID: "primary",
+				},
+			},
+		)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, client.Close())
+		}
+	}
+	return result, nil
+}
+
 func (backend *sessionBackend) nonOutlookAccount(
 	ctx context.Context,
 	configured config.Account,
 ) (sessionAccount, error) {
 	var combined sessionAccount
+	sharedGoogle := configured.Mail != nil &&
+		configured.Mail.Provider == domain.ProviderGoogleAPI &&
+		configured.Mail.GoogleAPI != nil &&
+		configured.Calendar != nil &&
+		configured.Calendar.Provider == domain.ProviderGoogleAPI &&
+		configured.Calendar.GoogleAPI != nil &&
+		oauthRoutesEqual(
+			*configured.Mail.GoogleAPI,
+			*configured.Calendar.GoogleAPI,
+		)
+	if sharedGoogle {
+		google, err := backend.googleAPIAccount(
+			ctx,
+			configured,
+			*configured.Mail.GoogleAPI,
+			true,
+			true,
+		)
+		if err != nil {
+			return sessionAccount{}, err
+		}
+		combined = mergeSessionAccounts(combined, google)
+	}
+	sharedGraph := configured.Mail != nil &&
+		configured.Mail.Provider == domain.ProviderMicrosoftGraph &&
+		configured.Mail.MicrosoftGraph != nil &&
+		configured.Calendar != nil &&
+		configured.Calendar.Provider == domain.ProviderMicrosoftGraph &&
+		configured.Calendar.MicrosoftGraph != nil &&
+		oauthRoutesEqual(
+			*configured.Mail.MicrosoftGraph,
+			*configured.Calendar.MicrosoftGraph,
+		)
+	if sharedGraph {
+		graph, err := backend.graphAPIAccount(
+			ctx,
+			configured,
+			*configured.Mail.MicrosoftGraph,
+			true,
+			true,
+		)
+		if err != nil {
+			return sessionAccount{}, errors.Join(
+				err,
+				closeSessionAccount(combined),
+			)
+		}
+		combined = mergeSessionAccounts(combined, graph)
+	}
 	if configured.Mail != nil {
 		var mail sessionAccount
 		var err error
@@ -1460,9 +1785,27 @@ func (backend *sessionBackend) nonOutlookAccount(
 			mail, err = backend.jmapAccount(ctx, configured)
 		case domain.ProviderIMAPSMTP:
 			mail, err = backend.imapAccount(ctx, configured)
-		case domain.ProviderMicrosoftGraph,
-			domain.ProviderGoogleAPI,
-			domain.ProviderGoogleWeb,
+		case domain.ProviderGoogleAPI:
+			if configured.Mail.GoogleAPI == nil {
+				err = errors.New("google API mail route settings are missing")
+			} else if !sharedGoogle {
+				mail, err = backend.googleAPIAccount(
+					ctx, configured, *configured.Mail.GoogleAPI, true, false,
+				)
+			}
+		case domain.ProviderMicrosoftGraph:
+			if configured.Mail.MicrosoftGraph == nil {
+				err = errors.New("microsoft Graph mail route settings are missing")
+			} else if !sharedGraph {
+				mail, err = backend.graphAPIAccount(
+					ctx,
+					configured,
+					*configured.Mail.MicrosoftGraph,
+					true,
+					false,
+				)
+			}
+		case domain.ProviderGoogleWeb,
 			domain.ProviderCalDAV,
 			domain.ProviderPOP3:
 			err = fmt.Errorf(
@@ -1484,9 +1827,27 @@ func (backend *sessionBackend) nonOutlookAccount(
 		case domain.ProviderMicrosoftOWA:
 		case domain.ProviderCalDAV:
 			calendar, err = backend.calDAVAccount(ctx, configured)
-		case domain.ProviderMicrosoftGraph,
-			domain.ProviderGoogleAPI,
-			domain.ProviderGoogleWeb,
+		case domain.ProviderGoogleAPI:
+			if configured.Calendar.GoogleAPI == nil {
+				err = errors.New("google API calendar route settings are missing")
+			} else if !sharedGoogle {
+				calendar, err = backend.googleAPIAccount(
+					ctx, configured, *configured.Calendar.GoogleAPI, false, true,
+				)
+			}
+		case domain.ProviderMicrosoftGraph:
+			if configured.Calendar.MicrosoftGraph == nil {
+				err = errors.New("microsoft Graph calendar route settings are missing")
+			} else if !sharedGraph {
+				calendar, err = backend.graphAPIAccount(
+					ctx,
+					configured,
+					*configured.Calendar.MicrosoftGraph,
+					false,
+					true,
+				)
+			}
+		case domain.ProviderGoogleWeb,
 			domain.ProviderJMAP,
 			domain.ProviderIMAPSMTP,
 			domain.ProviderPOP3:
@@ -1506,6 +1867,13 @@ func (backend *sessionBackend) nonOutlookAccount(
 		combined = mergeSessionAccounts(combined, calendar)
 	}
 	return combined, nil
+}
+
+func oauthRoutesEqual(left, right config.OAuthRoute) bool {
+	return left.APIBase == right.APIBase &&
+		left.ClientID == right.ClientID &&
+		left.RedirectURI == right.RedirectURI &&
+		left.Authorization == right.Authorization
 }
 
 func hasOutlookRoute(account config.Account) bool {
@@ -1538,6 +1906,13 @@ func mergeSessionAccounts(
 			AttachmentReads:  left.capabilities.AttachmentReads || right.capabilities.AttachmentReads,
 			AttachmentWrites: left.capabilities.AttachmentWrites || right.capabilities.AttachmentWrites,
 		},
+		degradations: append(
+			append(
+				[]domain.Degradation(nil),
+				left.degradations...,
+			),
+			right.degradations...,
+		),
 	}
 	if right.mail != nil {
 		merged.mail = right.mail

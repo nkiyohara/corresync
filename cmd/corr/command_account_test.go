@@ -257,3 +257,92 @@ func TestAccountAddPersistsMixedIMAPAndCalDAVRoutes(t *testing.T) {
 		t.Fatalf("account output = %q", stdout.String())
 	}
 }
+
+func TestAccountAddPersistsExplicitGooglePublicClientWithoutAuthorizing(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{{
+				Provider:                  domain.ProviderGoogleAPI,
+				Confidence:                98,
+				Authentication:            application.DiscoveryExplicitOAuth,
+				RequiresExplicitSelection: true,
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "test", Detail: "synthetic",
+				}},
+			}},
+		},
+	}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@gmail.com", Alias: "google",
+		Provider:         string(domain.ProviderGoogleAPI),
+		OAuthClientID:    "synthetic-public-client.apps.googleusercontent.com",
+		OAuthRedirectURI: "http://127.0.0.1:53682/oauth/callback",
+		AuthorizationKey: "google-reader",
+		ApproveOAuth:     true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["google"]
+	if account.Mail == nil || account.Mail.GoogleAPI == nil ||
+		account.Calendar == nil || account.Calendar.GoogleAPI == nil ||
+		account.Mail.GoogleAPI.ClientID != command.OAuthClientID ||
+		account.Mail.GoogleAPI.Authorization.Key != command.AuthorizationKey ||
+		account.Mail.GoogleAPI.Authorization.Backend != config.CredentialOSKeyring {
+		t.Fatalf("Google API account = %#v", account)
+	}
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("account output = %q", stdout.String())
+	}
+}
+
+func TestAccountAddPersistsExplicitGraphPublicClientWithoutAuthorizing(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{{
+				Provider:                  domain.ProviderMicrosoftGraph,
+				Confidence:                0,
+				Authentication:            application.DiscoveryExplicitOAuth,
+				RequiresExplicitSelection: true,
+				Endpoints: []application.DiscoveredEndpoint{{
+					Kind: "api", Value: "https://graph.microsoft.com/v1.0",
+				}},
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "test", Detail: "synthetic",
+				}},
+			}},
+		},
+	}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.test", Alias: "graph",
+		Provider:         string(domain.ProviderMicrosoftGraph),
+		OAuthClientID:    "synthetic-public-client",
+		OAuthRedirectURI: "http://127.0.0.1:53683/oauth/callback",
+		AuthorizationKey: "graph-reader",
+		ApproveOAuth:     true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["graph"]
+	if account.Mail == nil || account.Mail.MicrosoftGraph == nil ||
+		account.Calendar == nil || account.Calendar.MicrosoftGraph == nil ||
+		account.Mail.MicrosoftGraph.ClientID != command.OAuthClientID ||
+		account.Mail.MicrosoftGraph.Authorization.Key != command.AuthorizationKey ||
+		account.Mail.MicrosoftGraph.Authorization.Backend != config.CredentialOSKeyring {
+		t.Fatalf("Graph account = %#v", account)
+	}
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("account output = %q", stdout.String())
+	}
+}

@@ -115,8 +115,17 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 			if account.Capabilities == nil || account.Capabilities.Validate() != nil {
 				return errors.New("daemon returned invalid account capabilities")
 			}
+			if len(account.Degradations) > 32 {
+				return errors.New("daemon returned unbounded account degradations")
+			}
+			for _, degradation := range account.Degradations {
+				if degradation.Validate() != nil {
+					return errors.New("daemon returned invalid account degradation")
+				}
+			}
 		case "pending", "signed_out":
-			if account.Authenticated || account.CapturedAt != nil || account.Capabilities != nil {
+			if account.Authenticated || account.CapturedAt != nil ||
+				account.Capabilities != nil || len(account.Degradations) != 0 {
 				return errors.New("daemon returned invalid inactive session state")
 			}
 		default:

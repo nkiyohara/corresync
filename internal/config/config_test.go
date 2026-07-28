@@ -399,7 +399,7 @@ func TestOAuthRouteRequiresLoopbackPKCEAndOSKeyring(t *testing.T) {
 		Mail: &MailRoute{
 			Provider: domain.ProviderGoogleAPI,
 			GoogleAPI: &OAuthRoute{
-				APIBase:     "https://gmail.googleapis.com",
+				APIBase:     "https://www.googleapis.com",
 				ClientID:    "synthetic-public-client",
 				RedirectURI: "http://127.0.0.1:43123/callback",
 				Authorization: CredentialRef{
@@ -412,6 +412,24 @@ func TestOAuthRouteRequiresLoopbackPKCEAndOSKeyring(t *testing.T) {
 		t.Fatalf("valid public-client route rejected: %v", err)
 	}
 	account := configuration.Accounts["work"]
+	oauth := *account.Mail.GoogleAPI
+	oauth.APIBase = "https://api.attacker.invalid"
+	account.Mail.GoogleAPI = &oauth
+	configuration.Accounts["work"] = account
+	if err := configuration.Validate(); err == nil {
+		t.Fatal("credential-exfiltrating OAuth API base was accepted")
+	}
+
+	oauth.APIBase = "https://www.googleapis.com"
+	oauth.RedirectURI = "http://127.0.0.1:43123/callback?leak=true"
+	account.Mail.GoogleAPI = &oauth
+	configuration.Accounts["work"] = account
+	if err := configuration.Validate(); err == nil {
+		t.Fatal("OAuth redirect query was accepted")
+	}
+
+	oauth.RedirectURI = "http://127.0.0.1:43123/callback"
+	account.Mail.GoogleAPI = &oauth
 	account.Mail.GoogleAPI.Authorization.Backend = CredentialHelper
 	configuration.Accounts["work"] = account
 	if err := configuration.Validate(); err == nil {
