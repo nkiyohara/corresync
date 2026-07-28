@@ -25,6 +25,7 @@ type cli struct {
 	Config      configCommand     `cmd:"" help:"Initialize and inspect configuration."`
 	Account     accountCommand    `cmd:"" help:"Discover and manage isolated accounts."`
 	Doctor      doctorCommand     `cmd:"" help:"Diagnose local setup and opt-in provider compatibility."`
+	Import      importCommand     `cmd:"" help:"Scan local exports into private read-only staging."`
 	Auth        authCommand       `cmd:"" help:"Inspect and manage interactive sessions."`
 	Login       loginCommand      `cmd:"" hidden:"" help:"Open the interactive provider sign-in."`
 	Mail        mailCommand       `cmd:"" help:"Read and manage mail."`
