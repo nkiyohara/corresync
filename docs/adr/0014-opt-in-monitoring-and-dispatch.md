@@ -32,14 +32,16 @@ Modes are strictly ordered:
 off -> notify -> queue -> agent
 ```
 
-`off` collects nothing. `notify` emits a local notification on a platform with
-a validated adapter. `queue` persists matching events in a durable local
-outbox. `agent` dispatches to an explicitly configured runner. `notify` and
-`queue` require no AI provider, and neither implies that one exists. Linux uses
-`notify-send` and macOS uses `osascript`, with native argument separation and a
-short execution timeout. Windows `notify` is unavailable until the product
-installs a registered AppUserModelID, so setup fails before configuration
-changes while `queue` and `agent` remain usable.
+`off` collects nothing. Every collecting mode first persists matching events
+in a durable local outbox with an immutable delivery kind. `notify` drains
+notification events through a validated local adapter. `queue` retains events
+for manual inspection without automatic delivery. `agent` drains runner events
+to an explicitly configured executable. `notify` and `queue` require no AI
+provider, and neither implies that one exists. Linux uses `notify-send` and
+macOS uses `osascript`, with native argument separation and a short execution
+timeout. Windows `notify` is unavailable until the product installs a
+registered AppUserModelID, so setup fails before configuration changes while
+`queue` and `agent` remain usable.
 
 The pipeline is a provider watcher, cursor and watermark recovery,
 deduplication, a metadata-first policy filter, a durable local queue, and then
@@ -47,6 +49,16 @@ sinks. Every adapter persists its own cursor and recovers after a restart or a
 missed notification. Duplicate delivery is identifiable and safe rather than
 assumed away. Disabling monitoring stops collection and requires an explicit
 choice to retain or purge the local queue.
+
+The provider cursor advances monotonically in the same commit that creates
+first-seen outbox events. Quiet hours, debounce, rate limits, cancellation, and
+sink failures leave events pending instead of rolling back the cursor. Pending
+events are filtered by their original delivery kind, so changing mode cannot
+redirect old data to a different sink. A cursor that falls outside the bounded
+1000-item recovery window is re-baselined at the newest inspected window; all
+inspected items still pass through deduplication and normal delivery. State
+schema v1 entries migrate to local-only `queue` delivery rather than guessing
+an external destination.
 
 Events are metadata first: event identifier, account, source object identity,
 sender, subject, received time, and a trust marker. Bodies and attachments are

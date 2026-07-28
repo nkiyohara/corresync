@@ -326,9 +326,11 @@ corr import scan ./synthetic-export --format auto --approve-read --json
 corr import purge --account ALIAS --approve
 ```
 
-The first call must only plan. Approval must bind the exact source identity.
-Verify bounds and recognized-format counts locally, then verify purge removes
-only account-local Corresync staging and never changes the source.
+The first call must perform no filesystem scan and must request
+`--approve-read`. The approved call binds the exact resolved source identity,
+reads it, and creates the bounded account-local plan in one operation. Verify
+bounds and recognized-format counts locally, then verify purge removes only
+account-local Corresync staging and never changes the source.
 
 ## 10. Consequential writes
 
@@ -385,7 +387,9 @@ without claiming desktop-notification compatibility.
 Verify old/new/imported accounts begin `off`; collection starts only after
 authentication and approval; Sent/Drafts/self messages are suppressed where
 possible; restart recovery does not duplicate an event; notification values
-are bounded and treated as untrusted.
+are bounded and treated as untrusted. During quiet hours or rate limiting,
+confirm the provider cursor remains advanced while notification events stay
+pending, then confirm a later poll drains them once delivery is allowed.
 
 Queue mode requires a separate step. Test acknowledgement twice and confirm
 idempotence. Agent mode requires a disposable absolute runner, direct execution

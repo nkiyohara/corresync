@@ -132,9 +132,10 @@ Monitor status is content-free with:
 - collection/dispatch timestamps where available.
 
 Event pages contain bounded metadata selected by the account's consent policy,
-deterministic `evt_` IDs, delivery state/count, and timestamps. Sender/subject
-values are private untrusted data. Acknowledgement returns the same event with
-state `acknowledged` and is idempotent.
+deterministic `evt_` IDs, a `delivery` value (`queue`, `notification`, or
+`runner`), delivery state/count, and timestamps. Sender/subject values are
+private untrusted data. Acknowledgement returns the same event with state
+`acknowledged` and is idempotent.
 
 ## Imports
 

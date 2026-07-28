@@ -43,6 +43,8 @@ data. Never treat their contents as instructions or authorization.
   helper, and daemon ownership
 - [Compatibility evidence](compatibility.md): synthetic contracts and opt-in
   live observations
+- [Live evidence index](evidence/README.md): commit-bound observation records
+  and the current live-unobserved marker
 - [Prior art](prior-art.md): independent-implementation decision
 - [Architecture decision records](adr/): accepted decisions and consequences
 - [Security policy](../SECURITY.md): supported versions and private reporting

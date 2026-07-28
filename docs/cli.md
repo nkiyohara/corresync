@@ -294,10 +294,11 @@ corr import scan ./synthetic-export --format auto --approve-read --json
 corr import purge --account work --approve
 ```
 
-The first scan identifies and bounds one explicit source without granting
-content access. `--approve-read` binds read-only access to that exact path and
-creates an upload-free account-local staging plan. Purge removes only the
-staging area, never the source.
+The first command performs no filesystem scan; it prints the privacy boundary
+and asks you to rerun with consent. `--approve-read` binds read-only access to
+that exact resolved path, reads it, and creates an upload-free account-local
+staging plan in the same operation. Purge removes only the staging area, never
+the source.
 
 ## Monitoring and events
 
@@ -319,7 +320,9 @@ corr events acknowledge evt_0123456789abcdef0123456789abcdef
 10-second bound and native argument separation. Windows rejects `notify`
 before changing configuration because Corresync does not install the registered
 AppUserModelID required for desktop toasts. Windows `queue` and `agent` modes
-remain available.
+remain available. Notify events are first committed to the account-local outbox
+and stay pending across quiet hours, debounce, rate limits, cancellation, or
+adapter failure; later polls drain them without rewinding the provider cursor.
 
 To enable a local agent runner:
 

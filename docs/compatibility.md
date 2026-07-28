@@ -4,15 +4,15 @@ Compatibility is an evidence claim, not an inference from a fixture or a
 provider brand. This page distinguishes deterministic coverage on `main` from
 authorized live observations.
 
-## Current evidence
+## Current branch evidence
 
 <!-- markdownlint-disable MD013 -->
-| Boundary | Deterministic evidence | Live evidence | Status |
+| Boundary | Deterministic evidence | Recorded live evidence | Current branch status |
 | --- | --- | --- | --- |
-| CLI, stable JSON, configuration schema v3 | Unit, golden, migration, `NO_COLOR` | Local terminal | Observed |
+| CLI, stable JSON, configuration schema v3 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
-| Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | macOS arm64 | Observed |
-| Outlook Web mail/calendar | Synthetic typed wire contracts | Microsoft 365 work/school | Observed |
+| Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
+| Outlook Web mail/calendar | Synthetic typed wire contracts | Historical Microsoft 365 notes, not commit-bound | Deterministic only; live-unobserved |
 | Google Web read-only mail/calendar | Synthetic semantic-DOM and application integration contracts; opt-in live harness compiles | Not run | Deterministic only |
 | Google API mail/calendar | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
@@ -22,16 +22,17 @@ authorized live observations.
 | Cross-account search and agenda | Isolation, ordering, bounds, partial-failure tests | Not run | Deterministic only |
 | Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
 | Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
-| Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Local terminal | Deterministic only |
-| MCP clients | Native setup-plan and schema tests | Codex tool call; Claude health check | Partial |
-| Distribution | Archive/package/SBOM/inventory verification | Release CI and isolated Linux first run | Verified build |
+| Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
+| MCP clients | Native setup-plan and schema tests | Historical Codex/Claude notes, not commit-bound | Deterministic only; live-unobserved |
+| Distribution | Archive/package/SBOM/inventory verification | v0.7.0 release at `ec868d8`; no post-v0.7 candidate | Published tag only; current branch unobserved |
 <!-- markdownlint-enable MD013 -->
 
-The Outlook Web observations were made on 2026-07-18, 2026-07-19, and
-2026-07-25 using synthetic content and no third-party recipient. They prove one
-authorized environment, not universal tenant support. New provider adapters
-must remain labeled “deterministic only” until a bounded opt-in observation is
-recorded.
+Historical Outlook Web notes were made on 2026-07-18, 2026-07-19, and
+2026-07-25 using synthetic content and no third-party recipient. Those notes did
+not record the exact commit, so they are context only and do not substantiate
+this branch. No provider or platform has a commit-bound live observation for
+the post-v0.7 implementation. The explicit marker and required template live
+in the [live evidence index](evidence/README.md).
 
 Cross-compilation proves platform-specific code builds; it does not replace
 native browser, keyring, IPC, Gatekeeper, SmartScreen, or package-manager
@@ -39,8 +40,9 @@ evidence.
 
 ## Provider claims
 
-- `microsoft-owa`: mail and calendar are live-observed; some advanced fields
-  remain deterministic-only as listed below.
+- `microsoft-owa`: mail and calendar are implemented; historical live notes
+  exist, but the current branch remains live-unobserved because those notes are
+  not tied to an exact commit.
 - `google-web`: bounded read-only Gmail and Calendar snapshots are implemented
   through an isolated visible browser session, but have no recorded live
   observation.
@@ -56,9 +58,9 @@ evidence.
 `pop3` is a reserved unavailable identifier. Its presence in discovery and
 config validation does not constitute an adapter claim.
 
-## Outlook Web observation detail
+## Historical Outlook Web observation detail
 
-Observed:
+Historically noted, but not a current compatibility claim:
 
 - folder discovery, list/search/body, attachment metadata/content;
 - single-message move and read/unread restoration;

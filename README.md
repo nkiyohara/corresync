@@ -190,15 +190,18 @@ can advance only one boundary at a time:
 off → notify → queue → agent
 ```
 
-- `notify` shows selected metadata through a local Linux or macOS desktop
-  adapter;
-- `queue` also creates a bounded, durable account-local event queue;
+- `notify` stores selected metadata in a bounded account-local outbox and shows
+  it through a local Linux or macOS desktop adapter;
+- `queue` keeps selected metadata for manual inspection without a desktop
+  notification;
 - `agent` may invoke one absolute executable directly, without a shell, using
   bounded JSON on stdin.
 
 Remote runner egress requires a separate explicit approval. Polling starts only
 after interactive authentication; quiet hours, debounce, hourly rate limits,
 deduplication, retention, loop prevention, and a circuit breaker are enforced.
+Deferred notifications remain pending while the provider cursor advances
+monotonically, so a busy inbox cannot pin cursor recovery at an old message.
 Windows currently rejects `notify` setup because Corresync does not install a
 registered AppUserModelID; `queue` and `agent` remain available.
 

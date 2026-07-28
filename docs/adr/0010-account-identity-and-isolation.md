@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-07-28
 
 ## Context
 
@@ -56,7 +57,11 @@ versioned contract change, not a compatible addition. This extends
 [ADR 0004](0004-preview-commit.md) rather than replacing it.
 
 Removing an account purges its session material, cursors, queued events, and
-cached data, and closes any browser that belongs to it.
+cached data, and closes any browser that belongs to it. When the removed
+account is the default, both the removal target and approved replacement remain
+opaque IDs through the repository boundary and are resolved together inside
+the latest atomic configuration transaction. Alias changes between preview,
+purge, and commit cannot redirect the replacement.
 
 ## Consequences
 

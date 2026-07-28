@@ -8,7 +8,7 @@ not available through a raw protocol escape hatch.
 <!-- markdownlint-disable MD013 -->
 | Provider ID | Mail | Calendar | Authentication | Evidence on `main` |
 | --- | --- | --- | --- | --- |
-| `microsoft-owa` | Live-observed | Live-observed | Visible browser-owned Outlook Web session | Synthetic contracts plus bounded live observations |
+| `microsoft-owa` | Mail | Calendar | Visible browser-owned Outlook Web session | Implemented; synthetic contracts on current branch, historical live notes are not commit-bound |
 | `google-web` | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Visible browser-owned Google session | Implemented; synthetic DOM and integration contracts only |
 | `google-api` | Gmail | Selectable Google calendars | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
 | `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
@@ -127,10 +127,11 @@ outside scope.
 
 `corr import scan` accepts one explicit local source path and supports bounded
 inspection of recognized archives/exports, Maildir, and Thunderbird profiles.
-The first call returns a plan; `--approve-read` grants read-only access to that
-exact source. Import state is private and account-local. It never authenticates,
-uploads, sends, or mutates the source. `corr import purge` removes only
-Corresync-owned staging.
+Without `--approve-read`, it performs no filesystem scan and asks the operator
+to review the privacy boundary. Rerunning with `--approve-read` grants read-only
+access to that exact resolved source and creates the bounded account-local
+staging plan in one operation. It never authenticates, uploads, sends, or
+mutates the source. `corr import purge` removes only Corresync-owned staging.
 
 ## Monitoring and event dispatch
 
@@ -147,14 +148,17 @@ its cursor. It ignores Sent and Drafts and suppresses self-message loops.
 
 Account-local state provides deterministic event IDs, deduplication, atomic
 cursor/event updates, acknowledgement, retention, quiet hours, debounce,
-hourly limits, batching, and a circuit breaker. Notify mode rolls back the
-cursor and first-seen markers for every unreleased event, so quiet hours,
-debounce, rate limiting, or adapter failure retries rather than silently losing
-mail. Runner completion preserves an acknowledgement that races with dispatch
-without redelivering the event. Desktop notification adapters are local and
-time-bound: Linux uses `notify-send`, macOS uses `osascript`, and Windows
-rejects `notify` until Corresync has a registered AppUserModelID. Agent mode
-invokes one absolute executable directly—never through a shell—and sends
+hourly limits, batching, and a circuit breaker. The provider cursor advances
+monotonically with an atomic outbox commit. Notify-mode events remain pending
+in that outbox through quiet hours, debounce, rate limiting, cancellation, or
+adapter failure and are drained on later polls; the cursor is never rewound.
+Each event records whether it belongs to manual queueing, desktop notification,
+or runner delivery so a later policy change cannot redirect old pending data.
+Runner and notification completion preserve an acknowledgement that races with
+delivery without redelivering the event. Desktop notification adapters are
+local and time-bound: Linux uses `notify-send`, macOS uses `osascript`, and
+Windows rejects `notify` until Corresync has a registered AppUserModelID. Agent
+mode invokes one absolute executable directly—never through a shell—and sends
 bounded JSON on stdin. A runner claiming remote egress requires a separate
 explicit approval.
 

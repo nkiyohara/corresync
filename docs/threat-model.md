@@ -98,8 +98,10 @@ gateway or tenant administration service.
 
 ## Import controls
 
-- The first scan returns a bounded plan without reading private content.
-- Content access requires approval bound to one resolved source identity.
+- Without `--approve-read`, import scan performs no filesystem scan and exits
+  after displaying the privacy boundary.
+- `--approve-read` authorizes reading the one resolved source and creating its
+  bounded account-local staging plan in the same operation.
 - Reject traversal, symlink escape, special files, replacement, and excessive
   nesting/count/size.
 - Never authenticate, upload, send, modify, or delete the source.

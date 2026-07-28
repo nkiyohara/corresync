@@ -182,11 +182,11 @@ preview/commit lifetime.
 
 ## Import staging
 
-Import is local read-only planning, not provider synchronization. A source
-scanner receives one explicit path, identifies a supported format, bounds
-entries/bytes, rejects unsafe archives/links, and returns a review. Approval is
-bound to that source identity. Accepted metadata enters private account-local
-staging; no upload or authentication occurs.
+Import is local read-only staging, not provider synchronization. Without
+`--approve-read`, no filesystem scan occurs. Once approved, a source scanner
+receives one exact resolved path, identifies a supported format, bounds
+entries/bytes, rejects unsafe archives/links, and creates its plan and private
+account-local staging in one operation. No upload or authentication occurs.
 
 ## Monitoring and dispatch
 
@@ -200,12 +200,16 @@ deduplication, quiet hours, debounce, rate limits, batching, retention, and a
 circuit breaker.
 
 Queue/cursor/event state is atomically persisted under the account ID with
-owner-only permissions and symlink rejection. Notification processes are
-time-bound and receive metadata through native argument boundaries. Linux and
-macOS have local adapters; Windows rejects `notify` until a registered
-Corresync AppUserModelID exists. Agent mode executes one absolute program
-directly without a shell, sends only approved bounded fields as JSON stdin, and
-revalidates the declared egress.
+owner-only permissions and symlink rejection. Cursors advance monotonically;
+notification deferrals and failures leave delivery-bound events pending in the
+outbox instead of rewinding first-seen state. A cursor older than the bounded
+1000-item recovery window is re-baselined at the newest inspected window while
+all inspected items still pass through deduplication and delivery. Notification
+processes are time-bound and receive metadata through native argument
+boundaries. Linux and macOS have local adapters; Windows rejects `notify` until
+a registered Corresync AppUserModelID exists. Agent mode executes one absolute
+program directly without a shell, sends only approved bounded fields as JSON
+stdin, and revalidates the declared egress.
 
 MCP cannot enable or reconfigure monitoring or purge events. Resource updates
 and queue values are untrusted data, never triggers or instructions.
