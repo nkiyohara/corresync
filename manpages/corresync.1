@@ -1,0 +1,152 @@
+.TH CORRESYNC 1 "July 2026" "Corresync" "User Commands"
+.SH NAME
+corresync \- local-first Outlook Web mail and calendar CLI and MCP server
+.SH SYNOPSIS
+.B corresync
+.RI [ --config " path" ]
+.RI [ --version ]
+.I command
+.RI [ options ]
+.SH DESCRIPTION
+.B corresync
+controls an explicitly authorized Outlook Web session through a dedicated,
+interactive browser profile. It does not require a Microsoft Graph application,
+accept a password, persist browser authorization material, or intercept TLS.
+.PP
+CLI and MCP calls use the same typed application operations, deterministic
+policy checks, content-free audit boundary, and authenticated local session
+owner. Consequential external writes require an exact preview followed by a
+separate commit.
+.SH COMMANDS
+.TP
+.B config
+Create, locate, show, read, update, edit, and strictly validate the secret-free
+configuration.
+.TP
+.B doctor
+Diagnose local prerequisites and optionally probe Outlook Web compatibility.
+.TP
+.B auth
+Open interactive Outlook Web sign-in, inspect content-free session state, or
+close browsers and clear every in-memory session.
+.TP
+.B mail
+Discover folders; list, search, and read messages; create drafts; send reviewed
+new messages, replies, and forwards; retrieve bounded attachments; move,
+hard-delete, and set read state.
+.TP
+.B calendar
+List calendar event metadata in a bounded time window, or review and create one
+typed event with optional all-day, reminder, recurrence, attendee, and Teams
+link settings. Versioned update and cancellation commands use exact previews
+and commits without enabling general Teams access.
+.TP
+.B daemon
+Start, inspect, or stop the authenticated local session owner.
+.TP
+.B mcp
+Run the local stdio MCP server, register it through supported client CLIs, or
+print native client configuration.
+.TP
+.B update
+Check the latest stable public release. Explicitly self-update a direct
+installation after signed provenance and platform verification, or print the
+owner-specific command for a package-managed installation.
+.TP
+.B completion
+Generate a Bash, Zsh, or Fish completion script, or detect and idempotently
+install completion for the current shell.
+.TP
+.B version
+Print build and version information.
+.SH EXAMPLES
+.PP
+.nf
+corresync --version
+corresync help auth
+corresync config init
+corresync config set accounts.work.origin https://outlook.cloud.microsoft
+corresync auth login
+corresync auth status
+corresync mail list --limit 25
+corresync calendar list --start 2026-07-17T00:00:00Z \
+  --end 2026-07-18T00:00:00Z
+corresync calendar create --subject "Design review" \
+  --start 2026-07-20T09:00:00Z --end 2026-07-20T10:00:00Z \
+  --teams-meeting
+# Review the output, then repeat with --approve.
+corresync calendar update --event-id EVENT --change-key KEY \
+  --subject "Updated design review"
+corresync calendar cancel --event-id EVENT --change-key KEY
+# Both commands preview only; repeat with --approve to commit.
+corresync mcp setup codex
+corresync mcp setup claude-code
+corresync mcp setup github-copilot
+corresync mcp setup gemini-cli
+corresync mcp setup qwen-code
+corresync mcp setup qoder
+corresync completion install
+corresync update
+corresync update check
+.fi
+.SH EXIT STATUS
+.TP
+.B 0
+The command completed successfully.
+.TP
+.B 1
+An operation or diagnostic failed.
+.TP
+.B 2
+The command line was invalid.
+.SH ENVIRONMENT
+.TP
+.B NO_COLOR
+Disable terminal color and styling when set to any value.
+.TP
+.B TERM=dumb
+Disable terminal color and styling.
+.TP
+.B VISUAL
+Editor command used by
+.BR "corresync config edit" .
+.TP
+.B EDITOR
+Fallback editor command used when
+.B VISUAL
+is unset.
+.SH SECURITY
+Mail and calendar content is untrusted private input. Review exact previews
+before committing a write. Approval tokens are short-lived secret capabilities
+and must not be logged or persisted. If a write reports an unknown outcome,
+inspect mailbox state before retrying.
+.PP
+Only use
+.B corresync
+with accounts and data you are authorized to access. Undocumented Outlook Web contracts
+can change without notice; run
+.B corresync doctor --online
+after an update or unexplained compatibility failure.
+.PP
+Automatic update checks read only public release metadata, cache results for
+24 hours, and never write notices to MCP, completion, daemon, piped, or JSON
+output. Only an explicit
+.B corresync update
+may replace a verified direct installation; package-manager files are never
+modified. Set CORRESYNC_NO_UPDATE_CHECK=1 or configure disable_automatic_checks to
+opt out of startup checks.
+.SH FILES
+.TP
+.I config.toml
+The effective path is printed by
+.BR "corresync config path" .
+It contains account aliases, Outlook Web origins, browser settings, and policy only; it
+must not contain passwords, cookies, bearer tokens, or canary values.
+.SH SEE ALSO
+.BR corresync (1)
+command-specific help is available from
+.BR "corresync command --help"
+or
+.BR "corresync help command" .
+Project documentation and the security policy are distributed with release
+archives and native packages.

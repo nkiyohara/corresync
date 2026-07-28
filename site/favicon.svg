@@ -1,6 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="16" fill="#07111f"/>
-  <path d="M14 20h36v25H14z" fill="#2563eb"/>
-  <path d="m16 22 16 13 16-13" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M22 45V31m20 14V31" fill="none" stroke="#93c5fd" stroke-width="2"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="csf-title csf-desc">
+  <title id="csf-title">Corresync</title>
+  <desc id="csf-desc">A cream envelope with a red unread dot, circled by two blue sync arrows, on a deep navy rounded square.</desc>
+  <!-- Compact Corresync favicon, tuned for 16-32 px: filled flap, no airmail
+       stripe, bolder orbit. Canonical form: site/corresync-mark.svg.
+       Geometry rules: site/icon-readme.md -->
+  <rect width="64" height="64" rx="14" fill="#0e1523"/>
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="#9db4ea" stroke-opacity="0.14" stroke-width="2"/>
+  <path d="M8.027 30.854A24 24 0 0 1 42.043 10.202" fill="none" stroke="#6b93ff" stroke-width="6" stroke-linecap="round"/>
+  <path d="M55.973 33.146A24 24 0 0 1 21.957 53.798" fill="none" stroke="#6b93ff" stroke-width="6" stroke-linecap="round"/>
+  <path d="M44.762 4.299L49.477 15.551L39.323 16.106Z" fill="#6b93ff"/>
+  <path d="M19.238 59.701L14.523 48.449L24.677 47.894Z" fill="#6b93ff"/>
+  <rect x="18" y="23.5" width="28" height="19" rx="3" fill="#f2ede2"/>
+  <path d="M20.6 26.1L43.4 26.1L32 35.28Z" fill="#0e1523"/>
+  <circle cx="46.641" cy="23.111" r="5.75" fill="#e0574a" stroke="#0e1523" stroke-width="2.5"/>
 </svg>

@@ -111,7 +111,7 @@ func canonicalize(path, format string, when time.Time) error {
 	}
 	digest := sha256.Sum256(canonical)
 	if format == "spdx-json" {
-		document["documentNamespace"] = "https://github.com/nkiyohara/owa-bridge/sbom/spdx/" + hex.EncodeToString(digest[:])
+		document["documentNamespace"] = "https://github.com/nkiyohara/corresync/sbom/spdx/" + hex.EncodeToString(digest[:])
 	} else {
 		document["serialNumber"] = deterministicUUID(digest)
 	}

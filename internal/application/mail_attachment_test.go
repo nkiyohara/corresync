@@ -3,7 +3,7 @@ package application
 import (
 	"testing"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 func TestMailAttachmentSensitiveReadUsesPolicyAndAudit(t *testing.T) {

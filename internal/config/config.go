@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 const CurrentVersion = 2
@@ -57,7 +57,7 @@ type Browser struct {
 }
 
 // Updates controls only opportunistic public release checks. Explicit
-// `owa update` and `owa update check` calls remain available when automatic
+// `corresync update` and `corresync update check` remain available when automatic
 // checks are disabled.
 type Updates struct {
 	DisableAutomaticChecks bool `json:"disableAutomaticChecks" toml:"disable_automatic_checks"`

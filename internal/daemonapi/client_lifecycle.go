@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/localipc"
 )
 
 // Status negotiates the protocol and exposes the daemon default account.

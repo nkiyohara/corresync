@@ -11,8 +11,8 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 func TestDefaultIsValidAndSecretFree(t *testing.T) {

@@ -9,11 +9,11 @@ separately in [compatibility evidence](compatibility.md).
 Create the strict, secret-free default configuration:
 
 ```console
-owa config init
-owa config validate
-owa config path
-owa config show
-owa config get policy.max_recipients
+corresync config init
+corresync config validate
+corresync config path
+corresync config show
+corresync config get policy.max_recipients
 ```
 
 Use `--config /absolute/path/config.toml` before the command, or set
@@ -21,9 +21,9 @@ Use `--config /absolute/path/config.toml` before the command, or set
 existing path unless `--force` is explicit. A symlink, directory, or other
 non-regular target is rejected even with `--force`.
 
-Use `owa config edit` to edit TOML through `VISUAL`, `EDITOR`, or the platform
+Use `corresync config edit` to edit TOML through `VISUAL`, `EDITOR`, or the platform
 default. The original file is left unchanged if the editor fails or the result
-does not pass strict validation. `owa config set <key> <value>` supports only
+does not pass strict validation. `corresync config set <key> <value>` supports only
 the typed keys documented in [configuration.md](configuration.md); it validates
 the complete configuration before atomically replacing the file. Stop a
 running session owner after a successful edit.
@@ -41,14 +41,14 @@ config-scoped local IPC, and any already-running session owner without opening
 a browser:
 
 ```console
-owa doctor
-owa doctor --json
+corresync doctor
+corresync doctor --json
 ```
 
 After local checks pass, explicitly opt into live compatibility testing:
 
 ```console
-owa doctor --online
+corresync doctor --online
 ```
 
 The online form opens the normal interactive browser when needed, captures the
@@ -73,19 +73,19 @@ never makes release-endpoint failure a doctor failure.
 ## Check for updates
 
 ```console
-owa update
-owa update check
-owa update check --json
+corresync update
+corresync update check
+corresync update check --json
 ```
 
-`owa update` performs a fresh comparison with the latest public stable GitHub
+`corresync update` performs a fresh comparison with the latest public stable GitHub
 release. A direct installation downloads the matching archive, validates its
 signed Sigstore provenance, SHA-256 checksum, version, OS, and architecture,
 and replaces the executable with a rollback copy. A package-managed
 installation is not modified; the command prints the exact Homebrew, WinGet,
 Scoop, or native-package action.
 
-`owa update check` is read-only and cache-aware. It never suggests a
+`corresync update check` is read-only and cache-aware. It never suggests a
 prerelease, downgrade, or unattended replacement. Results—including temporary
 network failure—are cached for 24 hours. Human TTY output uses concise status
 and progress styling; `--json`, pipes, MCP, daemon, and completion output are
@@ -95,11 +95,11 @@ rollback, opt-out, and package-manager details.
 ## Authenticate
 
 ```console
-owa auth login
-owa auth login --account work --json
-owa auth login --account work --terminal
-owa auth status
-owa auth logout
+corresync auth login
+corresync auth login --account work --json
+corresync auth login --account work --terminal
+corresync auth status
+corresync auth logout
 ```
 
 The command connects to the config-scoped session owner, starting it if needed.
@@ -120,14 +120,14 @@ authorization snapshot remains in the daemon.
 exists. `auth logout` closes every dedicated browser and clears all in-memory
 sessions and pending approvals owned by that config-scoped daemon. Protected
 browser profiles remain on the device for the next interactive sign-in. The
-former top-level `owa login` spelling remains a hidden compatibility alias.
+former top-level `corresync login` spelling remains a hidden compatibility alias.
 
 ## Discover mail folders
 
 ```console
-owa mail folders
-owa mail folders --traversal shallow --parent inbox
-owa mail folders --parent-id 'opaque-discovered-id' --json
+corresync mail folders
+corresync mail folders --traversal shallow --parent inbox
+corresync mail folders --parent-id 'opaque-discovered-id' --json
 ```
 
 Folder discovery is bounded to 100 entries per page and starts at the message
@@ -140,9 +140,9 @@ mutable display name.
 ## List mail metadata
 
 ```console
-owa mail list
-owa mail list --folder archive --limit 50
-owa mail list --folder-id 'opaque-discovered-id' --json
+corresync mail list
+corresync mail list --folder archive --limit 50
+corresync mail list --folder-id 'opaque-discovered-id' --json
 ```
 
 The human table sanitizes terminal control characters and includes the full,
@@ -152,9 +152,9 @@ still excludes message bodies and attachment content.
 ## Search mail metadata
 
 ```console
-owa mail search --query 'subject:"Quarterly plan" from:alice'
-owa mail search --query 'kind:email attachment:report' --limit 50
-owa mail search \
+corresync mail search --query 'subject:"Quarterly plan" from:alice'
+corresync mail search --query 'kind:email attachment:report' --limit 50
+corresync mail search \
   --folder-id 'opaque-discovered-id' \
   --query 'body:proposal NOT from:bot' \
   --json
@@ -171,8 +171,8 @@ defined by [Microsoft's QueryString reference](https://learn.microsoft.com/en-us
 Read plain text for one exact ID returned by the list command:
 
 ```console
-owa mail body --message-id 'opaque-message-id'
-owa mail body --message-id 'opaque-message-id' --json
+corresync mail body --message-id 'opaque-message-id'
+corresync mail body --message-id 'opaque-message-id' --json
 ```
 
 The body is bounded to 1 MiB and requested as plain text. Its result includes
@@ -180,7 +180,7 @@ bounded file-attachment metadata but not content. Retrieve one returned ID into
 a new owner-only file, without overwriting an existing path:
 
 ```console
-owa mail attachment \
+corresync mail attachment \
   --attachment-id 'opaque-attachment-id' \
   --output ./attachment.bin
 ```
@@ -199,12 +199,12 @@ calls instead.
 Use the exact message ID and change key returned by `mail list` or `mail search`:
 
 ```console
-owa mail move \
+corresync mail move \
   --message-id 'opaque-message-id' \
   --change-key 'opaque-change-key' \
   --destination archive
 
-owa mail move \
+corresync mail move \
   --message-id 'opaque-message-id' \
   --change-key 'opaque-change-key' \
   --destination-id 'opaque-folder-id' \
@@ -226,12 +226,12 @@ new item ID, in which case list the destination to refresh it.
 ## Mark one message read or unread
 
 ```console
-owa mail mark \
+corresync mail mark \
   --message-id 'opaque-message-id' \
   --change-key 'opaque-change-key' \
   --state read
 
-owa mail mark \
+corresync mail mark \
   --message-id 'opaque-message-id' \
   --change-key 'opaque-change-key' \
   --state unread \
@@ -248,14 +248,14 @@ once and an ambiguous result is never retried automatically.
 ## Create a save-only draft
 
 ```console
-printf 'Hello from owa-bridge.\n' | \
-  owa mail draft \
+printf 'Hello from Corresync.\n' | \
+  corresync mail draft \
     --to alice@example.com \
     --cc bob@example.com \
     --subject 'Synthetic example' \
     --body-file -
 
-owa mail draft \
+corresync mail draft \
   --to alice@example.com \
   --subject 'From a file' \
   --body-file ./body.txt \
@@ -285,8 +285,8 @@ preview and commit as distinct tool calls.
 Preview only:
 
 ```console
-printf 'Hello from owa-bridge.\n' | \
-  owa mail send \
+printf 'Hello from Corresync.\n' | \
+  corresync mail send \
     --to alice@example.com \
     --subject 'Exact send preview' \
     --body-file -
@@ -314,7 +314,7 @@ attachments are not silently emulated.
 ## Permanently delete one message
 
 ```console
-owa mail delete \
+corresync mail delete \
   --message-id 'opaque-message-id' \
   --change-key 'opaque-change-key'
 ```
@@ -331,10 +331,10 @@ events. CLI processes never receive Outlook authorization material.
 ## Session owner
 
 ```console
-owa daemon start
-owa daemon status
-owa daemon status --json
-owa daemon stop
+corresync daemon start
+corresync daemon status
+corresync daemon status --json
+corresync daemon stop
 ```
 
 `start` launches one background process for the selected absolute config path
@@ -353,15 +353,15 @@ later commands start a fresh owner and reuse the protected browser profiles.
 After a binary update, the next command verifies the unchanged config digest,
 drains an older release through the same authenticated lifecycle controls, and
 starts the installed binary automatically. Config edits still require an
-explicit `owa daemon stop`.
+explicit `corresync daemon stop`.
 
 ## List calendar metadata
 
 ```console
-owa calendar list \
+corresync calendar list \
   --start 2026-07-17T00:00:00Z \
   --end 2026-07-18T00:00:00Z
-owa calendar list \
+corresync calendar list \
   --start 2026-07-17T00:00:00+01:00 \
   --end 2026-07-24T00:00:00+01:00 \
   --json
@@ -380,7 +380,7 @@ Preview an appointment without attendees:
 
 ```console
 printf 'Private planning notes.\n' | \
-  owa calendar create \
+  corresync calendar create \
     --subject 'Planning block' \
     --start 2026-07-20T09:00:00+01:00 \
     --end 2026-07-20T10:00:00+01:00 \
@@ -423,7 +423,7 @@ used by MCP.
 Use the exact ID and change key from `calendar list`:
 
 ```console
-owa calendar update \
+corresync calendar update \
   --event-id 'opaque-event-id' \
   --change-key 'opaque-change-key' \
   --subject 'Updated design review' \
@@ -453,7 +453,7 @@ Outlook omits a refreshed change key.
 ## Cancel one event version
 
 ```console
-owa calendar cancel \
+corresync calendar cancel \
   --event-id 'opaque-event-id' \
   --change-key 'opaque-change-key'
 ```
@@ -471,26 +471,26 @@ could duplicate notifications or target a newer version.
 ## MCP
 
 ```console
-owa mcp serve
-owa mcp setup codex
-owa mcp setup codex --dry-run
-owa mcp setup claude-code
-owa mcp setup claude-code --scope project
-owa mcp setup github-copilot
-owa mcp setup gemini-cli --scope user
-owa mcp setup qwen-code
-owa mcp setup qoder --scope user
-owa mcp config codex
-owa mcp config claude-code
-owa mcp config github-copilot
-owa mcp config gemini-cli
-owa mcp config qwen-code
-owa mcp config qoder
-owa mcp config kimi-code
+corresync mcp serve
+corresync mcp setup codex
+corresync mcp setup codex --dry-run
+corresync mcp setup claude-code
+corresync mcp setup claude-code --scope project
+corresync mcp setup github-copilot
+corresync mcp setup gemini-cli --scope user
+corresync mcp setup qwen-code
+corresync mcp setup qoder --scope user
+corresync mcp config codex
+corresync mcp config claude-code
+corresync mcp config github-copilot
+corresync mcp config gemini-cli
+corresync mcp config qwen-code
+corresync mcp config qoder
+corresync mcp config kimi-code
 ```
 
 `setup` invokes the supported client's official MCP command without rewriting
-unrelated configuration. New registrations default to `outlook-web` and the
+unrelated configuration. New registrations default to `corresync` and the
 success message reminds users to start a new agent session. `config` prints
 native TOML or JSON for review, Kimi Code CLI, project configuration, and
 advanced settings. The supported client set is Codex, Claude Code, GitHub
@@ -500,12 +500,18 @@ Copilot CLI, Gemini CLI, Qwen Code, Qoder, and Kimi Code CLI. See
 ## Generate shell completion
 
 ```console
-owa completion bash
-owa completion zsh
-owa completion fish
+corresync completion install
+corresync completion bash
+corresync completion zsh
+corresync completion fish
 ```
 
-The generated script invokes the installed `owa` from `PATH` only while the
+`completion install` detects Bash, Zsh, or Fish from `SHELL`; use `--shell` to
+override it. The install is idempotent, refuses to replace a different regular
+file without `--force`, and rejects symlink targets. It never appends to a shell
+startup file.
+
+The generated script invokes the installed `corresync` from `PATH` only while the
 shell requests candidates. Completion is derived from the live CLI command
 model and performs no Outlook operation.
 

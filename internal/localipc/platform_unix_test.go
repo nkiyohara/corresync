@@ -16,11 +16,12 @@ func TestPlatformEndpointFallsBackFromLongTemporaryDirectory(t *testing.T) {
 		filepath.Join("/private/var/folders", strings.Repeat("x", 64), "T"),
 		id,
 		501,
+		"corresync",
 	)
 	if err != nil {
 		t.Fatalf("platformEndpointInTemp() error = %v", err)
 	}
-	wantRuntimeDirectory := "/tmp/owa-bridge-501"
+	wantRuntimeDirectory := "/tmp/corresync-501"
 	if runtimeDirectory != wantRuntimeDirectory {
 		t.Fatalf("runtime directory = %q, want %q", runtimeDirectory, wantRuntimeDirectory)
 	}
@@ -37,11 +38,11 @@ func TestPlatformEndpointKeepsShortTemporaryDirectory(t *testing.T) {
 	t.Parallel()
 
 	id := strings.Repeat("b", 32)
-	address, runtimeDirectory, _, err := platformEndpointInTemp("/short", id, 42)
+	address, runtimeDirectory, _, err := platformEndpointInTemp("/short", id, 42, "corresync")
 	if err != nil {
 		t.Fatalf("platformEndpointInTemp() error = %v", err)
 	}
-	if runtimeDirectory != "/short/owa-bridge-42" ||
+	if runtimeDirectory != "/short/corresync-42" ||
 		address != filepath.Join(runtimeDirectory, id+".sock") {
 		t.Fatalf("short endpoint unexpectedly changed: address=%q runtime=%q", address, runtimeDirectory)
 	}

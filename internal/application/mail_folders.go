@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 // MailFolderTraversal controls whether FindFolder returns direct children or

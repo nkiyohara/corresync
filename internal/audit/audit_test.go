@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 type fixedClock struct{ now time.Time }

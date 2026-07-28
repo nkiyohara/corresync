@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 const MaxCalendarWindow = 31 * 24 * time.Hour

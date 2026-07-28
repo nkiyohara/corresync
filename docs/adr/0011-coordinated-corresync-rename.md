@@ -69,32 +69,38 @@ session, so the next command can often re-establish authorization without a full
 interactive sign-in. That is an expected outcome, not a guarantee, and a
 re-authentication prompt is a normal result of the migration.
 
-Documented aliases remain for a defined window: the `owa` command name; the
-`owa`, `owa-bridge`, and `outlook-web` MCP connection names; the legacy
-configuration, state, and cache locations; and the legacy release-workflow
+The canonical release does not publish legacy command, directory, plugin,
+Skill, completion, manpage, package, or MCP connection aliases. Compatibility
+is instead a finite set of migration-only inputs: the old default config and
+state locations, environment overrides, daemon namespace and request host,
+package-install detection, release artifact fallback, and release-workflow
 identity in ADR 0007. A legacy location is read only when its Corresync
-counterpart is absent. The window ends no earlier than 2027-07-28, requires at
-least one release that documents the deprecation before removal, and closes only
-at a major version boundary. It is a finite enumeration of known names and never
-a pattern match on `owa*`.
+counterpart is absent. These inputs are exact constants rather than a pattern
+match, and they are not shown in ordinary help or generated configuration.
+
+The v0.6.2 bridge release precedes the rename. It can verify both release
+workflow identities and extract the canonical artifact, preventing a direct
+v0.6 installation from becoming stranded when the repository and assets move.
+The v0.7 migration guide is the only user-facing document that names the old
+commands and paths.
 
 The release must include an end-to-end upgrade test from the last `owa-bridge`
 release to the first Corresync release, and one migration guide covering
 repository redirects, Pages URLs, package-manager changes, configuration
-migration, alias lifetime, and rollback.
+migration, compatibility inputs, and rollback.
 
 ## Consequences
 
 A single large release is harder to review and to revert than a sequence of
-small ones, and it temporarily doubles the accepted provenance identities,
-package identifiers, and documented command names. That is still better than a
+small ones, and it temporarily doubles the accepted provenance identities and
+migration inputs. That is still better than a
 multi-release window in which published artifacts, documentation, and the
 installed binary disagree about the product's name.
 
-Users who follow the migration guide keep their configuration and their
-authenticated browser profile. Users who ignore it keep working through the
-aliases until the window closes. Removing the aliases afterwards is a breaking
-change and requires a major release.
+Users who follow the migration guide keep their configuration and normally
+keep their authenticated browser profile. Existing client registrations and
+package identifiers must be replaced because no permanent public alias surface
+is created.
 
 The provider-neutral name does not by itself add a provider. What ships on the
 day of the rename is the same Outlook Web capability under a new name, and

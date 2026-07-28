@@ -12,20 +12,31 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/nkiyohara/owa-bridge/internal/application"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/localipc"
 )
 
 // Client calls one daemon namespace and reloads its rotating credential for
 // every operation. It never retries an ambiguous application call.
 type Client struct {
 	endpoint localipc.Endpoint
+	host     string
 	http     *http.Client
 }
 
 // NewClient creates a no-TCP HTTP transport over Unix socket or named pipe.
 func NewClient(endpoint localipc.Endpoint) (*Client, error) {
+	return newClient(endpoint, requestHost)
+}
+
+// NewLegacyClient creates the narrowly scoped v0.6 client used only to stop an
+// old session owner before migrating browser profiles.
+func NewLegacyClient(endpoint localipc.Endpoint) (*Client, error) {
+	return newClient(endpoint, "owa.local")
+}
+
+func newClient(endpoint localipc.Endpoint, host string) (*Client, error) {
 	if endpoint.Address == "" || endpoint.CredentialPath == "" {
 		return nil, errors.New("complete daemon endpoint is required")
 	}
@@ -36,7 +47,7 @@ func NewClient(endpoint localipc.Endpoint) (*Client, error) {
 		DisableKeepAlives:  true,
 		MaxConnsPerHost:    maxConcurrentCalls,
 	}
-	return &Client{endpoint: endpoint, http: &http.Client{
+	return &Client{endpoint: endpoint, host: host, http: &http.Client{
 		Transport: transport,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
@@ -360,7 +371,7 @@ func (client *Client) callWithCredential(
 	if len(payload) > maxRequestBytes {
 		return errors.New("daemon request exceeds maximum size")
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+requestHost+requestPath, bytes.NewReader(payload))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+client.host+requestPath, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("build daemon request: %w", err)
 	}

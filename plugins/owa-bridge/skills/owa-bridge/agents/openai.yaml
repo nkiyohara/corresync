@@ -1,4 +1,0 @@
-interface:
-  display_name: "OWA Bridge"
-  short_description: "Use Outlook Web mail and calendar tools"
-  default_prompt: "Use $owa-bridge to check my Outlook inbox and summarize what needs attention."

@@ -1,4 +1,4 @@
-// Package daemonapi defines the private, versioned API between owa-bridge
+// Package daemonapi defines the private, versioned API between Corresync
 // adapters and the local session-owning daemon.
 package daemonapi
 
@@ -13,17 +13,17 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/nkiyohara/owa-bridge/internal/application"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 const (
-	ProtocolVersion   = 11
+	ProtocolVersion   = 12
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
 	requestPath       = "/v1/call"
-	requestHost       = "owa.local"
+	requestHost       = "corresync.local"
 	authorizationType = "Bearer "
 )
 

@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const repositoryURL = "https://github.com/nkiyohara/owa-bridge"
+const repositoryURL = "https://github.com/nkiyohara/corresync"
 
 var (
 	versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`)
@@ -85,7 +85,7 @@ func render(dist string) error {
 		return err
 	}
 	if err := writeCatalog(
-		filepath.Join(dist, "homebrew", "Formula", "owa-bridge.rb"),
+		filepath.Join(dist, "homebrew", "Formula", "corresync.rb"),
 		[]byte(formula),
 	); err != nil {
 		return err
@@ -95,7 +95,7 @@ func render(dist string) error {
 	if err != nil {
 		return err
 	}
-	if err := writeCatalog(filepath.Join(dist, "scoop", "owa-bridge.json"), scoop); err != nil {
+	if err := writeCatalog(filepath.Join(dist, "scoop", "corresync.json"), scoop); err != nil {
 		return err
 	}
 
@@ -109,7 +109,7 @@ func render(dist string) error {
 		"manifests",
 		"n",
 		"nkiyohara",
-		"OWABridge",
+		"Corresync",
 		release.Version,
 	)
 	for name, contents := range winget {
@@ -189,13 +189,13 @@ func requireHash(hashes map[string]string, name string) (string, error) {
 }
 
 func renderFormula(release metadata, hashes map[string]string) (string, error) {
-	name := fmt.Sprintf("owa-bridge_%s_source.tar.gz", release.Version)
+	name := fmt.Sprintf("corresync_%s_source.tar.gz", release.Version)
 	hash, err := requireHash(hashes, name)
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(`class OwaBridge < Formula
-  desc "Local-first Outlook Web CLI and MCP server"
+	return fmt.Sprintf(`class Corresync < Formula
+  desc "Local-first guarded mail and calendar CLI and MCP server"
   homepage "%s"
   url "%s/releases/download/%s/%s"
   sha256 "%s"
@@ -206,25 +206,25 @@ func renderFormula(release metadata, hashes map[string]string) (string, error) {
   def install
     ldflags = %%W[
       -s -w -buildid=
-      -X github.com/nkiyohara/owa-bridge/internal/buildinfo.version=#{version}
-      -X github.com/nkiyohara/owa-bridge/internal/buildinfo.commit=%s
-      -X github.com/nkiyohara/owa-bridge/internal/buildinfo.buildDate=%s
+      -X github.com/nkiyohara/corresync/internal/buildinfo.version=#{version}
+      -X github.com/nkiyohara/corresync/internal/buildinfo.commit=%s
+      -X github.com/nkiyohara/corresync/internal/buildinfo.buildDate=%s
     ]
     system "go", "build", "-mod=vendor",
-           *std_go_args(output: bin/"owa", ldflags: ldflags.join(" ")),
-           "./cmd/owa"
+           *std_go_args(output: bin/"corresync", ldflags: ldflags.join(" ")),
+           "./cmd/corresync"
 
-    man1.install "manpages/owa.1"
-    bash_completion.install "completions/owa.bash" => "owa"
-    zsh_completion.install "completions/_owa"
-    fish_completion.install "completions/owa.fish"
+    man1.install "manpages/corresync.1"
+    bash_completion.install "completions/corresync.bash" => "corresync"
+    zsh_completion.install "completions/_corresync"
+    fish_completion.install "completions/corresync.fish"
     pkgshare.install "plugins"
     (pkgshare/".agents").install ".agents/plugins"
     (pkgshare/".claude-plugin").install ".claude-plugin/marketplace.json"
   end
 
   test do
-    assert_match version.to_s, shell_output("#{bin}/owa version --json")
+    assert_match version.to_s, shell_output("#{bin}/corresync version --json")
   end
 end
 `, repositoryURL, repositoryURL, release.Tag, name, hash, release.Commit, release.Date), nil
@@ -240,26 +240,26 @@ func renderScoop(release metadata, hashes map[string]string) ([]byte, error) {
 		Architecture: make(map[string]scoopArchitecture, len(architectures)),
 		Homepage:     repositoryURL,
 		License:      "Apache-2.0",
-		Description:  "Local-first Outlook Web CLI and MCP server",
+		Description:  "Local-first guarded mail and calendar CLI and MCP server",
 		Checkver:     scoopCheckver{GitHub: repositoryURL},
 		Autoupdate: scoopAutoupdate{
 			Architecture: make(map[string]scoopAutoupdateArchitecture, len(architectures)),
 		},
 	}
 	for scoopArch, goArch := range architectures {
-		name := fmt.Sprintf("owa-bridge_%s_windows_%s.zip", release.Version, goArch)
+		name := fmt.Sprintf("corresync_%s_windows_%s.zip", release.Version, goArch)
 		hash, err := requireHash(hashes, name)
 		if err != nil {
 			return nil, err
 		}
 		manifest.Architecture[scoopArch] = scoopArchitecture{
 			URL:  fmt.Sprintf("%s/releases/download/%s/%s", repositoryURL, release.Tag, name),
-			Bin:  []string{"owa.exe"},
+			Bin:  []string{"corresync.exe"},
 			Hash: hash,
 		}
 		manifest.Autoupdate.Architecture[scoopArch] = scoopAutoupdateArchitecture{
 			URL: fmt.Sprintf(
-				"%s/releases/download/v$version/owa-bridge_$version_windows_%s.zip",
+				"%s/releases/download/v$version/corresync_$version_windows_%s.zip",
 				repositoryURL,
 				goArch,
 			),
@@ -284,7 +284,7 @@ func renderWinget(release metadata, hashes map[string]string) (map[string]string
 	installers := []installer{{wingetArch: "arm64", goArch: "arm64"}, {wingetArch: "x64", goArch: "amd64"}}
 	var installerEntries strings.Builder
 	for _, item := range installers {
-		name := fmt.Sprintf("owa-bridge_%s_windows_%s.zip", release.Version, item.goArch)
+		name := fmt.Sprintf("corresync_%s_windows_%s.zip", release.Version, item.goArch)
 		hash, err := requireHash(hashes, name)
 		if err != nil {
 			return nil, err
@@ -292,8 +292,8 @@ func renderWinget(release metadata, hashes map[string]string) (map[string]string
 		_, _ = fmt.Fprintf(&installerEntries, `  - Architecture: %s
     NestedInstallerType: portable
     NestedInstallerFiles:
-      - RelativeFilePath: owa.exe
-        PortableCommandAlias: owa
+      - RelativeFilePath: corresync.exe
+        PortableCommandAlias: corresync
     InstallerUrl: %s/releases/download/%s/%s
     InstallerSha256: %s
     UpgradeBehavior: uninstallPrevious
@@ -301,7 +301,7 @@ func renderWinget(release metadata, hashes map[string]string) (map[string]string
 	}
 
 	installerYAML := fmt.Sprintf(`# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
-PackageIdentifier: nkiyohara.OWABridge
+PackageIdentifier: nkiyohara.Corresync
 PackageVersion: %s
 InstallerLocale: en-US
 InstallerType: zip
@@ -312,19 +312,19 @@ ManifestVersion: 1.12.0
 `, release.Version, date.Format(time.DateOnly), installerEntries.String())
 
 	localeYAML := fmt.Sprintf(`# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
-PackageIdentifier: nkiyohara.OWABridge
+PackageIdentifier: nkiyohara.Corresync
 PackageVersion: %s
 PackageLocale: en-US
 Publisher: nkiyohara
 PublisherUrl: https://github.com/nkiyohara
 PublisherSupportUrl: %s/issues
-PackageName: owa-bridge
+PackageName: Corresync
 PackageUrl: %s
 License: Apache-2.0
 LicenseUrl: %s/blob/main/LICENSE
 ShortDescription: Local-first Outlook Web CLI and MCP server
 Description: Manage an authorized Outlook Web mail and calendar session through a guarded CLI or local MCP server without a Microsoft Graph application.
-Moniker: owa-bridge
+Moniker: corresync
 Tags:
   - outlook
   - email
@@ -332,20 +332,20 @@ Tags:
   - cli
   - mcp
 ReleaseNotesUrl: %s/releases/tag/%s
-InstallationNotes: Run `+"`owa login`"+` interactively, then register your agent with `+"`owa mcp setup <client>`"+`. See the MCP guide for all seven clients and Kimi Code CLI configuration.
+InstallationNotes: Run `+"`corresync auth login`"+` interactively, then register your agent with `+"`corresync mcp setup <client>`"+`. See the MCP guide for all supported clients.
 ManifestType: defaultLocale
 ManifestVersion: 1.12.0
 `, release.Version, repositoryURL, repositoryURL, repositoryURL, repositoryURL, release.Tag)
 
 	versionYAML := fmt.Sprintf(`# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.12.0.schema.json
-PackageIdentifier: nkiyohara.OWABridge
+PackageIdentifier: nkiyohara.Corresync
 PackageVersion: %s
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.12.0
 `, release.Version)
 
-	prefix := "nkiyohara.OWABridge"
+	prefix := "nkiyohara.Corresync"
 	return map[string]string{
 		prefix + ".installer.yaml":    installerYAML,
 		prefix + ".locale.en-US.yaml": localeYAML,

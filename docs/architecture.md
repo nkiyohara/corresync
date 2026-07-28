@@ -18,10 +18,10 @@ direction is available in a release. A capability reaches
 synthetic fixture contract tests and a documented opt-in live observation, so
 those two pages remain the authority on what works.
 
-Command examples below use the `owa` name the current release installs.
+Command examples below use the `corresync` name the current release installs.
 [ADR 0011](adr/0011-coordinated-corresync-rename.md) defines the rename and the
-compatibility aliases that keep those commands working through the migration
-window.
+finite compatibility inputs used only while migrating local state and direct
+installations.
 
 ## Goals
 
@@ -130,7 +130,7 @@ added for advanced local deployments, but must bind to loopback, validate the
 
 Interactive CLI startup may read cached public stable-release metadata and
 display a TTY-only notice. It never updates in the background. The explicit
-`owa update` command follows the detected installation owner: package-managed
+`corresync update` command follows the detected installation owner: package-managed
 installs receive their exact external upgrade command, while a direct install
 uses the signed, rollback-capable flow in
 [ADR 0007](adr/0007-explicit-verified-self-update.md). MCP, daemon, completion,
@@ -146,7 +146,7 @@ is removed when the compatibility window in
 
 ## Session lifecycle (shipped)
 
-1. `owa auth login` launches a dedicated browser profile visibly by default;
+1. `corresync auth login` launches a dedicated browser profile visibly by default;
    `--terminal` explicitly selects a bounded text relay for an SSH TTY.
 2. The user completes the normal interactive sign-in flow in the browser or by
    relaying controls and individual keys to its headless page.
@@ -158,8 +158,8 @@ is removed when the compatibility window in
    The terminal relay never receives a complete form value.
 6. Expiry causes an explicit transition back to `needs_login`; it never falls
    back to credential automation.
-7. `owa auth status` exposes only account aliases and content-free lifecycle
-   state. `owa auth logout` shuts down the config-scoped owner, closes all
+7. `corresync auth status` exposes only account aliases and content-free lifecycle
+   state. `corresync auth logout` shuts down the config-scoped owner, closes all
    browsers, and discards in-memory sessions and approvals.
 
 This is the browser-owned form of authentication required wherever a web adapter

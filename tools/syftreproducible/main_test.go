@@ -12,19 +12,19 @@ func TestOutputDocument(t *testing.T) {
 	t.Parallel()
 
 	format, document, err := outputDocument([]string{
-		"owa.tar.gz", "--output", "spdx-json=owa.tar.gz.spdx.json", "--enrich", "all",
+		"corresync.tar.gz", "--output", "spdx-json=corresync.tar.gz.spdx.json", "--enrich", "all",
 	})
 	if err != nil {
 		t.Fatalf("outputDocument() error = %v", err)
 	}
-	if format != "spdx-json" || document != "owa.tar.gz.spdx.json" {
+	if format != "spdx-json" || document != "corresync.tar.gz.spdx.json" {
 		t.Fatalf("outputDocument() = %q, %q", format, document)
 	}
 	for _, arguments := range [][]string{
-		{"../owa.tar.gz", "--output", "spdx-json=sbom.json"},
-		{"owa.tar.gz", "--output", "xml=sbom.xml"},
-		{"owa.tar.gz", "--output", "spdx-json=../sbom.json"},
-		{"owa.tar.gz"},
+		{"../corresync.tar.gz", "--output", "spdx-json=sbom.json"},
+		{"corresync.tar.gz", "--output", "xml=sbom.xml"},
+		{"corresync.tar.gz", "--output", "spdx-json=../sbom.json"},
+		{"corresync.tar.gz"},
 	} {
 		if _, _, err := outputDocument(arguments); err == nil {
 			t.Errorf("outputDocument(%q) unexpectedly succeeded", arguments)
@@ -36,16 +36,16 @@ func TestCanonicalizeSPDXIsStable(t *testing.T) {
 	t.Parallel()
 
 	first := canonicalizeFixture(t, "spdx-json", `{
-		"name":"owa","documentNamespace":"https://random/one",
+		"name":"corresync","documentNamespace":"https://random/one",
 		"creationInfo":{"created":"2026-01-01T00:00:00Z"},"packages":[]}`)
 	second := canonicalizeFixture(t, "spdx-json", `{
 		"packages":[],"creationInfo":{"created":"2027-01-01T00:00:00Z"},
-		"documentNamespace":"https://random/two","name":"owa"}`)
+		"documentNamespace":"https://random/two","name":"corresync"}`)
 	if first != second {
 		t.Fatalf("canonical SPDX differs:\n%s\n%s", first, second)
 	}
 	if !strings.Contains(first, `"created":"2026-07-17T20:37:49Z"`) ||
-		!strings.Contains(first, `"documentNamespace":"https://github.com/nkiyohara/owa-bridge/sbom/spdx/`) {
+		!strings.Contains(first, `"documentNamespace":"https://github.com/nkiyohara/corresync/sbom/spdx/`) {
 		t.Fatalf("canonical SPDX metadata is invalid: %s", first)
 	}
 }
@@ -56,9 +56,9 @@ func TestCanonicalizeCycloneDXIsStable(t *testing.T) {
 	first := canonicalizeFixture(t, "cyclonedx-json", `{
 		"bomFormat":"CycloneDX","serialNumber":"urn:uuid:random-one",
 		"metadata":{"timestamp":"2026-01-01T00:00:00Z"},
-		"components":[{"name":"/tmp/syft-archive-contents-1234/owa"}]}`)
+		"components":[{"name":"/tmp/syft-archive-contents-1234/corresync"}]}`)
 	second := canonicalizeFixture(t, "cyclonedx-json", `{
-		"components":[{"name":"/tmp/syft-archive-contents-9876/owa"}],
+		"components":[{"name":"/tmp/syft-archive-contents-9876/corresync"}],
 		"metadata":{"timestamp":"2027-01-01T00:00:00Z"},
 		"serialNumber":"urn:uuid:random-two","bomFormat":"CycloneDX"}`)
 	if first != second {
@@ -66,7 +66,7 @@ func TestCanonicalizeCycloneDXIsStable(t *testing.T) {
 	}
 	if !strings.Contains(first, `"timestamp":"2026-07-17T20:37:49Z"`) ||
 		!strings.Contains(first, `"serialNumber":"urn:uuid:`) ||
-		!strings.Contains(first, `"name":"owa"`) {
+		!strings.Contains(first, `"name":"corresync"`) {
 		t.Fatalf("canonical CycloneDX metadata is invalid: %s", first)
 	}
 }

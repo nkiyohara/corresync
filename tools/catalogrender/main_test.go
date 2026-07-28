@@ -18,9 +18,9 @@ func TestRenderBindsCatalogsToChecksums(t *testing.T) {
   "date": "2026-07-20T10:30:00Z"
 }`
 	checksums := strings.Join([]string{
-		strings.Repeat("a", 64) + "  owa-bridge_1.2.3_source.tar.gz",
-		strings.Repeat("b", 64) + "  owa-bridge_1.2.3_windows_amd64.zip",
-		strings.Repeat("c", 64) + "  owa-bridge_1.2.3_windows_arm64.zip",
+		strings.Repeat("a", 64) + "  corresync_1.2.3_source.tar.gz",
+		strings.Repeat("b", 64) + "  corresync_1.2.3_windows_amd64.zip",
+		strings.Repeat("c", 64) + "  corresync_1.2.3_windows_arm64.zip",
 	}, "\n") + "\n"
 	writeTestFile(t, filepath.Join(dist, "metadata.json"), metadataJSON)
 	writeTestFile(t, filepath.Join(dist, "checksums.txt"), checksums)
@@ -29,13 +29,13 @@ func TestRenderBindsCatalogsToChecksums(t *testing.T) {
 		t.Fatalf("render() error = %v", err)
 	}
 
-	formula := readTestFile(t, filepath.Join(dist, "homebrew", "Formula", "owa-bridge.rb"))
+	formula := readTestFile(t, filepath.Join(dist, "homebrew", "Formula", "corresync.rb"))
 	for _, want := range []string{
-		"owa-bridge_1.2.3_source.tar.gz",
+		"corresync_1.2.3_source.tar.gz",
 		strings.Repeat("a", 64),
 		`depends_on "go" => :build`,
-		`std_go_args(output: bin/"owa"`,
-		`man1.install "manpages/owa.1"`,
+		`std_go_args(output: bin/"corresync"`,
+		`man1.install "manpages/corresync.1"`,
 		`pkgshare.install "plugins"`,
 		`(pkgshare/".agents").install ".agents/plugins"`,
 		`(pkgshare/".claude-plugin").install ".claude-plugin/marketplace.json"`,
@@ -45,16 +45,16 @@ func TestRenderBindsCatalogsToChecksums(t *testing.T) {
 		}
 	}
 
-	scoop := readTestFile(t, filepath.Join(dist, "scoop", "owa-bridge.json"))
+	scoop := readTestFile(t, filepath.Join(dist, "scoop", "corresync.json"))
 	for _, want := range []string{"windows_amd64.zip", strings.Repeat("b", 64), "windows_arm64.zip", strings.Repeat("c", 64)} {
 		if !strings.Contains(scoop, want) {
 			t.Errorf("Scoop manifest does not contain %q", want)
 		}
 	}
 
-	wingetRoot := filepath.Join(dist, "winget", "manifests", "n", "nkiyohara", "OWABridge", "1.2.3")
-	installer := readTestFile(t, filepath.Join(wingetRoot, "nkiyohara.OWABridge.installer.yaml"))
-	for _, want := range []string{"PortableCommandAlias: owa", strings.Repeat("b", 64), strings.Repeat("c", 64)} {
+	wingetRoot := filepath.Join(dist, "winget", "manifests", "n", "nkiyohara", "Corresync", "1.2.3")
+	installer := readTestFile(t, filepath.Join(wingetRoot, "nkiyohara.Corresync.installer.yaml"))
+	for _, want := range []string{"PortableCommandAlias: corresync", strings.Repeat("b", 64), strings.Repeat("c", 64)} {
 		if !strings.Contains(installer, want) {
 			t.Errorf("WinGet installer manifest does not contain %q", want)
 		}
@@ -71,7 +71,7 @@ func TestRenderRejectsMissingArtifact(t *testing.T) {
   "commit": "0123456789abcdef0123456789abcdef01234567",
   "date": "2026-07-20T10:30:00Z"
 }`)
-	writeTestFile(t, filepath.Join(dist, "checksums.txt"), strings.Repeat("a", 64)+"  owa-bridge_1.2.3_source.tar.gz\n")
+	writeTestFile(t, filepath.Join(dist, "checksums.txt"), strings.Repeat("a", 64)+"  corresync_1.2.3_source.tar.gz\n")
 
 	err := render(dist)
 	if err == nil || !strings.Contains(err.Error(), "windows_") {

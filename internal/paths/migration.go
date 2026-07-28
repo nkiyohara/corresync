@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 const legacyMigrationMarker = ".migrated-from-owa-bridge-v1"

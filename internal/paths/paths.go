@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 // StateDir returns the private application state directory for this platform.

@@ -60,8 +60,8 @@ jobs:
         with:
           name: package-catalogs-${{ github.ref_name }}
           path: |
-            dist/homebrew/Formula/owa-bridge.rb
-            dist/scoop/owa-bridge.json
+            dist/homebrew/Formula/corresync.rb
+            dist/scoop/corresync.json
             dist/winget/manifests
           if-no-files-found: error
           retention-days: 30
@@ -110,7 +110,7 @@ jobs:
       - name: Check out Homebrew tap
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: nkiyohara/homebrew-owa-bridge
+          repository: nkiyohara/homebrew-corresync
           path: repositories/homebrew
           ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
           # The following push requires this repo-scoped deploy key; no later step uploads artifacts.
@@ -119,23 +119,23 @@ jobs:
       - name: Publish Homebrew Formula
         run: |
           install -m 0644 \
-            catalogs/homebrew/Formula/owa-bridge.rb \
-            repositories/homebrew/Formula/owa-bridge.rb
+            catalogs/homebrew/Formula/corresync.rb \
+            repositories/homebrew/Formula/corresync.rb
           git -C repositories/homebrew diff --check
-          if git -C repositories/homebrew diff --quiet -- Formula/owa-bridge.rb; then
+          if git -C repositories/homebrew diff --quiet -- Formula/corresync.rb; then
             echo "Homebrew Formula is already current."
             exit 0
           fi
           git -C repositories/homebrew config user.name "github-actions[bot]"
           git -C repositories/homebrew config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C repositories/homebrew add Formula/owa-bridge.rb
-          git -C repositories/homebrew commit -m "chore: update owa-bridge to ${GITHUB_REF_NAME#v}"
+          git -C repositories/homebrew add Formula/corresync.rb
+          git -C repositories/homebrew commit -m "chore: update corresync to ${GITHUB_REF_NAME#v}"
           git -C repositories/homebrew push origin HEAD:main
 
       - name: Check out Scoop bucket
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: nkiyohara/scoop-owa-bridge
+          repository: nkiyohara/scoop-corresync
           path: repositories/scoop
           ssh-key: ${{ secrets.SCOOP_BUCKET_DEPLOY_KEY }}
           # The following push requires this repo-scoped deploy key; no later step uploads artifacts.
@@ -144,17 +144,17 @@ jobs:
       - name: Publish Scoop manifest
         run: |
           install -m 0644 \
-            catalogs/scoop/owa-bridge.json \
-            repositories/scoop/owa-bridge.json
+            catalogs/scoop/corresync.json \
+            repositories/scoop/corresync.json
           git -C repositories/scoop diff --check
-          if git -C repositories/scoop diff --quiet -- owa-bridge.json; then
+          if git -C repositories/scoop diff --quiet -- corresync.json; then
             echo "Scoop manifest is already current."
             exit 0
           fi
           git -C repositories/scoop config user.name "github-actions[bot]"
           git -C repositories/scoop config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C repositories/scoop add owa-bridge.json
-          git -C repositories/scoop commit -m "chore: update owa-bridge to ${GITHUB_REF_NAME#v}"
+          git -C repositories/scoop add corresync.json
+          git -C repositories/scoop commit -m "chore: update corresync to ${GITHUB_REF_NAME#v}"
           git -C repositories/scoop push origin HEAD:main
 
   submit-winget:
@@ -189,7 +189,7 @@ jobs:
             "X-GitHub-Api-Version" = "2022-11-28"
           }
           $query = [uri]::EscapeDataString(
-            "repo:microsoft/winget-pkgs is:pr is:open author:nkiyohara in:title nkiyohara.OWABridge"
+            "repo:microsoft/winget-pkgs is:pr is:open author:nkiyohara in:title nkiyohara.Corresync"
           )
           $response = Invoke-RestMethod -Headers $headers -Uri "https://api.github.com/search/issues?q=$query&per_page=100"
           $open = @($response.items)
@@ -231,5 +231,5 @@ jobs:
           WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
         run: |
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
-          $manifest = Join-Path "catalogs/winget/manifests/n/nkiyohara/OWABridge" $version
-          ./wingetcreate.exe submit --prtitle "Update nkiyohara.OWABridge to $version" --no-open $manifest
+          $manifest = Join-Path "catalogs/winget/manifests/n/nkiyohara/Corresync" $version
+          ./wingetcreate.exe submit --prtitle "Update nkiyohara.Corresync to $version" --no-open $manifest

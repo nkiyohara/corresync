@@ -1,7 +1,7 @@
 # Outlook Web protocol boundary
 
 Outlook Web's internal service is undocumented and can change without notice.
-`owa-bridge` treats it as a replaceable transport adapter, not as part of the
+`Corresync` treats it as a replaceable transport adapter, not as part of the
 domain or public CLI/MCP contract.
 
 ## HTTP invariants

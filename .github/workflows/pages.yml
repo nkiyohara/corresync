@@ -36,13 +36,16 @@ jobs:
           test -s site/index.html
           test -s site/styles.css
           test -s site/favicon.svg
+          test -s site/corresync-mark.svg
           test -s site/robots.txt
+          test -s site/sitemap.xml
           grep -Fq '<html lang="en">' site/index.html
-          grep -Fq 'https://nkiyohara.github.io/owa-bridge/' site/index.html
-          grep -Fq 'outlook-web' site/index.html
-          grep -Fq 'owa mcp setup github-copilot' site/index.html
-          grep -Fq 'owa mcp setup gemini-cli' site/index.html
-          grep -Fq 'owa mcp setup qwen-code' site/index.html
+          grep -Fq 'https://nkiyohara.github.io/corresync/' site/index.html
+          grep -Fq 'corresync mcp setup codex' site/index.html
+          grep -Fq 'corresync mcp setup github-copilot' site/index.html
+          grep -Fq 'corresync mcp setup gemini-cli' site/index.html
+          grep -Fq 'corresync mcp setup qwen-code' site/index.html
+          grep -Fq 'docs/migration-v0.7.md' site/index.html
           test -z "$(find site -type l -print -quit)"
 
       - name: Configure GitHub Pages

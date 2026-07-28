@@ -11,7 +11,7 @@ import (
 
 	"github.com/pelletier/go-toml/v2"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 const legacyVersion = 1

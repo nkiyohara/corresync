@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nkiyohara/owa-bridge/internal/application"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/localipc"
 )
 
 const (

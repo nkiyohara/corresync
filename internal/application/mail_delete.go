@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
 // MailDeleteInput permanently deletes one exact message version. It is kept

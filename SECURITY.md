@@ -4,7 +4,9 @@
 
 | Version | Supported |
 | --- | --- |
-| 0.6.x | Yes |
+| 0.7.x | Yes |
+| 0.6.2 | Migration bridge only |
+| Earlier 0.6.x | No |
 | 0.5.x | No |
 | 0.4.x | No |
 | 0.3.x | No |
@@ -15,7 +17,7 @@
 ## Report a vulnerability
 
 Use GitHub's
-[private vulnerability reporting](https://github.com/nkiyohara/owa-bridge/security/advisories/new).
+[private vulnerability reporting](https://github.com/nkiyohara/corresync/security/advisories/new).
 Do not include vulnerability details in a public issue, discussion, pull
 request, or email thread.
 

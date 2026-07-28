@@ -8,12 +8,12 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/nkiyohara/owa-bridge/internal/approval"
-	"github.com/nkiyohara/owa-bridge/internal/domain"
-	"github.com/nkiyohara/owa-bridge/internal/policy"
+	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CalendarMeetingUpdateModeOWADefault = "owa_default"
+const CalendarMeetingUpdateModeProviderDefault = "provider_default"
 
 // CalendarUpdateInput applies a closed patch to one exact event version.
 // Nil fields remain unchanged; an empty pointed-to string clears that field.
@@ -282,7 +282,7 @@ func (input CalendarUpdateInput) Review() CalendarUpdateReview {
 		RequiredAttendees:      append([]string(nil), input.RequiredAttendees...),
 		OptionalAttendees:      append([]string(nil), input.OptionalAttendees...),
 		AttendeeUpdatesMaySend: input.ReplaceAttendees,
-		MeetingUpdateMode:      CalendarMeetingUpdateModeOWADefault,
+		MeetingUpdateMode:      CalendarMeetingUpdateModeProviderDefault,
 	}
 	if input.Body != nil {
 		body := reviewCalendarBody(*input.Body)

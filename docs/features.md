@@ -10,17 +10,17 @@ through an arbitrary protocol escape hatch.
 
 | Capability | CLI | MCP | Stable result | Live observation |
 | --- | --- | --- | --- | --- |
-| Discover folders | `owa mail folders` | `mail_list_folders` | `MailFolderPage` | Observed |
-| List metadata | `owa mail list` | `mail_list` | `MailPage` | Observed |
-| Search metadata with AQS | `owa mail search` | `mail_search` | `MailPage` | Observed |
-| Read one plain-text body and attachment metadata | `owa mail body` | `mail_get_body` + commit when required | `MailBodyAccess` | Body observed; metadata contract-tested |
-| Retrieve one bounded file attachment | `owa mail attachment` | `mail_get_attachment` + commit when required | `MailAttachmentAccess` | Observed |
-| Save a text/HTML new, reply, reply-all, or forward draft | `owa mail draft` | `mail_create_draft` + commit when required | `MailDraftAccess` | New text observed; extensions contract-tested |
-| Send a text/HTML new message, reply, reply-all, or forward | `owa mail send` + `--approve` | `mail_send` + `mail_send_commit` | `MailSendAccess` | New text self-send observed; extensions contract-tested |
+| Discover folders | `corresync mail folders` | `mail_list_folders` | `MailFolderPage` | Observed |
+| List metadata | `corresync mail list` | `mail_list` | `MailPage` | Observed |
+| Search metadata with AQS | `corresync mail search` | `mail_search` | `MailPage` | Observed |
+| Read one plain-text body and attachment metadata | `corresync mail body` | `mail_get_body` + commit when required | `MailBodyAccess` | Body observed; metadata contract-tested |
+| Retrieve one bounded file attachment | `corresync mail attachment` | `mail_get_attachment` + commit when required | `MailAttachmentAccess` | Observed |
+| Save a text/HTML new, reply, reply-all, or forward draft | `corresync mail draft` | `mail_create_draft` + commit when required | `MailDraftAccess` | New text observed; extensions contract-tested |
+| Send a text/HTML new message, reply, reply-all, or forward | `corresync mail send` + `--approve` | `mail_send` + `mail_send_commit` | `MailSendAccess` | New text self-send observed; extensions contract-tested |
 | Add bounded file attachments to a draft or send | `--attachment` | `attachments` | Attachment hashes in `MailReview` | Contract-tested; live unobserved |
-| Move one message version | `owa mail move` | `mail_move` + commit when required | `MailMoveAccess` | Observed, including restore |
-| Set read or unread | `owa mail mark` | `mail_set_read_state` + commit when required | `MailReadStateAccess` | Observed, including restore |
-| Permanently delete one exact message version | `owa mail delete` + `--approve` | `mail_delete` + `mail_delete_commit` | `MailDeleteAccess` | Contract-tested; live unobserved |
+| Move one message version | `corresync mail move` | `mail_move` + commit when required | `MailMoveAccess` | Observed, including restore |
+| Set read or unread | `corresync mail mark` | `mail_set_read_state` + commit when required | `MailReadStateAccess` | Observed, including restore |
+| Permanently delete one exact message version | `corresync mail delete` + `--approve` | `mail_delete` + `mail_delete_commit` | `MailDeleteAccess` | Contract-tested; live unobserved |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -37,13 +37,13 @@ successful Outlook response may omit a Sent Items identity, so `sent.id` and
 
 | Capability | CLI | MCP | Stable result | Live observation |
 | --- | --- | --- | --- | --- |
-| List bounded event metadata | `owa calendar list` | `calendar_list` | `CalendarPage` | Observed |
-| Create an appointment or meeting | `owa calendar create` + `--approve` | `calendar_create` + `calendar_create_commit` | `CalendarCreateAccess` | Observed |
+| List bounded event metadata | `corresync calendar list` | `calendar_list` | `CalendarPage` | Observed |
+| Create an appointment or meeting | `corresync calendar create` + `--approve` | `calendar_create` + `calendar_create_commit` | `CalendarCreateAccess` | Observed |
 | Add a Teams join link at creation | `--teams-meeting` | `teamsMeeting: true` | `created.onlineMeetingJoinUrl` | Observed, self-attendee only |
 | Create all-day events, reminders, and recurrence | create flags | `allDay`, `reminder`, `recurrence` | `CalendarCreateAccess` review | Contract-tested; live unobserved |
-| Update supported fields | `owa calendar update` + `--approve` | `calendar_update` + `calendar_update_commit` | `CalendarUpdateAccess` | Observed |
+| Update supported fields | `corresync calendar update` + `--approve` | `calendar_update` + `calendar_update_commit` | `CalendarUpdateAccess` | Observed |
 | Replace reminders, all-day status, or attendee lists | update flags | typed update fields | `CalendarUpdateAccess` review | Contract-tested; live unobserved |
-| Cancel one event version | `owa calendar cancel` + `--approve` | `calendar_cancel` + `calendar_cancel_commit` | `CalendarCancelAccess` | Observed |
+| Cancel one event version | `corresync calendar cancel` + `--approve` | `calendar_cancel` + `calendar_cancel_commit` | `CalendarCancelAccess` | Observed |
 
 <!-- markdownlint-enable MD013 -->
 

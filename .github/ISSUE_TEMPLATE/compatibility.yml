@@ -11,9 +11,9 @@ body:
   - type: input
     id: version
     attributes:
-      label: owa version
-      description: Paste the version and commit from `owa version --json`.
-      placeholder: v0.3.0 / 0123456789abcdef
+      label: Corresync version
+      description: Paste the version and commit from `corresync version --json`.
+      placeholder: v0.7.0 / 0123456789abcdef
     validations:
       required: true
 
@@ -65,7 +65,7 @@ body:
     id: doctor
     attributes:
       label: Content-free doctor result
-      description: Review local paths, then paste `owa doctor --online --json`.
+      description: Review local paths, then paste `corresync doctor --online --json`.
       render: json
     validations:
       required: true

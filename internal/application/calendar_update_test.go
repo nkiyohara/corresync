@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 func stringPointer(value string) *string { return &value }
@@ -35,7 +35,7 @@ func TestCalendarUpdateAlwaysPreviewsThenCommitsExactPatch(t *testing.T) {
 	if access.Status != "approval_required" || access.Preview == nil || port.updateCalls != 0 ||
 		access.Preview.Operation.Name != "calendar.update" ||
 		access.Preview.Operation.Effect != domain.EffectExternalWrite ||
-		access.Review.MeetingUpdateMode != CalendarMeetingUpdateModeOWADefault {
+		access.Review.MeetingUpdateMode != CalendarMeetingUpdateModeProviderDefault {
 		t.Fatalf("unsafe preview: %+v calls=%d", access, port.updateCalls)
 	}
 	committed, err := service.CommitUpdate(t.Context(), access.Preview.Token, caller)

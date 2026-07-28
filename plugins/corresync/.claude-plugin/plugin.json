@@ -1,0 +1,12 @@
+{
+  "name": "corresync",
+  "description": "Makes guarded local mail and calendar tools discoverable from natural-language requests.",
+  "version": "0.7.0",
+  "author": {
+    "name": "Corresync contributors"
+  },
+  "homepage": "https://nkiyohara.github.io/corresync/",
+  "repository": "https://github.com/nkiyohara/corresync",
+  "license": "Apache-2.0",
+  "keywords": ["outlook", "email", "calendar", "mcp", "local-first"]
+}

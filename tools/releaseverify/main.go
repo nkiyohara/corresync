@@ -235,16 +235,16 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 
 func packageMissingFiles(extra map[string]any) []string {
 	required := map[string]bool{
-		"/usr/bin/owa": false,
-		"/usr/share/bash-completion/completions/owa":             false,
-		"/usr/share/zsh/site-functions/_owa":                     false,
-		"/usr/share/fish/vendor_completions.d/owa.fish":          false,
-		"/usr/share/man/man1/owa.1":                              false,
-		"/usr/share/doc/owa-bridge/CHANGELOG.md":                 false,
-		"/usr/share/doc/owa-bridge/third_party_licenses":         false,
-		"/usr/share/owa-bridge/plugins/owa-bridge":               false,
-		"/usr/share/owa-bridge/.agents/plugins/marketplace.json": false,
-		"/usr/share/owa-bridge/.claude-plugin/marketplace.json":  false,
+		"/usr/bin/corresync": false,
+		"/usr/share/bash-completion/completions/corresync":      false,
+		"/usr/share/zsh/site-functions/_corresync":              false,
+		"/usr/share/fish/vendor_completions.d/corresync.fish":   false,
+		"/usr/share/man/man1/corresync.1":                       false,
+		"/usr/share/doc/corresync/CHANGELOG.md":                 false,
+		"/usr/share/doc/corresync/third_party_licenses":         false,
+		"/usr/share/corresync/plugins/corresync":                false,
+		"/usr/share/corresync/.agents/plugins/marketplace.json": false,
+		"/usr/share/corresync/.claude-plugin/marketplace.json":  false,
 	}
 	files, ok := extra["Files"].([]any)
 	if !ok {
@@ -358,7 +358,7 @@ func verifySBOM(path string) (string, error) {
 			return "", fmt.Errorf("SPDX SBOM %q: %w", filepath.Base(path), err)
 		}
 		namespace, _ := document["documentNamespace"].(string)
-		if !strings.HasPrefix(namespace, "https://github.com/nkiyohara/owa-bridge/sbom/spdx/") {
+		if !strings.HasPrefix(namespace, "https://github.com/nkiyohara/corresync/sbom/spdx/") {
 			return "", fmt.Errorf("SPDX SBOM %q has a non-canonical namespace", filepath.Base(path))
 		}
 		return "SPDX", nil
@@ -389,27 +389,27 @@ func verifyArchive(path, goos string) error {
 		"LICENSE",
 		"README.md",
 		"SECURITY.md",
-		"completions/_owa",
-		"completions/owa.bash",
-		"completions/owa.fish",
+		"completions/_corresync",
+		"completions/corresync.bash",
+		"completions/corresync.fish",
 		"docs/install.md",
 		"docs/mcp.md",
-		"manpages/owa.1",
-		"plugins/owa-bridge/.claude-plugin/plugin.json",
-		"plugins/owa-bridge/.codex-plugin/plugin.json",
-		"plugins/owa-bridge/README.md",
-		"plugins/owa-bridge/assets/icon.svg",
-		"plugins/owa-bridge/skills/owa-bridge/SKILL.md",
-		"plugins/owa-bridge/skills/owa-bridge/agents/openai.yaml",
+		"manpages/corresync.1",
+		"plugins/corresync/.claude-plugin/plugin.json",
+		"plugins/corresync/.codex-plugin/plugin.json",
+		"plugins/corresync/README.md",
+		"plugins/corresync/assets/icon.svg",
+		"plugins/corresync/skills/corresync/SKILL.md",
+		"plugins/corresync/skills/corresync/agents/openai.yaml",
 		licensePrefix + "github.com/alecthomas/kong/COPYING",
 		licensePrefix + "github.com/hashicorp/go-multierror/LICENSE",
 		licensePrefix + "github.com/hashicorp/go-multierror/multierror.go",
 	}
 	if goos == "windows" {
-		want = append(want, "owa.exe")
+		want = append(want, "corresync.exe")
 		return verifyZip(path, want)
 	}
-	want = append(want, "owa")
+	want = append(want, "corresync")
 	return verifyTarGzip(path, want)
 }
 
@@ -490,21 +490,21 @@ func requireReleaseFiles(archive string, got, want []string) error {
 }
 
 func verifyCatalogs(dist string, hashes map[string]string) error {
-	formula, err := readLocalFile(filepath.Join(dist, "homebrew", "Formula", "owa-bridge.rb"))
+	formula, err := readLocalFile(filepath.Join(dist, "homebrew", "Formula", "corresync.rb"))
 	if err != nil {
 		return fmt.Errorf("read Homebrew Formula: %w", err)
 	}
 	for _, snippet := range []string{
 		`depends_on "go" => :build`,
-		`std_go_args(output: bin/"owa"`,
-		`bash_completion.install "completions/owa.bash" => "owa"`,
-		`zsh_completion.install "completions/_owa"`,
-		`fish_completion.install "completions/owa.fish"`,
-		`man1.install "manpages/owa.1"`,
+		`std_go_args(output: bin/"corresync"`,
+		`bash_completion.install "completions/corresync.bash" => "corresync"`,
+		`zsh_completion.install "completions/_corresync"`,
+		`fish_completion.install "completions/corresync.fish"`,
+		`man1.install "manpages/corresync.1"`,
 		`pkgshare.install "plugins"`,
 		`(pkgshare/".agents").install ".agents/plugins"`,
 		`(pkgshare/".claude-plugin").install ".claude-plugin/marketplace.json"`,
-		`shell_output("#{bin}/owa version --json")`,
+		`shell_output("#{bin}/corresync version --json")`,
 	} {
 		if !strings.Contains(string(formula), snippet) {
 			return fmt.Errorf("homebrew Formula is missing %q", snippet)
@@ -517,7 +517,7 @@ func verifyCatalogs(dist string, hashes map[string]string) error {
 		}
 	}
 
-	manifestData, err := readLocalFile(filepath.Join(dist, "scoop", "owa-bridge.json"))
+	manifestData, err := readLocalFile(filepath.Join(dist, "scoop", "corresync.json"))
 	if err != nil {
 		return fmt.Errorf("read Scoop manifest: %w", err)
 	}
@@ -552,8 +552,8 @@ func verifyCatalogs(dist string, hashes map[string]string) error {
 			installer = string(data)
 		}
 	}
-	if !strings.Contains(installer, "PortableCommandAlias: owa") {
-		return errors.New("WinGet manifest does not install the owa command")
+	if !strings.Contains(installer, "PortableCommandAlias: corresync") {
+		return errors.New("WinGet manifest does not install the corresync command")
 	}
 	for name, hash := range hashes {
 		if strings.Contains(name, "_windows_") && strings.HasSuffix(name, ".zip") {
@@ -578,20 +578,20 @@ func verifySourceArchive(archivePath string) error {
 	defer func() { _ = gzipReader.Close() }()
 
 	required := map[string]bool{
-		".agents/plugins/marketplace.json": false,
-		".claude-plugin/marketplace.json":  false,
-		"LICENSE":                          false,
-		"go.mod":                           false,
-		"go.sum":                           false,
-		"cmd/owa/main.go":                  false,
-		"internal/buildinfo/buildinfo.go":  false,
-		"manpages/owa.1":                   false,
-		"vendor/modules.txt":               false,
-		"completions/owa.bash":             false,
-		"completions/_owa":                 false,
-		"completions/owa.fish":             false,
-		"plugins/owa-bridge/.codex-plugin/plugin.json":  false,
-		"plugins/owa-bridge/skills/owa-bridge/SKILL.md": false,
+		".agents/plugins/marketplace.json":            false,
+		".claude-plugin/marketplace.json":             false,
+		"LICENSE":                                     false,
+		"go.mod":                                      false,
+		"go.sum":                                      false,
+		"cmd/corresync/main.go":                       false,
+		"internal/buildinfo/buildinfo.go":             false,
+		"manpages/corresync.1":                        false,
+		"vendor/modules.txt":                          false,
+		"completions/corresync.bash":                  false,
+		"completions/_corresync":                      false,
+		"completions/corresync.fish":                  false,
+		"plugins/corresync/.codex-plugin/plugin.json": false,
+		"plugins/corresync/skills/corresync/SKILL.md": false,
 	}
 	var prefix string
 	tarReader := tar.NewReader(gzipReader)

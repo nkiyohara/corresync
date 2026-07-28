@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security policy
-    url: https://github.com/nkiyohara/owa-bridge/security/policy
+    url: https://github.com/nkiyohara/corresync/security/policy
     about: Report suspected vulnerabilities without mailbox or session data.

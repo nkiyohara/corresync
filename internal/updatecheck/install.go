@@ -39,15 +39,20 @@ func DetectInstallationContext(ctx context.Context, executable string) InstallMe
 	executable = strings.ReplaceAll(executable, `\`, "/")
 	cleaned := filepath.ToSlash(strings.ToLower(filepath.Clean(executable)))
 	switch {
-	case strings.Contains(cleaned, "/cellar/owa-bridge/"),
+	case strings.Contains(cleaned, "/cellar/corresync/"),
+		strings.Contains(cleaned, "/homebrew/corresync/"),
+		strings.Contains(cleaned, "/cellar/owa-bridge/"),
 		strings.Contains(cleaned, "/homebrew/owa-bridge/"):
 		return InstallHomebrew
-	case strings.Contains(cleaned, "/scoop/apps/owa-bridge/"):
+	case strings.Contains(cleaned, "/scoop/apps/corresync/"),
+		strings.Contains(cleaned, "/scoop/apps/owa-bridge/"):
 		return InstallScoop
-	case strings.Contains(cleaned, "/winget/packages/nkiyohara.owabridge_"):
+	case strings.Contains(cleaned, "/winget/packages/nkiyohara.corresync_"),
+		strings.Contains(cleaned, "/winget/packages/nkiyohara.owabridge_"):
 		return InstallWinGet
 	}
-	if runtime.GOOS != "linux" || cleaned != "/usr/bin/owa" {
+	if runtime.GOOS != "linux" ||
+		(cleaned != "/usr/bin/corresync" && cleaned != "/usr/bin/owa") {
 		return InstallDirect
 	}
 	queries := []struct {
@@ -74,24 +79,24 @@ func DetectInstallationContext(ctx context.Context, executable string) InstallMe
 }
 
 // UpgradeAdvice returns the safe next action. Package-manager-owned binaries
-// remain delegated to their owner; direct installs route through `owa update`.
+// remain delegated to their owner; direct installs route through Corresync.
 func UpgradeAdvice(method InstallMethod, version string) string {
 	releaseVersion := strings.TrimPrefix(version, "v")
 	switch method {
 	case InstallHomebrew:
-		return "brew upgrade owa-bridge"
+		return "brew upgrade nkiyohara/corresync/corresync"
 	case InstallWinGet:
-		return "winget upgrade --id nkiyohara.OWABridge --exact"
+		return "winget upgrade --id nkiyohara.Corresync --exact"
 	case InstallScoop:
-		return "scoop update owa-bridge"
+		return "scoop update corresync"
 	case InstallDeb:
-		return "download and verify the new .deb, then run: sudo apt install ./owa-bridge_" + releaseVersion + "-*_*.deb"
+		return "download and verify the new .deb, then run: sudo apt install ./corresync_" + releaseVersion + "-*_*.deb"
 	case InstallRPM:
-		return "download and verify the new .rpm, then run: sudo dnf install ./owa-bridge-" + releaseVersion + "-*.rpm"
+		return "download and verify the new .rpm, then run: sudo dnf install ./corresync-" + releaseVersion + "-*.rpm"
 	case InstallAPK:
-		return "download and verify the new .apk, then run: sudo apk add ./owa-bridge_" + releaseVersion + "-r*_*.apk"
+		return "download and verify the new .apk, then run: sudo apk add ./corresync_" + releaseVersion + "-r*_*.apk"
 	case InstallDirect:
-		return "owa update"
+		return "corresync update"
 	}
 	return "review the verified release and use the original installation surface"
 }

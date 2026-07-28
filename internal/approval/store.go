@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 const (

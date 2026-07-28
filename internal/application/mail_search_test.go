@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nkiyohara/owa-bridge/internal/domain"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 func validMailSearchInput() MailSearchInput {

@@ -19,23 +19,27 @@ const maximumUnixSocketPath = 100
 
 const fallbackUnixTempDir = "/tmp"
 
-func platformEndpoint(id string) (address, runtimeDirectory, lockPath string, err error) {
+func platformEndpoint(
+	id,
+	runtimeName string,
+) (address, runtimeDirectory, lockPath string, err error) {
 	temporary, err := currentTempDir()
 	if err != nil {
 		return "", "", "", err
 	}
-	return platformEndpointInTemp(temporary, id, os.Geteuid())
+	return platformEndpointInTemp(temporary, id, os.Geteuid(), runtimeName)
 }
 
 func platformEndpointInTemp(
 	temporary, id string,
 	effectiveUID int,
+	runtimeName string,
 ) (address, runtimeDirectory, lockPath string, err error) {
-	runtimeDirectory = filepath.Join(temporary, "owa-bridge-"+strconv.Itoa(effectiveUID))
+	runtimeDirectory = filepath.Join(temporary, runtimeName+"-"+strconv.Itoa(effectiveUID))
 	address = filepath.Join(runtimeDirectory, id+".sock")
 	if len(address) > maximumUnixSocketPath && temporary != fallbackUnixTempDir {
 		runtimeDirectory = filepath.Join(
-			fallbackUnixTempDir, "owa-bridge-"+strconv.Itoa(effectiveUID),
+			fallbackUnixTempDir, runtimeName+"-"+strconv.Itoa(effectiveUID),
 		)
 		address = filepath.Join(runtimeDirectory, id+".sock")
 	}
@@ -60,7 +64,7 @@ func Listen(endpoint Endpoint) (*Listener, error) {
 	}
 	if err := unix.Flock(int(lock.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
 		_ = lock.Close()
-		return nil, errors.New("owa daemon is already running for this config")
+		return nil, errors.New("corresync daemon is already running for this config")
 	}
 	unlock := func() error {
 		return errors.Join(unix.Flock(int(lock.Fd()), unix.LOCK_UN), lock.Close())
