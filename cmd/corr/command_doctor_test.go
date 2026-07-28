@@ -11,6 +11,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
+	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/localipc"
 )
 
@@ -55,6 +56,66 @@ func TestDoctorOfflineProducesContentFreeHealthyReport(t *testing.T) {
 		report.Checks[6].Status != "skip" {
 		t.Fatalf("unexpected doctor checks: %+v", report.Checks)
 	}
+}
+
+func TestDoctorDoesNotRequireBrowserForStandardsRoutes(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	configuration := config.Default()
+	account := configuration.Accounts[configuration.DefaultAccount]
+	account.Address = "reader@example.invalid"
+	account.Mail = &config.MailRoute{
+		Provider: domain.ProviderJMAP,
+		JMAP: &config.JMAPRoute{
+			SessionURL: "https://mail.example.invalid/.well-known/jmap",
+			Username:   "reader@example.invalid",
+			Credential: config.CredentialRef{
+				Backend: config.CredentialOSKeyring,
+				Key:     "test-jmap",
+				Consent: true,
+			},
+		},
+	}
+	account.Calendar = nil
+	configuration.Accounts[configuration.DefaultAccount] = account
+	configuration.Browser.Executable = filepath.Join(root, "missing-browser")
+	configPath := filepath.Join(root, "config.toml")
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	app := newRuntime(
+		context.Background(),
+		configPath,
+		&stdout,
+		&bytes.Buffer{},
+		buildinfo.Current(),
+	)
+	app.endpoint = func(path string) (localipc.Endpoint, error) {
+		return localipc.ResolveInState(path, filepath.Join(root, "state"))
+	}
+	if err := (&doctorCommand{JSON: true}).Run(app); err != nil {
+		t.Fatalf("doctor.Run() error = %v", err)
+	}
+
+	var report doctorReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode doctor output: %v", err)
+	}
+	if !report.Healthy {
+		t.Fatalf("doctor report = %+v", report)
+	}
+	for _, check := range report.Checks {
+		if check.Name == "browser" {
+			if check.Status != "skip" {
+				t.Fatalf("browser check = %+v", check)
+			}
+			return
+		}
+	}
+	t.Fatalf("doctor report lacks browser check: %+v", report.Checks)
 }
 
 func TestDoctorOfflineRejectsIncompatibleRunningDaemon(t *testing.T) {

@@ -289,6 +289,16 @@ func TestClientUsesTLSDiscoveryAndConditionalCalendarWrites(t *testing.T) {
 	ownedPassword := client.password
 	t.Cleanup(func() { _ = client.Close() })
 
+	calendars, err := client.ListCalendarFolders(
+		t.Context(),
+		application.CalendarFolderListInput{Limit: 10},
+	)
+	if err != nil || len(calendars.Calendars) != 1 ||
+		!calendars.Calendars[0].IsDefault ||
+		calendars.Calendars[0].AccessRole != "unknown" ||
+		calendars.Calendars[0].ID == "" {
+		t.Fatalf("ListCalendarFolders() = %#v, %v", calendars, err)
+	}
 	page, err := client.ListCalendarEvents(t.Context(), application.CalendarListInput{
 		Calendar: application.CalendarFolder{
 			Kind: application.CalendarFolderDistinguished,

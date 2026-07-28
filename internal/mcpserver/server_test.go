@@ -62,6 +62,7 @@ type fakeBackend struct {
 	searchInput          application.MailSearchInput
 	searchAllInput       application.MailProjectionInput
 	folderInput          application.MailFolderListInput
+	calendarFolderInput  application.CalendarFolderListInput
 	bodyInput            application.MailBodyInput
 	attachmentInput      application.MailAttachmentInput
 	approvalToken        string
@@ -74,6 +75,7 @@ type fakeBackend struct {
 	mailPage             application.MailPage
 	mailProjection       application.MailProjectionPage
 	folderPage           application.MailFolderPage
+	calendarFolderPage   application.CalendarFolderPage
 	bodyAccess           application.MailBodyAccess
 	attachmentAccess     application.MailAttachmentAccess
 	draftInput           application.MailDraftInput
@@ -199,6 +201,16 @@ func (backend *fakeBackend) ListMailFolders(
 	backend.folderInput = input
 	backend.caller = caller
 	return backend.folderPage, backend.err
+}
+
+func (backend *fakeBackend) ListCalendarFolders(
+	_ context.Context,
+	input application.CalendarFolderListInput,
+	caller domain.Caller,
+) (application.CalendarFolderPage, error) {
+	backend.calendarFolderInput = input
+	backend.caller = caller
+	return backend.calendarFolderPage, backend.err
 }
 
 func (backend *fakeBackend) ListCalendar(
@@ -448,7 +460,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 32 || mailTool == nil {
+	if len(tools.Tools) != 33 || mailTool == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
@@ -780,6 +792,37 @@ func TestCalendarListToolMapsRequiredWindow(t *testing.T) {
 	if backend.calendarInput.Account != "work" || backend.calendarInput.Calendar.ID != "calendar" ||
 		backend.calendarInput.Start != "2026-07-17T00:00:00Z" {
 		t.Fatalf("unexpected calendar input: %+v", backend.calendarInput)
+	}
+}
+
+func TestCalendarFolderListToolUsesBoundedDefaults(t *testing.T) {
+	t.Parallel()
+
+	backend := &fakeBackend{calendarFolderPage: application.CalendarFolderPage{
+		Calendars: []application.CalendarFolderSummary{{
+			ID: "calendar-1", DisplayName: "Synthetic", IsDefault: true,
+			CanEdit: true, AccessRole: "owner",
+		}},
+		TotalCalendars: 1, IncludesLastItem: true,
+	}}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	clientSession := connectTestClient(t, server)
+	result, err := clientSession.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "calendar_list_folders", Arguments: map[string]any{},
+	})
+	if err != nil || result.IsError {
+		t.Fatalf("calendar_list_folders failed: result=%+v error=%v", result, err)
+	}
+	if backend.calendarFolderInput.Account != "work" ||
+		backend.calendarFolderInput.Limit != application.MaxCalendarFolderPageSize {
+		t.Fatalf("unexpected calendar folder input: %+v", backend.calendarFolderInput)
+	}
+	structured, ok := result.StructuredContent.(map[string]any)
+	if !ok || structured["totalCalendars"] != float64(1) {
+		t.Fatalf("unexpected structured output: %#v", result.StructuredContent)
 	}
 }
 

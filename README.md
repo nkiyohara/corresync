@@ -101,6 +101,7 @@ corr account add reader@example.invalid \
   --authorization-key personal-google \
   --approve-oauth
 corr auth login --account personal
+corr calendar folders --account personal
 ```
 
 OAuth providers require your own registered public-client configuration and

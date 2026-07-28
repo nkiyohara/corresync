@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,6 +48,76 @@ type graphEvent struct {
 	OnlineMeeting         struct {
 		JoinURL string `json:"joinUrl"`
 	} `json:"onlineMeeting"`
+}
+
+type graphCalendar struct {
+	ID                string `json:"id"`
+	Name              string `json:"name"`
+	CanEdit           bool   `json:"canEdit"`
+	IsDefaultCalendar bool   `json:"isDefaultCalendar"`
+}
+
+func (client *Client) ListCalendarFolders(
+	ctx context.Context,
+	input application.CalendarFolderListInput,
+) (application.CalendarFolderPage, error) {
+	var response struct {
+		Count    int             `json:"@odata.count"`
+		NextLink string          `json:"@odata.nextLink"`
+		Value    []graphCalendar `json:"value"`
+	}
+	if _, err := client.api.DoJSON(
+		ctx,
+		http.MethodGet,
+		"me/calendars",
+		url.Values{
+			"$select": {"id,name,canEdit,isDefaultCalendar"},
+			"$top":    {strconv.Itoa(input.Limit)},
+			"$skip":   {strconv.Itoa(input.Offset)},
+			"$count":  {"true"},
+		},
+		nil,
+		&response,
+		false,
+		http.Header{"ConsistencyLevel": {"eventual"}},
+		http.StatusOK,
+	); err != nil {
+		return application.CalendarFolderPage{}, err
+	}
+	if len(response.Value) > input.Limit ||
+		response.Count < len(response.Value) {
+		return application.CalendarFolderPage{}, errors.New(
+			"graph returned an invalid calendar page",
+		)
+	}
+	page := application.CalendarFolderPage{
+		Calendars:        make([]application.CalendarFolderSummary, 0, len(response.Value)),
+		TotalCalendars:   response.Count,
+		IncludesLastItem: response.NextLink == "",
+	}
+	for _, calendar := range response.Value {
+		if !validGraphID(calendar.ID) {
+			return application.CalendarFolderPage{}, errors.New(
+				"graph returned an invalid calendar identity",
+			)
+		}
+		id, err := encodeReference("mgc1_", struct {
+			ID string `json:"id"`
+		}{ID: calendar.ID})
+		if err != nil {
+			return application.CalendarFolderPage{}, err
+		}
+		role := "reader"
+		if calendar.CanEdit {
+			role = "writer"
+		}
+		page.Calendars = append(page.Calendars, application.CalendarFolderSummary{
+			ID: id, DisplayName: calendar.Name,
+			IsDefault: calendar.IsDefaultCalendar,
+			CanEdit:   calendar.CanEdit, AccessRole: role,
+		})
+	}
+	return page, nil
 }
 
 func (client *Client) ListCalendarEvents(

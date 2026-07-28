@@ -30,6 +30,14 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			writeGraphJSON(t, writer, map[string]any{
 				"id": "calendar1", "canEdit": true,
 			})
+		case "GET /me/calendars":
+			writeGraphJSON(t, writer, map[string]any{
+				"@odata.count": 1,
+				"value": []graphCalendar{{
+					ID: "calendar1", Name: "Primary",
+					CanEdit: true, IsDefaultCalendar: true,
+				}},
+			})
 		case "GET /me/mailFolders/inbox/messages":
 			writeGraphJSON(t, writer, map[string]any{
 				"@odata.count": 1,
@@ -219,6 +227,16 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 		t.Fatalf("delete degradation = %v", err)
 	}
 
+	calendars, err := client.ListCalendarFolders(
+		t.Context(),
+		application.CalendarFolderListInput{Limit: 10},
+	)
+	if err != nil || len(calendars.Calendars) != 1 ||
+		!calendars.Calendars[0].IsDefault ||
+		!calendars.Calendars[0].CanEdit ||
+		calendars.Calendars[0].ID == "" {
+		t.Fatalf("calendars = %#v error = %v", calendars, err)
+	}
 	calendar, err := client.ListCalendarEvents(
 		t.Context(),
 		application.CalendarListInput{

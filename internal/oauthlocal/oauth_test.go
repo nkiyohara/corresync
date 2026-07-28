@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -67,7 +66,7 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	transport.TLSClientConfig.RootCAs = roots
 	baseClient := &http.Client{Transport: transport}
 
-	redirectURI := unusedLoopbackURI(t)
+	redirectURI := "http://127.0.0.1:0/oauth/callback"
 	provider := Provider{
 		ID:      domain.ProviderGoogleAPI,
 		AuthURL: apiServer.URL + "/authorize", TokenURL: apiServer.URL + "/token",
@@ -113,6 +112,9 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 			callback, err := url.Parse(query.Get("redirect_uri"))
 			if err != nil {
 				return err
+			}
+			if callback.Port() == "" || callback.Port() == "0" {
+				t.Fatalf("authorization callback did not use the bound ephemeral port: %s", callback)
 			}
 			values := callback.Query()
 			values.Set("state", query.Get("state"))
@@ -187,6 +189,15 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	if openCalls != 1 {
 		t.Fatalf("existing grant reopened authorization: %d", openCalls)
 	}
+
+	provider.Scopes = append(provider.Scopes, "calendar.list.read")
+	third, err := manager.Client(t.Context(), route, provider)
+	if err != nil || third == nil {
+		t.Fatalf("expanded-scope Client() = %v, %v", third, err)
+	}
+	if openCalls != 2 {
+		t.Fatalf("expanded scopes did not start fresh explicit authorization: %d", openCalls)
+	}
 }
 
 func TestManagerRejectsTLSVerificationBypass(t *testing.T) {
@@ -199,23 +210,6 @@ func TestManagerRejectsTLSVerificationBypass(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "cannot be disabled") {
 		t.Fatalf("New() error = %v", err)
 	}
-}
-
-func unusedLoopbackURI(t *testing.T) string {
-	t.Helper()
-	listener, err := (&net.ListenConfig{}).Listen(
-		t.Context(),
-		"tcp",
-		"127.0.0.1:0",
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	address := listener.Addr().String()
-	if err := listener.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return "http://" + address + "/oauth/callback"
 }
 
 func errorsNewStatus(status int) error {

@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 15
+	ProtocolVersion   = 16
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -54,6 +54,7 @@ const (
 	MethodMailCommitState      Method = "mail.commit_read_state"
 	MethodMailDelete           Method = "mail.delete"
 	MethodMailCommitDelete     Method = "mail.commit_delete"
+	MethodCalendarFolders      Method = "calendar.folders.list"
 	MethodCalendarList         Method = "calendar.list"
 	MethodAgendaList           Method = "agenda.list"
 	MethodCalendarCreate       Method = "calendar.create"
@@ -325,6 +326,7 @@ type Backend interface {
 	CommitMailReadState(context.Context, string, domain.Caller) (application.MailReadStateAccess, error)
 	DeleteMail(context.Context, application.MailDeleteInput, domain.Caller) (application.MailDeleteAccess, error)
 	CommitMailDelete(context.Context, string, domain.Caller) (application.MailDeleteAccess, error)
+	ListCalendarFolders(context.Context, application.CalendarFolderListInput, domain.Caller) (application.CalendarFolderPage, error)
 	ListCalendar(context.Context, application.CalendarListInput, domain.Caller) (application.CalendarPage, error)
 	ListAgenda(context.Context, application.AgendaProjectionInput, domain.Caller) (application.AgendaProjectionPage, error)
 	CreateCalendar(context.Context, application.CalendarCreateInput, domain.Caller) (application.CalendarCreateAccess, error)
@@ -357,7 +359,7 @@ func (method Method) valid() bool {
 		MethodMailMove, MethodMailCommitMove,
 		MethodMailReadState, MethodMailCommitState,
 		MethodMailDelete, MethodMailCommitDelete,
-		MethodCalendarList, MethodAgendaList, MethodCalendarCreate, MethodCalendarCommit,
+		MethodCalendarFolders, MethodCalendarList, MethodAgendaList, MethodCalendarCreate, MethodCalendarCommit,
 		MethodCalendarUpdate, MethodCalendarCommitUpdate,
 		MethodCalendarCancel, MethodCalendarCommitCancel,
 		MethodMonitorStatus, MethodEventsList, MethodEventAcknowledge:

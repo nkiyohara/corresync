@@ -88,6 +88,27 @@ func TestMailFolderTableSanitizesNamesAndPreservesIDs(t *testing.T) {
 	}
 }
 
+func TestCalendarFolderTableSanitizesNamesAndPreservesIDs(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), "", &stdout, &bytes.Buffer{}, buildinfo.Current())
+	page := application.CalendarFolderPage{
+		Calendars: []application.CalendarFolderSummary{{
+			ID: "calendar-1", DisplayName: "Synthetic\x1b[2J calendar",
+			IsDefault: true, CanEdit: true, AccessRole: "owner", TimeZone: "UTC",
+		}},
+		TotalCalendars: 1, IncludesLastItem: true,
+	}
+	if err := writeCalendarFolderTable(app, page); err != nil {
+		t.Fatalf("writeCalendarFolderTable() error = %v", err)
+	}
+	if strings.Contains(stdout.String(), "\x1b") ||
+		!strings.Contains(stdout.String(), "calendar-1") {
+		t.Fatalf("unsafe or incomplete calendar table: %q", stdout.String())
+	}
+}
+
 func TestSanitizeTerminalTextRemovesSequencesButKeepsLayout(t *testing.T) {
 	t.Parallel()
 

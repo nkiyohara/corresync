@@ -15,6 +15,8 @@ import (
 	"github.com/nkiyohara/corresync/internal/application"
 )
 
+const maxGmailListPages = 22
+
 type gmailHeader struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
@@ -93,37 +95,64 @@ func (client *Client) listMessages(
 	label, query string,
 	offset, limit int,
 ) (application.MailPage, error) {
-	if offset+limit > 500 {
-		return application.MailPage{}, errors.New(
-			"gmail offset window cannot exceed 500 messages",
-		)
+	references := make([]struct {
+		ID string `json:"id"`
+	}, 0, limit)
+	pageToken := ""
+	remainingOffset := offset
+	total := 0
+	includesLast := false
+	for pageNumber := 0; len(references) < limit; pageNumber++ {
+		if pageNumber >= maxGmailListPages {
+			return application.MailPage{}, errors.New(
+				"gmail pagination exceeded the bounded offset window",
+			)
+		}
+		requestSize := min(500, remainingOffset+limit-len(references))
+		values := url.Values{"maxResults": {strconv.Itoa(requestSize)}}
+		if label != "" {
+			values.Set("labelIds", label)
+		}
+		if query != "" {
+			values.Set("q", query)
+		}
+		if pageToken != "" {
+			values.Set("pageToken", pageToken)
+		}
+		var listing gmailList
+		if _, err := client.api.DoJSON(
+			ctx, http.MethodGet, "gmail/v1/users/me/messages", values,
+			nil, &listing, false, nil, http.StatusOK,
+		); err != nil {
+			return application.MailPage{}, err
+		}
+		if total == 0 {
+			total = listing.ResultSizeEstimate
+		}
+		start := min(remainingOffset, len(listing.Messages))
+		remainingOffset -= start
+		available := listing.Messages[start:]
+		take := min(limit-len(references), len(available))
+		references = append(references, available[:take]...)
+		if listing.NextPageToken == "" {
+			includesLast = start+take == len(listing.Messages)
+			break
+		}
+		if len(listing.NextPageToken) > 8192 ||
+			strings.ContainsAny(listing.NextPageToken, "\r\n\x00") ||
+			listing.NextPageToken == pageToken {
+			return application.MailPage{}, errors.New(
+				"gmail returned an invalid pagination token",
+			)
+		}
+		pageToken = listing.NextPageToken
 	}
-	values := url.Values{
-		"maxResults": {strconv.Itoa(offset + limit)},
-	}
-	if label != "" {
-		values.Set("labelIds", label)
-	}
-	if query != "" {
-		values.Set("q", query)
-	}
-	var listing gmailList
-	if _, err := client.api.DoJSON(
-		ctx, http.MethodGet, "gmail/v1/users/me/messages", values,
-		nil, &listing, false, nil, http.StatusOK,
-	); err != nil {
-		return application.MailPage{}, err
-	}
-	if offset > len(listing.Messages) {
-		offset = len(listing.Messages)
-	}
-	end := min(offset+limit, len(listing.Messages))
 	page := application.MailPage{
-		Messages:         make([]application.MailSummary, 0, end-offset),
-		TotalItemsInView: listing.ResultSizeEstimate,
-		IncludesLastItem: listing.NextPageToken == "" && end == len(listing.Messages),
+		Messages:         make([]application.MailSummary, 0, len(references)),
+		TotalItemsInView: total,
+		IncludesLastItem: includesLast,
 	}
-	for _, item := range listing.Messages[offset:end] {
+	for _, item := range references {
 		message, err := client.getMessage(ctx, item.ID, "metadata")
 		if err != nil {
 			return application.MailPage{}, err

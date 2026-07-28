@@ -92,7 +92,7 @@ policy.
 
 ## Tool catalog
 
-The server exposes 32 narrow tools.
+The server exposes 33 narrow tools.
 
 Accounts and local monitoring:
 
@@ -104,7 +104,7 @@ Read and project:
 - `mail_list_folders`, `mail_list`, `mail_search`, `mail_search_all`;
 - `mail_get_body`, `mail_get_body_commit`;
 - `mail_get_attachment`, `mail_get_attachment_commit`;
-- `calendar_list`, `agenda_list`.
+- `calendar_list_folders`, `calendar_list`, `agenda_list`.
 
 Mail writes:
 

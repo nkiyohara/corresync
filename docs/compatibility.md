@@ -40,9 +40,9 @@ evidence.
 
 - `microsoft-owa`: mail and calendar are live-observed; some advanced fields
   remain deterministic-only as listed below.
-- `google-api`: Gmail and primary Google Calendar are implemented with a BYO
+- `google-api`: Gmail and selectable Google calendars are implemented with a BYO
   public OAuth client, but have no recorded live observation.
-- `microsoft-graph`: mail, primary calendar, and typed Teams-link creation are
+- `microsoft-graph`: mail, selectable calendars, and typed Teams-link creation are
   implemented with a BYO public OAuth client, but have no recorded live
   observation.
 - `jmap`, `imap-smtp`, and `caldav`: implemented against synthetic standards

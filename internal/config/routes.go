@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/nkiyohara/corresync/internal/domain"
@@ -323,6 +324,10 @@ func (route OAuthRoute) validate() error {
 		redirect.User != nil || redirect.Fragment != "" || redirect.RawQuery != "" ||
 		redirect.Port() == "" {
 		return errors.New("OAuth redirect URI must use an explicit loopback port")
+	}
+	port, err := strconv.ParseUint(redirect.Port(), 10, 16)
+	if err != nil || port > 65535 {
+		return errors.New("OAuth redirect URI has an invalid loopback port")
 	}
 	if route.Authorization.Backend != CredentialOSKeyring {
 		return errors.New("OAuth authorization must use the OS keyring")

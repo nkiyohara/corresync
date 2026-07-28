@@ -11,6 +11,7 @@ import (
 
 type fakeCalendarReader struct {
 	page         CalendarPage
+	folderPage   CalendarFolderPage
 	err          error
 	calls        int
 	createInput  CalendarCreateInput
@@ -24,6 +25,13 @@ type fakeCalendarReader struct {
 	cancelInput  CalendarCancelInput
 	cancelErr    error
 	cancelCalls  int
+}
+
+func (reader *fakeCalendarReader) ListCalendarFolders(
+	context.Context,
+	CalendarFolderListInput,
+) (CalendarFolderPage, error) {
+	return reader.folderPage, reader.err
 }
 
 func (reader *fakeCalendarReader) UpdateCalendarEvent(

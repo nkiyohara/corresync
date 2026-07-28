@@ -83,7 +83,7 @@ func New(ctx context.Context, options Options) (*Client, error) {
 			AccessRole string `json:"accessRole"`
 		}
 		if _, err := api.DoJSON(
-			ctx, http.MethodGet, "calendar/v3/calendars/primary", nil,
+			ctx, http.MethodGet, "calendar/v3/users/me/calendarList/primary", nil,
 			nil, &calendar, false, nil, http.StatusOK,
 		); err != nil {
 			_ = api.Close()

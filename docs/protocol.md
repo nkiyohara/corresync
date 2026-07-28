@@ -36,8 +36,8 @@ The closed application surface covers:
   reads;
 - save-only drafts, reviewed send/reply/forward, move, read state, and reviewed
   permanent deletion;
-- bounded calendar list, reviewed create/update/cancel, and provider-supported
-  online-meeting creation;
+- bounded selectable-calendar discovery and calendar list, reviewed
+  create/update/cancel, and provider-supported online-meeting creation;
 - isolated cross-account mail and agenda projections;
 - content-free session/capability status and local monitor/event state.
 

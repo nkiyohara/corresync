@@ -348,6 +348,12 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.CommitMailDelete(ctx, input.Token, request.Caller)
+	case MethodCalendarFolders:
+		var input application.CalendarFolderListInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		return server.backend.ListCalendarFolders(ctx, input, request.Caller)
 	case MethodCalendarList:
 		var input application.CalendarListInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {

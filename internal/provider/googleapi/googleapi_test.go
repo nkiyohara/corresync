@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -31,9 +32,16 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 			writeGoogleJSON(t, writer, map[string]any{
 				"emailAddress": "reader@example.test",
 			})
-		case "GET /calendar/v3/calendars/primary":
+		case "GET /calendar/v3/users/me/calendarList/primary":
 			writeGoogleJSON(t, writer, map[string]any{
-				"id": "reader@example.test",
+				"id": "reader@example.test", "accessRole": "owner",
+			})
+		case "GET /calendar/v3/users/me/calendarList":
+			writeGoogleJSON(t, writer, map[string]any{
+				"items": []googleCalendarListEntry{{
+					ID: "reader@example.test", Summary: "Primary",
+					TimeZone: "Europe/London", AccessRole: "owner", Primary: true,
+				}},
 			})
 		case "GET /gmail/v1/users/me/messages":
 			if request.URL.Query().Get("maxResults") != "1" {
@@ -215,6 +223,16 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 		t.Fatalf("move degradation = %v", err)
 	}
 
+	calendars, err := client.ListCalendarFolders(
+		t.Context(),
+		application.CalendarFolderListInput{Limit: 10},
+	)
+	if err != nil || len(calendars.Calendars) != 1 ||
+		!calendars.Calendars[0].IsDefault ||
+		!calendars.Calendars[0].CanEdit ||
+		calendars.Calendars[0].ID == "" {
+		t.Fatalf("calendars = %#v error = %v", calendars, err)
+	}
 	calendar, err := client.ListCalendarEvents(
 		t.Context(),
 		application.CalendarListInput{
@@ -285,6 +303,86 @@ func TestGoogleAPIRejectsIdentityMismatch(t *testing.T) {
 	})
 	if client != nil || err == nil || !strings.Contains(err.Error(), "identity") {
 		t.Fatalf("client = %#v error = %v", client, err)
+	}
+}
+
+func TestGmailPaginationTraversesBeyondTheFirstFiveHundredMessages(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch {
+		case request.URL.Path == "/gmail/v1/users/me/profile":
+			writeGoogleJSON(t, writer, map[string]string{
+				"emailAddress": "reader@example.test",
+			})
+		case request.URL.Path == "/gmail/v1/users/me/messages":
+			token := request.URL.Query().Get("pageToken")
+			if token == "" {
+				if request.URL.Query().Get("maxResults") != "500" {
+					t.Errorf("first maxResults = %q", request.URL.Query().Get("maxResults"))
+				}
+				messages := make([]map[string]string, 500)
+				for index := range messages {
+					messages[index] = map[string]string{"id": "m" + strconv.Itoa(index)}
+				}
+				writeGoogleJSON(t, writer, map[string]any{
+					"messages": messages, "nextPageToken": "page-2",
+					"resultSizeEstimate": 502,
+				})
+				return
+			}
+			if token != "page-2" || request.URL.Query().Get("maxResults") != "2" {
+				t.Errorf("second list query = %q", request.URL.RawQuery)
+			}
+			writeGoogleJSON(t, writer, map[string]any{
+				"messages":           []map[string]string{{"id": "m500"}, {"id": "m501"}},
+				"resultSizeEstimate": 502,
+			})
+		case strings.HasPrefix(
+			request.URL.Path,
+			"/gmail/v1/users/me/messages/m5",
+		):
+			id := strings.TrimPrefix(request.URL.Path, "/gmail/v1/users/me/messages/")
+			message := googleTestMessage(false)
+			message.ID = id
+			message.HistoryID = strings.TrimPrefix(id, "m") + "1"
+			message.Payload.Headers = []gmailHeader{
+				{Name: "Subject", Value: id},
+				{Name: "From", Value: "Sender <sender@example.test>"},
+			}
+			writeGoogleJSON(t, writer, message)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	client, err := New(t.Context(), Options{
+		APIBase: server.URL, Address: "reader@example.test",
+		Mail: true, HTTP: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	page, err := client.ListMessages(t.Context(), application.MailListInput{
+		Folder: application.MailFolder{
+			Kind: application.MailFolderDistinguished, ID: "inbox",
+		},
+		Offset: 500, Limit: 2,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Messages) != 2 ||
+		page.Messages[0].Subject != "m500" ||
+		page.Messages[1].Subject != "m501" ||
+		!page.IncludesLastItem ||
+		page.TotalItemsInView != 502 {
+		t.Fatalf("page = %#v", page)
 	}
 }
 

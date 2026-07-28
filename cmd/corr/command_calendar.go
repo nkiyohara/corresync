@@ -11,10 +11,18 @@ import (
 )
 
 type calendarCommand struct {
-	List   calendarListCommand   `cmd:"" help:"List event metadata in an absolute time window."`
-	Create calendarCreateCommand `cmd:"" help:"Review and create one typed calendar event."`
-	Update calendarUpdateCommand `cmd:"" help:"Review a versioned event field update."`
-	Cancel calendarCancelCommand `cmd:"" help:"Review and cancel one versioned event."`
+	Folders calendarFoldersCommand `cmd:"" help:"Discover calendars and their opaque IDs."`
+	List    calendarListCommand    `cmd:"" help:"List event metadata in an absolute time window."`
+	Create  calendarCreateCommand  `cmd:"" help:"Review and create one typed calendar event."`
+	Update  calendarUpdateCommand  `cmd:"" help:"Review a versioned event field update."`
+	Cancel  calendarCancelCommand  `cmd:"" help:"Review and cancel one versioned event."`
+}
+
+type calendarFoldersCommand struct {
+	Account string `help:"Configured account alias; defaults to default_account."`
+	Offset  int    `default:"0" help:"Zero-based page offset."`
+	Limit   int    `default:"100" help:"Calendars to return (1-100)."`
+	JSON    bool   `help:"Write the stable machine-readable schema."`
 }
 
 type calendarListCommand struct {
@@ -81,6 +89,36 @@ type calendarCancelCommand struct {
 	JSON      bool   `help:"Write the stable machine-readable schema."`
 }
 
+func (command *calendarFoldersCommand) Run(app *runtime) (returnErr error) {
+	configuration, _, err := app.loadConfig()
+	if err != nil {
+		return err
+	}
+	accountID, err := app.account(configuration, command.Account)
+	if err != nil {
+		return err
+	}
+	input := application.CalendarFolderListInput{
+		Account: accountID, Offset: command.Offset, Limit: command.Limit,
+	}
+	if err := input.Validate(); err != nil {
+		return err
+	}
+	client, _, err := app.openDaemon(app.context)
+	if err != nil {
+		return err
+	}
+	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
+	page, err := client.ListCalendarFolders(app.context, input, app.caller())
+	if err != nil {
+		return err
+	}
+	if command.JSON {
+		return writeJSON(app.stdout, page)
+	}
+	return writeCalendarFolderTable(app, page)
+}
+
 func (command *calendarListCommand) Run(app *runtime) (returnErr error) {
 	configuration, _, err := app.loadConfig()
 	if err != nil {
@@ -120,6 +158,32 @@ func (command *calendarListCommand) Run(app *runtime) (returnErr error) {
 		return writeJSON(app.stdout, page)
 	}
 	return writeCalendarTable(app, page)
+}
+
+func writeCalendarFolderTable(app *runtime, page application.CalendarFolderPage) error {
+	if len(page.Calendars) == 0 {
+		_, err := fmt.Fprintln(app.stdout, "No calendars.")
+		return err
+	}
+	writer := tabwriter.NewWriter(app.stdout, 0, 4, 2, ' ', 0)
+	if _, err := fmt.Fprintln(writer, "NAME\tDEFAULT\tEDITABLE\tACCESS\tTIME ZONE\tID"); err != nil {
+		return err
+	}
+	for _, calendar := range page.Calendars {
+		if _, err := fmt.Fprintf(
+			writer,
+			"%s\t%t\t%t\t%s\t%s\t%s\n",
+			sanitizeCell(calendar.DisplayName, 64),
+			calendar.IsDefault,
+			calendar.CanEdit,
+			sanitizeCell(calendar.AccessRole, 16),
+			sanitizeCell(calendar.TimeZone, 64),
+			sanitizeCell(calendar.ID, 4096),
+		); err != nil {
+			return err
+		}
+	}
+	return writer.Flush()
 }
 
 func (command *calendarCreateCommand) Run(app *runtime) (returnErr error) {

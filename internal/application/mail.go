@@ -10,7 +10,10 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const MaxMailPageSize = 100
+const (
+	MaxMailPageSize = 100
+	MaxMailOffset   = 10_000
+)
 
 // MailFolderKind distinguishes named folders from discovered opaque IDs.
 type MailFolderKind string
@@ -186,8 +189,8 @@ func (input MailListInput) Validate() error {
 	if err := validateMessageFolder(input.Folder); err != nil {
 		return err
 	}
-	if input.Offset < 0 {
-		return errors.New("mail offset must not be negative")
+	if input.Offset < 0 || input.Offset > MaxMailOffset {
+		return fmt.Errorf("mail offset must be between 0 and %d", MaxMailOffset)
 	}
 	if input.Limit < 1 || input.Limit > MaxMailPageSize {
 		return fmt.Errorf("mail limit must be between 1 and %d", MaxMailPageSize)

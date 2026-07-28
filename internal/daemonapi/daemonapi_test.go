@@ -24,27 +24,28 @@ const (
 )
 
 type fakeBackend struct {
-	mailInput         application.MailListInput
-	searchInput       application.MailSearchInput
-	searchAllInput    application.MailProjectionInput
-	bodyInput         application.MailBodyInput
-	attachmentInput   application.MailAttachmentInput
-	draftInput        application.MailDraftInput
-	sendInput         application.MailSendInput
-	moveInput         application.MailMoveInput
-	stateInput        application.MailReadStateInput
-	deleteInput       application.MailDeleteInput
-	folderInput       application.MailFolderListInput
-	calendarListInput application.CalendarListInput
-	agendaInput       application.AgendaProjectionInput
-	createInput       application.CalendarCreateInput
-	updateInput       application.CalendarUpdateInput
-	cancelInput       application.CalendarCancelInput
-	terminalInput     TerminalLoginInput
-	monitorListInput  application.MonitorEventListInput
-	monitorAckInput   application.MonitorAcknowledgeInput
-	commitToken       string
-	caller            domain.Caller
+	mailInput           application.MailListInput
+	searchInput         application.MailSearchInput
+	searchAllInput      application.MailProjectionInput
+	bodyInput           application.MailBodyInput
+	attachmentInput     application.MailAttachmentInput
+	draftInput          application.MailDraftInput
+	sendInput           application.MailSendInput
+	moveInput           application.MailMoveInput
+	stateInput          application.MailReadStateInput
+	deleteInput         application.MailDeleteInput
+	folderInput         application.MailFolderListInput
+	calendarFolderInput application.CalendarFolderListInput
+	calendarListInput   application.CalendarListInput
+	agendaInput         application.AgendaProjectionInput
+	createInput         application.CalendarCreateInput
+	updateInput         application.CalendarUpdateInput
+	cancelInput         application.CalendarCancelInput
+	terminalInput       TerminalLoginInput
+	monitorListInput    application.MonitorEventListInput
+	monitorAckInput     application.MonitorAcknowledgeInput
+	commitToken         string
+	caller              domain.Caller
 }
 
 func (backend *fakeBackend) DefaultAccount() domain.AccountID { return testAccountID }
@@ -232,6 +233,16 @@ func (backend *fakeBackend) DeleteMail(_ context.Context, input application.Mail
 func (backend *fakeBackend) CommitMailDelete(_ context.Context, token string, caller domain.Caller) (application.MailDeleteAccess, error) {
 	backend.commitToken, backend.caller = token, caller
 	return application.MailDeleteAccess{}, nil
+}
+func (backend *fakeBackend) ListCalendarFolders(_ context.Context, input application.CalendarFolderListInput, caller domain.Caller) (application.CalendarFolderPage, error) {
+	backend.calendarFolderInput, backend.caller = input, caller
+	return application.CalendarFolderPage{
+		Calendars: []application.CalendarFolderSummary{{
+			ID: "calendar-1", DisplayName: "Work", IsDefault: true,
+			CanEdit: true, AccessRole: "owner",
+		}},
+		TotalCalendars: 1, IncludesLastItem: true,
+	}, nil
 }
 func (backend *fakeBackend) ListCalendar(_ context.Context, input application.CalendarListInput, caller domain.Caller) (application.CalendarPage, error) {
 	backend.calendarListInput, backend.caller = input, caller
@@ -501,6 +512,18 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	}, caller)
 	if err != nil || len(folders.Folders) != 1 || backend.folderInput.Account != testAccountID {
 		t.Fatalf("ListMailFolders() = %+v, %v; backend input=%+v", folders, err, backend.folderInput)
+	}
+	calendars, err := client.ListCalendarFolders(t.Context(), application.CalendarFolderListInput{
+		Account: testAccountID, Limit: 100,
+	}, caller)
+	if err != nil || len(calendars.Calendars) != 1 ||
+		backend.calendarFolderInput.Account != testAccountID {
+		t.Fatalf(
+			"ListCalendarFolders() = %+v, %v; backend input=%+v",
+			calendars,
+			err,
+			backend.calendarFolderInput,
+		)
 	}
 	body, err := client.GetMailBody(t.Context(), application.MailBodyInput{
 		Account: testAccountID, MessageID: "message-1",

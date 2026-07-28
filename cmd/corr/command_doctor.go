@@ -55,15 +55,24 @@ func (command *doctorCommand) Run(app *runtime) error {
 		report.add("account", "fail", doctorError(err))
 		return command.finish(app, report)
 	}
+	_, configured, exists := configuration.AccountByID(accountID)
+	if !exists {
+		report.add("account", "fail", "configured account route disappeared")
+		return command.finish(app, report)
+	}
 	report.Account = string(accountID)
-	report.add("account", "pass", "configured account alias and HTTPS origin are valid")
+	report.add("account", "pass", "configured account identity and provider routes are valid")
 	command.addUpdateStatus(app, configuration, &report)
 
-	executable, err := browser.ResolveExecutable(configuration.Browser.Executable)
-	if err != nil {
-		report.add("browser", "fail", doctorError(err))
+	if hasOutlookRoute(configured) {
+		executable, err := browser.ResolveExecutable(configuration.Browser.Executable)
+		if err != nil {
+			report.add("browser", "fail", doctorError(err))
+		} else {
+			report.add("browser", "pass", "resolved "+sanitizeCell(filepath.Base(executable), 80))
+		}
 	} else {
-		report.add("browser", "pass", "resolved "+sanitizeCell(filepath.Base(executable), 80))
+		report.add("browser", "skip", "not required by the selected provider routes")
 	}
 
 	endpoint, err := app.endpoint(configPath)
@@ -78,18 +87,22 @@ func (command *doctorCommand) Run(app *runtime) error {
 	}
 
 	if !command.Online {
-		report.add("live_outlook_web", "skip", "run with --online to open the interactive browser")
+		report.add(
+			"live_provider_routes",
+			"skip",
+			"run with --online to authenticate and validate the selected routes",
+		)
 		return command.finish(app, report)
 	}
 	if !report.Healthy {
-		report.add("live_outlook_web", "skip", "local prerequisites failed")
+		report.add("live_provider_routes", "skip", "local prerequisites failed")
 		return command.finish(app, report)
 	}
 
 	client, status, err := app.openDaemon(app.context)
 	if err != nil {
 		report.set("daemon", "fail", doctorError(err))
-		report.add("live_outlook_web", "skip", "session owner is unavailable")
+		report.add("live_provider_routes", "skip", "session owner is unavailable")
 		return command.finish(app, report)
 	}
 	report.set(
@@ -100,62 +113,95 @@ func (command *doctorCommand) Run(app *runtime) error {
 
 	if _, err := client.Login(app.context, accountID, app.caller()); err != nil {
 		report.add("session", "fail", doctorError(err))
-		report.add("folder_contract", "skip", "interactive session was not captured")
-		report.add("mail_contract", "skip", "interactive session was not captured")
-		report.add("calendar_contract", "skip", "interactive session was not captured")
+		if configured.Mail != nil {
+			report.add("folder_contract", "skip", "provider authentication was not completed")
+			report.add("mail_contract", "skip", "provider authentication was not completed")
+		}
+		if configured.Calendar != nil {
+			report.add("calendar_folder_contract", "skip", "provider authentication was not completed")
+			report.add("calendar_contract", "skip", "provider authentication was not completed")
+		}
 		closeErr := client.Close()
 		if closeErr != nil {
 			report.add("daemon_close", "fail", doctorError(closeErr))
 		}
 		return command.finish(app, report)
 	}
-	report.add("session", "pass", "browser-owned authorization was captured in daemon memory")
+	report.add("session", "pass", "selected provider routes authenticated in daemon memory")
 
-	_, folderErr := client.ListMailFolders(app.context, application.MailFolderListInput{
-		Account: accountID,
-		Parent: application.MailFolder{
-			Kind: application.MailFolderDistinguished,
-			ID:   "msgfolderroot",
-		},
-		Traversal: application.MailFolderTraversalDeep,
-		Limit:     1,
-		TimeZone:  "UTC",
-	}, app.caller())
-	if folderErr != nil {
-		report.add("folder_contract", "fail", doctorError(folderErr))
+	if configured.Mail == nil {
+		report.add("folder_contract", "skip", "the account has no mail route")
+		report.add("mail_contract", "skip", "the account has no mail route")
 	} else {
-		report.add("folder_contract", "pass", "metadata response accepted; no folder data emitted")
+		_, folderErr := client.ListMailFolders(app.context, application.MailFolderListInput{
+			Account: accountID,
+			Parent: application.MailFolder{
+				Kind: application.MailFolderDistinguished,
+				ID:   "msgfolderroot",
+			},
+			Traversal: application.MailFolderTraversalDeep,
+			Limit:     1,
+			TimeZone:  "UTC",
+		}, app.caller())
+		if folderErr != nil {
+			report.add("folder_contract", "fail", doctorError(folderErr))
+		} else {
+			report.add("folder_contract", "pass", "metadata response accepted; no folder data emitted")
+		}
+
+		_, mailErr := client.ListMail(app.context, application.MailListInput{
+			Account: accountID,
+			Folder: application.MailFolder{
+				Kind: application.MailFolderDistinguished,
+				ID:   "inbox",
+			},
+			Limit:    1,
+			TimeZone: "UTC",
+		}, app.caller())
+		if mailErr != nil {
+			report.add("mail_contract", "fail", doctorError(mailErr))
+		} else {
+			report.add("mail_contract", "pass", "metadata response accepted; no message data emitted")
+		}
 	}
 
-	_, mailErr := client.ListMail(app.context, application.MailListInput{
-		Account: accountID,
-		Folder: application.MailFolder{
-			Kind: application.MailFolderDistinguished,
-			ID:   "inbox",
-		},
-		Limit:    1,
-		TimeZone: "UTC",
-	}, app.caller())
-	if mailErr != nil {
-		report.add("mail_contract", "fail", doctorError(mailErr))
+	if configured.Calendar == nil {
+		report.add("calendar_folder_contract", "skip", "the account has no calendar route")
+		report.add("calendar_contract", "skip", "the account has no calendar route")
 	} else {
-		report.add("mail_contract", "pass", "metadata response accepted; no message data emitted")
-	}
+		_, folderErr := client.ListCalendarFolders(
+			app.context,
+			application.CalendarFolderListInput{
+				Account: accountID,
+				Limit:   1,
+			},
+			app.caller(),
+		)
+		if folderErr != nil {
+			report.add("calendar_folder_contract", "fail", doctorError(folderErr))
+		} else {
+			report.add(
+				"calendar_folder_contract",
+				"pass",
+				"metadata response accepted; no calendar data emitted",
+			)
+		}
 
-	start := time.Now().UTC().Truncate(time.Second)
-	_, calendarErr := client.ListCalendar(app.context, application.CalendarListInput{
-		Account: accountID,
-		Calendar: application.CalendarFolder{
-			Kind: application.CalendarFolderDistinguished,
-			ID:   "calendar",
-		},
-		Start: start.Format(time.RFC3339),
-		End:   start.Add(time.Hour).Format(time.RFC3339),
-	}, app.caller())
-	if calendarErr != nil {
-		report.add("calendar_contract", "fail", doctorError(calendarErr))
-	} else {
-		report.add("calendar_contract", "pass", "metadata response accepted; no event data emitted")
+		start := time.Now().UTC().Truncate(time.Second)
+		_, calendarErr := client.ListCalendar(app.context, application.CalendarListInput{
+			Account: accountID,
+			Calendar: application.CalendarFolder{
+				Kind: application.CalendarFolderDistinguished,
+				ID:   "calendar",
+			},
+			Start: start.Format(time.RFC3339),
+			End:   start.Add(time.Hour).Format(time.RFC3339),
+		}, app.caller())
+		if calendarErr != nil {
+			report.add("calendar_contract", "fail", doctorError(calendarErr))
+		} else {
+			report.add("calendar_contract", "pass", "metadata response accepted; no event data emitted")
+		}
 	}
 	if err := client.Close(); err != nil {
 		report.add("daemon_close", "fail", doctorError(err))

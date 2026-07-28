@@ -30,6 +30,8 @@ const (
 	defaultRequestTimeout = 30 * time.Second
 )
 
+var errStoredGrantMismatch = errors.New("stored OAuth grant needs fresh authorization")
+
 // Provider is a closed OAuth public-client profile with service-derived least
 // privilege scopes.
 type Provider struct {
@@ -68,6 +70,7 @@ func ProviderFor(
 		if calendarEnabled {
 			result.Scopes = append(
 				result.Scopes,
+				"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 				"https://www.googleapis.com/auth/calendar.events",
 			)
 		}
@@ -173,7 +176,8 @@ func (manager *Manager) Client(
 		return nil, errors.New("OAuth authorization handle is not explicitly consented")
 	}
 	grant, err := manager.load(route, provider)
-	if errors.Is(err, keyring.ErrNotFound) {
+	if errors.Is(err, keyring.ErrNotFound) ||
+		errors.Is(err, errStoredGrantMismatch) {
 		grant, err = manager.authorize(ctx, route, provider)
 	}
 	if err != nil {
@@ -225,8 +229,16 @@ func (manager *Manager) load(
 		grant.RedirectURI != route.RedirectURI ||
 		grant.Token.AccessToken == "" ||
 		!hasScopes(grant.Scopes, provider.Scopes) {
-		return storedGrant{}, errors.New(
+		return storedGrant{}, fmt.Errorf(
+			"%w: %s",
+			errStoredGrantMismatch,
 			"stored OAuth grant does not match the configured public client and scopes",
+		)
+	}
+	if !grant.Token.Valid() && grant.Token.RefreshToken == "" {
+		return storedGrant{}, fmt.Errorf(
+			"%w: stored OAuth grant cannot be refreshed",
+			errStoredGrantMismatch,
 		)
 	}
 	return grant, nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -53,6 +54,134 @@ type googleEvent struct {
 			URI            string `json:"uri"`
 		} `json:"entryPoints"`
 	} `json:"conferenceData,omitempty"`
+}
+
+type googleCalendarListEntry struct {
+	ID              string `json:"id"`
+	Summary         string `json:"summary"`
+	SummaryOverride string `json:"summaryOverride"`
+	TimeZone        string `json:"timeZone"`
+	AccessRole      string `json:"accessRole"`
+	Primary         bool   `json:"primary"`
+	Deleted         bool   `json:"deleted"`
+}
+
+func (client *Client) ListCalendarFolders(
+	ctx context.Context,
+	input application.CalendarFolderListInput,
+) (application.CalendarFolderPage, error) {
+	const maximumPages = 42
+	entries := make([]googleCalendarListEntry, 0, input.Limit)
+	remainingOffset := input.Offset
+	pageToken := ""
+	totalSeen := 0
+	for pageNumber := 0; ; pageNumber++ {
+		if pageNumber >= maximumPages {
+			return application.CalendarFolderPage{}, errors.New(
+				"google Calendar pagination exceeded the bounded offset window",
+			)
+		}
+		requestSize := 250
+		query := url.Values{
+			"maxResults":  {strconv.Itoa(requestSize)},
+			"showDeleted": {"false"},
+			"showHidden":  {"true"},
+		}
+		if pageToken != "" {
+			query.Set("pageToken", pageToken)
+		}
+		var response struct {
+			Items         []googleCalendarListEntry `json:"items"`
+			NextPageToken string                    `json:"nextPageToken"`
+		}
+		if _, err := client.api.DoJSON(
+			ctx,
+			http.MethodGet,
+			"calendar/v3/users/me/calendarList",
+			query,
+			nil,
+			&response,
+			false,
+			nil,
+			http.StatusOK,
+		); err != nil {
+			return application.CalendarFolderPage{}, err
+		}
+		totalSeen += len(response.Items)
+		if totalSeen >
+			application.MaxCalendarFolderOffset+application.MaxCalendarFolderPageSize {
+			return application.CalendarFolderPage{}, errors.New(
+				"google Calendar collection exceeds the bounded offset window",
+			)
+		}
+		start := min(remainingOffset, len(response.Items))
+		remainingOffset -= start
+		if len(entries) < input.Limit {
+			available := response.Items[start:]
+			take := min(input.Limit-len(entries), len(available))
+			entries = append(entries, available[:take]...)
+		}
+		if response.NextPageToken == "" {
+			break
+		}
+		if len(response.NextPageToken) > 8192 ||
+			strings.ContainsAny(response.NextPageToken, "\r\n\x00") ||
+			response.NextPageToken == pageToken {
+			return application.CalendarFolderPage{}, errors.New(
+				"google Calendar returned an invalid pagination token",
+			)
+		}
+		pageToken = response.NextPageToken
+	}
+	result := application.CalendarFolderPage{
+		Calendars:        make([]application.CalendarFolderSummary, 0, len(entries)),
+		TotalCalendars:   totalSeen,
+		IncludesLastItem: input.Offset+len(entries) >= totalSeen,
+	}
+	for _, entry := range entries {
+		if !validGoogleID(entry.ID) || entry.Deleted {
+			return application.CalendarFolderPage{}, errors.New(
+				"google Calendar returned an invalid calendar identity",
+			)
+		}
+		id, err := encodeReference("ggc1_", struct {
+			ID string `json:"id"`
+		}{ID: entry.ID})
+		if err != nil {
+			return application.CalendarFolderPage{}, err
+		}
+		name := entry.SummaryOverride
+		if name == "" {
+			name = entry.Summary
+		}
+		role := googleCalendarAccessRole(entry.AccessRole)
+		result.Calendars = append(
+			result.Calendars,
+			application.CalendarFolderSummary{
+				ID: id, DisplayName: name, IsDefault: entry.Primary,
+				CanEdit:    role == "owner" || role == "writer",
+				AccessRole: role, TimeZone: entry.TimeZone,
+			},
+		)
+	}
+	return result, nil
+}
+
+func googleCalendarAccessRole(value string) string {
+	switch value {
+	case "owner":
+		return "owner"
+	case "writer":
+		return "writer"
+	case "writerWithoutPrivateAccess":
+		return "writer"
+	case "reader":
+		return "reader"
+	case "freeBusyReader":
+		return "free_busy"
+	default:
+		return "unknown"
+	}
 }
 
 func (client *Client) ListCalendarEvents(

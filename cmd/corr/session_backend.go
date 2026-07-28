@@ -1226,6 +1226,31 @@ func (backend *sessionBackend) ListCalendar(
 	return calendar.List(ctx, input, caller)
 }
 
+func (backend *sessionBackend) ListCalendarFolders(
+	ctx context.Context,
+	input application.CalendarFolderListInput,
+	caller domain.Caller,
+) (application.CalendarFolderPage, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.CalendarFolderPage{}, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+
+	services, err := backend.accountServices(ctx, input.Account, caller)
+	if err != nil {
+		return application.CalendarFolderPage{}, err
+	}
+	calendar, err := services.calendarService()
+	if err != nil {
+		return application.CalendarFolderPage{}, err
+	}
+	return calendar.ListFolders(ctx, input, caller)
+}
+
 func (backend *sessionBackend) ListAgenda(
 	ctx context.Context,
 	input application.AgendaProjectionInput,
@@ -1870,10 +1895,6 @@ func (backend *sessionBackend) googleAPIAccount(
 	if calendarEnabled {
 		result.degradations = append(
 			result.degradations,
-			domain.Degradation{
-				Feature: "calendar.selection",
-				Reason:  "the Google API route currently exposes the primary calendar only",
-			},
 			domain.Degradation{
 				Feature: "calendar.online_meeting_create",
 				Reason:  "the Google API route does not provision online meetings",

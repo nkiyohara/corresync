@@ -9,8 +9,8 @@ not available through a raw protocol escape hatch.
 | Provider ID | Mail candidate | Calendar candidate | Authentication | Evidence on `main` |
 | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Live-observed | Live-observed | Visible browser-owned Outlook Web session | Synthetic contracts plus bounded live observations |
-| `google-api` | Gmail | Primary Google Calendar | Explicit BYO public OAuth client; grant in OS keyring | Candidate; synthetic adapter and integration contracts only |
-| `microsoft-graph` | Mail | Primary calendar, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Candidate; synthetic adapter and integration contracts only |
+| `google-api` | Gmail | Selectable Google calendars | Explicit BYO public OAuth client; grant in OS keyring | Candidate; synthetic adapter and integration contracts only |
+| `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Candidate; synthetic adapter and integration contracts only |
 | `jmap` | Mail | — | OS keyring or approved credential helper | Candidate; synthetic RFC 8620 contracts only |
 | `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Candidate; synthetic protocol contracts only |
 | `caldav` | — | Calendar | OS keyring or approved credential helper | Candidate; synthetic WebDAV/iCalendar contracts only |
@@ -71,6 +71,7 @@ Provider differences remain visible:
 <!-- markdownlint-disable MD013 -->
 | Capability | CLI | MCP | Safety |
 | --- | --- | --- | --- |
+| Discover calendars | `corr calendar folders` | `calendar_list_folders` | Bounded metadata and opaque IDs |
 | List one account | `corr calendar list` | `calendar_list` | Bounded absolute window |
 | List all accounts | `corr agenda list --all-accounts` | `agenda_list` | Normalized isolated projection |
 | Create | `corr calendar create` | `calendar_create` + `calendar_create_commit` | Mandatory preview and commit |
@@ -82,10 +83,11 @@ Provider differences remain visible:
 The normalized contract includes bounded subject/body, absolute start/end,
 time zone, location, all-day state, reminder, supported recurrence, and
 required/optional attendees. Capability and degradation records state when a
-provider cannot preserve a field. Google currently selects the primary
-calendar and does not provision an online meeting. Graph reports Teams meeting
-support. Outlook Web can provision a Teams join link as a creation property.
-CalDAV maps typed events through WebDAV/iCalendar and uses conditional writes.
+provider cannot preserve a field. Google discovers every visible calendar but
+does not provision an online meeting. Graph discovers selectable calendars and
+reports Teams meeting support. Outlook Web can provision a Teams join link as
+a creation property. CalDAV discovers VEVENT collections, maps typed events
+through WebDAV/iCalendar, and uses conditional writes.
 
 Create/update/cancel reviews also name the selected route's attendee-
 notification and cancellation disposition. Outlook Web, Google, and Graph use

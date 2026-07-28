@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,11 +37,27 @@ func (manager *Manager) authorize(
 		redirect.Hostname() != "127.0.0.1" {
 		return storedGrant{}, errors.New("OAuth redirect must use loopback HTTP")
 	}
-	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", redirect.Host)
+	callbackPath := redirect.EscapedPath()
+	if callbackPath == "" {
+		callbackPath = "/"
+	}
+	listener, err := (&net.ListenConfig{}).Listen(
+		ctx,
+		"tcp4",
+		net.JoinHostPort("127.0.0.1", redirect.Port()),
+	)
 	if err != nil {
 		return storedGrant{}, fmt.Errorf("listen for OAuth callback: %w", err)
 	}
 	defer func() { _ = listener.Close() }()
+	actualAddress, ok := listener.Addr().(*net.TCPAddr)
+	if !ok || actualAddress.Port < 1 {
+		return storedGrant{}, errors.New("OAuth callback listener has no loopback port")
+	}
+	actualRedirect := *redirect
+	actualRedirect.Host = net.JoinHostPort("127.0.0.1", strconv.Itoa(actualAddress.Port))
+	flowRoute := route
+	flowRoute.RedirectURI = actualRedirect.String()
 
 	state, err := randomURLValue(32)
 	if err != nil {
@@ -52,7 +69,8 @@ func (manager *Manager) authorize(
 		ReadHeaderTimeout: 5 * time.Second,
 		MaxHeaderBytes:    8 << 10,
 		Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			if request.Method != http.MethodGet || request.URL.Path != redirect.Path {
+			if request.Method != http.MethodGet ||
+				request.URL.EscapedPath() != callbackPath {
 				http.NotFound(writer, request)
 				return
 			}
@@ -104,7 +122,7 @@ func (manager *Manager) authorize(
 	}()
 	defer func() { _ = server.Close() }()
 
-	oauthConfig := oauthConfig(route, provider)
+	oauthConfig := oauthConfig(flowRoute, provider)
 	options := []oauth2.AuthCodeOption{oauth2.S256ChallengeOption(verifier)}
 	for name, value := range provider.AuthParams {
 		options = append(options, oauth2.SetAuthURLParam(name, value))

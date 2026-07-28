@@ -380,6 +380,16 @@ func (client *Client) CommitMailDelete(ctx context.Context, token string, caller
 	return result, client.call(ctx, MethodMailCommitDelete, caller, ApprovalInput{Token: token}, &result)
 }
 
+// ListCalendarFolders discovers bounded selectable calendar metadata.
+func (client *Client) ListCalendarFolders(
+	ctx context.Context,
+	input application.CalendarFolderListInput,
+	caller domain.Caller,
+) (application.CalendarFolderPage, error) {
+	var result application.CalendarFolderPage
+	return result, client.call(ctx, MethodCalendarFolders, caller, input, &result)
+}
+
 func (client *Client) ListCalendar(ctx context.Context, input application.CalendarListInput, caller domain.Caller) (application.CalendarPage, error) {
 	var result application.CalendarPage
 	return result, client.call(ctx, MethodCalendarList, caller, input, &result)

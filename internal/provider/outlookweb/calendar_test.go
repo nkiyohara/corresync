@@ -21,6 +21,22 @@ func validCalendarInput() application.CalendarListInput {
 	}
 }
 
+func TestListCalendarFoldersReturnsTheDistinguishedCalendar(t *testing.T) {
+	t.Parallel()
+
+	page, err := (&Client{}).ListCalendarFolders(
+		t.Context(),
+		application.CalendarFolderListInput{Limit: 10},
+	)
+	if err != nil || len(page.Calendars) != 1 ||
+		page.Calendars[0].ID != "calendar" ||
+		!page.Calendars[0].IsDefault ||
+		!page.Calendars[0].CanEdit ||
+		!page.IncludesLastItem {
+		t.Fatalf("ListCalendarFolders() = %#v, %v", page, err)
+	}
+}
+
 func TestCalendarViewRequestMatchesGoldenFixture(t *testing.T) {
 	t.Parallel()
 

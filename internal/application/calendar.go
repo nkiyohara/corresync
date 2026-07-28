@@ -76,6 +76,7 @@ type CalendarReader interface {
 // application service. It intentionally exposes no generic item mutation.
 type CalendarPort interface {
 	CalendarReader
+	CalendarFolderReader
 	CalendarCreator
 	CalendarUpdater
 	CalendarCanceller
@@ -128,6 +129,7 @@ func (effects CalendarEffects) validate() error {
 type CalendarService struct {
 	guard        *Guard
 	reader       CalendarReader
+	folderReader CalendarFolderReader
 	creator      CalendarCreator
 	updater      CalendarUpdater
 	canceller    CalendarCanceller
@@ -155,7 +157,8 @@ func NewCalendarService(
 		return nil, err
 	}
 	return &CalendarService{
-		guard: guard, reader: port, creator: port, updater: port, canceller: port,
+		guard: guard, reader: port, folderReader: port,
+		creator: port, updater: port, canceller: port,
 		maxAttendees: options.MaxAttendees, provenance: options.Provenance,
 		effects: options.Effects,
 	}, nil

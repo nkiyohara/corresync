@@ -218,7 +218,8 @@ func (client *Client) CreateCalendarEvent(
 	objectPath := strings.TrimSuffix(calendarPath, "/") + "/" +
 		url.PathEscape(uid) + "." + ical.Extension
 	etag, err := client.conditionalRequest(
-		ctx, http.MethodPut, objectPath, "If-None-Match", "*", calendar,
+		ctx, http.MethodPut, calendarPath, objectPath,
+		"If-None-Match", "*", calendar,
 	)
 	if err != nil {
 		return application.CalendarCreateResult{}, err
@@ -364,6 +365,7 @@ func (client *Client) UpdateCalendarEvent(
 	etag, err := client.conditionalRequest(
 		ctx,
 		http.MethodPut,
+		reference.Calendar,
 		reference.Path,
 		"If-Match",
 		strconv.Quote(input.ChangeKey),
@@ -399,6 +401,7 @@ func (client *Client) CancelCalendarEvent(
 	_, err = client.conditionalRequest(
 		ctx,
 		http.MethodDelete,
+		reference.Calendar,
 		reference.Path,
 		"If-Match",
 		strconv.Quote(input.ChangeKey),
@@ -415,9 +418,9 @@ func (client *Client) exactEvent(
 	if err != nil {
 		return eventReference{}, nil, ical.Event{}, err
 	}
-	if reference.Calendar != client.calendarPath {
+	if !client.hasCalendar(reference.Calendar) {
 		return eventReference{}, nil, ical.Event{}, errors.New(
-			"CalDAV event belongs to a different calendar",
+			"CalDAV event belongs to an undiscovered calendar",
 		)
 	}
 	object, err := client.dav.GetCalendarObject(ctx, reference.Path)

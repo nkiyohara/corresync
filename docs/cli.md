@@ -217,8 +217,11 @@ permission to retry an ambiguous request.
 ## Calendar
 
 ```console
+corr calendar folders --account work
+
 corr calendar list \
   --account work \
+  --calendar-id opaque-calendar-id \
   --start 2026-07-28T09:00:00Z \
   --end 2026-07-28T17:00:00Z
 
@@ -232,6 +235,9 @@ printf 'Synthetic agenda.\n' | \
     --required-attendee reader@example.invalid \
     --body-file -
 ```
+
+`calendar folders` discovers bounded provider calendars and copyable opaque
+IDs. Omit `--calendar-id` to use the provider's primary calendar.
 
 Creation, update, and cancellation always use preview/commit:
 

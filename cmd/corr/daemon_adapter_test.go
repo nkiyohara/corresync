@@ -196,6 +196,15 @@ func (*adapterTestBackend) DeleteMail(context.Context, application.MailDeleteInp
 func (*adapterTestBackend) CommitMailDelete(context.Context, string, domain.Caller) (application.MailDeleteAccess, error) {
 	return application.MailDeleteAccess{}, nil
 }
+func (*adapterTestBackend) ListCalendarFolders(context.Context, application.CalendarFolderListInput, domain.Caller) (application.CalendarFolderPage, error) {
+	return application.CalendarFolderPage{
+		Calendars: []application.CalendarFolderSummary{{
+			ID: "calendar-1", DisplayName: "Work", IsDefault: true,
+			CanEdit: true, AccessRole: "owner",
+		}},
+		TotalCalendars: 1, IncludesLastItem: true,
+	}, nil
+}
 func (*adapterTestBackend) ListCalendar(context.Context, application.CalendarListInput, domain.Caller) (application.CalendarPage, error) {
 	return application.CalendarPage{}, nil
 }

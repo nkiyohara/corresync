@@ -42,6 +42,7 @@ type Options struct {
 type Client struct {
 	endpoint     *url.URL
 	calendarPath string
+	calendars    []caldav.Calendar
 	username     string
 	password     []byte
 	http         *http.Client
@@ -130,17 +131,29 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		_ = client.Close()
 		return nil, fmt.Errorf("discover CalDAV calendars: %w", err)
 	}
+	if len(calendars) >
+		application.MaxCalendarFolderOffset+application.MaxCalendarFolderPageSize {
+		_ = client.Close()
+		return nil, errors.New("CalDAV calendar discovery exceeds the configured limit")
+	}
 	sort.Slice(calendars, func(left, right int) bool {
 		return calendars[left].Path < calendars[right].Path
 	})
 	selected := ""
+	eventCalendars := make([]caldav.Calendar, 0, len(calendars))
 	for _, calendar := range calendars {
 		if !supportsEvents(calendar.SupportedComponentSet) {
 			continue
 		}
+		if !validDAVPath(calendar.Path) {
+			_ = client.Close()
+			return nil, errors.New("CalDAV discovery returned an invalid calendar path")
+		}
+		eventCalendars = append(eventCalendars, calendar)
 		if options.CalendarPath == "" || calendar.Path == options.CalendarPath {
-			selected = calendar.Path
-			break
+			if selected == "" {
+				selected = calendar.Path
+			}
 		}
 	}
 	if selected == "" {
@@ -151,6 +164,7 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		return nil, errors.New("CalDAV account has no VEVENT calendar")
 	}
 	client.calendarPath = selected
+	client.calendars = eventCalendars
 	return client, nil
 }
 
@@ -289,14 +303,28 @@ func (client *Client) calendarFor(folder application.CalendarFolder) (string, er
 	if err != nil || !validDAVPath(string(data)) {
 		return "", errors.New("CalDAV calendar ID is malformed")
 	}
-	if string(data) != client.calendarPath {
-		return "", errors.New("CalDAV calendar is not selected for this account")
+	if !client.hasCalendar(string(data)) {
+		return "", errors.New("CalDAV calendar was not discovered for this account")
 	}
 	return string(data), nil
 }
 
-func (client *Client) objectURL(objectPath string) (*url.URL, error) {
-	if !validDAVPath(objectPath) || !pathWithin(objectPath, client.calendarPath) {
+func (client *Client) hasCalendar(calendarPath string) bool {
+	for _, calendar := range client.calendars {
+		if calendar.Path == calendarPath {
+			return true
+		}
+	}
+	return false
+}
+
+func (client *Client) objectURL(
+	objectPath string,
+	calendarPath string,
+) (*url.URL, error) {
+	if !client.hasCalendar(calendarPath) ||
+		!validDAVPath(objectPath) ||
+		!pathWithin(objectPath, calendarPath) {
 		return nil, errors.New("CalDAV object path escapes the selected calendar")
 	}
 	target := *client.endpoint
@@ -309,10 +337,10 @@ func (client *Client) objectURL(objectPath string) (*url.URL, error) {
 
 func (client *Client) conditionalRequest(
 	ctx context.Context,
-	method, objectPath, conditionName, conditionValue string,
+	method, calendarPath, objectPath, conditionName, conditionValue string,
 	calendar *ical.Calendar,
 ) (string, error) {
-	target, err := client.objectURL(objectPath)
+	target, err := client.objectURL(objectPath, calendarPath)
 	if err != nil {
 		return "", err
 	}

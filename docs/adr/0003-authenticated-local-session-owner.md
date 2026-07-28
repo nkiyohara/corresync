@@ -65,6 +65,9 @@ adds content-free monitor status plus bounded local event listing and
 acknowledgement; monitor configuration and purge are intentionally absent.
 Protocol version 15 adds the selected calendar route's typed attendee-
 notification and cancellation-disposition semantics to review results.
+Protocol version 16 adds bounded `calendar.folders.list` discovery so every
+provider can expose selectable opaque calendar IDs through the same typed
+application, CLI, and MCP boundary.
 
 Before a client reads the rotating bearer, it authenticates the endpoint
 itself. On Unix it opens the runtime directory without following symlinks,
