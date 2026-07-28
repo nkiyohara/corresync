@@ -158,7 +158,8 @@ jobs:
             catalogs/homebrew/Formula/corresync.rb \
             repositories/homebrew/Formula/corresync.rb
           git -C repositories/homebrew diff --check
-          if git -C repositories/homebrew diff --quiet -- Formula/corresync.rb; then
+          if [[ -z "$(git -C repositories/homebrew status \
+            --porcelain=v1 --untracked-files=all -- Formula/corresync.rb)" ]]; then
             echo "Homebrew Formula is already current."
             exit 0
           fi
@@ -183,7 +184,8 @@ jobs:
             catalogs/scoop/corresync.json \
             repositories/scoop/corresync.json
           git -C repositories/scoop diff --check
-          if git -C repositories/scoop diff --quiet -- corresync.json; then
+          if [[ -z "$(git -C repositories/scoop status \
+            --porcelain=v1 --untracked-files=all -- corresync.json)" ]]; then
             echo "Scoop manifest is already current."
             exit 0
           fi
