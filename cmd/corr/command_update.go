@@ -54,7 +54,7 @@ func (command *updateCommand) Run(app *runtime) error {
 		return (&updateCheckCommand{JSON: command.JSON}).Run(app)
 	default:
 		return fmt.Errorf(
-			"unknown update action %q; use \"corresync update\" or \"corresync update check\"",
+			"unknown update action %q; use \"corr update\" or \"corr update check\"",
 			*command.Action,
 		)
 	}

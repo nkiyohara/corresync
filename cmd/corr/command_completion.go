@@ -21,22 +21,22 @@ type completionInstallCommand struct {
 }
 
 var completionScripts = map[string]string{
-	"bash": `# bash completion for corresync
+	"bash": `# bash completion for corr
 # The installed command resolves itself from PATH for relocatable archives.
-complete -o default -o bashdefault -C corresync corresync
+complete -o default -o bashdefault -C corr corr
 `,
-	"zsh": `#compdef corresync
+	"zsh": `#compdef corr
 # zsh completion for Corresync through its bash-compatible completion protocol.
 autoload -U +X bashcompinit && bashcompinit
-complete -o default -o bashdefault -C corresync corresync
+complete -o default -o bashdefault -C corr corr
 `,
 	"fish": `# fish completion for Corresync
-function __corresync_complete
+function __corr_complete
     set -lx COMP_LINE (commandline -cp)
     test -z (commandline -ct); and set COMP_LINE "$COMP_LINE "
-    command corresync
+    command corr
 end
-complete -f -c corresync -a "(__corresync_complete)"
+complete -f -c corr -a "(__corr_complete)"
 `,
 }
 
@@ -48,7 +48,7 @@ func (command *completionCommand) Run(app *runtime) error {
 		}).Run(app)
 	}
 	if command.Shell != "auto" || command.Force {
-		return errors.New("--shell and --force apply only to `corresync completion install`")
+		return errors.New("--shell and --force apply only to `corr completion install`")
 	}
 	script, exists := completionScripts[command.Action]
 	if !exists {
@@ -124,7 +124,7 @@ func completionInstallPath(
 		} else if !filepath.IsAbs(dataHome) {
 			return "", errors.New("XDG_DATA_HOME must be absolute")
 		}
-		return filepath.Join(dataHome, "bash-completion", "completions", "corresync"), nil
+		return filepath.Join(dataHome, "bash-completion", "completions", commandName), nil
 	case "fish":
 		configHome := lookupCompletionEnv(lookup, "XDG_CONFIG_HOME")
 		if configHome == "" {
@@ -132,7 +132,7 @@ func completionInstallPath(
 		} else if !filepath.IsAbs(configHome) {
 			return "", errors.New("XDG_CONFIG_HOME must be absolute")
 		}
-		return filepath.Join(configHome, "fish", "completions", "corresync.fish"), nil
+		return filepath.Join(configHome, "fish", "completions", commandName+".fish"), nil
 	case "zsh":
 		zshHome := lookupCompletionEnv(lookup, "ZDOTDIR")
 		if zshHome == "" {
@@ -140,7 +140,7 @@ func completionInstallPath(
 		} else if !filepath.IsAbs(zshHome) {
 			return "", errors.New("ZDOTDIR must be absolute")
 		}
-		return filepath.Join(zshHome, ".zfunc", "_corresync"), nil
+		return filepath.Join(zshHome, ".zfunc", "_"+commandName), nil
 	default:
 		return "", fmt.Errorf("unsupported shell %q", shell)
 	}
@@ -173,7 +173,7 @@ func installCompletion(path string, contents []byte, force bool) (string, error)
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return "", fmt.Errorf("create completion directory: %w", err)
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".corresync-completion-*")
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".corr-completion-*")
 	if err != nil {
 		return "", fmt.Errorf("create temporary completion: %w", err)
 	}
@@ -197,7 +197,7 @@ func installCompletion(path string, contents []byte, force bool) (string, error)
 	}
 	var backupPath string
 	if replace {
-		backup, backupErr := os.CreateTemp(filepath.Dir(path), ".corresync-completion-backup-*")
+		backup, backupErr := os.CreateTemp(filepath.Dir(path), ".corr-completion-backup-*")
 		if backupErr != nil {
 			return "", fmt.Errorf("reserve completion backup: %w", backupErr)
 		}

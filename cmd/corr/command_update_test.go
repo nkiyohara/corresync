@@ -146,7 +146,7 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 	app.interactiveOutput = func() bool { return true }
 	app.maybeNotifyUpdate(t.Context())
 	if !strings.Contains(stderr.String(), "Update available") ||
-		!strings.Contains(stderr.String(), "Run corresync update") {
+		!strings.Contains(stderr.String(), "Run corr update") {
 		t.Fatalf("TTY notice missing: %q", stderr.String())
 	}
 

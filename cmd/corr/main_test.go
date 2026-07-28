@@ -90,7 +90,7 @@ func TestRunSupportsConventionalVersionAndHelpForms(t *testing.T) {
 		if code := run(context.Background(), arguments, &stdout, &stderr); code != 0 {
 			t.Fatalf("run(%q) code = %d, stderr = %q", arguments, code, stderr.String())
 		}
-		if !strings.HasPrefix(stdout.String(), "corresync dev ") {
+		if !strings.HasPrefix(stdout.String(), "corr dev ") {
 			t.Fatalf("run(%q) stdout = %q", arguments, stdout.String())
 		}
 	}
@@ -128,7 +128,7 @@ func TestUpdateDefaultsToActionAndKeepsCheckOnlySubcommand(t *testing.T) {
 		t.Fatalf("development update code = %d, want 1; stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 	if !strings.Contains(stderr.String(), "development builds cannot self-update") {
-		t.Fatalf("corresync update did not select the default update action: %q", stderr.String())
+		t.Fatalf("corr update did not select the default update action: %q", stderr.String())
 	}
 
 	stdout.Reset()

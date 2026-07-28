@@ -21,7 +21,7 @@ func (view updateView) writeNotice(current, latest string) error {
 		"\n%s  %s\n   Run %s\n",
 		view.accent(),
 		view.strong("Update available")+"  "+view.muted(versionPair(current, latest)),
-		view.command("corresync update"),
+		view.command("corr update"),
 	)
 	return err
 }
@@ -54,7 +54,7 @@ func (view updateView) writeCheck(report updateReport) error {
 		_, err := view.printf(
 			"%s  %s\n   %s\n",
 			view.success(),
-			view.strong("corresync "+strings.TrimPrefix(report.CurrentVersion, "v")+" is up to date"),
+			view.strong("corr "+strings.TrimPrefix(report.CurrentVersion, "v")+" is up to date"),
 			view.muted("Latest stable "+strings.TrimPrefix(report.LatestVersion, "v")+" · checked "+report.CheckedAt),
 		)
 		return err
@@ -96,7 +96,7 @@ func (view updateView) writeAction(report updateActionReport) error {
 		_, err := view.printf(
 			"%s  %s\n",
 			view.success(),
-			view.strong("corresync "+strings.TrimPrefix(report.CurrentVersion, "v")+" is up to date"),
+			view.strong("corr "+strings.TrimPrefix(report.CurrentVersion, "v")+" is up to date"),
 		)
 		return err
 	case "action_required":

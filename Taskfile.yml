@@ -3,7 +3,7 @@ version: "3"
 set: [errexit, nounset, pipefail]
 
 vars:
-  BINARY: bin/corresync
+  BINARY: bin/corr
 
 tasks:
   default:
@@ -60,7 +60,7 @@ tasks:
     desc: Check licenses of dependencies linked into the release binary
     cmds:
       - >-
-        go-licenses check ./cmd/corresync
+        go-licenses check ./cmd/corr
         --ignore github.com/nkiyohara/corresync
 
   secrets:
@@ -73,7 +73,7 @@ tasks:
     desc: Build the local CLI
     cmds:
       - mkdir -p bin
-      - go build -trimpath -o {{.BINARY}} ./cmd/corresync
+      - go build -trimpath -o {{.BINARY}} ./cmd/corr
 
   release:check:
     desc: Validate the GoReleaser configuration

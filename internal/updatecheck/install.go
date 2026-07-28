@@ -52,7 +52,7 @@ func DetectInstallationContext(ctx context.Context, executable string) InstallMe
 		return InstallWinGet
 	}
 	if runtime.GOOS != "linux" ||
-		(cleaned != "/usr/bin/corresync" && cleaned != "/usr/bin/owa") {
+		(cleaned != "/usr/bin/corr" && cleaned != "/usr/bin/corresync" && cleaned != "/usr/bin/owa") {
 		return InstallDirect
 	}
 	queries := []struct {
@@ -96,7 +96,7 @@ func UpgradeAdvice(method InstallMethod, version string) string {
 	case InstallAPK:
 		return "download and verify the new .apk, then run: sudo apk add ./corresync_" + releaseVersion + "-r*_*.apk"
 	case InstallDirect:
-		return "corresync update"
+		return "corr update"
 	}
 	return "review the verified release and use the original installation surface"
 }

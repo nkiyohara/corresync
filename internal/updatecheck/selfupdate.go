@@ -443,7 +443,7 @@ func releaseArtifactCandidates(
 		return []releaseArtifact{
 			{
 				Archive:    fmt.Sprintf("corresync_%s_%s_%s.tar.gz", versionText, goos, goarch),
-				Executable: "corresync",
+				Executable: "corr",
 			},
 			{
 				Archive:    fmt.Sprintf("owa-bridge_%s_%s_%s.tar.gz", versionText, goos, goarch),
@@ -454,7 +454,7 @@ func releaseArtifactCandidates(
 		return []releaseArtifact{
 			{
 				Archive:    fmt.Sprintf("corresync_%s_windows_%s.zip", versionText, goarch),
-				Executable: "corresync.exe",
+				Executable: "corr.exe",
 			},
 			{
 				Archive:    fmt.Sprintf("owa-bridge_%s_windows_%s.zip", versionText, goarch),

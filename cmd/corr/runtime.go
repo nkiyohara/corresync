@@ -207,11 +207,11 @@ func (app *runtime) requireDaemonStopped() error {
 	defer cancel()
 	owner, inspectErr := client.InspectOwner(ctx, app.caller())
 	if owner.Status().ProcessID > 0 {
-		return errors.New("account changes require a stopped session owner; run `corresync daemon stop`")
+		return errors.New("account changes require a stopped session owner; run `corr daemon stop`")
 	}
 	if inspectErr != nil {
 		return fmt.Errorf(
-			"cannot safely determine whether the session owner is stopped; run `corresync daemon stop`: %w",
+			"cannot safely determine whether the session owner is stopped; run `corr daemon stop`: %w",
 			inspectErr,
 		)
 	}

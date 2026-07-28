@@ -405,7 +405,7 @@ func TestMCPSetupRequiresInitializedConfiguration(t *testing.T) {
 	command := mcpCodexSetupCommand{mcpSetupFlags: mcpSetupFlags{
 		mcpClientConfigFlags: mcpClientConfigFlags{Name: "corresync", Executable: os.Args[0]},
 	}}
-	if err := command.Run(app); err == nil || !strings.Contains(err.Error(), "corresync config init") {
+	if err := command.Run(app); err == nil || !strings.Contains(err.Error(), "corr config init") {
 		t.Fatalf("Run() error = %v, want config initialization guidance", err)
 	}
 }

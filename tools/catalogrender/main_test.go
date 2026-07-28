@@ -34,8 +34,9 @@ func TestRenderBindsCatalogsToChecksums(t *testing.T) {
 		"corresync_1.2.3_source.tar.gz",
 		strings.Repeat("a", 64),
 		`depends_on "go" => :build`,
-		`std_go_args(output: bin/"corresync"`,
-		`man1.install "manpages/corresync.1"`,
+		`std_go_args(output: bin/"corr"`,
+		`bin.install_symlink "corr" => "corresync"`,
+		`man1.install "manpages/corr.1"`,
 		`pkgshare.install "plugins"`,
 		`(pkgshare/".agents").install ".agents/plugins"`,
 		`(pkgshare/".claude-plugin").install ".claude-plugin/marketplace.json"`,
@@ -54,7 +55,12 @@ func TestRenderBindsCatalogsToChecksums(t *testing.T) {
 
 	wingetRoot := filepath.Join(dist, "winget", "manifests", "n", "nkiyohara", "Corresync", "1.2.3")
 	installer := readTestFile(t, filepath.Join(wingetRoot, "nkiyohara.Corresync.installer.yaml"))
-	for _, want := range []string{"PortableCommandAlias: corresync", strings.Repeat("b", 64), strings.Repeat("c", 64)} {
+	for _, want := range []string{
+		"PortableCommandAlias: corr",
+		"PortableCommandAlias: corresync",
+		strings.Repeat("b", 64),
+		strings.Repeat("c", 64),
+	} {
 		if !strings.Contains(installer, want) {
 			t.Errorf("WinGet installer manifest does not contain %q", want)
 		}

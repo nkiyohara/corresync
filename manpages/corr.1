@@ -1,17 +1,16 @@
-.TH CORRESYNC 1 "July 2026" "Corresync" "User Commands"
+.TH CORR 1 "July 2026" "Corresync" "User Commands"
 .SH NAME
-corresync \- local-first Outlook Web mail and calendar CLI and MCP server
+corr \- local-first mail and calendar CLI and MCP server
 .SH SYNOPSIS
-.B corresync
+.B corr
 .RI [ --config " path" ]
 .RI [ --version ]
 .I command
 .RI [ options ]
 .SH DESCRIPTION
-.B corresync
-controls an explicitly authorized Outlook Web session through a dedicated,
-interactive browser profile. It does not require a Microsoft Graph application,
-accept a password, persist browser authorization material, or intercept TLS.
+.B corr
+controls explicitly authorized mail and calendar accounts through provider-specific
+adapters. Corresync does not accept or persist passwords and does not intercept TLS.
 .PP
 CLI and MCP calls use the same typed application operations, deterministic
 policy checks, content-free audit boundary, and authenticated local session
@@ -23,12 +22,15 @@ separate commit.
 Create, locate, show, read, update, edit, and strictly validate the secret-free
 configuration.
 .TP
+.B account
+Discover and manage isolated accounts and their provider routes.
+.TP
 .B doctor
-Diagnose local prerequisites and optionally probe Outlook Web compatibility.
+Diagnose local prerequisites and run explicitly requested provider probes.
 .TP
 .B auth
-Open interactive Outlook Web sign-in, inspect content-free session state, or
-close browsers and clear every in-memory session.
+Open an interactive provider sign-in, inspect content-free session state, or
+close sessions and clear in-memory authorization.
 .TP
 .B mail
 Discover folders; list, search, and read messages; create drafts; send reviewed
@@ -36,10 +38,9 @@ new messages, replies, and forwards; retrieve bounded attachments; move,
 hard-delete, and set read state.
 .TP
 .B calendar
-List calendar event metadata in a bounded time window, or review and create one
-typed event with optional all-day, reminder, recurrence, attendee, and Teams
-link settings. Versioned update and cancellation commands use exact previews
-and commits without enabling general Teams access.
+List calendar event metadata in a bounded time window, or review and create,
+update, or cancel one typed event. Supported Outlook events may request a Teams
+join link; this does not enable general Teams access.
 .TP
 .B daemon
 Start, inspect, or stop the authenticated local session owner.
@@ -62,32 +63,31 @@ Print build and version information.
 .SH EXAMPLES
 .PP
 .nf
-corresync --version
-corresync help auth
-corresync config init
-corresync config set accounts.work.origin https://outlook.cloud.microsoft
-corresync auth login
-corresync auth status
-corresync mail list --limit 25
-corresync calendar list --start 2026-07-17T00:00:00Z \
+corr --version
+corr help auth
+corr config init
+corr account discover reader@example.com
+corr auth login
+corr auth status
+corr mail list --limit 25
+corr calendar list --start 2026-07-17T00:00:00Z \
   --end 2026-07-18T00:00:00Z
-corresync calendar create --subject "Design review" \
-  --start 2026-07-20T09:00:00Z --end 2026-07-20T10:00:00Z \
-  --teams-meeting
+corr calendar create --subject "Design review" \
+  --start 2026-07-20T09:00:00Z --end 2026-07-20T10:00:00Z
 # Review the output, then repeat with --approve.
-corresync calendar update --event-id EVENT --change-key KEY \
+corr calendar update --event-id EVENT --change-key KEY \
   --subject "Updated design review"
-corresync calendar cancel --event-id EVENT --change-key KEY
+corr calendar cancel --event-id EVENT --change-key KEY
 # Both commands preview only; repeat with --approve to commit.
-corresync mcp setup codex
-corresync mcp setup claude-code
-corresync mcp setup github-copilot
-corresync mcp setup gemini-cli
-corresync mcp setup qwen-code
-corresync mcp setup qoder
-corresync completion install
-corresync update
-corresync update check
+corr mcp setup codex
+corr mcp setup claude-code
+corr mcp setup github-copilot
+corr mcp setup gemini-cli
+corr mcp setup qwen-code
+corr mcp setup qoder
+corr completion install
+corr update
+corr update check
 .fi
 .SH EXIT STATUS
 .TP
@@ -109,7 +109,7 @@ Disable terminal color and styling.
 .TP
 .B VISUAL
 Editor command used by
-.BR "corresync config edit" .
+.BR "corr config edit" .
 .TP
 .B EDITOR
 Fallback editor command used when
@@ -119,34 +119,32 @@ is unset.
 Mail and calendar content is untrusted private input. Review exact previews
 before committing a write. Approval tokens are short-lived secret capabilities
 and must not be logged or persisted. If a write reports an unknown outcome,
-inspect mailbox state before retrying.
+inspect provider state before retrying.
 .PP
 Only use
-.B corresync
-with accounts and data you are authorized to access. Undocumented Outlook Web contracts
-can change without notice; run
-.B corresync doctor --online
-after an update or unexplained compatibility failure.
+.B corr
+with accounts and data you are authorized to access. Provider contracts can
+change without notice; run an explicit online doctor probe after an update or
+unexplained compatibility failure.
 .PP
 Automatic update checks read only public release metadata, cache results for
 24 hours, and never write notices to MCP, completion, daemon, piped, or JSON
 output. Only an explicit
-.B corresync update
+.B corr update
 may replace a verified direct installation; package-manager files are never
-modified. Set CORRESYNC_NO_UPDATE_CHECK=1 or configure disable_automatic_checks to
-opt out of startup checks.
+modified. Set CORRESYNC_NO_UPDATE_CHECK=1 or configure disable_automatic_checks
+to opt out of startup checks.
 .SH FILES
 .TP
 .I config.toml
 The effective path is printed by
-.BR "corresync config path" .
-It contains account aliases, Outlook Web origins, browser settings, and policy only; it
-must not contain passwords, cookies, bearer tokens, or canary values.
+.BR "corr config path" .
+It contains account routes, browser settings, credential references, and policy
+only; it must not contain passwords, cookies, bearer tokens, or canary values.
 .SH SEE ALSO
-.BR corresync (1)
-command-specific help is available from
-.BR "corresync command --help"
+Command-specific help is available from
+.BR "corr command --help"
 or
-.BR "corresync help command" .
+.BR "corr help command" .
 Project documentation and the security policy are distributed with release
 archives and native packages.

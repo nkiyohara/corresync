@@ -22,9 +22,9 @@ func TestCompletionScriptsAreRelocatableAndCurrent(t *testing.T) {
 		file  string
 		want  string
 	}{
-		{shell: "bash", file: "corresync.bash", want: "complete -o default"},
-		{shell: "zsh", file: "_corresync", want: "bashcompinit"},
-		{shell: "fish", file: "corresync.fish", want: "command corresync"},
+		{shell: "bash", file: "corr.bash", want: "complete -o default"},
+		{shell: "zsh", file: "_corr", want: "bashcompinit"},
+		{shell: "fish", file: "corr.fish", want: "command corr"},
 	}
 	for _, test := range tests {
 		t.Run(test.shell, func(t *testing.T) {
@@ -46,7 +46,7 @@ func TestCompletionScriptsAreRelocatableAndCurrent(t *testing.T) {
 				t.Fatalf("read committed completion: %v", err)
 			}
 			if string(committed) != stdout.String() {
-				t.Fatalf("%s is stale; regenerate it with `corresync completion %s`", committedPath, test.shell)
+				t.Fatalf("%s is stale; regenerate it with `corr completion %s`", committedPath, test.shell)
 			}
 		})
 	}
@@ -71,7 +71,7 @@ func TestCompletionInstallDetectsShellAndIsIdempotent(t *testing.T) {
 	if output := runInstall(); !strings.Contains(output, "Installed fish completion") {
 		t.Fatalf("first install output = %q", output)
 	}
-	path := filepath.Join(home, "config", "fish", "completions", "corresync.fish")
+	path := filepath.Join(home, "config", "fish", "completions", "corr.fish")
 	first, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +89,7 @@ func TestCompletionInstallDetectsShellAndIsIdempotent(t *testing.T) {
 }
 
 func TestCompletionInstallProtectsDifferentExistingFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "completions", "corresync")
+	path := filepath.Join(t.TempDir(), "completions", "corr")
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func TestCompletionInstallRejectsRelativeBaseOverride(t *testing.T) {
 func TestCompletionModelPredictsNestedCommandsAndEnums(t *testing.T) {
 	t.Parallel()
 
-	parser, err := kong.New(&cli{}, kong.Name("corresync"))
+	parser, err := kong.New(&cli{}, kong.Name(commandName))
 	if err != nil {
 		t.Fatalf("create parser: %v", err)
 	}

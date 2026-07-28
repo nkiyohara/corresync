@@ -13,7 +13,7 @@ func TestUpgradeAdviceCoversEveryInstallationMethod(t *testing.T) {
 		{InstallDeb, "sudo apt install ./corresync_0.4.0-*_*.deb"},
 		{InstallRPM, "sudo dnf install ./corresync-0.4.0-*.rpm"},
 		{InstallAPK, "sudo apk add ./corresync_0.4.0-r*_*.apk"},
-		{InstallDirect, "corresync update"},
+		{InstallDirect, "corr update"},
 	}
 	for _, test := range tests {
 		if got := UpgradeAdvice(test.method, "v0.4.0"); !contains(got, test.want) {
@@ -27,8 +27,11 @@ func TestDetectInstallationRecognizesCatalogPaths(t *testing.T) {
 		path string
 		want InstallMethod
 	}{
+		{"/opt/homebrew/Cellar/corresync/0.8.0/bin/corr", InstallHomebrew},
 		{"/opt/homebrew/Cellar/corresync/0.7.0/bin/corresync", InstallHomebrew},
+		{`C:\Users\reader\scoop\apps\corresync\current\corr.exe`, InstallScoop},
 		{`C:\Users\reader\scoop\apps\corresync\current\corresync.exe`, InstallScoop},
+		{`C:\Users\reader\AppData\Local\Microsoft\WinGet\Packages\nkiyohara.Corresync_Microsoft.Winget.Source_8wekyb3d8bbwe\corr.exe`, InstallWinGet},
 		{`C:\Users\reader\AppData\Local\Microsoft\WinGet\Packages\nkiyohara.Corresync_Microsoft.Winget.Source_8wekyb3d8bbwe\corresync.exe`, InstallWinGet},
 		{"/tmp/corresync", InstallDirect},
 		// These exact historical paths remain recognized only so an existing

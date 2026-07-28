@@ -308,7 +308,7 @@ func selectAccountCandidate(
 		}
 	}
 	return application.ProviderCandidate{}, errors.New(
-		"no automatically selectable provider is available; inspect `corresync account discover` and pass --provider with an explicit endpoint",
+		"no automatically selectable provider is available; inspect `corr account discover` and pass --provider with an explicit endpoint",
 	)
 }
 

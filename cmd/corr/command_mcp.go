@@ -310,7 +310,7 @@ func (command *mcpQoderSetupCommand) Run(app *runtime) error {
 func resolveMCPSetup(app *runtime, name, executable string) (string, string, []string, error) {
 	if _, _, err := app.loadConfig(); err != nil {
 		return "", "", nil, fmt.Errorf(
-			"load Corresync configuration before MCP setup (run `corresync config init` first): %w",
+			"load Corresync configuration before MCP setup (run `corr config init` first): %w",
 			err,
 		)
 	}
@@ -323,7 +323,7 @@ func resolveMCPSetup(app *runtime, name, executable string) (string, string, []s
 		return "", "", nil, fmt.Errorf("inspect Corresync executable %s: %w", executable, err)
 	}
 	if !info.Mode().IsRegular() {
-		return "", "", nil, fmt.Errorf("corresync executable is not a regular file: %s", executable)
+		return "", "", nil, fmt.Errorf("configured executable is not a regular file: %s", executable)
 	}
 	return name, executable, arguments, nil
 }

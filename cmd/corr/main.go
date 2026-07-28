@@ -1,4 +1,4 @@
-// Command corresync provides the Corresync CLI, daemon, and MCP entry point.
+// Command corr provides the Corresync CLI, daemon, and MCP entry point.
 package main
 
 import (
@@ -38,6 +38,8 @@ type cli struct {
 type versionCommand struct {
 	JSON bool `help:"Write machine-readable JSON."`
 }
+
+const commandName = "corr"
 
 func (command *versionCommand) Run(app *runtime) error {
 	if command.JSON {
@@ -80,7 +82,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 	exitCode := -1
 	parser, err := kong.New(
 		&commandLine,
-		kong.Name("corresync"),
+		kong.Name(commandName),
 		kong.Description("Local-first, guarded mail and calendar."),
 		kong.Help(compactHelpPrinter),
 		kong.Vars{"version": versionLine(info)},
@@ -175,7 +177,7 @@ func compactHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 
 func versionLine(info buildinfo.Info) string {
 	return fmt.Sprintf(
-		"corresync %s (commit %s, built %s, %s)",
+		commandName+" %s (commit %s, built %s, %s)",
 		info.Version,
 		info.Commit,
 		info.BuildDate,

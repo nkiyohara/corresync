@@ -113,7 +113,7 @@ func daemonChanged(previous, current daemonapi.Status) bool {
 func (app *runtime) validateDaemonConfig(status daemonapi.Status, configDigest string) error {
 	if status.ConfigDigest != configDigest {
 		return errors.New(
-			"session owner has stale configuration; run `corresync daemon stop` and retry",
+			"session owner has stale configuration; run `corr daemon stop` and retry",
 		)
 	}
 	return nil

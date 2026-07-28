@@ -22,11 +22,12 @@ func TestPackageInventoryRequiresPublicChangelog(t *testing.T) {
 	t.Parallel()
 
 	destinations := []string{
+		"/usr/bin/corr",
 		"/usr/bin/corresync",
-		"/usr/share/bash-completion/completions/corresync",
-		"/usr/share/zsh/site-functions/_corresync",
-		"/usr/share/fish/vendor_completions.d/corresync.fish",
-		"/usr/share/man/man1/corresync.1",
+		"/usr/share/bash-completion/completions/corr",
+		"/usr/share/zsh/site-functions/_corr",
+		"/usr/share/fish/vendor_completions.d/corr.fish",
+		"/usr/share/man/man1/corr.1",
 		"/usr/share/doc/corresync/CHANGELOG.md",
 		"/usr/share/doc/corresync/third_party_licenses",
 		"/usr/share/corresync/plugins/corresync",
@@ -41,8 +42,8 @@ func TestPackageInventoryRequiresPublicChangelog(t *testing.T) {
 		t.Fatalf("complete package inventory missing = %v", missing)
 	}
 
-	withoutChangelog := append([]any(nil), files[:5]...)
-	withoutChangelog = append(withoutChangelog, files[6:]...)
+	withoutChangelog := append([]any(nil), files[:6]...)
+	withoutChangelog = append(withoutChangelog, files[7:]...)
 	missing := packageMissingFiles(map[string]any{"Files": withoutChangelog})
 	if !slices.Contains(missing, "/usr/share/doc/corresync/CHANGELOG.md") {
 		t.Fatalf("package inventory missing = %v, want changelog", missing)

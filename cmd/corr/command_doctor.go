@@ -204,7 +204,7 @@ func (command *doctorCommand) addDaemonStatus(
 				"daemon",
 				"fail",
 				fmt.Sprintf(
-					"running version %s uses protocol %d; run `corresync daemon start` to replace it",
+					"running version %s uses protocol %d; run `corr daemon start` to replace it",
 					status.Version,
 					status.ProtocolVersion,
 				),
@@ -224,7 +224,7 @@ func (command *doctorCommand) addDaemonStatus(
 			"daemon",
 			"fail",
 			fmt.Sprintf(
-				"running version %s uses protocol %d; run `corresync daemon start` to replace it",
+				"running version %s uses protocol %d; run `corr daemon start` to replace it",
 				status.Version,
 				status.ProtocolVersion,
 			),
