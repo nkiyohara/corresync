@@ -174,7 +174,7 @@ func TestDesktopNotifierSeparatesUntrustedLinuxOptions(t *testing.T) {
 	if err := notifier.Notify(t.Context(), application.MonitorRelease{
 		Destination: "desktop",
 		Event: map[string]any{
-			"subject": "--urgency=critical",
+			"subject": "--urgency=critical <b>unsafe & urgent</b>",
 		},
 	}); err != nil {
 		t.Fatalf("Notify() error = %v", err)
@@ -183,7 +183,7 @@ func TestDesktopNotifierSeparatesUntrustedLinuxOptions(t *testing.T) {
 		"--app-name=Corresync",
 		"--",
 		"Corresync",
-		"--urgency=critical",
+		"--urgency=critical &lt;b&gt;unsafe &amp; urgent&lt;/b&gt;",
 	}) {
 		t.Fatalf("notification arguments = %+v", arguments)
 	}

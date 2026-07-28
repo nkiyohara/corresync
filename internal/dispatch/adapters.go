@@ -112,7 +112,7 @@ func (notifier *DesktopNotifier) Notify(
 			"--app-name=Corresync",
 			"--",
 			title,
-			summary,
+			escapeNotificationMarkup(summary),
 		)
 	case "darwin":
 		command, err := notifier.lookPath("osascript")
@@ -133,6 +133,14 @@ end run`,
 	default:
 		return ValidateDesktopNotificationPlatform(notifier.goos)
 	}
+}
+
+func escapeNotificationMarkup(value string) string {
+	return strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+	).Replace(value)
 }
 
 func notificationSummary(event map[string]any) string {

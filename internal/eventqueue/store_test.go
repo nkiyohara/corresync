@@ -234,6 +234,39 @@ func TestRetentionPrunesOnlyAcknowledgedEvents(t *testing.T) {
 	}
 }
 
+func TestMarkNotificationPersistsTheMaximumHourlyBatch(t *testing.T) {
+	t.Parallel()
+	store := NewAt(t.TempDir())
+	now := time.Now().UTC()
+	if err := store.MarkNotification(
+		t.Context(),
+		testAccountA,
+		application.MaxMonitorDispatchesPerHour,
+		now,
+	); err != nil {
+		t.Fatalf("MarkNotification() error = %v", err)
+	}
+	status, err := store.Status(t.Context(), testAccountA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.DispatchedLastHour != application.MaxMonitorDispatchesPerHour {
+		t.Fatalf(
+			"DispatchedLastHour = %d, want %d",
+			status.DispatchedLastHour,
+			application.MaxMonitorDispatchesPerHour,
+		)
+	}
+	if err := store.MarkNotification(
+		t.Context(),
+		testAccountA,
+		1,
+		now,
+	); err == nil {
+		t.Fatal("MarkNotification() exceeded the hourly history bound")
+	}
+}
+
 func TestStoreRejectsSymlinkState(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink privilege is platform-specific")

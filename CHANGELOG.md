@@ -47,8 +47,10 @@ All notable user-facing changes are recorded here. The project follows
   and peer UIDs before transmitting the rotating daemon bearer; reject
   symlinks, wrong types/owners/modes, squatters, and replacement races.
 - Keep attacker-controlled notification metadata behind native argument
-  boundaries, reject NUL metadata, time-bound notification utilities, and
-  reject Windows `notify` setup until Corresync has a registered AppUserModelID.
+  boundaries, escape Linux notification markup, reject NUL metadata, time-bound
+  notification utilities, persist the full configured hourly rate-limit batch,
+  and reject Windows `notify` setup until Corresync has a registered
+  AppUserModelID.
 - Add `corr feedback`, an allowlisted deterministic report with an optional
   bounded generalized last-error record. Generation is local; copy/save/open
   actions occur only after full display, and GitHub is never submitted

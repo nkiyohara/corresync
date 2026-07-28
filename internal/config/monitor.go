@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
 )
 
@@ -83,8 +84,12 @@ func (monitor Monitor) validate() error {
 		duration > 90*24*time.Hour {
 		return errors.New("retention must be between 1 hour and 90 days")
 	}
-	if monitor.RateLimitHour < 1 || monitor.RateLimitHour > 1000 {
-		return errors.New("rate_limit_hour must be between 1 and 1000")
+	if monitor.RateLimitHour < 1 ||
+		monitor.RateLimitHour > application.MaxMonitorDispatchesPerHour {
+		return fmt.Errorf(
+			"rate_limit_hour must be between 1 and %d",
+			application.MaxMonitorDispatchesPerHour,
+		)
 	}
 	if monitor.QuietHours != nil {
 		if err := monitor.QuietHours.validate(); err != nil {

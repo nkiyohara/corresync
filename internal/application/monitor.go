@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	MaxMonitorEventsPage = 100
-	MonitorTrustMarker   = "untrusted_data"
+	MaxMonitorEventsPage        = 100
+	MaxMonitorDispatchesPerHour = 1000
+	MonitorTrustMarker          = "untrusted_data"
 )
 
 // MonitorPolicy is the secret-free, immutable account policy visible to
@@ -251,7 +252,7 @@ func (status MonitorStatus) Validate(expected domain.AccountID) error {
 		status.Queue.ScanFailures < 0 ||
 		status.Queue.DispatchFailures < 0 ||
 		status.Queue.DispatchedLastHour < 0 ||
-		status.Queue.DispatchedLastHour > 1000 {
+		status.Queue.DispatchedLastHour > MaxMonitorDispatchesPerHour {
 		return errors.New("monitor queue status has invalid counts")
 	}
 	if !status.Mode.Collects() {
@@ -260,7 +261,8 @@ func (status MonitorStatus) Validate(expected domain.AccountID) error {
 		}
 		return nil
 	}
-	if status.RateLimitHour < 1 || status.RateLimitHour > 1000 ||
+	if status.RateLimitHour < 1 ||
+		status.RateLimitHour > MaxMonitorDispatchesPerHour ||
 		len(status.Filter.SenderDomains) > 32 ||
 		len(status.Filter.SubjectContains) > 32 {
 		return errors.New("monitor status has invalid policy bounds")

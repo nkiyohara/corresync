@@ -340,7 +340,8 @@ func (store *Store) MarkDispatch(
 	state.CircuitOpenUntil = nil
 	state.LastDispatchAt = &dispatched
 	pruneDispatches(&state, dispatched.Add(-time.Hour))
-	if len(state.Dispatches)+len(eventIDs) > 1000 {
+	if len(state.Dispatches)+len(eventIDs) >
+		application.MaxMonitorDispatchesPerHour {
 		return errors.New("dispatch history reached its hourly safety bound")
 	}
 	for range len(eventIDs) {
@@ -358,8 +359,11 @@ func (store *Store) MarkNotification(
 	if err := account.ValidateOpaque(); err != nil {
 		return err
 	}
-	if count < 1 || count > 100 {
-		return errors.New("notification batch must contain 1 through 100 events")
+	if count < 1 || count > application.MaxMonitorDispatchesPerHour {
+		return fmt.Errorf(
+			"notification batch must contain 1 through %d events",
+			application.MaxMonitorDispatchesPerHour,
+		)
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -376,7 +380,8 @@ func (store *Store) MarkNotification(
 	state.CircuitOpenUntil = nil
 	state.LastDispatchAt = &released
 	pruneDispatches(&state, released.Add(-time.Hour))
-	if len(state.Dispatches)+count > 1000 {
+	if len(state.Dispatches)+count >
+		application.MaxMonitorDispatchesPerHour {
 		return errors.New("notification history reached its hourly safety bound")
 	}
 	for range count {
@@ -610,7 +615,8 @@ func (store *Store) load(account domain.AccountID) (persistedState, string, erro
 		}
 	}
 	if state.ScanFailures < 0 || state.DispatchFailures < 0 ||
-		len(state.Dispatches) > 1000 || len(state.LastError) > 64 ||
+		len(state.Dispatches) > application.MaxMonitorDispatchesPerHour ||
+		len(state.LastError) > 64 ||
 		strings.ContainsAny(state.LastError, "\r\n\x00") {
 		return persistedState{}, "", errors.New("monitor state counters are invalid")
 	}
