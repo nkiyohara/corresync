@@ -177,7 +177,7 @@ func (route MailRoute) validate() error {
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires google_web settings")
 		}
-		return route.GoogleWeb.validate()
+		return route.GoogleWeb.validateFor("mail.google.com")
 	case domain.ProviderMicrosoftGraph:
 		if route.MicrosoftGraph == nil {
 			return errors.New("microsoft-graph requires microsoft_graph settings")
@@ -221,7 +221,7 @@ func (route CalendarRoute) validate() error {
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires google_web settings")
 		}
-		return route.GoogleWeb.validate()
+		return route.GoogleWeb.validateFor("calendar.google.com")
 	case domain.ProviderMicrosoftGraph:
 		if route.MicrosoftGraph == nil {
 			return errors.New("microsoft-graph requires microsoft_graph settings")
@@ -368,6 +368,17 @@ func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
 
 func (route WebRoute) validate() error {
 	return validateOrigin(route.Origin)
+}
+
+func (route WebRoute) validateFor(host string) error {
+	if err := route.validate(); err != nil {
+		return err
+	}
+	parsed, _ := url.Parse(route.Origin)
+	if parsed.Host != host {
+		return fmt.Errorf("google Web origin must be https://%s", host)
+	}
+	return nil
 }
 
 func (endpoint TLSEndpoint) validate(name string) error {

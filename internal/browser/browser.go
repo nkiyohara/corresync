@@ -1,4 +1,5 @@
-// Package browser launches an isolated, visible Chromium session for Outlook.
+// Package browser launches isolated, visible Chromium sessions for explicitly
+// configured provider-owned web applications.
 package browser
 
 import (
@@ -6,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,10 +21,16 @@ import (
 
 // Options define the browser-owned authentication boundary.
 type Options struct {
-	Origin     string
-	ProfileDir string
-	Executable string
-	Headless   bool
+	Origin            string
+	AdditionalOrigins []string
+	StartURL          string
+	ProfileDir        string
+	Executable        string
+	Headless          bool
+	// BrowserOwnedOnly disables the Outlook network authorization observer.
+	// Closed semantic DOM drivers use this mode so cookies, bearer tokens, and
+	// browser storage remain exclusively inside the browser process.
+	BrowserOwnedOnly bool
 }
 
 // Browser owns a Chromium process, target, observer, and session manager.
@@ -31,6 +39,7 @@ type Browser struct {
 	cancelContext   context.CancelFunc
 	cancelAllocator context.CancelFunc
 	sessions        *session.Manager
+	allowedOrigins  map[string]struct{}
 	interactionMu   sync.Mutex
 	closeOnce       sync.Once
 	closeErr        error
@@ -53,9 +62,12 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 		return nil, fmt.Errorf("protect browser profile: %w", err)
 	}
 
-	manager, err := session.NewManager(options.Origin)
-	if err != nil {
-		return nil, err
+	var manager *session.Manager
+	if !options.BrowserOwnedOnly {
+		manager, err = session.NewManager(options.Origin)
+		if err != nil {
+			return nil, err
+		}
 	}
 	execOptions := append([]chromedp.ExecAllocatorOption{}, chromedp.DefaultExecAllocatorOptions[:]...)
 	execOptions = append(
@@ -74,15 +86,20 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 		cancelContext:   cancelContext,
 		cancelAllocator: cancelAllocator,
 		sessions:        manager,
+		allowedOrigins:  allowedBrowserOrigins(options),
 	}
-	observer := newRequestObserver(manager)
-	chromedp.ListenTarget(browserContext, observer.Handle)
-
-	if err := chromedp.Run(browserContext, network.Enable()); err != nil {
-		_ = instance.Close()
-		return nil, fmt.Errorf("start browser network observer: %w", err)
+	if manager != nil {
+		observer := newRequestObserver(manager)
+		chromedp.ListenTarget(browserContext, observer.Handle)
+		if err := chromedp.Run(browserContext, network.Enable()); err != nil {
+			_ = instance.Close()
+			return nil, fmt.Errorf("start browser network observer: %w", err)
+		}
 	}
-	loginURL := strings.TrimSuffix(options.Origin, "/") + "/mail/"
+	loginURL := options.StartURL
+	if loginURL == "" {
+		loginURL = strings.TrimSuffix(options.Origin, "/") + "/mail/"
+	}
 	if err := chromedp.Run(browserContext, chromedp.Navigate(loginURL)); err != nil {
 		_ = instance.Close()
 		return nil, fmt.Errorf("navigate to Outlook Web: %w", err)
@@ -92,18 +109,33 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 
 // WaitForSession waits for an authorized first-party Outlook Web request.
 func (browser *Browser) WaitForSession(ctx context.Context) (session.Credentials, error) {
+	if browser.sessions == nil {
+		return session.Credentials{}, errors.New(
+			"authorization observation is disabled for this browser",
+		)
+	}
 	return browser.sessions.Wait(ctx)
 }
 
 // CurrentSession returns the current browser-observed authorization snapshot
 // without waiting for a new request.
 func (browser *Browser) CurrentSession() (session.Credentials, error) {
+	if browser.sessions == nil {
+		return session.Credentials{}, errors.New(
+			"authorization observation is disabled for this browser",
+		)
+	}
 	return browser.sessions.Current()
 }
 
 // Apply applies the newest browser-observed credentials to an exact-origin
 // request without exposing them to callers.
 func (browser *Browser) Apply(request *http.Request) error {
+	if browser.sessions == nil {
+		return errors.New(
+			"authorization observation is disabled for this browser",
+		)
+	}
 	return browser.sessions.Apply(request)
 }
 
@@ -130,5 +162,42 @@ func validateOptions(options Options) error {
 	if _, err := session.NewManager(options.Origin); err != nil {
 		return fmt.Errorf("validate browser origin: %w", err)
 	}
+	allowed := allowedBrowserOrigins(options)
+	for _, origin := range options.AdditionalOrigins {
+		if _, err := session.NewManager(origin); err != nil {
+			return fmt.Errorf("validate additional browser origin: %w", err)
+		}
+	}
+	if options.StartURL != "" {
+		target, err := url.Parse(options.StartURL)
+		if err != nil || target.User != nil ||
+			strings.ContainsAny(options.StartURL, "\r\n\x00") {
+			return errors.New("browser start URL is malformed")
+		}
+		if _, exists := allowed[browserRequestOrigin(target)]; !exists {
+			return errors.New("browser start URL is outside the approved origins")
+		}
+	}
 	return nil
+}
+
+func allowedBrowserOrigins(options Options) map[string]struct{} {
+	result := make(map[string]struct{}, 1+len(options.AdditionalOrigins))
+	for _, raw := range append([]string{options.Origin}, options.AdditionalOrigins...) {
+		parsed, err := url.Parse(raw)
+		if err == nil {
+			if origin := browserRequestOrigin(parsed); origin != "" {
+				result[origin] = struct{}{}
+			}
+		}
+	}
+	return result
+}
+
+func browserRequestOrigin(target *url.URL) string {
+	if target == nil || target.Scheme != "https" || target.Host == "" ||
+		target.User != nil {
+		return ""
+	}
+	return "https://" + strings.ToLower(target.Host)
 }

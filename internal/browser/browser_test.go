@@ -1,10 +1,36 @@
 package browser
 
 import (
+	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestBrowserOwnedModeCannotExposeAuthorization(t *testing.T) {
+	t.Parallel()
+
+	instance := &Browser{}
+	if _, err := instance.WaitForSession(context.Background()); err == nil {
+		t.Fatal("WaitForSession() exposed a browser-owned session")
+	}
+	if _, err := instance.CurrentSession(); err == nil {
+		t.Fatal("CurrentSession() exposed a browser-owned session")
+	}
+	request, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"https://mail.google.com/",
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := instance.Apply(request); err == nil {
+		t.Fatal("Apply() exposed a browser-owned session")
+	}
+}
 
 func TestValidateOptions(t *testing.T) {
 	t.Parallel()
@@ -16,12 +42,23 @@ func TestValidateOptions(t *testing.T) {
 	if err := validateOptions(valid); err != nil {
 		t.Fatalf("validateOptions() error = %v", err)
 	}
+	google := valid
+	google.Origin = "https://mail.google.com"
+	google.AdditionalOrigins = []string{"https://calendar.google.com"}
+	google.StartURL = "https://mail.google.com/mail/u/0/#inbox"
+	if err := validateOptions(google); err != nil {
+		t.Fatalf("validateOptions(Google) error = %v", err)
+	}
 
 	tests := []Options{
 		{},
 		{Origin: "http://outlook.example", ProfileDir: valid.ProfileDir},
 		{Origin: valid.Origin, ProfileDir: "relative/profile"},
 		{Origin: valid.Origin, ProfileDir: valid.ProfileDir, Executable: "chrome\n--flag"},
+		{
+			Origin: valid.Origin, ProfileDir: valid.ProfileDir,
+			StartURL: "https://example.invalid/",
+		},
 	}
 	for _, options := range tests {
 		if err := validateOptions(options); err == nil {

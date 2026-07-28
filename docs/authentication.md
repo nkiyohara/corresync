@@ -50,12 +50,14 @@ These routes require an explicitly configured public OAuth client and a
 registered loopback redirect:
 
 ```text
-http://127.0.0.1:<registered-port>/<registered-path>
+http://127.0.0.1:<registered-or-ephemeral-port>/<registered-path>
 ```
 
-Login opens the provider authorization page in a browser, binds the redirect
-to an unpredictable state value, and accepts only the exact configured
-loopback URI. Corresync never accepts a client secret, device-code unattended
+Login first prints the exact service-derived scopes. It then opens the provider
+authorization page in a browser when a matching valid grant is absent, binds
+the redirect to an unpredictable state value, and accepts only the configured
+loopback path and actual bound port. Configured port `0` requests an available
+ephemeral port. Corresync never accepts a client secret, device-code unattended
 flow, password grant, or broad tenant credential.
 
 The resulting grant is stored by the operating-system keyring under the

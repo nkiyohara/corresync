@@ -23,6 +23,10 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	if err != nil {
 		return err
 	}
+	_, configured, exists := configuration.AccountByID(accountID)
+	if !exists {
+		return errors.New("configured account route disappeared")
+	}
 	if command.Terminal {
 		if _, err := interactiveTerminalInput(app); err != nil {
 			return err
@@ -35,6 +39,9 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
 	if command.Terminal {
 		return runTerminalLogin(app, client, accountID)
+	}
+	if err := writeOAuthConsentNotice(app, configured); err != nil {
+		return err
 	}
 	result, err := client.Login(app.context, accountID, app.caller())
 	if err != nil {

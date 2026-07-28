@@ -10,14 +10,17 @@ import (
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/credential"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
 	"github.com/nkiyohara/corresync/internal/provider/googleapi"
+	"github.com/nkiyohara/corresync/internal/provider/googleweb"
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
+	"github.com/nkiyohara/corresync/internal/session"
 )
 
 type oauthManagerStub struct {
@@ -26,6 +29,62 @@ type oauthManagerStub struct {
 	provider oauthlocal.Provider
 	client   *http.Client
 	err      error
+}
+
+type googleWebBrowserStub struct {
+	waitOrigins []string
+	closed      bool
+}
+
+func (*googleWebBrowserStub) WaitForSession(
+	context.Context,
+) (session.Credentials, error) {
+	return session.Credentials{}, errors.New("authorization observation is disabled")
+}
+
+func (*googleWebBrowserStub) Apply(*http.Request) error {
+	return errors.New("authorization observation is disabled")
+}
+
+func (stub *googleWebBrowserStub) Close() error {
+	stub.closed = true
+	return nil
+}
+
+func (stub *googleWebBrowserStub) WaitForGoogleWeb(
+	_ context.Context,
+	origins []string,
+) error {
+	stub.waitOrigins = append([]string(nil), origins...)
+	return nil
+}
+
+func (*googleWebBrowserStub) GoogleIdentity(
+	context.Context,
+	string,
+) (string, error) {
+	return "reader@example.test", nil
+}
+
+func (*googleWebBrowserStub) GoogleMailRows(
+	context.Context,
+	string,
+) ([]browser.GoogleMailRow, error) {
+	return nil, nil
+}
+
+func (*googleWebBrowserStub) GoogleMailBody(
+	context.Context,
+	string,
+) (string, error) {
+	return "", nil
+}
+
+func (*googleWebBrowserStub) GoogleCalendarRows(
+	context.Context,
+	string,
+) ([]browser.GoogleCalendarRow, error) {
+	return nil, nil
 }
 
 func TestProjectionAccountsExposeOnlyContentFreePerServiceStatus(t *testing.T) {
@@ -469,6 +528,94 @@ func TestSessionBackendOnlyAuthorizesGraphForExplicitCLILogin(t *testing.T) {
 			manager.calls,
 			factoryCalls,
 			manager.provider,
+		)
+	}
+}
+
+func TestSessionBackendOnlyOpensBrowserOwnedGoogleForExplicitCLILogin(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	const accountID domain.AccountID = "acc_00000000000000000000000000000001"
+	configuration := config.Default()
+	configuration.Accounts["work"] = config.Account{
+		ID: accountID, Address: "reader@example.test",
+		Mail: &config.MailRoute{
+			Provider: domain.ProviderGoogleWeb,
+			GoogleWeb: &config.WebRoute{
+				Origin: "https://mail.google.com",
+			},
+		},
+		Calendar: &config.CalendarRoute{
+			Provider: domain.ProviderGoogleWeb,
+			GoogleWeb: &config.WebRoute{
+				Origin: "https://calendar.google.com",
+			},
+		},
+	}
+	factoryError := errors.New("synthetic Google Web factory stop")
+	factoryCalls := 0
+	launchCalls := 0
+	handle := &googleWebBrowserStub{}
+	app := &runtime{
+		context: t.Context(),
+		stderr:  &strings.Builder{},
+		launch: func(
+			_ context.Context,
+			options browser.Options,
+		) (browserHandle, error) {
+			launchCalls++
+			if !options.BrowserOwnedOnly ||
+				options.Origin != "https://mail.google.com" ||
+				!slices.Equal(
+					options.AdditionalOrigins,
+					[]string{"https://calendar.google.com"},
+				) {
+				t.Fatalf("browser options = %#v", options)
+			}
+			return handle, nil
+		},
+	}
+	backend := &sessionBackend{
+		app:           app,
+		configuration: configuration,
+		accounts:      make(map[domain.AccountID]sessionAccount),
+		previews:      make(map[string]sessionPreview),
+		lifecycle:     t.Context(),
+		newGoogleWeb: func(
+			_ context.Context,
+			options googleweb.Options,
+		) (*googleweb.Client, error) {
+			factoryCalls++
+			if !options.Mail || !options.Calendar || options.Driver != handle ||
+				options.ExpectedAddress != "reader@example.test" {
+				t.Fatalf("Google Web options = %#v", options)
+			}
+			return nil, factoryError
+		},
+	}
+	mcpCaller := domain.Caller{Surface: "mcp", Instance: "synthetic-client"}
+	cliCaller := domain.Caller{Surface: "cli", Instance: "synthetic-process"}
+
+	if _, err := backend.Login(t.Context(), accountID, mcpCaller); err == nil {
+		t.Fatal("MCP Login() unexpectedly opened Google Web")
+	}
+	if launchCalls != 0 || factoryCalls != 0 {
+		t.Fatalf("MCP touched browser: launch=%d factory=%d", launchCalls, factoryCalls)
+	}
+	if _, err := backend.Login(t.Context(), accountID, cliCaller); !errors.Is(
+		err,
+		factoryError,
+	) {
+		t.Fatalf("CLI Login() error = %v", err)
+	}
+	if launchCalls != 1 || factoryCalls != 1 || !handle.closed {
+		t.Fatalf(
+			"explicit Google Web login = launch %d factory %d closed %t",
+			launchCalls,
+			factoryCalls,
+			handle.closed,
 		)
 	}
 }

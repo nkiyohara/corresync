@@ -501,7 +501,7 @@ func (service *AccountService) validateMailRoute(route AccountMailRouteInput) er
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires Google Web settings")
 		}
-		return validateAccountOrigin(route.GoogleWeb.Origin)
+		return validateGoogleWebOrigin(route.GoogleWeb.Origin, "mail.google.com")
 	case domain.ProviderMicrosoftGraph:
 		if route.MicrosoftGraph == nil {
 			return errors.New("microsoft-graph requires Microsoft Graph settings")
@@ -597,7 +597,10 @@ func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteI
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires Google Web settings")
 		}
-		return validateAccountOrigin(route.GoogleWeb.Origin)
+		return validateGoogleWebOrigin(
+			route.GoogleWeb.Origin,
+			"calendar.google.com",
+		)
 	case domain.ProviderMicrosoftGraph:
 		if route.MicrosoftGraph == nil {
 			return errors.New("microsoft-graph requires Microsoft Graph settings")
@@ -666,6 +669,17 @@ func validateOAuthInput(
 		return errors.New("OAuth authorization must use the OS keyring")
 	}
 	return validateAccountCredential(route.Authorization)
+}
+
+func validateGoogleWebOrigin(raw, host string) error {
+	if err := validateAccountOrigin(raw); err != nil {
+		return err
+	}
+	parsed, _ := url.Parse(raw)
+	if parsed.Host != host {
+		return fmt.Errorf("google Web origin must be https://%s", host)
+	}
+	return nil
 }
 
 func validateCalDAVInput(route AccountCalDAVInput) error {

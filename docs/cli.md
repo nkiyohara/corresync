@@ -49,13 +49,13 @@ Examples:
 # Outlook Web
 corr account add reader@example.invalid \
   --alias work \
-  --provider microsoft-owa \
+  --mail-provider microsoft-owa \
   --origin https://outlook.cloud.microsoft
 
 # Gmail and Google Calendar with an authorized public client
 corr account add reader@example.invalid \
   --alias personal \
-  --provider google-api \
+  --mail-provider google-api \
   --calendar-provider google-api \
   --oauth-client-id synthetic-public-client \
   --oauth-redirect-uri http://127.0.0.1:8765/callback \
@@ -65,7 +65,7 @@ corr account add reader@example.invalid \
 # IMAP/SMTP mail plus CalDAV calendar
 corr account add reader@example.invalid \
   --alias standards \
-  --provider imap-smtp \
+  --mail-provider imap-smtp \
   --calendar-provider caldav \
   --imap-host imap.example.invalid \
   --imap-port 993 \
@@ -78,9 +78,22 @@ corr account add reader@example.invalid \
   --calendar-credential-key standards-calendar \
   --approve-credential \
   --approve-calendar-credential
+
+# Calendar-only Graph route with a dynamically allocated loopback port
+corr account add reader@example.invalid \
+  --alias calendar-only \
+  --mail-provider none \
+  --calendar-provider microsoft-graph \
+  --calendar-oauth-client-id synthetic-public-client \
+  --calendar-oauth-redirect-uri http://127.0.0.1:0/callback \
+  --calendar-authorization-key calendar-graph \
+  --approve-calendar-oauth
 ```
 
-No account command accepts a password or token.
+Mail and calendar providers are independent. Calendar-specific OAuth flags
+default to their shared `--oauth-*` values; set them explicitly when the two
+services use different providers or grants. `--provider` remains a compatibility
+alias for `--mail-provider`. No account command accepts a password or token.
 
 ## Authentication and doctor
 
@@ -93,7 +106,8 @@ corr doctor
 corr doctor --online --account work
 ```
 
-`auth login` invokes the route's browser/keyring/helper authentication.
+`auth login` displays the exact OAuth scope set before any provider page can
+open, then invokes the route's browser/keyring/helper authentication.
 `--terminal` is an experimental Outlook-Web-only browser relay and requires an
 interactive TTY. `auth status` is content-free.
 

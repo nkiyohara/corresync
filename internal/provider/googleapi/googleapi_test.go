@@ -306,6 +306,25 @@ func TestGoogleAPIRejectsIdentityMismatch(t *testing.T) {
 	}
 }
 
+func TestGoogleAPIRejectsReadOnlyPrimaryCalendarForWriteRoute(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		_ *http.Request,
+	) {
+		writeGoogleJSON(t, writer, map[string]string{
+			"id": "reader@example.test", "accessRole": "reader",
+		})
+	}))
+	defer server.Close()
+	client, err := New(t.Context(), Options{
+		APIBase: server.URL, Calendar: true, HTTP: server.Client(),
+	})
+	if client != nil || err == nil || !strings.Contains(err.Error(), "not editable") {
+		t.Fatalf("client = %#v error = %v", client, err)
+	}
+}
+
 func TestGmailPaginationTraversesBeyondTheFirstFiveHundredMessages(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(

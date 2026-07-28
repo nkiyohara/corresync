@@ -38,7 +38,8 @@ type accountShowCommand struct {
 type accountAddCommand struct {
 	Address                   string `arg:"" help:"Bare email address for the account."`
 	Alias                     string `help:"Local alias; defaults to the address local part."`
-	Provider                  string `help:"Explicit primary provider override."`
+	Provider                  string `help:"Compatibility alias for --mail-provider."`
+	MailProvider              string `help:"Explicit mail provider override; use none for calendar-only."`
 	CalendarProvider          string `help:"Explicit calendar provider override; use none for mail-only."`
 	Origin                    string `help:"Outlook Web HTTPS origin override."`
 	Mailbox                   string `help:"Optional Outlook mailbox identity."`
@@ -48,6 +49,11 @@ type accountAddCommand struct {
 	OAuthRedirectURI          string `name:"oauth-redirect-uri" help:"Registered http://127.0.0.1 loopback redirect URI."`
 	AuthorizationKey          string `help:"OS-keyring handle for the OAuth grant."`
 	ApproveOAuth              bool   `name:"approve-oauth" help:"Confirm explicit OAuth authorization when no valid grant exists."`
+	CalendarAPIBase           string `name:"calendar-api-base" help:"Calendar OAuth API HTTPS base override."`
+	CalendarOAuthClientID     string `name:"calendar-oauth-client-id" help:"Calendar BYO OAuth public-client ID; defaults to --oauth-client-id."`
+	CalendarOAuthRedirectURI  string `name:"calendar-oauth-redirect-uri" help:"Calendar loopback redirect; defaults to --oauth-redirect-uri."`
+	CalendarAuthorizationKey  string `name:"calendar-authorization-key" help:"Calendar OAuth grant key; defaults to --authorization-key."`
+	ApproveCalendarOAuth      bool   `name:"approve-calendar-oauth" help:"Confirm a distinct calendar OAuth authorization."`
 	Username                  string `help:"Standards mail login identity; defaults to the address."`
 	CredentialBackend         string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
 	CredentialKey             string `help:"External standards credential lookup key."`
@@ -60,6 +66,7 @@ type accountAddCommand struct {
 	SMTPTLS                   string `name:"smtp-tls" default:"starttls" enum:"implicit,starttls" help:"SMTP TLS mode."`
 	CalDAVEndpoint            string `name:"caldav-endpoint" help:"CalDAV HTTPS discovery endpoint."`
 	CalendarPath              string `help:"Optional absolute CalDAV calendar path."`
+	CalendarOrigin            string `name:"calendar-origin" help:"Google Calendar Web HTTPS origin override."`
 	CalendarUsername          string `help:"CalDAV login identity; defaults to --username or the address."`
 	CalendarCredentialBackend string `help:"External CalDAV credential backend; defaults to --credential-backend."`
 	CalendarCredentialKey     string `help:"External CalDAV credential key; defaults to --credential-key."`
@@ -223,8 +230,22 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
+	mailProvider, err := command.effectiveMailProvider()
+	if err != nil {
+		return err
+	}
+	if mailProvider == "none" &&
+		(command.CalendarProvider == "" || command.CalendarProvider == "none") {
+		return errors.New(
+			"calendar-only account requires an explicit --calendar-provider",
+		)
+	}
+	selectionProvider := mailProvider
+	if selectionProvider == "none" {
+		selectionProvider = command.CalendarProvider
+	}
 	var endpointOverride string
-	switch domain.ProviderID(command.Provider) {
+	switch domain.ProviderID(selectionProvider) {
 	case domain.ProviderJMAP:
 		endpointOverride = command.SessionURL
 	case domain.ProviderIMAPSMTP:
@@ -239,23 +260,37 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		endpointOverride = command.CalDAVEndpoint
 	case domain.ProviderGoogleAPI:
 		endpointOverride = command.APIBase
+		if mailProvider == "none" && command.CalendarAPIBase != "" {
+			endpointOverride = command.CalendarAPIBase
+		}
 		if endpointOverride == "" {
 			endpointOverride = "https://www.googleapis.com"
 		}
 	case domain.ProviderMicrosoftGraph:
 		endpointOverride = command.APIBase
+		if mailProvider == "none" && command.CalendarAPIBase != "" {
+			endpointOverride = command.CalendarAPIBase
+		}
 		if endpointOverride == "" {
 			endpointOverride = "https://graph.microsoft.com/v1.0"
 		}
 	case "",
 		domain.ProviderMicrosoftOWA,
-		domain.ProviderGoogleWeb,
 		domain.ProviderPOP3:
 		endpointOverride = command.Origin
+	case domain.ProviderGoogleWeb:
+		endpointOverride = command.Origin
+		if endpointOverride == "" {
+			endpointOverride = "https://mail.google.com"
+		}
 	default:
 		endpointOverride = command.Origin
 	}
-	selected, err := selectAccountCandidate(result, command.Provider, endpointOverride)
+	selected, err := selectAccountCandidate(
+		result,
+		selectionProvider,
+		endpointOverride,
+	)
 	if err != nil {
 		return err
 	}
@@ -263,7 +298,10 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	if alias == "" {
 		alias = command.Address[:strings.LastIndexByte(command.Address, '@')]
 	}
-	mail, calendar, endpoint, err := command.routes(selected, result)
+	routing := *command
+	routing.Provider = mailProvider
+	routing.MailProvider = ""
+	mail, calendar, endpoint, err := routing.routes(selected, result)
 	if err != nil {
 		return err
 	}
@@ -291,6 +329,19 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		view.strong("Account "+sanitizeCell(account.Alias, 64)+" added; authentication has not started"),
 	)
 	return err
+}
+
+func (command accountAddCommand) effectiveMailProvider() (string, error) {
+	if command.Provider != "" && command.MailProvider != "" &&
+		command.Provider != command.MailProvider {
+		return "", errors.New(
+			"--provider and --mail-provider must select the same provider",
+		)
+	}
+	if command.MailProvider != "" {
+		return command.MailProvider, nil
+	}
+	return command.Provider, nil
 }
 
 func (command accountAddCommand) routes(
@@ -407,6 +458,7 @@ func (command accountAddCommand) routes(
 			domain.ProviderGoogleAPI,
 			selected,
 			"https://www.googleapis.com",
+			command.Provider == "none",
 		)
 		if err != nil {
 			return nil, nil, "", err
@@ -431,6 +483,7 @@ func (command accountAddCommand) routes(
 			domain.ProviderMicrosoftGraph,
 			selected,
 			"https://graph.microsoft.com/v1.0",
+			command.Provider == "none",
 		)
 		if err != nil {
 			return nil, nil, "", err
@@ -450,9 +503,36 @@ func (command accountAddCommand) routes(
 			selected,
 			discovery,
 		)
-	case
-		domain.ProviderGoogleWeb,
-		domain.ProviderPOP3:
+	case domain.ProviderGoogleWeb:
+		mailOrigin := command.Origin
+		if mailOrigin == "" {
+			mailOrigin = candidateHTTPSEndpoint(selected, "origin")
+		}
+		if mailOrigin == "" {
+			mailOrigin = "https://mail.google.com"
+		}
+		calendarOrigin := command.CalendarOrigin
+		if calendarOrigin == "" {
+			calendarOrigin = "https://calendar.google.com"
+		}
+		return command.finishRoutes(
+			&application.AccountMailRouteInput{
+				Provider: domain.ProviderGoogleWeb,
+				GoogleWeb: &application.AccountWebInput{
+					Origin: mailOrigin,
+				},
+			},
+			&application.AccountCalendarRouteInput{
+				Provider: domain.ProviderGoogleWeb,
+				GoogleWeb: &application.AccountWebInput{
+					Origin: calendarOrigin,
+				},
+			},
+			mailOrigin+" · Google Calendar "+calendarOrigin,
+			selected,
+			discovery,
+		)
+	case domain.ProviderPOP3:
 		return nil, nil, "", fmt.Errorf(
 			"provider %q has no account route builder",
 			selected.Provider,
@@ -466,29 +546,53 @@ func (command accountAddCommand) oauthRoute(
 	provider domain.ProviderID,
 	selected application.ProviderCandidate,
 	defaultBase string,
+	calendar bool,
 ) (*application.AccountOAuthInput, error) {
 	apiBase := command.APIBase
+	clientID := command.OAuthClientID
+	redirectURI := command.OAuthRedirectURI
+	authorizationKey := command.AuthorizationKey
+	approved := command.ApproveOAuth
+	if calendar {
+		if command.CalendarAPIBase != "" {
+			apiBase = command.CalendarAPIBase
+		}
+		if command.CalendarOAuthClientID != "" {
+			clientID = command.CalendarOAuthClientID
+		}
+		if command.CalendarOAuthRedirectURI != "" {
+			redirectURI = command.CalendarOAuthRedirectURI
+		}
+		if command.CalendarAuthorizationKey != "" {
+			authorizationKey = command.CalendarAuthorizationKey
+		}
+		if command.ApproveCalendarOAuth {
+			approved = true
+		}
+	}
 	if apiBase == "" {
 		apiBase = candidateHTTPSEndpoint(selected, "api")
 	}
 	if apiBase == "" {
 		apiBase = defaultBase
 	}
-	if command.OAuthClientID == "" ||
-		command.OAuthRedirectURI == "" ||
-		command.AuthorizationKey == "" ||
-		!command.ApproveOAuth {
-		return nil, fmt.Errorf(
-			"%s requires --oauth-client-id, --oauth-redirect-uri, "+
-				"--authorization-key, and --approve-oauth",
-			provider,
-		)
+	if clientID == "" ||
+		redirectURI == "" ||
+		authorizationKey == "" ||
+		!approved {
+		flags := "--oauth-client-id, --oauth-redirect-uri, " +
+			"--authorization-key, and --approve-oauth"
+		if calendar {
+			flags = "calendar OAuth flags or their shared OAuth defaults, " +
+				"plus explicit OAuth approval"
+		}
+		return nil, fmt.Errorf("%s requires %s", provider, flags)
 	}
 	return &application.AccountOAuthInput{
-		APIBase: apiBase, ClientID: command.OAuthClientID,
-		RedirectURI: command.OAuthRedirectURI,
+		APIBase: apiBase, ClientID: clientID,
+		RedirectURI: redirectURI,
 		Authorization: application.AccountCredentialInput{
-			Backend: "os-keyring", Key: command.AuthorizationKey, Consent: true,
+			Backend: "os-keyring", Key: authorizationKey, Consent: true,
 		},
 	}, nil
 }
@@ -500,6 +604,9 @@ func (command accountAddCommand) finishRoutes(
 	selected application.ProviderCandidate,
 	discovery application.AccountDiscoveryResult,
 ) (*application.AccountMailRouteInput, *application.AccountCalendarRouteInput, string, error) {
+	if command.Provider == "none" {
+		mail = nil
+	}
 	provider := command.CalendarProvider
 	if provider == "" && selected.Provider == domain.ProviderCalDAV {
 		provider = string(domain.ProviderCalDAV)
@@ -520,9 +627,59 @@ func (command accountAddCommand) finishRoutes(
 		}
 		return mail, calendar, endpoint, nil
 	case domain.ProviderCalDAV:
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderGoogleAPI,
-		domain.ProviderGoogleWeb,
+	case domain.ProviderGoogleAPI, domain.ProviderMicrosoftGraph:
+		if calendar == nil ||
+			calendar.Provider != domain.ProviderID(provider) ||
+			command.hasDistinctCalendarOAuth() {
+			candidate := candidateForProvider(discovery, domain.ProviderID(provider))
+			defaultBase := "https://www.googleapis.com"
+			if provider == string(domain.ProviderMicrosoftGraph) {
+				defaultBase = "https://graph.microsoft.com/v1.0"
+			}
+			oauth, err := command.oauthRoute(
+				domain.ProviderID(provider),
+				candidate,
+				defaultBase,
+				true,
+			)
+			if err != nil {
+				return nil, nil, "", err
+			}
+			calendar = &application.AccountCalendarRouteInput{
+				Provider: domain.ProviderID(provider),
+			}
+			if provider == string(domain.ProviderGoogleAPI) {
+				calendar.GoogleAPI = oauth
+			} else {
+				calendar.MicrosoftGraph = oauth
+			}
+			if endpoint == "" {
+				endpoint = oauth.APIBase
+			} else {
+				endpoint += " · " + provider + " " + oauth.APIBase
+			}
+		}
+		return mail, calendar, endpoint, nil
+	case domain.ProviderGoogleWeb:
+		if calendar == nil || calendar.Provider != domain.ProviderGoogleWeb {
+			origin := command.CalendarOrigin
+			if origin == "" {
+				origin = "https://calendar.google.com"
+			}
+			calendar = &application.AccountCalendarRouteInput{
+				Provider: domain.ProviderGoogleWeb,
+				GoogleWeb: &application.AccountWebInput{
+					Origin: origin,
+				},
+			}
+			if endpoint == "" {
+				endpoint = origin
+			} else {
+				endpoint += " · google-web " + origin
+			}
+		}
+		return mail, calendar, endpoint, nil
+	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
 		domain.ProviderPOP3:
@@ -594,6 +751,26 @@ func (command accountAddCommand) finishRoutes(
 		endpoint += " · CalDAV " + calendarEndpoint
 	}
 	return mail, calendar, endpoint, nil
+}
+
+func candidateForProvider(
+	discovery application.AccountDiscoveryResult,
+	provider domain.ProviderID,
+) application.ProviderCandidate {
+	for _, candidate := range discovery.Candidates {
+		if candidate.Provider == provider {
+			return candidate
+		}
+	}
+	return application.ProviderCandidate{Provider: provider}
+}
+
+func (command accountAddCommand) hasDistinctCalendarOAuth() bool {
+	return command.CalendarAPIBase != "" ||
+		command.CalendarOAuthClientID != "" ||
+		command.CalendarOAuthRedirectURI != "" ||
+		command.CalendarAuthorizationKey != "" ||
+		command.ApproveCalendarOAuth
 }
 
 func (command *accountRenameCommand) Run(app *runtime) error {
@@ -680,6 +857,7 @@ func selectAccountCandidate(
 			provider != domain.ProviderIMAPSMTP &&
 			provider != domain.ProviderCalDAV &&
 			provider != domain.ProviderGoogleAPI &&
+			provider != domain.ProviderGoogleWeb &&
 			provider != domain.ProviderMicrosoftGraph {
 			return application.ProviderCandidate{}, fmt.Errorf(
 				"provider %q is not available in this build",

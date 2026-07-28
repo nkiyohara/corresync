@@ -26,6 +26,8 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			writeGraphJSON(t, writer, map[string]string{
 				"id": "user1", "mail": "reader@example.test",
 			})
+		case "GET /me/mailFolders/inbox":
+			writeGraphJSON(t, writer, map[string]string{"id": "inbox1"})
 		case "GET /me/calendar":
 			writeGraphJSON(t, writer, map[string]any{
 				"id": "calendar1", "canEdit": true,

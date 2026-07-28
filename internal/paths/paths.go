@@ -69,6 +69,29 @@ func ProfileDir(account domain.AccountID) (string, error) {
 	return filepath.Join(state, "profiles", profileKey(string(account))), nil
 }
 
+// ProviderProfileDir isolates additional browser-owned provider routes while
+// preserving the original Outlook profile location for v0.7 migration.
+func ProviderProfileDir(
+	account domain.AccountID,
+	provider domain.ProviderID,
+) (string, error) {
+	if provider == domain.ProviderMicrosoftOWA {
+		return ProfileDir(account)
+	}
+	if err := provider.Validate(); err != nil {
+		return "", err
+	}
+	accountState, err := AccountStateDir(account)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(
+		accountState,
+		"browser-profiles",
+		profileKey(string(provider)),
+	), nil
+}
+
 // AccountStateDir contains provider cursors, caches, import plans, and monitor
 // state owned by one stable account. It never uses an alias or address as a
 // path component.

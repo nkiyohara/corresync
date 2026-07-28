@@ -24,6 +24,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/localipc"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
 	"github.com/nkiyohara/corresync/internal/paths"
+	"github.com/nkiyohara/corresync/internal/provider/googleweb"
 	"github.com/nkiyohara/corresync/internal/session"
 	"github.com/nkiyohara/corresync/internal/updatecheck"
 )
@@ -39,6 +40,11 @@ type terminalBrowserHandle interface {
 	CurrentSession() (session.Credentials, error)
 	TerminalSnapshot(context.Context) (browser.TerminalView, error)
 	TerminalAct(context.Context, browser.TerminalAction) error
+}
+
+type googleWebBrowserHandle interface {
+	browserHandle
+	googleweb.Driver
 }
 
 type browserLauncher func(context.Context, browser.Options) (browserHandle, error)
@@ -204,6 +210,7 @@ func (app *runtime) accountServices() (
 			domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV,
 			domain.ProviderGoogleAPI,
+			domain.ProviderGoogleWeb,
 			domain.ProviderMicrosoftGraph,
 		},
 	)
@@ -218,6 +225,7 @@ func (app *runtime) accountServices() (
 			domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV,
 			domain.ProviderGoogleAPI,
+			domain.ProviderGoogleWeb,
 			domain.ProviderMicrosoftGraph,
 		},
 	)

@@ -64,7 +64,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 	report.add("account", "pass", "configured account identity and provider routes are valid")
 	command.addUpdateStatus(app, configuration, &report)
 
-	if hasOutlookRoute(configured) {
+	if hasBrowserRoute(configured) {
 		executable, err := browser.ResolveExecutable(configuration.Browser.Executable)
 		if err != nil {
 			report.add("browser", "fail", doctorError(err))

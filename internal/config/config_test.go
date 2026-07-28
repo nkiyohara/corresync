@@ -502,6 +502,49 @@ func TestOAuthRouteRequiresLoopbackPKCEAndOSKeyring(t *testing.T) {
 	}
 }
 
+func TestGoogleWebRoutesRequireExactProviderOwnedOrigins(t *testing.T) {
+	t.Parallel()
+	configuration := Default()
+	configuration.Accounts["work"] = Account{
+		ID: defaultAccountID,
+		Mail: &MailRoute{
+			Provider: domain.ProviderGoogleWeb,
+			GoogleWeb: &WebRoute{
+				Origin: "https://mail.google.com",
+			},
+		},
+		Calendar: &CalendarRoute{
+			Provider: domain.ProviderGoogleWeb,
+			GoogleWeb: &WebRoute{
+				Origin: "https://calendar.google.com",
+			},
+		},
+	}
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("valid Google Web routes rejected: %v", err)
+	}
+	for name, origin := range map[string]string{
+		"lookalike": "https://mail.google.com.attacker.invalid",
+		"path":      "https://mail.google.com/mail",
+		"query":     "https://mail.google.com/?continue=attacker",
+		"userinfo":  "https://user@mail.google.com",
+	} {
+		t.Run(name, func(t *testing.T) {
+			invalid := configuration
+			account := invalid.Accounts["work"]
+			route := *account.Mail.GoogleWeb
+			route.Origin = origin
+			mail := *account.Mail
+			mail.GoogleWeb = &route
+			account.Mail = &mail
+			invalid.Accounts["work"] = account
+			if err := invalid.Validate(); err == nil {
+				t.Fatalf("Google Web accepted origin %q", origin)
+			}
+		})
+	}
+}
+
 func testOutlookAccount(
 	id domain.AccountID,
 	origin string,

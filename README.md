@@ -94,7 +94,7 @@ evidence, then select a route explicitly:
 corr account discover reader@example.invalid
 corr account add reader@example.invalid \
   --alias personal \
-  --provider google-api \
+  --mail-provider google-api \
   --calendar-provider google-api \
   --oauth-client-id synthetic-public-client \
   --oauth-redirect-uri http://127.0.0.1:8765/callback \

@@ -199,6 +199,10 @@ func TestClientReadsConditionallyUpdatesAndSubmitsSyntheticStandardsMail(t *test
 	for index := range secret {
 		secret[index] = 'x'
 	}
+	observed := client.ObservedCapabilities()
+	if !observed.Move || observed.UIDPlus {
+		t.Fatalf("synthetic IMAP capabilities = %#v", observed)
+	}
 
 	page, err := client.ListMessages(t.Context(), application.MailListInput{
 		Folder: application.MailFolder{

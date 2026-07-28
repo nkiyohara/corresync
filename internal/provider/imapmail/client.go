@@ -64,8 +64,16 @@ type Client struct {
 	sender     string
 	password   []byte
 	tlsConfig  *tls.Config
+	observed   ObservedCapabilities
 	passwordMu sync.RWMutex
 	close      sync.Once
+}
+
+// ObservedCapabilities are server-advertised IMAP features confirmed after
+// authenticated TLS setup. They contain no mailbox data or server banners.
+type ObservedCapabilities struct {
+	Move    bool
+	UIDPlus bool
 }
 
 // New validates both TLS transports and authenticates without reading mailbox
@@ -102,7 +110,16 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		password:  append([]byte(nil), options.Password...),
 		tlsConfig: tlsConfig,
 	}
-	if err := client.withIMAP(ctx, func(*imapclient.Client) error { return nil }); err != nil {
+	if err := client.withIMAP(ctx, func(connection *imapclient.Client) error {
+		capabilities, err := connection.Capability()
+		if err != nil {
+			return err
+		}
+		client.observed = ObservedCapabilities{
+			Move: capabilities["MOVE"], UIDPlus: capabilities["UIDPLUS"],
+		}
+		return nil
+	}); err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("authenticate IMAP: %w", err)
 	}
@@ -111,6 +128,15 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		return nil, fmt.Errorf("authenticate SMTP submission: %w", err)
 	}
 	return client, nil
+}
+
+// ObservedCapabilities returns the immutable post-authentication capability
+// snapshot collected without reading mailbox content.
+func (client *Client) ObservedCapabilities() ObservedCapabilities {
+	if client == nil {
+		return ObservedCapabilities{}
+	}
+	return client.observed
 }
 
 func (client *Client) withIMAP(

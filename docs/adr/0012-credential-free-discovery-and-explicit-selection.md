@@ -54,13 +54,22 @@ used only when a valid Graph authorization is already configured or the user
 explicitly selects it. It is never an implicit dependency, an automatic
 fallback, or a capability probe.
 
-Google distinguishes account types during discovery, but discovery does not
-select a route. The implemented Google API route is used only after explicit
-selection or when an existing configured route names it. `google-web` remains
-a reserved unavailable provider ID, so there is no web-session fallback.
-Submitting consent or an admin-review request always requires an explicit human
-action. Where the service is disabled or access is denied, the failure is
-reported plainly and no bypass is attempted.
+Google consumer domains and Google-hosted Workspace MX evidence produce two
+separate candidates. Automatic mode may select the first-party `google-web`
+route because it opens only Google-owned Gmail and Calendar applications in an
+isolated, browser-owned profile and requests no third-party OAuth consent. The
+web adapter has a closed, read-only semantic DOM surface: its process cannot
+read browser cookies, browser storage, passwords, bearer tokens, or arbitrary
+page state, and it reports bounded visible-snapshot limitations explicitly.
+
+The separate `google-api` route is used only after explicit selection or when an
+existing configured route names it. Before an authorization browser opens, the
+CLI displays the exact mail and calendar scopes. Submitting consent or an
+admin-review request always requires an explicit human action. A blocked API
+grant never falls through to another grant, and disabled Gmail, Calendar, or
+browser access fails clearly rather than attempting to bypass organization
+policy. Consumer-versus-managed inference remains evidence, not proof, and both
+routes remain manually overridable.
 
 ### Password-bearing providers use an external credential facility
 
@@ -101,3 +110,9 @@ configuration instead of an unwanted authorization request. Corresync ships no
 centrally held OAuth client secret; Google API and Graph use an explicitly
 selected bring-your-own public-client registration as detailed in
 [ADR 0015](0015-per-service-provider-routes.md).
+
+The Google web route trades API completeness for consent safety: it can expose
+only provider-owned UI projections that pass the closed adapter contract, and
+it never pretends that a virtualized DOM snapshot is a complete remote page.
+Users who need API writes or complete pagination must explicitly select and
+authorize `google-api`.

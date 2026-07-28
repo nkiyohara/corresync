@@ -91,6 +91,29 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		return nil, errors.New("graph grant identity does not match the configured account")
 	}
 	client.address = address
+	if options.Mail {
+		var inbox struct {
+			ID string `json:"id"`
+		}
+		if _, err := api.DoJSON(
+			ctx,
+			http.MethodGet,
+			"me/mailFolders/inbox",
+			url.Values{"$select": {"id"}},
+			nil,
+			&inbox,
+			false,
+			nil,
+			http.StatusOK,
+		); err != nil {
+			_ = api.Close()
+			return nil, fmt.Errorf("confirm Microsoft Graph mail: %w", err)
+		}
+		if !validGraphID(inbox.ID) {
+			_ = api.Close()
+			return nil, errors.New("graph returned no primary mail folder")
+		}
+	}
 	if options.Calendar {
 		var calendar struct {
 			ID      string `json:"id"`

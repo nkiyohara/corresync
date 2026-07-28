@@ -93,6 +93,10 @@ func New(ctx context.Context, options Options) (*Client, error) {
 			_ = api.Close()
 			return nil, errors.New("google Calendar returned no primary calendar identity")
 		}
+		if calendar.AccessRole != "owner" && calendar.AccessRole != "writer" {
+			_ = api.Close()
+			return nil, errors.New("google primary calendar is not editable")
+		}
 	}
 	return client, nil
 }

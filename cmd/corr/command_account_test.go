@@ -171,6 +171,60 @@ func TestSelectAccountCandidateDoesNotAutoSelectExplicitConsent(t *testing.T) {
 	}
 }
 
+func TestAccountAddAutoSelectsBrowserOwnedGoogleWithoutOAuth(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{
+				{
+					Provider:                  domain.ProviderGoogleAPI,
+					Confidence:                98,
+					Authentication:            application.DiscoveryExplicitOAuth,
+					RequiresExplicitSelection: true,
+					Evidence: []application.DiscoveryEvidence{{
+						Source: "known_domain", Detail: "gmail.com",
+					}},
+				},
+				{
+					Provider:       domain.ProviderGoogleWeb,
+					Confidence:     90,
+					Authentication: application.DiscoveryBrowserFirstParty,
+					Endpoints: []application.DiscoveredEndpoint{{
+						Kind: "origin", Value: "https://mail.google.com",
+					}},
+					Evidence: []application.DiscoveryEvidence{{
+						Source: "known_domain", Detail: "gmail.com",
+					}},
+				},
+			},
+		},
+	}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	if err := (&accountAddCommand{
+		Address: "reader@gmail.com",
+		Alias:   "google-web",
+	}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["google-web"]
+	if account.Mail == nil || account.Mail.Provider != domain.ProviderGoogleWeb ||
+		account.Mail.GoogleWeb == nil ||
+		account.Mail.GoogleWeb.Origin != "https://mail.google.com" ||
+		account.Calendar == nil ||
+		account.Calendar.Provider != domain.ProviderGoogleWeb ||
+		account.Calendar.GoogleWeb == nil ||
+		account.Calendar.GoogleWeb.Origin != "https://calendar.google.com" {
+		t.Fatalf("browser-owned Google account = %#v", account)
+	}
+	if strings.Contains(stdout.String(), "OAuth") ||
+		!strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("automatic Google output = %q", stdout.String())
+	}
+}
+
 func TestAccountAddPersistsJMAPRouteWithoutAuthenticating(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
@@ -347,5 +401,98 @@ func TestAccountAddPersistsExplicitGraphPublicClientWithoutAuthorizing(t *testin
 	}
 	if !strings.Contains(stdout.String(), "authentication has not started") {
 		t.Fatalf("account output = %q", stdout.String())
+	}
+}
+
+func TestAccountAddPersistsCalendarOnlyGoogleRoute(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{{
+				Provider:                  domain.ProviderGoogleAPI,
+				Confidence:                90,
+				Authentication:            application.DiscoveryExplicitOAuth,
+				RequiresExplicitSelection: true,
+				Available:                 true,
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "test", Detail: "synthetic",
+				}},
+			}},
+		},
+	}
+	app, path, _ := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "calendar@example.test", Alias: "calendar-only",
+		MailProvider:             "none",
+		CalendarProvider:         string(domain.ProviderGoogleAPI),
+		CalendarOAuthClientID:    "synthetic-calendar-client",
+		CalendarOAuthRedirectURI: "http://127.0.0.1:0/oauth/callback",
+		CalendarAuthorizationKey: "calendar-only-google",
+		ApproveCalendarOAuth:     true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["calendar-only"]
+	if account.Mail != nil ||
+		account.Calendar == nil ||
+		account.Calendar.GoogleAPI == nil ||
+		account.Calendar.GoogleAPI.ClientID != command.CalendarOAuthClientID ||
+		account.Calendar.GoogleAPI.Authorization.Key !=
+			command.CalendarAuthorizationKey {
+		t.Fatalf("calendar-only Google account = %#v", account)
+	}
+}
+
+func TestAccountAddPersistsIndependentIMAPAndGraphCalendarRoutes(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, path, _ := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "mixed@example.test", Alias: "mixed-api",
+		MailProvider:             string(domain.ProviderIMAPSMTP),
+		CalendarProvider:         string(domain.ProviderMicrosoftGraph),
+		Username:                 "mixed@example.test",
+		CredentialBackend:        "os-keyring",
+		CredentialKey:            "mixed-imap",
+		ApproveCredential:        true,
+		IMAPHost:                 "imap.example.test",
+		IMAPPort:                 993,
+		IMAPTLS:                  "implicit",
+		SMTPHost:                 "smtp.example.test",
+		SMTPPort:                 587,
+		SMTPTLS:                  "starttls",
+		CalendarOAuthClientID:    "synthetic-graph-client",
+		CalendarOAuthRedirectURI: "http://127.0.0.1:0/oauth/callback",
+		CalendarAuthorizationKey: "mixed-graph-calendar",
+		ApproveCalendarOAuth:     true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["mixed-api"]
+	if account.Mail == nil || account.Mail.IMAPSMTP == nil ||
+		account.Calendar == nil ||
+		account.Calendar.MicrosoftGraph == nil ||
+		account.Calendar.MicrosoftGraph.Authorization.Key !=
+			command.CalendarAuthorizationKey {
+		t.Fatalf("mixed IMAP/Graph account = %#v", account)
+	}
+}
+
+func TestAccountAddRejectsConflictingProviderAliases(t *testing.T) {
+	t.Parallel()
+	command := accountAddCommand{
+		Provider:     string(domain.ProviderJMAP),
+		MailProvider: string(domain.ProviderIMAPSMTP),
+	}
+	if _, err := command.effectiveMailProvider(); err == nil {
+		t.Fatal("effectiveMailProvider() accepted conflicting aliases")
 	}
 }

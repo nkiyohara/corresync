@@ -155,7 +155,7 @@ Google API and Microsoft Graph are explicit BYO public-client integrations:
 ```console
 corr account add reader@example.invalid \
   --alias personal \
-  --provider google-api \
+  --mail-provider google-api \
   --calendar-provider google-api \
   --oauth-client-id synthetic-public-client \
   --oauth-redirect-uri http://127.0.0.1:8765/callback \
@@ -163,10 +163,19 @@ corr account add reader@example.invalid \
   --approve-oauth
 ```
 
-The redirect must be a registered loopback `http://127.0.0.1` URI. The provider
-authorization flow opens a browser and validates state. Grants belong to the OS
-keyring. There is no client-secret field and no automatic Graph or Google
-selection. Use only a client registration you are authorized to operate.
+The redirect must be an allowed loopback `http://127.0.0.1` URI. Port `0`
+selects an available ephemeral port for public-client registrations that permit
+native-app loopback ports; otherwise configure an explicitly registered port.
+Before a provider page can open, `corr auth login` prints the exact service-
+derived scope set. The flow validates state and grants belong to the OS keyring.
+There is no client-secret field and no automatic Graph or Google selection. Use
+only a client registration you are authorized to operate.
+
+Mail and calendar routes can also use distinct OAuth providers and grants.
+Prefix the calendar settings with `calendar-`, for example
+`--calendar-oauth-client-id` and `--calendar-authorization-key`. A
+calendar-only account uses `--mail-provider none`; `--calendar-provider none`
+creates a mail-only account.
 
 ## Outlook Web routing
 
