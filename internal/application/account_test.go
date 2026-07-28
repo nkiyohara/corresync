@@ -196,3 +196,65 @@ func TestAccountServiceFailsClosed(t *testing.T) {
 		t.Fatalf("Remove() did not fail before config removal: err=%v repo=%#v", err, repository)
 	}
 }
+
+func TestAccountServiceAddsMixedStandardsRoutesWithoutExposingLookupKeys(t *testing.T) {
+	t.Parallel()
+	repository := &accountRepositoryStub{
+		catalog: AccountCatalog{Accounts: []AccountView{
+			accountFixture("work", "acc_00000000000000000000000000000001", true),
+		}},
+	}
+	service, err := NewAccountService(
+		repository,
+		&accountPurgerStub{},
+		[]domain.ProviderID{domain.ProviderIMAPSMTP, domain.ProviderCalDAV},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.newID = func() (domain.AccountID, error) {
+		return "acc_00000000000000000000000000000002", nil
+	}
+	added, err := service.Add(t.Context(), AccountAddInput{
+		Alias: "standards", Address: "reader@example.invalid",
+		Mail: &AccountMailRouteInput{
+			Provider: domain.ProviderIMAPSMTP,
+			IMAPSMTP: &AccountIMAPSMTPInput{
+				IMAP: AccountTLSEndpointInput{
+					Host: "imap.example.invalid", Port: 993, Mode: "implicit",
+				},
+				SMTP: AccountTLSEndpointInput{
+					Host: "smtp.example.invalid", Port: 587, Mode: "starttls",
+				},
+				Username: "reader@example.invalid",
+				Credential: AccountCredentialInput{
+					Backend: "os-keyring", Key: "private-mail-key", Consent: true,
+				},
+			},
+		},
+		Calendar: &AccountCalendarRouteInput{
+			Provider: domain.ProviderCalDAV,
+			CalDAV: &AccountCalDAVInput{
+				Endpoint:     "https://dav.example.invalid/",
+				CalendarPath: "/calendars/reader/main/",
+				Username:     "reader@example.invalid",
+				Credential: AccountCredentialInput{
+					Backend: "helper", Key: "private-calendar-key", Consent: true,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if added.Mail == nil || added.Mail.Provider != domain.ProviderIMAPSMTP ||
+		added.Calendar == nil || added.Calendar.Provider != domain.ProviderCalDAV ||
+		added.Mail.Credential.Backend != "os-keyring" ||
+		added.Calendar.Credential.Backend != "helper" {
+		t.Fatalf("mixed account view = %#v", added)
+	}
+	if repository.added.Mail.IMAPSMTP.Credential.Key != "private-mail-key" ||
+		repository.added.Calendar.CalDAV.Credential.Key != "private-calendar-key" {
+		t.Fatalf("persisted registration lost credential references: %#v", repository.added)
+	}
+}

@@ -19,6 +19,8 @@ import (
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/paths"
+	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
+	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
 	"github.com/nkiyohara/corresync/internal/provider/outlookweb"
 	"github.com/nkiyohara/corresync/internal/session"
@@ -74,6 +76,8 @@ type sessionBackend struct {
 	recorder      *audit.FileRecorder
 	credentials   *credential.Resolver
 	newJMAP       func(context.Context, jmap.Options) (*jmap.Client, error)
+	newIMAP       func(context.Context, imapmail.Options) (*imapmail.Client, error)
+	newCalDAV     func(context.Context, caldavprovider.Options) (*caldavprovider.Client, error)
 
 	mu           sync.Mutex
 	activationMu sync.Mutex
@@ -128,6 +132,8 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		recorder:         recorder,
 		credentials:      credentials,
 		newJMAP:          jmap.New,
+		newIMAP:          imapmail.New,
+		newCalDAV:        caldavprovider.New,
 		accounts:         make(map[domain.AccountID]sessionAccount),
 		previews:         make(map[string]sessionPreview),
 		lifecycle:        lifecycle,
@@ -278,6 +284,15 @@ func (backend *sessionBackend) TerminalLogin(
 				err, backend.dropTerminalInteraction(interaction, true),
 			)
 		}
+		standards, err := backend.nonOutlookAccount(ctx, configured)
+		if err != nil {
+			return daemonapi.TerminalLoginResult{}, errors.Join(
+				err,
+				closeSessionAccount(account),
+				backend.dropTerminalInteraction(interaction, false),
+			)
+		}
+		account = mergeSessionAccounts(account, standards)
 		backend.accounts[input.Account] = account
 		_ = backend.dropTerminalInteraction(interaction, false)
 		return authenticatedTerminalResult(input.Account, account.captured), nil
@@ -1164,37 +1179,29 @@ func (backend *sessionBackend) activateAccount(
 	backend.mu.Unlock()
 
 	var services sessionAccount
-	var err error
-	switch {
-	case outlookOnly(configured):
+	if hasOutlookRoute(configured) {
 		var handle browserHandle
 		var captured session.Credentials
-		handle, captured, err = backend.app.authenticate(
+		handle, captured, err := backend.app.authenticate(
 			ctx,
 			backend.configuration,
 			accountID,
 			configured,
 		)
-		if err == nil {
-			services, err = backend.outlookAccount(configured, handle, captured)
-			if err != nil {
-				err = errors.Join(err, handle.Close())
-			}
+		if err != nil {
+			return sessionAccount{}, err
 		}
-	case configured.Mail != nil &&
-		configured.Mail.Provider == domain.ProviderJMAP &&
-		configured.Calendar == nil:
-		services, err = backend.jmapAccount(ctx, configured)
-	default:
-		err = fmt.Errorf(
-			"configured route combination (%s mail, %s calendar) is not available in this build",
-			configured.MailProvider(),
-			configured.CalendarProvider(),
-		)
+		web, err := backend.outlookAccount(configured, handle, captured)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, handle.Close())
+		}
+		services = mergeSessionAccounts(services, web)
 	}
+	standards, err := backend.nonOutlookAccount(ctx, configured)
 	if err != nil {
-		return sessionAccount{}, err
+		return sessionAccount{}, errors.Join(err, closeSessionAccount(services))
 	}
+	services = mergeSessionAccounts(services, standards)
 
 	backend.mu.Lock()
 	defer backend.mu.Unlock()
@@ -1227,7 +1234,8 @@ func (backend *sessionBackend) outlookAccount(
 		return sessionAccount{}, err
 	}
 	var mail *application.MailService
-	if configured.Mail != nil {
+	if configured.Mail != nil &&
+		configured.Mail.Provider == domain.ProviderMicrosoftOWA {
 		var err error
 		mail, err = application.NewMailService(backend.guard, client, application.MailOptions{
 			MaxRecipients: backend.configuration.Policy.MaxRecipients,
@@ -1242,7 +1250,8 @@ func (backend *sessionBackend) outlookAccount(
 		}
 	}
 	var calendar *application.CalendarService
-	if configured.Calendar != nil {
+	if configured.Calendar != nil &&
+		configured.Calendar.Provider == domain.ProviderMicrosoftOWA {
 		var err error
 		calendar, err = application.NewCalendarService(
 			backend.guard,
@@ -1321,19 +1330,243 @@ func (backend *sessionBackend) jmapAccount(
 	}, nil
 }
 
-func outlookOnly(account config.Account) bool {
-	return (account.Mail == nil || account.Mail.Provider == domain.ProviderMicrosoftOWA) &&
-		(account.Calendar == nil || account.Calendar.Provider == domain.ProviderMicrosoftOWA)
+func (backend *sessionBackend) imapAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	route := configured.Mail.IMAPSMTP
+	if route == nil {
+		return sessionAccount{}, errors.New("IMAP/SMTP route settings are missing")
+	}
+	secret, err := backend.credentials.Resolve(ctx, route.Credential)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	defer func() { _ = secret.Close() }()
+	password := []byte(secret.String())
+	defer func() {
+		for index := range password {
+			password[index] = 0
+		}
+	}()
+	factory := backend.newIMAP
+	if factory == nil {
+		factory = imapmail.New
+	}
+	sender := route.Mailbox
+	if sender == "" {
+		sender = configured.Address
+	}
+	client, err := factory(ctx, imapmail.Options{
+		IMAP: imapmail.Endpoint{
+			Host: route.IMAP.Host, Port: route.IMAP.Port, Mode: string(route.IMAP.Mode),
+		},
+		SMTP: imapmail.Endpoint{
+			Host: route.SMTP.Host, Port: route.SMTP.Port, Mode: string(route.SMTP.Mode),
+		},
+		Username: route.Username,
+		Sender:   sender,
+		Password: password,
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	mail, err := application.NewMailService(backend.guard, client, application.MailOptions{
+		MaxRecipients: backend.configuration.Policy.MaxRecipients,
+		Provenance: domain.Provenance{
+			AccountID: configured.ID, Provider: domain.ProviderIMAPSMTP,
+			MailboxID: "configured-imap-account",
+		},
+	})
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, client.Close())
+	}
+	return sessionAccount{
+		closers:  []sessionCloser{client},
+		mail:     mail,
+		captured: time.Now().UTC(),
+		capabilities: domain.Capabilities{
+			Mail: true, Folders: true, AttachmentReads: true,
+			AttachmentWrites: true,
+		},
+	}, nil
+}
+
+func (backend *sessionBackend) calDAVAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	route := configured.Calendar.CalDAV
+	if route == nil {
+		return sessionAccount{}, errors.New("CalDAV route settings are missing")
+	}
+	secret, err := backend.credentials.Resolve(ctx, route.Credential)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	defer func() { _ = secret.Close() }()
+	password := []byte(secret.String())
+	defer func() {
+		for index := range password {
+			password[index] = 0
+		}
+	}()
+	factory := backend.newCalDAV
+	if factory == nil {
+		factory = caldavprovider.New
+	}
+	client, err := factory(ctx, caldavprovider.Options{
+		Endpoint: route.Endpoint, CalendarPath: route.CalendarPath,
+		Username: route.Username, Password: password,
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	calendar, err := application.NewCalendarService(
+		backend.guard,
+		client,
+		application.CalendarOptions{
+			MaxAttendees: backend.configuration.Policy.MaxAttendees,
+			Provenance: domain.Provenance{
+				AccountID: configured.ID, Provider: domain.ProviderCalDAV,
+				CalendarID: "configured-caldav-calendar",
+			},
+		},
+	)
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, client.Close())
+	}
+	return sessionAccount{
+		closers:  []sessionCloser{client},
+		calendar: calendar,
+		captured: time.Now().UTC(),
+		capabilities: domain.Capabilities{
+			Calendar: true,
+		},
+	}, nil
+}
+
+func (backend *sessionBackend) nonOutlookAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	var combined sessionAccount
+	if configured.Mail != nil {
+		var mail sessionAccount
+		var err error
+		switch configured.Mail.Provider {
+		case domain.ProviderMicrosoftOWA:
+		case domain.ProviderJMAP:
+			mail, err = backend.jmapAccount(ctx, configured)
+		case domain.ProviderIMAPSMTP:
+			mail, err = backend.imapAccount(ctx, configured)
+		case domain.ProviderMicrosoftGraph,
+			domain.ProviderGoogleAPI,
+			domain.ProviderGoogleWeb,
+			domain.ProviderCalDAV,
+			domain.ProviderPOP3:
+			err = fmt.Errorf(
+				"configured mail provider %q is not available in this build",
+				configured.Mail.Provider,
+			)
+		default:
+			err = fmt.Errorf("unknown configured mail provider %q", configured.Mail.Provider)
+		}
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
+		}
+		combined = mergeSessionAccounts(combined, mail)
+	}
+	if configured.Calendar != nil {
+		var calendar sessionAccount
+		var err error
+		switch configured.Calendar.Provider {
+		case domain.ProviderMicrosoftOWA:
+		case domain.ProviderCalDAV:
+			calendar, err = backend.calDAVAccount(ctx, configured)
+		case domain.ProviderMicrosoftGraph,
+			domain.ProviderGoogleAPI,
+			domain.ProviderGoogleWeb,
+			domain.ProviderJMAP,
+			domain.ProviderIMAPSMTP,
+			domain.ProviderPOP3:
+			err = fmt.Errorf(
+				"configured calendar provider %q is not available in this build",
+				configured.Calendar.Provider,
+			)
+		default:
+			err = fmt.Errorf(
+				"unknown configured calendar provider %q",
+				configured.Calendar.Provider,
+			)
+		}
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
+		}
+		combined = mergeSessionAccounts(combined, calendar)
+	}
+	return combined, nil
+}
+
+func hasOutlookRoute(account config.Account) bool {
+	return account.Mail != nil &&
+		account.Mail.Provider == domain.ProviderMicrosoftOWA ||
+		account.Calendar != nil &&
+			account.Calendar.Provider == domain.ProviderMicrosoftOWA
+}
+
+func mergeSessionAccounts(
+	left sessionAccount,
+	right sessionAccount,
+) sessionAccount {
+	merged := sessionAccount{
+		closers:  append(append([]sessionCloser(nil), left.closers...), right.closers...),
+		mail:     left.mail,
+		calendar: left.calendar,
+		captured: left.captured,
+		capabilities: domain.Capabilities{
+			Mail:             left.capabilities.Mail || right.capabilities.Mail,
+			Calendar:         left.capabilities.Calendar || right.capabilities.Calendar,
+			Folders:          left.capabilities.Folders || right.capabilities.Folders,
+			Labels:           left.capabilities.Labels || right.capabilities.Labels,
+			Push:             left.capabilities.Push || right.capabilities.Push,
+			FreeBusy:         left.capabilities.FreeBusy || right.capabilities.FreeBusy,
+			IncrementalSync:  left.capabilities.IncrementalSync || right.capabilities.IncrementalSync,
+			ScheduledSend:    left.capabilities.ScheduledSend || right.capabilities.ScheduledSend,
+			SharedMailboxes:  left.capabilities.SharedMailboxes || right.capabilities.SharedMailboxes,
+			SharedCalendars:  left.capabilities.SharedCalendars || right.capabilities.SharedCalendars,
+			AttachmentReads:  left.capabilities.AttachmentReads || right.capabilities.AttachmentReads,
+			AttachmentWrites: left.capabilities.AttachmentWrites || right.capabilities.AttachmentWrites,
+		},
+	}
+	if right.mail != nil {
+		merged.mail = right.mail
+	}
+	if right.calendar != nil {
+		merged.calendar = right.calendar
+	}
+	if right.captured.After(merged.captured) {
+		merged.captured = right.captured
+	}
+	merged.capabilities.OnlineMeeting = left.capabilities.OnlineMeeting
+	if right.capabilities.OnlineMeeting != "" {
+		merged.capabilities.OnlineMeeting = right.capabilities.OnlineMeeting
+	}
+	return merged
 }
 
 func outlookWebCapabilities(account config.Account) domain.Capabilities {
 	capabilities := domain.Capabilities{
-		Mail: account.Mail != nil, Calendar: account.Calendar != nil,
-		Folders:         account.Mail != nil,
-		SharedMailboxes: account.Mail != nil,
-		AttachmentReads: account.Mail != nil, AttachmentWrites: account.Mail != nil,
+		Mail: account.Mail != nil &&
+			account.Mail.Provider == domain.ProviderMicrosoftOWA,
+		Calendar: account.Calendar != nil &&
+			account.Calendar.Provider == domain.ProviderMicrosoftOWA,
 	}
-	if account.Calendar != nil {
+	capabilities.Folders = capabilities.Mail
+	capabilities.SharedMailboxes = capabilities.Mail
+	capabilities.AttachmentReads = capabilities.Mail
+	capabilities.AttachmentWrites = capabilities.Mail
+	if capabilities.Calendar {
 		capabilities.OnlineMeeting = "teams"
 	}
 	return capabilities

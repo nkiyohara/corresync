@@ -96,10 +96,42 @@ func mailRouteView(route *config.MailRoute) *application.AccountRouteView {
 				Consented:  route.JMAP.Credential.Consent,
 			},
 		}
+	case domain.ProviderIMAPSMTP:
+		if route.IMAPSMTP == nil {
+			return &application.AccountRouteView{Provider: route.Provider}
+		}
+		return &application.AccountRouteView{
+			Provider: route.Provider,
+			Endpoints: []application.DiscoveredEndpoint{
+				{
+					Kind: "imap",
+					Value: fmt.Sprintf(
+						"%s://%s:%d",
+						route.IMAPSMTP.IMAP.Mode,
+						route.IMAPSMTP.IMAP.Host,
+						route.IMAPSMTP.IMAP.Port,
+					),
+				},
+				{
+					Kind: "smtp",
+					Value: fmt.Sprintf(
+						"%s://%s:%d",
+						route.IMAPSMTP.SMTP.Mode,
+						route.IMAPSMTP.SMTP.Host,
+						route.IMAPSMTP.SMTP.Port,
+					),
+				},
+			},
+			Identity: route.IMAPSMTP.Username,
+			Credential: &application.AccountCredentialView{
+				Configured: true,
+				Backend:    string(route.IMAPSMTP.Credential.Backend),
+				Consented:  route.IMAPSMTP.Credential.Consent,
+			},
+		}
 	case domain.ProviderMicrosoftGraph,
 		domain.ProviderGoogleAPI,
 		domain.ProviderGoogleWeb,
-		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return &application.AccountRouteView{
@@ -120,12 +152,32 @@ func calendarRouteView(route *config.CalendarRoute) *application.AccountRouteVie
 	switch route.Provider {
 	case domain.ProviderMicrosoftOWA:
 		return outlookWebRouteView(route.Provider, route.OutlookWeb)
+	case domain.ProviderCalDAV:
+		if route.CalDAV == nil {
+			return &application.AccountRouteView{Provider: route.Provider}
+		}
+		endpoints := []application.DiscoveredEndpoint{
+			{Kind: "endpoint", Value: route.CalDAV.Endpoint},
+		}
+		if route.CalDAV.CalendarPath != "" {
+			endpoints = append(endpoints, application.DiscoveredEndpoint{
+				Kind: "calendar", Value: route.CalDAV.CalendarPath,
+			})
+		}
+		return &application.AccountRouteView{
+			Provider: route.Provider, Endpoints: endpoints,
+			Identity: route.CalDAV.Username,
+			Credential: &application.AccountCredentialView{
+				Configured: true,
+				Backend:    string(route.CalDAV.Credential.Backend),
+				Consented:  route.CalDAV.Credential.Consent,
+			},
+		}
 	case domain.ProviderMicrosoftGraph,
 		domain.ProviderGoogleAPI,
 		domain.ProviderGoogleWeb,
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
-		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return &application.AccountRouteView{
 			Provider: route.Provider,
@@ -187,10 +239,35 @@ func mailRouteConfig(
 				},
 			},
 		}, nil
+	case domain.ProviderIMAPSMTP:
+		if route.IMAPSMTP == nil {
+			return nil, errors.New("IMAP/SMTP mail settings are missing")
+		}
+		return &config.MailRoute{
+			Provider: route.Provider,
+			IMAPSMTP: &config.IMAPSMTPRoute{
+				IMAP: config.TLSEndpoint{
+					Host: route.IMAPSMTP.IMAP.Host,
+					Port: route.IMAPSMTP.IMAP.Port,
+					Mode: config.TLSMode(route.IMAPSMTP.IMAP.Mode),
+				},
+				SMTP: config.TLSEndpoint{
+					Host: route.IMAPSMTP.SMTP.Host,
+					Port: route.IMAPSMTP.SMTP.Port,
+					Mode: config.TLSMode(route.IMAPSMTP.SMTP.Mode),
+				},
+				Username: route.IMAPSMTP.Username,
+				Mailbox:  route.IMAPSMTP.Mailbox,
+				Credential: config.CredentialRef{
+					Backend: config.CredentialBackend(route.IMAPSMTP.Credential.Backend),
+					Key:     route.IMAPSMTP.Credential.Key,
+					Consent: route.IMAPSMTP.Credential.Consent,
+				},
+			},
+		}, nil
 	case domain.ProviderMicrosoftGraph,
 		domain.ProviderGoogleAPI,
 		domain.ProviderGoogleWeb,
-		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return nil, fmt.Errorf("mail provider %q is not accepted by account add", route.Provider)
@@ -205,18 +282,49 @@ func calendarRouteConfig(
 	if route == nil {
 		return nil, nil
 	}
-	if route.Provider != domain.ProviderMicrosoftOWA || route.OutlookWeb == nil {
+	switch route.Provider {
+	case domain.ProviderMicrosoftOWA:
+		if route.OutlookWeb == nil {
+			return nil, errors.New("outlook Web calendar settings are missing")
+		}
+		return &config.CalendarRoute{
+			Provider: route.Provider,
+			OutlookWeb: &config.OutlookWebRoute{
+				Origin: route.OutlookWeb.Origin, Mailbox: route.OutlookWeb.Mailbox,
+			},
+		}, nil
+	case domain.ProviderCalDAV:
+		if route.CalDAV == nil {
+			return nil, errors.New("CalDAV calendar settings are missing")
+		}
+		return &config.CalendarRoute{
+			Provider: route.Provider,
+			CalDAV: &config.CalDAVRoute{
+				Endpoint: route.CalDAV.Endpoint, CalendarPath: route.CalDAV.CalendarPath,
+				Username: route.CalDAV.Username,
+				Credential: config.CredentialRef{
+					Backend: config.CredentialBackend(route.CalDAV.Credential.Backend),
+					Key:     route.CalDAV.Credential.Key,
+					Consent: route.CalDAV.Credential.Consent,
+				},
+			},
+		}, nil
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderPOP3:
+		return nil, fmt.Errorf(
+			"calendar provider %q is not accepted by account add",
+			route.Provider,
+		)
+	default:
 		return nil, fmt.Errorf(
 			"calendar provider %q is not accepted by account add",
 			route.Provider,
 		)
 	}
-	return &config.CalendarRoute{
-		Provider: route.Provider,
-		OutlookWeb: &config.OutlookWebRoute{
-			Origin: route.OutlookWeb.Origin, Mailbox: route.OutlookWeb.Mailbox,
-		},
-	}, nil
 }
 
 // RenameAccount atomically changes only the mutable alias.

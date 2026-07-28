@@ -3,7 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -34,18 +36,31 @@ type accountShowCommand struct {
 }
 
 type accountAddCommand struct {
-	Address           string `arg:"" help:"Bare email address for the account."`
-	Alias             string `help:"Local alias; defaults to the address local part."`
-	Provider          string `help:"Explicit mail provider override."`
-	Origin            string `help:"Outlook Web HTTPS origin override."`
-	Mailbox           string `help:"Optional Outlook mailbox identity."`
-	SessionURL        string `help:"JMAP HTTPS session resource."`
-	Username          string `help:"JMAP login identity; defaults to the address."`
-	CredentialBackend string `default:"os-keyring" enum:"os-keyring,helper" help:"External JMAP credential backend."`
-	CredentialKey     string `help:"External JMAP credential lookup key."`
-	ApproveCredential bool   `help:"Record explicit consent to use the external credential."`
-	Default           bool   `help:"Make this the default account."`
-	JSON              bool   `help:"Write machine-readable JSON."`
+	Address                   string `arg:"" help:"Bare email address for the account."`
+	Alias                     string `help:"Local alias; defaults to the address local part."`
+	Provider                  string `help:"Explicit primary provider override."`
+	CalendarProvider          string `help:"Explicit calendar provider override; use none for mail-only."`
+	Origin                    string `help:"Outlook Web HTTPS origin override."`
+	Mailbox                   string `help:"Optional Outlook mailbox identity."`
+	SessionURL                string `help:"JMAP HTTPS session resource."`
+	Username                  string `help:"Standards mail login identity; defaults to the address."`
+	CredentialBackend         string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
+	CredentialKey             string `help:"External standards credential lookup key."`
+	ApproveCredential         bool   `help:"Record explicit consent to use that external credential."`
+	IMAPHost                  string `help:"IMAP server host."`
+	IMAPPort                  uint16 `help:"IMAP server port."`
+	IMAPTLS                   string `default:"implicit" enum:"implicit,starttls" help:"IMAP TLS mode."`
+	SMTPHost                  string `help:"SMTP Submission server host."`
+	SMTPPort                  uint16 `help:"SMTP Submission server port."`
+	SMTPTLS                   string `default:"starttls" enum:"implicit,starttls" help:"SMTP TLS mode."`
+	CalDAVEndpoint            string `help:"CalDAV HTTPS discovery endpoint."`
+	CalendarPath              string `help:"Optional absolute CalDAV calendar path."`
+	CalendarUsername          string `help:"CalDAV login identity; defaults to --username or the address."`
+	CalendarCredentialBackend string `help:"External CalDAV credential backend; defaults to --credential-backend."`
+	CalendarCredentialKey     string `help:"External CalDAV credential key; defaults to --credential-key."`
+	ApproveCalendarCredential bool   `help:"Record consent for a distinct CalDAV credential."`
+	Default                   bool   `help:"Make this the default account."`
+	JSON                      bool   `help:"Write machine-readable JSON."`
 }
 
 type accountRenameCommand struct {
@@ -203,9 +218,29 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	endpointOverride := command.Origin
-	if command.Provider == string(domain.ProviderJMAP) {
+	var endpointOverride string
+	switch domain.ProviderID(command.Provider) {
+	case domain.ProviderJMAP:
 		endpointOverride = command.SessionURL
+	case domain.ProviderIMAPSMTP:
+		if command.IMAPHost != "" && command.IMAPPort != 0 {
+			endpointOverride = fmt.Sprintf(
+				"%s://%s",
+				command.IMAPTLS,
+				net.JoinHostPort(command.IMAPHost, strconv.Itoa(int(command.IMAPPort))),
+			)
+		}
+	case domain.ProviderCalDAV:
+		endpointOverride = command.CalDAVEndpoint
+	case "",
+		domain.ProviderMicrosoftOWA,
+		domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderPOP3:
+		endpointOverride = command.Origin
+	default:
+		endpointOverride = command.Origin
 	}
 	selected, err := selectAccountCandidate(result, command.Provider, endpointOverride)
 	if err != nil {
@@ -215,7 +250,7 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	if alias == "" {
 		alias = command.Address[:strings.LastIndexByte(command.Address, '@')]
 	}
-	mail, calendar, endpoint, err := command.routes(selected, result.Address)
+	mail, calendar, endpoint, err := command.routes(selected, result)
 	if err != nil {
 		return err
 	}
@@ -247,8 +282,9 @@ func (command *accountAddCommand) Run(app *runtime) error {
 
 func (command accountAddCommand) routes(
 	selected application.ProviderCandidate,
-	address string,
+	discovery application.AccountDiscoveryResult,
 ) (*application.AccountMailRouteInput, *application.AccountCalendarRouteInput, string, error) {
+	address := discovery.Address
 	switch selected.Provider {
 	case domain.ProviderMicrosoftOWA:
 		origin := command.Origin
@@ -263,14 +299,14 @@ func (command accountAddCommand) routes(
 		web := &application.AccountOutlookWebInput{
 			Origin: origin, Mailbox: command.Mailbox,
 		}
-		return &application.AccountMailRouteInput{
-				Provider: domain.ProviderMicrosoftOWA, OutlookWeb: web,
-			}, &application.AccountCalendarRouteInput{
-				Provider: domain.ProviderMicrosoftOWA,
-				OutlookWeb: &application.AccountOutlookWebInput{
-					Origin: origin, Mailbox: command.Mailbox,
-				},
-			}, origin, nil
+		return command.finishRoutes(&application.AccountMailRouteInput{
+			Provider: domain.ProviderMicrosoftOWA, OutlookWeb: web,
+		}, &application.AccountCalendarRouteInput{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &application.AccountOutlookWebInput{
+				Origin: origin, Mailbox: command.Mailbox,
+			},
+		}, origin, selected, discovery)
 	case domain.ProviderJMAP:
 		sessionURL := command.SessionURL
 		if sessionURL == "" {
@@ -291,7 +327,7 @@ func (command accountAddCommand) routes(
 				"JMAP requires --credential-backend, --credential-key, and --approve-credential",
 			)
 		}
-		return &application.AccountMailRouteInput{
+		return command.finishRoutes(&application.AccountMailRouteInput{
 			Provider: domain.ProviderJMAP,
 			JMAP: &application.AccountJMAPInput{
 				SessionURL: sessionURL,
@@ -302,12 +338,60 @@ func (command accountAddCommand) routes(
 					Consent: command.ApproveCredential,
 				},
 			},
-		}, nil, sessionURL, nil
+		}, nil, sessionURL, selected, discovery)
+	case domain.ProviderIMAPSMTP:
+		imapEndpoint, err := accountTLSEndpoint(
+			command.IMAPHost,
+			command.IMAPPort,
+			command.IMAPTLS,
+			candidateEndpoint(selected, "imap"),
+			"implicit",
+		)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("IMAP endpoint: %w", err)
+		}
+		smtpEndpoint, err := accountTLSEndpoint(
+			command.SMTPHost,
+			command.SMTPPort,
+			command.SMTPTLS,
+			candidateEndpoint(selected, "smtp"),
+			"starttls",
+		)
+		if err != nil {
+			return nil, nil, "", fmt.Errorf("SMTP endpoint: %w", err)
+		}
+		username := command.Username
+		if username == "" {
+			username = address
+		}
+		if command.CredentialKey == "" || !command.ApproveCredential {
+			return nil, nil, "", errors.New(
+				"IMAP/SMTP requires --credential-key and --approve-credential",
+			)
+		}
+		return command.finishRoutes(&application.AccountMailRouteInput{
+			Provider: domain.ProviderIMAPSMTP,
+			IMAPSMTP: &application.AccountIMAPSMTPInput{
+				IMAP: imapEndpoint, SMTP: smtpEndpoint,
+				Username: username, Mailbox: command.Mailbox,
+				Credential: application.AccountCredentialInput{
+					Backend: command.CredentialBackend,
+					Key:     command.CredentialKey,
+					Consent: command.ApproveCredential,
+				},
+			},
+		}, nil, fmt.Sprintf(
+			"IMAP %s:%d · SMTP %s:%d",
+			imapEndpoint.Host,
+			imapEndpoint.Port,
+			smtpEndpoint.Host,
+			smtpEndpoint.Port,
+		), selected, discovery)
+	case domain.ProviderCalDAV:
+		return command.finishRoutes(nil, nil, "", selected, discovery)
 	case domain.ProviderMicrosoftGraph,
 		domain.ProviderGoogleAPI,
 		domain.ProviderGoogleWeb,
-		domain.ProviderIMAPSMTP,
-		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return nil, nil, "", fmt.Errorf(
 			"provider %q has no account route builder",
@@ -316,6 +400,109 @@ func (command accountAddCommand) routes(
 	default:
 		return nil, nil, "", fmt.Errorf("unknown provider %q", selected.Provider)
 	}
+}
+
+func (command accountAddCommand) finishRoutes(
+	mail *application.AccountMailRouteInput,
+	calendar *application.AccountCalendarRouteInput,
+	endpoint string,
+	selected application.ProviderCandidate,
+	discovery application.AccountDiscoveryResult,
+) (*application.AccountMailRouteInput, *application.AccountCalendarRouteInput, string, error) {
+	provider := command.CalendarProvider
+	if provider == "" && selected.Provider == domain.ProviderCalDAV {
+		provider = string(domain.ProviderCalDAV)
+	}
+	switch domain.ProviderID(provider) {
+	case "":
+		return mail, calendar, endpoint, nil
+	case "none":
+		if mail == nil {
+			return nil, nil, "", errors.New("calendar-only selection cannot use --calendar-provider none")
+		}
+		return mail, nil, endpoint, nil
+	case domain.ProviderMicrosoftOWA:
+		if selected.Provider != domain.ProviderMicrosoftOWA || calendar == nil {
+			return nil, nil, "", errors.New(
+				"microsoft-owa calendar requires a selected Outlook Web route",
+			)
+		}
+		return mail, calendar, endpoint, nil
+	case domain.ProviderCalDAV:
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderPOP3:
+		return nil, nil, "", fmt.Errorf(
+			"provider %q cannot supply a configured calendar route",
+			provider,
+		)
+	default:
+		return nil, nil, "", fmt.Errorf(
+			"calendar provider %q is not available in this build",
+			provider,
+		)
+	}
+
+	calendarEndpoint := command.CalDAVEndpoint
+	if calendarEndpoint == "" {
+		for _, candidate := range discovery.Candidates {
+			if candidate.Provider == domain.ProviderCalDAV && candidate.Available {
+				calendarEndpoint = candidateHTTPSEndpoint(candidate, "caldav")
+				if calendarEndpoint != "" {
+					break
+				}
+			}
+		}
+	}
+	if calendarEndpoint == "" && selected.Provider == domain.ProviderCalDAV {
+		calendarEndpoint = candidateHTTPSEndpoint(selected, "caldav")
+	}
+	if calendarEndpoint == "" {
+		return nil, nil, "", errors.New(
+			"CalDAV requires --caldav-endpoint with an explicit HTTPS discovery endpoint",
+		)
+	}
+	username := command.CalendarUsername
+	if username == "" {
+		username = command.Username
+	}
+	if username == "" {
+		username = discovery.Address
+	}
+	backend := command.CalendarCredentialBackend
+	if backend == "" {
+		backend = command.CredentialBackend
+	}
+	key := command.CalendarCredentialKey
+	consent := command.ApproveCalendarCredential
+	if key == "" {
+		key = command.CredentialKey
+		consent = command.ApproveCredential
+	}
+	if backend == "" || key == "" || !consent {
+		return nil, nil, "", errors.New(
+			"CalDAV requires an external credential key and explicit credential approval",
+		)
+	}
+	calendar = &application.AccountCalendarRouteInput{
+		Provider: domain.ProviderCalDAV,
+		CalDAV: &application.AccountCalDAVInput{
+			Endpoint: calendarEndpoint, CalendarPath: command.CalendarPath,
+			Username: username,
+			Credential: application.AccountCredentialInput{
+				Backend: backend, Key: key, Consent: consent,
+			},
+		},
+	}
+	if endpoint == "" {
+		endpoint = calendarEndpoint
+	} else {
+		endpoint += " · CalDAV " + calendarEndpoint
+	}
+	return mail, calendar, endpoint, nil
 }
 
 func (command *accountRenameCommand) Run(app *runtime) error {
@@ -397,7 +584,10 @@ func selectAccountCandidate(
 				return candidate, nil
 			}
 		}
-		if provider != domain.ProviderMicrosoftOWA && provider != domain.ProviderJMAP {
+		if provider != domain.ProviderMicrosoftOWA &&
+			provider != domain.ProviderJMAP &&
+			provider != domain.ProviderIMAPSMTP &&
+			provider != domain.ProviderCalDAV {
 			return application.ProviderCandidate{}, fmt.Errorf(
 				"provider %q is not available in this build",
 				provider,
@@ -409,13 +599,19 @@ func selectAccountCandidate(
 			)
 		}
 		if _, err := url.ParseRequestURI(originOverride); err != nil {
-			return application.ProviderCandidate{}, errors.New("--origin is not a valid URI")
+			return application.ProviderCandidate{}, errors.New(
+				"manual provider endpoint is not a valid URI",
+			)
 		}
 		authentication := application.DiscoveryBrowserFirstParty
 		kind := "origin"
-		if provider == domain.ProviderJMAP {
-			authentication = application.DiscoveryExternalCredential
-			kind = "jmap"
+		standards := map[domain.ProviderID]string{
+			domain.ProviderJMAP:     "jmap",
+			domain.ProviderIMAPSMTP: "imap",
+			domain.ProviderCalDAV:   "caldav",
+		}
+		if standardsKind, isStandards := standards[provider]; isStandards {
+			authentication, kind = application.DiscoveryExternalCredential, standardsKind
 		}
 		return application.ProviderCandidate{
 			Provider: provider, Confidence: 0,
@@ -438,6 +634,38 @@ func selectAccountCandidate(
 	return application.ProviderCandidate{}, errors.New(
 		"no automatically selectable provider is available; inspect `corr account discover` and pass --provider with an explicit endpoint",
 	)
+}
+
+func accountTLSEndpoint(
+	host string,
+	port uint16,
+	mode string,
+	discovered string,
+	discoveredMode string,
+) (application.AccountTLSEndpointInput, error) {
+	if host == "" && port == 0 && discovered != "" {
+		discoveredHost, discoveredPort, err := net.SplitHostPort(discovered)
+		if err != nil {
+			return application.AccountTLSEndpointInput{}, errors.New(
+				"discovered endpoint is not host:port; pass explicit host and port",
+			)
+		}
+		parsedPort, err := strconv.ParseUint(discoveredPort, 10, 16)
+		if err != nil || parsedPort == 0 {
+			return application.AccountTLSEndpointInput{}, errors.New(
+				"discovered endpoint port is invalid",
+			)
+		}
+		host, port, mode = discoveredHost, uint16(parsedPort), discoveredMode
+	}
+	if host == "" || port == 0 {
+		return application.AccountTLSEndpointInput{}, errors.New(
+			"host and port are required",
+		)
+	}
+	return application.AccountTLSEndpointInput{
+		Host: host, Port: port, Mode: mode,
+	}, nil
 }
 
 func candidateEndpoint(candidate application.ProviderCandidate, kind string) string {

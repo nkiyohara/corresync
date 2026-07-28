@@ -143,6 +143,18 @@ func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 				},
 			},
 		},
+		Calendar: &config.CalendarRoute{
+			Provider: domain.ProviderCalDAV,
+			CalDAV: &config.CalDAVRoute{
+				Endpoint: "https://dav.example.invalid/",
+				Username: "reader@example.invalid",
+				Credential: config.CredentialRef{
+					Backend: config.CredentialHelper,
+					Key:     "private-calendar-key",
+					Consent: true,
+				},
+			},
+		},
 	}
 	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)
@@ -158,6 +170,7 @@ func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 	output := string(encoded)
 	for _, private := range []string{
 		"private-credential-key",
+		"private-calendar-key",
 		"private-helper-command",
 		"--private-profile",
 	} {

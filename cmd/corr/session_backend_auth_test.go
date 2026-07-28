@@ -5,11 +5,13 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/credential"
 	"github.com/nkiyohara/corresync/internal/domain"
+	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
 )
 
@@ -109,5 +111,136 @@ func TestSessionBackendOnlyResolvesJMAPCredentialForExplicitCLILogin(t *testing.
 		if value != 0 {
 			t.Fatalf("temporary credential byte %d was not zeroed", index)
 		}
+	}
+}
+
+func TestSessionBackendOnlyResolvesCalDAVCredentialForExplicitCLILogin(t *testing.T) {
+	t.Parallel()
+
+	const accountID domain.AccountID = "acc_00000000000000000000000000000001"
+	keyringReads := 0
+	resolver, err := credential.New(credential.Options{
+		Keyring: func(service, key string) (string, error) {
+			keyringReads++
+			if service != "corresync" || key != "caldav-work" {
+				t.Fatalf("keyring request = %q, %q", service, key)
+			}
+			return "synthetic-secret", nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration := config.Default()
+	configuration.Accounts["work"] = config.Account{
+		ID: accountID,
+		Calendar: &config.CalendarRoute{
+			Provider: domain.ProviderCalDAV,
+			CalDAV: &config.CalDAVRoute{
+				Endpoint: "https://dav.example.invalid/",
+				Username: "reader@example.invalid",
+				Credential: config.CredentialRef{
+					Backend: config.CredentialOSKeyring,
+					Key:     "caldav-work",
+					Consent: true,
+				},
+			},
+		},
+	}
+	factoryCalls := 0
+	var observedPassword []byte
+	factoryError := errors.New("synthetic factory stop")
+	backend := &sessionBackend{
+		configuration: configuration,
+		credentials:   resolver,
+		accounts:      make(map[domain.AccountID]sessionAccount),
+		previews:      make(map[string]sessionPreview),
+		newCalDAV: func(
+			_ context.Context,
+			options caldavprovider.Options,
+		) (*caldavprovider.Client, error) {
+			factoryCalls++
+			observedPassword = options.Password
+			return nil, factoryError
+		},
+	}
+	mcpCaller := domain.Caller{Surface: "mcp", Instance: "synthetic-client"}
+	cliCaller := domain.Caller{Surface: "cli", Instance: "synthetic-process"}
+
+	_, err = backend.ListCalendar(t.Context(), application.CalendarListInput{
+		Account: accountID,
+		Calendar: application.CalendarFolder{
+			Kind: application.CalendarFolderDistinguished,
+			ID:   "calendar",
+		},
+		Start: "2026-07-28T00:00:00Z",
+		End:   "2026-07-29T00:00:00Z",
+	}, mcpCaller)
+	if err == nil || !strings.Contains(err.Error(), "corr auth login") {
+		t.Fatalf("ListCalendar() error = %v", err)
+	}
+	if keyringReads != 0 || factoryCalls != 0 {
+		t.Fatalf(
+			"ordinary MCP read touched authentication: keyring=%d factory=%d",
+			keyringReads,
+			factoryCalls,
+		)
+	}
+
+	_, err = backend.Login(t.Context(), accountID, mcpCaller)
+	if err == nil || !strings.Contains(err.Error(), "explicit local CLI") {
+		t.Fatalf("MCP Login() error = %v", err)
+	}
+	if keyringReads != 0 || factoryCalls != 0 {
+		t.Fatalf(
+			"MCP login touched authentication: keyring=%d factory=%d",
+			keyringReads,
+			factoryCalls,
+		)
+	}
+
+	_, err = backend.Login(t.Context(), accountID, cliCaller)
+	if !errors.Is(err, factoryError) {
+		t.Fatalf("CLI Login() error = %v", err)
+	}
+	if keyringReads != 1 || factoryCalls != 1 {
+		t.Fatalf(
+			"explicit CLI login did not resolve once: keyring=%d factory=%d",
+			keyringReads,
+			factoryCalls,
+		)
+	}
+	for index, value := range observedPassword {
+		if value != 0 {
+			t.Fatalf("temporary credential byte %d was not zeroed", index)
+		}
+	}
+}
+
+func TestMergeSessionAccountsPreservesServiceSpecificCapabilities(t *testing.T) {
+	t.Parallel()
+	mail := &application.MailService{}
+	calendar := &application.CalendarService{}
+	merged := mergeSessionAccounts(
+		sessionAccount{
+			mail: mail,
+			capabilities: domain.Capabilities{
+				Mail: true, Folders: true, AttachmentReads: true,
+			},
+			captured: time.Unix(1, 0),
+		},
+		sessionAccount{
+			calendar: calendar,
+			capabilities: domain.Capabilities{
+				Calendar: true,
+			},
+			captured: time.Unix(2, 0),
+		},
+	)
+	if merged.mail != mail || merged.calendar != calendar ||
+		!merged.capabilities.Mail || !merged.capabilities.Calendar ||
+		!merged.capabilities.Folders || !merged.capabilities.AttachmentReads ||
+		!merged.captured.Equal(time.Unix(2, 0)) {
+		t.Fatalf("mergeSessionAccounts() = %#v", merged)
 	}
 }

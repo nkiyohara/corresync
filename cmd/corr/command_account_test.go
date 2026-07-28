@@ -213,3 +213,47 @@ func TestAccountAddPersistsJMAPRouteWithoutAuthenticating(t *testing.T) {
 		t.Fatalf("output did not preserve authentication boundary: %q", stdout.String())
 	}
 }
+
+func TestAccountAddPersistsMixedIMAPAndCalDAVRoutes(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.invalid", Alias: "standards",
+		Provider:          string(domain.ProviderIMAPSMTP),
+		CalendarProvider:  string(domain.ProviderCalDAV),
+		Username:          "reader@example.invalid",
+		CredentialBackend: "os-keyring",
+		CredentialKey:     "standards-account",
+		ApproveCredential: true,
+		IMAPHost:          "imap.example.invalid",
+		IMAPPort:          993,
+		IMAPTLS:           "implicit",
+		SMTPHost:          "smtp.example.invalid",
+		SMTPPort:          587,
+		SMTPTLS:           "starttls",
+		CalDAVEndpoint:    "https://dav.example.invalid/",
+		CalendarPath:      "/calendars/reader/main/",
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["standards"]
+	if account.Mail == nil || account.Mail.IMAPSMTP == nil ||
+		account.Calendar == nil || account.Calendar.CalDAV == nil {
+		t.Fatalf("mixed standards account = %#v", account)
+	}
+	if account.Mail.IMAPSMTP.Credential.Key != "standards-account" ||
+		account.Calendar.CalDAV.Credential.Key != "standards-account" ||
+		account.Calendar.CalDAV.CalendarPath != "/calendars/reader/main/" {
+		t.Fatalf("mixed standards routes = %#v", account)
+	}
+	if !strings.Contains(stdout.String(), "IMAP") ||
+		!strings.Contains(stdout.String(), "CalDAV") ||
+		!strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("account output = %q", stdout.String())
+	}
+}

@@ -172,6 +172,8 @@ func (app *runtime) accountServices() (
 		[]domain.ProviderID{
 			domain.ProviderMicrosoftOWA,
 			domain.ProviderJMAP,
+			domain.ProviderIMAPSMTP,
+			domain.ProviderCalDAV,
 		},
 	)
 	if err != nil {
@@ -182,6 +184,8 @@ func (app *runtime) accountServices() (
 		[]domain.ProviderID{
 			domain.ProviderMicrosoftOWA,
 			domain.ProviderJMAP,
+			domain.ProviderIMAPSMTP,
+			domain.ProviderCalDAV,
 		},
 	)
 	if err != nil {

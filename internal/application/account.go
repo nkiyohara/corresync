@@ -65,17 +65,44 @@ type AccountJMAPInput struct {
 	Credential AccountCredentialInput `json:"credential"`
 }
 
+// AccountTLSEndpointInput is one encrypted standards-protocol endpoint.
+type AccountTLSEndpointInput struct {
+	Host string `json:"host"`
+	Port uint16 `json:"port"`
+	Mode string `json:"mode"`
+}
+
+// AccountIMAPSMTPInput configures separate receive and submission transports.
+type AccountIMAPSMTPInput struct {
+	IMAP       AccountTLSEndpointInput `json:"imap"`
+	SMTP       AccountTLSEndpointInput `json:"smtp"`
+	Username   string                  `json:"username"`
+	Mailbox    string                  `json:"mailbox,omitempty"`
+	Credential AccountCredentialInput  `json:"credential"`
+}
+
+// AccountCalDAVInput configures authenticated principal discovery for one
+// calendar. CalendarPath may remain empty to select the first VEVENT calendar.
+type AccountCalDAVInput struct {
+	Endpoint     string                 `json:"endpoint"`
+	CalendarPath string                 `json:"calendarPath,omitempty"`
+	Username     string                 `json:"username"`
+	Credential   AccountCredentialInput `json:"credential"`
+}
+
 // AccountMailRouteInput is a closed selection for shipped mail adapters.
 type AccountMailRouteInput struct {
 	Provider   domain.ProviderID       `json:"provider"`
 	OutlookWeb *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
 	JMAP       *AccountJMAPInput       `json:"jmap,omitempty"`
+	IMAPSMTP   *AccountIMAPSMTPInput   `json:"imapSmtp,omitempty"`
 }
 
 // AccountCalendarRouteInput is the corresponding calendar selection.
 type AccountCalendarRouteInput struct {
 	Provider   domain.ProviderID       `json:"provider"`
 	OutlookWeb *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
+	CalDAV     *AccountCalDAVInput     `json:"caldav,omitempty"`
 }
 
 // AccountAddInput explicitly selects service routes to persist. Discovery
@@ -414,6 +441,9 @@ func (service *AccountService) validateMailRoute(route AccountMailRouteInput) er
 	if route.JMAP != nil {
 		present++
 	}
+	if route.IMAPSMTP != nil {
+		present++
+	}
 	if present != 1 {
 		return errors.New("exactly one provider-specific mail route is required")
 	}
@@ -428,10 +458,14 @@ func (service *AccountService) validateMailRoute(route AccountMailRouteInput) er
 			return errors.New("jmap requires JMAP settings")
 		}
 		return validateJMAPInput(*route.JMAP)
+	case domain.ProviderIMAPSMTP:
+		if route.IMAPSMTP == nil {
+			return errors.New("imap-smtp requires IMAP/SMTP settings")
+		}
+		return validateIMAPSMTPInput(*route.IMAPSMTP)
 	case domain.ProviderMicrosoftGraph,
 		domain.ProviderGoogleAPI,
 		domain.ProviderGoogleWeb,
-		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return fmt.Errorf("provider %q cannot supply a configured mail route", route.Provider)
@@ -440,17 +474,97 @@ func (service *AccountService) validateMailRoute(route AccountMailRouteInput) er
 	}
 }
 
+func validateIMAPSMTPInput(route AccountIMAPSMTPInput) error {
+	if err := validateAccountTLSEndpoint("IMAP", route.IMAP); err != nil {
+		return err
+	}
+	if err := validateAccountTLSEndpoint("SMTP", route.SMTP); err != nil {
+		return err
+	}
+	if route.Username == "" || len(route.Username) > 320 ||
+		strings.TrimSpace(route.Username) != route.Username ||
+		strings.ContainsAny(route.Username, "\r\n\x00") {
+		return errors.New("IMAP/SMTP username is malformed")
+	}
+	if err := validateOptionalMailbox(route.Mailbox); err != nil {
+		return err
+	}
+	return validateAccountCredential(route.Credential)
+}
+
+func validateAccountTLSEndpoint(name string, endpoint AccountTLSEndpointInput) error {
+	if endpoint.Host == "" || len(endpoint.Host) > 253 ||
+		strings.TrimSpace(endpoint.Host) != endpoint.Host ||
+		strings.ContainsAny(endpoint.Host, "\r\n\x00/@") {
+		return fmt.Errorf("%s host is malformed", name)
+	}
+	if endpoint.Port == 0 {
+		return fmt.Errorf("%s port is required", name)
+	}
+	switch endpoint.Mode {
+	case "implicit", "starttls":
+		return nil
+	default:
+		return fmt.Errorf("%s TLS mode must be implicit or starttls", name)
+	}
+}
+
 func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteInput) error {
 	if err := service.requireAvailable(route.Provider); err != nil {
 		return err
 	}
-	if route.Provider != domain.ProviderMicrosoftOWA || route.OutlookWeb == nil {
+	present := 0
+	if route.OutlookWeb != nil {
+		present++
+	}
+	if route.CalDAV != nil {
+		present++
+	}
+	if present != 1 {
+		return errors.New("exactly one provider-specific calendar route is required")
+	}
+	switch route.Provider {
+	case domain.ProviderMicrosoftOWA:
+		if route.OutlookWeb == nil {
+			return errors.New("microsoft-owa requires Outlook Web settings")
+		}
+		return validateOutlookWebInput(*route.OutlookWeb)
+	case domain.ProviderCalDAV:
+		if route.CalDAV == nil {
+			return errors.New("caldav requires CalDAV settings")
+		}
+		return validateCalDAVInput(*route.CalDAV)
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderPOP3:
 		return fmt.Errorf(
 			"provider %q cannot supply a configured calendar route",
 			route.Provider,
 		)
+	default:
+		return fmt.Errorf("unknown calendar provider %q", route.Provider)
 	}
-	return validateOutlookWebInput(*route.OutlookWeb)
+}
+
+func validateCalDAVInput(route AccountCalDAVInput) error {
+	if err := validateAccountHTTPSURL("CalDAV endpoint", route.Endpoint, true); err != nil {
+		return err
+	}
+	if route.CalendarPath != "" &&
+		(!strings.HasPrefix(route.CalendarPath, "/") ||
+			len(route.CalendarPath) > 2048 ||
+			strings.ContainsAny(route.CalendarPath, "\r\n\x00?#")) {
+		return errors.New("CalDAV calendar path must be a bounded absolute DAV path")
+	}
+	if route.Username == "" || len(route.Username) > 320 ||
+		strings.TrimSpace(route.Username) != route.Username ||
+		strings.ContainsAny(route.Username, "\r\n\x00") {
+		return errors.New("CalDAV username is malformed")
+	}
+	return validateAccountCredential(route.Credential)
 }
 
 func validateOutlookWebInput(route AccountOutlookWebInput) error {
@@ -572,10 +686,31 @@ func mailRouteView(route *AccountMailRouteInput) *AccountRouteView {
 				Consented: route.JMAP.Credential.Consent,
 			},
 		}
+	case domain.ProviderIMAPSMTP:
+		if route.IMAPSMTP == nil {
+			return &AccountRouteView{Provider: route.Provider}
+		}
+		return &AccountRouteView{
+			Provider: route.Provider,
+			Endpoints: []DiscoveredEndpoint{
+				{
+					Kind:  "imap",
+					Value: accountTLSEndpointView(route.IMAPSMTP.IMAP),
+				},
+				{
+					Kind:  "smtp",
+					Value: accountTLSEndpointView(route.IMAPSMTP.SMTP),
+				},
+			},
+			Identity: route.IMAPSMTP.Username,
+			Credential: &AccountCredentialView{
+				Configured: true, Backend: route.IMAPSMTP.Credential.Backend,
+				Consented: route.IMAPSMTP.Credential.Consent,
+			},
+		}
 	case domain.ProviderMicrosoftGraph,
 		domain.ProviderGoogleAPI,
 		domain.ProviderGoogleWeb,
-		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
 		domain.ProviderPOP3:
 		return &AccountRouteView{Provider: route.Provider}
@@ -584,11 +719,47 @@ func mailRouteView(route *AccountMailRouteInput) *AccountRouteView {
 	}
 }
 
+func accountTLSEndpointView(endpoint AccountTLSEndpointInput) string {
+	return fmt.Sprintf("%s://%s:%d", endpoint.Mode, endpoint.Host, endpoint.Port)
+}
+
 func calendarRouteView(route *AccountCalendarRouteInput) *AccountRouteView {
 	if route == nil {
 		return nil
 	}
-	return outlookWebRouteView(route.Provider, route.OutlookWeb)
+	switch route.Provider {
+	case domain.ProviderMicrosoftOWA:
+		return outlookWebRouteView(route.Provider, route.OutlookWeb)
+	case domain.ProviderCalDAV:
+		if route.CalDAV == nil {
+			return &AccountRouteView{Provider: route.Provider}
+		}
+		endpoints := []DiscoveredEndpoint{
+			{Kind: "endpoint", Value: route.CalDAV.Endpoint},
+		}
+		if route.CalDAV.CalendarPath != "" {
+			endpoints = append(endpoints, DiscoveredEndpoint{
+				Kind: "calendar", Value: route.CalDAV.CalendarPath,
+			})
+		}
+		return &AccountRouteView{
+			Provider: route.Provider, Endpoints: endpoints,
+			Identity: route.CalDAV.Username,
+			Credential: &AccountCredentialView{
+				Configured: true, Backend: route.CalDAV.Credential.Backend,
+				Consented: route.CalDAV.Credential.Consent,
+			},
+		}
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderPOP3:
+		return &AccountRouteView{Provider: route.Provider}
+	default:
+		return &AccountRouteView{Provider: route.Provider}
+	}
 }
 
 func outlookWebRouteView(
@@ -618,6 +789,10 @@ func cloneMailRoute(route *AccountMailRouteInput) *AccountMailRouteInput {
 		value := *route.JMAP
 		cloned.JMAP = &value
 	}
+	if route.IMAPSMTP != nil {
+		value := *route.IMAPSMTP
+		cloned.IMAPSMTP = &value
+	}
 	return &cloned
 }
 
@@ -629,6 +804,10 @@ func cloneCalendarRoute(route *AccountCalendarRouteInput) *AccountCalendarRouteI
 	if route.OutlookWeb != nil {
 		value := *route.OutlookWeb
 		cloned.OutlookWeb = &value
+	}
+	if route.CalDAV != nil {
+		value := *route.CalDAV
+		cloned.CalDAV = &value
 	}
 	return &cloned
 }
