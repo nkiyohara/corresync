@@ -30,8 +30,10 @@ authenticates. The account receives a generated opaque ID, monitoring remains
 off, and login occurs only through `corr auth login --account ALIAS`.
 
 Rename preserves the stable ID and every account-local state tree. Remove
-requires approval and deletes only Corresync-owned profile, import, cursor, and
-queue state. Removing the default account requires `--new-default`.
+requires approval and deletes Corresync-owned profile, import, cursor, queue,
+and unshared Corresync-owned OAuth grant state. External standards credentials
+remain in their keyring/helper. Removing the default account requires
+`--new-default`.
 
 ## Schema v3
 
@@ -87,11 +89,13 @@ Each account may have mail, calendar, or both. Supported route payloads are:
 | Service | Provider | Nested table |
 | --- | --- | --- |
 | mail | `microsoft-owa` | `mail.outlook_web` |
+| mail | `google-web` | `mail.google_web` |
 | mail | `google-api` | `mail.google_api` |
 | mail | `microsoft-graph` | `mail.microsoft_graph` |
 | mail | `jmap` | `mail.jmap` |
 | mail | `imap-smtp` | `mail.imap_smtp` |
 | calendar | `microsoft-owa` | `calendar.outlook_web` |
+| calendar | `google-web` | `calendar.google_web` |
 | calendar | `google-api` | `calendar.google_api` |
 | calendar | `microsoft-graph` | `calendar.microsoft_graph` |
 | calendar | `caldav` | `calendar.caldav` |
@@ -176,6 +180,28 @@ Prefix the calendar settings with `calendar-`, for example
 `--calendar-oauth-client-id` and `--calendar-authorization-key`. A
 calendar-only account uses `--mail-provider none`; `--calendar-provider none`
 creates a mail-only account.
+
+## Google Web routing
+
+Managed Google accounts may use a browser-owned, read-only route without a
+public OAuth client:
+
+```console
+corr account add reader@example.invalid \
+  --alias managed \
+  --mail-provider google-web \
+  --calendar-provider google-web \
+  --origin https://mail.google.com \
+  --calendar-origin https://calendar.google.com
+```
+
+Only the exact provider-owned origins above are accepted. Authentication and
+identity confirmation remain inside one visible, stable-ID-isolated browser
+profile. The adapter reads a bounded semantic snapshot of Gmail and Google
+Calendar; it exposes incomplete pagination as a degradation and implements no
+mail or calendar writes. Credential-free discovery may rank this route for a
+managed Workspace address, but never opens a browser or requests OAuth/admin
+consent.
 
 ## Outlook Web routing
 

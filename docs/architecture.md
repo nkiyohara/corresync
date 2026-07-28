@@ -16,6 +16,7 @@ public transports and one authenticated local session owner.
                   ▼
        config-scoped session owner
        ├── Outlook Web browser adapter
+       ├── Google Web browser adapter
        ├── Google API OAuth adapter
        ├── Microsoft Graph OAuth adapter
        ├── JMAP adapter
@@ -72,7 +73,9 @@ config.
 
 Account add requires explicit selection when evidence is ambiguous. Add,
 rename, and remove use typed application commands over an atomic config store.
-Remove also coordinates deletion of only Corresync-owned account state.
+Remove also coordinates deletion of only Corresync-owned account state,
+including an unshared Corresync-owned OAuth grant. External standards
+credentials remain under their keyring/helper owner.
 
 MCP exposes the same typed lifecycle through caller-bound add, rename, and
 remove preview/commit pairs. A commit drains and restarts the session owner
@@ -84,6 +87,7 @@ action and account preview never resolves credentials or starts OAuth.
 The session owner creates all authenticated provider clients:
 
 - Outlook Web: dedicated browser profile and in-memory captured session;
+- Google Web: dedicated visible browser profile and bounded semantic reads;
 - Google/Graph: interactive OAuth browser plus grant in OS keyring;
 - JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference.
 

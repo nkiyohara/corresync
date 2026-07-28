@@ -6,22 +6,23 @@ not available through a raw protocol escape hatch.
 ## Provider routes
 
 <!-- markdownlint-disable MD013 -->
-| Provider ID | Mail candidate | Calendar candidate | Authentication | Evidence on `main` |
+| Provider ID | Mail | Calendar | Authentication | Evidence on `main` |
 | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Live-observed | Live-observed | Visible browser-owned Outlook Web session | Synthetic contracts plus bounded live observations |
-| `google-api` | Gmail | Selectable Google calendars | Explicit BYO public OAuth client; grant in OS keyring | Candidate; synthetic adapter and integration contracts only |
-| `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Candidate; synthetic adapter and integration contracts only |
-| `jmap` | Mail | — | OS keyring or approved credential helper | Candidate; synthetic RFC 8620 contracts only |
-| `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Candidate; synthetic protocol contracts only |
-| `caldav` | — | Calendar | OS keyring or approved credential helper | Candidate; synthetic WebDAV/iCalendar contracts only |
+| `google-web` | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Visible browser-owned Google session | Implemented; synthetic DOM and integration contracts only |
+| `google-api` | Gmail | Selectable Google calendars | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
+| `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
+| `jmap` | Mail | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts only |
+| `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts only |
+| `caldav` | — | Calendar | OS keyring or approved credential helper | Implemented; synthetic WebDAV/iCalendar contracts only |
 <!-- markdownlint-enable MD013 -->
 
 Mail and calendar are selected independently. For example, one account may use
-IMAP/SMTP for mail and CalDAV for calendar. `google-web` and `pop3` are reserved
-identifiers without route builders and cannot be selected.
+IMAP/SMTP for mail and CalDAV for calendar. `pop3` is reserved without a route
+builder and cannot be selected.
 
-“Candidate” means the adapter and synthetic contracts exist on `main`; it is
-not yet a stable compatibility claim. The latest stable v0.7 release remains
+“Implemented” means the route and synthetic contracts exist on `main`; it is
+not a universal compatibility claim. The latest stable v0.7 release remains
 Outlook-Web-only. See [compatibility evidence](compatibility.md) before using a
 development build with a live account.
 
@@ -55,13 +56,18 @@ reported and never automatically retried.
 
 Provider differences remain visible:
 
+- Google Web is a bounded visible-browser snapshot: metadata reads are
+  available, pagination beyond the visible snapshot is explicitly incomplete,
+  and every mail/calendar write is unavailable;
 - Gmail uses Gmail query syntax, has no atomic history precondition for move or
   label changes, and least-privilege scopes exclude permanent delete;
 - Graph query syntax differs from Outlook AQS, reply/forward and move expose no
   atomic source ETag precondition, its permanent-delete action exposes no
   atomic ETag precondition, and send may return no sent-item identity;
 - JMAP exposes incremental state and strong state preconditions where the
-  server supports them;
+  server supports them; a missing Submission capability degrades draft/send
+  while mail reads remain available, and a read-only account reports writes
+  unavailable;
 - IMAP/SMTP behavior depends on advertised server capabilities;
 - Outlook Web supports explicit shared/delegated mailbox routing only when the
   signed-in user already has that permission.
@@ -83,15 +89,16 @@ Provider differences remain visible:
 The normalized contract includes bounded subject/body, absolute start/end,
 time zone, location, all-day state, reminder, supported recurrence, and
 required/optional attendees. Capability and degradation records state when a
-provider cannot preserve a field. Google discovers every visible calendar but
-does not provision an online meeting. Graph discovers selectable calendars and
-reports Teams meeting support. Outlook Web can provision a Teams join link as
-a creation property. CalDAV discovers VEVENT collections, maps typed events
+provider cannot preserve a field. Google Web exposes only its bounded read-only
+visible snapshot; Google API discovers selectable calendars but does not
+provision an online meeting. Graph discovers selectable calendars and reports
+Teams meeting support. Outlook Web can provision a Teams join link as a
+creation property. CalDAV discovers VEVENT collections, maps typed events
 through WebDAV/iCalendar, and uses conditional writes.
 
 Create/update/cancel reviews also name the selected route's attendee-
-notification and cancellation disposition. Outlook Web, Google, and Graph use
-their reviewed provider-managed notification behavior. The current CalDAV
+notification and cancellation disposition. Outlook Web, Google API, and Graph
+use their reviewed provider-managed notification behavior. The current CalDAV
 adapter performs calendar-object storage only: it claims no scheduling
 notification and refuses to delete an attendee event as though it had sent a
 cancellation.
@@ -108,6 +115,9 @@ outside scope.
 - Mail and calendar provider routes are independent.
 - Rename preserves identity and state. Remove requires approval and an explicit
   replacement when removing the default account.
+- Remove purges account-local state and any unshared OAuth grant owned by
+  Corresync; external standards credential records remain owned by their
+  keyring/helper.
 - Cross-account search and agenda merge normalized results deterministically,
   retain provenance, enforce global bounds, and return explicit partial
   failures.

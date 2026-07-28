@@ -10,10 +10,10 @@ All notable user-facing changes are recorded here. The project follows
 - Add atomic account discovery/add/rename/remove with stable opaque identities,
   explicit mail/calendar routes, account-local state, and credential-free
   discovery.
-- Add implemented Google API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV
-  adapters alongside Outlook Web, with typed capabilities, visible
-  degradations, synthetic contracts, explicit selection, and no automatic
-  provider fallback.
+- Add implemented read-only Google Web, Google API, Microsoft Graph, JMAP,
+  IMAP/SMTP, and CalDAV adapters alongside Outlook Web, with typed
+  capabilities, visible degradations, synthetic contracts, explicit selection,
+  and no automatic provider fallback.
 - Make calendar create/update/cancel reviews carry the selected route's typed
   attendee-notification and cancellation-disposition semantics instead of
   inheriting Outlook-specific behavior.

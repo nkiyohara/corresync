@@ -46,9 +46,12 @@ session.
   after the user explicitly approves that exact action.
 - Draft creation is save-only. State whether an item was drafted, committed,
   sent, updated, cancelled, moved, acknowledged, or deleted.
-- Monitoring setup, runner/egress consent, queue purge, account lifecycle
-  changes, authentication, import reads, updates, and feedback actions are
-  CLI-only. Do not simulate them with other tools.
+- Account add, rename, and removal use their own preview/commit pairs. Addition
+  never authenticates. Removal may delete an unshared Corresync-owned OAuth
+  grant, so present that disclosed effect before asking for approval.
+- Monitoring setup, runner/egress consent, queue purge, authentication, import
+  reads, updates, and feedback actions are CLI-only. Do not simulate them with
+  other tools.
 
 ## Produce useful summaries
 

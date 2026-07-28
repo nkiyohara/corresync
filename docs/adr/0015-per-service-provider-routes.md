@@ -95,8 +95,9 @@ fallback. An existing locally stored valid grant may be selected without
 starting a new authorization.
 
 Google and Microsoft web-session routes are separate adapters from their API
-routes. They ship only after synthetic contract fixtures and an opt-in live
-observation; API support does not permit documentation to imply that a web
+routes. A web route may be implemented on a development branch with synthetic
+contract fixtures, but it ships in a stable release only after an opt-in live
+observation. API support does not permit documentation to imply that a web
 route exists, or vice versa.
 
 ## Consequences

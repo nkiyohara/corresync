@@ -51,10 +51,12 @@ controls. It does not bypass authentication, tenant policy, MFA, Conditional
 Access, disabled services, mailbox permissions, or administrator consent.
 
 The Outlook Web route does not require a third-party Microsoft Graph
-application. Google API and Microsoft Graph routes require an explicitly
-selected public OAuth client. JMAP, IMAP/SMTP, and CalDAV routes use only an
-OS-keyring entry or approved helper reference. None of these models is an
-authorization bypass: the provider must already permit the requested operation.
+application. The read-only Google Web route keeps sign-in and session material
+inside a visible provider-owned browser. Google API and Microsoft Graph routes
+require an explicitly selected public OAuth client. JMAP, IMAP/SMTP, and
+CalDAV routes use only an OS-keyring entry or approved helper reference. None
+of these models is an authorization bypass: the provider must already permit
+the requested operation.
 
 Expected controls include:
 

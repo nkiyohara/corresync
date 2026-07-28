@@ -13,6 +13,7 @@ authorized live observations.
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | macOS arm64 | Observed |
 | Outlook Web mail/calendar | Synthetic typed wire contracts | Microsoft 365 work/school | Observed |
+| Google Web read-only mail/calendar | Synthetic semantic-DOM and application integration contracts; opt-in live harness compiles | Not run | Deterministic only |
 | Google API mail/calendar | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
@@ -40,6 +41,9 @@ evidence.
 
 - `microsoft-owa`: mail and calendar are live-observed; some advanced fields
   remain deterministic-only as listed below.
+- `google-web`: bounded read-only Gmail and Calendar snapshots are implemented
+  through an isolated visible browser session, but have no recorded live
+  observation.
 - `google-api`: Gmail and selectable Google calendars are implemented with a BYO
   public OAuth client, but have no recorded live observation.
 - `microsoft-graph`: mail, selectable calendars, and typed Teams-link creation are
@@ -49,8 +53,8 @@ evidence.
   contracts, with server-specific behavior exposed through capabilities and
   degradations.
 
-`google-web` and `pop3` are reserved unavailable identifiers. Their presence in
-discovery/config validation does not constitute an adapter claim.
+`pop3` is a reserved unavailable identifier. Its presence in discovery and
+config validation does not constitute an adapter claim.
 
 ## Outlook Web observation detail
 
@@ -108,6 +112,27 @@ authorized to test. Prefer a dedicated test account and synthetic content.
 The online doctor is bounded and content-free in its output. It does not prove
 mutation compatibility. Monitoring, remote egress, permanent deletion, and
 calendar invitations require separate explicit authorization.
+
+The managed Google Web adapter also has a separate opt-in, read-only harness.
+It requires a visible browser profile and authenticates only inside that
+browser:
+
+```console
+read -r -p "Authorized Google address: " CORRESYNC_LIVE_GOOGLE_ADDRESS
+export CORRESYNC_LIVE_GOOGLE_ADDRESS
+CORRESYNC_LIVE_CONFIRM=google-web-read-only \
+CORRESYNC_LIVE_GOOGLE_PROFILE_DIR="$(mktemp -d)" \
+mise exec -- go test -tags=live \
+  -run TestLiveGoogleWebVisibleRead ./internal/provider/googleweb
+unset CORRESYNC_LIVE_GOOGLE_ADDRESS
+```
+
+Set `CORRESYNC_LIVE_BROWSER_EXECUTABLE` only when browser auto-detection is not
+appropriate. Use a dedicated profile directory and remove it only through a
+reviewed local cleanup after the test. The harness accepts no password, token,
+cookie, or storage export; it verifies the visible signed-in identity and
+performs bounded mail/calendar reads only. It is excluded from default tests
+and CI.
 
 See the [manual test checklist](manual-test-checklist.md) for provider and
 platform recording templates.

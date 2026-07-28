@@ -128,7 +128,8 @@ addition, rename, and removal are caller-bound preview/commit pairs; commit
 stops and restarts the session owner around the atomic config change so no
 authenticated route can retain stale configuration. Addition never
 authenticates. Removal previews its Corresync-owned state purge and never
-deletes an external credential-owner record.
+deletes an external standards credential. Its review discloses deletion of an
+unshared Corresync-owned OAuth grant; shared grants are retained.
 
 Authentication, monitor enable/reconfigure, runner/egress consent, queue purge,
 local import reads, updates, and feedback external actions remain CLI-only.
@@ -180,6 +181,7 @@ egress, or purge a queue.
 Tools route through the account's selected service:
 
 - Outlook Web: visible browser-owned session;
+- Google Web: visible browser-owned, bounded read-only Gmail/Calendar snapshot;
 - Google API or Graph: explicit OAuth grant in OS keyring;
 - JMAP and IMAP/SMTP: explicit standards credential backend;
 - CalDAV: explicit calendar credential backend.

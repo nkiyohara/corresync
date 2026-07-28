@@ -36,9 +36,11 @@ calendar. Its command is `corr`. Configure several isolated accounts, choose a
 mail and calendar provider for each, then use the same typed operations from a
 terminal, script, or agent.
 
-The development branch contains deterministic candidate implementations for:
+The development branch implements seven explicit provider routes:
 
 - Outlook Web through a visible, browser-owned session;
+- managed Gmail and Google Calendar through a visible, browser-owned,
+  read-only Google Web session;
 - Gmail and Google Calendar through an explicitly configured public OAuth
   client;
 - Microsoft 365 mail and calendar through explicitly configured Graph OAuth;
@@ -47,10 +49,10 @@ The development branch contains deterministic candidate implementations for:
 - CalDAV calendar, including a CalDAV calendar paired with a different mail
   provider.
 
-Only Outlook Web has a recorded live observation. Google, Graph, JMAP,
-IMAP/SMTP, and CalDAV remain synthetic-only release candidates until their
-documented opt-in live checks are completed; implementation is not a universal
-provider-compatibility claim. The latest stable v0.7 release remains
+Only Outlook Web has a recorded live observation. Google Web, Google API,
+Graph, JMAP, IMAP/SMTP, and CalDAV are implemented and deterministically tested
+on `main`, but remain pre-release compatibility claims until their documented
+opt-in live checks are completed. The latest stable v0.7 release remains
 Outlook-Web-only.
 
 Corresync never guesses a privileged route, requests a password, or silently
@@ -108,6 +110,9 @@ OAuth providers require your own registered public-client configuration and
 store grants in the OS keyring. Standards providers use an OS-keyring entry or
 an explicitly approved credential helper; passwords and tokens never enter
 `config.toml`. See [account and provider configuration](docs/configuration.md).
+Managed Google accounts can instead select `google-web` for a visible,
+browser-owned, read-only Gmail and Calendar snapshot without creating an OAuth
+client.
 
 ### Read across accounts
 

@@ -188,7 +188,7 @@ Pass criteria:
 - candidates explain evidence, confidence, auth type, and availability;
 - no browser/keyring/helper opens during discovery;
 - ambiguous evidence requires an explicit provider;
-- unavailable/reserved providers cannot be selected.
+- unavailable routes and the reserved `pop3` provider cannot be selected.
 
 Add only a route approved for the test. Use synthetic aliases and follow
 [configuration.md](configuration.md). For standards routes, preload a
@@ -227,6 +227,24 @@ Pass criteria:
 
 The Outlook-Web-only `--terminal` relay is optional, requires a real TTY, and
 must reject piped input. Do not record entered or rendered identity values.
+
+For a separately authorized managed Google Web observation, use its opt-in
+read-only harness from a source checkout:
+
+```console
+read -r -p "Authorized Google address: " CORRESYNC_LIVE_GOOGLE_ADDRESS
+export CORRESYNC_LIVE_GOOGLE_ADDRESS
+CORRESYNC_LIVE_CONFIRM=google-web-read-only \
+CORRESYNC_LIVE_GOOGLE_PROFILE_DIR="$(mktemp -d)" \
+mise exec -- go test -tags=live \
+  -run TestLiveGoogleWebVisibleRead ./internal/provider/googleweb
+unset CORRESYNC_LIVE_GOOGLE_ADDRESS
+```
+
+Verify the browser stays visible, both Google surfaces match the configured
+identity, only bounded metadata is read, and no cookie/token/storage export or
+write occurs. Use a dedicated profile and remove it only through a reviewed
+local cleanup after the test. Record only the content-free evidence header.
 
 ## 7. Read-only CLI
 
@@ -289,6 +307,8 @@ Pass criteria:
 - content is treated as untrusted data;
 - account add/rename/remove require the matching short-lived MCP preview token,
   and a commit restarts the session owner without starting authentication;
+- account removal review discloses any unshared Corresync-owned OAuth grant
+  deletion and retains external standards credentials;
 - MCP cannot authenticate, configure monitoring/egress, scan imports, purge
   queues, update the binary, or submit feedback.
 

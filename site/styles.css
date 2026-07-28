@@ -626,7 +626,7 @@ pre {
 .safety-links a { color: #b8c8ff; }
 .safety-links a:hover { color: #d4ddff; }
 
-/* ---------- Roadmap: shipped vs planned ---------- */
+/* ---------- Implemented routes and workflows ---------- */
 
 .roadmap-grid {
   display: grid;
@@ -643,7 +643,7 @@ pre {
 }
 
 .panel.now { border: 1px solid var(--line-strong); background: var(--card); box-shadow: var(--shadow); }
-.panel.next { border: 2px dashed var(--line-strong); background: transparent; }
+.panel.next { border: 1px solid var(--line-strong); background: var(--card); box-shadow: var(--shadow); }
 
 .panel header { margin-bottom: 1.4rem; }
 .panel h3 { margin: 0; font-size: 1.35rem; }
@@ -663,11 +663,6 @@ pre {
   border: 1px solid var(--accent);
   color: var(--accent-deep);
   background: var(--accent-wash);
-}
-
-.badge.planned {
-  border: 1px dashed var(--muted);
-  color: var(--muted);
 }
 
 .panel-cols {

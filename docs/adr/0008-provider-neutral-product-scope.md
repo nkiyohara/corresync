@@ -79,9 +79,9 @@ monitoring.
 
 ## Implementation amendment
 
-Google API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters are now
-implemented behind the shared application boundary. Their evidence is
-deterministic-only until separately recorded in
+The read-only Google Web, Google API, Microsoft Graph, JMAP, IMAP/SMTP, and
+CalDAV adapters are now implemented behind the shared application boundary.
+Their evidence is deterministic-only until separately recorded in
 [compatibility.md](../compatibility.md). Outlook Web remains the only provider
 with bounded live observations; this evidence difference is not a capability
 fallback.

@@ -82,6 +82,20 @@ delete, and send may not yield a stable sent-item identity. The adapter does
 not enable push/history monitoring or scheduled send. Calendar operations do
 not claim online-meeting creation.
 
+## Google Web
+
+The managed Google Web route opens only the exact Gmail and Google Calendar
+origins in one dedicated visible browser profile. Authentication, SSO, MFA,
+account selection, and organization notices remain browser-owned. The adapter
+never reads cookies, browser storage, or authorization tokens.
+
+After confirming the configured identity on both surfaces, a bounded semantic
+DOM driver returns visible mail and calendar metadata. It treats the snapshot
+as read-only and incomplete: pagination beyond the rendered set is not
+invented, unsupported details are degradations, and all draft/send/organization
+and calendar mutation operations fail as unavailable without touching the
+browser.
+
 ## Microsoft Graph
 
 The Graph adapter is an explicit route, never an automatic fallback for a
@@ -105,6 +119,11 @@ when the server supports it.
 JMAP method calls and arbitrary property maps never cross the adapter boundary.
 State mismatch becomes a visible conflict or degradation rather than an
 unreviewed retry.
+
+A server may provide usable mail without JMAP Submission. In that case reads
+remain available while draft/send report a `mail.write`/`mail.send`
+degradation. A read-only advertised account likewise remains readable and
+rejects every write explicitly.
 
 ## IMAP and SMTP Submission
 

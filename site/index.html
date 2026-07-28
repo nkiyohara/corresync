@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Corresync — local-first mail and calendar for terminals and agents</title>
-  <meta name="description" content="Corresync brings Outlook, Gmail, Graph, JMAP, IMAP/SMTP, and CalDAV accounts to one guarded local CLI and MCP server. Explicit authentication, isolated accounts, reviewed writes, no hosted relay.">
+  <meta name="description" content="Corresync brings Outlook Web, Google Web/API, Graph, JMAP, IMAP/SMTP, and CalDAV accounts to one guarded local CLI and MCP server. Explicit authentication, isolated accounts, reviewed writes, no hosted relay.">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
   <meta property="og:title" content="Corresync — all your correspondence, one local core">
@@ -51,8 +51,8 @@
           <a class="button secondary" href="https://github.com/nkiyohara/corresync/releases/latest">Latest release<span aria-hidden="true"> ↗</span></a>
         </div>
         <p class="hero-note">
-          Outlook Web live-observed · new routes synthetic-only on main<br>
-          Gmail · Microsoft Graph · JMAP · IMAP/SMTP · CalDAV<br>
+          Outlook Web live-observed · new routes deterministic-only on main<br>
+          Google Web/API · Microsoft Graph · JMAP · IMAP/SMTP · CalDAV<br>
           macOS, Linux, and Windows · amd64 &amp; arm64 · Apache-2.0
         </p>
       </div>
@@ -108,12 +108,12 @@
       <div class="fit-grid">
         <article class="fit-card">
           <p class="chip">Provider-native</p>
-          <h3>Outlook Web, Google API, Microsoft Graph</h3>
+          <h3>Outlook Web, Google Web/API, Microsoft Graph</h3>
           <p>
-            Use an interactive Outlook Web session, or explicitly configure a
-            public OAuth client with PKCE for Google or Graph. Grants stay in
-            the operating-system keyring; no shared client secret or hosted
-            token relay exists.
+            Use an interactive Outlook Web session, a managed read-only Google
+            Web session, or explicitly configure a public OAuth client with
+            PKCE for Google or Graph. OAuth grants stay in the operating-system
+            keyring; no shared client secret or hosted token relay exists.
           </p>
         </article>
         <article class="fit-card highlight">
@@ -203,7 +203,7 @@ corr doctor --online --account work</code></pre>
       <div class="section-heading">
         <p class="eyebrow"><span aria-hidden="true"></span>Local MCP over stdio</p>
         <h2 id="agents-title">One guarded server, native client setup.</h2>
-        <p>Every client reaches the same 32 narrow tools and two read-only monitor resources.</p>
+        <p>Every client reaches the same 39 narrow tools and two read-only monitor resources.</p>
       </div>
       <div class="agent-grid">
         <article><span class="agent-letter" aria-hidden="true">C</span><h3>Codex</h3><code>corr mcp setup codex</code><p>Plugin and bundled Agent Skill.</p></article>
@@ -284,7 +284,7 @@ corr doctor --online --account work</code></pre>
     <section class="roadmap" id="providers" aria-labelledby="providers-title">
       <div class="section-heading">
         <p class="eyebrow"><span aria-hidden="true"></span>Implemented, with evidence marked plainly</p>
-        <h2 id="providers-title">Six explicit provider routes. No hidden fallback.</h2>
+        <h2 id="providers-title">Seven explicit provider routes. No hidden fallback.</h2>
         <p>
           All routes have synthetic contracts. Outlook Web also has bounded live
           observations; the newer adapters stay labeled deterministic-only until
@@ -294,15 +294,15 @@ corr doctor --online --account work</code></pre>
       <div class="roadmap-grid">
         <article class="panel now" aria-labelledby="panel-provider-title">
           <header>
-            <p class="badge live">Candidate implementations on main</p>
-            <h3 id="panel-provider-title">Mail and calendar route candidates</h3>
+            <p class="badge live">Implemented on main</p>
+            <h3 id="panel-provider-title">Mail and calendar routes</h3>
           </header>
           <div class="panel-cols">
             <div>
               <h4>Mail</h4>
               <ul>
                 <li>Outlook Web and Microsoft Graph</li>
-                <li>Gmail via Google API</li>
+                <li>Gmail via Google Web or API</li>
                 <li>JMAP</li>
                 <li>IMAP with SMTP Submission</li>
               </ul>
@@ -311,7 +311,7 @@ corr doctor --online --account work</code></pre>
               <h4>Calendar</h4>
               <ul>
                 <li>Outlook Web and Microsoft Graph</li>
-                <li>Primary Google Calendar</li>
+                <li>Google Calendar via Web or API</li>
                 <li>CalDAV</li>
                 <li>Provider-supported Teams links</li>
               </ul>
@@ -327,7 +327,7 @@ corr doctor --online --account work</code></pre>
 
         <article class="panel next" aria-labelledby="panel-workflow-title">
           <header>
-            <p class="badge planned">Local-first workflows</p>
+            <p class="badge live">Implemented local-first workflows</p>
             <h3 id="panel-workflow-title">Beyond one inbox</h3>
           </header>
           <ul class="plan-list">

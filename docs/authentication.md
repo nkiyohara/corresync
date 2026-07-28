@@ -44,6 +44,19 @@ Piped input is rejected. CAPTCHA, passkeys, security keys, client
 certificates, native dialogs, and graphical custom login may require the
 visible browser. Do not use the relay to bypass organization policy.
 
+## Google Web
+
+The `google-web` route uses one dedicated visible browser profile to open the
+exact `https://mail.google.com` and `https://calendar.google.com` origins. It
+confirms that both surfaces show the configured account identity, then exposes
+only a bounded read-only semantic snapshot.
+
+Sign-in, SSO, MFA, organization notices, and account selection stay inside the
+browser. Corresync does not request a password, inspect cookies or browser
+storage, extract an authorization token, or invoke Google administrator
+consent. The profile is isolated by stable account ID. Google Web and Google
+API are separate explicit routes: neither silently falls back to the other.
+
 ## Google API and Microsoft Graph
 
 These routes require an explicitly configured public OAuth client and a
@@ -93,9 +106,9 @@ cookie, token, page content, or mailbox item.
 `corr auth logout` closes all account adapters and browsers owned by the
 config-scoped daemon, clears in-memory sessions, rotates/removes IPC
 credentials, and exits the owner. Provider keyring entries and user-owned
-credential-helper data are external and are not deleted implicitly. Account
-removal may explicitly revoke a Corresync-owned OAuth authorization where the
-configured backend supports it.
+credential-helper data are external and are not deleted implicitly. Approved
+account removal deletes an unshared OAuth grant only when Corresync owns that
+grant; shared grants and external standards credentials are retained.
 
 ## Local IPC authentication
 

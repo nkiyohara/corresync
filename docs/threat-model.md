@@ -38,6 +38,9 @@ gateway or tenant administration service.
   config, CLI, MCP, audit, feedback, or logs.
 - Browser routes use visible interactive sign-in. OAuth routes use
   Authorization Code with PKCE for an explicitly selected public client.
+- The Google Web route reads only bounded semantic page state after exact-origin
+  and identity validation; it never extracts cookies, browser storage, or
+  authorization tokens and exposes no write operation.
 - Standards credentials remain behind an OS-keyring entry or an explicitly
   approved helper reference.
 - Discovery cannot access credentials, start consent, or probe administrator

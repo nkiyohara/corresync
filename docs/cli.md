@@ -62,6 +62,14 @@ corr account add reader@example.invalid \
   --authorization-key personal-google \
   --approve-oauth
 
+# Managed Gmail and Calendar through a visible read-only browser
+corr account add reader@example.invalid \
+  --alias managed \
+  --mail-provider google-web \
+  --calendar-provider google-web \
+  --origin https://mail.google.com \
+  --calendar-origin https://calendar.google.com
+
 # IMAP/SMTP mail plus CalDAV calendar
 corr account add reader@example.invalid \
   --alias standards \
@@ -94,6 +102,8 @@ Mail and calendar providers are independent. Calendar-specific OAuth flags
 default to their shared `--oauth-*` values; set them explicitly when the two
 services use different providers or grants. `--provider` remains a compatibility
 alias for `--mail-provider`. No account command accepts a password or token.
+Approved removal discloses and purges account-local state plus an unshared
+Corresync-owned OAuth grant; it never deletes an external standards credential.
 
 ## Authentication and doctor
 
@@ -109,7 +119,8 @@ corr doctor --online --account work
 `auth login` displays the exact OAuth scope set before any provider page can
 open, then invokes the route's browser/keyring/helper authentication.
 `--terminal` is an experimental Outlook-Web-only browser relay and requires an
-interactive TTY. `auth status` is content-free.
+interactive TTY. Google Web uses a visible browser-owned session and provides
+bounded read-only Gmail/Calendar snapshots. `auth status` is content-free.
 
 `doctor` validates local config, browser prerequisites, IPC, daemon state, and
 update policy. `--online` is an explicit live compatibility check; it is never

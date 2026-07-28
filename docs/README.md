@@ -61,7 +61,7 @@ detail, but changing an accepted decision requires a new or amended ADR.
 
 1. `AGENTS.md` for scope and non-negotiable invariants;
 2. accepted ADRs for architectural decisions;
-3. `docs/features.md` for the shipped surface;
+3. `docs/features.md` for the implemented surface and evidence level;
 4. `docs/json.md` for machine compatibility;
 5. `corr help <command>` for exact flags in the installed binary.
 
