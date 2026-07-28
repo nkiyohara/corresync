@@ -98,7 +98,8 @@ func monitorTestEvent(state string) application.MonitorEvent {
 		ID:      "evt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 		Account: testAccountID, AccountAlias: "work",
 		Provider: domain.ProviderJMAP, SourceObjectID: "synthetic-message",
-		Trust: application.MonitorTrustMarker, State: state,
+		Trust:    application.MonitorTrustMarker,
+		Delivery: application.MonitorDeliveryQueue, State: state,
 		DeliveryCount: 1, DetectedAt: time.Unix(4, 0).UTC(),
 	}
 	if state == "acknowledged" {

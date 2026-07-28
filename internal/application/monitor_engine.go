@@ -105,7 +105,7 @@ func (engine *MonitorEngine) Poll(
 	}
 	result, err := engine.store.CommitScan(ctx, MonitorScan{
 		Account: policy.Account, Cursor: cursor, Bootstrap: !state.Initialized,
-		Queue: policy.Mode.Queues(), ObservedAt: now,
+		Delivery: monitorDelivery(policy.Mode), ObservedAt: now,
 		RetainAfter: now.Add(-policy.Retention), Detections: detections,
 	})
 	if err != nil {
@@ -144,16 +144,7 @@ func (engine *MonitorEngine) Poll(
 	case domain.MonitorOff, domain.MonitorQueue:
 		return nil
 	case domain.MonitorNotify:
-		if len(result.Events) == 0 {
-			return nil
-		}
-		return engine.notify(
-			ctx,
-			policy,
-			result.Events,
-			cursor,
-			state.Cursor,
-		)
+		return engine.notifyPending(ctx, policy)
 	case domain.MonitorAgent:
 		return engine.dispatchPending(ctx, policy)
 	}
@@ -234,15 +225,13 @@ func (engine *MonitorEngine) readMailboxWindow(
 			messages = append(messages, message)
 		}
 		if recovered || page.IncludesLastItem || len(page.Messages) == 0 {
-			recovered = true
 			break
 		}
 	}
-	if !recovered {
-		return nil, "", errors.New(
-			"monitor cursor was not recovered within 1000 inbox messages; no cursor was advanced",
-		)
-	}
+	// When recovered is false, the old cursor has fallen outside the bounded
+	// recovery window. The inspected messages and newCursor intentionally
+	// continue below: committing them establishes the newest bounded window as
+	// the baseline without an unbounded mailbox walk.
 	if newCursor == "" {
 		empty := sha256.Sum256([]byte("empty:" + string(policy.Account)))
 		newCursor = hex.EncodeToString(empty[:])
@@ -308,21 +297,24 @@ func matchesMonitorPolicy(
 	return true, "matched"
 }
 
-func (engine *MonitorEngine) notify(
+func (engine *MonitorEngine) notifyPending(
 	ctx context.Context,
 	policy MonitorPolicy,
-	events []MonitorEvent,
-	committedCursor string,
-	previousCursor string,
 ) error {
+	state, err := engine.store.Status(ctx, policy.Account)
+	if err != nil {
+		return err
+	}
+	page, err := engine.store.List(ctx, MonitorEventListInput{
+		Account:  policy.Account,
+		State:    "pending",
+		Delivery: MonitorDeliveryNotification,
+		Limit:    MaxMonitorEventsPage,
+	})
+	if err != nil || page.Total == 0 {
+		return err
+	}
 	if engine.notifier == nil {
-		rollbackErr := engine.rollbackNotifications(
-			ctx,
-			policy,
-			committedCursor,
-			previousCursor,
-			events,
-		)
 		failureErr := engine.store.MarkDispatchFailure(
 			context.WithoutCancel(ctx),
 			policy.Account,
@@ -332,77 +324,38 @@ func (engine *MonitorEngine) notify(
 		auditErr := engine.recordPipeline(
 			ctx, policy, "notification", "matched",
 			policy.NotificationFields, policy.NotificationTarget,
-			"failed", len(events),
+			"failed", page.Total,
 		)
 		return errors.Join(
 			errors.New("configured notification adapter is unavailable"),
-			rollbackErr,
 			failureErr,
 			auditErr,
 		)
 	}
 	if inQuietHours(policy, engine.now()) {
-		rollbackErr := engine.rollbackNotifications(
-			ctx,
-			policy,
-			committedCursor,
-			previousCursor,
-			events,
-		)
-		auditErr := engine.recordPipeline(
+		return engine.recordPipeline(
 			ctx, policy, "notification", "matched",
 			policy.NotificationFields, policy.NotificationTarget,
-			"quiet_hours", len(events),
-		)
-		return errors.Join(rollbackErr, auditErr)
-	}
-	state, err := engine.store.Status(ctx, policy.Account)
-	if err != nil {
-		return errors.Join(
-			err,
-			engine.rollbackNotifications(
-				ctx,
-				policy,
-				committedCursor,
-				previousCursor,
-				events,
-			),
+			"quiet_hours", page.Total,
 		)
 	}
 	if blocked := dispatchBlockReason(policy, state, engine.now()); blocked != "" {
-		rollbackErr := engine.rollbackNotifications(
-			ctx,
-			policy,
-			committedCursor,
-			previousCursor,
-			events,
-		)
-		auditErr := engine.recordPipeline(
+		return engine.recordPipeline(
 			ctx, policy, "notification", "matched",
 			policy.NotificationFields, policy.NotificationTarget,
-			blocked, len(events),
+			blocked, page.Total,
 		)
-		return errors.Join(rollbackErr, auditErr)
 	}
 	remaining := policy.RateLimitHour - state.DispatchedLastHour
-	releaseCount := min(remaining, len(events))
+	releaseCount := min(remaining, len(page.Events))
 	released := 0
-	for _, event := range events[:releaseCount] {
+	for _, event := range page.Events[:releaseCount] {
 		release := MonitorRelease{
 			Destination: policy.NotificationTarget,
 			Fields:      append([]string(nil), policy.NotificationFields...),
 			Event:       releaseEvent(event, policy.NotificationFields),
 		}
 		if err := engine.notifier.Notify(ctx, release); err != nil {
-			var notificationErr error
-			if released > 0 {
-				notificationErr = engine.store.MarkNotification(
-					context.WithoutCancel(ctx),
-					policy.Account,
-					released,
-					engine.now(),
-				)
-			}
 			failureErr := engine.store.MarkDispatchFailure(
 				context.WithoutCancel(ctx), policy.Account, engine.now(),
 				"notification_failed",
@@ -412,20 +365,25 @@ func (engine *MonitorEngine) notify(
 				policy.NotificationFields, policy.NotificationTarget,
 				"failed", 1,
 			)
-			rollbackErr := engine.rollbackNotifications(
-				ctx,
-				policy,
-				committedCursor,
-				previousCursor,
-				events[released:],
-			)
 			return errors.Join(
 				err,
-				notificationErr,
 				failureErr,
 				auditErr,
-				rollbackErr,
 			)
+		}
+		if err := engine.store.MarkDispatch(
+			context.WithoutCancel(ctx),
+			policy.Account,
+			MonitorDeliveryNotification,
+			[]string{event.ID},
+			engine.now(),
+		); err != nil {
+			auditErr := engine.recordPipeline(
+				ctx, policy, "notification", "matched",
+				policy.NotificationFields, policy.NotificationTarget,
+				"failed", 1,
+			)
+			return errors.Join(err, auditErr)
 		}
 		released++
 		if err := engine.recordPipeline(
@@ -433,74 +391,21 @@ func (engine *MonitorEngine) notify(
 			policy.NotificationFields, policy.NotificationTarget,
 			"completed", 1,
 		); err != nil {
-			_ = engine.store.MarkNotification(
-				context.WithoutCancel(ctx),
-				policy.Account,
-				released,
-				engine.now(),
-			)
-			rollbackErr := engine.rollbackNotifications(
-				ctx,
-				policy,
-				committedCursor,
-				previousCursor,
-				events[released:],
-			)
-			return errors.Join(err, rollbackErr)
+			return err
 		}
 	}
-	if released > 0 {
-		if err := engine.store.MarkNotification(
-			ctx,
-			policy.Account,
-			released,
-			engine.now(),
-		); err != nil {
-			rollbackErr := engine.rollbackNotifications(
-				ctx,
-				policy,
-				committedCursor,
-				previousCursor,
-				events[released:],
-			)
-			return errors.Join(err, rollbackErr)
+	if released < page.Total {
+		result := "batch_limited"
+		if remaining <= released {
+			result = "rate_limited"
 		}
-	}
-	if releaseCount < len(events) {
-		rollbackErr := engine.rollbackNotifications(
-			ctx,
-			policy,
-			committedCursor,
-			previousCursor,
-			events[releaseCount:],
-		)
-		auditErr := engine.recordPipeline(
+		return engine.recordPipeline(
 			ctx, policy, "notification", "matched",
 			policy.NotificationFields, policy.NotificationTarget,
-			"rate_limited", len(events)-releaseCount,
+			result, page.Total-released,
 		)
-		return errors.Join(rollbackErr, auditErr)
 	}
 	return nil
-}
-
-func (engine *MonitorEngine) rollbackNotifications(
-	ctx context.Context,
-	policy MonitorPolicy,
-	committedCursor string,
-	previousCursor string,
-	events []MonitorEvent,
-) error {
-	if len(events) == 0 {
-		return nil
-	}
-	return engine.store.RollbackNotification(
-		context.WithoutCancel(ctx),
-		policy.Account,
-		committedCursor,
-		previousCursor,
-		events,
-	)
 }
 
 func (engine *MonitorEngine) dispatchPending(
@@ -530,7 +435,8 @@ func (engine *MonitorEngine) dispatchPending(
 	remaining := policy.RateLimitHour - state.DispatchedLastHour
 	limit := min(remaining, MaxMonitorEventsPage)
 	page, err := engine.store.List(ctx, MonitorEventListInput{
-		Account: policy.Account, State: "pending", Limit: limit,
+		Account: policy.Account, State: "pending",
+		Delivery: MonitorDeliveryRunner, Limit: limit,
 	})
 	if err != nil || len(page.Events) == 0 {
 		return err
@@ -557,13 +463,33 @@ func (engine *MonitorEngine) dispatchPending(
 		)
 		return err
 	}
-	if err := engine.store.MarkDispatch(ctx, policy.Account, ids, now); err != nil {
+	if err := engine.store.MarkDispatch(
+		context.WithoutCancel(ctx),
+		policy.Account,
+		MonitorDeliveryRunner,
+		ids,
+		now,
+	); err != nil {
 		return err
 	}
 	return engine.recordPipeline(
 		ctx, policy, "runner", "matched", policy.RunnerFields,
 		policy.RunnerTarget, "completed", len(events),
 	)
+}
+
+func monitorDelivery(mode domain.MonitorMode) string {
+	switch mode {
+	case domain.MonitorOff:
+		return ""
+	case domain.MonitorNotify:
+		return MonitorDeliveryNotification
+	case domain.MonitorQueue:
+		return MonitorDeliveryQueue
+	case domain.MonitorAgent:
+		return MonitorDeliveryRunner
+	}
+	return ""
 }
 
 func dispatchAllowed(

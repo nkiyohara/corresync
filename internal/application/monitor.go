@@ -14,6 +14,9 @@ const (
 	MaxMonitorEventsPage        = 100
 	MaxMonitorDispatchesPerHour = 1000
 	MonitorTrustMarker          = "untrusted_data"
+	MonitorDeliveryQueue        = "queue"
+	MonitorDeliveryNotification = "notification"
+	MonitorDeliveryRunner       = "runner"
 )
 
 // MonitorPolicy is the secret-free, immutable account policy visible to
@@ -117,6 +120,7 @@ type MonitorEvent struct {
 	Importance     string            `json:"importance,omitempty"`
 	HasAttachments bool              `json:"hasAttachments"`
 	Trust          string            `json:"trust"`
+	Delivery       string            `json:"delivery"`
 	State          string            `json:"state"`
 	DeliveryCount  int               `json:"deliveryCount"`
 	DetectedAt     time.Time         `json:"detectedAt"`
@@ -135,10 +139,11 @@ type MonitorEventPage struct {
 
 // MonitorEventListInput selects one account queue and an optional state.
 type MonitorEventListInput struct {
-	Account domain.AccountID `json:"account"`
-	State   string           `json:"state,omitempty"`
-	Offset  int              `json:"offset"`
-	Limit   int              `json:"limit"`
+	Account  domain.AccountID `json:"account"`
+	State    string           `json:"state,omitempty"`
+	Delivery string           `json:"delivery,omitempty"`
+	Offset   int              `json:"offset"`
+	Limit    int              `json:"limit"`
 }
 
 // MonitorAcknowledgeInput updates one local queue item only.
@@ -168,7 +173,7 @@ type MonitorScan struct {
 	Account     domain.AccountID
 	Cursor      string
 	Bootstrap   bool
-	Queue       bool
+	Delivery    string
 	ObservedAt  time.Time
 	RetainAfter time.Time
 	Detections  []MonitorDetection
@@ -188,15 +193,13 @@ type MonitorEventStore interface {
 	Acknowledge(context.Context, MonitorAcknowledgeInput, time.Time) (MonitorEvent, error)
 	Purge(context.Context, domain.AccountID) (int, error)
 	CommitScan(context.Context, MonitorScan) (MonitorScanResult, error)
-	RollbackNotification(
+	MarkDispatch(
 		context.Context,
 		domain.AccountID,
 		string,
-		string,
-		[]MonitorEvent,
+		[]string,
+		time.Time,
 	) error
-	MarkNotification(context.Context, domain.AccountID, int, time.Time) error
-	MarkDispatch(context.Context, domain.AccountID, []string, time.Time) error
 	MarkScanFailure(context.Context, domain.AccountID, time.Time, string) error
 	MarkDispatchFailure(context.Context, domain.AccountID, time.Time, string) error
 }
@@ -378,6 +381,9 @@ func (event MonitorEvent) Validate(expected domain.AccountID) error {
 		event.DetectedAt.IsZero() {
 		return errors.New("monitor event lacks trust or delivery metadata")
 	}
+	if !validMonitorDelivery(event.Delivery, false) {
+		return errors.New("monitor event has an invalid delivery kind")
+	}
 	switch event.State {
 	case "pending":
 		if event.DispatchedAt != nil || event.AcknowledgedAt != nil {
@@ -417,6 +423,9 @@ func (page MonitorEventPage) Validate(input MonitorEventListInput) error {
 		}
 		if input.State != "" && event.State != input.State {
 			return errors.New("monitor event page violated its state filter")
+		}
+		if input.Delivery != "" && event.Delivery != input.Delivery {
+			return errors.New("monitor event page violated its delivery filter")
 		}
 	}
 	return nil
@@ -639,6 +648,9 @@ func (input MonitorEventListInput) Validate() error {
 	default:
 		return errors.New("event state must be pending, dispatched, or acknowledged")
 	}
+	if !validMonitorDelivery(input.Delivery, true) {
+		return errors.New("event delivery must be queue, notification, or runner")
+	}
 	if input.Offset < 0 || input.Offset > 10_000 {
 		return errors.New("event offset must be between 0 and 10000")
 	}
@@ -646,6 +658,18 @@ func (input MonitorEventListInput) Validate() error {
 		return fmt.Errorf("event limit must be between 1 and %d", MaxMonitorEventsPage)
 	}
 	return nil
+}
+
+func validMonitorDelivery(delivery string, allowEmpty bool) bool {
+	if delivery == "" {
+		return allowEmpty
+	}
+	switch delivery {
+	case MonitorDeliveryQueue, MonitorDeliveryNotification, MonitorDeliveryRunner:
+		return true
+	default:
+		return false
+	}
 }
 
 func (input MonitorAcknowledgeInput) Validate() error {

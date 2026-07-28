@@ -565,7 +565,8 @@ func TestMonitoringToolsAndResourcesCannotEnableOrBroadenPolicy(t *testing.T) {
 			Events: []application.MonitorEvent{{
 				ID: eventID, Account: account, AccountAlias: "work",
 				Provider: domain.ProviderJMAP, SourceObjectID: "synthetic",
-				Trust: application.MonitorTrustMarker, State: "pending",
+				Trust:    application.MonitorTrustMarker,
+				Delivery: application.MonitorDeliveryQueue, State: "pending",
 				DeliveryCount: 1,
 			}},
 			Limit: 50, Total: 1,
@@ -573,7 +574,8 @@ func TestMonitoringToolsAndResourcesCannotEnableOrBroadenPolicy(t *testing.T) {
 		monitorEvent: application.MonitorEvent{
 			ID: eventID, Account: account, AccountAlias: "work",
 			Provider: domain.ProviderJMAP, SourceObjectID: "synthetic",
-			Trust: application.MonitorTrustMarker, State: "acknowledged",
+			Trust:    application.MonitorTrustMarker,
+			Delivery: application.MonitorDeliveryQueue, State: "acknowledged",
 		},
 	}
 	server, err := New(

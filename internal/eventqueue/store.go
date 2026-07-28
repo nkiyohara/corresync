@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	stateSchemaVersion = 1
+	stateSchemaVersion = 2
 	maximumStateBytes  = 32 << 20
 	maximumQueueEvents = 10_000
 	maximumSeenObjects = 20_000
@@ -148,7 +148,8 @@ func (store *Store) List(
 	}
 	events := make([]application.MonitorEvent, 0, len(state.Events))
 	for _, event := range state.Events {
-		if input.State == "" || event.State == input.State {
+		if (input.State == "" || event.State == input.State) &&
+			(input.Delivery == "" || event.Delivery == input.Delivery) {
 			events = append(events, event)
 		}
 	}
@@ -264,8 +265,8 @@ func (store *Store) CommitScan(
 		if scan.Bootstrap || !detection.Matched {
 			continue
 		}
-		event := monitorEvent(detection, scan.ObservedAt)
-		if scan.Queue {
+		event := monitorEvent(detection, scan.Delivery, scan.ObservedAt)
+		if scan.Delivery != "" {
 			if len(state.Events) >= maximumQueueEvents {
 				return application.MonitorScanResult{}, errors.New(
 					"monitor queue reached its 10000-event safety bound; acknowledge and purge events",
@@ -295,69 +296,10 @@ func (store *Store) CommitScan(
 	return result, nil
 }
 
-func (store *Store) RollbackNotification(
-	ctx context.Context,
-	account domain.AccountID,
-	committedCursor string,
-	previousCursor string,
-	events []application.MonitorEvent,
-) error {
-	if err := account.ValidateOpaque(); err != nil {
-		return err
-	}
-	if !validMonitorCursor(committedCursor) ||
-		!validMonitorCursor(previousCursor) {
-		return errors.New("notification rollback requires valid monitor cursors")
-	}
-	if len(events) == 0 || len(events) > 1000 {
-		return errors.New("notification rollback must contain 1 through 1000 events")
-	}
-	keys := make(map[string]application.MonitorEvent, len(events))
-	for _, event := range events {
-		if err := event.Validate(account); err != nil ||
-			event.ID != eventID(account, event.Provider, event.SourceObjectID) {
-			return errors.New("notification rollback contains an invalid event")
-		}
-		key := sourceKey(event.Provider, event.SourceObjectID)
-		if _, duplicate := keys[key]; duplicate {
-			return errors.New("notification rollback contains a duplicate event")
-		}
-		keys[key] = event
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	state, path, err := store.load(account)
-	if err != nil {
-		return err
-	}
-	if !state.Initialized || state.Cursor != committedCursor {
-		return errors.New("monitor cursor changed before notification rollback")
-	}
-	for key, event := range keys {
-		seen, exists := state.Seen[key]
-		if !exists || seen.Count != 1 ||
-			!seen.LastSeenAt.Equal(event.DetectedAt.UTC()) {
-			return errors.New("notification rollback event is outside the committed scan")
-		}
-	}
-	for _, queued := range state.Events {
-		if _, exists := keys[sourceKey(queued.Provider, queued.SourceObjectID)]; exists {
-			return errors.New("notification rollback cannot remove a queued event")
-		}
-	}
-	for key := range keys {
-		delete(state.Seen, key)
-	}
-	state.Cursor = previousCursor
-	return store.save(path, state)
-}
-
 func (store *Store) MarkDispatch(
 	ctx context.Context,
 	account domain.AccountID,
+	delivery string,
 	eventIDs []string,
 	now time.Time,
 ) error {
@@ -366,6 +308,10 @@ func (store *Store) MarkDispatch(
 	}
 	if len(eventIDs) == 0 || len(eventIDs) > 100 {
 		return errors.New("dispatch batch must contain 1 through 100 events")
+	}
+	if delivery != application.MonitorDeliveryNotification &&
+		delivery != application.MonitorDeliveryRunner {
+		return errors.New("dispatch requires a notification or runner delivery kind")
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -387,6 +333,9 @@ func (store *Store) MarkDispatch(
 	for index := range state.Events {
 		if _, exists := pending[state.Events[index].ID]; !exists {
 			continue
+		}
+		if state.Events[index].Delivery != delivery {
+			return errors.New("dispatch batch crossed its delivery boundary")
 		}
 		switch state.Events[index].State {
 		case "pending":
@@ -415,46 +364,6 @@ func (store *Store) MarkDispatch(
 	}
 	for range len(eventIDs) {
 		state.Dispatches = append(state.Dispatches, dispatched)
-	}
-	return store.save(path, state)
-}
-
-func (store *Store) MarkNotification(
-	ctx context.Context,
-	account domain.AccountID,
-	count int,
-	now time.Time,
-) error {
-	if err := account.ValidateOpaque(); err != nil {
-		return err
-	}
-	if count < 1 || count > application.MaxMonitorDispatchesPerHour {
-		return fmt.Errorf(
-			"notification batch must contain 1 through %d events",
-			application.MaxMonitorDispatchesPerHour,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	state, path, err := store.load(account)
-	if err != nil {
-		return err
-	}
-	released := now.UTC()
-	state.DispatchFailures = 0
-	state.LastError = ""
-	state.CircuitOpenUntil = nil
-	state.LastDispatchAt = &released
-	pruneDispatches(&state, released.Add(-time.Hour))
-	if len(state.Dispatches)+count >
-		application.MaxMonitorDispatchesPerHour {
-		return errors.New("notification history reached its hourly safety bound")
-	}
-	for range count {
-		state.Dispatches = append(state.Dispatches, released)
 	}
 	return store.save(path, state)
 }
@@ -529,6 +438,13 @@ func validateScan(scan application.MonitorScan) error {
 	if len(scan.Detections) > 1000 {
 		return errors.New("monitor scan exceeds the 1000-object recovery bound")
 	}
+	switch scan.Delivery {
+	case "", application.MonitorDeliveryQueue,
+		application.MonitorDeliveryNotification,
+		application.MonitorDeliveryRunner:
+	default:
+		return errors.New("monitor scan has an invalid delivery kind")
+	}
 	for _, detection := range scan.Detections {
 		if detection.Account != scan.Account {
 			return errors.New("monitor detection crossed its account boundary")
@@ -578,6 +494,7 @@ func validMonitorCursor(cursor string) bool {
 
 func monitorEvent(
 	detection application.MonitorDetection,
+	delivery string,
 	detectedAt time.Time,
 ) application.MonitorEvent {
 	return application.MonitorEvent{
@@ -587,7 +504,8 @@ func monitorEvent(
 		Sender: detection.Sender, Subject: detection.Subject,
 		ReceivedAt: detection.ReceivedAt, Importance: detection.Importance,
 		HasAttachments: detection.HasAttachments,
-		Trust:          application.MonitorTrustMarker, State: "pending",
+		Trust:          application.MonitorTrustMarker, Delivery: delivery,
+		State:         "pending",
 		DeliveryCount: 1, DetectedAt: detectedAt.UTC(),
 	}
 }
@@ -676,9 +594,21 @@ func (store *Store) load(account domain.AccountID) (persistedState, string, erro
 	if decoder.Decode(&struct{}{}) != io.EOF {
 		return persistedState{}, "", errors.New("monitor state contains trailing data")
 	}
-	if state.SchemaVersion != stateSchemaVersion || state.Seen == nil ||
+	if (state.SchemaVersion != 1 && state.SchemaVersion != stateSchemaVersion) ||
+		state.Seen == nil ||
 		len(state.Events) > maximumQueueEvents || len(state.Seen) > maximumSeenObjects {
 		return persistedState{}, "", errors.New("monitor state failed structural validation")
+	}
+	if state.SchemaVersion == 1 {
+		for index := range state.Events {
+			if state.Events[index].Delivery == "" {
+				// Legacy outbox entries predate automatic notification
+				// persistence. Keep them local-only rather than guessing a
+				// newly configured external sink.
+				state.Events[index].Delivery = application.MonitorDeliveryQueue
+			}
+		}
+		state.SchemaVersion = stateSchemaVersion
 	}
 	if state.Initialized {
 		if len(state.Cursor) != sha256.Size*2 {

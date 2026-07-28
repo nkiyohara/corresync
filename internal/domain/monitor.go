@@ -26,9 +26,11 @@ func (mode MonitorMode) Validate() error {
 // Collects reports whether the provider watcher may read metadata.
 func (mode MonitorMode) Collects() bool { return mode != MonitorOff }
 
-// Queues reports whether matching metadata may be persisted in the outbox.
+// Queues reports whether matching metadata may be persisted in the local
+// outbox. Notification delivery also uses the outbox so deferrals never rewind
+// the provider cursor or drop a first-seen event.
 func (mode MonitorMode) Queues() bool {
-	return mode == MonitorQueue || mode == MonitorAgent
+	return mode != MonitorOff
 }
 
 // Dispatches reports whether an explicitly configured runner may be invoked.

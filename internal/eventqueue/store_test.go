@@ -234,17 +234,43 @@ func TestRetentionPrunesOnlyAcknowledgedEvents(t *testing.T) {
 	}
 }
 
-func TestMarkNotificationPersistsTheMaximumHourlyBatch(t *testing.T) {
+func TestMarkDispatchEnforcesTheMaximumHourlyHistory(t *testing.T) {
 	t.Parallel()
 	store := NewAt(t.TempDir())
 	now := time.Now().UTC()
-	if err := store.MarkNotification(
+	if _, err := store.CommitScan(
 		t.Context(),
-		testAccountA,
-		application.MaxMonitorDispatchesPerHour,
-		now,
+		testScan(testAccountA, now.Add(-time.Minute), true, "baseline", nil),
 	); err != nil {
-		t.Fatalf("MarkNotification() error = %v", err)
+		t.Fatal(err)
+	}
+	detections := make([]application.MonitorDetection, 0, application.MaxMonitorDispatchesPerHour)
+	for index := range application.MaxMonitorDispatchesPerHour {
+		detections = append(
+			detections,
+			testDetection(testAccountA, "message-"+time.Duration(index).String(), true),
+		)
+	}
+	scan := testScan(testAccountA, now, false, "full", detections)
+	scan.Delivery = application.MonitorDeliveryRunner
+	result, err := store.CommitScan(t.Context(), scan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for offset := 0; offset < len(result.Events); offset += 100 {
+		ids := make([]string, 0, 100)
+		for _, event := range result.Events[offset : offset+100] {
+			ids = append(ids, event.ID)
+		}
+		if err := store.MarkDispatch(
+			t.Context(),
+			testAccountA,
+			application.MonitorDeliveryRunner,
+			ids,
+			now,
+		); err != nil {
+			t.Fatalf("MarkDispatch() error = %v", err)
+		}
 	}
 	status, err := store.Status(t.Context(), testAccountA)
 	if err != nil {
@@ -257,23 +283,37 @@ func TestMarkNotificationPersistsTheMaximumHourlyBatch(t *testing.T) {
 			application.MaxMonitorDispatchesPerHour,
 		)
 	}
-	if err := store.MarkNotification(
+	extraScan := testScan(
+		testAccountA,
+		now.Add(time.Minute),
+		false,
+		"extra",
+		[]application.MonitorDetection{testDetection(testAccountA, "extra", true)},
+	)
+	extraScan.Delivery = application.MonitorDeliveryRunner
+	extra, err := store.CommitScan(t.Context(), extraScan)
+	if err != nil || len(extra.Events) != 1 {
+		t.Fatalf("extra CommitScan() = %+v, %v", extra, err)
+	}
+	if err := store.MarkDispatch(
 		t.Context(),
 		testAccountA,
-		1,
+		application.MonitorDeliveryRunner,
+		[]string{extra.Events[0].ID},
 		now,
 	); err == nil {
-		t.Fatal("MarkNotification() exceeded the hourly history bound")
+		t.Fatal("MarkDispatch() exceeded the hourly history bound")
 	}
 }
 
-func TestRollbackNotificationRestoresCursorAndMakesEventsRetryable(t *testing.T) {
+func TestNotificationOutboxKeepsCursorMonotonicAndEventsPending(t *testing.T) {
 	t.Parallel()
 	store := NewAt(t.TempDir())
 	start := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
-	baseline := testScan(testAccountA, start, true, "baseline", nil)
-	baseline.Queue = false
-	if _, err := store.CommitScan(t.Context(), baseline); err != nil {
+	if _, err := store.CommitScan(
+		t.Context(),
+		testScan(testAccountA, start, true, "baseline", nil),
+	); err != nil {
 		t.Fatal(err)
 	}
 	next := testScan(
@@ -283,30 +323,73 @@ func TestRollbackNotificationRestoresCursorAndMakesEventsRetryable(t *testing.T)
 		"next",
 		[]application.MonitorDetection{testDetection(testAccountA, "message", true)},
 	)
-	next.Queue = false
+	next.Delivery = application.MonitorDeliveryNotification
 	first, err := store.CommitScan(t.Context(), next)
 	if err != nil || len(first.Events) != 1 {
 		t.Fatalf("first CommitScan() = %+v, %v", first, err)
-	}
-	if err := store.RollbackNotification(
-		t.Context(),
-		testAccountA,
-		next.Cursor,
-		baseline.Cursor,
-		first.Events,
-	); err != nil {
-		t.Fatalf("RollbackNotification() error = %v", err)
 	}
 	status, err := store.Status(t.Context(), testAccountA)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Cursor != baseline.Cursor {
-		t.Fatalf("cursor = %q, want %q", status.Cursor, baseline.Cursor)
+	if status.Cursor != next.Cursor || status.Pending != 1 {
+		t.Fatalf("status = %+v, want committed cursor and pending event", status)
 	}
-	retry, err := store.CommitScan(t.Context(), next)
-	if err != nil || len(retry.Events) != 1 || retry.Duplicates != 0 {
-		t.Fatalf("retry CommitScan() = %+v, %v", retry, err)
+	page, err := store.List(t.Context(), application.MonitorEventListInput{
+		Account:  testAccountA,
+		State:    "pending",
+		Delivery: application.MonitorDeliveryNotification,
+		Limit:    10,
+	})
+	if err != nil || len(page.Events) != 1 {
+		t.Fatalf("notification pending page = %+v, %v", page, err)
+	}
+}
+
+func TestLegacyEventsMigrateToLocalOnlyDelivery(t *testing.T) {
+	t.Parallel()
+	store := NewAt(t.TempDir())
+	start := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	if _, err := store.CommitScan(
+		t.Context(),
+		testScan(testAccountA, start, true, "baseline", nil),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CommitScan(
+		t.Context(),
+		testScan(
+			testAccountA,
+			start.Add(time.Minute),
+			false,
+			"next",
+			[]application.MonitorDetection{
+				testDetection(testAccountA, "legacy-message", true),
+			},
+		),
+	); err != nil {
+		t.Fatal(err)
+	}
+	state, path, err := store.load(testAccountA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.SchemaVersion = 1
+	state.Events[0].Delivery = ""
+	if err := store.save(path, state); err != nil {
+		t.Fatal(err)
+	}
+	page, err := NewAt(filepath.Dir(filepath.Dir(path))).List(
+		t.Context(),
+		application.MonitorEventListInput{
+			Account:  testAccountA,
+			Delivery: application.MonitorDeliveryQueue,
+			Limit:    10,
+		},
+	)
+	if err != nil || len(page.Events) != 1 ||
+		page.Events[0].Delivery != application.MonitorDeliveryQueue {
+		t.Fatalf("migrated page = %+v, %v", page, err)
 	}
 }
 
@@ -320,16 +403,15 @@ func TestMarkDispatchPreservesConcurrentAcknowledgement(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	result, err := store.CommitScan(
-		t.Context(),
-		testScan(
-			testAccountA,
-			start.Add(time.Minute),
-			false,
-			"next",
-			[]application.MonitorDetection{testDetection(testAccountA, "message", true)},
-		),
+	dispatchScan := testScan(
+		testAccountA,
+		start.Add(time.Minute),
+		false,
+		"next",
+		[]application.MonitorDetection{testDetection(testAccountA, "message", true)},
 	)
+	dispatchScan.Delivery = application.MonitorDeliveryRunner
+	result, err := store.CommitScan(t.Context(), dispatchScan)
 	if err != nil || len(result.Events) != 1 {
 		t.Fatalf("CommitScan() = %+v, %v", result, err)
 	}
@@ -348,6 +430,7 @@ func TestMarkDispatchPreservesConcurrentAcknowledgement(t *testing.T) {
 	if err := store.MarkDispatch(
 		t.Context(),
 		testAccountA,
+		application.MonitorDeliveryRunner,
 		[]string{input.EventID},
 		dispatchedAt,
 	); err != nil {
@@ -441,7 +524,8 @@ func testScan(
 ) application.MonitorScan {
 	return application.MonitorScan{
 		Account: account, Cursor: cursor(cursorValue), Bootstrap: bootstrap,
-		Queue: true, ObservedAt: now, RetainAfter: now.Add(-24 * time.Hour),
+		Delivery:   application.MonitorDeliveryQueue,
+		ObservedAt: now, RetainAfter: now.Add(-24 * time.Hour),
 		Detections: detections,
 	}
 }
