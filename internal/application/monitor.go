@@ -51,21 +51,23 @@ type MonitorCatalog interface {
 
 // MonitorQueueStatus contains only local operational metadata.
 type MonitorQueueStatus struct {
-	Initialized        bool       `json:"initialized"`
-	Cursor             string     `json:"cursor,omitempty"`
-	LastScanAt         *time.Time `json:"lastScanAt,omitempty"`
-	LastError          string     `json:"lastError,omitempty"`
-	Queued             int        `json:"queued"`
-	Pending            int        `json:"pending"`
-	Dispatched         int        `json:"dispatched"`
-	Acknowledged       int        `json:"acknowledged"`
-	ScanFailures       int        `json:"scanFailures"`
-	DispatchFailures   int        `json:"dispatchFailures"`
-	DispatchedLastHour int        `json:"dispatchedLastHour"`
-	LastDispatchAt     *time.Time `json:"lastDispatchAt,omitempty"`
-	CircuitOpenUntil   *time.Time `json:"circuitOpenUntil,omitempty"`
-	OldestPendingAt    *time.Time `json:"oldestPendingAt,omitempty"`
-	LastAcknowledgedAt *time.Time `json:"lastAcknowledgedAt,omitempty"`
+	Initialized          bool       `json:"initialized"`
+	Cursor               string     `json:"cursor,omitempty"`
+	LastScanAt           *time.Time `json:"lastScanAt,omitempty"`
+	LastError            string     `json:"lastError,omitempty"`
+	Queued               int        `json:"queued"`
+	Pending              int        `json:"pending"`
+	Dispatched           int        `json:"dispatched"`
+	Acknowledged         int        `json:"acknowledged"`
+	ScanFailures         int        `json:"scanFailures"`
+	DispatchFailures     int        `json:"dispatchFailures"`
+	RecoveryOverflows    int        `json:"recoveryOverflows"`
+	DispatchedLastHour   int        `json:"dispatchedLastHour"`
+	LastDispatchAt       *time.Time `json:"lastDispatchAt,omitempty"`
+	CircuitOpenUntil     *time.Time `json:"circuitOpenUntil,omitempty"`
+	OldestPendingAt      *time.Time `json:"oldestPendingAt,omitempty"`
+	LastAcknowledgedAt   *time.Time `json:"lastAcknowledgedAt,omitempty"`
+	LastRecoveryOverflow *time.Time `json:"lastRecoveryOverflowAt,omitempty"`
 }
 
 // MonitorStatus joins immutable consent with local queue health.
@@ -170,13 +172,14 @@ type MonitorDetection struct {
 
 // MonitorScan atomically advances one provider cursor with every observation.
 type MonitorScan struct {
-	Account     domain.AccountID
-	Cursor      string
-	Bootstrap   bool
-	Delivery    string
-	ObservedAt  time.Time
-	RetainAfter time.Time
-	Detections  []MonitorDetection
+	Account          domain.AccountID
+	Cursor           string
+	Bootstrap        bool
+	Delivery         string
+	RecoveryOverflow bool
+	ObservedAt       time.Time
+	RetainAfter      time.Time
+	Detections       []MonitorDetection
 }
 
 // MonitorScanResult returns only first-seen matching events. Duplicate
@@ -261,6 +264,9 @@ func (status MonitorStatus) Validate(expected domain.AccountID) error {
 			status.Queue.Queued ||
 		status.Queue.ScanFailures < 0 ||
 		status.Queue.DispatchFailures < 0 ||
+		status.Queue.RecoveryOverflows < 0 ||
+		(status.Queue.RecoveryOverflows == 0) !=
+			(status.Queue.LastRecoveryOverflow == nil) ||
 		status.Queue.DispatchedLastHour < 0 ||
 		status.Queue.DispatchedLastHour > MaxMonitorDispatchesPerHour {
 		return errors.New("monitor queue status has invalid counts")

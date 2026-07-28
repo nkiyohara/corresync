@@ -19,6 +19,11 @@ const (
 	monitorPageSize      = 100
 )
 
+var ErrMonitorRecoveryOverflow = errors.New(
+	"monitor cursor recovery exceeded 1000 inbox messages; " +
+		"the inspected window was committed and older uninspected messages were not emitted",
+)
+
 // MonitorEngine performs one bounded poll. Scheduling and authenticated
 // session ownership stay in the daemon adapter.
 type MonitorEngine struct {
@@ -62,7 +67,12 @@ func (engine *MonitorEngine) Poll(
 	if err != nil {
 		return err
 	}
-	detections, cursor, err := engine.scanMailbox(ctx, policy, mail, state)
+	detections, cursor, recoveryOverflow, err := engine.scanMailbox(
+		ctx,
+		policy,
+		mail,
+		state,
+	)
 	if err != nil {
 		storeErr := engine.store.MarkScanFailure(
 			context.WithoutCancel(ctx),
@@ -106,7 +116,8 @@ func (engine *MonitorEngine) Poll(
 	result, err := engine.store.CommitScan(ctx, MonitorScan{
 		Account: policy.Account, Cursor: cursor, Bootstrap: !state.Initialized,
 		Delivery: monitorDelivery(policy.Mode), ObservedAt: now,
-		RetainAfter: now.Add(-policy.Retention), Detections: detections,
+		RecoveryOverflow: recoveryOverflow,
+		RetainAfter:      now.Add(-policy.Retention), Detections: detections,
 	})
 	if err != nil {
 		stage := "detection"
@@ -140,15 +151,31 @@ func (engine *MonitorEngine) Poll(
 			}
 		}
 	}
+	var overflowErr error
+	if recoveryOverflow {
+		overflowErr = errors.Join(
+			ErrMonitorRecoveryOverflow,
+			engine.recordPipeline(
+				ctx,
+				policy,
+				"detection",
+				"cursor_recovery_overflow",
+				nil,
+				"",
+				"failed",
+				len(detections),
+			),
+		)
+	}
 	switch policy.Mode {
 	case domain.MonitorOff, domain.MonitorQueue:
-		return nil
+		return overflowErr
 	case domain.MonitorNotify:
-		return engine.notifyPending(ctx, policy)
+		return errors.Join(overflowErr, engine.notifyPending(ctx, policy))
 	case domain.MonitorAgent:
-		return engine.dispatchPending(ctx, policy)
+		return errors.Join(overflowErr, engine.dispatchPending(ctx, policy))
 	}
-	return nil
+	return overflowErr
 }
 
 func (engine *MonitorEngine) scanMailbox(
@@ -156,17 +183,28 @@ func (engine *MonitorEngine) scanMailbox(
 	policy MonitorPolicy,
 	mail *MailService,
 	state MonitorQueueStatus,
-) ([]MonitorDetection, string, error) {
-	first, firstCursor, err := engine.readMailboxWindow(ctx, policy, mail, state)
+) ([]MonitorDetection, string, bool, error) {
+	first, firstCursor, firstOverflow, err := engine.readMailboxWindow(
+		ctx,
+		policy,
+		mail,
+		state,
+	)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
-	second, secondCursor, err := engine.readMailboxWindow(ctx, policy, mail, state)
+	second, secondCursor, secondOverflow, err := engine.readMailboxWindow(
+		ctx,
+		policy,
+		mail,
+		state,
+	)
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
-	if firstCursor != secondCursor || !sameMonitorWindow(first, second) {
-		return nil, "", errors.New(
+	if firstCursor != secondCursor || firstOverflow != secondOverflow ||
+		!sameMonitorWindow(first, second) {
+		return nil, "", false, errors.New(
 			"mailbox changed during cursor recovery; no cursor was advanced",
 		)
 	}
@@ -188,7 +226,7 @@ func (engine *MonitorEngine) scanMailbox(
 			Matched:        matched, FilterReason: reason,
 		})
 	}
-	return detections, secondCursor, nil
+	return detections, secondCursor, secondOverflow, nil
 }
 
 func (engine *MonitorEngine) readMailboxWindow(
@@ -196,7 +234,7 @@ func (engine *MonitorEngine) readMailboxWindow(
 	policy MonitorPolicy,
 	mail *MailService,
 	state MonitorQueueStatus,
-) ([]MailSummary, string, error) {
+) ([]MailSummary, string, bool, error) {
 	caller := domain.Caller{Surface: "daemon", Instance: "monitor"}
 	messages := make([]MailSummary, 0, monitorPageSize)
 	newCursor := state.Cursor
@@ -208,7 +246,7 @@ func (engine *MonitorEngine) readMailboxWindow(
 			Offset:  offset, Limit: monitorPageSize, TimeZone: "UTC",
 		}, caller)
 		if err != nil {
-			return nil, "", err
+			return nil, "", false, err
 		}
 		if offset == 0 && len(page.Messages) > 0 {
 			newCursor = monitorCursor(
@@ -236,7 +274,7 @@ func (engine *MonitorEngine) readMailboxWindow(
 		empty := sha256.Sum256([]byte("empty:" + string(policy.Account)))
 		newCursor = hex.EncodeToString(empty[:])
 	}
-	return messages, newCursor, nil
+	return messages, newCursor, !recovered, nil
 }
 
 func sameMonitorWindow(left, right []MailSummary) bool {

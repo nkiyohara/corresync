@@ -86,6 +86,11 @@ func (store *memoryMonitorStore) CommitScan(
 	store.lastScan = scan
 	store.status.Initialized = true
 	store.status.Cursor = scan.Cursor
+	if scan.RecoveryOverflow {
+		observed := scan.ObservedAt
+		store.status.RecoveryOverflows++
+		store.status.LastRecoveryOverflow = &observed
+	}
 	result := MonitorScanResult{}
 	if scan.Bootstrap {
 		return result, nil
@@ -475,16 +480,19 @@ func TestMonitorCursorRebaselinesAfterBoundedRecoveryWindow(t *testing.T) {
 	engine.now = func() time.Time {
 		return time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
 	}
-	if err := engine.Poll(
+	err = engine.Poll(
 		t.Context(),
 		testMonitorPolicy(domain.MonitorQueue),
 		monitorMailService(t, reader),
-	); err != nil {
-		t.Fatalf("Poll() error = %v", err)
+	)
+	if !errors.Is(err, ErrMonitorRecoveryOverflow) {
+		t.Fatalf("Poll() error = %v, want recovery overflow", err)
 	}
 	wantCursor := monitorCursor(domain.ProviderJMAP, "message-0-0")
 	if store.status.Cursor != wantCursor ||
-		len(store.lastScan.Detections) != monitorRecoveryLimit {
+		len(store.lastScan.Detections) != monitorRecoveryLimit ||
+		store.status.RecoveryOverflows != 1 ||
+		store.status.LastRecoveryOverflow == nil {
 		t.Fatalf(
 			"rebaseline status=%+v detections=%d, want cursor %q",
 			store.status,

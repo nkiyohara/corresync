@@ -324,6 +324,7 @@ func TestNotificationOutboxKeepsCursorMonotonicAndEventsPending(t *testing.T) {
 		[]application.MonitorDetection{testDetection(testAccountA, "message", true)},
 	)
 	next.Delivery = application.MonitorDeliveryNotification
+	next.RecoveryOverflow = true
 	first, err := store.CommitScan(t.Context(), next)
 	if err != nil || len(first.Events) != 1 {
 		t.Fatalf("first CommitScan() = %+v, %v", first, err)
@@ -332,7 +333,9 @@ func TestNotificationOutboxKeepsCursorMonotonicAndEventsPending(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Cursor != next.Cursor || status.Pending != 1 {
+	if status.Cursor != next.Cursor || status.Pending != 1 ||
+		status.RecoveryOverflows != 1 ||
+		status.LastRecoveryOverflow == nil {
 		t.Fatalf("status = %+v, want committed cursor and pending event", status)
 	}
 	page, err := store.List(t.Context(), application.MonitorEventListInput{
@@ -390,6 +393,45 @@ func TestLegacyEventsMigrateToLocalOnlyDelivery(t *testing.T) {
 	if err != nil || len(page.Events) != 1 ||
 		page.Events[0].Delivery != application.MonitorDeliveryQueue {
 		t.Fatalf("migrated page = %+v, %v", page, err)
+	}
+}
+
+func TestTerminalEventsExpireAndYieldCapacity(t *testing.T) {
+	t.Parallel()
+	cutoff := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	old := cutoff.Add(-time.Minute)
+	recent := cutoff.Add(time.Minute)
+	state := persistedState{Events: []application.MonitorEvent{
+		{ID: "pending", State: "pending", DetectedAt: old},
+		{ID: "old-dispatched", State: "dispatched", DispatchedAt: &old},
+		{ID: "recent-dispatched", State: "dispatched", DispatchedAt: &recent},
+		{ID: "old-acknowledged", State: "acknowledged", AcknowledgedAt: &old},
+	}}
+	prune(&state, cutoff)
+	if len(state.Events) != 2 ||
+		state.Events[0].ID != "pending" ||
+		state.Events[1].ID != "recent-dispatched" {
+		t.Fatalf("retained terminal events = %+v", state.Events)
+	}
+
+	state.Events = make([]application.MonitorEvent, maximumQueueEvents)
+	for index := range state.Events {
+		state.Events[index].ID = "pending"
+		state.Events[index].State = "pending"
+	}
+	state.Events[10] = application.MonitorEvent{
+		ID: "newer-terminal", State: "dispatched", DispatchedAt: &recent,
+	}
+	state.Events[20] = application.MonitorEvent{
+		ID: "oldest-terminal", State: "acknowledged", AcknowledgedAt: &old,
+	}
+	if !makeEventCapacity(&state) || len(state.Events) != maximumQueueEvents-1 {
+		t.Fatalf("terminal event did not yield capacity: %d", len(state.Events))
+	}
+	for _, event := range state.Events {
+		if event.ID == "oldest-terminal" {
+			t.Fatal("capacity eviction retained the oldest terminal event")
+		}
 	}
 }
 

@@ -37,19 +37,21 @@ type seenObject struct {
 }
 
 type persistedState struct {
-	SchemaVersion      int                        `json:"schemaVersion"`
-	Initialized        bool                       `json:"initialized"`
-	Cursor             string                     `json:"cursor,omitempty"`
-	LastScanAt         *time.Time                 `json:"lastScanAt,omitempty"`
-	LastError          string                     `json:"lastError,omitempty"`
-	Seen               map[string]seenObject      `json:"seen"`
-	Events             []application.MonitorEvent `json:"events"`
-	ScanFailures       int                        `json:"scanFailures"`
-	DispatchFailures   int                        `json:"dispatchFailures"`
-	Dispatches         []time.Time                `json:"dispatches,omitempty"`
-	LastDispatchAt     *time.Time                 `json:"lastDispatchAt,omitempty"`
-	CircuitOpenUntil   *time.Time                 `json:"circuitOpenUntil,omitempty"`
-	LastAcknowledgedAt *time.Time                 `json:"lastAcknowledgedAt,omitempty"`
+	SchemaVersion        int                        `json:"schemaVersion"`
+	Initialized          bool                       `json:"initialized"`
+	Cursor               string                     `json:"cursor,omitempty"`
+	LastScanAt           *time.Time                 `json:"lastScanAt,omitempty"`
+	LastError            string                     `json:"lastError,omitempty"`
+	Seen                 map[string]seenObject      `json:"seen"`
+	Events               []application.MonitorEvent `json:"events"`
+	ScanFailures         int                        `json:"scanFailures"`
+	DispatchFailures     int                        `json:"dispatchFailures"`
+	RecoveryOverflows    int                        `json:"recoveryOverflows"`
+	Dispatches           []time.Time                `json:"dispatches,omitempty"`
+	LastDispatchAt       *time.Time                 `json:"lastDispatchAt,omitempty"`
+	CircuitOpenUntil     *time.Time                 `json:"circuitOpenUntil,omitempty"`
+	LastAcknowledgedAt   *time.Time                 `json:"lastAcknowledgedAt,omitempty"`
+	LastRecoveryOverflow *time.Time                 `json:"lastRecoveryOverflowAt,omitempty"`
 }
 
 // Store serializes all queue operations and atomically replaces each account
@@ -101,10 +103,12 @@ func status(state persistedState, now time.Time) application.MonitorQueueStatus 
 		Initialized: state.Initialized, Cursor: state.Cursor,
 		LastScanAt: state.LastScanAt, LastError: state.LastError,
 		Queued: len(state.Events), DispatchFailures: state.DispatchFailures,
-		ScanFailures:       state.ScanFailures,
-		LastDispatchAt:     state.LastDispatchAt,
-		CircuitOpenUntil:   state.CircuitOpenUntil,
-		LastAcknowledgedAt: state.LastAcknowledgedAt,
+		ScanFailures:         state.ScanFailures,
+		RecoveryOverflows:    state.RecoveryOverflows,
+		LastDispatchAt:       state.LastDispatchAt,
+		CircuitOpenUntil:     state.CircuitOpenUntil,
+		LastAcknowledgedAt:   state.LastAcknowledgedAt,
+		LastRecoveryOverflow: state.LastRecoveryOverflow,
 	}
 	hourAgo := now.Add(-time.Hour)
 	for _, dispatched := range state.Dispatches {
@@ -267,9 +271,9 @@ func (store *Store) CommitScan(
 		}
 		event := monitorEvent(detection, scan.Delivery, scan.ObservedAt)
 		if scan.Delivery != "" {
-			if len(state.Events) >= maximumQueueEvents {
+			if !makeEventCapacity(&state) {
 				return application.MonitorScanResult{}, errors.New(
-					"monitor queue reached its 10000-event safety bound; acknowledge and purge events",
+					"monitor pending queue reached its 10000-event safety bound; acknowledge or purge events",
 				)
 			}
 			state.Events = append(state.Events, event)
@@ -287,7 +291,11 @@ func (store *Store) CommitScan(
 	state.Cursor = scan.Cursor
 	state.LastScanAt = &scanned
 	state.ScanFailures = 0
-	if state.DispatchFailures == 0 {
+	if scan.RecoveryOverflow {
+		state.RecoveryOverflows++
+		state.LastRecoveryOverflow = &scanned
+		state.LastError = "cursor_recovery_overflow"
+	} else if state.DispatchFailures == 0 {
 		state.LastError = ""
 	}
 	if err := store.save(path, state); err != nil {
@@ -534,12 +542,50 @@ func prune(state *persistedState, retainAfter time.Time) {
 	}
 	retained := state.Events[:0]
 	for _, event := range state.Events {
-		if event.State != "acknowledged" || !event.DetectedAt.Before(retainAfter) {
+		var completedAt *time.Time
+		switch event.State {
+		case "dispatched":
+			completedAt = event.DispatchedAt
+		case "acknowledged":
+			completedAt = event.AcknowledgedAt
+		}
+		if completedAt == nil || !completedAt.Before(retainAfter) {
 			retained = append(retained, event)
 		}
 	}
 	state.Events = retained
 	pruneDispatches(state, retainAfter)
+}
+
+func makeEventCapacity(state *persistedState) bool {
+	if len(state.Events) < maximumQueueEvents {
+		return true
+	}
+	oldestIndex := -1
+	var oldest time.Time
+	for index := range state.Events {
+		event := &state.Events[index]
+		var completedAt *time.Time
+		switch event.State {
+		case "dispatched":
+			completedAt = event.DispatchedAt
+		case "acknowledged":
+			completedAt = event.AcknowledgedAt
+		}
+		if completedAt == nil {
+			continue
+		}
+		if oldestIndex < 0 || completedAt.Before(oldest) {
+			oldestIndex = index
+			oldest = *completedAt
+		}
+	}
+	if oldestIndex < 0 {
+		return false
+	}
+	copy(state.Events[oldestIndex:], state.Events[oldestIndex+1:])
+	state.Events = state.Events[:len(state.Events)-1]
+	return true
 }
 
 func pruneDispatches(state *persistedState, retainAfter time.Time) {
@@ -619,6 +665,8 @@ func (store *Store) load(account domain.AccountID) (persistedState, string, erro
 		}
 	}
 	if state.ScanFailures < 0 || state.DispatchFailures < 0 ||
+		state.RecoveryOverflows < 0 ||
+		(state.RecoveryOverflows == 0) != (state.LastRecoveryOverflow == nil) ||
 		len(state.Dispatches) > application.MaxMonitorDispatchesPerHour ||
 		len(state.LastError) > 64 ||
 		strings.ContainsAny(state.LastError, "\r\n\x00") {
