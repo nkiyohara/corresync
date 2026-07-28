@@ -48,7 +48,7 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	_, err = view.printf(
 		"%s  %s\n   %s\n",
 		view.success(),
-		view.strong("Authenticated Outlook Web"),
+		view.strong("Authenticated provider routes"),
 		view.muted(fmt.Sprintf("Account %s · captured %s", accountID, result.CapturedAt.UTC().Format("2006-01-02T15:04:05Z"))),
 	)
 	return err

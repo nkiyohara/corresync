@@ -8,7 +8,7 @@ import (
 )
 
 type authCommand struct {
-	Login  loginCommand      `cmd:"" help:"Open the interactive Outlook Web sign-in."`
+	Login  loginCommand      `cmd:"" help:"Explicitly authenticate one configured provider route."`
 	Status authStatusCommand `cmd:"" help:"Inspect content-free session state."`
 	Logout authLogoutCommand `cmd:"" help:"Close browsers and clear all in-memory sessions."`
 }
@@ -85,7 +85,7 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 	if _, err := view.printf(
 		"%s  %s  %s\n",
 		view.info(),
-		view.strong("Outlook Web sessions"),
+		view.strong("Provider sessions"),
 		view.muted(fmt.Sprintf("daemon %s · PID %d", report.DaemonVersion, report.ProcessID)),
 	); err != nil {
 		return err

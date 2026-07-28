@@ -15,19 +15,39 @@ import (
 	"github.com/nkiyohara/corresync/internal/audit"
 	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/config"
+	"github.com/nkiyohara/corresync/internal/credential"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/paths"
+	"github.com/nkiyohara/corresync/internal/provider/jmap"
 	"github.com/nkiyohara/corresync/internal/provider/outlookweb"
 	"github.com/nkiyohara/corresync/internal/session"
 )
 
+type sessionCloser interface {
+	Close() error
+}
+
 type sessionAccount struct {
-	handle       browserHandle
+	closers      []sessionCloser
 	mail         *application.MailService
 	calendar     *application.CalendarService
 	captured     time.Time
 	capabilities domain.Capabilities
+}
+
+func (account sessionAccount) mailService() (*application.MailService, error) {
+	if account.mail == nil {
+		return nil, errors.New("configured account has no mail route")
+	}
+	return account.mail, nil
+}
+
+func (account sessionAccount) calendarService() (*application.CalendarService, error) {
+	if account.calendar == nil {
+		return nil, errors.New("configured account has no calendar route")
+	}
+	return account.calendar, nil
 }
 
 type sessionPreview struct {
@@ -52,16 +72,19 @@ type sessionBackend struct {
 	configuration config.Config
 	guard         *application.Guard
 	recorder      *audit.FileRecorder
+	credentials   *credential.Resolver
+	newJMAP       func(context.Context, jmap.Options) (*jmap.Client, error)
 
-	mu        sync.Mutex
-	accounts  map[domain.AccountID]sessionAccount
-	previews  map[string]sessionPreview
-	closed    bool
-	active    sync.WaitGroup
-	lifecycle context.Context
-	cancel    context.CancelFunc
-	close     sync.Once
-	closeErr  error
+	mu           sync.Mutex
+	activationMu sync.Mutex
+	accounts     map[domain.AccountID]sessionAccount
+	previews     map[string]sessionPreview
+	closed       bool
+	active       sync.WaitGroup
+	lifecycle    context.Context
+	cancel       context.CancelFunc
+	close        sync.Once
+	closeErr     error
 
 	terminalSessions map[string]*terminalLoginSession
 	terminalAccounts map[domain.AccountID]string
@@ -90,12 +113,21 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		_ = recorder.Close()
 		return nil, err
 	}
+	credentials, err := credential.New(credential.Options{
+		Helper: configuration.Credentials.Helper,
+	})
+	if err != nil {
+		_ = recorder.Close()
+		return nil, err
+	}
 	lifecycle, cancel := context.WithCancel(context.Background())
 	return &sessionBackend{
 		app:              app,
 		configuration:    configuration,
 		guard:            guard,
 		recorder:         recorder,
+		credentials:      credentials,
+		newJMAP:          jmap.New,
 		accounts:         make(map[domain.AccountID]sessionAccount),
 		previews:         make(map[string]sessionPreview),
 		lifecycle:        lifecycle,
@@ -120,8 +152,16 @@ func (backend *sessionBackend) ResolveAccount(reference string) (domain.AccountI
 func (backend *sessionBackend) Login(
 	ctx context.Context,
 	accountID domain.AccountID,
-	_ domain.Caller,
+	caller domain.Caller,
 ) (daemonapi.LoginResult, error) {
+	if err := caller.Validate(); err != nil {
+		return daemonapi.LoginResult{}, err
+	}
+	if caller.Surface != "cli" {
+		return daemonapi.LoginResult{}, errors.New(
+			"authentication can only be started by an explicit local CLI command",
+		)
+	}
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
@@ -131,7 +171,7 @@ func (backend *sessionBackend) Login(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	account, err := backend.accountServices(ctx, accountID)
+	account, err := backend.activateAccount(ctx, accountID)
 	if err != nil {
 		return daemonapi.LoginResult{}, err
 	}
@@ -232,7 +272,7 @@ func (backend *sessionBackend) TerminalLogin(
 				input.Account,
 			)
 		}
-		account, err := backend.accountFromHandle(configured, interaction.handle, credentials)
+		account, err := backend.outlookAccount(configured, interaction.handle, credentials)
 		if err != nil {
 			return daemonapi.TerminalLoginResult{}, errors.Join(
 				err, backend.dropTerminalInteraction(interaction, true),
@@ -399,11 +439,15 @@ func (backend *sessionBackend) ListMail(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailPage{}, err
 	}
-	return services.mail.List(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailPage{}, err
+	}
+	return mail.List(ctx, input, caller)
 }
 
 func (backend *sessionBackend) SearchMail(
@@ -420,11 +464,15 @@ func (backend *sessionBackend) SearchMail(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailPage{}, err
 	}
-	return services.mail.Search(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailPage{}, err
+	}
+	return mail.Search(ctx, input, caller)
 }
 
 func (backend *sessionBackend) ListMailFolders(
@@ -441,11 +489,15 @@ func (backend *sessionBackend) ListMailFolders(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailFolderPage{}, err
 	}
-	return services.mail.ListFolders(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailFolderPage{}, err
+	}
+	return mail.ListFolders(ctx, input, caller)
 }
 
 func (backend *sessionBackend) GetMailBody(
@@ -462,11 +514,15 @@ func (backend *sessionBackend) GetMailBody(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailBodyAccess{}, err
 	}
-	access, err := services.mail.GetBody(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailBodyAccess{}, err
+	}
+	access, err := mail.GetBody(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -487,11 +543,15 @@ func (backend *sessionBackend) GetMailAttachment(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailAttachmentAccess{}, err
 	}
-	access, err := services.mail.GetAttachment(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailAttachmentAccess{}, err
+	}
+	access, err := mail.GetAttachment(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -512,11 +572,15 @@ func (backend *sessionBackend) CreateMailDraft(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailDraftAccess{}, err
 	}
-	access, err := services.mail.CreateDraft(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailDraftAccess{}, err
+	}
+	access, err := mail.CreateDraft(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -563,11 +627,15 @@ func (backend *sessionBackend) SendMail(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailSendAccess{}, err
 	}
-	access, err := services.mail.Send(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailSendAccess{}, err
+	}
+	access, err := mail.Send(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -614,11 +682,15 @@ func (backend *sessionBackend) MoveMail(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailMoveAccess{}, err
 	}
-	access, err := services.mail.Move(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailMoveAccess{}, err
+	}
+	access, err := mail.Move(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -665,11 +737,15 @@ func (backend *sessionBackend) SetMailReadState(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailReadStateAccess{}, err
 	}
-	access, err := services.mail.SetReadState(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailReadStateAccess{}, err
+	}
+	access, err := mail.SetReadState(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -716,11 +792,15 @@ func (backend *sessionBackend) DeleteMail(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.MailDeleteAccess{}, err
 	}
-	access, err := services.mail.Delete(ctx, input, caller)
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailDeleteAccess{}, err
+	}
+	access, err := mail.Delete(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -856,11 +936,15 @@ func (backend *sessionBackend) ListCalendar(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.CalendarPage{}, err
 	}
-	return services.calendar.List(ctx, input, caller)
+	calendar, err := services.calendarService()
+	if err != nil {
+		return application.CalendarPage{}, err
+	}
+	return calendar.List(ctx, input, caller)
 }
 
 func (backend *sessionBackend) CreateCalendar(
@@ -877,11 +961,15 @@ func (backend *sessionBackend) CreateCalendar(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.CalendarCreateAccess{}, err
 	}
-	access, err := services.calendar.Create(ctx, input, caller)
+	calendar, err := services.calendarService()
+	if err != nil {
+		return application.CalendarCreateAccess{}, err
+	}
+	access, err := calendar.Create(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -928,11 +1016,15 @@ func (backend *sessionBackend) UpdateCalendar(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.CalendarUpdateAccess{}, err
 	}
-	access, err := services.calendar.Update(ctx, input, caller)
+	calendar, err := services.calendarService()
+	if err != nil {
+		return application.CalendarUpdateAccess{}, err
+	}
+	access, err := calendar.Update(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -979,11 +1071,15 @@ func (backend *sessionBackend) CancelCalendar(
 	backend.mu.Unlock()
 	defer backend.active.Done()
 
-	services, err := backend.accountServices(ctx, input.Account)
+	services, err := backend.accountServices(ctx, input.Account, caller)
 	if err != nil {
 		return application.CalendarCancelAccess{}, err
 	}
-	access, err := services.calendar.Cancel(ctx, input, caller)
+	calendar, err := services.calendarService()
+	if err != nil {
+		return application.CalendarCancelAccess{}, err
+	}
+	access, err := calendar.Cancel(ctx, input, caller)
 	if err == nil && access.Preview != nil {
 		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
 	}
@@ -1017,9 +1113,13 @@ func (backend *sessionBackend) CommitCalendarCancel(
 }
 
 func (backend *sessionBackend) accountServices(
-	ctx context.Context,
+	_ context.Context,
 	accountID domain.AccountID,
+	caller domain.Caller,
 ) (sessionAccount, error) {
+	if err := caller.Validate(); err != nil {
+		return sessionAccount{}, err
+	}
 	backend.mu.Lock()
 	defer backend.mu.Unlock()
 	if account, exists := backend.accounts[accountID]; exists {
@@ -1028,23 +1128,87 @@ func (backend *sessionBackend) accountServices(
 	if _, exists := backend.terminalAccounts[accountID]; exists {
 		return sessionAccount{}, errors.New("terminal login is in progress for this account")
 	}
-	_, configured, exists := backend.configuration.AccountByID(accountID)
-	if !exists {
+	if _, _, exists := backend.configuration.AccountByID(accountID); !exists {
 		return sessionAccount{}, fmt.Errorf("account %q is not configured", accountID)
 	}
-	handle, credentials, err := backend.app.authenticate(ctx, backend.configuration, accountID, configured)
+	return sessionAccount{}, errors.New(
+		"account is not authenticated; run `corr auth login --account <alias>` interactively",
+	)
+}
+
+func (backend *sessionBackend) activateAccount(
+	ctx context.Context,
+	accountID domain.AccountID,
+) (sessionAccount, error) {
+	backend.activationMu.Lock()
+	defer backend.activationMu.Unlock()
+
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return sessionAccount{}, errors.New("session backend is closed")
+	}
+	if account, exists := backend.accounts[accountID]; exists {
+		backend.mu.Unlock()
+		return account, nil
+	}
+	if _, exists := backend.terminalAccounts[accountID]; exists {
+		backend.mu.Unlock()
+		return sessionAccount{}, errors.New("terminal login is in progress for this account")
+	}
+	_, configured, exists := backend.configuration.AccountByID(accountID)
+	if !exists {
+		backend.mu.Unlock()
+		return sessionAccount{}, fmt.Errorf("account %q is not configured", accountID)
+	}
+	backend.mu.Unlock()
+
+	var services sessionAccount
+	var err error
+	switch {
+	case outlookOnly(configured):
+		var handle browserHandle
+		var captured session.Credentials
+		handle, captured, err = backend.app.authenticate(
+			ctx,
+			backend.configuration,
+			accountID,
+			configured,
+		)
+		if err == nil {
+			services, err = backend.outlookAccount(configured, handle, captured)
+			if err != nil {
+				err = errors.Join(err, handle.Close())
+			}
+		}
+	case configured.Mail != nil &&
+		configured.Mail.Provider == domain.ProviderJMAP &&
+		configured.Calendar == nil:
+		services, err = backend.jmapAccount(ctx, configured)
+	default:
+		err = fmt.Errorf(
+			"configured route combination (%s mail, %s calendar) is not available in this build",
+			configured.MailProvider(),
+			configured.CalendarProvider(),
+		)
+	}
 	if err != nil {
 		return sessionAccount{}, err
 	}
-	services, err := backend.accountFromHandle(configured, handle, credentials)
-	if err != nil {
-		return sessionAccount{}, errors.Join(err, handle.Close())
+
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	if backend.closed {
+		return sessionAccount{}, errors.Join(
+			errors.New("session backend closed during authentication"),
+			closeSessionAccount(services),
+		)
 	}
 	backend.accounts[accountID] = services
 	return services, nil
 }
 
-func (backend *sessionBackend) accountFromHandle(
+func (backend *sessionBackend) outlookAccount(
 	configured config.Account,
 	handle browserHandle,
 	credentials session.Credentials,
@@ -1062,45 +1226,127 @@ func (backend *sessionBackend) accountFromHandle(
 	if err != nil {
 		return sessionAccount{}, err
 	}
-	mail, err := application.NewMailService(backend.guard, client, application.MailOptions{
-		MaxRecipients: backend.configuration.Policy.MaxRecipients,
-		Provenance: domain.Provenance{
-			AccountID: configured.ID,
-			Provider:  configured.MailProvider(),
-			MailboxID: "configured-mailbox",
-		},
-	})
-	if err != nil {
-		return sessionAccount{}, err
-	}
-	calendar, err := application.NewCalendarService(
-		backend.guard,
-		client,
-		application.CalendarOptions{
-			MaxAttendees: backend.configuration.Policy.MaxAttendees,
+	var mail *application.MailService
+	if configured.Mail != nil {
+		var err error
+		mail, err = application.NewMailService(backend.guard, client, application.MailOptions{
+			MaxRecipients: backend.configuration.Policy.MaxRecipients,
 			Provenance: domain.Provenance{
-				AccountID:  configured.ID,
-				Provider:   configured.CalendarProvider(),
-				CalendarID: "calendar",
+				AccountID: configured.ID,
+				Provider:  configured.MailProvider(),
+				MailboxID: "configured-mailbox",
 			},
-		},
-	)
-	if err != nil {
-		return sessionAccount{}, err
+		})
+		if err != nil {
+			return sessionAccount{}, err
+		}
+	}
+	var calendar *application.CalendarService
+	if configured.Calendar != nil {
+		var err error
+		calendar, err = application.NewCalendarService(
+			backend.guard,
+			client,
+			application.CalendarOptions{
+				MaxAttendees: backend.configuration.Policy.MaxAttendees,
+				Provenance: domain.Provenance{
+					AccountID:  configured.ID,
+					Provider:   configured.CalendarProvider(),
+					CalendarID: "calendar",
+				},
+			},
+		)
+		if err != nil {
+			return sessionAccount{}, err
+		}
 	}
 	services := sessionAccount{
-		handle: handle, mail: mail, calendar: calendar, captured: credentials.CapturedAt(),
-		capabilities: outlookWebCapabilities(),
+		closers: []sessionCloser{handle}, mail: mail, calendar: calendar,
+		captured:     credentials.CapturedAt(),
+		capabilities: outlookWebCapabilities(configured),
 	}
 	return services, nil
 }
 
-func outlookWebCapabilities() domain.Capabilities {
-	return domain.Capabilities{
-		Mail: true, Calendar: true, Folders: true,
-		OnlineMeeting: "teams", SharedMailboxes: true,
-		AttachmentReads: true, AttachmentWrites: true,
+func (backend *sessionBackend) jmapAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	route := configured.Mail.JMAP
+	if route == nil {
+		return sessionAccount{}, errors.New("JMAP route settings are missing")
 	}
+	secret, err := backend.credentials.Resolve(ctx, route.Credential)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	defer func() { _ = secret.Close() }()
+	password := []byte(secret.String())
+	defer func() {
+		for index := range password {
+			password[index] = 0
+		}
+	}()
+	factory := backend.newJMAP
+	if factory == nil {
+		factory = jmap.New
+	}
+	client, err := factory(ctx, jmap.Options{
+		SessionURL: route.SessionURL,
+		Username:   route.Username,
+		Password:   password,
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	mail, err := application.NewMailService(backend.guard, client, application.MailOptions{
+		MaxRecipients: backend.configuration.Policy.MaxRecipients,
+		Provenance: domain.Provenance{
+			AccountID: configured.ID,
+			Provider:  domain.ProviderJMAP,
+			MailboxID: "primary-mail-account",
+		},
+	})
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, client.Close())
+	}
+	return sessionAccount{
+		closers:  []sessionCloser{client},
+		mail:     mail,
+		captured: time.Now().UTC(),
+		capabilities: domain.Capabilities{
+			Mail: true, Folders: true, AttachmentReads: true,
+			AttachmentWrites: true, IncrementalSync: true,
+		},
+	}, nil
+}
+
+func outlookOnly(account config.Account) bool {
+	return (account.Mail == nil || account.Mail.Provider == domain.ProviderMicrosoftOWA) &&
+		(account.Calendar == nil || account.Calendar.Provider == domain.ProviderMicrosoftOWA)
+}
+
+func outlookWebCapabilities(account config.Account) domain.Capabilities {
+	capabilities := domain.Capabilities{
+		Mail: account.Mail != nil, Calendar: account.Calendar != nil,
+		Folders:         account.Mail != nil,
+		SharedMailboxes: account.Mail != nil,
+		AttachmentReads: account.Mail != nil, AttachmentWrites: account.Mail != nil,
+	}
+	if account.Calendar != nil {
+		capabilities.OnlineMeeting = "teams"
+	}
+	return capabilities
+}
+
+func closeSessionAccount(account sessionAccount) error {
+	closeErrors := make([]error, 0, len(account.closers))
+	for _, closer := range account.closers {
+		if closer != nil {
+			closeErrors = append(closeErrors, closer.Close())
+		}
+	}
+	return errors.Join(closeErrors...)
 }
 
 func (backend *sessionBackend) Close() error {
@@ -1115,7 +1361,7 @@ func (backend *sessionBackend) Close() error {
 		defer backend.mu.Unlock()
 		closeErrors := make([]error, 0, len(backend.accounts)+len(backend.terminalSessions)+1)
 		for _, account := range backend.accounts {
-			closeErrors = append(closeErrors, account.handle.Close())
+			closeErrors = append(closeErrors, closeSessionAccount(account))
 		}
 		for _, interaction := range backend.terminalSessions {
 			closeErrors = append(closeErrors, interaction.handle.Close())
