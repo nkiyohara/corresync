@@ -61,7 +61,7 @@ type MailPage struct {
 	IncludesLastItem bool          `json:"includesLastItem"`
 }
 
-// MailReader is the application port implemented by the OWA adapter.
+// MailReader is the provider-neutral application read port.
 type MailReader interface {
 	ListMessages(context.Context, MailListInput) (MailPage, error)
 }

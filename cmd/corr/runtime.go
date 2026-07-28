@@ -262,7 +262,7 @@ func (app *runtime) requireDaemonStopped() error {
 }
 
 // openDaemon connects to the config-scoped session owner, starting it when
-// absent. It never receives Outlook authorization material.
+// absent. It never receives provider authorization material.
 func (app *runtime) openDaemon(ctx context.Context) (*daemonapi.Client, daemonapi.Status, error) {
 	if _, _, err := app.loadConfigContext(ctx); err != nil {
 		return nil, daemonapi.Status{}, err

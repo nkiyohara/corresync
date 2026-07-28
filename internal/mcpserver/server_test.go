@@ -455,7 +455,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 	if annotation == nil || !annotation.ReadOnlyHint || annotation.DestructiveHint == nil || *annotation.DestructiveHint {
 		t.Fatalf("unsafe or missing annotations: %+v", annotation)
 	}
-	if !strings.HasPrefix(mailTool.Description, "Use when the user asks to check Outlook") {
+	if !strings.HasPrefix(mailTool.Description, "Use when the user asks to check mail") {
 		t.Fatalf("mail_list description does not front-load discovery guidance: %q", mailTool.Description)
 	}
 

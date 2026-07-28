@@ -43,6 +43,38 @@ func TestRunShowsCommandGroupHelp(t *testing.T) {
 	}
 }
 
+func TestAccountAddHelpUsesConventionalProtocolFlagNames(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run(
+		context.Background(),
+		[]string{"account", "add", "--help"},
+		&stdout,
+		&stderr,
+	); code != 0 {
+		t.Fatalf("account add help code = %d, stderr = %q", code, stderr.String())
+	}
+	for _, flag := range []string{
+		"--oauth-client-id",
+		"--oauth-redirect-uri",
+		"--approve-oauth",
+		"--imap-tls",
+		"--smtp-tls",
+		"--caldav-endpoint",
+	} {
+		if !strings.Contains(stdout.String(), flag) {
+			t.Errorf("account add help is missing %q:\n%s", flag, stdout.String())
+		}
+	}
+	for _, legacy := range []string{"--o-auth", "--imaptls", "--smtptls", "--cal-dav"} {
+		if strings.Contains(stdout.String(), legacy) {
+			t.Errorf("account add help retained malformed flag %q:\n%s", legacy, stdout.String())
+		}
+	}
+}
+
 func TestRootHelpCommandDescriptionsMatchCommandHelp(t *testing.T) {
 	t.Parallel()
 

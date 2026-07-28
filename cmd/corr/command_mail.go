@@ -20,7 +20,7 @@ import (
 type mailCommand struct {
 	Folders    mailFoldersCommand    `cmd:"" help:"Discover mail folders and their opaque IDs."`
 	List       mailListCommand       `cmd:"" help:"List message metadata in a folder."`
-	Search     mailSearchCommand     `cmd:"" help:"Search message metadata in one folder with Outlook AQS."`
+	Search     mailSearchCommand     `cmd:"" help:"Search message metadata in one folder with the provider query language."`
 	Body       mailBodyCommand       `cmd:"" help:"Review and read plain text for one explicit message ID."`
 	Attachment mailAttachmentCommand `cmd:"" help:"Review and retrieve one bounded file attachment."`
 	Move       mailMoveCommand       `cmd:"" help:"Review and move one versioned message to one folder."`
@@ -37,7 +37,7 @@ type mailFoldersCommand struct {
 	Traversal string `default:"deep" enum:"shallow,deep" help:"Folder hierarchy traversal."`
 	Offset    int    `default:"0" help:"Zero-based page offset."`
 	Limit     int    `default:"100" help:"Folders to return (1-100)."`
-	TimeZone  string `name:"time-zone" default:"UTC" help:"OWA time-zone identifier."`
+	TimeZone  string `name:"time-zone" default:"UTC" help:"Provider time-zone identifier."`
 	JSON      bool   `help:"Write the stable machine-readable schema."`
 }
 
@@ -94,7 +94,7 @@ type mailListCommand struct {
 	FolderID string `name:"folder-id" help:"Opaque folder ID from folder discovery."`
 	Offset   int    `default:"0" help:"Zero-based page offset."`
 	Limit    int    `default:"25" help:"Messages to return (1-100)."`
-	TimeZone string `name:"time-zone" default:"UTC" help:"OWA time-zone identifier."`
+	TimeZone string `name:"time-zone" default:"UTC" help:"Provider time-zone identifier."`
 	JSON     bool   `help:"Write the stable machine-readable schema."`
 }
 
@@ -421,7 +421,7 @@ func (command *mailMoveCommand) Run(app *runtime) (returnErr error) {
 	}
 	if access.Moved.ID == "" {
 		_, err = fmt.Fprintf(
-			app.stdout, "Moved message to %s; Outlook returned no new ID, so list the destination to refresh it.\n",
+			app.stdout, "Moved message to %s; the provider returned no new ID, so list the destination to refresh it.\n",
 			sanitizeCell(moveDestinationLabel(access.Review.Destination), 120),
 		)
 		return err
@@ -975,7 +975,7 @@ func writeMailReadStateReview(
 func writeMailDeleteReview(writer io.Writer, review application.MailDeleteReview, committing bool) error {
 	action := "Preview only; nothing was deleted. Rerun with --approve to permanently delete this exact version."
 	if committing {
-		action = "Permanently deleting this exact message version now; this cannot be undone in Outlook."
+		action = "Permanently deleting this exact message version now; the selected provider cannot undo it."
 	}
 	_, err := fmt.Fprintf(
 		writer, "%s\nMessage ID: %s\nChange key: %s\nDelete type: %s\n",

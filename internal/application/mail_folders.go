@@ -52,7 +52,7 @@ type MailFolderPage struct {
 	IncludesLastItem bool                `json:"includesLastItem"`
 }
 
-// MailFolderReader is implemented by the isolated OWA adapter.
+// MailFolderReader is implemented by each isolated mail adapter.
 type MailFolderReader interface {
 	ListMailFolders(context.Context, MailFolderListInput) (MailFolderPage, error)
 }

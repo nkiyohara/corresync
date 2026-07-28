@@ -33,7 +33,8 @@ type MailReadStateReview struct {
 	State     MailReadState `json:"state"`
 }
 
-// MailReadStateResult contains a refreshed identity when OWA returns one.
+// MailReadStateResult contains a refreshed identity when the provider returns
+// one.
 type MailReadStateResult struct {
 	ID         string            `json:"id,omitempty"`
 	ChangeKey  string            `json:"changeKey,omitempty"`
@@ -49,7 +50,7 @@ type MailReadStateAccess struct {
 	Preview *approval.Preview    `json:"preview,omitempty"`
 }
 
-// MailReadStateWriter is the narrow OWA port for the IsRead field.
+// MailReadStateWriter is the narrow provider-neutral port for read state.
 type MailReadStateWriter interface {
 	SetMailReadState(context.Context, MailReadStateInput) (MailReadStateResult, error)
 }

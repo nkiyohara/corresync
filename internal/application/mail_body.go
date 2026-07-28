@@ -35,7 +35,7 @@ type MailBodyAccess struct {
 	Preview *approval.Preview `json:"preview,omitempty"`
 }
 
-// MailBodyReader is the narrow OWA port for an explicit body read.
+// MailBodyReader is the narrow provider-neutral port for an explicit body read.
 type MailBodyReader interface {
 	GetMessageBody(context.Context, MailBodyInput) (MailBody, error)
 }

@@ -44,21 +44,21 @@ type accountAddCommand struct {
 	Mailbox                   string `help:"Optional Outlook mailbox identity."`
 	SessionURL                string `help:"JMAP HTTPS session resource."`
 	APIBase                   string `help:"Google or Microsoft API HTTPS base override."`
-	OAuthClientID             string `help:"BYO OAuth public-client ID."`
-	OAuthRedirectURI          string `help:"Registered http://127.0.0.1 loopback redirect URI."`
+	OAuthClientID             string `name:"oauth-client-id" help:"BYO OAuth public-client ID."`
+	OAuthRedirectURI          string `name:"oauth-redirect-uri" help:"Registered http://127.0.0.1 loopback redirect URI."`
 	AuthorizationKey          string `help:"OS-keyring handle for the OAuth grant."`
-	ApproveOAuth              bool   `help:"Confirm explicit OAuth authorization when no valid grant exists."`
+	ApproveOAuth              bool   `name:"approve-oauth" help:"Confirm explicit OAuth authorization when no valid grant exists."`
 	Username                  string `help:"Standards mail login identity; defaults to the address."`
 	CredentialBackend         string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
 	CredentialKey             string `help:"External standards credential lookup key."`
 	ApproveCredential         bool   `help:"Record explicit consent to use that external credential."`
 	IMAPHost                  string `help:"IMAP server host."`
 	IMAPPort                  uint16 `help:"IMAP server port."`
-	IMAPTLS                   string `default:"implicit" enum:"implicit,starttls" help:"IMAP TLS mode."`
+	IMAPTLS                   string `name:"imap-tls" default:"implicit" enum:"implicit,starttls" help:"IMAP TLS mode."`
 	SMTPHost                  string `help:"SMTP Submission server host."`
 	SMTPPort                  uint16 `help:"SMTP Submission server port."`
-	SMTPTLS                   string `default:"starttls" enum:"implicit,starttls" help:"SMTP TLS mode."`
-	CalDAVEndpoint            string `help:"CalDAV HTTPS discovery endpoint."`
+	SMTPTLS                   string `name:"smtp-tls" default:"starttls" enum:"implicit,starttls" help:"SMTP TLS mode."`
+	CalDAVEndpoint            string `name:"caldav-endpoint" help:"CalDAV HTTPS discovery endpoint."`
 	CalendarPath              string `help:"Optional absolute CalDAV calendar path."`
 	CalendarUsername          string `help:"CalDAV login identity; defaults to --username or the address."`
 	CalendarCredentialBackend string `help:"External CalDAV credential backend; defaults to --credential-backend."`

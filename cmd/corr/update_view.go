@@ -89,7 +89,7 @@ func (view updateView) writeAction(report updateActionReport) error {
 			"Sigstore identity · SHA-256 · version · platform",
 			"Backup",
 			report.BackupPath,
-			view.muted("The running session owner will switch versions on the next Outlook command."),
+			view.muted("The running session owner will switch versions on the next provider command."),
 		)
 		return err
 	case string(updatecheck.InstallStatusCurrent):

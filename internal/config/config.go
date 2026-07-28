@@ -107,7 +107,7 @@ type Browser struct {
 }
 
 // Updates controls only opportunistic public release checks. Explicit
-// `corresync update` and `corresync update check` remain available when automatic
+// `corr update` and `corr update check` remain available when automatic
 // checks are disabled.
 type Updates struct {
 	DisableAutomaticChecks bool `json:"disableAutomaticChecks" toml:"disable_automatic_checks"`

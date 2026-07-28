@@ -12,15 +12,15 @@ import (
 )
 
 const (
-	// MaxMailSearchPageSize matches the bounded OWA search result window.
+	// MaxMailSearchPageSize bounds every provider search adapter.
 	MaxMailSearchPageSize = 50
-	// MaxMailSearchQueryBytes prevents an agent from turning AQS into an
-	// unbounded request payload while retaining useful user-facing searches.
+	// MaxMailSearchQueryBytes prevents an agent from turning a provider query
+	// into an unbounded request payload while retaining useful searches.
 	MaxMailSearchQueryBytes = 1024
 )
 
-// MailSearchInput is a read-only search contract. Query uses the user-facing
-// AQS subset accepted by Outlook; it is not an arbitrary OWA action.
+// MailSearchInput is a read-only search contract. Query uses the selected
+// provider's user-facing language; it is not an arbitrary protocol action.
 type MailSearchInput struct {
 	Account  domain.AccountID `json:"account"`
 	Folder   MailFolder       `json:"folder"`

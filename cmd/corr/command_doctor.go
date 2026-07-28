@@ -232,7 +232,7 @@ func (command *doctorCommand) addDaemonStatus(
 		return
 	}
 	if errors.Is(statusErr, os.ErrNotExist) {
-		report.add("daemon", "skip", "not running; it will start on the first Outlook command")
+		report.add("daemon", "skip", "not running; it will start on the first provider command")
 		return
 	}
 	report.add("daemon", "fail", doctorError(statusErr))

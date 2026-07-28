@@ -10,7 +10,7 @@ import (
 )
 
 // daemonMCPBackend forwards the MCP application boundary to the sole local
-// session owner. Outlook credentials never enter the MCP stdio process.
+// session owner. Provider credentials never enter the MCP stdio process.
 type daemonMCPBackend struct {
 	*daemonapi.Client
 	defaultAccount domain.AccountID
