@@ -250,6 +250,26 @@ func TestSessionBackendOnlyResolvesJMAPCredentialForExplicitCLILogin(t *testing.
 	}
 }
 
+func TestJMAPCapabilityReportPreservesReadAccessAndNamesWriteDegradation(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	capabilities, degradations := jmapCapabilityReport(
+		jmap.ObservedCapabilities{ReadOnly: true},
+	)
+	if !capabilities.Mail || !capabilities.Folders ||
+		!capabilities.AttachmentReads || !capabilities.IncrementalSync ||
+		capabilities.AttachmentWrites {
+		t.Fatalf("capabilities = %+v", capabilities)
+	}
+	if len(degradations) != 2 ||
+		degradations[0].Feature != "mail.write" ||
+		degradations[1].Feature != "mail.send" {
+		t.Fatalf("degradations = %+v", degradations)
+	}
+}
+
 func TestSessionBackendOnlyResolvesCalDAVCredentialForExplicitCLILogin(t *testing.T) {
 	t.Parallel()
 

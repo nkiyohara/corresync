@@ -1702,15 +1702,39 @@ func (backend *sessionBackend) jmapAccount(
 	if err != nil {
 		return sessionAccount{}, errors.Join(err, client.Close())
 	}
-	return sessionAccount{
-		closers:  []sessionCloser{client},
-		mail:     mail,
-		captured: time.Now().UTC(),
-		capabilities: domain.Capabilities{
-			Mail: true, Folders: true, AttachmentReads: true,
-			AttachmentWrites: true, IncrementalSync: true,
-		},
-	}, nil
+	observed := client.ObservedCapabilities()
+	capabilities, degradations := jmapCapabilityReport(observed)
+	result := sessionAccount{
+		closers:      []sessionCloser{client},
+		mail:         mail,
+		captured:     time.Now().UTC(),
+		capabilities: capabilities,
+		degradations: degradations,
+	}
+	return result, nil
+}
+
+func jmapCapabilityReport(
+	observed jmap.ObservedCapabilities,
+) (domain.Capabilities, []domain.Degradation) {
+	capabilities := domain.Capabilities{
+		Mail: true, Folders: true, AttachmentReads: true,
+		AttachmentWrites: !observed.ReadOnly, IncrementalSync: true,
+	}
+	degradations := make([]domain.Degradation, 0, 2)
+	if observed.ReadOnly {
+		degradations = append(degradations, domain.Degradation{
+			Feature: "mail.write",
+			Reason:  "the authenticated JMAP account is read-only",
+		})
+	}
+	if !observed.Submission {
+		degradations = append(degradations, domain.Degradation{
+			Feature: "mail.send",
+			Reason:  "the authenticated JMAP account has no matching submission capability",
+		})
+	}
+	return capabilities, degradations
 }
 
 func (backend *sessionBackend) imapAccount(

@@ -19,11 +19,13 @@ type syntheticJMAP struct {
 	state    string
 	ifState  string
 	requests []string
+	submit   bool
+	readOnly bool
 }
 
 func newSyntheticJMAP(t *testing.T) *syntheticJMAP {
 	t.Helper()
-	fixture := &syntheticJMAP{t: t, state: "state-1"}
+	fixture := &syntheticJMAP{t: t, state: "state-1", submit: true}
 	fixture.server = httptest.NewTLSServer(http.HandlerFunc(fixture.serveHTTP))
 	t.Cleanup(fixture.server.Close)
 	return fixture
@@ -37,28 +39,33 @@ func (fixture *syntheticJMAP) serveHTTP(writer http.ResponseWriter, request *htt
 	}
 	switch request.URL.Path {
 	case "/session":
+		serverCapabilities := map[string]any{
+			coreCapability: map[string]any{},
+			mailCapability: map[string]any{},
+		}
+		accountCapabilities := map[string]any{
+			mailCapability: map[string]any{},
+		}
+		primaryAccounts := map[string]string{
+			mailCapability: "account-1",
+		}
+		if fixture.submit {
+			serverCapabilities[submissionCapability] = map[string]any{}
+			accountCapabilities[submissionCapability] = map[string]any{}
+			primaryAccounts[submissionCapability] = "account-1"
+		}
 		fixture.writeJSON(writer, map[string]any{
-			"capabilities": map[string]any{
-				coreCapability:       map[string]any{},
-				mailCapability:       map[string]any{},
-				submissionCapability: map[string]any{},
-			},
+			"capabilities": serverCapabilities,
 			"accounts": map[string]any{
 				"account-1": map[string]any{
-					"accountCapabilities": map[string]any{
-						mailCapability:       map[string]any{},
-						submissionCapability: map[string]any{},
-					},
-					"isReadOnly": false,
+					"accountCapabilities": accountCapabilities,
+					"isReadOnly":          fixture.readOnly,
 				},
 			},
-			"primaryAccounts": map[string]string{
-				mailCapability:       "account-1",
-				submissionCapability: "account-1",
-			},
-			"apiUrl":      fixture.server.URL + "/api",
-			"downloadUrl": fixture.server.URL + "/download/{accountId}/{blobId}/{name}",
-			"uploadUrl":   fixture.server.URL + "/upload/{accountId}",
+			"primaryAccounts": primaryAccounts,
+			"apiUrl":          fixture.server.URL + "/api",
+			"downloadUrl":     fixture.server.URL + "/download/{accountId}/{blobId}/{name}",
+			"uploadUrl":       fixture.server.URL + "/upload/{accountId}",
 		})
 	case "/api":
 		fixture.serveAPI(writer, request)
@@ -146,6 +153,25 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 					"draft": map[string]any{"id": "draft-1", "blobId": "draft-blob"},
 				},
 			}
+		}
+	case "Identity/get":
+		result = map[string]any{
+			"accountId": "account-1", "state": "identities-1",
+			"list": []map[string]any{{
+				"id": "identity-1", "name": "Reader",
+				"email": "reader@example.invalid",
+			}},
+			"notFound": []string{},
+		}
+	case "EmailSubmission/set":
+		result = map[string]any{
+			"accountId": "account-1", "oldState": "submissions-1",
+			"newState": "submissions-2",
+			"created": map[string]any{
+				"send": map[string]any{
+					"id": "submission-1", "emailId": "draft-1",
+				},
+			},
 		}
 	default:
 		fixture.t.Errorf("unexpected method %q", method)
@@ -236,6 +262,93 @@ func TestClientReadsAndConditionallyUpdatesSyntheticJMAP(t *testing.T) {
 	fixture.mu.Unlock()
 	if ifState != "state-1" {
 		t.Fatalf("ifInState = %q", ifState)
+	}
+
+	draft, err := client.CreateMailDraft(t.Context(), application.MailDraftInput{
+		To:      []string{"recipient@example.invalid"},
+		Subject: "Synthetic draft",
+		Body:    "Draft body",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if draft.ID != "draft-1" || draft.ChangeKey != "state-2" {
+		t.Fatalf("draft = %#v", draft)
+	}
+	sent, err := client.SendMail(t.Context(), application.MailSendInput{
+		To:      []string{"recipient@example.invalid"},
+		Subject: "Synthetic send",
+		Body:    "Send body",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sent.ID != "draft-1" || sent.ChangeKey != "state-2" {
+		t.Fatalf("sent = %#v", sent)
+	}
+	if observed := client.ObservedCapabilities(); !observed.Submission ||
+		observed.ReadOnly {
+		t.Fatalf("observed capabilities = %#v", observed)
+	}
+}
+
+func TestClientDegradesMissingSubmissionAndReadOnlyAccounts(t *testing.T) {
+	t.Parallel()
+
+	noSubmission := newSyntheticJMAP(t)
+	noSubmission.submit = false
+	client, err := New(t.Context(), Options{
+		SessionURL: noSubmission.server.URL + "/session",
+		Username:   "reader@example.invalid",
+		Password:   []byte("synthetic-secret"),
+		Client:     noSubmission.server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	if client.ObservedCapabilities().Submission {
+		t.Fatal("submission was reported without session evidence")
+	}
+	if _, err := client.ListMessages(t.Context(), application.MailListInput{
+		Folder: application.MailFolder{
+			Kind: application.MailFolderDistinguished,
+			ID:   "inbox",
+		},
+		Limit: 1,
+	}); err != nil {
+		t.Fatalf("mail read degraded with submission: %v", err)
+	}
+	if _, err := client.SendMail(t.Context(), application.MailSendInput{
+		To: []string{"recipient@example.invalid"}, Subject: "Must not submit",
+		Body: "body",
+	}); err == nil || !strings.Contains(err.Error(), "submission is unavailable") {
+		t.Fatalf("SendMail() error = %v", err)
+	}
+
+	readOnly := newSyntheticJMAP(t)
+	readOnly.readOnly = true
+	readOnlyClient, err := New(t.Context(), Options{
+		SessionURL: readOnly.server.URL + "/session",
+		Username:   "reader@example.invalid",
+		Password:   []byte("synthetic-secret"),
+		Client:     readOnly.server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = readOnlyClient.Close() })
+	if !readOnlyClient.ObservedCapabilities().ReadOnly {
+		t.Fatal("read-only account was not reported")
+	}
+	if _, err := readOnlyClient.CreateMailDraft(
+		t.Context(),
+		application.MailDraftInput{
+			To: []string{"recipient@example.invalid"}, Subject: "Must not write",
+			Body: "body",
+		},
+	); err == nil || !strings.Contains(err.Error(), "read-only") {
+		t.Fatalf("CreateMailDraft() error = %v", err)
 	}
 }
 

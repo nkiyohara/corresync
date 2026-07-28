@@ -59,7 +59,15 @@ type Client struct {
 	downloadURL string
 	uploadURL   string
 	accountID   string
+	observed    ObservedCapabilities
 	close       sync.Once
+}
+
+// ObservedCapabilities reports account-specific JMAP behavior confirmed by
+// the authenticated session resource.
+type ObservedCapabilities struct {
+	Submission bool
+	ReadOnly   bool
 }
 
 // New retrieves and validates the configured JMAP session resource. The call
@@ -110,10 +118,6 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		_ = client.Close()
 		return nil, errors.New("JMAP server does not advertise mail")
 	}
-	if _, ok := document.Capabilities[submissionCapability]; !ok {
-		_ = client.Close()
-		return nil, errors.New("JMAP server does not advertise submission")
-	}
 	accountID := document.PrimaryAccount[mailCapability]
 	account, ok := document.Accounts[accountID]
 	if !ok || accountID == "" {
@@ -124,18 +128,11 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		_ = client.Close()
 		return nil, errors.New("JMAP account does not advertise mail")
 	}
-	if document.PrimaryAccount[submissionCapability] != accountID {
-		_ = client.Close()
-		return nil, errors.New("JMAP session has no matching primary submission account")
-	}
-	if _, ok := account.AccountCapabilities[submissionCapability]; !ok {
-		_ = client.Close()
-		return nil, errors.New("JMAP account does not advertise submission")
-	}
-	if account.IsReadOnly {
-		_ = client.Close()
-		return nil, errors.New("JMAP account is read-only")
-	}
+	_, serverSubmission := document.Capabilities[submissionCapability]
+	_, accountSubmission := account.AccountCapabilities[submissionCapability]
+	submission := serverSubmission &&
+		accountSubmission &&
+		document.PrimaryAccount[submissionCapability] == accountID
 	apiURL, err := validatedHTTPSURL("JMAP API URL", document.APIURL)
 	if err != nil {
 		_ = client.Close()
@@ -153,7 +150,27 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	client.downloadURL = document.DownloadURL
 	client.uploadURL = document.UploadURL
 	client.accountID = accountID
+	client.observed = ObservedCapabilities{
+		Submission: submission,
+		ReadOnly:   account.IsReadOnly,
+	}
 	return client, nil
+}
+
+// ObservedCapabilities returns the immutable post-authentication capability
+// snapshot without exposing provider identifiers or session data.
+func (client *Client) ObservedCapabilities() ObservedCapabilities {
+	if client == nil {
+		return ObservedCapabilities{}
+	}
+	return client.observed
+}
+
+func (client *Client) requireWrite(feature string) error {
+	if client.observed.ReadOnly {
+		return fmt.Errorf("JMAP %s is unavailable because the account is read-only", feature)
+	}
+	return nil
 }
 
 func (client *Client) fetchSession(

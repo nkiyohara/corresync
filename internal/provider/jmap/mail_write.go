@@ -41,6 +41,9 @@ func (client *Client) CreateMailDraft(
 	ctx context.Context,
 	input application.MailDraftInput,
 ) (application.MailDraft, error) {
+	if err := client.requireWrite("draft creation"); err != nil {
+		return application.MailDraft{}, err
+	}
 	return client.createDraft(ctx, input)
 }
 
@@ -48,6 +51,14 @@ func (client *Client) SendMail(
 	ctx context.Context,
 	input application.MailSendInput,
 ) (application.MailSendResult, error) {
+	if err := client.requireWrite("submission"); err != nil {
+		return application.MailSendResult{}, err
+	}
+	if !client.observed.Submission {
+		return application.MailSendResult{}, errors.New(
+			"JMAP submission is unavailable for this account",
+		)
+	}
 	draftInput := application.MailDraftInput{
 		Account: input.Account, To: input.To, CC: input.CC, BCC: input.BCC,
 		Subject: input.Subject, Body: input.Body, BodyFormat: input.BodyFormat,
@@ -115,6 +126,9 @@ func (client *Client) MoveMail(
 	ctx context.Context,
 	input application.MailMoveInput,
 ) (application.MailMoveResult, error) {
+	if err := client.requireWrite("move"); err != nil {
+		return application.MailMoveResult{}, err
+	}
 	destination, err := client.resolveMailbox(ctx, input.Destination)
 	if err != nil {
 		return application.MailMoveResult{}, err
@@ -142,6 +156,9 @@ func (client *Client) SetMailReadState(
 	ctx context.Context,
 	input application.MailReadStateInput,
 ) (application.MailReadStateResult, error) {
+	if err := client.requireWrite("read-state update"); err != nil {
+		return application.MailReadStateResult{}, err
+	}
 	if _, err := client.requireEmailState(ctx, input.MessageID, input.ChangeKey); err != nil {
 		return application.MailReadStateResult{}, err
 	}
@@ -164,6 +181,9 @@ func (client *Client) DeleteMail(
 	ctx context.Context,
 	input application.MailDeleteInput,
 ) error {
+	if err := client.requireWrite("delete"); err != nil {
+		return err
+	}
 	if _, err := client.requireEmailState(ctx, input.MessageID, input.ChangeKey); err != nil {
 		return err
 	}
