@@ -128,6 +128,7 @@ Monitor status is content-free with:
 - configured sink type, disclosed field names, and egress declaration;
 - cursor/dedup health;
 - queue counts;
+- persistent cursor-recovery overflow count and last-overflow time;
 - rate-limit/circuit-breaker state;
 - collection/dispatch timestamps where available.
 
@@ -136,6 +137,11 @@ deterministic `evt_` IDs, a `delivery` value (`queue`, `notification`, or
 `runner`), delivery state/count, and timestamps. Sender/subject values are
 private untrusted data. Acknowledgement returns the same event with state
 `acknowledged` and is idempotent.
+
+When cursor recovery exceeds 1000 inbox messages, the inspected bounded window
+is committed so monitoring can continue, but the poll fails explicitly and
+status records `recoveryOverflows` plus `lastRecoveryOverflowAt`. Older
+uninspected messages are not claimed as emitted.
 
 ## Imports
 

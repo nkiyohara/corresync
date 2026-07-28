@@ -95,9 +95,12 @@ discovery.
 All remote endpoints require encrypted transport. IMAP/SMTP support implicit
 TLS or STARTTLS according to the explicit route. IMAP response literals are
 bounded individually and in aggregate from the first greeting, including after
-STARTTLS; LF-only control lines are rejected. Reply inheritance drops malformed
-external Message-ID/References values and forwarding does not depend on them.
-CalDAV and JMAP endpoints must be HTTPS; a JMAP session may advertise
+STARTTLS. The byte filter uses the same pinned go-imap response parser with
+zero-length prior literal probes before treating payload bytes as opaque, so a
+status-text `{N}` cannot desynchronize it from the parser; LF-only control lines
+are rejected. Reply inheritance drops malformed external
+Message-ID/References values and forwarding does not depend on them. CalDAV
+and JMAP endpoints must be HTTPS; a JMAP session may advertise
 API/upload/download URLs only on that exact HTTPS origin. Certificate
 verification is never disabled.
 

@@ -202,6 +202,8 @@ after interactive authentication; quiet hours, debounce, hourly rate limits,
 deduplication, retention, loop prevention, and a circuit breaker are enforced.
 Deferred notifications remain pending while the provider cursor advances
 monotonically, so a busy inbox cannot pin cursor recovery at an old message.
+Recovery beyond the bounded 1000-message window is recorded and returned as an
+explicit degraded result rather than silently claiming complete delivery.
 Windows currently rejects `notify` setup because Corresync does not install a
 registered AppUserModelID; `queue` and `agent` remain available.
 

@@ -204,12 +204,16 @@ owner-only permissions and symlink rejection. Cursors advance monotonically;
 notification deferrals and failures leave delivery-bound events pending in the
 outbox instead of rewinding first-seen state. A cursor older than the bounded
 1000-item recovery window is re-baselined at the newest inspected window while
-all inspected items still pass through deduplication and delivery. Notification
-processes are time-bound and receive metadata through native argument
-boundaries. Linux and macOS have local adapters; Windows rejects `notify` until
-a registered Corresync AppUserModelID exists. Agent mode executes one absolute
-program directly without a shell, sends only approved bounded fields as JSON
-stdin, and revalidates the declared egress.
+all inspected items still pass through deduplication and delivery. Because
+older uninspected items are not emitted, this is an explicit degraded result:
+the poll returns an overflow error and persists its count and time in monitor
+status. Terminal delivery records expire by completion time, and capacity
+pressure evicts the oldest terminal record before refusing new pending data.
+Notification processes are time-bound and receive metadata through native
+argument boundaries. Linux and macOS have local adapters; Windows rejects
+`notify` until a registered Corresync AppUserModelID exists. Agent mode
+executes one absolute program directly without a shell, sends only approved
+bounded fields as JSON stdin, and revalidates the declared egress.
 
 MCP cannot enable or reconfigure monitoring or purge events. Resource updates
 and queue values are untrusted data, never triggers or instructions.

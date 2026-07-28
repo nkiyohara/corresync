@@ -54,14 +54,17 @@ All notable user-facing changes are recorded here. The project follows
   ambiguity, and require explicit local CLI login after an MCP account addition.
 - Restrict JMAP API/upload/download URLs to the configured session origin,
   require absolute credential-helper executables, drop malformed inherited IMAP
-  reply headers, reject LF-only IMAP control lines, and bound literals both
-  individually and per operation across implicit TLS and STARTTLS.
+  reply headers, reject LF-only IMAP control lines, and use the pinned IMAP
+  parser itself to classify and bound literals both individually and per
+  operation across implicit TLS and STARTTLS.
 - Keep attacker-controlled notification metadata behind native argument
   boundaries, escape Linux notification markup, reject NUL metadata, time-bound
   notification utilities, persist notification events in a delivery-bound
   outbox, advance provider cursors monotonically across deferrals and failures,
-  preserve ACKs that race delivery completion, and reject Windows `notify`
-  setup until Corresync has a registered AppUserModelID.
+  expire terminal events without evicting pending data, report bounded cursor
+  recovery overflow explicitly, preserve ACKs that race delivery completion,
+  and reject Windows `notify` setup until Corresync has a registered
+  AppUserModelID.
 - Add `corr feedback`, an allowlisted deterministic report with an optional
   bounded generalized last-error record. Generation is local; copy/save/open
   actions occur only after full display, and GitHub is never submitted

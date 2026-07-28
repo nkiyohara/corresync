@@ -390,6 +390,11 @@ possible; restart recovery does not duplicate an event; notification values
 are bounded and treated as untrusted. During quiet hours or rate limiting,
 confirm the provider cursor remains advanced while notification events stay
 pending, then confirm a later poll drains them once delivery is allowed.
+With a synthetic adapter only, place the prior cursor beyond the 1000-message
+recovery window and confirm the poll returns an explicit overflow, monitor
+status increments the durable overflow counter/time, and the inspected window
+still becomes the new bounded baseline. Do not perform this load test against a
+live mailbox.
 
 Queue mode requires a separate step. Test acknowledgement twice and confirm
 idempotence. Agent mode requires a disposable absolute runner, direct execution

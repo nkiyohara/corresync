@@ -154,6 +154,13 @@ in that outbox through quiet hours, debounce, rate limiting, cancellation, or
 adapter failure and are drained on later polls; the cursor is never rewound.
 Each event records whether it belongs to manual queueing, desktop notification,
 or runner delivery so a later policy change cannot redirect old pending data.
+Terminal deliveries expire by completion time under retention; if the 10,000
+event bound is reached, the oldest terminal record yields capacity while
+pending data is never evicted. If more than 1000 messages separate the saved
+cursor from the inbox head, the inspected window is committed for continued
+operation, but status increments `recoveryOverflows`, records the time, and the
+poll returns an explicit overflow error because older uninspected messages were
+not emitted.
 Runner and notification completion preserve an acknowledgement that races with
 delivery without redelivering the event. Desktop notification adapters are
 local and time-bound: Linux uses `notify-send`, macOS uses `osascript`, and
