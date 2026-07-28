@@ -41,6 +41,20 @@ func TestDefaultIsValidAndSecretFree(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsAliasThatLooksLikeOpaqueAccountID(t *testing.T) {
+	t.Parallel()
+
+	configuration := Default()
+	account := configuration.Accounts["work"]
+	delete(configuration.Accounts, "work")
+	alias := "acc_11111111111111111111111111111111"
+	configuration.Accounts[alias] = account
+	configuration.DefaultAccount = alias
+	if err := configuration.Validate(); err == nil {
+		t.Fatal("opaque account ID form was accepted as an alias")
+	}
+}
+
 func TestMonitorConsentBoundariesValidateIndependently(t *testing.T) {
 	t.Parallel()
 

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -48,7 +49,17 @@ func scanThunderbird(
 		root = filepath.Dir(source)
 		profilesPath = source
 	}
-	encoded, err := readSourceFile(profilesPath, maximumProfilesINIBytes)
+	rootHandle, err := os.OpenRoot(root)
+	if err != nil {
+		return scanResult{}, fmt.Errorf("open Thunderbird source root: %w", err)
+	}
+	defer func() { _ = rootHandle.Close() }()
+	profilesRelative := filepath.Base(profilesPath)
+	encoded, err := readRootSourceFile(
+		rootHandle,
+		profilesRelative,
+		maximumProfilesINIBytes,
+	)
 	if err != nil {
 		return scanResult{}, err
 	}
@@ -81,13 +92,13 @@ func scanThunderbird(
 			})
 			continue
 		}
-		profilePath := filepath.Clean(filepath.Join(root, filepath.FromSlash(profile.Path)))
-		if !pathWithin(root, profilePath) {
+		profilePath := filepath.Clean(filepath.FromSlash(profile.Path))
+		if !pathWithin(".", profilePath) {
 			return scanResult{}, errors.New(
 				"thunderbird profile path escapes the approved source root",
 			)
 		}
-		profileInfo, err := os.Lstat(profilePath)
+		profileInfo, err := rootHandle.Lstat(profilePath)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
@@ -100,7 +111,11 @@ func scanThunderbird(
 			)
 		}
 		prefsPath := filepath.Join(profilePath, "prefs.js")
-		prefs, err := readSourceFile(prefsPath, maximumPrefsJSBytes)
+		prefs, err := readRootSourceFile(
+			rootHandle,
+			prefsPath,
+			maximumPrefsJSBytes,
+		)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
@@ -274,4 +289,38 @@ func pathWithin(root, candidate string) bool {
 	return err == nil &&
 		relative != ".." &&
 		!strings.HasPrefix(relative, ".."+string(filepath.Separator))
+}
+
+func readRootSourceFile(
+	root *os.Root,
+	name string,
+	maximum int,
+) ([]byte, error) {
+	info, err := root.Lstat(name)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("import source item is not a regular file")
+	}
+	file, err := root.Open(name)
+	if err != nil {
+		return nil, fmt.Errorf("open import source file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	opened, err := file.Stat()
+	if err != nil || !os.SameFile(info, opened) {
+		return nil, errors.New("import source changed while it was opened")
+	}
+	if opened.Size() > int64(maximum) {
+		return nil, errors.New("import item exceeds the configured byte limit")
+	}
+	content, err := io.ReadAll(io.LimitReader(file, int64(maximum)+1))
+	if err != nil {
+		return nil, fmt.Errorf("read import source: %w", err)
+	}
+	if len(content) > maximum {
+		return nil, errors.New("import item exceeds the configured byte limit")
+	}
+	return content, nil
 }

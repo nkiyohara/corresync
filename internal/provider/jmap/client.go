@@ -138,11 +138,25 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		_ = client.Close()
 		return nil, err
 	}
-	if _, err := validatedTemplateURL("JMAP download URL", document.DownloadURL); err != nil {
+	if err := requireSameOrigin("JMAP API URL", sessionURL, apiURL); err != nil {
 		_ = client.Close()
 		return nil, err
 	}
-	if _, err := validatedTemplateURL("JMAP upload URL", document.UploadURL); err != nil {
+	downloadURL, err := validatedTemplateURL("JMAP download URL", document.DownloadURL)
+	if err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	if err := requireSameOrigin("JMAP download URL", sessionURL, downloadURL); err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	uploadURL, err := validatedTemplateURL("JMAP upload URL", document.UploadURL)
+	if err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	if err := requireSameOrigin("JMAP upload URL", sessionURL, uploadURL); err != nil {
 		_ = client.Close()
 		return nil, err
 	}
@@ -299,6 +313,9 @@ func (client *Client) upload(
 	if err != nil {
 		return blobUpload{}, err
 	}
+	if err := requireSameOrigin("JMAP upload target", client.apiURL, target); err != nil {
+		return blobUpload{}, err
+	}
 	request, err := http.NewRequestWithContext(
 		ctx,
 		http.MethodPost,
@@ -361,6 +378,9 @@ func (client *Client) download(
 	if err != nil {
 		return nil, err
 	}
+	if err := requireSameOrigin("JMAP download target", client.apiURL, target); err != nil {
+		return nil, err
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("create JMAP download request: %w", err)
@@ -416,6 +436,23 @@ func validatedTemplateURL(name, raw string) (*url.URL, error) {
 		"type":      "application/octet-stream",
 	})
 	return validatedHTTPSURL(name, expanded)
+}
+
+func requireSameOrigin(name string, approved, candidate *url.URL) error {
+	if approved == nil || candidate == nil ||
+		!strings.EqualFold(approved.Scheme, candidate.Scheme) ||
+		!strings.EqualFold(approved.Hostname(), candidate.Hostname()) ||
+		effectiveHTTPSPort(approved) != effectiveHTTPSPort(candidate) {
+		return fmt.Errorf("%s must use the configured JMAP session origin", name)
+	}
+	return nil
+}
+
+func effectiveHTTPSPort(value *url.URL) string {
+	if value.Port() == "" {
+		return "443"
+	}
+	return value.Port()
 }
 
 func expandTemplate(template string, values map[string]string) string {

@@ -188,6 +188,13 @@ type MonitorEventStore interface {
 	Acknowledge(context.Context, MonitorAcknowledgeInput, time.Time) (MonitorEvent, error)
 	Purge(context.Context, domain.AccountID) (int, error)
 	CommitScan(context.Context, MonitorScan) (MonitorScanResult, error)
+	RollbackNotification(
+		context.Context,
+		domain.AccountID,
+		string,
+		string,
+		[]MonitorEvent,
+	) error
 	MarkNotification(context.Context, domain.AccountID, int, time.Time) error
 	MarkDispatch(context.Context, domain.AccountID, []string, time.Time) error
 	MarkScanFailure(context.Context, domain.AccountID, time.Time, string) error
@@ -661,7 +668,8 @@ func (service *MonitorService) auditPrepared(
 	}
 	return service.audit.Record(ctx, AuditEvent{
 		Phase: AuditPhasePrepared, Outcome: AuditOutcomeAllowed,
-		Reason: "policy_allowed", Caller: caller, Operation: operation.View(),
+		Reason: "local_operation_validated", Caller: caller,
+		Operation: operation.View(),
 	})
 }
 

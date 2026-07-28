@@ -131,6 +131,115 @@ func TestDaemonMCPAccountLifecycleUsesCallerBoundPreviewCommit(t *testing.T) {
 	}
 }
 
+func TestDaemonMCPAccountLifecycleCommitKeepsPreviewedOpaqueIdentity(t *testing.T) {
+	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
+	accounts, _, err := app.accountServices()
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalDefault := configuration.Accounts[configuration.DefaultAccount].ID
+	approvals, err := approval.NewStore(approval.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &daemonMCPBackend{
+		app: app, configuration: configuration,
+		defaultAccount: originalDefault,
+		accounts:       accounts, approvals: approvals,
+		accountMutation: func(
+			ctx context.Context,
+			_ domain.Caller,
+			change func(context.Context) (application.AccountView, error),
+		) (application.AccountView, error) {
+			return change(ctx)
+		},
+	}
+	added, err := accounts.Add(t.Context(), application.AccountAddInput{
+		Alias: "team", Address: "reader@example.invalid",
+		Mail: &application.AccountMailRouteInput{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &application.AccountOutlookWebInput{
+				Origin: "https://outlook.example.invalid",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	caller := domain.Caller{Surface: "mcp", Instance: "identity-test"}
+	renamePreview, err := backend.PreviewAccountRename(
+		t.Context(),
+		application.AccountRenameInput{Account: "team", NewAlias: "office"},
+		caller,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := accounts.Rename(t.Context(), application.AccountRenameInput{
+		Account: "team", NewAlias: "archive",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := accounts.Rename(t.Context(), application.AccountRenameInput{
+		Account: "work", NewAlias: "team",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	renamed, err := backend.CommitAccountRename(
+		t.Context(),
+		renamePreview.Preview.Token,
+		caller,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if renamed.Account == nil || renamed.Account.ID != added.ID ||
+		renamed.Account.Alias != "office" {
+		t.Fatalf("rename changed the wrong account: %+v", renamed)
+	}
+
+	removePreview, err := backend.PreviewAccountRemove(
+		t.Context(),
+		application.AccountRemoveInput{Account: "office"},
+		caller,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := accounts.Rename(t.Context(), application.AccountRenameInput{
+		Account: "office", NewAlias: "archive",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := accounts.Rename(t.Context(), application.AccountRenameInput{
+		Account: "team", NewAlias: "office",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	removed, err := backend.CommitAccountRemove(
+		t.Context(),
+		removePreview.Preview.Token,
+		caller,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed.Account == nil || removed.Account.ID != added.ID {
+		t.Fatalf("remove changed the wrong account: %+v", removed)
+	}
+	survivor, err := accounts.Show(t.Context(), "office")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if survivor.ID != originalDefault {
+		t.Fatalf("unexpected survivor: %+v", survivor)
+	}
+}
+
 func TestDaemonMCPAccountMutationRestartsAroundConfigurationChange(t *testing.T) {
 	root := t.TempDir()
 	configPath := filepath.Join(root, "config.toml")

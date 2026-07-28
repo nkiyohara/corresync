@@ -86,11 +86,22 @@ func testMailService(t *testing.T, reader MailPort) (*MailService, *memoryAudit)
 	if err != nil {
 		t.Fatalf("NewGuard() error = %v", err)
 	}
-	service, err := NewMailService(guard, reader, MailOptions{MaxRecipients: 20})
+	service, err := NewMailService(guard, reader, testMailOptions())
 	if err != nil {
 		t.Fatalf("NewMailService() error = %v", err)
 	}
 	return service, recorder
+}
+
+func testMailOptions() MailOptions {
+	return MailOptions{
+		MaxRecipients: 20,
+		Provenance: domain.Provenance{
+			AccountID: "work",
+			Provider:  domain.ProviderJMAP,
+			MailboxID: "synthetic-mailbox",
+		},
+	}
 }
 
 func validMailListInput() MailListInput {
@@ -118,6 +129,22 @@ func TestMailServiceListsThroughPolicyAndAudit(t *testing.T) {
 		recorder.events[1].Phase != AuditPhaseExecuted ||
 		recorder.events[1].Outcome != AuditOutcomeSuccess {
 		t.Fatalf("unexpected audit events: %+v", recorder.events)
+	}
+}
+
+func TestMailServiceFailsClosedWithoutRoutedProvenance(t *testing.T) {
+	t.Parallel()
+	operation, err := domain.NewOperation(
+		"mail.send",
+		domain.EffectExternalWrite,
+		"work",
+		struct{}{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&MailService{}).validateExecutionAccount(operation); err == nil {
+		t.Fatal("mail execution accepted missing routed provenance")
 	}
 }
 

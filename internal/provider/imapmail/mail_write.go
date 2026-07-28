@@ -302,6 +302,11 @@ type mailComposition struct {
 	References  string
 }
 
+const (
+	maximumReferencesBytes = 8 << 10
+	maximumReferenceIDs    = 100
+)
+
 func (client *Client) compose(
 	ctx context.Context,
 	input application.MailDraftInput,
@@ -339,10 +344,19 @@ func (client *Client) compose(
 	if envelope == nil {
 		return mailComposition{}, errors.New("IMAP reference envelope is missing")
 	}
-	result.InReplyTo = envelope.MessageId
-	result.References = strings.TrimSpace(
-		parsed.Header.Get("References") + " " + envelope.MessageId,
+	messageID, err := normalizeMessageID(envelope.MessageId)
+	if err != nil {
+		return mailComposition{}, fmt.Errorf("IMAP reference message ID is malformed: %w", err)
+	}
+	references, err := normalizeReferences(
+		parsed.Header.Get("References"),
+		messageID,
 	)
+	if err != nil {
+		return mailComposition{}, fmt.Errorf("IMAP reference chain is malformed: %w", err)
+	}
+	result.InReplyTo = messageID
+	result.References = references
 	switch input.EffectiveComposeMode() {
 	case application.MailComposeNew:
 		return result, nil
@@ -409,6 +423,18 @@ func uniqueIMAPAddresses(
 func (client *Client) buildMessage(
 	composition mailComposition,
 ) ([]byte, string, error) {
+	if composition.InReplyTo != "" {
+		normalized, err := normalizeMessageID(composition.InReplyTo)
+		if err != nil || normalized != composition.InReplyTo {
+			return nil, "", errors.New("mail In-Reply-To value is malformed")
+		}
+	}
+	if composition.References != "" {
+		normalized, err := normalizeReferences(composition.References, "")
+		if err != nil || normalized != composition.References {
+			return nil, "", errors.New("mail References value is malformed")
+		}
+	}
 	random := make([]byte, 18)
 	if _, err := rand.Read(random); err != nil {
 		return nil, "", err
@@ -505,4 +531,48 @@ func (client *Client) buildMessage(
 		return nil, "", err
 	}
 	return body.Bytes(), messageID, nil
+}
+
+func normalizeMessageID(value string) (string, error) {
+	if len(value) < 5 || len(value) > 998 ||
+		value[0] != '<' || value[len(value)-1] != '>' {
+		return "", errors.New("message ID must use angle-bracket form")
+	}
+	inner := value[1 : len(value)-1]
+	if !strings.Contains(inner, "@") || strings.ContainsAny(inner, "<>") {
+		return "", errors.New("message ID has an invalid identifier")
+	}
+	for _, character := range []byte(value) {
+		if character < 0x21 || character > 0x7e {
+			return "", errors.New("message ID contains whitespace or a control character")
+		}
+	}
+	return value, nil
+}
+
+func normalizeReferences(existing, current string) (string, error) {
+	if len(existing)+len(current)+1 > maximumReferencesBytes {
+		return "", errors.New("reference chain exceeds the configured limit")
+	}
+	values := strings.Fields(existing)
+	if current != "" {
+		values = append(values, current)
+	}
+	if len(values) > maximumReferenceIDs {
+		return "", errors.New("reference chain contains too many message IDs")
+	}
+	seen := make(map[string]struct{}, len(values))
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		messageID, err := normalizeMessageID(value)
+		if err != nil {
+			return "", err
+		}
+		if _, exists := seen[messageID]; exists {
+			continue
+		}
+		seen[messageID] = struct{}{}
+		normalized = append(normalized, messageID)
+	}
+	return strings.Join(normalized, " "), nil
 }

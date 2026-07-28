@@ -221,7 +221,7 @@ func TestAccountLifecycleReviewsNeverMutateRepositoryOrState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.ReviewAdd(t.Context(), AccountAddInput{
+	addReview, err := service.ReviewAdd(t.Context(), AccountAddInput{
 		Alias: "team", Address: "team@example.invalid",
 		Mail: &AccountMailRouteInput{
 			Provider: domain.ProviderMicrosoftOWA,
@@ -229,8 +229,12 @@ func TestAccountLifecycleReviewsNeverMutateRepositoryOrState(t *testing.T) {
 				Origin: "https://outlook.example.invalid",
 			},
 		},
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatal(err)
+	}
+	if addReview.Authentication != "explicit_cli_required" {
+		t.Fatalf("account add authentication boundary = %+v", addReview)
 	}
 	if _, err := service.ReviewRename(t.Context(), AccountRenameInput{
 		Account: "personal", NewAlias: "home",

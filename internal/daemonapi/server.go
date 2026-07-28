@@ -77,9 +77,13 @@ func NewServer(backend Backend, options ServerOptions) (*Server, error) {
 	server.http = &http.Server{
 		Handler:           server,
 		ReadHeaderTimeout: 5 * time.Second,
-		IdleTimeout:       30 * time.Second,
-		MaxHeaderBytes:    8 << 10,
-		ErrorLog:          log.New(io.Discard, "", 0),
+		ReadTimeout:       30 * time.Second,
+		// Login is the only deliberately long request and configuration caps
+		// its interactive browser wait at 30 minutes.
+		WriteTimeout:   31 * time.Minute,
+		IdleTimeout:    30 * time.Second,
+		MaxHeaderBytes: 8 << 10,
+		ErrorLog:       log.New(io.Discard, "", 0),
 	}
 	return server, nil
 }

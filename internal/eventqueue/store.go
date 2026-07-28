@@ -295,6 +295,66 @@ func (store *Store) CommitScan(
 	return result, nil
 }
 
+func (store *Store) RollbackNotification(
+	ctx context.Context,
+	account domain.AccountID,
+	committedCursor string,
+	previousCursor string,
+	events []application.MonitorEvent,
+) error {
+	if err := account.ValidateOpaque(); err != nil {
+		return err
+	}
+	if !validMonitorCursor(committedCursor) ||
+		!validMonitorCursor(previousCursor) {
+		return errors.New("notification rollback requires valid monitor cursors")
+	}
+	if len(events) == 0 || len(events) > 1000 {
+		return errors.New("notification rollback must contain 1 through 1000 events")
+	}
+	keys := make(map[string]application.MonitorEvent, len(events))
+	for _, event := range events {
+		if err := event.Validate(account); err != nil ||
+			event.ID != eventID(account, event.Provider, event.SourceObjectID) {
+			return errors.New("notification rollback contains an invalid event")
+		}
+		key := sourceKey(event.Provider, event.SourceObjectID)
+		if _, duplicate := keys[key]; duplicate {
+			return errors.New("notification rollback contains a duplicate event")
+		}
+		keys[key] = event
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	state, path, err := store.load(account)
+	if err != nil {
+		return err
+	}
+	if !state.Initialized || state.Cursor != committedCursor {
+		return errors.New("monitor cursor changed before notification rollback")
+	}
+	for key, event := range keys {
+		seen, exists := state.Seen[key]
+		if !exists || seen.Count != 1 ||
+			!seen.LastSeenAt.Equal(event.DetectedAt.UTC()) {
+			return errors.New("notification rollback event is outside the committed scan")
+		}
+	}
+	for _, queued := range state.Events {
+		if _, exists := keys[sourceKey(queued.Provider, queued.SourceObjectID)]; exists {
+			return errors.New("notification rollback cannot remove a queued event")
+		}
+	}
+	for key := range keys {
+		delete(state.Seen, key)
+	}
+	state.Cursor = previousCursor
+	return store.save(path, state)
+}
+
 func (store *Store) MarkDispatch(
 	ctx context.Context,
 	account domain.AccountID,
@@ -318,6 +378,9 @@ func (store *Store) MarkDispatch(
 	}
 	pending := make(map[string]struct{}, len(eventIDs))
 	for _, id := range eventIDs {
+		if _, duplicate := pending[id]; duplicate {
+			return errors.New("dispatch batch contains a duplicate event")
+		}
 		pending[id] = struct{}{}
 	}
 	dispatched := now.UTC()
@@ -325,10 +388,16 @@ func (store *Store) MarkDispatch(
 		if _, exists := pending[state.Events[index].ID]; !exists {
 			continue
 		}
-		if state.Events[index].State != "pending" {
-			return errors.New("dispatch batch contains a non-pending event")
+		switch state.Events[index].State {
+		case "pending":
+			state.Events[index].State = "dispatched"
+		case "acknowledged":
+			// The runner already received this event. Preserve an
+			// acknowledgement that raced with the out-of-process call while
+			// still recording that the dispatch completed.
+		default:
+			return errors.New("dispatch batch contains an already-dispatched event")
 		}
-		state.Events[index].State = "dispatched"
 		state.Events[index].DispatchedAt = &dispatched
 		delete(pending, state.Events[index].ID)
 	}
@@ -450,10 +519,7 @@ func validateScan(scan application.MonitorScan) error {
 	if err := scan.Account.ValidateOpaque(); err != nil {
 		return err
 	}
-	if len(scan.Cursor) != sha256.Size*2 {
-		return errors.New("monitor cursor must be a SHA-256 hex string")
-	}
-	if _, err := hex.DecodeString(scan.Cursor); err != nil {
+	if !validMonitorCursor(scan.Cursor) {
 		return errors.New("monitor cursor must be a SHA-256 hex string")
 	}
 	if scan.ObservedAt.IsZero() || scan.RetainAfter.IsZero() ||
@@ -500,6 +566,14 @@ func validateScan(scan application.MonitorScan) error {
 		}
 	}
 	return nil
+}
+
+func validMonitorCursor(cursor string) bool {
+	if len(cursor) != sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(cursor)
+	return err == nil
 }
 
 func monitorEvent(

@@ -286,6 +286,37 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 	}
 }
 
+func TestGoogleAPICalendarOnlyRouteBindsTheConfiguredIdentity(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		if request.URL.Path != "/calendar/v3/users/me/calendarList/primary" {
+			http.Error(writer, "unexpected request", http.StatusNotFound)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		writeGoogleJSON(t, writer, map[string]any{
+			"id": "other@example.test", "accessRole": "owner",
+		})
+	}))
+	defer server.Close()
+
+	client, err := New(t.Context(), Options{
+		APIBase:  server.URL,
+		Address:  "reader@example.test",
+		Calendar: true,
+		HTTP:     server.Client(),
+	})
+	if client != nil {
+		_ = client.Close()
+	}
+	if err == nil || !strings.Contains(err.Error(), "identity") {
+		t.Fatalf("New() error = %v, want calendar identity mismatch", err)
+	}
+}
+
 func TestGoogleAPIRejectsIdentityMismatch(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(

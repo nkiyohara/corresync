@@ -93,6 +93,13 @@ func New(ctx context.Context, options Options) (*Client, error) {
 			_ = api.Close()
 			return nil, errors.New("google Calendar returned no primary calendar identity")
 		}
+		if client.address != "" &&
+			!strings.EqualFold(calendar.ID, client.address) {
+			_ = api.Close()
+			return nil, errors.New(
+				"google Calendar grant identity does not match the configured account",
+			)
+		}
 		if calendar.AccessRole != "owner" && calendar.AccessRole != "writer" {
 			_ = api.Close()
 			return nil, errors.New("google primary calendar is not editable")

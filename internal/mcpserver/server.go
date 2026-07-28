@@ -392,7 +392,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "account_add",
 		Title:       "Preview adding an account route",
-		Description: "Validate one complete, explicit, secret-free mail/calendar route and return a caller-bound approval preview. No authentication, credential lookup, OAuth, browser, or configuration write occurs. Commit restarts the local session owner so no route uses stale configuration.",
+		Description: "Validate one complete, explicit, secret-free mail/calendar route and return a caller-bound approval preview. No authentication, credential lookup, OAuth, browser, or configuration write occurs. The review states that a later explicit local CLI login is required. Commit restarts the local session owner so no route uses stale configuration.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Review an account addition",
 			ReadOnlyHint:    false,
@@ -410,7 +410,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "account_add_commit",
 		Title:       "Commit an approved account addition",
-		Description: "Consume exactly one account_add approval, atomically save the reviewed route without authenticating, and restart the local session owner. The token is caller-bound, short-lived, single-use, and bound to the complete route payload.",
+		Description: "Consume exactly one account_add approval, atomically save the reviewed route without authenticating or resolving a credential, and restart the local session owner. A later explicit local CLI login remains required. The token is caller-bound, short-lived, single-use, and bound to the complete route payload, including private credential references omitted from read views.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Commit the reviewed account addition",
 			ReadOnlyHint:    false,

@@ -6,18 +6,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/oauthlocal"
 	"github.com/nkiyohara/corresync/internal/updatecheck"
 )
 
 type doctorCommand struct {
 	Account string `help:"Configured account alias; defaults to default_account."`
-	Online  bool   `help:"Interactively validate the live mail and calendar contracts."`
+	Online  bool   `help:"Validate live contracts through an already authenticated session."`
 	JSON    bool   `help:"Write a content-free machine-readable report."`
 }
 
@@ -55,13 +58,14 @@ func (command *doctorCommand) Run(app *runtime) error {
 		report.add("account", "fail", doctorError(err))
 		return command.finish(app, report)
 	}
-	_, configured, exists := configuration.AccountByID(accountID)
+	alias, configured, exists := configuration.AccountByID(accountID)
 	if !exists {
 		report.add("account", "fail", "configured account route disappeared")
 		return command.finish(app, report)
 	}
 	report.Account = string(accountID)
 	report.add("account", "pass", "configured account identity and provider routes are valid")
+	command.addOAuthScopes(configured, &report)
 	command.addUpdateStatus(app, configuration, &report)
 
 	if hasBrowserRoute(configured) {
@@ -90,7 +94,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 		report.add(
 			"live_provider_routes",
 			"skip",
-			"run with --online to authenticate and validate the selected routes",
+			"run `corr auth login` first, then use --online to validate the selected routes",
 		)
 		return command.finish(app, report)
 	}
@@ -111,15 +115,24 @@ func (command *doctorCommand) Run(app *runtime) error {
 		fmt.Sprintf("protocol %d session owner is ready", status.ProtocolVersion),
 	)
 
-	if _, err := client.Login(app.context, accountID, app.caller()); err != nil {
-		report.add("session", "fail", doctorError(err))
+	sessions, err := client.SessionStatus(app.context, app.caller())
+	authenticated := err == nil && authenticatedSession(sessions, accountID)
+	if err != nil || !authenticated {
+		detail := doctorError(err)
+		if err == nil {
+			detail = fmt.Sprintf(
+				"no authenticated session; run `corr auth login --account %s` first",
+				sanitizeCell(alias, 64),
+			)
+		}
+		report.add("session", "fail", detail)
 		if configured.Mail != nil {
-			report.add("folder_contract", "skip", "provider authentication was not completed")
-			report.add("mail_contract", "skip", "provider authentication was not completed")
+			report.add("folder_contract", "skip", "provider session is not authenticated")
+			report.add("mail_contract", "skip", "provider session is not authenticated")
 		}
 		if configured.Calendar != nil {
-			report.add("calendar_folder_contract", "skip", "provider authentication was not completed")
-			report.add("calendar_contract", "skip", "provider authentication was not completed")
+			report.add("calendar_folder_contract", "skip", "provider session is not authenticated")
+			report.add("calendar_contract", "skip", "provider session is not authenticated")
 		}
 		closeErr := client.Close()
 		if closeErr != nil {
@@ -207,6 +220,53 @@ func (command *doctorCommand) Run(app *runtime) error {
 		report.add("daemon_close", "fail", doctorError(err))
 	}
 	return command.finish(app, report)
+}
+
+func (command *doctorCommand) addOAuthScopes(
+	account config.Account,
+	report *doctorReport,
+) {
+	routes, err := accountOAuthConsents(account)
+	if err != nil {
+		report.add("oauth_scopes", "fail", doctorError(err))
+		return
+	}
+	if len(routes) == 0 {
+		return
+	}
+	summaries := make([]string, 0, len(routes))
+	for _, route := range routes {
+		provider, err := oauthlocal.ProviderFor(
+			route.provider,
+			route.mail,
+			route.calendar,
+		)
+		if err != nil {
+			report.add("oauth_scopes", "fail", doctorError(err))
+			return
+		}
+		summaries = append(
+			summaries,
+			fmt.Sprintf("%s: %s", route.provider, strings.Join(provider.Scopes, ", ")),
+		)
+	}
+	report.add(
+		"oauth_scopes",
+		"pass",
+		"configured explicit consent: "+strings.Join(summaries, "; "),
+	)
+}
+
+func authenticatedSession(
+	sessions daemonapi.SessionStatusResult,
+	account domain.AccountID,
+) bool {
+	for _, session := range sessions.Accounts {
+		if session.Account == account {
+			return session.Authenticated
+		}
+	}
+	return false
 }
 
 func (command *doctorCommand) addDaemonStatus(

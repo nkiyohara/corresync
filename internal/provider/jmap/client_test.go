@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -289,6 +290,70 @@ func TestClientReadsAndConditionallyUpdatesSyntheticJMAP(t *testing.T) {
 	if observed := client.ObservedCapabilities(); !observed.Submission ||
 		observed.ReadOnly {
 		t.Fatalf("observed capabilities = %#v", observed)
+	}
+}
+
+func TestClientRejectsCrossOriginSessionEndpointsBeforeCredentialReuse(
+	t *testing.T,
+) {
+	t.Parallel()
+	var attackerRequests atomic.Int32
+	attacker := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		attackerRequests.Add(1)
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(attacker.Close)
+	session := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		if request.URL.Path != "/session" {
+			writer.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if _, _, ok := request.BasicAuth(); !ok {
+			writer.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"capabilities": map[string]any{
+				coreCapability: map[string]any{},
+				mailCapability: map[string]any{},
+			},
+			"accounts": map[string]any{
+				"account-1": map[string]any{
+					"accountCapabilities": map[string]any{
+						mailCapability: map[string]any{},
+					},
+				},
+			},
+			"primaryAccounts": map[string]string{
+				mailCapability: "account-1",
+			},
+			"apiUrl":      attacker.URL + "/api",
+			"downloadUrl": attacker.URL + "/download/{accountId}/{blobId}/{name}",
+			"uploadUrl":   attacker.URL + "/upload/{accountId}",
+		})
+	}))
+	t.Cleanup(session.Close)
+
+	_, err := New(t.Context(), Options{
+		SessionURL: session.URL + "/session",
+		Username:   "reader@example.invalid",
+		Password:   []byte("synthetic-secret"),
+		Client:     session.Client(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "session origin") {
+		t.Fatalf("cross-origin session endpoints error = %v", err)
+	}
+	if attackerRequests.Load() != 0 {
+		t.Fatalf(
+			"credential was sent to unapproved origin %d times",
+			attackerRequests.Load(),
+		)
 	}
 }
 

@@ -267,6 +267,112 @@ func TestMarkNotificationPersistsTheMaximumHourlyBatch(t *testing.T) {
 	}
 }
 
+func TestRollbackNotificationRestoresCursorAndMakesEventsRetryable(t *testing.T) {
+	t.Parallel()
+	store := NewAt(t.TempDir())
+	start := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	baseline := testScan(testAccountA, start, true, "baseline", nil)
+	baseline.Queue = false
+	if _, err := store.CommitScan(t.Context(), baseline); err != nil {
+		t.Fatal(err)
+	}
+	next := testScan(
+		testAccountA,
+		start.Add(time.Minute),
+		false,
+		"next",
+		[]application.MonitorDetection{testDetection(testAccountA, "message", true)},
+	)
+	next.Queue = false
+	first, err := store.CommitScan(t.Context(), next)
+	if err != nil || len(first.Events) != 1 {
+		t.Fatalf("first CommitScan() = %+v, %v", first, err)
+	}
+	if err := store.RollbackNotification(
+		t.Context(),
+		testAccountA,
+		next.Cursor,
+		baseline.Cursor,
+		first.Events,
+	); err != nil {
+		t.Fatalf("RollbackNotification() error = %v", err)
+	}
+	status, err := store.Status(t.Context(), testAccountA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Cursor != baseline.Cursor {
+		t.Fatalf("cursor = %q, want %q", status.Cursor, baseline.Cursor)
+	}
+	retry, err := store.CommitScan(t.Context(), next)
+	if err != nil || len(retry.Events) != 1 || retry.Duplicates != 0 {
+		t.Fatalf("retry CommitScan() = %+v, %v", retry, err)
+	}
+}
+
+func TestMarkDispatchPreservesConcurrentAcknowledgement(t *testing.T) {
+	t.Parallel()
+	store := NewAt(t.TempDir())
+	start := time.Now().UTC().Add(-3 * time.Minute).Truncate(time.Second)
+	if _, err := store.CommitScan(
+		t.Context(),
+		testScan(testAccountA, start, true, "baseline", nil),
+	); err != nil {
+		t.Fatal(err)
+	}
+	result, err := store.CommitScan(
+		t.Context(),
+		testScan(
+			testAccountA,
+			start.Add(time.Minute),
+			false,
+			"next",
+			[]application.MonitorDetection{testDetection(testAccountA, "message", true)},
+		),
+	)
+	if err != nil || len(result.Events) != 1 {
+		t.Fatalf("CommitScan() = %+v, %v", result, err)
+	}
+	input := application.MonitorAcknowledgeInput{
+		Account: testAccountA,
+		EventID: result.Events[0].ID,
+	}
+	if _, err := store.Acknowledge(
+		t.Context(),
+		input,
+		start.Add(2*time.Minute),
+	); err != nil {
+		t.Fatal(err)
+	}
+	dispatchedAt := start.Add(3 * time.Minute)
+	if err := store.MarkDispatch(
+		t.Context(),
+		testAccountA,
+		[]string{input.EventID},
+		dispatchedAt,
+	); err != nil {
+		t.Fatalf("MarkDispatch() error = %v", err)
+	}
+	page, err := store.List(t.Context(), application.MonitorEventListInput{
+		Account: testAccountA,
+		State:   "acknowledged",
+		Limit:   10,
+	})
+	if err != nil || len(page.Events) != 1 ||
+		page.Events[0].DispatchedAt == nil ||
+		!page.Events[0].DispatchedAt.Equal(dispatchedAt) {
+		t.Fatalf("acknowledged events = %+v, %v", page.Events, err)
+	}
+	status, err := store.Status(t.Context(), testAccountA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Acknowledged != 1 || status.Dispatched != 0 ||
+		status.DispatchedLastHour != 1 {
+		t.Fatalf("status = %+v", status)
+	}
+}
+
 func TestStoreRejectsSymlinkState(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink privilege is platform-specific")

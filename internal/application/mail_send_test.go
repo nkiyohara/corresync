@@ -30,7 +30,7 @@ func TestMailSendAlwaysPreviewsThenCommitsExactContent(t *testing.T) {
 		t.Fatalf("NewGuard() error = %v", err)
 	}
 	port := &fakeMailReader{}
-	service, err := NewMailService(guard, port, MailOptions{MaxRecipients: 20})
+	service, err := NewMailService(guard, port, testMailOptions())
 	if err != nil {
 		t.Fatalf("NewMailService() error = %v", err)
 	}
@@ -80,7 +80,7 @@ func TestMailSendRejectsMissingRecipientAndWrongCaller(t *testing.T) {
 		t.Fatalf("NewGuard() error = %v", err)
 	}
 	port := &fakeMailReader{}
-	service, err := NewMailService(guard, port, MailOptions{MaxRecipients: 20})
+	service, err := NewMailService(guard, port, testMailOptions())
 	if err != nil {
 		t.Fatalf("NewMailService() error = %v", err)
 	}
@@ -162,7 +162,7 @@ func TestMailSendAuditsAmbiguousOutcome(t *testing.T) {
 		t.Fatalf("NewGuard() error = %v", err)
 	}
 	port := &fakeMailReader{err: ErrWriteOutcomeUnknown}
-	service, err := NewMailService(guard, port, MailOptions{MaxRecipients: 20})
+	service, err := NewMailService(guard, port, testMailOptions())
 	if err != nil {
 		t.Fatalf("NewMailService() error = %v", err)
 	}
@@ -193,7 +193,7 @@ func TestMailSendApprovalCannotBeConsumedByDraftTool(t *testing.T) {
 		t.Fatalf("NewGuard() error = %v", err)
 	}
 	port := &fakeMailReader{}
-	service, err := NewMailService(guard, port, MailOptions{MaxRecipients: 20})
+	service, err := NewMailService(guard, port, testMailOptions())
 	if err != nil {
 		t.Fatalf("NewMailService() error = %v", err)
 	}

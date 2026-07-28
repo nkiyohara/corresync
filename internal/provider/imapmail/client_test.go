@@ -312,6 +312,55 @@ func TestClientOwnsCredentialAndRejectsTLSVerificationBypass(t *testing.T) {
 	}
 }
 
+func TestDialBoundedIMAPCompletesSTARTTLSBeforeLibraryParsing(t *testing.T) {
+	t.Parallel()
+	serverTLS, clientTLS := syntheticTLS(t)
+	backend := memory.New()
+	if _, err := backend.Login(
+		&imap.ConnInfo{},
+		"username",
+		"password",
+	); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := (&net.ListenConfig{}).Listen(
+		t.Context(),
+		"tcp",
+		"127.0.0.1:0",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := imapserver.New(backend)
+	service.TLSConfig = serverTLS
+	service.ErrorLog = log.New(io.Discard, "", 0)
+	go func() { _ = service.Serve(listener) }()
+	t.Cleanup(func() { _ = service.Close() })
+	clientTLS.ServerName = "example.com"
+
+	connection, err := dialBoundedIMAP(
+		t.Context(),
+		&net.Dialer{Timeout: networkTimeout},
+		listener.Addr().String(),
+		TLSStartTLS,
+		clientTLS,
+	)
+	if err != nil {
+		t.Fatalf("dialBoundedIMAP() error = %v", err)
+	}
+	t.Cleanup(func() { _ = connection.Terminate() })
+	connection.Timeout = networkTimeout
+	if err := connection.Login("username", "password"); err != nil {
+		t.Fatalf("Login() after STARTTLS error = %v", err)
+	}
+	if _, err := connection.Capability(); err != nil {
+		t.Fatalf("Capability() after STARTTLS error = %v", err)
+	}
+	if err := connection.Logout(); err != nil {
+		t.Fatalf("Logout() after STARTTLS error = %v", err)
+	}
+}
+
 func TestParseMIMEKeepsAttachmentsBoundedAndAddressable(t *testing.T) {
 	t.Parallel()
 	raw := "From: sender@example.invalid\r\n" +
@@ -332,5 +381,41 @@ func TestParseMIMEKeepsAttachmentsBoundedAndAddressable(t *testing.T) {
 		parsed.Attachments[0].Name != "report.txt" ||
 		string(parsed.Attachments[0].Content) != "fixture" {
 		t.Fatalf("parsed MIME = %#v", parsed)
+	}
+}
+
+func TestBuildMessageRejectsInjectedReferenceHeaders(t *testing.T) {
+	t.Parallel()
+	client := &Client{sender: "reader@example.invalid"}
+	for _, malicious := range []string{
+		"<message@example.invalid>\r\nBcc: attacker@example.invalid",
+		"<message@example.invalid>\nX-Injected: true",
+		"message@example.invalid",
+	} {
+		_, _, err := client.buildMessage(mailComposition{
+			To:        []string{"recipient@example.invalid"},
+			Subject:   "Synthetic reply",
+			Body:      "Hello",
+			InReplyTo: malicious,
+			References: "<parent@example.invalid> " +
+				malicious,
+		})
+		if err == nil {
+			t.Fatalf("malicious message ID %q was accepted", malicious)
+		}
+	}
+}
+
+func TestNormalizeReferencesProducesBoundedHeaderSafeChain(t *testing.T) {
+	t.Parallel()
+	got, err := normalizeReferences(
+		"<first@example.invalid> <first@example.invalid>",
+		"<second@example.invalid>",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "<first@example.invalid> <second@example.invalid>" {
+		t.Fatalf("normalized references = %q", got)
 	}
 }

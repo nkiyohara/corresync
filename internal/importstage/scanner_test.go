@@ -266,6 +266,34 @@ func TestThunderbirdScanOnlyStagesSanitizedAccountHints(t *testing.T) {
 	assertStagingExcludes(t, []byte("SECRET_LOGIN_MARKER"))
 }
 
+func TestThunderbirdScanRejectsIntermediateSymlinkEscape(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+	root := t.TempDir()
+	outside := t.TempDir()
+	writeFixture(t, filepath.Join(root, "profiles.ini"), []byte(
+		"[Profile0]\nIsRelative=1\nPath=escape/synthetic.default\n",
+	))
+	writeFixture(
+		t,
+		filepath.Join(outside, "synthetic.default", "prefs.js"),
+		[]byte(
+			"user_pref(\"mail.server.server1.hostname\", "+
+				"\"outside.example.test\");\n",
+		),
+	)
+	if err := os.Symlink(outside, filepath.Join(root, "escape")); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+	_, err := New().Scan(context.Background(), application.ImportScanInput{
+		Account: importTestAccount, Source: root,
+		Format: application.ImportFormatThunderbird, PrivacyApproved: true,
+	})
+	if err == nil {
+		t.Fatal("Thunderbird scanner followed an intermediate symlink outside the root")
+	}
+	assertStagingExcludes(t, []byte("outside.example.test"))
+}
+
 func TestScanRejectsSymbolicLinkSource(t *testing.T) {
 	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
 	root := t.TempDir()
@@ -368,6 +396,11 @@ func assertStagingExcludes(t *testing.T, forbidden []byte) {
 		t.Fatal(err)
 	}
 	root := filepath.Join(accountState, "imports")
+	if _, err := os.Lstat(root); errors.Is(err, os.ErrNotExist) {
+		return
+	} else if err != nil {
+		t.Fatal(err)
+	}
 	if err := filepath.WalkDir(root, func(
 		path string,
 		entry fs.DirEntry,

@@ -49,6 +49,9 @@ type AccountAlias string
 // Validate rejects aliases that cannot safely cross CLI, config, or IPC
 // boundaries. Aliases are never used as persistent storage keys.
 func (alias AccountAlias) Validate() error {
+	if opaqueAccountIDPattern.MatchString(string(alias)) {
+		return errors.New("account alias must not use the opaque account ID form")
+	}
 	return validateIdentifier("account alias", string(alias), 64)
 }
 

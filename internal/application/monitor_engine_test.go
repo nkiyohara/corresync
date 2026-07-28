@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nkiyohara/corresync/internal/approval"
 	"github.com/nkiyohara/corresync/internal/domain"
@@ -22,6 +23,7 @@ type memoryMonitorStore struct {
 	dispatches   [][]string
 	failures     int
 	acknowledged bool
+	rollbacks    int
 }
 
 func (store *memoryMonitorStore) Status(
@@ -109,6 +111,21 @@ func (store *memoryMonitorStore) CommitScan(
 	return result, nil
 }
 
+func (store *memoryMonitorStore) RollbackNotification(
+	_ context.Context,
+	_ domain.AccountID,
+	committedCursor string,
+	previousCursor string,
+	events []MonitorEvent,
+) error {
+	if store.status.Cursor != committedCursor {
+		return errors.New("cursor mismatch")
+	}
+	store.status.Cursor = previousCursor
+	store.rollbacks += len(events)
+	return nil
+}
+
 func (store *memoryMonitorStore) MarkDispatch(
 	_ context.Context,
 	_ domain.AccountID,
@@ -172,6 +189,18 @@ func (runner *capturingRunner) Run(
 	return nil
 }
 
+type failingNotifier struct {
+	calls int
+}
+
+func (notifier *failingNotifier) Notify(
+	context.Context,
+	MonitorRelease,
+) error {
+	notifier.calls++
+	return errors.New("synthetic notification failure")
+}
+
 func TestMonitorEngineBootstrapsThenRecoversOnlyNewerMail(t *testing.T) {
 	t.Parallel()
 	reader := &fakeMailReader{page: MailPage{
@@ -224,6 +253,156 @@ func TestMonitorEngineBootstrapsThenRecoversOnlyNewerMail(t *testing.T) {
 		!slices.Contains(stages, "filter") ||
 		!slices.Contains(stages, "queue") {
 		t.Fatalf("pipeline audit stages = %v", stages)
+	}
+}
+
+func TestMonitorEngineBoundsUntrustedMetadataBeforeCommit(t *testing.T) {
+	t.Parallel()
+	reader := &fakeMailReader{page: MailPage{
+		Messages: []MailSummary{
+			{
+				ID:      "new",
+				Subject: strings.Repeat("界", 1000) + "\x00",
+				From: MailAddress{
+					Name:    strings.Repeat("送", 300) + "\x00",
+					Address: strings.Repeat("a", 400) + "\x00",
+				},
+				ReceivedAt: strings.Repeat("r", 200) + "\x00",
+				Importance: strings.Repeat("i", 64) + "\x00",
+			},
+			{ID: "old"},
+		},
+		IncludesLastItem: true,
+	}}
+	store := &memoryMonitorStore{status: MonitorQueueStatus{
+		Initialized: true,
+		Cursor:      monitorCursor(domain.ProviderJMAP, "old"),
+	}}
+	engine, err := NewMonitorEngine(store, &memoryAudit{}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine.now = func() time.Time {
+		return time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	}
+	if err := engine.Poll(
+		t.Context(),
+		testMonitorPolicy(domain.MonitorQueue),
+		monitorMailService(t, reader),
+	); err != nil {
+		t.Fatalf("Poll() error = %v", err)
+	}
+	if len(store.lastScan.Detections) != 1 {
+		t.Fatalf("detections = %+v", store.lastScan.Detections)
+	}
+	detection := store.lastScan.Detections[0]
+	if len(detection.Subject) > 2048 || !utf8.ValidString(detection.Subject) ||
+		len(detection.Sender.Name) > 512 ||
+		len(detection.Sender.Address) > 320 ||
+		len(detection.ReceivedAt) > 128 ||
+		len(detection.Importance) > 32 ||
+		strings.Contains(
+			detection.Subject+detection.Sender.Name+detection.Sender.Address+
+				detection.ReceivedAt+detection.Importance,
+			"\x00",
+		) {
+		t.Fatalf("unbounded detection = %+v", detection)
+	}
+}
+
+func TestNotificationDeferralsAndFailuresRollbackUnreleasedEvents(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	previousCursor := monitorCursor(domain.ProviderJMAP, "old")
+	committedCursor := monitorCursor(domain.ProviderJMAP, "new")
+	event := MonitorEvent{
+		ID:      "evt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Account: monitorTestAccount, AccountAlias: "work",
+		Provider: domain.ProviderJMAP, SourceObjectID: "new",
+		Trust: MonitorTrustMarker, State: "pending", DeliveryCount: 1,
+		DetectedAt: now,
+	}
+	tests := []struct {
+		name       string
+		configure  func(*MonitorPolicy, *memoryMonitorStore)
+		notifier   MonitorNotifier
+		wantNotify int
+	}{
+		{
+			name: "quiet hours",
+			configure: func(policy *MonitorPolicy, _ *memoryMonitorStore) {
+				policy.QuietStart = "11:00"
+				policy.QuietEnd = "13:00"
+				policy.QuietTimeZone = "UTC"
+			},
+		},
+		{
+			name: "debounce",
+			configure: func(_ *MonitorPolicy, store *memoryMonitorStore) {
+				last := now.Add(-time.Second)
+				store.status.LastDispatchAt = &last
+			},
+		},
+		{
+			name: "rate limit",
+			configure: func(policy *MonitorPolicy, store *memoryMonitorStore) {
+				store.status.DispatchedLastHour = policy.RateLimitHour
+			},
+		},
+		{
+			name:       "adapter failure",
+			configure:  func(*MonitorPolicy, *memoryMonitorStore) {},
+			notifier:   &failingNotifier{},
+			wantNotify: 1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			store := &memoryMonitorStore{status: MonitorQueueStatus{
+				Initialized: true,
+				Cursor:      committedCursor,
+			}}
+			policy := testMonitorPolicy(domain.MonitorNotify)
+			policy.NotificationTarget = "desktop"
+			policy.NotificationFields = []string{"event_id"}
+			test.configure(&policy, store)
+			notifier := test.notifier
+			if notifier == nil {
+				notifier = &failingNotifier{}
+			}
+			engine, err := NewMonitorEngine(
+				store,
+				&memoryAudit{},
+				notifier,
+				nil,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			engine.now = func() time.Time { return now }
+			_ = engine.notify(
+				t.Context(),
+				policy,
+				[]MonitorEvent{event},
+				committedCursor,
+				previousCursor,
+			)
+			failed, ok := notifier.(*failingNotifier)
+			if !ok {
+				t.Fatal("test notifier has the wrong type")
+			}
+			if store.rollbacks != 1 ||
+				store.status.Cursor != previousCursor ||
+				failed.calls != test.wantNotify {
+				t.Fatalf(
+					"rollback=%d cursor=%q notify=%d",
+					store.rollbacks,
+					store.status.Cursor,
+					failed.calls,
+				)
+			}
+		})
 	}
 }
 

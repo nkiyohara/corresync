@@ -216,3 +216,71 @@ func TestDoctorReportsInvalidConfigBeforeOnlineWork(t *testing.T) {
 		t.Fatalf("unexpected doctor failure report: %+v", report)
 	}
 }
+
+func TestDoctorOnlineRequiresAnExistingSessionWithoutStartingLogin(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	executable := filepath.Join(root, "chromium")
+	// #nosec G306 -- the owner-only synthetic executable is intentional.
+	if err := os.WriteFile(executable, []byte("synthetic executable"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	configuration := config.Default()
+	configuration.Browser.Executable = executable
+	configuration.Updates.DisableAutomaticChecks = true
+	configPath := filepath.Join(root, "config.toml")
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+	configDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := localipc.ResolveInState(
+		configPath,
+		filepath.Join(root, "state"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	app := newRuntime(
+		t.Context(),
+		configPath,
+		&stdout,
+		&bytes.Buffer{},
+		buildinfo.Current(),
+	)
+	app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
+	daemon := startLifecycleTestDaemon(
+		t.Context(),
+		t,
+		endpoint,
+		daemonapi.ProtocolVersion,
+		app.info.Version,
+		321,
+		configDigest,
+	)
+	t.Cleanup(daemon.stop)
+
+	if err := (&doctorCommand{Online: true, JSON: true}).Run(app); err == nil {
+		t.Fatal("doctor online unexpectedly accepted a signed-out session")
+	}
+	var report doctorReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatalf("decode doctor output: %v", err)
+	}
+	for _, check := range report.Checks {
+		if check.Name != "session" {
+			continue
+		}
+		if check.Status != "fail" ||
+			!bytes.Contains([]byte(check.Detail), []byte("corr auth login --account work")) ||
+			bytes.Contains([]byte(check.Detail), []byte("unsupported lifecycle test method")) {
+			t.Fatalf("session check = %+v", check)
+		}
+		return
+	}
+	t.Fatalf("doctor report lacks session check: %+v", report.Checks)
+}

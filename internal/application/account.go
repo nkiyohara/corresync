@@ -173,8 +173,10 @@ type AccountChangeReview struct {
 	Calendar            *AccountRouteView `json:"calendar,omitempty"`
 	MakesDefault        bool              `json:"makesDefault"`
 	ReplacementDefault  string            `json:"replacementDefault,omitempty"`
+	ReplacementAccount  domain.AccountID  `json:"replacementAccount,omitempty"`
 	PurgesLocalState    bool              `json:"purgesLocalState"`
 	MayDeleteOwnedOAuth bool              `json:"mayDeleteOwnedOAuth"`
+	Authentication      string            `json:"authentication,omitempty"`
 	RestartsSessions    bool              `json:"restartsSessions"`
 }
 
@@ -319,7 +321,8 @@ func (service *AccountService) ReviewAdd(
 	review := AccountChangeReview{
 		Action: "add", Alias: input.Alias, Address: address,
 		Mail: mailRouteView(input.Mail), Calendar: calendarRouteView(input.Calendar),
-		MakesDefault: input.Default || len(catalog.Accounts) == 0,
+		MakesDefault:   input.Default || len(catalog.Accounts) == 0,
+		Authentication: "explicit_cli_required",
 	}
 	if input.Mail != nil {
 		review.MailProvider = input.Mail.Provider
@@ -432,7 +435,7 @@ func (service *AccountService) Remove(
 	ctx context.Context,
 	input AccountRemoveInput,
 ) (AccountView, error) {
-	account, replacement, err := service.reviewRemove(ctx, input)
+	account, replacement, _, err := service.reviewRemove(ctx, input)
 	if err != nil {
 		return AccountView{}, err
 	}
@@ -451,13 +454,14 @@ func (service *AccountService) ReviewRemove(
 	ctx context.Context,
 	input AccountRemoveInput,
 ) (AccountChangeReview, error) {
-	account, replacement, err := service.reviewRemove(ctx, input)
+	account, replacement, replacementAccount, err := service.reviewRemove(ctx, input)
 	if err != nil {
 		return AccountChangeReview{}, err
 	}
 	return AccountChangeReview{
 		Action: "remove", Account: account.ID, Alias: account.Alias,
-		ReplacementDefault: replacement, PurgesLocalState: true,
+		ReplacementDefault: replacement, ReplacementAccount: replacementAccount,
+		PurgesLocalState:    true,
 		MayDeleteOwnedOAuth: accountUsesOAuth(account),
 	}, nil
 }
@@ -485,41 +489,43 @@ func accountUsesOAuth(account AccountView) bool {
 func (service *AccountService) reviewRemove(
 	ctx context.Context,
 	input AccountRemoveInput,
-) (AccountView, string, error) {
+) (AccountView, string, domain.AccountID, error) {
 	account, err := service.Show(ctx, input.Account)
 	if err != nil {
-		return AccountView{}, "", err
+		return AccountView{}, "", "", err
 	}
 	catalog, err := service.List(ctx)
 	if err != nil {
-		return AccountView{}, "", err
+		return AccountView{}, "", "", err
 	}
 	if len(catalog.Accounts) == 1 {
-		return AccountView{}, "", errors.New("cannot remove the only configured account")
+		return AccountView{}, "", "", errors.New("cannot remove the only configured account")
 	}
 	replacement := input.ReplacementDefault
+	var replacementAccountID domain.AccountID
 	if account.IsDefault {
 		if replacement == "" {
-			return AccountView{}, "", errors.New(
+			return AccountView{}, "", "", errors.New(
 				"removing the default account requires --new-default",
 			)
 		}
 		replacementAccount, resolveErr := service.Show(ctx, replacement)
 		if resolveErr != nil {
-			return AccountView{}, "", resolveErr
+			return AccountView{}, "", "", resolveErr
 		}
 		if replacementAccount.ID == account.ID {
-			return AccountView{}, "", errors.New(
+			return AccountView{}, "", "", errors.New(
 				"replacement default must be a different account",
 			)
 		}
 		replacement = replacementAccount.Alias
+		replacementAccountID = replacementAccount.ID
 	} else if replacement != "" {
-		return AccountView{}, "", errors.New(
+		return AccountView{}, "", "", errors.New(
 			"--new-default is valid only when removing the default account",
 		)
 	}
-	return account, replacement, nil
+	return account, replacement, replacementAccountID, nil
 }
 
 func validateAccountCatalog(catalog AccountCatalog) error {

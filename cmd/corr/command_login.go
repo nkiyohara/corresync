@@ -32,6 +32,9 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 			return err
 		}
 	}
+	if err := writeOAuthConsentNotice(app, configured); err != nil {
+		return err
+	}
 	client, _, err := app.openDaemon(app.context)
 	if err != nil {
 		return err
@@ -39,9 +42,6 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
 	if command.Terminal {
 		return runTerminalLogin(app, client, accountID)
-	}
-	if err := writeOAuthConsentNotice(app, configured); err != nil {
-		return err
 	}
 	result, err := client.Login(app.context, accountID, app.caller())
 	if err != nil {

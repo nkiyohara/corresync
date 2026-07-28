@@ -227,6 +227,11 @@ func (configuration Config) Validate() error {
 			return fmt.Errorf("validate account %q routes: %w", alias, err)
 		}
 	}
+	for _, alias := range aliases {
+		if _, conflicts := accountIDs[domain.AccountID(alias)]; conflicts {
+			return fmt.Errorf("account alias %q conflicts with an opaque account ID", alias)
+		}
+	}
 
 	if err := configuration.Policy.Rules().Validate(); err != nil {
 		return fmt.Errorf("validate policy: %w", err)

@@ -166,7 +166,10 @@ func NewCalendarService(
 
 func (service *CalendarService) validateExecutionAccount(operation domain.Operation) error {
 	expected := service.provenance.AccountID
-	if expected != "" && operation.Account() != expected {
+	if expected == "" {
+		return errors.New("calendar service lacks routed account provenance")
+	}
+	if operation.Account() != expected {
 		return errors.New("calendar operation account does not match the routed service")
 	}
 	return nil

@@ -174,11 +174,13 @@ func (backend *daemonMCPBackend) PreviewAccountRename(
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
+	normalized := input
+	normalized.Account = string(review.Account)
 	operation, err := domain.NewOperation(
 		"account.rename",
 		domain.EffectReversibleWrite,
 		review.Account,
-		input,
+		normalized,
 	)
 	if err != nil {
 		return application.AccountChangeAccess{}, err
@@ -211,6 +213,11 @@ func (backend *daemonMCPBackend) CommitAccountRename(
 	if err := operation.DecodePayload(&input); err != nil {
 		return application.AccountChangeAccess{}, err
 	}
+	if input.Account != string(operation.Account()) {
+		return application.AccountChangeAccess{}, errors.New(
+			"approved account rename no longer matches its account",
+		)
+	}
 	account, err := backend.executeAccountMutation(
 		ctx,
 		caller,
@@ -235,11 +242,16 @@ func (backend *daemonMCPBackend) PreviewAccountRemove(
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
+	normalized := input
+	normalized.Account = string(review.Account)
+	if review.ReplacementAccount != "" {
+		normalized.ReplacementDefault = string(review.ReplacementAccount)
+	}
 	operation, err := domain.NewOperation(
 		"account.remove",
 		domain.EffectDestructiveWrite,
 		review.Account,
-		input,
+		normalized,
 	)
 	if err != nil {
 		return application.AccountChangeAccess{}, err
@@ -271,6 +283,11 @@ func (backend *daemonMCPBackend) CommitAccountRemove(
 	var input application.AccountRemoveInput
 	if err := operation.DecodePayload(&input); err != nil {
 		return application.AccountChangeAccess{}, err
+	}
+	if input.Account != string(operation.Account()) {
+		return application.AccountChangeAccess{}, errors.New(
+			"approved account removal no longer matches its account",
+		)
 	}
 	account, err := backend.executeAccountMutation(
 		ctx,

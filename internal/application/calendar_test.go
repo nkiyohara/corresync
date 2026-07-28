@@ -80,6 +80,11 @@ func testCalendarService(t *testing.T, reader CalendarPort) (*CalendarService, *
 	guard, recorder := newTestGuard(t, policy.DefaultRules())
 	service, err := NewCalendarService(guard, reader, CalendarOptions{
 		MaxAttendees: 50,
+		Provenance: domain.Provenance{
+			AccountID:  "work",
+			Provider:   domain.ProviderCalDAV,
+			CalendarID: "synthetic-calendar",
+		},
 		Effects: CalendarEffects{
 			CreateAttendeeNotifications: true,
 			UpdateAttendeeNotifications: true,
@@ -123,6 +128,22 @@ func TestCalendarServiceListsThroughPolicyAndAudit(t *testing.T) {
 		recorder.events[1].Phase != AuditPhaseExecuted ||
 		recorder.events[1].Outcome != AuditOutcomeSuccess {
 		t.Fatalf("unexpected audit events: %+v", recorder.events)
+	}
+}
+
+func TestCalendarServiceFailsClosedWithoutRoutedProvenance(t *testing.T) {
+	t.Parallel()
+	operation, err := domain.NewOperation(
+		"calendar.create",
+		domain.EffectExternalWrite,
+		"work",
+		struct{}{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&CalendarService{}).validateExecutionAccount(operation); err == nil {
+		t.Fatal("calendar execution accepted missing routed provenance")
 	}
 }
 

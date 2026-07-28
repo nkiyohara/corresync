@@ -51,6 +51,11 @@ func TestCalendarReviewsUseConfiguredProviderEffects(t *testing.T) {
 	guard, _ := newTestGuard(t, policy.DefaultRules())
 	service, err := NewCalendarService(guard, port, CalendarOptions{
 		MaxAttendees: 50,
+		Provenance: domain.Provenance{
+			AccountID:  "work",
+			Provider:   domain.ProviderCalDAV,
+			CalendarID: "synthetic-calendar",
+		},
 		Effects: CalendarEffects{
 			CancellationMode:        CalendarCancellationNoScheduling,
 			CancellationDisposition: CalendarDispositionCalendarObject,

@@ -133,7 +133,10 @@ func NewMailService(guard *Guard, reader MailPort, options MailOptions) (*MailSe
 
 func (service *MailService) validateExecutionAccount(operation domain.Operation) error {
 	expected := service.provenance.AccountID
-	if expected != "" && operation.Account() != expected {
+	if expected == "" {
+		return errors.New("mail service lacks routed account provenance")
+	}
+	if operation.Account() != expected {
 		return errors.New("mail operation account does not match the routed service")
 	}
 	return nil

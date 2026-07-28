@@ -33,8 +33,9 @@ const (
 	TLSImplicit = "implicit"
 	TLSStartTLS = "starttls"
 
-	maximumRawMessageBytes = 8 << 20
-	networkTimeout         = 30 * time.Second
+	maximumRawMessageBytes  = 8 << 20
+	maximumIMAPLiteralBytes = maximumRawMessageBytes
+	networkTimeout          = 30 * time.Second
 )
 
 // Endpoint is one fail-closed TLS endpoint.
@@ -154,19 +155,13 @@ func (client *Client) withIMAP(
 	address := net.JoinHostPort(client.imap.Host, strconv.Itoa(int(client.imap.Port)))
 	dialer := &net.Dialer{Timeout: networkTimeout}
 	tlsConfig := client.endpointTLS(client.imap.Host)
-	var connection *imapclient.Client
-	var err error
-	switch client.imap.Mode {
-	case TLSImplicit:
-		connection, err = imapclient.DialWithDialerTLS(dialer, address, tlsConfig)
-	case TLSStartTLS:
-		connection, err = imapclient.DialWithDialer(dialer, address)
-		if err == nil {
-			err = connection.StartTLS(tlsConfig)
-		}
-	default:
-		return errors.New("unsupported IMAP TLS mode")
-	}
+	connection, err := dialBoundedIMAP(
+		ctx,
+		dialer,
+		address,
+		client.imap.Mode,
+		tlsConfig,
+	)
 	if err != nil {
 		if connection != nil {
 			_ = connection.Terminate()
