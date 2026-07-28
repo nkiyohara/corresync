@@ -57,8 +57,9 @@ type CalendarUpdateReview struct {
 
 // CalendarUpdateResult contains a refreshed identity when OWA returns one.
 type CalendarUpdateResult struct {
-	ID        string `json:"id,omitempty"`
-	ChangeKey string `json:"changeKey,omitempty"`
+	ID         string            `json:"id,omitempty"`
+	ChangeKey  string            `json:"changeKey,omitempty"`
+	Provenance domain.Provenance `json:"provenance,omitempty"`
 }
 
 // CalendarUpdateAccess is an immutable preview or a completed update.
@@ -83,8 +84,12 @@ func (service *CalendarService) Update(
 	if err := input.ValidateWithAttendeeLimit(service.maxAttendees); err != nil {
 		return CalendarUpdateAccess{}, err
 	}
-	operation, err := domain.NewOperation(
-		"calendar.update", domain.EffectExternalWrite, input.Account, input,
+	operation, err := domain.NewTargetedOperation(
+		"calendar.update",
+		domain.EffectExternalWrite,
+		input.Account,
+		calendarEventTarget(input.EventID),
+		input,
 	)
 	if err != nil {
 		return CalendarUpdateAccess{}, fmt.Errorf("create calendar update operation: %w", err)
@@ -149,6 +154,9 @@ func (service *CalendarService) executeUpdate(
 	})
 	if callErr != nil || auditErr != nil {
 		return CalendarUpdateResult{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		updated.Provenance = service.calendarProvenance(updated.ID)
 	}
 	return updated, nil
 }

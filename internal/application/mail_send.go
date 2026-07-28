@@ -29,8 +29,9 @@ type MailSendInput struct {
 // MailSendResult identifies a sent copy only when OWA returns an item ID.
 // A successful SendAndSaveCopy response is allowed to omit it.
 type MailSendResult struct {
-	ID        string `json:"id,omitempty"`
-	ChangeKey string `json:"changeKey,omitempty"`
+	ID         string            `json:"id,omitempty"`
+	ChangeKey  string            `json:"changeKey,omitempty"`
+	Provenance domain.Provenance `json:"provenance,omitempty"`
 }
 
 // MailSendAccess is either an immutable approval preview or a completed send.
@@ -56,7 +57,13 @@ func (service *MailService) Send(
 	if err := input.Validate(service.maxRecipients); err != nil {
 		return MailSendAccess{}, err
 	}
-	operation, err := domain.NewOperation("mail.send", domain.EffectExternalWrite, input.Account, input)
+	operation, err := domain.NewTargetedOperation(
+		"mail.send",
+		domain.EffectExternalWrite,
+		input.Account,
+		configuredMailboxTarget(),
+		input,
+	)
 	if err != nil {
 		return MailSendAccess{}, fmt.Errorf("create mail send operation: %w", err)
 	}
@@ -129,6 +136,9 @@ func (service *MailService) executeSend(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailSendResult{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		sent.Provenance = service.mailProvenance(sent.ID)
 	}
 	return sent, nil
 }

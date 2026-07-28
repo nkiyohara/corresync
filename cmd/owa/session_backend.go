@@ -23,10 +23,11 @@ import (
 )
 
 type sessionAccount struct {
-	handle   browserHandle
-	mail     *application.MailService
-	calendar *application.CalendarService
-	captured time.Time
+	handle       browserHandle
+	mail         *application.MailService
+	calendar     *application.CalendarService
+	captured     time.Time
+	capabilities domain.Capabilities
 }
 
 type sessionPreview struct {
@@ -105,7 +106,15 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 }
 
 func (backend *sessionBackend) DefaultAccount() domain.AccountID {
-	return domain.AccountID(backend.configuration.DefaultAccount)
+	return backend.configuration.Accounts[backend.configuration.DefaultAccount].ID
+}
+
+func (backend *sessionBackend) ResolveAccount(reference string) (domain.AccountID, error) {
+	_, account, err := backend.configuration.ResolveAccount(reference)
+	if err != nil {
+		return "", err
+	}
+	return account.ID, nil
 }
 
 func (backend *sessionBackend) Login(
@@ -149,16 +158,19 @@ func (backend *sessionBackend) SessionStatus(
 		Accounts: make([]daemonapi.SessionStatus, 0, len(aliases)),
 	}
 	for _, alias := range aliases {
-		accountID := domain.AccountID(alias)
+		configured := backend.configuration.Accounts[alias]
+		accountID := configured.ID
 		state := daemonapi.SessionStatus{
-			Account: accountID,
-			State:   "signed_out",
+			Account: accountID, Alias: alias, Provider: configured.Provider,
+			State: "signed_out",
 		}
 		if account, exists := backend.accounts[accountID]; exists {
 			capturedAt := account.captured.UTC()
 			state.State = "authenticated"
 			state.Authenticated = true
 			state.CapturedAt = &capturedAt
+			capabilities := account.capabilities
+			state.Capabilities = &capabilities
 		} else if _, exists := backend.terminalAccounts[accountID]; exists {
 			state.State = "pending"
 		}
@@ -213,7 +225,13 @@ func (backend *sessionBackend) TerminalLogin(
 
 	credentials, credentialsErr := interaction.handle.CurrentSession()
 	if credentialsErr == nil {
-		configured := backend.configuration.Accounts[string(input.Account)]
+		_, configured, exists := backend.configuration.AccountByID(input.Account)
+		if !exists {
+			return daemonapi.TerminalLoginResult{}, fmt.Errorf(
+				"account %q is not configured",
+				input.Account,
+			)
+		}
 		account, err := backend.accountFromHandle(configured, interaction.handle, credentials)
 		if err != nil {
 			return daemonapi.TerminalLoginResult{}, errors.Join(
@@ -261,7 +279,7 @@ func (backend *sessionBackend) terminalInteraction(
 		}
 		return interaction, nil
 	}
-	configured, exists := backend.configuration.Accounts[string(input.Account)]
+	_, configured, exists := backend.configuration.AccountByID(input.Account)
 	if !exists {
 		return nil, fmt.Errorf("account %q is not configured", input.Account)
 	}
@@ -1006,7 +1024,7 @@ func (backend *sessionBackend) accountServices(
 	if _, exists := backend.terminalAccounts[accountID]; exists {
 		return sessionAccount{}, errors.New("terminal login is in progress for this account")
 	}
-	configured, exists := backend.configuration.Accounts[string(accountID)]
+	_, configured, exists := backend.configuration.AccountByID(accountID)
 	if !exists {
 		return sessionAccount{}, fmt.Errorf("account %q is not configured", accountID)
 	}
@@ -1038,6 +1056,11 @@ func (backend *sessionBackend) accountFromHandle(
 	}
 	mail, err := application.NewMailService(backend.guard, client, application.MailOptions{
 		MaxRecipients: backend.configuration.Policy.MaxRecipients,
+		Provenance: domain.Provenance{
+			AccountID: configured.ID,
+			Provider:  configured.Provider,
+			MailboxID: "configured-mailbox",
+		},
 	})
 	if err != nil {
 		return sessionAccount{}, err
@@ -1045,15 +1068,31 @@ func (backend *sessionBackend) accountFromHandle(
 	calendar, err := application.NewCalendarService(
 		backend.guard,
 		client,
-		application.CalendarOptions{MaxAttendees: backend.configuration.Policy.MaxAttendees},
+		application.CalendarOptions{
+			MaxAttendees: backend.configuration.Policy.MaxAttendees,
+			Provenance: domain.Provenance{
+				AccountID:  configured.ID,
+				Provider:   configured.Provider,
+				CalendarID: "calendar",
+			},
+		},
 	)
 	if err != nil {
 		return sessionAccount{}, err
 	}
 	services := sessionAccount{
 		handle: handle, mail: mail, calendar: calendar, captured: credentials.CapturedAt(),
+		capabilities: owaCapabilities(),
 	}
 	return services, nil
+}
+
+func owaCapabilities() domain.Capabilities {
+	return domain.Capabilities{
+		Mail: true, Calendar: true, Folders: true,
+		OnlineMeeting: "teams", SharedMailboxes: true,
+		AttachmentReads: true, AttachmentWrites: true,
+	}
 }
 
 func (backend *sessionBackend) Close() error {

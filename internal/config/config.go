@@ -15,7 +15,9 @@ import (
 	"github.com/nkiyohara/owa-bridge/internal/policy"
 )
 
-const CurrentVersion = 1
+const CurrentVersion = 2
+
+const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
 // Config is the complete persisted configuration. It intentionally has no
 // credential, cookie, token, canary, or password field.
@@ -28,12 +30,15 @@ type Config struct {
 	Updates        Updates            `json:"updates" toml:"updates"`
 }
 
-// Account identifies one Outlook Web origin by a non-personal local alias.
-// Mailbox optionally selects a shared or delegated SMTP mailbox while keeping
-// authentication in the same browser-owned Outlook Web session.
+// Account is one provider routing and isolation boundary. The map key in
+// Config.Accounts is its mutable local alias; ID is an opaque, stable storage
+// and policy key that does not change when the alias or address changes.
 type Account struct {
-	Origin  string `json:"origin" toml:"origin"`
-	Mailbox string `json:"mailbox,omitempty" toml:"mailbox,omitempty"`
+	ID       domain.AccountID  `json:"id" toml:"id"`
+	Provider domain.ProviderID `json:"provider" toml:"provider"`
+	Address  string            `json:"address,omitempty" toml:"address,omitempty"`
+	Origin   string            `json:"origin" toml:"origin"`
+	Mailbox  string            `json:"mailbox,omitempty" toml:"mailbox,omitempty"`
 }
 
 // Policy maps persisted settings into the deterministic policy core.
@@ -87,7 +92,11 @@ func Default() Config {
 		Version:        CurrentVersion,
 		DefaultAccount: "work",
 		Accounts: map[string]Account{
-			"work": {Origin: "https://outlook.cloud.microsoft"},
+			"work": {
+				ID:       defaultAccountID,
+				Provider: domain.ProviderMicrosoftOWA,
+				Origin:   "https://outlook.cloud.microsoft",
+			},
 		},
 		Policy: Policy{
 			Mode:          policy.ModeGuarded,
@@ -96,6 +105,21 @@ func Default() Config {
 		},
 		Browser: Browser{LoginTimeout: Duration(5 * time.Minute)},
 	}
+}
+
+// NewDefault returns a safe default with a freshly generated local account ID.
+// It is used for persisted user configuration; Default remains deterministic
+// so callers can use it as an in-memory baseline and in fixtures.
+func NewDefault() (Config, error) {
+	configuration := Default()
+	accountID, err := domain.NewAccountID()
+	if err != nil {
+		return Config{}, err
+	}
+	account := configuration.Accounts[configuration.DefaultAccount]
+	account.ID = accountID
+	configuration.Accounts[configuration.DefaultAccount] = account
+	return configuration, nil
 }
 
 // Validate rejects ambiguous, unsafe, or unsupported configuration.
@@ -113,19 +137,46 @@ func (configuration Config) Validate() error {
 		return fmt.Errorf("default account %q is not configured", configuration.DefaultAccount)
 	}
 
+	accountIDs := make(map[domain.AccountID]string, len(configuration.Accounts))
 	aliases := make([]string, 0, len(configuration.Accounts))
 	for alias := range configuration.Accounts {
 		aliases = append(aliases, alias)
 	}
 	sort.Strings(aliases)
 	for _, alias := range aliases {
-		if err := domain.AccountID(alias).Validate(); err != nil {
+		if err := domain.AccountAlias(alias).Validate(); err != nil {
 			return fmt.Errorf("validate account alias %q: %w", alias, err)
 		}
-		if err := validateOrigin(configuration.Accounts[alias].Origin); err != nil {
+		account := configuration.Accounts[alias]
+		if err := account.ID.ValidateOpaque(); err != nil {
+			return fmt.Errorf("validate account %q ID: %w", alias, err)
+		}
+		if previous, exists := accountIDs[account.ID]; exists {
+			return fmt.Errorf(
+				"accounts %q and %q use duplicate ID %q",
+				previous,
+				alias,
+				account.ID,
+			)
+		}
+		accountIDs[account.ID] = alias
+		if err := account.Provider.Validate(); err != nil {
+			return fmt.Errorf("validate account %q provider: %w", alias, err)
+		}
+		if account.Provider != domain.ProviderMicrosoftOWA {
+			return fmt.Errorf(
+				"validate account %q: provider %q is not available in this release",
+				alias,
+				account.Provider,
+			)
+		}
+		if err := validateAddress(account.Address); err != nil {
 			return fmt.Errorf("validate account %q: %w", alias, err)
 		}
-		if err := validateMailbox(configuration.Accounts[alias].Mailbox); err != nil {
+		if err := validateOrigin(account.Origin); err != nil {
+			return fmt.Errorf("validate account %q: %w", alias, err)
+		}
+		if err := validateMailbox(account.Mailbox); err != nil {
 			return fmt.Errorf("validate account %q: %w", alias, err)
 		}
 	}
@@ -149,6 +200,33 @@ func (configuration Config) Validate() error {
 	return nil
 }
 
+// ResolveAccount accepts either a human-facing alias or an opaque account ID.
+// It always returns the canonical alias and persisted account definition.
+func (configuration Config) ResolveAccount(reference string) (string, Account, error) {
+	if reference == "" {
+		reference = configuration.DefaultAccount
+	}
+	if account, exists := configuration.Accounts[reference]; exists {
+		return reference, account, nil
+	}
+	for alias, account := range configuration.Accounts {
+		if string(account.ID) == reference {
+			return alias, account, nil
+		}
+	}
+	return "", Account{}, fmt.Errorf("account %q is not configured", reference)
+}
+
+// AccountByID returns the definition for an already resolved stable account ID.
+func (configuration Config) AccountByID(accountID domain.AccountID) (string, Account, bool) {
+	for alias, account := range configuration.Accounts {
+		if account.ID == accountID {
+			return alias, account, true
+		}
+	}
+	return "", Account{}, false
+}
+
 func validateMailbox(value string) error {
 	if value == "" {
 		return nil
@@ -159,6 +237,16 @@ func validateMailbox(value string) error {
 	parsed, err := mail.ParseAddress(value)
 	if err != nil || parsed.Name != "" || parsed.Address != value || !strings.Contains(value, "@") {
 		return errors.New("mailbox must be a bare SMTP address")
+	}
+	return nil
+}
+
+func validateAddress(value string) error {
+	if value == "" {
+		return nil
+	}
+	if err := validateMailbox(value); err != nil {
+		return errors.New("address must be a bare email address")
 	}
 	return nil
 }

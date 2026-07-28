@@ -25,6 +25,7 @@ type MailBody struct {
 	ChangeKey   string                   `json:"changeKey,omitempty"`
 	Text        string                   `json:"text"`
 	Attachments []MailAttachmentMetadata `json:"attachments,omitempty"`
+	Provenance  domain.Provenance        `json:"provenance,omitempty"`
 }
 
 // MailBodyAccess represents either completed content or an approval preview.
@@ -122,6 +123,14 @@ func (service *MailService) executeBody(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailBody{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		body.Provenance = service.mailProvenance(body.ID)
+		for index := range body.Attachments {
+			body.Attachments[index].Provenance = service.mailProvenance(
+				body.Attachments[index].ID,
+			)
+		}
 	}
 	return body, nil
 }

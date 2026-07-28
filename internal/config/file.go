@@ -21,6 +21,16 @@ func DefaultPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve user config directory: %w", err)
 	}
+	return filepath.Join(directory, "corresync", "config.toml"), nil
+}
+
+// LegacyDefaultPath returns the read-only rollback path used by owa-bridge
+// releases through v0.6.x. Migration never edits or removes this file.
+func LegacyDefaultPath() (string, error) {
+	directory, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve user config directory: %w", err)
+	}
 	return filepath.Join(directory, "owa-bridge", "config.toml"), nil
 }
 

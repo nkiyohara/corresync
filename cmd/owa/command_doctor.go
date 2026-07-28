@@ -239,7 +239,7 @@ func (command *doctorCommand) addDaemonStatus(
 }
 
 func (command *doctorCommand) addUpdateStatus(app *runtime, configuration config.Config, report *doctorReport) {
-	if !app.automaticUpdateChecksEnabled(&configuration) {
+	if !app.automaticUpdateChecksEnabled(app.context, &configuration) {
 		report.add("update", "skip", "automatic stable-release checks are disabled")
 		return
 	}

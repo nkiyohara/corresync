@@ -62,8 +62,13 @@ func TestSessionBackendTerminalLoginStartsHeadlessAndBindsCaller(t *testing.T) {
 		terminalSessions: make(map[string]*terminalLoginSession),
 		terminalAccounts: make(map[domain.AccountID]string),
 	}
+	accountID := backend.configuration.Accounts["work"].ID
 	caller := domain.Caller{Surface: "cli", Instance: "process-1"}
-	result, err := backend.TerminalLogin(t.Context(), daemonapi.TerminalLoginInput{Account: "work"}, caller)
+	result, err := backend.TerminalLogin(
+		t.Context(),
+		daemonapi.TerminalLoginInput{Account: accountID},
+		caller,
+	)
 	if err != nil || result.Status != "pending" || result.View == nil {
 		t.Fatalf("TerminalLogin(start) = %+v, %v", result, err)
 	}
@@ -72,7 +77,7 @@ func TestSessionBackendTerminalLoginStartsHeadlessAndBindsCaller(t *testing.T) {
 	}
 
 	_, err = backend.TerminalLogin(t.Context(), daemonapi.TerminalLoginInput{
-		Account: "work", SessionID: result.SessionID,
+		Account: accountID, SessionID: result.SessionID,
 		Action: &daemonapi.TerminalLoginAction{Type: "key", ControlID: "control-1", Key: "a"},
 	}, domain.Caller{Surface: "cli", Instance: "process-2"})
 	if err == nil || err.Error() != "invalid or expired terminal login session" {
@@ -80,7 +85,7 @@ func TestSessionBackendTerminalLoginStartsHeadlessAndBindsCaller(t *testing.T) {
 	}
 
 	result, err = backend.TerminalLogin(t.Context(), daemonapi.TerminalLoginInput{
-		Account: "work", SessionID: result.SessionID,
+		Account: accountID, SessionID: result.SessionID,
 		Action: &daemonapi.TerminalLoginAction{Type: "key", ControlID: "control-1", Key: "a"},
 	}, caller)
 	if err != nil || result.Status != "pending" || len(fakeBrowser.actions) != 1 || fakeBrowser.actions[0].Key != "a" {
@@ -88,7 +93,7 @@ func TestSessionBackendTerminalLoginStartsHeadlessAndBindsCaller(t *testing.T) {
 	}
 
 	result, err = backend.TerminalLogin(t.Context(), daemonapi.TerminalLoginInput{
-		Account: "work", SessionID: result.SessionID,
+		Account: accountID, SessionID: result.SessionID,
 		Action: &daemonapi.TerminalLoginAction{Type: "cancel"},
 	}, caller)
 	if err != nil || result.Status != "cancelled" || !fakeBrowser.closed || len(backend.terminalSessions) != 0 {

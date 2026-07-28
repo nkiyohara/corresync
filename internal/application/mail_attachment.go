@@ -15,13 +15,14 @@ const MaxMailAttachmentMetadata = 100
 // MailAttachmentMetadata is bounded attachment metadata returned with an
 // explicitly requested message body.
 type MailAttachmentMetadata struct {
-	ID          string `json:"id"`
-	Kind        string `json:"kind"`
-	Name        string `json:"name,omitempty"`
-	ContentType string `json:"contentType,omitempty"`
-	Size        int    `json:"size"`
-	IsInline    bool   `json:"isInline"`
-	ContentID   string `json:"contentId,omitempty"`
+	ID          string            `json:"id"`
+	Kind        string            `json:"kind"`
+	Name        string            `json:"name,omitempty"`
+	ContentType string            `json:"contentType,omitempty"`
+	Size        int               `json:"size"`
+	IsInline    bool              `json:"isInline"`
+	ContentID   string            `json:"contentId,omitempty"`
+	Provenance  domain.Provenance `json:"provenance,omitempty"`
 }
 
 // MailAttachmentInput names one exact attachment returned with a body read.
@@ -128,6 +129,9 @@ func (service *MailService) executeAttachment(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailAttachment{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		attachment.Provenance = service.mailProvenance(attachment.ID)
 	}
 	return attachment, nil
 }

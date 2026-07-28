@@ -69,6 +69,7 @@ func (service *MailService) Search(
 	if callErr != nil || auditErr != nil {
 		return MailPage{}, errors.Join(callErr, auditErr)
 	}
+	service.applyMailPage(&page)
 	return page, nil
 }
 

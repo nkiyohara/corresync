@@ -25,6 +25,7 @@ const (
 // transport directly.
 type Backend interface {
 	DefaultAccount() domain.AccountID
+	ResolveAccount(string) (domain.AccountID, error)
 	ListMailFolders(context.Context, application.MailFolderListInput, domain.Caller) (application.MailFolderPage, error)
 	ListMail(context.Context, application.MailListInput, domain.Caller) (application.MailPage, error)
 	SearchMail(context.Context, application.MailSearchInput, domain.Caller) (application.MailPage, error)
@@ -277,9 +278,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "read",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input CalendarListInput) (*mcp.CallToolResult, application.CalendarPage, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.CalendarPage{}, err
 		}
 		calendar := application.CalendarFolder{
 			Kind: application.CalendarFolderDistinguished,
@@ -311,9 +312,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "external_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input CalendarCreateInput) (*mcp.CallToolResult, application.CalendarCreateAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.CalendarCreateAccess{}, err
 		}
 		calendar := application.CalendarFolder{
 			Kind: application.CalendarFolderDistinguished,
@@ -368,9 +369,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "external_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input CalendarUpdateInput) (*mcp.CallToolResult, application.CalendarUpdateAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.CalendarUpdateAccess{}, err
 		}
 		access, err := backend.UpdateCalendar(ctx, application.CalendarUpdateInput{
 			Account: account, EventID: input.EventID, ChangeKey: input.ChangeKey,
@@ -416,9 +417,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "destructive_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input CalendarCancelInput) (*mcp.CallToolResult, application.CalendarCancelAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.CalendarCancelAccess{}, err
 		}
 		access, err := backend.CancelCalendar(ctx, application.CalendarCancelInput{
 			Account: account, EventID: input.EventID, ChangeKey: input.ChangeKey,
@@ -458,9 +459,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "read",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailFolderListInput) (*mcp.CallToolResult, application.MailFolderPage, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailFolderPage{}, err
 		}
 		parent := application.MailFolder{Kind: application.MailFolderDistinguished, ID: input.Parent}
 		if parent.ID == "" {
@@ -502,9 +503,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "sensitive_read",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailBodyInput) (*mcp.CallToolResult, application.MailBodyAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailBodyAccess{}, err
 		}
 		access, err := backend.GetMailBody(ctx, application.MailBodyInput{
 			Account: account, MessageID: input.MessageID,
@@ -544,9 +545,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "sensitive_read",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailAttachmentGetInput) (*mcp.CallToolResult, application.MailAttachmentAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailAttachmentAccess{}, err
 		}
 		access, err := backend.GetMailAttachment(ctx, application.MailAttachmentInput{
 			Account: account, AttachmentID: input.AttachmentID,
@@ -586,9 +587,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "reversible_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailDraftInput) (*mcp.CallToolResult, application.MailDraftAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailDraftAccess{}, err
 		}
 		attachments, err := decodeMailAttachments(input.Attachments)
 		if err != nil {
@@ -638,9 +639,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "external_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailSendInput) (*mcp.CallToolResult, application.MailSendAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailSendAccess{}, err
 		}
 		attachments, err := decodeMailAttachments(input.Attachments)
 		if err != nil {
@@ -690,9 +691,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "read",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailListInput) (*mcp.CallToolResult, application.MailPage, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailPage{}, err
 		}
 		folder := application.MailFolder{
 			Kind: application.MailFolderDistinguished,
@@ -736,9 +737,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "read",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailSearchInput) (*mcp.CallToolResult, application.MailPage, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailPage{}, err
 		}
 		folder := application.MailFolder{Kind: application.MailFolderDistinguished, ID: input.Folder}
 		if folder.ID == "" {
@@ -776,9 +777,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "reversible_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailMoveInput) (*mcp.CallToolResult, application.MailMoveAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailMoveAccess{}, err
 		}
 		destination := application.MailFolder{
 			Kind: application.MailFolderDistinguished, ID: input.Destination,
@@ -828,9 +829,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "reversible_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailReadStateInput) (*mcp.CallToolResult, application.MailReadStateAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailReadStateAccess{}, err
 		}
 		access, err := backend.SetMailReadState(ctx, application.MailReadStateInput{
 			Account: account, MessageID: input.MessageID, ChangeKey: input.ChangeKey,
@@ -871,9 +872,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.owa-bridge/effect":              "destructive_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailDeleteInput) (*mcp.CallToolResult, application.MailDeleteAccess, error) {
-		account := backend.DefaultAccount()
-		if input.Account != "" {
-			account = domain.AccountID(input.Account)
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailDeleteAccess{}, err
 		}
 		access, err := backend.DeleteMail(ctx, application.MailDeleteInput{
 			Account: account, MessageID: input.MessageID, ChangeKey: input.ChangeKey,

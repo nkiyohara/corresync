@@ -18,6 +18,7 @@ import (
 	"github.com/nkiyohara/owa-bridge/internal/buildinfo"
 	"github.com/nkiyohara/owa-bridge/internal/config"
 	"github.com/nkiyohara/owa-bridge/internal/daemonapi"
+	"github.com/nkiyohara/owa-bridge/internal/domain"
 	"github.com/nkiyohara/owa-bridge/internal/localipc"
 )
 
@@ -425,7 +426,7 @@ func startLifecycleTestDaemon(
 					Version:         version,
 					ProcessID:       processID,
 					StartedAt:       time.Unix(1, 0).UTC(),
-					DefaultAccount:  "work",
+					DefaultAccount:  adapterTestAccountID,
 					ConfigDigest:    configDigest,
 				})
 				response.Result = encoded
@@ -433,8 +434,9 @@ func startLifecycleTestDaemon(
 			case envelope.Method == "session.status":
 				encoded, encodeErr := json.Marshal(daemonapi.SessionStatusResult{
 					Accounts: []daemonapi.SessionStatus{{
-						Account: "work",
-						State:   "signed_out",
+						Account: adapterTestAccountID, Alias: "work",
+						Provider: domain.ProviderMicrosoftOWA,
+						State:    "signed_out",
 					}},
 				})
 				response.Result = encoded

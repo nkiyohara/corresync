@@ -42,7 +42,11 @@ func (command *configInitCommand) Run(app *runtime) error {
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("inspect config path: %w", err)
 	}
-	if err := config.Save(path, config.Default()); err != nil {
+	configuration, err := config.NewDefault()
+	if err != nil {
+		return err
+	}
+	if err := config.Save(path, configuration); err != nil {
 		return err
 	}
 	if command.JSON {
@@ -115,9 +119,10 @@ func (command *configShowCommand) Run(app *runtime) error {
 			mailbox = " · " + account.Mailbox
 		}
 		if _, err := view.printf(
-			"  %s  %s %s%s\n",
+			"  %s  %s %s · %s%s\n",
 			view.success(),
 			view.strong(fmt.Sprintf("%-16s", alias)),
+			account.Provider,
 			account.Origin,
 			view.muted(mailbox),
 		); err != nil {
@@ -323,6 +328,12 @@ func getConfigValue(configuration config.Config, key string) (any, error) {
 			return nil, fmt.Errorf("account %q is not configured", alias)
 		}
 		switch field {
+		case "id":
+			return account.ID, nil
+		case "provider":
+			return account.Provider, nil
+		case "address":
+			return account.Address, nil
 		case "origin":
 			return account.Origin, nil
 		case "mailbox":
@@ -383,11 +394,25 @@ func setConfigValue(configuration *config.Config, key, value string) error {
 		if !ok {
 			return fmt.Errorf("unsupported configuration key %q", key)
 		}
-		if err := domain.AccountID(alias).Validate(); err != nil {
+		if err := domain.AccountAlias(alias).Validate(); err != nil {
 			return fmt.Errorf("invalid account alias %q: %w", alias, err)
 		}
 		account, exists := configuration.Accounts[alias]
+		if !exists {
+			accountID, err := domain.NewAccountID()
+			if err != nil {
+				return err
+			}
+			account.ID = accountID
+			account.Provider = domain.ProviderMicrosoftOWA
+		}
 		switch field {
+		case "id":
+			return errors.New("account ID is read-only")
+		case "provider":
+			account.Provider = domain.ProviderID(value)
+		case "address":
+			account.Address = value
 		case "origin":
 			account.Origin = value
 		case "mailbox":
@@ -408,7 +433,7 @@ func accountConfigKey(key string) (alias, field string, ok bool) {
 		return "", "", false
 	}
 	remainder := strings.TrimPrefix(key, "accounts.")
-	for _, candidate := range []string{"origin", "mailbox"} {
+	for _, candidate := range []string{"id", "provider", "address", "origin", "mailbox"} {
 		suffix := "." + candidate
 		if strings.HasSuffix(remainder, suffix) {
 			alias := strings.TrimSuffix(remainder, suffix)

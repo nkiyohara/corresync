@@ -37,14 +37,28 @@ type adapterTestBackend struct {
 	calendarCancelReview  application.CalendarCancelReview
 }
 
-func (*adapterTestBackend) DefaultAccount() domain.AccountID { return "work" }
+const adapterTestAccountID = "acc_00000000000000000000000000000001"
+
+func (*adapterTestBackend) DefaultAccount() domain.AccountID { return adapterTestAccountID }
+func (backend *adapterTestBackend) ResolveAccount(reference string) (domain.AccountID, error) {
+	if reference == "" {
+		return backend.DefaultAccount(), nil
+	}
+	if reference == "missing" {
+		return "", errors.New("account is not configured")
+	}
+	return domain.AccountID(reference), nil
+}
 
 func (*adapterTestBackend) SessionStatus(
 	context.Context,
 	domain.Caller,
 ) (daemonapi.SessionStatusResult, error) {
 	return daemonapi.SessionStatusResult{
-		Accounts: []daemonapi.SessionStatus{{Account: "work", State: "signed_out"}},
+		Accounts: []daemonapi.SessionStatus{{
+			Account: adapterTestAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA, State: "signed_out",
+		}},
 	}, nil
 }
 func (*adapterTestBackend) Login(_ context.Context, account domain.AccountID, _ domain.Caller) (daemonapi.LoginResult, error) {
@@ -438,7 +452,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 		t.Fatalf("newDaemonMCPBackend() error = %v", err)
 	}
 	t.Cleanup(func() { _ = mcpBackend.Close() })
-	if mcpBackend.DefaultAccount() != "work" {
+	if mcpBackend.DefaultAccount() != adapterTestAccountID {
 		t.Fatalf("MCP default account = %q", mcpBackend.DefaultAccount())
 	}
 }

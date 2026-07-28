@@ -79,8 +79,9 @@ type MailDraftInput struct {
 
 // MailDraft identifies the saved draft returned by OWA.
 type MailDraft struct {
-	ID        string `json:"id"`
-	ChangeKey string `json:"changeKey,omitempty"`
+	ID         string            `json:"id"`
+	ChangeKey  string            `json:"changeKey,omitempty"`
+	Provenance domain.Provenance `json:"provenance,omitempty"`
 }
 
 // MailReview is safe to show before saving or sending an exact composition.
@@ -122,7 +123,13 @@ func (service *MailService) CreateDraft(
 		return MailDraftAccess{}, err
 	}
 	review := input.Review()
-	operation, err := domain.NewOperation("mail.create_draft", domain.EffectReversibleWrite, input.Account, input)
+	operation, err := domain.NewTargetedOperation(
+		"mail.create_draft",
+		domain.EffectReversibleWrite,
+		input.Account,
+		configuredMailboxTarget(),
+		input,
+	)
 	if err != nil {
 		return MailDraftAccess{}, fmt.Errorf("create mail draft operation: %w", err)
 	}
@@ -198,6 +205,9 @@ func (service *MailService) executeDraft(
 	})
 	if callErr != nil || auditErr != nil {
 		return MailDraft{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		draft.Provenance = service.mailProvenance(draft.ID)
 	}
 	return draft, nil
 }

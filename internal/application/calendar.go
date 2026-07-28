@@ -38,19 +38,20 @@ type CalendarListInput struct {
 // CalendarEvent is metadata only. It excludes body, attendee list, attachment
 // content, and online-meeting join URLs.
 type CalendarEvent struct {
-	ID              string      `json:"id"`
-	ChangeKey       string      `json:"changeKey,omitempty"`
-	Subject         string      `json:"subject,omitempty"`
-	Start           string      `json:"start"`
-	End             string      `json:"end"`
-	Location        string      `json:"location,omitempty"`
-	Organizer       MailAddress `json:"organizer,omitempty"`
-	IsAllDay        bool        `json:"isAllDay"`
-	IsOnlineMeeting bool        `json:"isOnlineMeeting"`
-	IsOrganizer     bool        `json:"isOrganizer"`
-	IsCancelled     bool        `json:"isCancelled"`
-	MyResponse      string      `json:"myResponse,omitempty"`
-	FreeBusy        string      `json:"freeBusy,omitempty"`
+	ID              string            `json:"id"`
+	ChangeKey       string            `json:"changeKey,omitempty"`
+	Subject         string            `json:"subject,omitempty"`
+	Start           string            `json:"start"`
+	End             string            `json:"end"`
+	Location        string            `json:"location,omitempty"`
+	Organizer       MailAddress       `json:"organizer,omitempty"`
+	IsAllDay        bool              `json:"isAllDay"`
+	IsOnlineMeeting bool              `json:"isOnlineMeeting"`
+	IsOrganizer     bool              `json:"isOrganizer"`
+	IsCancelled     bool              `json:"isCancelled"`
+	MyResponse      string            `json:"myResponse,omitempty"`
+	FreeBusy        string            `json:"freeBusy,omitempty"`
+	Provenance      domain.Provenance `json:"provenance,omitempty"`
 }
 
 // CalendarPage is the stable output contract shared by CLI and MCP.
@@ -77,6 +78,7 @@ type CalendarPort interface {
 // CalendarOptions applies configured limits at the application boundary.
 type CalendarOptions struct {
 	MaxAttendees int
+	Provenance   domain.Provenance
 }
 
 // CalendarService applies policy and audit around calendar use cases.
@@ -87,6 +89,7 @@ type CalendarService struct {
 	updater      CalendarUpdater
 	canceller    CalendarCanceller
 	maxAttendees int
+	provenance   domain.Provenance
 }
 
 // NewCalendarService requires the shared guard and a transport port.
@@ -106,7 +109,7 @@ func NewCalendarService(
 	}
 	return &CalendarService{
 		guard: guard, reader: port, creator: port, updater: port, canceller: port,
-		maxAttendees: options.MaxAttendees,
+		maxAttendees: options.MaxAttendees, provenance: options.Provenance,
 	}, nil
 }
 
@@ -147,6 +150,11 @@ func (service *CalendarService) List(
 	})
 	if callErr != nil || auditErr != nil {
 		return CalendarPage{}, errors.Join(callErr, auditErr)
+	}
+	if service.provenance.AccountID != "" {
+		for index := range page.Events {
+			page.Events[index].Provenance = service.calendarProvenance(page.Events[index].ID)
+		}
 	}
 	return page, nil
 }
@@ -191,4 +199,24 @@ func validateCalendarFolder(calendar CalendarFolder) error {
 		return errors.New("calendar folder kind is required")
 	}
 	return nil
+}
+
+func calendarFolderTarget(calendar CalendarFolder) domain.TargetRef {
+	return domain.TargetRef{
+		Kind: domain.TargetCalendar,
+		ID:   string(calendar.Kind) + ":" + calendar.ID,
+	}
+}
+
+func calendarEventTarget(eventID string) domain.TargetRef {
+	return domain.TargetRef{Kind: domain.TargetCalendar, ID: "event:" + eventID}
+}
+
+func (service *CalendarService) calendarProvenance(sourceObjectID string) domain.Provenance {
+	provenance := service.provenance
+	if provenance.AccountID == "" {
+		return domain.Provenance{}
+	}
+	provenance.SourceObjectID = sourceObjectID
+	return provenance
 }

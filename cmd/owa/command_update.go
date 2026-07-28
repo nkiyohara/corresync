@@ -146,7 +146,9 @@ func (app *runtime) updateReportWith(
 }
 
 func (app *runtime) maybeNotifyUpdate(parent context.Context) {
-	if app.interactiveOutput == nil || !app.interactiveOutput() || !app.automaticUpdateChecksEnabled(nil) {
+	if app.interactiveOutput == nil ||
+		!app.interactiveOutput() ||
+		!app.automaticUpdateChecksEnabled(parent, nil) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(parent, 750*time.Millisecond)
@@ -159,14 +161,17 @@ func (app *runtime) maybeNotifyUpdate(parent context.Context) {
 	_ = view.writeNotice(report.CurrentVersion, report.LatestVersion)
 }
 
-func (app *runtime) automaticUpdateChecksEnabled(configuration *config.Config) bool {
+func (app *runtime) automaticUpdateChecksEnabled(
+	ctx context.Context,
+	configuration *config.Config,
+) bool {
 	if value, exists := app.lookupEnv("OWA_NO_UPDATE_CHECK"); exists && disablesUpdateCheck(value) {
 		return false
 	}
 	if configuration != nil {
 		return !configuration.Updates.DisableAutomaticChecks
 	}
-	loaded, _, err := app.loadConfig()
+	loaded, _, err := app.loadConfigContext(ctx)
 	if err == nil {
 		return !loaded.Updates.DisableAutomaticChecks
 	}

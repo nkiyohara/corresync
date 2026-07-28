@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+
+	"github.com/nkiyohara/owa-bridge/internal/domain"
 )
 
 type authCommand struct {
@@ -23,10 +25,13 @@ type authStatusReport struct {
 }
 
 type sessionStatusView struct {
-	Account       string `json:"account"`
-	State         string `json:"state"`
-	Authenticated bool   `json:"authenticated"`
-	CapturedAt    string `json:"capturedAt,omitempty"`
+	Account       string               `json:"account"`
+	Alias         string               `json:"alias"`
+	Provider      string               `json:"provider"`
+	State         string               `json:"state"`
+	Authenticated bool                 `json:"authenticated"`
+	CapturedAt    string               `json:"capturedAt,omitempty"`
+	Capabilities  *domain.Capabilities `json:"capabilities,omitempty"`
 }
 
 func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
@@ -34,10 +39,13 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 	if err != nil {
 		return err
 	}
+	var selectedAccount string
 	if command.Account != "" {
-		if _, err := app.account(configuration, command.Account); err != nil {
-			return err
+		accountID, accountErr := app.account(configuration, command.Account)
+		if accountErr != nil {
+			return accountErr
 		}
+		selectedAccount = string(accountID)
 	}
 	client, daemonStatus, err := app.openDaemon(app.context)
 	if err != nil {
@@ -54,13 +62,16 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 		Accounts:      make([]sessionStatusView, 0, len(result.Accounts)),
 	}
 	for _, account := range result.Accounts {
-		if command.Account != "" && string(account.Account) != command.Account {
+		if selectedAccount != "" && string(account.Account) != selectedAccount {
 			continue
 		}
 		item := sessionStatusView{
 			Account:       string(account.Account),
+			Alias:         account.Alias,
+			Provider:      string(account.Provider),
 			State:         account.State,
 			Authenticated: account.Authenticated,
+			Capabilities:  account.Capabilities,
 		}
 		if account.CapturedAt != nil {
 			item.CapturedAt = account.CapturedAt.UTC().Format("2006-01-02T15:04:05Z")
@@ -93,7 +104,7 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 		if _, err := view.printf(
 			"   %s  %s %s\n",
 			icon,
-			view.strong(fmt.Sprintf("%-16s", account.Account)),
+			view.strong(fmt.Sprintf("%-16s", account.Alias)),
 			view.muted(detail),
 		); err != nil {
 			return err

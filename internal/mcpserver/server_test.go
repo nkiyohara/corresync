@@ -59,6 +59,12 @@ type fakeBackend struct {
 }
 
 func (backend *fakeBackend) DefaultAccount() domain.AccountID { return "work" }
+func (backend *fakeBackend) ResolveAccount(reference string) (domain.AccountID, error) {
+	if reference == "" {
+		return backend.DefaultAccount(), nil
+	}
+	return domain.AccountID(reference), nil
+}
 
 func (backend *fakeBackend) ListMail(
 	_ context.Context,

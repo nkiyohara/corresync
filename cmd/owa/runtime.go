@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/nkiyohara/owa-bridge/internal/browser"
@@ -59,6 +60,8 @@ type runtime struct {
 	interactiveOutput func() bool
 	interactiveStdout func() bool
 	lookupEnv         func(string) (string, bool)
+	migrationOnce     sync.Once
+	migrationErr      error
 }
 
 func newRuntime(
@@ -151,7 +154,7 @@ func newRuntime(
 // openDaemon connects to the config-scoped session owner, starting it when
 // absent. It never receives Outlook authorization material.
 func (app *runtime) openDaemon(ctx context.Context) (*daemonapi.Client, daemonapi.Status, error) {
-	if _, _, err := app.loadConfig(); err != nil {
+	if _, _, err := app.loadConfigContext(ctx); err != nil {
 		return nil, daemonapi.Status{}, err
 	}
 	configPath, err := app.resolvedConfigPath()
@@ -218,7 +221,25 @@ func (app *runtime) openDaemon(ctx context.Context) (*daemonapi.Client, daemonap
 
 func (app *runtime) resolvedConfigPath() (string, error) {
 	if app.configPath == "" {
-		return config.DefaultPath()
+		path, migrated, err := config.EnsureDefaultPath()
+		if err != nil {
+			return "", err
+		}
+		if migrated {
+			legacyPath, legacyErr := config.LegacyDefaultPath()
+			if legacyErr != nil {
+				return "", legacyErr
+			}
+			if _, writeErr := fmt.Fprintf(
+				app.stderr,
+				"Migrated configuration to %s; rollback copy preserved at %s.\n",
+				path,
+				legacyPath,
+			); writeErr != nil {
+				return "", writeErr
+			}
+		}
+		return path, nil
 	}
 	absolute, err := filepath.Abs(app.configPath)
 	if err != nil {
@@ -228,6 +249,12 @@ func (app *runtime) resolvedConfigPath() (string, error) {
 }
 
 func (app *runtime) loadConfig() (config.Config, string, error) {
+	return app.loadConfigContext(app.context)
+}
+
+func (app *runtime) loadConfigContext(
+	ctx context.Context,
+) (config.Config, string, error) {
 	path, err := app.resolvedConfigPath()
 	if err != nil {
 		return config.Config{}, "", err
@@ -236,6 +263,14 @@ func (app *runtime) loadConfig() (config.Config, string, error) {
 	if err != nil {
 		return config.Config{}, path, err
 	}
+	if app.configPath == "" {
+		app.migrationOnce.Do(func() {
+			app.migrationErr = app.migrateLegacyState(ctx, configuration)
+		})
+		if app.migrationErr != nil {
+			return config.Config{}, path, app.migrationErr
+		}
+	}
 	return configuration, path, nil
 }
 
@@ -243,15 +278,11 @@ func (app *runtime) account(
 	configuration config.Config,
 	requested string,
 ) (domain.AccountID, error) {
-	alias := requested
-	if alias == "" {
-		alias = configuration.DefaultAccount
+	_, account, err := configuration.ResolveAccount(requested)
+	if err != nil {
+		return "", err
 	}
-	_, exists := configuration.Accounts[alias]
-	if !exists {
-		return "", fmt.Errorf("account %q is not configured", alias)
-	}
-	return domain.AccountID(alias), nil
+	return account.ID, nil
 }
 
 func (app *runtime) authenticate(

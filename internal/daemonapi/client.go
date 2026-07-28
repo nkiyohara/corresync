@@ -80,14 +80,20 @@ func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (
 func validateSessionStatusResult(result SessionStatusResult) error {
 	seen := make(map[domain.AccountID]struct{}, len(result.Accounts))
 	for index, account := range result.Accounts {
-		if err := account.Account.Validate(); err != nil {
+		if err := account.Account.ValidateOpaque(); err != nil {
 			return errors.New("daemon returned an invalid session account")
+		}
+		if err := domain.AccountAlias(account.Alias).Validate(); err != nil {
+			return errors.New("daemon returned an invalid session account alias")
+		}
+		if err := account.Provider.Validate(); err != nil {
+			return errors.New("daemon returned an invalid session provider")
 		}
 		if _, exists := seen[account.Account]; exists {
 			return errors.New("daemon returned duplicate session accounts")
 		}
 		seen[account.Account] = struct{}{}
-		if index > 0 && result.Accounts[index-1].Account >= account.Account {
+		if index > 0 && result.Accounts[index-1].Alias >= account.Alias {
 			return errors.New("daemon returned unsorted session accounts")
 		}
 		switch account.State {
@@ -95,8 +101,11 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 			if !account.Authenticated || account.CapturedAt == nil || account.CapturedAt.IsZero() {
 				return errors.New("daemon returned invalid authenticated session state")
 			}
+			if account.Capabilities == nil || account.Capabilities.Validate() != nil {
+				return errors.New("daemon returned invalid account capabilities")
+			}
 		case "pending", "signed_out":
-			if account.Authenticated || account.CapturedAt != nil {
+			if account.Authenticated || account.CapturedAt != nil || account.Capabilities != nil {
 				return errors.New("daemon returned invalid inactive session state")
 			}
 		default:

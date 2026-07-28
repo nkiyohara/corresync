@@ -1,10 +1,16 @@
 package domain
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 )
+
+var opaqueAccountIDPattern = regexp.MustCompile(`^acc_[a-f0-9]{32}$`)
 
 // AccountID is an opaque identifier for one configured mailbox account.
 type AccountID string
@@ -12,6 +18,62 @@ type AccountID string
 // Validate ensures an account identifier is safe to use in policy boundaries.
 func (account AccountID) Validate() error {
 	return validateIdentifier("account", string(account), 128)
+}
+
+// ValidateOpaque ensures a persisted account identifier is generated,
+// non-personal, and independent of an address or mutable alias.
+func (account AccountID) ValidateOpaque() error {
+	if !opaqueAccountIDPattern.MatchString(string(account)) {
+		return errorsAccountID()
+	}
+	return nil
+}
+
+// NewAccountID returns a random local account identifier. It contains no
+// provider, address, alias, tenant, or mailbox information.
+func NewAccountID() (AccountID, error) {
+	value := make([]byte, 16)
+	if _, err := rand.Read(value); err != nil {
+		return "", fmt.Errorf("generate account ID: %w", err)
+	}
+	return AccountID("acc_" + hex.EncodeToString(value)), nil
+}
+
+func errorsAccountID() error {
+	return errors.New("account ID must use the opaque acc_<32 lowercase hex> form")
+}
+
+// AccountAlias is a mutable, human-facing local account name.
+type AccountAlias string
+
+// Validate rejects aliases that cannot safely cross CLI, config, or IPC
+// boundaries. Aliases are never used as persistent storage keys.
+func (alias AccountAlias) Validate() error {
+	return validateIdentifier("account alias", string(alias), 64)
+}
+
+// ProviderID identifies one explicit provider adapter.
+type ProviderID string
+
+const (
+	ProviderMicrosoftOWA   ProviderID = "microsoft-owa"
+	ProviderMicrosoftGraph ProviderID = "microsoft-graph"
+	ProviderGoogleAPI      ProviderID = "google-api"
+	ProviderGoogleWeb      ProviderID = "google-web"
+	ProviderJMAP           ProviderID = "jmap"
+	ProviderIMAPSMTP       ProviderID = "imap-smtp"
+	ProviderCalDAV         ProviderID = "caldav"
+	ProviderPOP3           ProviderID = "pop3"
+)
+
+var providerIDPattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
+
+// Validate ensures a provider ID is stable and safe for schemas and routing.
+func (provider ProviderID) Validate() error {
+	if len(provider) > 64 || !providerIDPattern.MatchString(string(provider)) {
+		return fmt.Errorf("invalid provider ID %q", provider)
+	}
+	return nil
 }
 
 // Caller identifies the local adapter instance requesting an operation.

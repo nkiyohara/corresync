@@ -18,6 +18,11 @@ import (
 	"github.com/nkiyohara/owa-bridge/internal/localipc"
 )
 
+const (
+	testAccountID  = "acc_00000000000000000000000000000001"
+	testAccountID2 = "acc_00000000000000000000000000000002"
+)
+
 type fakeBackend struct {
 	mailInput         application.MailListInput
 	searchInput       application.MailSearchInput
@@ -38,14 +43,17 @@ type fakeBackend struct {
 	caller            domain.Caller
 }
 
-func (backend *fakeBackend) DefaultAccount() domain.AccountID { return "work" }
+func (backend *fakeBackend) DefaultAccount() domain.AccountID { return testAccountID }
 
 func (backend *fakeBackend) SessionStatus(
 	context.Context,
 	domain.Caller,
 ) (SessionStatusResult, error) {
 	return SessionStatusResult{
-		Accounts: []SessionStatus{{Account: "work", State: "signed_out"}},
+		Accounts: []SessionStatus{{
+			Account: testAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA, State: "signed_out",
+		}},
 	}, nil
 }
 func (*fakeBackend) Login(_ context.Context, account domain.AccountID, _ domain.Caller) (LoginResult, error) {
@@ -211,21 +219,34 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 	t.Parallel()
 
 	capturedAt := time.Unix(1, 0)
+	signedOut := func(account, alias string) SessionStatus {
+		return SessionStatus{
+			Account: domain.AccountID(account), Alias: alias,
+			Provider: domain.ProviderMicrosoftOWA, State: "signed_out",
+		}
+	}
 	tests := []SessionStatusResult{
 		{Accounts: []SessionStatus{
-			{Account: "work", State: "signed_out"},
-			{Account: "work", State: "signed_out"},
+			signedOut(testAccountID, "personal"),
+			signedOut(testAccountID, "work"),
 		}},
 		{Accounts: []SessionStatus{
-			{Account: "work", State: "signed_out"},
-			{Account: "personal", State: "signed_out"},
+			signedOut(testAccountID, "work"),
+			signedOut(testAccountID2, "personal"),
 		}},
-		{Accounts: []SessionStatus{{Account: "work", State: "unknown"}}},
 		{Accounts: []SessionStatus{{
-			Account: "work", State: "authenticated", Authenticated: true,
+			Account: testAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA, State: "unknown",
 		}}},
 		{Accounts: []SessionStatus{{
-			Account: "work", State: "signed_out", CapturedAt: &capturedAt,
+			Account: testAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA,
+			State:    "authenticated", Authenticated: true,
+		}}},
+		{Accounts: []SessionStatus{{
+			Account: testAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA,
+			State:    "signed_out", CapturedAt: &capturedAt,
 		}}},
 	}
 	for index, result := range tests {
@@ -272,74 +293,74 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	}
 	caller := domain.Caller{Surface: "cli", Instance: "process-1"}
 	status, err := client.Status(t.Context(), caller)
-	if err != nil || status.DefaultAccount != "work" || status.ProtocolVersion != ProtocolVersion {
+	if err != nil || status.DefaultAccount != testAccountID || status.ProtocolVersion != ProtocolVersion {
 		t.Fatalf("Status() = %+v, %v", status, err)
 	}
-	login, err := client.Login(t.Context(), "work", caller)
-	if err != nil || !login.Authenticated || login.Account != "work" {
+	login, err := client.Login(t.Context(), testAccountID, caller)
+	if err != nil || !login.Authenticated || login.Account != testAccountID {
 		t.Fatalf("Login() = %+v, %v", login, err)
 	}
 	sessions, err := client.SessionStatus(t.Context(), caller)
 	if err != nil ||
 		len(sessions.Accounts) != 1 ||
-		sessions.Accounts[0].Account != "work" ||
+		sessions.Accounts[0].Account != testAccountID ||
 		sessions.Accounts[0].State != "signed_out" {
 		t.Fatalf("SessionStatus() = %+v, %v", sessions, err)
 	}
-	terminalLogin, err := client.TerminalLogin(t.Context(), TerminalLoginInput{Account: "work"}, caller)
+	terminalLogin, err := client.TerminalLogin(t.Context(), TerminalLoginInput{Account: testAccountID}, caller)
 	if err != nil || terminalLogin.Status != "pending" || terminalLogin.View == nil ||
 		len(terminalLogin.View.Controls) != 1 {
 		t.Fatalf("TerminalLogin(start) = %+v, %v", terminalLogin, err)
 	}
 	terminalLogin, err = client.TerminalLogin(t.Context(), TerminalLoginInput{
-		Account: "work", SessionID: terminalLogin.SessionID,
+		Account: testAccountID, SessionID: terminalLogin.SessionID,
 		Action: &TerminalLoginAction{Type: "key", ControlID: "control-1", Key: "a"},
 	}, caller)
 	if err != nil || terminalLogin.Status != "authenticated" || backend.terminalInput.Action.Key != "a" {
 		t.Fatalf("TerminalLogin(continue) = %+v, %v; input=%+v", terminalLogin, err, backend.terminalInput)
 	}
 	page, err := client.ListMail(t.Context(), application.MailListInput{
-		Account: "work", Folder: application.MailFolder{Kind: application.MailFolderDistinguished, ID: "inbox"},
+		Account: testAccountID, Folder: application.MailFolder{Kind: application.MailFolderDistinguished, ID: "inbox"},
 		Limit: 25, TimeZone: "UTC",
 	}, caller)
 	if err != nil || len(page.Messages) != 1 {
 		t.Fatalf("ListMail() = %+v, %v", page, err)
 	}
-	if backend.caller != caller || backend.mailInput.Account != "work" {
+	if backend.caller != caller || backend.mailInput.Account != testAccountID {
 		t.Fatalf("backend received caller=%+v input=%+v", backend.caller, backend.mailInput)
 	}
 	search, err := client.SearchMail(t.Context(), application.MailSearchInput{
-		Account: "work", Folder: application.MailFolder{Kind: application.MailFolderDistinguished, ID: "inbox"},
+		Account: testAccountID, Folder: application.MailFolder{Kind: application.MailFolderDistinguished, ID: "inbox"},
 		Query: "subject:synthetic", Limit: 25, TimeZone: "UTC",
 	}, caller)
 	if err != nil || len(search.Messages) != 1 || backend.searchInput.Query != "subject:synthetic" {
 		t.Fatalf("SearchMail() = %+v, %v; backend input=%+v", search, err, backend.searchInput)
 	}
 	moved, err := client.MoveMail(t.Context(), application.MailMoveInput{
-		Account: "work", MessageID: "message-1", ChangeKey: "change-1",
+		Account: testAccountID, MessageID: "message-1", ChangeKey: "change-1",
 		Destination: application.MailFolder{Kind: application.MailFolderOpaque, ID: "folder-1"},
 	}, caller)
 	if err != nil || moved.Moved == nil || moved.Moved.ID != "moved-1" || backend.moveInput.ChangeKey != "change-1" {
 		t.Fatalf("MoveMail() = %+v, %v; backend input=%+v", moved, err, backend.moveInput)
 	}
 	readState, err := client.SetMailReadState(t.Context(), application.MailReadStateInput{
-		Account: "work", MessageID: "message-1", ChangeKey: "change-1", State: application.MailReadStateRead,
+		Account: testAccountID, MessageID: "message-1", ChangeKey: "change-1", State: application.MailReadStateRead,
 	}, caller)
 	if err != nil || readState.Updated == nil || readState.Updated.State != application.MailReadStateRead ||
 		backend.stateInput.ChangeKey != "change-1" {
 		t.Fatalf("SetMailReadState() = %+v, %v; backend input=%+v", readState, err, backend.stateInput)
 	}
 	folders, err := client.ListMailFolders(t.Context(), application.MailFolderListInput{
-		Account:   "work",
+		Account:   testAccountID,
 		Parent:    application.MailFolder{Kind: application.MailFolderDistinguished, ID: "msgfolderroot"},
 		Traversal: application.MailFolderTraversalDeep,
 		Limit:     100, TimeZone: "UTC",
 	}, caller)
-	if err != nil || len(folders.Folders) != 1 || backend.folderInput.Account != "work" {
+	if err != nil || len(folders.Folders) != 1 || backend.folderInput.Account != testAccountID {
 		t.Fatalf("ListMailFolders() = %+v, %v; backend input=%+v", folders, err, backend.folderInput)
 	}
 	body, err := client.GetMailBody(t.Context(), application.MailBodyInput{
-		Account: "work", MessageID: "message-1",
+		Account: testAccountID, MessageID: "message-1",
 	}, caller)
 	if err != nil || body.Body == nil || body.Body.Text != "Synthetic body" || backend.bodyInput.MessageID != "message-1" {
 		t.Fatalf("GetMailBody() = %+v, %v; backend input=%+v", body, err, backend.bodyInput)
@@ -349,7 +370,7 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 		t.Fatalf("CommitMailBody() = %+v, %v; token=%q", body, err, backend.commitToken)
 	}
 	attachment, err := client.GetMailAttachment(t.Context(), application.MailAttachmentInput{
-		Account: "work", AttachmentID: "attachment-1",
+		Account: testAccountID, AttachmentID: "attachment-1",
 	}, caller)
 	if err != nil || attachment.Attachment == nil ||
 		attachment.Attachment.ContentBase64 != "Zml4dHVyZQ==" ||
@@ -361,7 +382,7 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 		t.Fatalf("CommitMailAttachment() = %+v, %v; token=%q", attachment, err, backend.commitToken)
 	}
 	draft, err := client.CreateMailDraft(t.Context(), application.MailDraftInput{
-		Account: "work", To: []string{"reader@example.test"}, Subject: "Synthetic draft", Body: "Synthetic body",
+		Account: testAccountID, To: []string{"reader@example.test"}, Subject: "Synthetic draft", Body: "Synthetic body",
 	}, caller)
 	if err != nil || draft.Draft == nil || draft.Draft.ID != "draft-1" || backend.draftInput.Subject != "Synthetic draft" {
 		t.Fatalf("CreateMailDraft() = %+v, %v; backend input=%+v", draft, err, backend.draftInput)
@@ -371,7 +392,7 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 		t.Fatalf("CommitMailDraft() = %+v, %v; token=%q", draft, err, backend.commitToken)
 	}
 	send, err := client.SendMail(t.Context(), application.MailSendInput{
-		Account: "work", To: []string{"reader@example.test"}, Subject: "Synthetic send", Body: "Synthetic body",
+		Account: testAccountID, To: []string{"reader@example.test"}, Subject: "Synthetic send", Body: "Synthetic body",
 	}, caller)
 	if err != nil || send.Status != "approval_required" || backend.sendInput.Subject != "Synthetic send" {
 		t.Fatalf("SendMail() = %+v, %v; backend input=%+v", send, err, backend.sendInput)
@@ -389,14 +410,14 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 		t.Fatalf("CommitMailReadState() = %+v, %v; token=%q", readState, err, backend.commitToken)
 	}
 	calendarPage, err := client.ListCalendar(t.Context(), application.CalendarListInput{
-		Account: "work", Calendar: application.CalendarFolder{Kind: application.CalendarFolderDistinguished, ID: "calendar"},
+		Account: testAccountID, Calendar: application.CalendarFolder{Kind: application.CalendarFolderDistinguished, ID: "calendar"},
 		Start: "2026-07-20T09:00:00Z", End: "2026-07-20T10:00:00Z",
 	}, caller)
 	if err != nil || len(calendarPage.Events) != 1 || backend.calendarListInput.Start != "2026-07-20T09:00:00Z" {
 		t.Fatalf("ListCalendar() = %+v, %v; backend input=%+v", calendarPage, err, backend.calendarListInput)
 	}
 	calendarAccess, err := client.CreateCalendar(t.Context(), application.CalendarCreateInput{
-		Account:      "work",
+		Account:      testAccountID,
 		Calendar:     application.CalendarFolder{Kind: application.CalendarFolderDistinguished, ID: "calendar"},
 		Subject:      "Synthetic event",
 		Start:        "2026-07-20T09:00:00Z",
@@ -414,7 +435,7 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	}
 	updatedSubject := "Updated synthetic event"
 	updateAccess, err := client.UpdateCalendar(t.Context(), application.CalendarUpdateInput{
-		Account: "work", EventID: "event-1", ChangeKey: "change-1", Subject: &updatedSubject,
+		Account: testAccountID, EventID: "event-1", ChangeKey: "change-1", Subject: &updatedSubject,
 	}, caller)
 	if err != nil || updateAccess.Status != "approval_required" || backend.updateInput.Subject == nil ||
 		*backend.updateInput.Subject != updatedSubject {
@@ -425,7 +446,7 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 		t.Fatalf("CommitCalendarUpdate() = %+v, %v", updateAccess, err)
 	}
 	cancelAccess, err := client.CancelCalendar(t.Context(), application.CalendarCancelInput{
-		Account: "work", EventID: "event-1", ChangeKey: "change-2",
+		Account: testAccountID, EventID: "event-1", ChangeKey: "change-2",
 	}, caller)
 	if err != nil || cancelAccess.Status != "approval_required" || backend.cancelInput.ChangeKey != "change-2" {
 		t.Fatalf("CancelCalendar() = %+v, %v; backend input=%+v", cancelAccess, err, backend.cancelInput)
@@ -500,7 +521,7 @@ func TestClientInspectsAndStopsIncompatibleDaemon(t *testing.T) {
 					Version:         "0.4.1",
 					ProcessID:       123,
 					StartedAt:       time.Unix(1, 0).UTC(),
-					DefaultAccount:  "work",
+					DefaultAccount:  testAccountID,
 					ConfigDigest:    strings.Repeat("a", 64),
 				})
 				response.Result = encoded
@@ -570,7 +591,7 @@ func TestClientInspectsAndStopsIncompatibleDaemon(t *testing.T) {
 	observedMu.Lock()
 	beforeLogin := len(observed)
 	observedMu.Unlock()
-	if _, err := client.Login(t.Context(), "work", caller); !errors.As(err, &versionErr) {
+	if _, err := client.Login(t.Context(), testAccountID, caller); !errors.As(err, &versionErr) {
 		t.Fatalf("Login() error = %v, want protocol mismatch", err)
 	}
 	observedMu.Lock()

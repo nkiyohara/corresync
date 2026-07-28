@@ -44,7 +44,8 @@ func TestDoctorOfflineProducesContentFreeHealthyReport(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
 		t.Fatalf("decode doctor output: %v", err)
 	}
-	if !report.Healthy || report.Online || report.Account != "work" {
+	if !report.Healthy || report.Online ||
+		report.Account != string(configuration.Accounts[configuration.DefaultAccount].ID) {
 		t.Fatalf("unexpected doctor report: %+v", report)
 	}
 	if len(report.Checks) != 7 ||

@@ -21,16 +21,16 @@ func TestSessionBackendReportsContentFreeAccountState(t *testing.T) {
 	backend := &sessionBackend{
 		configuration: config.Config{
 			Accounts: map[string]config.Account{
-				"work":     {Origin: "https://outlook.cloud.microsoft"},
-				"personal": {Origin: "https://outlook.office.com"},
-				"pending":  {Origin: "https://outlook.cloud.microsoft"},
+				"work":     {ID: "acc_00000000000000000000000000000001"},
+				"personal": {ID: "acc_00000000000000000000000000000002"},
+				"pending":  {ID: "acc_00000000000000000000000000000003"},
 			},
 		},
 		accounts: map[domain.AccountID]sessionAccount{
-			"work": {captured: capturedAt},
+			"acc_00000000000000000000000000000001": {captured: capturedAt},
 		},
 		terminalAccounts: map[domain.AccountID]string{
-			"pending": "tls1_synthetic",
+			"acc_00000000000000000000000000000003": "tls1_synthetic",
 		},
 	}
 	result, err := backend.SessionStatus(t.Context(), domain.Caller{})
@@ -38,11 +38,11 @@ func TestSessionBackendReportsContentFreeAccountState(t *testing.T) {
 		t.Fatalf("SessionStatus() error = %v", err)
 	}
 	if len(result.Accounts) != 3 ||
-		result.Accounts[0].Account != "pending" ||
+		result.Accounts[0].Account != "acc_00000000000000000000000000000003" ||
 		result.Accounts[0].State != "pending" ||
-		result.Accounts[1].Account != "personal" ||
+		result.Accounts[1].Account != "acc_00000000000000000000000000000002" ||
 		result.Accounts[1].State != "signed_out" ||
-		result.Accounts[2].Account != "work" ||
+		result.Accounts[2].Account != "acc_00000000000000000000000000000001" ||
 		result.Accounts[2].State != "authenticated" ||
 		result.Accounts[2].CapturedAt == nil ||
 		!result.Accounts[2].CapturedAt.Equal(capturedAt) {
@@ -90,7 +90,8 @@ func TestAuthStatusReportsContentFreeDaemonState(t *testing.T) {
 	}
 	if report.ProcessID != 4242 ||
 		len(report.Accounts) != 1 ||
-		report.Accounts[0].Account != "work" ||
+		report.Accounts[0].Account != adapterTestAccountID ||
+		report.Accounts[0].Alias != "work" ||
 		report.Accounts[0].State != "signed_out" ||
 		report.Accounts[0].CapturedAt != "" {
 		t.Fatalf("auth status = %+v", report)
