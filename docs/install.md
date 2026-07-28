@@ -126,7 +126,8 @@ corr doctor --online
 
 The browser owns sign-in, MFA, Conditional Access, and session cookies.
 Corresync never asks for a password or copies an authorization header into its
-configuration.
+configuration. Online doctor reuses that authenticated session and never starts
+login or OAuth itself.
 
 For another provider:
 

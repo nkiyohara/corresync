@@ -219,7 +219,8 @@ Pass criteria:
 
 - status contains only local aliases, lifecycle state, capabilities, and
   degradations;
-- online doctor performs bounded checks and returns content-free stages;
+- online doctor reuses the existing session, shows configured OAuth scopes,
+  performs bounded checks, and never opens another login/consent flow;
 - no secret or provider response body reaches stdout/logs;
 - no mailbox/calendar write occurs;
 - unavailable behavior appears as a degradation, not a silent provider

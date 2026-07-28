@@ -109,9 +109,10 @@ authorized to test. Prefer a dedicated test account and synthetic content.
    state after any unknown outcome.
 9. Stop the owner with `corr daemon stop`.
 
-The online doctor is bounded and content-free in its output. It does not prove
-mutation compatibility. Monitoring, remote egress, permanent deletion, and
-calendar invitations require separate explicit authorization.
+The online doctor is bounded and content-free in its output. It requires the
+session established in step 4 and never initiates authentication or OAuth. It
+does not prove mutation compatibility. Monitoring, remote egress, permanent
+deletion, and calendar invitations require separate explicit authorization.
 
 The managed Google Web adapter also has a separate opt-in, read-only harness.
 It requires a visible browser profile and authenticates only inside that

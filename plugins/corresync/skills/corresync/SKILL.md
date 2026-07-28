@@ -47,8 +47,11 @@ session.
 - Draft creation is save-only. State whether an item was drafted, committed,
   sent, updated, cancelled, moved, acknowledged, or deleted.
 - Account add, rename, and removal use their own preview/commit pairs. Addition
-  never authenticates. Removal may delete an unshared Corresync-owned OAuth
-  grant, so present that disclosed effect before asking for approval.
+  never authenticates; the review requires a later explicit local CLI login.
+  Removal may delete an unshared Corresync-owned OAuth grant, so present that
+  disclosed effect before asking for approval.
+- Check route capabilities before proposing a write. Google Web is read-only;
+  provider-specific degradations can make other operations unavailable.
 - Monitoring setup, runner/egress consent, queue purge, authentication, import
   reads, updates, and feedback actions are CLI-only. Do not simulate them with
   other tools.

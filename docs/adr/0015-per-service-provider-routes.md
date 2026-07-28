@@ -69,16 +69,23 @@ authorization code, access token, or refresh token. Unknown provider fields are
 errors; there is no arbitrary options map.
 
 Discovery produces candidates but never writes configuration. Account addition
-shows the selected mail and calendar routes before saving them. Manual endpoints
-are always available and pass the same strict TLS and syntax validation.
+shows the selected mail and calendar routes before saving them. CLI and MCP
+account lifecycle entry points call the same typed use case; MCP changes use a
+caller-bound preview/commit pair. Addition through either surface does not
+authenticate or resolve a credential, and its review requires a later explicit
+local CLI login. Manual endpoints are always available and pass the same strict
+TLS and syntax validation.
 
 ### Secrets stay behind explicit local handles
 
 Password-bearing standards routes follow ADR 0012: configuration stores only a
 credential backend and key reference. The operating-system credential facility
 or explicitly configured helper returns a secret on demand to the local session
-owner after a prior human consent step. Discovery, MCP, and capability probing
-cannot trigger that access.
+owner after a prior human consent step. Discovery, MCP, account addition, and
+capability probing cannot trigger that access; only explicit local CLI login
+may activate the configured route. Credential-reference keys remain private
+write input, are omitted from route/review output, and remain bound by the
+approval operation digest.
 
 OAuth routes use Authorization Code with PKCE as a local public client and store
 the resulting grant only in the operating-system credential facility. A client

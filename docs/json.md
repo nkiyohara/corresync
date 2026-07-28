@@ -64,8 +64,10 @@ It performs no authentication or configuration write.
 `account list/show/add/rename/remove --json` use account views containing alias,
 stable ID, address when configured, mail/calendar route summaries, default
 status, and operation status. Route documents are secret-free but still
-private: addresses, endpoints, OAuth client IDs, credential reference keys, and
-helper configuration must not be posted publicly.
+private: addresses, endpoints, OAuth client IDs, and helper configuration must
+not be posted publicly. Credential-reference keys are accepted only as private
+account-add input and omitted from every read/review view; an approval digest
+binds the complete write input without echoing the key.
 
 ## Mail
 

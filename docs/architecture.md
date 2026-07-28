@@ -118,8 +118,10 @@ private. Symlinks, regular files, FIFOs, permissive directories, wrong owners,
 socket squatters, and replacement races fail closed. Listener-side checks
 remain in force. The legacy migration client uses the same path.
 
-Windows uses a local byte-mode named pipe that rejects remote clients and has a
-protected DACL for SYSTEM and the current user.
+Windows uses a local byte-mode named pipe that rejects remote clients. Before
+the bearer is sent, the client validates the pipe and credential-file owner,
+protected non-null DACL, server process ID, and server process SID against the
+current user.
 
 The HTTP-shaped daemon protocol additionally validates bearer, caller, method,
 body size, concurrency, protocol version, config digest, result schema, and

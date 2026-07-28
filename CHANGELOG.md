@@ -10,10 +10,10 @@ All notable user-facing changes are recorded here. The project follows
 - Add atomic account discovery/add/rename/remove with stable opaque identities,
   explicit mail/calendar routes, account-local state, and credential-free
   discovery.
-- Add implemented read-only Google Web, Google API, Microsoft Graph, JMAP,
-  IMAP/SMTP, and CalDAV adapters alongside Outlook Web, with typed
-  capabilities, visible degradations, synthetic contracts, explicit selection,
-  and no automatic provider fallback.
+- Add a bounded read-only Google Web adapter plus write-capable Google API,
+  Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters alongside Outlook Web,
+  with typed capabilities, visible degradations, synthetic contracts, explicit
+  selection, and no automatic provider fallback.
 - Make calendar create/update/cancel reviews carry the selected route's typed
   attendee-notification and cancellation-disposition semantics instead of
   inheriting Outlook-specific behavior.
@@ -46,11 +46,20 @@ All notable user-facing changes are recorded here. The project follows
 - Authenticate and pin Unix runtime directories, locks, sockets, identities,
   and peer UIDs before transmitting the rotating daemon bearer; reject
   symlinks, wrong types/owners/modes, squatters, and replacement races.
+- Authenticate the Windows named-pipe owner, server process SID, protected
+  DACL, and credential-file owner before transmitting the daemon bearer.
+- Bind account lifecycle commits to previewed opaque identities even if aliases
+  change, reject alias/ID ambiguity, and require explicit local CLI login after
+  an MCP account addition.
+- Restrict JMAP API/upload/download URLs to the configured session origin,
+  reject injected IMAP reply headers, and bound IMAP literals from the first
+  greeting across implicit TLS and STARTTLS.
 - Keep attacker-controlled notification metadata behind native argument
   boundaries, escape Linux notification markup, reject NUL metadata, time-bound
   notification utilities, persist the full configured hourly rate-limit batch,
-  and reject Windows `notify` setup until Corresync has a registered
-  AppUserModelID.
+  retry unsent notifications without losing cursor state, preserve ACKs that
+  race runner completion, and reject Windows `notify` setup until Corresync has
+  a registered AppUserModelID.
 - Add `corr feedback`, an allowlisted deterministic report with an optional
   bounded generalized last-error record. Generation is local; copy/save/open
   actions occur only after full display, and GitHub is never submitted

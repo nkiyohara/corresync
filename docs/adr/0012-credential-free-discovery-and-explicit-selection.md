@@ -87,10 +87,14 @@ configuration, state, logs, audit records, or MCP output, and is never accepted
 as a command-line flag or as the value of an inherited environment variable.
 
 Neither backend is consulted during discovery, capability probing, or automatic
-selection, and no MCP tool can read a secret or trigger a credential prompt.
-This is the single narrow exception to "no secrets in core": the secret belongs
-to an external facility that the human already trusts, and this project holds a
-reference to it rather than a copy of it.
+selection, and no MCP tool can read a secret, resolve a reference, trigger a
+credential prompt, or authenticate. An MCP account-add preview may persist a
+reviewed private handle reference, but its result explicitly requires a later
+`corr auth login` invocation from the local CLI before the reference can be
+used. The approval digest binds the complete input while read/review views omit
+the private lookup key. This is the single narrow exception to "no secrets in
+core": the secret belongs to an external facility that the human already
+trusts, and this project holds a reference to it rather than a copy of it.
 
 ## Consequences
 

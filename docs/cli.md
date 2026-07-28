@@ -123,8 +123,9 @@ interactive TTY. Google Web uses a visible browser-owned session and provides
 bounded read-only Gmail/Calendar snapshots. `auth status` is content-free.
 
 `doctor` validates local config, browser prerequisites, IPC, daemon state, and
-update policy. `--online` is an explicit live compatibility check; it is never
-run by default tests.
+update policy. `--online` validates only an already authenticated session; it
+never starts login or OAuth. Run `auth login` first. The report includes the
+configured OAuth scope set and is never run by default tests.
 
 ## Mail reads
 

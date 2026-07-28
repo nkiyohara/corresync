@@ -114,6 +114,11 @@ Managed Google accounts can instead select `google-web` for a visible,
 browser-owned, read-only Gmail and Calendar snapshot without creating an OAuth
 client.
 
+Account lifecycle is also available through MCP preview/commit tools, but
+addition never authenticates or resolves a credential. A local
+`corr auth login --account ALIAS` remains required before the route can be
+used.
+
 ### Read across accounts
 
 ```console
@@ -251,8 +256,9 @@ Humans and scripts ──────── corr ───┘              │
 The daemon owns all authenticated provider sessions. On Unix, clients validate
 and pin the owner-only runtime directory, singleton lock, socket type,
 ownership, permissions, peer UID, and socket identity before an IPC bearer can
-be sent. Windows named pipes are restricted to SYSTEM and the current user.
-There is no TCP listener or hosted relay.
+be sent. On Windows, clients verify the protected pipe DACL, owner, and server
+process SID before sending the bearer. There is no TCP listener or hosted
+relay.
 
 ## Project boundaries
 

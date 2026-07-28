@@ -93,8 +93,10 @@ not provide a password prompt, store helper output, or use credentials during
 discovery.
 
 All remote endpoints require encrypted transport. IMAP/SMTP support implicit
-TLS or STARTTLS according to the explicit route. CalDAV and JMAP endpoints must
-be HTTPS. Certificate verification is never disabled.
+TLS or STARTTLS according to the explicit route. IMAP response literals are
+bounded from the first greeting, including after STARTTLS. CalDAV and JMAP
+endpoints must be HTTPS; a JMAP session may advertise API/upload/download URLs
+only on that exact HTTPS origin. Certificate verification is never disabled.
 
 ## Session status and logout
 
@@ -125,8 +127,10 @@ The daemon exposes no TCP port. MCP uses stdio. On Unix:
    socket squatting, and connection-time replacement fail closed.
 
 The legacy migration client uses the same authenticated connection path.
-Windows named pipes reject remote clients and use a protected DACL limited to
-SYSTEM and the current user.
+Windows named pipes reject remote clients. Before any bearer is sent, the
+client verifies the pipe owner, protected non-null DACL, server process ID, and
+server process SID against the current user; the credential file receives the
+same owner/DACL validation.
 
 The local bearer is random, owner-only, rotated with daemon ownership, reloaded
 for each operation, and sent only after transport authentication succeeds.
@@ -136,9 +140,11 @@ and effect-policy checks remain in force.
 ## Online diagnostics
 
 `corr doctor` is local and does not authenticate. `corr doctor --online` is the
-explicit opt-in provider compatibility check. It may authenticate the selected
-account and request only bounded folder, mail, and calendar metadata contracts.
-It must not be part of default tests or CI.
+explicit opt-in provider compatibility check for an already authenticated
+session. Run `corr auth login --account ALIAS` first. Doctor reports the exact
+configured OAuth scopes, never starts OAuth or opens a provider login, and
+requests only bounded folder, mail, and calendar metadata contracts. It must
+not be part of default tests or CI.
 
 For shareable support material, use `corr feedback --last-error`. It records
 only generalized error classes and a redacted command shape; it never copies

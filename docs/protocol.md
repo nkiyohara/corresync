@@ -116,6 +116,11 @@ handle. It validates advertised capabilities, keeps account and mailbox IDs
 opaque, batches only within application limits, and exposes incremental state
 when the server supports it.
 
+The session resource and every advertised API, upload, and download target must
+share one exact HTTPS origin, including the effective port. This deliberately
+rejects cross-origin JMAP deployments so Basic authorization cannot be
+redirected to a server that was not explicitly configured.
+
 JMAP method calls and arbitrary property maps never cross the adapter boundary.
 State mismatch becomes a visible conflict or degradation rather than an
 unreviewed retry.
@@ -134,8 +139,12 @@ TLS downgrade are rejected.
 
 The adapter advertises only behavior supported by server capabilities. MIME is
 parsed and constructed behind bounded typed operations; callers cannot submit
-raw commands or arbitrary headers. SMTP acceptance without a returned message
-identity is represented explicitly.
+raw commands or arbitrary headers. Server literal declarations are bounded
+before parser allocation from the first greeting onward. STARTTLS is negotiated
+with a bounded pre-TLS control exchange, then the complete decrypted IMAP
+stream is checked. Reply message IDs and References are normalized as bounded
+angle-bracket identifiers before header construction. SMTP acceptance without
+a returned message identity is represented explicitly.
 
 ## CalDAV
 

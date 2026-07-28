@@ -147,10 +147,14 @@ its cursor. It ignores Sent and Drafts and suppresses self-message loops.
 
 Account-local state provides deterministic event IDs, deduplication, atomic
 cursor/event updates, acknowledgement, retention, quiet hours, debounce,
-hourly limits, batching, and a circuit breaker. Desktop notification adapters
-are local and time-bound: Linux uses `notify-send`, macOS uses `osascript`, and
-Windows rejects `notify` until Corresync has a registered AppUserModelID. Agent
-mode invokes one absolute executable directly—never through a shell—and sends
+hourly limits, batching, and a circuit breaker. Notify mode rolls back the
+cursor and first-seen markers for every unreleased event, so quiet hours,
+debounce, rate limiting, or adapter failure retries rather than silently losing
+mail. Runner completion preserves an acknowledgement that races with dispatch
+without redelivering the event. Desktop notification adapters are local and
+time-bound: Linux uses `notify-send`, macOS uses `osascript`, and Windows
+rejects `notify` until Corresync has a registered AppUserModelID. Agent mode
+invokes one absolute executable directly—never through a shell—and sends
 bounded JSON on stdin. A runner claiming remote egress requires a separate
 explicit approval.
 

@@ -127,7 +127,11 @@ Account changes use the same typed application lifecycle as the CLI. MCP
 addition, rename, and removal are caller-bound preview/commit pairs; commit
 stops and restarts the session owner around the atomic config change so no
 authenticated route can retain stale configuration. Addition never
-authenticates. Removal previews its Corresync-owned state purge and never
+authenticates or resolves a credential, and its review says
+`explicit_cli_required`; `corr auth login --account ALIAS` remains a separate
+local human action. Private credential-reference keys are omitted from read and
+review views, while the caller-bound operation digest still commits to the
+complete input. Removal previews its Corresync-owned state purge and never
 deletes an external standards credential. Its review discloses deletion of an
 unshared Corresync-owned OAuth grant; shared grants are retained.
 
@@ -189,6 +193,10 @@ Tools route through the account's selected service:
 No tool silently changes providers or initiates administrator consent.
 `account_discover` is read-only and credential-free; its candidates are hints,
 not permission to configure or authenticate.
+
+Capability checks remain provider-specific. In particular, Google Web exposes
+bounded reads only; its mail and calendar writes are unavailable rather than
+silently routed to Google API.
 
 Cross-account tools fan out through isolated services and report partial
 failures without dropping successful results. All write tools still require one

@@ -59,7 +59,9 @@ gateway or tenant administration service.
 - On Unix, reject untrusted runtime directories, symlinks, wrong types or
   owners, permissive modes, inactive locks, socket squatters, peer-UID
   mismatch, and directory/socket replacement races.
-- On Windows, reject remote named-pipe clients and require the protected DACL.
+- On Windows, reject remote named-pipe clients and validate the pipe owner,
+  protected non-null DACL, server process ID/SID, and credential-file owner
+  before sending the bearer.
 - Validate bearer, caller, protocol version, config digest, method, body size,
   result size, concurrency, and shutdown lifetime.
 - Rotate the bearer on every owner start and remove only the current owner's

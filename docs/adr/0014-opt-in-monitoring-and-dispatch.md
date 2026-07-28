@@ -64,11 +64,15 @@ an MCP client, or an automatically started agent can never broaden its own
 watcher scope, filters, accounts, tools, or egress. Those change only through
 human configuration.
 
-The MCP surface is read-only with one local exception. It may expose
+The monitoring MCP surface is read-only with one local exception. It may expose
 `monitor_status` and `events_list`, and an `event_acknowledge` whose only target
 is the local event queue. No MCP tool enables monitoring, changes mode, widens a
-filter, enables automatic agent execution, enables egress, adds an account, or
-approves a commit. Resource change notifications may be published where a client
+filter, enables automatic agent execution, enables egress, or purges monitoring
+state. Separate account lifecycle tools may add, rename, or remove a route
+through the server-enforced caller-bound preview/commit protocol. Account add
+cannot authenticate or resolve a credential and explicitly requires a later
+local CLI login; account removal discloses its local-state and owned-grant
+effects. Resource change notifications may be published where a client
 subscribes, but a resource update is not a model turn, carries no write
 authority, and implies no permission to start a hosted-model request. New
 implementation does not depend on deprecated MCP Sampling.
