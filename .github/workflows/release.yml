@@ -216,7 +216,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           WINGET_PR_AUTHOR: ${{ vars.WINGET_PR_AUTHOR }}
         run: |
-          if ($env:WINGET_PR_AUTHOR -notmatch '^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$') {
+          if ($env:WINGET_PR_AUTHOR -notmatch '\A[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}\z') {
             throw "WINGET_PR_AUTHOR must be a valid GitHub login"
           }
           $version = $env:GITHUB_REF_NAME -replace '^v', ''
