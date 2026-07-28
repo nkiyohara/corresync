@@ -131,9 +131,7 @@ func (command *calendarCreateCommand) Run(app *runtime) (returnErr error) {
 	if err != nil {
 		return err
 	}
-	body, err := readPlainTextBody(
-		app, command.BodyFile, application.MaxCalendarBodyBytes, "calendar event",
-	)
+	body, err := readPlainTextBody(app, command.BodyFile, "calendar event")
 	if err != nil {
 		return err
 	}
@@ -243,9 +241,7 @@ func (command *calendarUpdateCommand) Run(app *runtime) (returnErr error) {
 		input.Subject = stringValuePointer(command.Subject)
 	}
 	if command.BodyFile != "" {
-		body, err := readPlainTextBody(
-			app, command.BodyFile, application.MaxCalendarBodyBytes, "calendar event",
-		)
+		body, err := readPlainTextBody(app, command.BodyFile, "calendar event")
 		if err != nil {
 			return err
 		}

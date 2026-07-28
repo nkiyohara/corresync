@@ -894,19 +894,15 @@ func writeMailAttachmentReview(writer io.Writer, attachmentID string, committing
 }
 
 func readDraftBody(app *runtime, path string) (body string, returnErr error) {
-	return readPlainTextBody(app, path, application.MaxMailDraftBodyBytes, "draft")
+	return readPlainTextBody(app, path, "draft")
 }
 
-// The calendar and draft limits currently match, but remain separate typed
-// contracts and may diverge without changing this reader.
-//
-//nolint:unparam
 func readPlainTextBody(
 	app *runtime,
 	path string,
-	maximumBytes int64,
 	kind string,
 ) (body string, returnErr error) {
+	const maximumBytes = application.MaxMailDraftBodyBytes
 	if path == "" {
 		return "", nil
 	}
