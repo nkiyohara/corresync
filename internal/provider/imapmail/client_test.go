@@ -361,6 +361,35 @@ func TestDialBoundedIMAPCompletesSTARTTLSBeforeLibraryParsing(t *testing.T) {
 	}
 }
 
+func TestIMAPCollectorsDrainHostileExcessResponses(t *testing.T) {
+	t.Parallel()
+	messages, err := collectFetchedMessages(
+		1,
+		func(output chan *imap.Message) error {
+			defer close(output)
+			output <- &imap.Message{Uid: 1}
+			output <- &imap.Message{Uid: 1}
+			return nil
+		},
+	)
+	if err == nil || len(messages) != 0 {
+		t.Fatalf("collectFetchedMessages() = %d, %v; want bounded error", len(messages), err)
+	}
+
+	mailboxes, err := collectMailboxes(
+		func(output chan *imap.MailboxInfo) error {
+			defer close(output)
+			for index := range 1025 {
+				output <- &imap.MailboxInfo{Name: strconv.Itoa(index)}
+			}
+			return nil
+		},
+	)
+	if err == nil || len(mailboxes) != 0 {
+		t.Fatalf("collectMailboxes() = %d, %v; want bounded error", len(mailboxes), err)
+	}
+}
+
 func TestParseMIMEKeepsAttachmentsBoundedAndAddressable(t *testing.T) {
 	t.Parallel()
 	raw := "From: sender@example.invalid\r\n" +
@@ -417,5 +446,35 @@ func TestNormalizeReferencesProducesBoundedHeaderSafeChain(t *testing.T) {
 	}
 	if got != "<first@example.invalid> <second@example.invalid>" {
 		t.Fatalf("normalized references = %q", got)
+	}
+}
+
+func TestInheritedReplyHeadersDropMalformedInputAndAllowForward(t *testing.T) {
+	t.Parallel()
+	inReplyTo, references := inheritedReplyHeaders(
+		application.MailComposeReply,
+		"<current@example.invalid>",
+		"<first@example.invalid>, bare@example.invalid "+
+			"<broken> <second@example.invalid> \u2603",
+	)
+	if inReplyTo != "<current@example.invalid>" ||
+		references != "<first@example.invalid> <second@example.invalid> <current@example.invalid>" {
+		t.Fatalf("inherited headers = %q, %q", inReplyTo, references)
+	}
+	inReplyTo, references = inheritedReplyHeaders(
+		application.MailComposeReplyAll,
+		"",
+		"<first@example.invalid>",
+	)
+	if inReplyTo != "" || references != "" {
+		t.Fatalf("missing Message-ID inherited headers = %q, %q", inReplyTo, references)
+	}
+	inReplyTo, references = inheritedReplyHeaders(
+		application.MailComposeForward,
+		"malformed",
+		"<first@example.invalid>",
+	)
+	if inReplyTo != "" || references != "" {
+		t.Fatalf("forward inherited headers = %q, %q", inReplyTo, references)
 	}
 }

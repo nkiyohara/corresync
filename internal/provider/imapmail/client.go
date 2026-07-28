@@ -411,18 +411,33 @@ func (client *Client) resolveMailbox(
 }
 
 func listMailboxes(connection *imapclient.Client) ([]*imap.MailboxInfo, error) {
+	return collectMailboxes(func(mailboxes chan *imap.MailboxInfo) error {
+		return connection.List("", "*", mailboxes)
+	})
+}
+
+func collectMailboxes(
+	command func(chan *imap.MailboxInfo) error,
+) ([]*imap.MailboxInfo, error) {
 	mailboxes := make(chan *imap.MailboxInfo, 32)
 	done := make(chan error, 1)
-	go func() { done <- connection.List("", "*", mailboxes) }()
+	go func() { done <- command(mailboxes) }()
 	result := make([]*imap.MailboxInfo, 0, 32)
+	var limitErr error
 	for mailbox := range mailboxes {
-		result = append(result, mailbox)
-		if len(result) > 1024 {
-			return nil, errors.New("IMAP mailbox count exceeds the limit")
+		if mailbox == nil {
+			limitErr = errors.New("IMAP returned an empty mailbox entry")
+			continue
 		}
+		if len(result) >= 1024 {
+			limitErr = errors.New("IMAP mailbox count exceeds the limit")
+			continue
+		}
+		result = append(result, mailbox)
 	}
-	if err := <-done; err != nil {
-		return nil, err
+	commandErr := <-done
+	if limitErr != nil || commandErr != nil {
+		return nil, errors.Join(limitErr, commandErr)
 	}
 	return result, nil
 }

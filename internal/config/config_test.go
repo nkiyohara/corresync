@@ -451,6 +451,11 @@ func TestMixedStandardsRoutesAreStrictAndSecretFree(t *testing.T) {
 	if err := configuration.Validate(); err != nil {
 		t.Fatalf("mixed standards routes are invalid: %v", err)
 	}
+	relativeHelper := configuration
+	relativeHelper.Credentials.Helper = []string{"example-helper", "get"}
+	if err := relativeHelper.Validate(); err == nil {
+		t.Fatal("relative credential helper executable was accepted")
+	}
 	encoded, err := toml.Marshal(configuration)
 	if err != nil {
 		t.Fatal(err)

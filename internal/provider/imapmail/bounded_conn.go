@@ -18,6 +18,7 @@ import (
 
 const (
 	maximumIMAPControlLineBytes = 64 << 10
+	maximumIMAPOperationBytes   = 32 << 20
 	maximumIMAPUpgradeLines     = 100
 	imapStartTLSTag             = "C0"
 )
@@ -162,6 +163,8 @@ type boundedIMAPConn struct {
 	literalRemaining uint64
 	terminalErr      error
 	errorReturned    bool
+	maximumTotal     uint64
+	literalTotal     uint64
 }
 
 func newBoundedIMAPConn(
@@ -175,6 +178,7 @@ func newBoundedIMAPConn(
 	return &boundedIMAPConn{
 		Conn:           connection,
 		maximumLiteral: uint64(maximumLiteral),
+		maximumTotal:   maximumIMAPOperationBytes,
 		pending:        append([]byte(nil), prefix...),
 		controlLine:    make([]byte, 0, 4096),
 	}, nil
@@ -245,9 +249,22 @@ func (connection *boundedIMAPConn) inspect(input []byte) error {
 				connection.maximumLiteral,
 			)
 		}
+		if len(connection.controlLine) < 2 ||
+			connection.controlLine[len(connection.controlLine)-2] != '\r' {
+			return errors.New("IMAP response control line does not use CRLF")
+		}
+		if literal &&
+			(size > connection.maximumTotal ||
+				connection.literalTotal > connection.maximumTotal-size) {
+			return fmt.Errorf(
+				"IMAP response literals exceed the %d-byte operation limit",
+				connection.maximumTotal,
+			)
+		}
 		connection.pending = append(connection.pending, character)
 		connection.controlLine = connection.controlLine[:0]
 		if literal {
+			connection.literalTotal += size
 			connection.literalRemaining = size
 		}
 	}
@@ -255,10 +272,13 @@ func (connection *boundedIMAPConn) inspect(input []byte) error {
 }
 
 func imapLiteralSize(line []byte) (uint64, bool, error) {
-	if !bytes.HasSuffix(line, []byte("\r\n")) {
+	if len(line) == 0 || line[len(line)-1] != '\n' {
 		return 0, false, nil
 	}
-	end := len(line) - len("\r\n")
+	end := len(line) - 1
+	if end > 0 && line[end-1] == '\r' {
+		end--
+	}
 	if end == 0 || line[end-1] != '}' {
 		return 0, false, nil
 	}

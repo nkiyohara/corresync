@@ -351,13 +351,37 @@ func fetchUIDs(
 	for _, uid := range uids {
 		set.AddNum(uid)
 	}
-	messages := make(chan *imap.Message, len(uids))
-	if err := connection.UidFetch(set, items, messages); err != nil {
-		return nil, err
-	}
-	result := make([]*imap.Message, 0, len(uids))
+	return collectFetchedMessages(len(uids), func(messages chan *imap.Message) error {
+		return connection.UidFetch(set, items, messages)
+	})
+}
+
+func collectFetchedMessages(
+	maximum int,
+	command func(chan *imap.Message) error,
+) ([]*imap.Message, error) {
+	messages := make(chan *imap.Message)
+	done := make(chan error, 1)
+	go func() { done <- command(messages) }()
+	result := make([]*imap.Message, 0, maximum)
+	var limitErr error
 	for message := range messages {
+		if message == nil {
+			limitErr = errors.New("IMAP returned an empty FETCH response")
+			continue
+		}
+		if len(result) >= maximum {
+			limitErr = fmt.Errorf(
+				"IMAP returned more than %d requested messages",
+				maximum,
+			)
+			continue
+		}
 		result = append(result, message)
+	}
+	commandErr := <-done
+	if limitErr != nil || commandErr != nil {
+		return nil, errors.Join(limitErr, commandErr)
 	}
 	return result, nil
 }

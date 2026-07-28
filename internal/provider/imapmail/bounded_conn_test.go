@@ -29,6 +29,53 @@ func TestBoundedIMAPConnRejectsOversizedLiteralBeforePayload(t *testing.T) {
 	}
 }
 
+func TestBoundedIMAPConnRejectsBareLFLiteralDeclaration(t *testing.T) {
+	t.Parallel()
+	server, client := net.Pipe()
+	t.Cleanup(func() {
+		_ = server.Close()
+		_ = client.Close()
+	})
+	bounded, err := newBoundedIMAPConn(client, 8, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		_, _ = io.WriteString(server, "* 1 FETCH (BODY[] {500000000}\n")
+	}()
+	_, err = io.ReadAll(bounded)
+	if err == nil ||
+		(!strings.Contains(err.Error(), "exceeding") &&
+			!strings.Contains(err.Error(), "CRLF")) {
+		t.Fatalf("ReadAll() error = %v, want fail-closed literal parsing", err)
+	}
+}
+
+func TestBoundedIMAPConnRejectsAggregateLiteralBudget(t *testing.T) {
+	t.Parallel()
+	server, client := net.Pipe()
+	t.Cleanup(func() {
+		_ = server.Close()
+		_ = client.Close()
+	})
+	bounded, err := newBoundedIMAPConn(client, 8, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bounded.maximumTotal = 10
+	go func() {
+		_, _ = io.WriteString(
+			server,
+			"* 1 FETCH (BODY[] {6}\r\nfirst!)\r\n"+
+				"* 2 FETCH (BODY[] {6}\r\nsecond)\r\n",
+		)
+	}()
+	_, err = io.ReadAll(bounded)
+	if err == nil || !strings.Contains(err.Error(), "operation limit") {
+		t.Fatalf("ReadAll() error = %v, want aggregate limit", err)
+	}
+}
+
 func TestBoundedIMAPConnDoesNotParseMarkersInsideLiteralData(t *testing.T) {
 	t.Parallel()
 	server, client := net.Pipe()
@@ -65,6 +112,7 @@ func TestIMAPLiteralSizeHandlesSplitIndependentSyntax(t *testing.T) {
 	}{
 		{line: "* OK ready\r\n"},
 		{line: "* 1 FETCH {42}\r\n", size: 42, literal: true},
+		{line: "* 1 FETCH {42}\n", size: 42, literal: true},
 		{line: "* 1 FETCH ~{42+}\r\n", size: 42, literal: true},
 		{line: "* 1 FETCH {nope}\r\n", wantErr: true},
 	} {

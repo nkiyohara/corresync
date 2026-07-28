@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -421,6 +422,9 @@ func (reference CredentialRef) validate(oauth bool) error {
 func (credentials Credentials) validate() error {
 	if len(credentials.Helper) > 16 {
 		return errors.New("credential helper has too many arguments")
+	}
+	if len(credentials.Helper) > 0 && !filepath.IsAbs(credentials.Helper[0]) {
+		return errors.New("credential helper executable must use an absolute path")
 	}
 	for _, argument := range credentials.Helper {
 		if err := validateBoundedText("credential helper argument", argument, 4096, false); err != nil {

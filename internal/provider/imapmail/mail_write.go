@@ -344,19 +344,11 @@ func (client *Client) compose(
 	if envelope == nil {
 		return mailComposition{}, errors.New("IMAP reference envelope is missing")
 	}
-	messageID, err := normalizeMessageID(envelope.MessageId)
-	if err != nil {
-		return mailComposition{}, fmt.Errorf("IMAP reference message ID is malformed: %w", err)
-	}
-	references, err := normalizeReferences(
+	result.InReplyTo, result.References = inheritedReplyHeaders(
+		input.EffectiveComposeMode(),
+		envelope.MessageId,
 		parsed.Header.Get("References"),
-		messageID,
 	)
-	if err != nil {
-		return mailComposition{}, fmt.Errorf("IMAP reference chain is malformed: %w", err)
-	}
-	result.InReplyTo = messageID
-	result.References = references
 	switch input.EffectiveComposeMode() {
 	case application.MailComposeNew:
 		return result, nil
@@ -575,4 +567,61 @@ func normalizeReferences(existing, current string) (string, error) {
 		normalized = append(normalized, messageID)
 	}
 	return strings.Join(normalized, " "), nil
+}
+
+func inheritedReplyHeaders(
+	mode application.MailComposeMode,
+	messageID string,
+	existing string,
+) (string, string) {
+	if mode == application.MailComposeForward {
+		return "", ""
+	}
+	current, err := normalizeMessageID(messageID)
+	if err != nil {
+		return "", ""
+	}
+	return current, inheritValidReferences(existing, current)
+}
+
+func inheritValidReferences(existing, current string) string {
+	seen := make(map[string]struct{}, maximumReferenceIDs)
+	references := make([]string, 0, maximumReferenceIDs)
+	total := 0
+	reserved := len(current)
+	if current != "" {
+		reserved++
+	}
+	for offset := 0; offset < len(existing) &&
+		len(references) < maximumReferenceIDs-1; {
+		openOffset := strings.IndexByte(existing[offset:], '<')
+		if openOffset < 0 {
+			break
+		}
+		open := offset + openOffset
+		closeOffset := strings.IndexByte(existing[open+1:], '>')
+		if closeOffset < 0 {
+			break
+		}
+		close := open + 1 + closeOffset
+		candidate := existing[open : close+1]
+		offset = close + 1
+		normalized, err := normalizeMessageID(candidate)
+		if err != nil {
+			continue
+		}
+		if _, duplicate := seen[normalized]; duplicate ||
+			total+len(normalized)+1+reserved > maximumReferencesBytes {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		references = append(references, normalized)
+		total += len(normalized) + 1
+	}
+	if current != "" {
+		if _, duplicate := seen[current]; !duplicate {
+			references = append(references, current)
+		}
+	}
+	return strings.Join(references, " ")
 }
