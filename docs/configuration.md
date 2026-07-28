@@ -1,32 +1,62 @@
 # Configuration
 
-Corresync uses strict TOML in the platform user configuration directory:
+Corresync uses strict, secret-free TOML:
 
 - Linux: `$XDG_CONFIG_HOME/corresync/config.toml`, normally
   `~/.config/corresync/config.toml`;
 - macOS: `~/Library/Application Support/corresync/config.toml`;
 - Windows: `%AppData%\corresync\config.toml`.
 
-The application creates the project directory with owner-only permissions and
-atomically replaces the file with mode `0600` where the operating system
-supports Unix permissions.
+Use `CORRESYNC_CONFIG` or global `--config` for an explicit file. The directory
+is protected and the file is atomically written with owner-only permissions
+where supported.
+
+## Prefer lifecycle commands
+
+```console
+corr config init
+corr config validate
+corr config show
+corr account discover reader@example.invalid
+corr account add --help
+corr account list
+corr account show work
+corr account rename work primary
+corr account remove old --approve
+```
+
+Discovery is read-only and credential-free. Adding a route never
+authenticates. The account receives a generated opaque ID, monitoring remains
+off, and login occurs only through `corr auth login --account ALIAS`.
+
+Rename preserves the stable ID and every account-local state tree. Remove
+requires approval and deletes only Corresync-owned profile, import, cursor, and
+queue state. Removing the default account requires `--new-default`.
+
+## Schema v3
+
+Schema v3 separates mail and calendar routes. A minimal Outlook Web
+configuration looks like:
 
 ```toml
-version = 2
+version = 3
 default_account = "work"
 
 [accounts.work]
 id = "acc_0123456789abcdef0123456789abcdef"
+address = "reader@example.invalid"
+
+[accounts.work.mail]
 provider = "microsoft-owa"
+
+[accounts.work.mail.outlook_web]
 origin = "https://outlook.cloud.microsoft"
 
-# Optional second alias for a mailbox the same signed-in user can already
-# access in Outlook Web. This is not a credential or permission grant.
-[accounts.shared]
-id = "acc_fedcba9876543210fedcba9876543210"
+[accounts.work.calendar]
 provider = "microsoft-owa"
+
+[accounts.work.calendar.outlook_web]
 origin = "https://outlook.cloud.microsoft"
-mailbox = "shared@example.com"
 
 [policy]
 mode = "guarded"
@@ -42,60 +72,158 @@ login_timeout = "5m0s"
 disable_automatic_checks = false
 ```
 
-Unknown fields, non-HTTPS origins, URL credentials, unsupported policy modes,
-and out-of-range limits are errors. There is deliberately no unguarded-write
-mode.
+Unknown fields, mismatched tagged-union payloads, unsupported providers,
+credential-bearing URLs, non-TLS remote endpoints, duplicate account IDs,
+invalid aliases, and out-of-range policy values are rejected.
 
-Use `corresync config show` for a concise validated summary or `--json` for the
-full secret-free model. The following keys are available to `config get` and
-`config set`:
+Do not copy example IDs into multiple accounts. Let `corr account add` generate
+them.
 
-- `default_account`;
-- `accounts.<alias>.id`, `accounts.<alias>.provider`,
-  `accounts.<alias>.address`, `accounts.<alias>.origin`, and
-  `accounts.<alias>.mailbox`;
-- `policy.mode`, `policy.preview_sensitive_reads`,
-  `policy.preview_reversible_writes`, `policy.max_recipients`, and
-  `policy.max_attendees`;
-- `browser.executable` and `browser.login_timeout`;
-- `updates.disable_automatic_checks`.
+## Per-service routes
 
-`version` and opaque account `id` values can be read but not changed through
-`config set`. IDs are generated once and remain stable when a human-facing
-alias or address changes. Values are parsed as their declared
-boolean, integer, duration, or string type and the complete configuration is
-validated before an atomic save. `config set` writes normalized TOML; use
-`config edit` when comments or manual ordering should be retained.
+Each account may have mail, calendar, or both. Supported route payloads are:
 
-`origin` is an exact authorization boundary, not a discovery hint or wildcard.
-If a normal browser ends on a different Outlook host after sign-in, configure
-that final HTTPS origin with no path. Do not add the identity-provider origin,
-tenant vanity aliases that merely redirect elsewhere, or multiple origins in an
-attempt to make capture succeed. Sovereign, hybrid, and on-premises deployments
-must use the actual OWA service origin observed by an authorized user.
+<!-- markdownlint-disable MD013 -->
+| Service | Provider | Nested table |
+| --- | --- | --- |
+| mail | `microsoft-owa` | `mail.outlook_web` |
+| mail | `google-api` | `mail.google_api` |
+| mail | `microsoft-graph` | `mail.microsoft_graph` |
+| mail | `jmap` | `mail.jmap` |
+| mail | `imap-smtp` | `mail.imap_smtp` |
+| calendar | `microsoft-owa` | `calendar.outlook_web` |
+| calendar | `google-api` | `calendar.google_api` |
+| calendar | `microsoft-graph` | `calendar.microsoft_graph` |
+| calendar | `caldav` | `calendar.caldav` |
+<!-- markdownlint-enable MD013 -->
 
-The currently shipped provider is `microsoft-owa`; other provider IDs are
-reserved until their adapters and capability contracts ship. The configuration
-schema cannot represent a password, OAuth token, cookie,
-canary, or refresh token. Browser session material belongs to the dedicated
-browser profile and the in-memory session owner, never this file.
+The payload must match the provider exactly. Google or Graph mail and calendar
+routes may share one identical OAuth route. An IMAP/SMTP mail route can be
+paired with a CalDAV calendar route.
 
-`disable_automatic_checks = true` disables opportunistic stable-release checks
-without disabling explicit `corresync update` or `corresync update check`
-commands. Set `CORRESYNC_NO_UPDATE_CHECK=1` for a process-level override.
-Checks read only the public latest-release metadata, are cached for 24 hours,
-and never run through MCP, completion, or JSON notification output.
+Use `corr account add` for these combinations; it validates endpoint
+discovery, explicit provider selection, required consent bits, and route
+pairing before saving.
 
-An optional account `mailbox` must be one bare SMTP address. It enables
-explicit shared/delegated mailbox routing with OWA's anchor and explicit-logon
-headers while retaining the configured origin and interactive browser session.
-It does not grant access, add a delegate, or change folder permissions; Outlook
-must already authorize the signed-in user. Keep separate aliases for the user's
-own mailbox and each explicitly routed mailbox, and select one with `--account`.
+## External credentials
 
-The daemon publishes a SHA-256 digest of the exact secret-free config it loaded.
-CLI and MCP compare it before every new connection. If only the executable or
-private protocol version changed, the next command drains the authenticated old
-owner and starts the current binary automatically. If the config digest
-changed, the client fails closed instead; run `corresync daemon stop` and retry
-to apply the edit and start a fresh owner with the new policy.
+`config.toml` can hold only a credential reference:
+
+```toml
+[accounts.work.mail.imap_smtp.credential]
+backend = "os-keyring"
+key = "work-mail"
+consent = true
+```
+
+The OS-keyring service name is `corresync`. Store the actual password or token
+with your platform's keyring facility under the selected key. Corresync reads
+it only while constructing the explicitly authenticated adapter, bounds it to
+64 KiB, keeps it in memory, and overwrites its owned byte buffer on close.
+
+An advanced installation can name one helper:
+
+```toml
+[credentials]
+helper = ["/absolute/path/to/credential-helper", "get"]
+
+[accounts.work.calendar.caldav.credential]
+backend = "helper"
+key = "work-calendar"
+consent = true
+```
+
+The executable is invoked directly without a shell. It receives one bounded
+JSON line on stdin:
+
+```json
+{"version":1,"operation":"get","key":"work-calendar"}
+```
+
+It must return only the secret and an optional final newline on stdout.
+Stderr is discarded, output is bounded, and the child environment is reduced
+to a small platform allowlist. Helper arguments and reference keys are private
+configuration—not suitable for support reports.
+
+Corresync never stores a password, cookie, OAuth access/refresh token,
+authorization header, or browser canary in TOML.
+
+## OAuth routes
+
+Google API and Microsoft Graph are explicit BYO public-client integrations:
+
+```console
+corr account add reader@example.invalid \
+  --alias personal \
+  --provider google-api \
+  --calendar-provider google-api \
+  --oauth-client-id synthetic-public-client \
+  --oauth-redirect-uri http://127.0.0.1:8765/callback \
+  --authorization-key personal-google \
+  --approve-oauth
+```
+
+The redirect must be a registered loopback `http://127.0.0.1` URI. The provider
+authorization flow opens a browser and validates state. Grants belong to the OS
+keyring. There is no client-secret field and no automatic Graph or Google
+selection. Use only a client registration you are authorized to operate.
+
+## Outlook Web routing
+
+`origin` is an exact authorization boundary, not a wildcard. Configure the
+final HTTPS Outlook host used after normal sign-in, with no path. Do not use an
+identity-provider URL or a vanity redirect.
+
+An optional bare `mailbox` address routes a shared/delegated mailbox that the
+same signed-in user is already allowed to access. It grants no permission and
+does not manage delegates or folders.
+
+## Monitoring
+
+No monitor table means `off`. Enable one account through the CLI so consent
+advances only one step and all bounds are validated:
+
+```console
+corr monitor enable --mode notify \
+  --notification-field sender \
+  --approve
+```
+
+Modes are `off`, `notify`, `queue`, and `agent`. Configuration may include
+metadata filters, poll interval, debounce, retention, hourly release limit,
+quiet hours, notification fields, or an absolute runner executable. Agent
+mode's remote egress declaration requires `approve_remote = true`, which the
+CLI writes only after `--approve-remote-egress`.
+
+Old configs, imports, and account additions always default to off.
+
+## Policy and updates
+
+There is no unguarded-write mode. The `guarded` policy controls optional
+previews for sensitive reads and reversible writes; destructive writes and
+external sends retain mandatory review.
+
+`updates.disable_automatic_checks = true` disables opportunistic public release
+checks without disabling `corr update` or `corr update check`.
+`CORRESYNC_NO_UPDATE_CHECK=1` provides a process override.
+
+## Config lifecycle
+
+`corr config edit` uses `VISUAL`, `EDITOR`, or the platform default, then saves
+only if strict validation succeeds. `config set` supports the documented
+simple scalar keys and writes normalized TOML; use account lifecycle commands
+for tagged provider routes.
+
+The daemon publishes a digest of the exact config it loaded. CLI and MCP verify
+it before use. A binary/protocol change can replace an authenticated old
+daemon; a config digest change fails closed. Run:
+
+```console
+corr daemon stop
+```
+
+then retry so the new owner starts with the new policy.
+
+Schema v1 and v2 files are read into schema v3 in memory during migration.
+Automatic migration preserves the original rollback copy and never migrates
+IPC credentials.

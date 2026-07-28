@@ -3,6 +3,57 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Accounts and providers
+
+- Add atomic account discovery/add/rename/remove with stable opaque identities,
+  explicit mail/calendar routes, account-local state, and credential-free
+  discovery.
+- Add implemented Google API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV
+  adapters alongside Outlook Web, with typed capabilities, visible
+  degradations, synthetic contracts, explicit selection, and no automatic
+  provider fallback.
+- Make calendar create/update/cancel reviews carry the selected route's typed
+  attendee-notification and cancellation-disposition semantics instead of
+  inheriting Outlook-specific behavior.
+- Fail closed on Graph permanent mail deletion because its permanent-delete
+  action exposes no atomic ETag precondition; expose the limitation as a typed
+  account degradation.
+- Add interactive public-client OAuth with PKCE and OS-keyring grants for
+  Google/Graph, plus approved external credential handles for standards
+  providers. No password, token, helper output, or client secret enters config.
+
+### Read, import, and monitoring workflows
+
+- Add isolated cross-account mail search and agenda projections with stable
+  ordering, provenance, global bounds, and explicit partial failures.
+- Add read-only, identity-bound local import scanning/staging for recognized
+  exports, archives, Maildir, and Thunderbird profiles, plus safe account-local
+  purge.
+- Add opt-in monitoring modes (`off -> notify -> queue -> agent`) with durable
+  recovery/deduplication, quiet hours, bounds, loop prevention, rate limits,
+  circuit breaking, direct no-shell runners, and separate remote-egress
+  approval.
+- Add read-only MCP monitor/event resources and tools; monitoring setup, runner
+  consent, egress approval, and queue purge remain CLI-only.
+
+### Safety and experience
+
+- Make `corr` the primary command while keeping an identical `corresync`
+  compatibility entry for the finite v0.8–v0.9 transition. Completion detection
+  installs one idempotent `corr` file and never appends shell startup lines.
+- Authenticate and pin Unix runtime directories, locks, sockets, identities,
+  and peer UIDs before transmitting the rotating daemon bearer; reject
+  symlinks, wrong types/owners/modes, squatters, and replacement races.
+- Add `corr feedback`, an allowlisted deterministic report with an optional
+  bounded generalized last-error record. Generation is local; copy/save/open
+  actions occur only after full display, and GitHub is never submitted
+  automatically.
+- Refresh CLI/MCP help, README, Pages, plugin/Skill, feature/evidence tables,
+  architecture, security guidance, runbooks, and icon for the implemented
+  multi-provider surface.
+
 ## 0.7.0 - 2026-07-28
 
 ### Corresync

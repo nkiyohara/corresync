@@ -1,310 +1,237 @@
 # Architecture
 
-Corresync is a local-first mail and calendar bridge. Its provider-neutral
-product scope is accepted in
-[ADR 0008](adr/0008-provider-neutral-product-scope.md), and the coordinated
-rename from `owa-bridge` is defined in
-[ADR 0011](adr/0011-coordinated-corresync-rename.md).
-
-## Reading this document
-
-Sections marked **Shipped** describe the current release. Sections marked
-**Accepted direction** describe decisions that an accepted ADR records and that
-no release provides yet.
-
-Exactly one provider adapter ships today: Outlook Web. Nothing in the accepted
-direction is available in a release. A capability reaches
-[features](features.md) or [compatibility evidence](compatibility.md) only with
-synthetic fixture contract tests and a documented opt-in live observation, so
-those two pages remain the authority on what works.
-
-Command examples below use the `corresync` name the current release installs.
-[ADR 0011](adr/0011-coordinated-corresync-rename.md) defines the rename and the
-finite compatibility inputs used only while migrating local state and direct
-installations.
-
-## Goals
-
-Corresync gives a signed-in human a coherent mail and calendar surface for
-accounts they already control:
-
-- a discoverable CLI for people and shell scripts;
-- an MCP server for Claude Code, Codex, and other compatible clients;
-- mail and calendar operations with identical behavior on both surfaces;
-- explicit, deterministic safety controls around side effects;
-- one safety model shared by every provider adapter;
-- authentication that preserves the organization's normal sign-in controls, and
-  that is browser-owned wherever a web adapter is used.
-
-The current release meets these goals for one provider. Extending them across
-providers is the subject of ADRs 0008 to 0014.
-
-## Scope boundaries
-
-Corresync does not provide a hosted relay, a multi-user server, a Microsoft
-Graph compatibility layer, a Teams collaboration surface, or any mechanism for
-bypassing access policy. Tenant-wide and administrative access, unattended
-credential login, and TLS interception are permanently out of scope, not
-deferred.
-
-Microsoft Graph is never an implicit dependency, an automatic fallback, or a
-capability probe. Optional Graph support is accepted only for an explicit user
-selection or an authorization the user already granted; see
-[ADR 0012](adr/0012-credential-free-discovery-and-explicit-selection.md). No
-release implements it.
-
-A Teams join link provisioned as part of one calendar event is calendar scope;
-see [ADR 0005](adr/0005-calendar-hosted-teams-links.md). The provider-neutral
-scope does not widen that boundary: Teams chat, channels, calls, recordings, and
-meeting lifecycle management stay out of scope.
-
-## System context (shipped)
+Corresync is a local-first multi-account mail/calendar application with two
+public transports and one authenticated local session owner.
 
 ```text
-┌──────────────────── local machine ─────────────────────┐
-│                                                        │
-│  CLI ──┐                                               │
-│        ├── application ── policy ── audit              │
-│  MCP ──┘        │            │                         │
-│                 │            └── approval tokens       │
-│                 │                                      │
-│                 └── provider port                      │
-│                         │                              │
-│  dedicated browser ── session owner                    │
-│                         │                              │
-│              Outlook Web adapter                       │
-│                                                        │
-└─────────────────────────┼──────────────────────────────┘
-                          │ TLS
-                 Outlook Web service
+┌──────────────┐       ┌──────────────┐
+│ corr CLI     │       │ MCP stdio    │
+└──────┬───────┘       └──────┬───────┘
+       └──────────┬────────────┘
+                  ▼
+       typed application use cases
+       policy · approval · provenance
+                  │
+          authenticated local IPC
+                  ▼
+       config-scoped session owner
+       ├── Outlook Web browser adapter
+       ├── Google API OAuth adapter
+       ├── Microsoft Graph OAuth adapter
+       ├── JMAP adapter
+       ├── IMAP/SMTP adapter
+       └── CalDAV adapter
 ```
 
-## Dependency rule
+There is no remote MCP transport, TCP daemon listener, hosted relay, or
+tenant-wide component.
+
+## Dependency direction
 
 Dependencies point inward:
 
 ```text
-adapters (CLI, MCP)               -> application -> domain
-provider transports (Outlook Web) -> application ports
-platform (browser, IPC, keyring)  -> application ports
+domain
+  ▲
+application ports and typed use cases
+  ▲
+provider adapters · persistence · browser · IPC
+  ▲
+CLI · MCP · daemon transports
 ```
 
-The domain package cannot import browser, protocol, CLI, MCP, persistence, or
-operating-system packages. A command is represented once as typed input and
-output. Adapters translate but do not contain business behavior, and a provider
-adapter holds no policy or approval logic. See
-[ADR 0009](adr/0009-provider-capability-degradation-contracts.md).
+The domain does not import provider, browser, CLI, MCP, persistence, or IPC
+packages. Provider adapters translate a protocol into application ports; they
+do not own effect policy. CLI and MCP call the same use cases and result types.
 
-## Runtime topology (shipped)
+## Account identity and routes
 
-The long-lived local daemon owns the browser and authenticated session. CLI and
-MCP processes communicate with it over operating-system IPC. This gives the
-project one session owner, prevents competing browser profiles, and keeps
-session material out of agent processes.
+An account has:
 
-Each absolute config path and state directory derives a separate, opaque daemon
-namespace. Linux and macOS use a Unix socket protected by a non-blocking
-singleton lock, owner-only mode, and same-effective-user peer credentials.
-Windows uses a byte-mode named pipe restricted by ACL to the current user and
-SYSTEM, with remote clients rejected. Both transports also require a rotating
-256-bit credential from an owner-only state file.
+- an editable human alias;
+- an optional address;
+- one stable opaque account ID;
+- an optional mail route;
+- an optional calendar route;
+- account-local monitoring consent.
 
-The wire format is strict, versioned JSON over HTTP semantics on that local
-stream. It has a closed method registry, bounded request/response bodies,
-bounded concurrency, no redirects, and no automatic retry of application
-operations. Clients also reject a stale config digest or different executable
-version before invoking mailbox operations. When an installed binary changes but
-the exact config digest does not, the next client may inspect and gracefully
-stop the authenticated old owner through stable lifecycle controls before
-starting the current binary. The stop is bound to the inspected credential
-generation, and the old browser closes before its singleton lock is released.
-Mail, calendar, login, preview, and commit calls never use that compatibility
-path. It never binds TCP. See
-[ADR 0003](adr/0003-authenticated-local-session-owner.md).
+The stable ID keys browser profiles, OAuth/keyring ownership, import staging,
+provider cursors, monitor queue/dedup state, provenance, and policy. Rename does
+not move or merge that state.
 
-The default MCP transport is stdio. Optional Streamable HTTP support may be
-added for advanced local deployments, but must bind to loopback, validate the
-`Origin` header, and require authentication.
+Mail and calendar routes are independent tagged unions. The config validator
+requires exactly one matching payload for each selected provider. There is no
+ambient provider detection at operation time and no automatic Graph fallback.
 
-## Release update boundary (shipped)
+## Discovery and account lifecycle
 
-Interactive CLI startup may read cached public stable-release metadata and
-display a TTY-only notice. It never updates in the background. The explicit
-`corresync update` command follows the detected installation owner: package-managed
-installs receive their exact external upgrade command, while a direct install
-uses the signed, rollback-capable flow in
-[ADR 0007](adr/0007-explicit-verified-self-update.md). MCP, daemon, completion,
-machine-readable output, and mailbox use cases do not enter this local
-release-management path.
+Discovery is a bounded unauthenticated application port. It may inspect DNS and
+well-known HTTPS metadata and returns ranked explainable candidates. It cannot
+read credentials, launch authentication, request admin consent, or modify
+config.
 
-Provenance verification already accepts exactly two enumerated release-workflow
-identities, `nkiyohara/owa-bridge` and `nkiyohara/corresync`, each bound to the
-requested tag. That finite allowlist exists so an installed binary can verify
-and apply the first renamed release. It is not a repository-name pattern, and it
-is removed when the compatibility window in
-[ADR 0011](adr/0011-coordinated-corresync-rename.md) closes.
+Account add requires explicit selection when evidence is ambiguous. Add,
+rename, and remove use typed application commands over an atomic config store.
+Remove also coordinates deletion of only Corresync-owned account state.
 
-## Session lifecycle (shipped)
+MCP can discover/list/show accounts but cannot add, rename, remove, or
+authenticate them.
 
-1. `corresync auth login` launches a dedicated browser profile visibly by default;
-   `--terminal` explicitly selects a bounded text relay for an SSH TTY.
-2. The user completes the normal interactive sign-in flow in the browser or by
-   relaying controls and individual keys to its headless page.
-3. The session owner observes only the minimum first-party request metadata
-   needed to execute Outlook Web operations.
-4. Short-lived authorization material remains in memory whenever possible.
-5. The browser profile is stored using Chromium's platform protections. The
-   project never stores a username, password, or refresh token in its config.
-   The terminal relay never receives a complete form value.
-6. Expiry causes an explicit transition back to `needs_login`; it never falls
-   back to credential automation.
-7. `corresync auth status` exposes only account aliases and content-free lifecycle
-   state. `corresync auth logout` shuts down the config-scoped owner, closes all
-   browsers, and discards in-memory sessions and approvals.
+## Authentication ownership
 
-This is the browser-owned form of authentication required wherever a web adapter
-is used; see [ADR 0002](adr/0002-interactive-browser-session.md) and
-[ADR 0006](adr/0006-text-terminal-browser-login.md).
+The session owner creates all authenticated provider clients:
 
-## Outlook Web transport (shipped)
+- Outlook Web: dedicated browser profile and in-memory captured session;
+- Google/Graph: interactive OAuth browser plus grant in OS keyring;
+- JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference.
 
-OWA is an undocumented, changeable protocol. It is therefore implemented as a
-replaceable adapter with:
+No application transport accepts a password. OAuth client secrets, unattended
+grants, TLS interception, and raw authorization injection are unrepresentable.
+The daemon closes secret-owning clients on logout and clears owned mutable
+secret bytes.
 
-- capability discovery instead of version assumptions;
-- typed operations rather than a public arbitrary-action escape hatch;
-- captured, redacted fixtures for deterministic contract tests;
-- bounded retries that distinguish idempotent reads from writes;
-- request identifiers and postcondition checks for ambiguous write outcomes;
-- protocol diagnostics that never log credentials or message bodies by
-  default.
+## Local IPC
 
-The preferred operation family is OWA's current `service.svc` surface. Any use
-of a legacy Outlook REST endpoint must be isolated behind a separate capability
-and must not be required for core behavior.
+The endpoint namespace is derived from config path and state directory so
+unrelated configs cannot collide. A rotating owner-only bearer authenticates
+application requests, but the transport itself is authenticated before that
+bearer can be transmitted.
 
-## Provider adapters (accepted direction)
+On Unix, the client:
 
-Providers become adapters behind application ports sharing one typed core.
-Candidate adapters are the standards family (JMAP, IMAP, SMTP Submission,
-CalDAV, and POP3 as a constrained import mode), Google API and Google
-web-session adapters, and optional explicitly selected Microsoft Graph. Outlook
-Web remains the default Microsoft route, because tenants that block third-party
-applications leave it as the only route their users are permitted to take.
+1. opens the private runtime directory with `O_NOFOLLOW`;
+2. validates directory type, owner, and mode;
+3. opens and validates the singleton lock relative to the pinned directory;
+4. proves an active owner holds the lock;
+5. validates and pins the owner-only Unix socket;
+6. connects and verifies peer UID;
+7. rechecks directory/socket identities and singleton ownership.
 
-Capability is a per-account observation made after sign-in, never an inference
-from a provider name or an email domain. An asserted capability is evidence; an
-unasserted one is the absence of evidence rather than proof of refusal, and an
-operation that depends on an unconfirmed capability fails closed instead of
-silently choosing a degraded path. Where a provider cannot represent a requested
-operation exactly, the use case either refuses it or names the affected feature,
-the reason, and whether the mapping is lossy, in the preview and before
-approval. Silent normalization is forbidden. See
-[ADR 0009](adr/0009-provider-capability-degradation-contracts.md).
+`XDG_RUNTIME_DIR` is preferred only when absolute, current-user-owned, and
+private. Symlinks, regular files, FIFOs, permissive directories, wrong owners,
+socket squatters, and replacement races fail closed. Listener-side checks
+remain in force. The legacy migration client uses the same path.
 
-## Safety model
+Windows uses a local byte-mode named pipe that rejects remote clients and has a
+protected DACL for SYSTEM and the current user.
 
-Every use case declares an effect class:
+The HTTP-shaped daemon protocol additionally validates bearer, caller, method,
+body size, concurrency, protocol version, config digest, result schema, and
+effect policy.
 
-| Class | Examples | Default behavior |
-| --- | --- | --- |
-| Read | search, message metadata, agenda | execute |
-| Sensitive read | body, attachment | execute with audit event |
-| Reversible write | create draft, mark read | policy dependent |
-| External write | send, invite, respond | preview then exact commit |
-| Destructive write | delete, cancel meeting | preview then exact commit |
+## Read paths and projections
 
-Preview returns a normalized representation, warnings, and a short-lived token
-bound to the exact operation hash. Commit rejects modified, expired, replayed,
-or differently scoped operations. MCP annotations communicate intent to the
-host, but server-side policy remains authoritative. See
-[ADR 0004](adr/0004-preview-commit.md).
+Single-account reads resolve one account ID and one provider service. Returned
+objects carry provider/account provenance. Bodies and attachment bytes require
+explicit APIs separate from metadata listing.
 
-Under the accepted direction this boundary also carries a target: every mutation
-resolves exactly one account and exactly one mailbox or calendar before preview,
-and the approval token binds that target alongside the account, caller, and
-payload, so a commit cannot be redirected to a different account or container.
-Adding the target to that binding changes the operation digest and is therefore
-a versioned contract change. See
-[ADR 0010](adr/0010-account-identity-and-isolation.md).
+Cross-account mail search and agenda are application-level projections. They
+fan out to isolated services, normalize results, merge them deterministically,
+apply global pagination/bounds, and preserve per-account failures. They never
+share a provider client or create a broadcast write.
 
-## Accounts and routing (accepted direction)
+## Preview and commit
 
-An account identifier is opaque, locally generated, and stable, and it is not
-derived from an email address, display name, tenant, provider object ID, or
-configuration alias. The human-facing alias is a separate mutable label.
+Consequential writes use one protocol in every adapter:
 
-Each account isolates its browser profile and cookie jar, credential handles,
-provider cursors, rate limits, caches, and audit context, including two accounts
-on the same provider and origin. Every result carries provenance: account,
-provider, mailbox or calendar identifier, and the provider's own object
-identity.
+```text
+typed input
+  → normalize and validate
+  → evaluate policy
+  → return exact review + caller-bound approval
+  → commit same digest once
+  → invalidate approval
+```
 
-Reads may aggregate across accounts. An aggregated inbox, search, or agenda is a
-projection over separate provider objects and never a writable merged store, and
-display normalization preserves an event's original time-zone and floating-time
-semantics.
+The digest binds account, provider, target, version, recipients/attendees,
+fields, content bytes/digests, and effect. Approval is short-lived,
+single-use, and process-bound. MCP annotations are descriptive only.
 
-## Discovery and provider selection (accepted direction)
+Provider adapters make one write attempt. Timeouts and ambiguous transport
+outcomes become unknown results; they are never automatically retried.
 
-Onboarding resolves a destination before authenticating. Discovery is
-credential-free: it collects evidence from well-known domains, MX and SRV
-records, standards `well-known` endpoints, and autoconfiguration, scores
-candidates with the evidence that produced them, requires valid TLS, and never
-sends a password, token, or cookie to a candidate endpoint. Domain inference is
-evidence, never proof, and manual override is always available.
+## Provider capabilities and degradations
 
-Automatic selection may choose only a first-party interactive browser session or
-an authorization the user already granted. It never initiates a Graph
-authorization, never initiates a managed Google Workspace third-party API
-authorization, and never submits an administrator review request.
+Adapters return normalized capability records after authentication. Callers do
+not infer support from provider branding. A provider difference is represented
+as:
 
-The configuration schema still cannot represent a password, app-specific
-password, OAuth token, cookie, or refresh token. A standards provider that
-requires a secret reads it through a narrow credential port backed either by an
-operating-system credential facility or by a user-configured helper command,
-after an explicit per-account human consent step. Configuration stores only the
-backend and its key reference, and no MCP tool can read a secret or trigger a
-credential prompt. See
-[ADR 0012](adr/0012-credential-free-discovery-and-explicit-selection.md).
+- unavailable capability;
+- explicit bounded degradation;
+- lossy flag when normalization discards detail;
+- operation error when safety cannot be preserved.
 
-## Import and staging (accepted direction)
+This keeps one typed core without pretending every provider has identical
+atomic preconditions, search language, calendar selection, or meeting-link
+support.
 
-Account configuration, authentication, and local data are three separate
-operations. Scanning and preview are strictly read-only, explain any
-operating-system privacy permission before requesting it, and never reuse
-another application's passwords, tokens, cookies, or session material. Imported
-data lands in a local staging area; uploading it to a provider is a separate
-reviewed operation that uses the same preview and commit boundary. See
-[ADR 0013](adr/0013-read-only-import-staging.md).
+The composition root also supplies a closed `CalendarEffects` value for each
+calendar adapter. Creation, update, and cancellation reviews therefore state
+the route's attendee-notification and cancellation disposition instead of
+embedding Outlook semantics in the application core. The effects value is
+validated when the account service is constructed and stays fixed for the
+preview/commit lifetime.
 
-## Monitoring, events, and dispatch (accepted direction)
+## Import staging
 
-Monitoring, agent dispatch, and data egress are three separate consent
-boundaries. All default to disabled on a fresh install, after an upgrade, and
-after an account import, and enabling one never enables another. The modes are
-`off`, `notify`, `queue`, and `agent`; `notify` and `queue` work with no AI
-provider configured.
+Import is local read-only planning, not provider synchronization. A source
+scanner receives one explicit path, identifies a supported format, bounds
+entries/bytes, rejects unsafe archives/links, and returns a review. Approval is
+bound to that source identity. Accepted metadata enters private account-local
+staging; no upload or authentication occurs.
 
-Events are metadata first, with bodies fetched only when policy and destination
-require them. Automatically triggered agents are read-only by default, and every
-external write still passes through preview and commit. The MCP surface is
-read-only apart from acknowledging a local event, and no MCP tool can enable
-monitoring, widen a filter, enable automatic execution, or enable egress. See
-[ADR 0014](adr/0014-opt-in-monitoring-and-dispatch.md).
+## Monitoring and dispatch
 
-## Compatibility
+Monitoring is account-local and off by default. Consent advances one boundary
+at a time: `off -> notify -> queue -> agent`.
 
-- Operating systems: macOS, Linux, and Windows.
-- Architectures: amd64 and arm64.
-- Toolchain: Go 1.26 or newer.
-- Interfaces: stable CLI JSON schema and MCP tool contracts.
-- MCP: stdio first; Streamable HTTP optional.
-- Outlook: capability-tested against Outlook on the web, not inferred from a
-  desktop Outlook installation.
+After interactive authentication, a monitor polls only inbox metadata. Two
+scans establish a stable provider window before cursor commit. The engine
+applies metadata filters, self-message suppression, deterministic IDs,
+deduplication, quiet hours, debounce, rate limits, batching, retention, and a
+circuit breaker.
 
-Compatibility claims require a fixture contract test and a documented live smoke
-test. Live tests are opt-in and must never be part of the default suite. A
-provider adapter is listed only once it has both, and the distinction between
-deterministic coverage and live observation stays visible on the
-[compatibility evidence](compatibility.md) page.
+Queue/cursor/event state is atomically persisted under the account ID with
+owner-only permissions and symlink rejection. Notifications are local adapters.
+Agent mode executes one absolute program directly without a shell, sends only
+approved bounded fields as JSON stdin, and revalidates the declared egress.
+
+MCP cannot enable or reconfigure monitoring or purge events. Resource updates
+and queue values are untrusted data, never triggers or instructions.
+
+## Feedback
+
+The feedback package accepts only allowlisted public build atoms, aggregate
+provider IDs/capabilities, fixed collection statuses, and a sanitized error
+record. It cannot accept raw errors, arguments, configuration values, paths, or
+mail/calendar objects into the report schema.
+
+The last error is a single bounded replace-in-place owner-only record. It
+stores generalized classes, command placeholders, flag names, and a
+deterministic local hash. Malformed data degrades visibly.
+
+Report generation performs no network operation. Copy, save, and opening a
+prefilled GitHub page occur only after report output and explicit CLI choice.
+
+## Audit
+
+Audit events are content-free and effect-oriented. They record caller, account
+ID, provider, operation class, decision, bounded result state, and policy
+reason—never bodies, subjects, recipients, attendees, addresses, queries,
+tokens, credential references, runner arguments, or approval values.
+
+Monitoring adds content-free detection/filter/queue/destination/field/result/
+acknowledgement transitions.
+
+## Updates and distribution
+
+Automatic update discovery reads only public latest-release metadata, is
+cached, and is absent from machine transports and feedback. Explicit direct
+updates verify a finite GitHub Actions Sigstore identity allowlist, signed
+checksums, version, OS, architecture, and artifact inventory before
+rollback-capable replacement. Package-managed binaries remain owned by their
+package manager.
+
+The v0.6 legacy names survive only in narrow migration/update inputs. Canonical
+runtime, config, state, IPC, package, plugin, and documentation names are
+Corresync; the primary command is `corr`.

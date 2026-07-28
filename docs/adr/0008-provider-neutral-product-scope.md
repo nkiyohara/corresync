@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-07-28
 
 ## Context
 
@@ -52,11 +53,11 @@ unimplemented:
   scope exactly as decided in
   [ADR 0005](0005-calendar-hosted-teams-links.md).
 
-Scope is not capability. The current release implements exactly one provider
-adapter. A provider may be described as supported only after it has synthetic
-fixture contract tests and a documented opt-in live observation, and
-documentation must state plainly which capabilities ship today and which are
-accepted direction.
+Scope is not capability. At the time of this decision, the current release
+implemented exactly one provider adapter. A provider may be described as
+live-compatible only after synthetic fixture contract tests and a documented
+opt-in live observation; documentation must distinguish that claim from an
+adapter implemented and deterministically tested on `main`.
 
 ## Consequences
 
@@ -74,4 +75,13 @@ to take.
 The review surface grows with every adapter. That growth is bounded by
 requiring each one to reuse the existing typed core instead of introducing a
 parallel one, and by ADRs 0012 to 0014, which constrain onboarding, import, and
-monitoring before any of them is implemented.
+monitoring.
+
+## Implementation amendment
+
+Google API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters are now
+implemented behind the shared application boundary. Their evidence is
+deterministic-only until separately recorded in
+[compatibility.md](../compatibility.md). Outlook Web remains the only provider
+with bounded live observations; this evidence difference is not a capability
+fallback.

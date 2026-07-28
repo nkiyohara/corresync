@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-07-28
 
 ## Context
 
@@ -53,13 +54,13 @@ used only when a valid Graph authorization is already configured or the user
 explicitly selects it. It is never an implicit dependency, an automatic
 fallback, or a capability probe.
 
-Google distinguishes account types. An existing valid grant is used where one
-exists; consumer accounts may prefer the API with a web-session fallback;
-managed Workspace accounts default to the web session. A Workspace API failure
-may offer the web-session adapter, but submitting an admin-review request
-requires an explicit human action. Where the service itself is disabled or
-normal browser access is denied, the failure is reported plainly and no bypass
-is attempted.
+Google distinguishes account types during discovery, but discovery does not
+select a route. The implemented Google API route is used only after explicit
+selection or when an existing configured route names it. `google-web` remains
+a reserved unavailable provider ID, so there is no web-session fallback.
+Submitting consent or an admin-review request always requires an explicit human
+action. Where the service is disabled or access is denied, the failure is
+reported plainly and no bypass is attempted.
 
 ### Password-bearing providers use an external credential facility
 
@@ -96,7 +97,7 @@ trade against storing one in a file this project controls.
 
 Discovery will sometimes be wrong. It is built to be explainable and
 overridable rather than authoritative, so a wrong guess costs a manual
-configuration instead of an unwanted authorization request. Whether consumer
-Google accounts should prefer the API or a web session while the project ships
-no centrally verified OAuth client remains open and is deliberately not settled
-here.
+configuration instead of an unwanted authorization request. Corresync ships no
+centrally held OAuth client secret; Google API and Graph use an explicitly
+selected bring-your-own public-client registration as detailed in
+[ADR 0015](0015-per-service-provider-routes.md).

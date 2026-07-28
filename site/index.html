@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Corresync — local-first mail and calendar for your terminal and AI agents</title>
-  <meta name="description" content="Corresync bridges your mailbox and calendar to the terminal and AI agents. Local-first, browser-owned sign-in, preview-before-commit writes, no hosted relay. Outlook Web today; more providers on the roadmap.">
+  <title>Corresync — local-first mail and calendar for terminals and agents</title>
+  <meta name="description" content="Corresync brings Outlook, Gmail, Graph, JMAP, IMAP/SMTP, and CalDAV accounts to one guarded local CLI and MCP server. Explicit authentication, isolated accounts, reviewed writes, no hosted relay.">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-  <meta property="og:title" content="Corresync — local-first mail + calendar for terminals and AI agents">
-  <meta property="og:description" content="A local-first bridge from your mailbox to your terminal and AI agents. Works through your own Outlook Web sign-in — no Graph app registration, no hosted relay — with preview-before-commit writes.">
+  <meta property="og:title" content="Corresync — all your correspondence, one local core">
+  <meta property="og:description" content="A multi-account mail and calendar CLI plus MCP server with explicit provider routes, preview-before-commit writes, opt-in monitoring, and no hosted relay.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://nkiyohara.github.io/corresync/">
   <link rel="canonical" href="https://nkiyohara.github.io/corresync/">
@@ -29,30 +29,30 @@
       <a href="#quickstart">Quickstart</a>
       <a href="#agents">Agents</a>
       <a href="#safety">Safety</a>
-      <a href="#roadmap">Roadmap</a>
+      <a href="#providers">Providers</a>
       <a href="#migrate">Migrate</a>
       <a href="https://github.com/nkiyohara/corresync">GitHub<span aria-hidden="true"> ↗</span></a>
     </nav>
   </header>
 
   <main id="main">
-
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
         <p class="eyebrow"><span aria-hidden="true"></span>Local-first correspondence</p>
-        <h1 id="hero-title">Your mail and calendar, <em>bridged</em> to your terminal and AI agents.</h1>
+        <h1 id="hero-title">Every inbox and calendar. <em>One guarded core.</em></h1>
         <p class="lede">
-          Corresync is a local-first bridge with one guarded core: a CLI for you and
-          your scripts, an MCP server for your agents — both working through a browser
-          session you sign in to yourself. No hosted relay. No captured password.
-          Writes preview before they commit.
+          Corresync is a multi-account mail and calendar bridge: a short
+          <code>corr</code> CLI for you and your scripts, plus a local MCP server
+          for agents. Accounts stay isolated, providers stay explicit, and every
+          consequential write is reviewed before commit.
         </p>
         <div class="actions">
-          <a class="button primary" href="#quickstart">Install in sixty seconds</a>
+          <a class="button primary" href="#quickstart">Get started</a>
           <a class="button secondary" href="https://github.com/nkiyohara/corresync/releases/latest">Latest release<span aria-hidden="true"> ↗</span></a>
         </div>
         <p class="hero-note">
-          Outlook Web today · <a href="#roadmap">more providers on the roadmap</a><br>
+          Outlook Web live-observed · new routes synthetic-only on main<br>
+          Gmail · Microsoft Graph · JMAP · IMAP/SMTP · CalDAV<br>
           macOS, Linux, and Windows · amd64 &amp; arm64 · Apache-2.0
         </p>
       </div>
@@ -60,142 +60,139 @@
       <figure class="terminal hero-terminal">
         <figcaption class="term-bar">
           <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-          <span class="term-title">one core · two interfaces</span>
+          <span class="term-title">one core · many accounts · two interfaces</span>
         </figcaption>
-        <pre tabindex="0" role="region" aria-label="Terminal demo: the corresync CLI lists mail, then an AI agent uses the same core over MCP"><code><span class="t-prompt">$</span> corresync mail list --limit 3
-<span class="t-unread">●</span> <span class="t-dim">09:12</span>  Ana Ruiz   Quarterly plan review
-<span class="t-read">·</span> <span class="t-dim">08:47</span>  Finance    Invoice #2214 approved
-<span class="t-read">·</span> <span class="t-dim">07:58</span>  Kim Osei   Standup notes — Tuesday
+        <pre tabindex="0" role="region" aria-label="Terminal demo: corr searches all configured mail accounts, then an agent lists the combined agenda"><code><span class="t-prompt">$</span> corr mail search --all-accounts \
+    --query 'subject:"Quarterly plan"' --limit 3
+<span class="t-unread">●</span> <span class="t-dim">work · microsoft-owa</span>  Ana Ruiz  Plan review
+<span class="t-read">·</span> <span class="t-dim">personal · google-api</span> Finance   Plan receipt
 
-<span class="t-sep">── the same core, from an agent ──</span>
+<span class="t-sep">── the same typed core, from an agent ──</span>
 
 <span class="t-ask">›</span> What needs my attention before noon?
-  <span class="t-tool">mail_list</span> <span class="t-tool">calendar_list</span> <span class="t-dim">local · metadata-first</span>
-  Reply to Ana's plan review. Your 09:30
-  design review has a Teams link ready.</code></pre>
+  <span class="t-tool">mail_search_all</span> <span class="t-tool">agenda_list</span>
+  Two messages match. Your 09:30 design
+  review is on the work calendar.</code></pre>
       </figure>
     </section>
 
     <section class="trust-row" aria-label="Core promises">
       <div>
         <strong>Local first</strong>
-        <span>No hosted relay — mailbox access stays on your machine</span>
+        <span>No hosted relay or remote MCP endpoint</span>
       </div>
       <div>
-        <strong>Browser-owned sign-in</strong>
-        <span>Normal SSO, MFA, and Conditional Access; the CLI never sees a password</span>
+        <strong>Explicit authentication</strong>
+        <span>Visible browser, public-client OAuth, or approved local credential handle</span>
       </div>
       <div>
         <strong>Preview → commit</strong>
-        <span>Consequential writes show an exact review first, and fail closed</span>
+        <span>External and destructive writes are exact, single-use reviews</span>
       </div>
       <div>
-        <strong>One typed core</strong>
-        <span>CLI and MCP call the same use cases and policy checks</span>
+        <strong>Account isolation</strong>
+        <span>Every result carries account and provider provenance</span>
       </div>
     </section>
 
     <section class="fit" id="fit" aria-labelledby="fit-title">
       <div class="section-heading">
-        <p class="eyebrow"><span aria-hidden="true"></span>No Graph app required</p>
-        <h2 id="fit-title">Built for organizations that never approved a&nbsp;Graph&nbsp;app.</h2>
+        <p class="eyebrow"><span aria-hidden="true"></span>Bring the route you actually use</p>
+        <h2 id="fit-title">Web session, provider API, or open standard.</h2>
         <p>
-          Plenty of tenants let you use Outlook on the web while third-party
-          Microsoft&nbsp;Graph applications stay unapproved. That gap is exactly
-          where Corresync lives.
+          One account can use different mail and calendar routes. Corresync
+          makes that choice visible instead of guessing from an address or
+          silently falling back.
         </p>
       </div>
       <div class="fit-grid">
         <article class="fit-card">
-          <p class="chip">When Graph is approved</p>
-          <h3>Microsoft Graph is a fine choice</h3>
+          <p class="chip">Provider-native</p>
+          <h3>Outlook Web, Google API, Microsoft Graph</h3>
           <p>
-            If your organization registers and consents to API applications, use
-            them. Optional, explicitly configured Graph support is on the
-            Corresync roadmap — as a choice, never as a hidden fallback.
+            Use an interactive Outlook Web session, or explicitly configure a
+            public OAuth client with PKCE for Google or Graph. Grants stay in
+            the operating-system keyring; no shared client secret or hosted
+            token relay exists.
           </p>
         </article>
         <article class="fit-card highlight">
-          <p class="chip">When it isn't</p>
-          <h3>Corresync works through your session</h3>
+          <p class="chip">Standards-first</p>
+          <h3>JMAP, IMAP/SMTP, and CalDAV</h3>
           <p>
-            Corresync works through the interactive Outlook Web session you
-            already use — the same sign-in with your SSO, your MFA, your
-            Conditional Access, in a dedicated browser profile, and only the
-            permissions your account already holds. It never files an admin
-            consent request, and never probes in a way that could trigger one.
+            Combine the standards your provider exposes—for example IMAP/SMTP
+            mail with a CalDAV calendar. Configuration stores only typed
+            endpoints and an approved keyring/helper reference, never a
+            password.
           </p>
         </article>
       </div>
       <p class="fine-print">
-        Corresync automates a session you legitimately own. It does not bypass
-        authentication, sign-in policy, or permissions, and it grants nothing your
-        account doesn't already have — see the
-        <a href="https://github.com/nkiyohara/corresync/blob/main/docs/threat-model.md">threat model</a>.
+        Credential-free discovery ranks evidence but never authenticates or
+        adds an account. You select each route explicitly. See the
+        <a href="https://github.com/nkiyohara/corresync/blob/main/docs/features.md">provider and degradation matrix</a>.
       </p>
     </section>
 
     <section class="quickstart" id="quickstart" aria-labelledby="quickstart-title">
       <div class="section-heading">
-        <p class="eyebrow"><span aria-hidden="true"></span>Sixty-second setup</p>
-        <h2 id="quickstart-title">Install. Sign in. Ask.</h2>
-        <p>One local binary, one client command, then ordinary language — or ordinary flags.</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>Short command, explicit setup</p>
+        <h2 id="quickstart-title">Install. Choose. Connect.</h2>
+        <p>One local package, one account decision, then ordinary flags or ordinary language.</p>
       </div>
       <ol class="steps">
         <li>
           <span class="step-number" aria-hidden="true">01</span>
           <div>
-            <h3>Install and sign in</h3>
-            <pre tabindex="0" role="region" aria-label="Install and sign-in commands"><code><span class="t-comment"># macOS or Linux</span>
+            <h3>Install and verify</h3>
+            <pre tabindex="0" role="region" aria-label="Install and verification commands"><code><span class="t-comment"># macOS or Linux</span>
 brew install nkiyohara/corresync/corresync
 
 <span class="t-comment"># Windows</span>
 winget install --id nkiyohara.Corresync --exact
 
-corresync config init
-corresync auth login
-corresync doctor --online
-corresync completion install</code></pre>
+corr --version
+corr config init
+corr completion install</code></pre>
             <p>
-              Scoop, direct downloads, checksums, Sigstore verification, and Linux
-              packages are in the
+              Scoop, direct downloads, checksums, Sigstore provenance, and
+              native Linux packages are in the
               <a href="https://github.com/nkiyohara/corresync/blob/main/docs/install.md">install guide</a>.
-              Sign-in stays inside a dedicated browser profile; the CLI never asks
-              for a password.
+              Completion detects Bash, Zsh, or Fish and is idempotent.
             </p>
           </div>
         </li>
         <li>
           <span class="step-number" aria-hidden="true">02</span>
           <div>
-            <h3>Connect your agent</h3>
-            <pre tabindex="0" role="region" aria-label="MCP client setup commands"><code>corresync mcp setup codex
-<span class="t-comment"># or: claude-code, github-copilot,</span>
-<span class="t-comment">#     gemini-cli, qwen-code, qoder</span></code></pre>
+            <h3>Add and authenticate an account</h3>
+            <pre tabindex="0" role="region" aria-label="Account discovery and authentication commands"><code>corr account discover reader@example.invalid
+corr account add reader@example.invalid --help
+corr account list
+corr auth login --account work
+corr doctor --online --account work</code></pre>
             <p>
-              Registers “Corresync — Mail &amp; Calendar” through your client's
-              official configuration. Inspect first with <code>--dry-run</code>;
-              v0.6 users should re-register once after following the migration
-              guide.
+              Discovery uses no credentials. Account creation shows the route,
+              authentication type, capabilities, and degradation boundary before
+              saving. Monitoring remains off.
             </p>
           </div>
         </li>
         <li>
           <span class="step-number" aria-hidden="true">03</span>
           <div>
-            <h3>Ask naturally, or script it</h3>
-            <pre tabindex="0" role="region" aria-label="Example agent request and CLI commands"><code><span class="t-ask">›</span> Check Outlook and summarize what needs
-  my attention.
+            <h3>Connect an agent—or use the CLI</h3>
+            <pre tabindex="0" role="region" aria-label="MCP setup and CLI commands"><code>corr mcp setup codex
+<span class="t-comment"># or: claude-code, github-copilot,</span>
+<span class="t-comment">#     gemini-cli, qwen-code, qoder</span>
 
-<span class="t-prompt">$</span> corresync mail search \
-    --query 'subject:"Quarterly plan" from:ana'
-<span class="t-prompt">$</span> corresync calendar list \
+<span class="t-prompt">$</span> corr agenda list --all-accounts \
     --start 2026-07-28T00:00:00Z \
     --end 2026-07-29T00:00:00Z</code></pre>
             <p>
-              Agents, scripts, and humans reach the same typed use cases and the
-              same stable
-              <a href="https://github.com/nkiyohara/corresync/blob/main/docs/json.md">JSON result shapes</a>.
+              Agents, scripts, and humans reach the same typed use cases, policy
+              checks, and
+              <a href="https://github.com/nkiyohara/corresync/blob/main/docs/json.md">stable JSON shapes</a>.
             </p>
           </div>
         </li>
@@ -204,22 +201,22 @@ corresync completion install</code></pre>
 
     <section class="agents" id="agents" aria-labelledby="agents-title">
       <div class="section-heading">
-        <p class="eyebrow"><span aria-hidden="true"></span>One protocol, native setup</p>
-        <h2 id="agents-title">Built for the agents you use.</h2>
-        <p>Each client is configured through its own official mechanism. The guarded core stays the same.</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>Local MCP over stdio</p>
+        <h2 id="agents-title">One guarded server, native client setup.</h2>
+        <p>Every client reaches the same 32 narrow tools and two read-only monitor resources.</p>
       </div>
       <div class="agent-grid">
-        <article><span class="agent-letter" aria-hidden="true">C</span><h3>Codex</h3><code>corresync mcp setup codex</code><p>Plugin marketplace and bundled Agent Skill.</p></article>
-        <article><span class="agent-letter" aria-hidden="true">A</span><h3>Claude Code</h3><code>corresync mcp setup claude-code</code><p>Plugin install plus user and project scopes.</p></article>
-        <article><span class="agent-letter" aria-hidden="true">GH</span><h3>GitHub Copilot CLI</h3><code>corresync mcp setup github-copilot</code><p>Native registration with printed verification.</p></article>
-        <article><span class="agent-letter" aria-hidden="true">G</span><h3>Gemini CLI</h3><code>corresync mcp setup gemini-cli</code><p>User and project scopes, native Skill manager.</p></article>
-        <article><span class="agent-letter" aria-hidden="true">Q</span><h3>Qwen Code</h3><code>corresync mcp setup qwen-code</code><p>Native CLI registration and Skill support.</p></article>
-        <article><span class="agent-letter" aria-hidden="true">Q</span><h3>Qoder</h3><code>corresync mcp setup qoder</code><p>User, local, and project scopes.</p></article>
-        <article><span class="agent-letter" aria-hidden="true">K</span><h3>Kimi Code CLI</h3><code>corresync mcp config kimi-code</code><p>Prints the native MCP JSON to paste.</p></article>
-        <article><span class="agent-letter" aria-hidden="true">+</span><h3>Any MCP client</h3><code>corresync mcp serve</code><p>A plain stdio server for everything else.</p></article>
+        <article><span class="agent-letter" aria-hidden="true">C</span><h3>Codex</h3><code>corr mcp setup codex</code><p>Plugin and bundled Agent Skill.</p></article>
+        <article><span class="agent-letter" aria-hidden="true">A</span><h3>Claude Code</h3><code>corr mcp setup claude-code</code><p>Plugin plus user/project scopes.</p></article>
+        <article><span class="agent-letter" aria-hidden="true">GH</span><h3>GitHub Copilot CLI</h3><code>corr mcp setup github-copilot</code><p>Native registration and verification.</p></article>
+        <article><span class="agent-letter" aria-hidden="true">G</span><h3>Gemini CLI</h3><code>corr mcp setup gemini-cli</code><p>User/project scopes and Skill support.</p></article>
+        <article><span class="agent-letter" aria-hidden="true">Q</span><h3>Qwen Code</h3><code>corr mcp setup qwen-code</code><p>Native registration and Skill support.</p></article>
+        <article><span class="agent-letter" aria-hidden="true">Q</span><h3>Qoder</h3><code>corr mcp setup qoder</code><p>User, local, and project scopes.</p></article>
+        <article><span class="agent-letter" aria-hidden="true">K</span><h3>Kimi Code CLI</h3><code>corr mcp config kimi-code</code><p>Reviewable native MCP JSON.</p></article>
+        <article><span class="agent-letter" aria-hidden="true">+</span><h3>Any MCP client</h3><code>corr mcp serve</code><p>Plain stdio, no remote endpoint.</p></article>
       </div>
       <p class="center-link">
-        Connection name <code>corresync</code> · MCP Registry <code>io.github.nkiyohara/corresync</code><br>
+        Connection <code>corresync</code> · Registry <code>io.github.nkiyohara/corresync</code><br>
         <a href="https://github.com/nkiyohara/corresync/blob/main/docs/mcp.md">Open the complete MCP manual<span aria-hidden="true"> →</span></a>
       </p>
     </section>
@@ -227,21 +224,21 @@ corresync completion install</code></pre>
     <section class="safety" id="safety" aria-labelledby="safety-title">
       <div class="safety-head">
         <p class="eyebrow light"><span aria-hidden="true"></span>Safety is the architecture</p>
-        <h2 id="safety-title">Agents get narrow tools. Never your session.</h2>
+        <h2 id="safety-title">Agents get typed tools. Never your credentials.</h2>
         <p class="safety-lede">
-          A local daemon owns the interactive browser session. CLI and MCP calls
-          enter the same typed application core and the same policy boundary —
-          authorization material never enters an agent process.
+          CLI and MCP enter the same application core. A config-scoped local
+          owner holds provider clients; endpoint authentication completes before
+          its rotating bearer is transmitted.
         </p>
       </div>
 
-      <div class="flow" role="img" aria-label="Architecture diagram: AI agents connect over MCP standard input and output, and humans or scripts connect over the CLI. Both paths enter one typed core with policy checks, which uses local inter-process communication to reach the session owner — your browser profile — which reaches Outlook Web over HTTPS.">
+      <div class="flow" role="img" aria-label="Architecture diagram: AI agents over MCP and humans or scripts over the CLI enter one typed policy core. Authenticated local IPC reaches a provider session owner, which connects only to explicitly configured mail and calendar providers.">
         <div class="flow-in">
           <p class="flow-lane"><span class="chip-node">AI agents</span><span class="flow-edge">MCP · stdio</span></p>
           <p class="flow-lane"><span class="chip-node">You &amp; scripts</span><span class="flow-edge">CLI</span></p>
         </div>
         <p class="flow-chain">
-          <span class="chip-node strong">typed core · policy</span><span class="flow-edge">local IPC</span><span class="chip-node">session owner<small>your browser profile</small></span><span class="flow-edge">HTTPS</span><span class="chip-node">Outlook Web</span>
+          <span class="chip-node strong">typed core · policy</span><span class="flow-edge">authenticated IPC</span><span class="chip-node">session owner<small>account-isolated clients</small></span><span class="flow-edge">TLS</span><span class="chip-node">explicit providers</span>
         </p>
       </div>
 
@@ -249,33 +246,31 @@ corresync completion install</code></pre>
         <figure class="terminal safety-terminal">
           <figcaption class="term-bar">
             <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span class="term-title">nothing sends without --approve</span>
+            <span class="term-title">nothing sends without exact approval</span>
           </figcaption>
-          <pre tabindex="0" role="region" aria-label="Terminal demo of the preview and commit write protocol"><code><span class="t-prompt">$</span> corresync mail send --to ana@example.com \
+          <pre tabindex="0" role="region" aria-label="Terminal preview and commit example"><code><span class="t-prompt">$</span> corr mail send --account work \
+    --to ana@example.invalid \
     --subject 'Quarterly plan — v2' \
     --body-file reply.txt
 
 <span class="t-review">REVIEW · send new message</span>
-  to       ana@example.com
-  subject  Quarterly plan — v2
+  account  work · microsoft-owa
+  to       ana@example.invalid
   body     text/plain · 412 B · <span class="t-dim">sha256 9f2c1a…</span>
-<span class="t-dim">Nothing sent. Repeat the exact command with</span>
-<span class="t-dim">--approve to commit this review.</span>
+<span class="t-dim">Nothing sent. Repeat this exact command</span>
+<span class="t-dim">with --approve to commit the review.</span>
 
-<span class="t-prompt">$</span> corresync mail send --to ana@example.com \
-    --subject 'Quarterly plan — v2' \
-    --body-file reply.txt <span class="t-approve">--approve</span>
-
-<span class="t-sent">SENT · bound to review 9f2c1a…</span></code></pre>
+<span class="t-prompt">$</span> corr mail send … <span class="t-approve">--approve</span>
+<span class="t-sent">SENT · one attempt · review 9f2c1a…</span></code></pre>
         </figure>
 
         <ul class="safety-points">
-          <li><strong>Metadata first.</strong> Listings exclude bodies; sensitive reads are explicit, separate tools.</li>
-          <li><strong>Preview binds the commit.</strong> A short-lived token is tied to the originating process and the exact operation digest.</li>
-          <li><strong>Fail closed.</strong> An ambiguous write outcome is never retried automatically — no duplicate mail, events, or invitations.</li>
-          <li><strong>Untrusted by default.</strong> Message and event content is data for you, never instructions for an agent.</li>
-          <li><strong>No ambient listener.</strong> MCP runs over stdio; daemon IPC is a Unix socket or Windows named pipe.</li>
-          <li><strong>Transparent scope.</strong> The shipped Outlook Web provider and planned adapters are labeled separately.</li>
+          <li><strong>Metadata first.</strong> Lists omit bodies and bytes; sensitive reads stay separate.</li>
+          <li><strong>Preview binds commit.</strong> Caller, account, provider, target, payload, expiry, and one use.</li>
+          <li><strong>Fail closed.</strong> An ambiguous write is never retried automatically.</li>
+          <li><strong>Untrusted by default.</strong> Mail, events, imports, and queue values are data—not instructions.</li>
+          <li><strong>No ambient listener.</strong> MCP is stdio; daemon IPC is a Unix socket or Windows named pipe.</li>
+          <li><strong>Private support.</strong> <code>corr feedback</code> is allowlisted, local, visible before action, and never auto-submits.</li>
         </ul>
       </div>
       <p class="safety-links">
@@ -286,68 +281,66 @@ corresync completion install</code></pre>
       </p>
     </section>
 
-    <section class="roadmap" id="roadmap" aria-labelledby="roadmap-title">
+    <section class="roadmap" id="providers" aria-labelledby="providers-title">
       <div class="section-heading">
-        <p class="eyebrow"><span aria-hidden="true"></span>Shipped vs. planned, marked plainly</p>
-        <h2 id="roadmap-title">Outlook Web today. Every account next.</h2>
+        <p class="eyebrow"><span aria-hidden="true"></span>Implemented, with evidence marked plainly</p>
+        <h2 id="providers-title">Six explicit provider routes. No hidden fallback.</h2>
         <p>
-          A clear line between what you can run right now and what is being
-          designed in the open.
+          All routes have synthetic contracts. Outlook Web also has bounded live
+          observations; the newer adapters stay labeled deterministic-only until
+          their own authorized observations are recorded.
         </p>
       </div>
       <div class="roadmap-grid">
-        <article class="panel now" aria-labelledby="panel-now-title">
+        <article class="panel now" aria-labelledby="panel-provider-title">
           <header>
-            <p class="badge live">In the current release</p>
-            <h3 id="panel-now-title">The Outlook Web adapter</h3>
+            <p class="badge live">Candidate implementations on main</p>
+            <h3 id="panel-provider-title">Mail and calendar route candidates</h3>
           </header>
           <div class="panel-cols">
             <div>
               <h4>Mail</h4>
               <ul>
-                <li>Folders, metadata lists, AQS search</li>
-                <li>Explicit body and bounded attachment reads</li>
-                <li>Drafts, replies, forwards, reviewed sends</li>
-                <li>Versioned moves, read state, reviewed deletion</li>
+                <li>Outlook Web and Microsoft Graph</li>
+                <li>Gmail via Google API</li>
+                <li>JMAP</li>
+                <li>IMAP with SMTP Submission</li>
               </ul>
             </div>
             <div>
               <h4>Calendar</h4>
               <ul>
-                <li>Bounded schedule listings</li>
-                <li>Events with attendees, recurrence, reminders</li>
-                <li>Optional Teams join link at creation</li>
-                <li>Versioned updates and cancellation</li>
+                <li>Outlook Web and Microsoft Graph</li>
+                <li>Primary Google Calendar</li>
+                <li>CalDAV</li>
+                <li>Provider-supported Teams links</li>
               </ul>
             </div>
           </div>
           <p class="panel-foot">
-            Plus stable account IDs and target isolation, explicit
-            shared-mailbox routing, a stable JSON contract, idempotent shell
-            completion install, a man page, and signed releases — SHA-256
-            checksums, Sigstore provenance, SBOMs, verified self-update.
-            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/features.md">Full feature matrix<span aria-hidden="true"> →</span></a>
+            Only Outlook Web is live-observed. The other routes have synthetic
+            contract evidence and are not stable compatibility claims.
+            Capabilities and degradations travel with every result.
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/features.md">Compare exact provider behavior<span aria-hidden="true"> →</span></a>
           </p>
         </article>
 
-        <article class="panel next" aria-labelledby="panel-next-title">
+        <article class="panel next" aria-labelledby="panel-workflow-title">
           <header>
-            <p class="badge planned">Planned — not shipped yet</p>
-            <h3 id="panel-next-title">One bridge, every account</h3>
+            <p class="badge planned">Local-first workflows</p>
+            <h3 id="panel-workflow-title">Beyond one inbox</h3>
           </header>
           <ul class="plan-list">
-            <li><strong>Deeper multi-account workflows.</strong> Stable account boundaries ship now; aggregated views and richer account lifecycle commands come next.</li>
-            <li><strong>Start from an email address.</strong> Evidence-scored provider discovery with manual override — authenticating only after you confirm the destination.</li>
-            <li><strong>More providers, openly.</strong> JMAP, IMAP, SMTP submission, and CalDAV; Google with API-first consumer and web-session-first Workspace defaults; optional, explicitly configured Graph.</li>
-            <li><strong>Careful import.</strong> Read-only scans of Apple Mail, Thunderbird, and Outlook profiles plus MBOX, Maildir, EML, PST, OLM, ICS, and VCF archives.</li>
-            <li><strong>Cross-account views.</strong> Aggregated inbox and agenda projections; commits stay bound to one exact target.</li>
-            <li><strong>Opt-in monitoring.</strong> Off by default and metadata-first, with AI dispatch as a separate consent and auto-triggered agents read-only by default.</li>
+            <li><strong>Multi-account projections.</strong> Search mail and list an agenda across isolated accounts with provenance and partial failures.</li>
+            <li><strong>Read-only import staging.</strong> Inspect recognized exports, archives, Maildir, and Thunderbird profiles without uploading or changing the source.</li>
+            <li><strong>Opt-in monitoring.</strong> Move deliberately from off to local notification, durable queue, and finally an approved runner.</li>
+            <li><strong>Separate egress consent.</strong> Remote runner disclosure is never implied by collection or local execution.</li>
+            <li><strong>Privacy-preserving feedback.</strong> Generate a redacted report locally, inspect it, then explicitly copy, save, or open GitHub.</li>
           </ul>
           <p class="panel-foot">
-            Every phase keeps the same non-negotiables: no hosted relay, no
-            captured passwords, no admin-consent probing, no bypassed sign-in
-            controls.
-            <a href="https://github.com/nkiyohara/corresync/issues/20">Follow the roadmap<span aria-hidden="true"> →</span></a>
+            Automatic agents are read-only by default. Every external write
+            still goes through the same preview/commit boundary.
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/cli.md">Explore the CLI<span aria-hidden="true"> →</span></a>
           </p>
         </article>
       </div>
@@ -356,41 +349,42 @@ corresync completion install</code></pre>
     <section class="migrate" id="migrate" aria-labelledby="migrate-title">
       <div class="migrate-inner">
         <div class="migrate-copy">
-          <p class="eyebrow"><span aria-hidden="true"></span>Change of address</p>
-          <h2 id="migrate-title">Coming from owa-bridge?</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Command transition</p>
+          <h2 id="migrate-title">Corresync is the product. <code>corr</code> is the command.</h2>
           <p>
-            The rename to Corresync ships as one coordinated release —
-            repository, packages, CLI, MCP, local state, and this site — with a
-            v0.6.2 bridge release for direct upgrades.
+            Existing 0.7 scripts receive a finite compatibility window, while
+            new setup converges on the short command. Product-scoped package,
+            repository, config/state, plugin, and MCP names remain
+            <code>corresync</code>.
           </p>
           <ul>
-            <li>The v0.6.2 updater trusts the renamed release workflow and canonical artifacts.</li>
-            <li>Configuration migrates to schema v2; browser profiles move rather than duplicate, so a fresh sign-in can be required.</li>
-            <li>The public command, MCP registration, package, plugin, Skill, completion, and manual all become <code>corresync</code>.</li>
-            <li>GitHub preserves repository redirects. Pages intentionally has no redirect; update bookmarks.</li>
+            <li>0.8 and 0.9 archives/packages carry identical <code>corr</code> and compatibility executables.</li>
+            <li>Completions, manuals, help, MCP registrations, and new examples use <code>corr</code>.</li>
+            <li>Schema v3 preserves account IDs while introducing explicit mail/calendar routes.</li>
+            <li>Former project names are accepted only by the finite v0.6 migration path.</li>
+            <li>Pages intentionally has no legacy redirect.</li>
           </ul>
           <p class="migrate-link">
-            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/migration-v0.7.md">Open the exact v0.7 migration guide<span aria-hidden="true"> →</span></a>
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/migration-v0.7.md">Open the migration guide<span aria-hidden="true"> →</span></a>
           </p>
         </div>
         <figure class="terminal migrate-terminal">
           <figcaption class="term-bar">
             <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span class="term-title">bridge, then canonical</span>
+            <span class="term-title">short command, stable product identity</span>
           </figcaption>
-          <pre tabindex="0" role="region" aria-label="Terminal migration from the v0.6 bridge release to Corresync"><code><span class="t-prompt">$</span> owa update
-<span class="t-dim"># run once from the v0.6.2 bridge release</span>
-
-<span class="t-prompt">$</span> corresync --version
-<span class="t-dim"># canonical command from v0.7 onward</span></code></pre>
+          <pre tabindex="0" role="region" aria-label="Corresync command transition"><code><span class="t-prompt">$</span> corr --version
+<span class="t-prompt">$</span> corr account list
+<span class="t-prompt">$</span> corr mail search --all-accounts …
+<span class="t-prompt">$</span> corr update</code></pre>
         </figure>
       </div>
     </section>
 
     <section class="final-cta" aria-labelledby="final-title">
-      <p class="eyebrow"><span aria-hidden="true"></span>Ready when your inbox is</p>
-      <h2 id="final-title">Bring your correspondence to the conversation.</h2>
-      <p>Locally, visibly, and with every consequential action reviewed.</p>
+      <p class="eyebrow"><span aria-hidden="true"></span>Ready when your inboxes are</p>
+      <h2 id="final-title">Bring your correspondence into one local conversation.</h2>
+      <p>Explicit providers, isolated accounts, visible effects.</p>
       <div class="actions centered">
         <a class="button primary" href="https://github.com/nkiyohara/corresync/releases/latest">Get Corresync</a>
         <a class="button secondary" href="https://github.com/nkiyohara/corresync/blob/main/README.md">Read the documentation</a>
@@ -404,10 +398,9 @@ corresync completion install</code></pre>
       <span class="brand-name">corresync</span>
     </a>
     <p>
-      Corresync is independent, local-first mail and calendar tooling. Not
-      affiliated with, endorsed by, or sponsored by
-      Microsoft. Microsoft, Outlook, Microsoft&nbsp;365, and Teams are trademarks
-      of the Microsoft group of companies.
+      Corresync is independent local-first mail and calendar tooling. It is not
+      affiliated with or endorsed by Google, Microsoft, or any provider named
+      here. Product names are trademarks of their respective owners.
     </p>
     <nav aria-label="Footer">
       <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security</a>

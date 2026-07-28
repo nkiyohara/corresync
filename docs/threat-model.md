@@ -1,95 +1,142 @@
 # Threat model
 
-`Corresync` handles email, calendar data, and a live Outlook Web session. Its
-security boundary is intentionally narrower than that of a general browser
-automation framework.
+Corresync handles private mail/calendar data and the authority to act as an
+interactively authenticated user. It is a local single-user tool, not a remote
+gateway or tenant administration service.
 
 ## Assets
 
-- the user's authenticated Outlook Web session;
-- message bodies, attachments, recipients, and calendar details;
-- the authority to send mail or alter meetings as the signed-in user;
-- local configuration, audit records, and approval tokens.
+- browser sessions, OAuth grants, and credential-helper results;
+- messages, attachments, recipients, events, attendees, and meeting links;
+- authority to send mail, change mailbox state, or alter meetings;
+- stable account identities, provider cursors, import staging, event queues,
+  monitor configuration, and local notification/runner destinations;
+- configuration, content-free audit records, approval tokens, daemon
+  credentials, and privacy-preserving error records;
+- release artifacts, checksums, SBOMs, and update provenance.
 
 ## Trust boundaries
 
-- Outlook Web and the organization's identity provider are external systems.
-- MCP hosts and models are untrusted callers, even when locally installed.
-- message bodies and calendar content are untrusted input and may contain prompt
-  injection.
-- other local users and processes are outside the trust boundary.
-- CI fixtures and logs must be safe to publish.
+- providers and identity systems are external services;
+- MCP hosts, models, plugins, scripts, notification viewers, and local runners
+  are untrusted callers;
+- mail, calendar, import, and event-queue values are attacker-controlled data
+  and may contain prompt injection;
+- another local user or a process outside the selected user boundary is
+  untrusted;
+- imported files can be malformed, oversized, symlinked, replaced, or crafted
+  to escape their selected root;
+- clipboard tools, browsers, issue trackers, and remote runner destinations
+  cross an explicit disclosure boundary;
+- CI logs, fixtures, feedback reports, and public issues must be safe to
+  publish.
 
-## Required controls
+## Authentication controls
 
-### Authentication
+- Never accept or persist passwords, cookies, canaries, bearer tokens, OAuth
+  authorization codes, access tokens, refresh tokens, or client secrets in
+  config, CLI, MCP, audit, feedback, or logs.
+- Browser routes use visible interactive sign-in. OAuth routes use
+  Authorization Code with PKCE for an explicitly selected public client.
+- Standards credentials remain behind an OS-keyring entry or an explicitly
+  approved helper reference.
+- Discovery cannot access credentials, start consent, or probe administrator
+  approval.
+- Never automate around MFA, Conditional Access, consent, or provider policy.
+- Never use TLS interception or silently downgrade TLS.
+- The text-only terminal browser relay requires an interactive TTY, sends at
+  most one sanitized control event, and is never exposed through MCP.
 
-- Never accept or persist a password as a command argument, configuration
-  value, structured API field, log entry, or complete terminal-relay value.
-- Restrict terminal login to an interactive TTY and relay at most one sanitized
-  key event per authenticated local IPC request; never expose it through MCP.
-- Never automate around MFA, Conditional Access, or consent screens.
-- Never use a TLS interception proxy.
-- Prefer browser-context execution; otherwise keep captured bearer material in
-  locked process memory and never emit it to stdout, logs, crash reports, or MCP.
-- Store the dedicated browser profile with user-only permissions.
+## Local IPC controls
 
-### Local interfaces
+- Use an owner-only Unix socket or protected local Windows named pipe; never a
+  TCP listener.
+- Namespace the endpoint by config/state identity and hold a singleton lock.
+- Authenticate the endpoint before transmitting the rotating local bearer.
+- On Unix, reject untrusted runtime directories, symlinks, wrong types or
+  owners, permissive modes, inactive locks, socket squatters, peer-UID
+  mismatch, and directory/socket replacement races.
+- On Windows, reject remote named-pipe clients and require the protected DACL.
+- Validate bearer, caller, protocol version, config digest, method, body size,
+  result size, concurrency, and shutdown lifetime.
+- Rotate the bearer on every owner start and remove only the current owner's
+  credential during shutdown.
 
-- Use stdio, Unix sockets, or Windows named pipes by default.
-- Authenticate IPC peers and reject cross-user access.
-- Namespace the daemon by config and state paths, rotate a high-entropy local
-  credential on every start, and remove it during graceful shutdown.
-- Never bind the session owner to TCP; bound local request size, response size,
-  header size, concurrency, and shutdown time.
-- If local HTTP is enabled, bind only to loopback, validate `Origin`, and require
-  a high-entropy credential.
+## Data and action controls
 
-### Tool execution
+- Treat every provider value as data, never instructions.
+- Keep provider protocols behind closed typed adapters; expose no arbitrary
+  action, URL, header, method, property, command, or payload surface.
+- Enforce effect policy in the application core for both CLI and MCP.
+- Bind approval tokens to caller, account, provider, target, normalized
+  payload, effect, expiry, and one use.
+- Require preview/commit for external and destructive writes. Never retry a
+  write whose remote outcome may be committed.
+- Preserve account/provider provenance across projections and never implement a
+  broadcast write.
+- Bound recipients, attendees, query/results, time windows, bodies,
+  attachments, imports, queues, runner input, and feedback records.
 
-- Treat all mailbox content as data, never instructions.
-- Enforce effect policy in the application core, not only in CLI prompts or MCP
-  annotations.
-- Bind approval tokens to the normalized operation, account, caller, expiry,
-  and a single use.
-- Require preview for every external send, regardless of configurable policy;
-  never retry a write with an ambiguous remote outcome.
-- Apply recipient and attendee limits before preview and again before commit.
-- Do not expose arbitrary OWA actions in a release build.
+## Monitoring and runner controls
 
-### Observability
+- Monitoring defaults to `off`; upgrades and imports do not enable it.
+- Consent advances separately through collection, queueing, agent execution,
+  content inclusion, and remote egress.
+- Exclude Sent and Drafts where possible, deduplicate events, rate-limit and
+  debounce dispatch, enforce quiet hours, and stop through a circuit breaker.
+- Invoke one absolute runner directly without a shell. Runner arguments are
+  configuration, never content-derived.
+- Automatically triggered agents are read-only by default. Mail/calendar
+  content cannot widen filters, routes, tools, egress, or write authority.
+- MCP may inspect monitor/event state and acknowledge a local event, but cannot
+  enable monitoring, add a runner, approve egress, or purge the queue.
 
-- Log operation type, timestamps, caller, result class, and opaque identifiers.
-- Redact authorization headers, cookies, canaries, email addresses, subjects,
-  bodies, attachment names, and free-form calendar text by default.
-- Keep diagnostic body capture opt-in, time-bounded, and visibly dangerous.
+## Import controls
 
-### Supply chain
+- The first scan returns a bounded plan without reading private content.
+- Content access requires approval bound to one resolved source identity.
+- Reject traversal, symlink escape, special files, replacement, and excessive
+  nesting/count/size.
+- Never authenticate, upload, send, modify, or delete the source.
+- Purge removes only Corresync-owned account-local staging.
+
+## Observability and feedback controls
+
+- Audit only operation/effect, time, caller, account/provider provenance,
+  bounded result class, and policy reason.
+- Exclude authorization, addresses, subjects, bodies, attachment names, event
+  text, queries, credential references, runner arguments, and approval values.
+- Keep only one bounded, owner-only generalized last-error record; replacement
+  is atomic and symlink-safe.
+- Build feedback from an allowlist. Raw errors, arguments, paths, identifiers,
+  content, environment values, and credentials are not accepted by the report
+  schema.
+- Generate and print the complete report locally before copy, save, or opening
+  a browser. Never submit automatically.
+
+## Supply-chain controls
 
 - Pin CI actions by immutable commit SHA.
-- Review and automate dependency updates.
-- Run static analysis, tests, vulnerability scanning, and secret scanning.
-- Produce checksums and SBOMs for every release artifact.
-- Attach workload-identity signatures only when their public transparency
-  metadata is compatible with the repository's privacy requirement.
-- Limit startup update discovery to an unauthenticated, bounded read of the
-  public stable-release endpoint. Send no Outlook or machine identifiers,
-  cache both success and failure for 24 hours, and never let a background
-  check replace a binary. An explicit direct self-update must verify the exact
-  tagged workflow's Sigstore identity, signed checksum inventory, candidate
-  version and platform, and preserve a rollback copy. Never modify files owned
-  by a package manager.
+- Run formatting, tests, race detection, static analysis, secret scanning,
+  vulnerability scanning, and linked-license checks.
+- Build reproducible archives/packages with checksums and per-artifact SPDX and
+  CycloneDX SBOMs.
+- Verify a direct update's exact tag, platform, checksum, and GitHub Actions
+  Sigstore identity; preserve rollback and never replace package-managed files.
+- Keep automatic update checks bounded, unauthenticated, cached, and free of
+  account or machine identifiers. Disable them in MCP, daemon, completion,
+  feedback, pipes, and JSON output.
 
 ## Explicitly unsupported
 
-- unattended username/password sign-in;
-- scripted or piped terminal-login input;
-- tenant-wide or delegated access to other users' mailboxes;
-- remotely exposed MCP without an independent secure deployment layer;
-- defeating an organization's technical or administrative controls;
-- execution of instructions found inside messages or meeting descriptions.
+- unattended or password-based login;
+- TLS interception or bypassing organizational controls;
+- automatic provider fallback or tenant-wide/delegated authorization;
+- generic provider actions or arbitrary protocol payloads;
+- Teams chat, channels, calls, recordings, or meeting lifecycle management;
+- remote MCP, hosted relay, multi-user daemon, or ambient network listener;
+- automatic crash upload, telemetry, or issue submission;
+- executing instructions found in messages, events, imports, or attachments.
 
-## Reporting
-
-Do not open a public issue for a suspected vulnerability. Follow
+Report suspected vulnerabilities privately as described in
 [SECURITY.md](../SECURITY.md).

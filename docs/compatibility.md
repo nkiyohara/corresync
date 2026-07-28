@@ -1,142 +1,138 @@
 # Compatibility evidence
 
-Compatibility is an evidence claim, not an assumption derived from an OWA
-payload fixture. This page distinguishes deterministic coverage from live
-mailbox observations.
+Compatibility is an evidence claim, not an inference from a fixture or a
+provider brand. This page distinguishes deterministic coverage on `main` from
+authorized live observations.
 
 ## Current evidence
 
 <!-- markdownlint-disable MD013 -->
-
-| Boundary | Deterministic | Live | Status |
+| Boundary | Deterministic evidence | Live evidence | Status |
 | --- | --- | --- | --- |
-| CLI help/version/config/auth presentation | Unit/golden/NO_COLOR | Local terminal | Deterministic only |
-| Config, policy, audit | Unit/race | macOS arm64, Chrome | Observed |
-| Local session owner | Unix/Windows contracts | macOS arm64 | Observed |
-| Text-only SSH login relay | Unit/IPC/browser projection contracts | Linux amd64, Chrome, sign-in shell | Partial |
-| Folder discovery, list/search/body | JSON contracts | Microsoft 365 work/school | Observed |
-| Single-message move | Preview/commit + JSON | Move and restore | Observed |
-| Single-message read/unread | Preview/commit + JSON | Read and restore unread | Observed |
-| Draft and new send | Preview/commit contracts | Save-only and self-send | Observed |
-| Reply/forward/HTML/file attachments | Typed validation + OWA JSON contracts | Not run | Deterministic only |
-| Attachment metadata/content read | Bounded GetItem/GetAttachment contracts | Microsoft 365 work/school | Observed |
-| Message hard delete | Destructive preview/commit + JSON | Not run | Deterministic only |
-| Explicit shared/delegated mailbox routing | Config/header contracts | Not run | Deterministic only |
-| Calendar list | Two JSON shapes | Primary calendar | Observed |
-| Calendar create | Preview/commit + JSON | Appointment and self meeting | Observed |
-| Teams link at calendar creation | Closed provider + JSON | Self-attendee meeting | Observed |
-| Calendar update/cancel | Versioned preview/commit + JSON | Update and cleanup | Observed |
-| All-day/reminder/recurrence/attendee replacement | Typed validation + OWA JSON contracts | Not run | Deterministic only |
-| Codex MCP client | Native CLI registration | Empty calendar tool call | Observed |
-| Claude Code MCP client | Native CLI registration | Stdio health check only | Partial |
-| GitHub Copilot CLI MCP client | Native CLI plan + JSON schema | Not run | Deterministic only |
-| Gemini CLI MCP client | Native CLI plan + JSON schema | Not run | Deterministic only |
-| Qwen Code MCP client | Native CLI plan + JSON schema | Not run | Deterministic only |
-| Qoder MCP client | Native CLI plan + JSON schema | Not run | Deterministic only |
-| Kimi Code MCP client | Native JSON schema | Not run | Deterministic only |
-| Distribution | 7 archives, 6 packages, 26 SBOMs | Local + release CI | Verified build |
-
+| CLI, stable JSON, configuration schema v3 | Unit, golden, migration, `NO_COLOR` | Local terminal | Observed |
+| Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
+| Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | macOS arm64 | Observed |
+| Outlook Web mail/calendar | Synthetic typed wire contracts | Microsoft 365 work/school | Observed |
+| Google API mail/calendar | Synthetic REST and application integration contracts | Not run | Deterministic only |
+| Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
+| JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
+| IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
+| CalDAV calendar | Synthetic WebDAV/iCalendar/conditional-write contracts | Not run | Deterministic only |
+| Cross-account search and agenda | Isolation, ordering, bounds, partial-failure tests | Not run | Deterministic only |
+| Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
+| Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
+| Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Local terminal | Deterministic only |
+| MCP clients | Native setup-plan and schema tests | Codex tool call; Claude health check | Partial |
+| Distribution | Archive/package/SBOM/inventory verification | Release CI and isolated Linux first run | Verified build |
 <!-- markdownlint-enable MD013 -->
 
-The live observations were made on 2026-07-18, 2026-07-19, and 2026-07-25 with
-synthetic content and no third-party recipient. They show one authorized
-environment working; they are not a universal tenant or protocol support claim.
-`SECURITY.md` remains the source of truth for supported release versions.
+The Outlook Web observations were made on 2026-07-18, 2026-07-19, and
+2026-07-25 using synthetic content and no third-party recipient. They prove one
+authorized environment, not universal tenant support. New provider adapters
+must remain labeled “deterministic only” until a bounded opt-in observation is
+recorded.
 
-On 2026-07-19, `corresync login --terminal` launched headless Google Chrome on Linux
-amd64, rendered the Microsoft sign-in text and eight numbered controls, focused
-the email field, returned to the control list with Escape, and cancelled
-cleanly. No credential or MFA value was entered, so completion of
-authentication, Conditional Access, and OWA session capture remains
-unobserved. This is partial relay evidence, not an authentication compatibility
-claim.
+Cross-compilation proves platform-specific code builds; it does not replace
+native browser, keyring, IPC, Gatekeeper, SmartScreen, or package-manager
+evidence.
 
-The distribution row means the verifier checked the complete artifact
-inventory, checksums, archive and package contents, both SBOM formats, generated
-package-manager manifests, and an isolated Linux first run. It does not imply
-native macOS or Windows runtime evidence.
+## Provider claims
+
+- `microsoft-owa`: mail and calendar are live-observed; some advanced fields
+  remain deterministic-only as listed below.
+- `google-api`: Gmail and primary Google Calendar are implemented with a BYO
+  public OAuth client, but have no recorded live observation.
+- `microsoft-graph`: mail, primary calendar, and typed Teams-link creation are
+  implemented with a BYO public OAuth client, but have no recorded live
+  observation.
+- `jmap`, `imap-smtp`, and `caldav`: implemented against synthetic standards
+  contracts, with server-specific behavior exposed through capabilities and
+  degradations.
+
+`google-web` and `pop3` are reserved unavailable identifiers. Their presence in
+discovery/config validation does not constitute an adapter claim.
+
+## Outlook Web observation detail
+
+Observed:
+
+- folder discovery, list/search/body, attachment metadata/content;
+- single-message move and read/unread restoration;
+- save-only draft and self-recipient new send;
+- bounded primary-calendar list, create, update, cancel;
+- Teams join URL returned from a reviewed event creation;
+- Codex discovery and a bounded calendar tool call.
+
+Deterministic only:
+
+- reply, reply-all, forward, HTML, and file-attachment composition;
+- permanent message deletion and shared/delegated mailbox routing;
+- all-day/reminder/recurrence creation and attendee replacement;
+- the complete text-only terminal authentication flow.
+
+Calendar list does not reliably return the join URL created with an event.
+Treat the reviewed creation result as the provisioning result.
 
 ## Release targets
 
-Build and archive coverage is mandatory for these targets:
-
+<!-- markdownlint-disable MD013 -->
 | OS | amd64 | arm64 |
 | --- | --- | --- |
 | macOS | tar.gz | tar.gz |
 | Linux | tar.gz, deb, RPM, APK | tar.gz, deb, RPM, APK |
 | Windows | zip | zip |
+<!-- markdownlint-enable MD013 -->
 
-Cross-compilation proves that platform-specific code builds; it does not replace
-a native browser, IPC, install, or Gatekeeper/SmartScreen observation.
+Release verification checks archives, native packages, both SBOM formats,
+checksums, source/catalog manifests, completion, manual, plugin, Skill,
+essential documentation, and an isolated Linux first run. During the finite
+command transition, archives/packages carry `corr` plus the identical
+`corresync` compatibility entry.
 
-## Opt-in live smoke test
+## Opt-in live workflow
 
-Use only a mailbox and device you are authorized to test. Prefer a dedicated
-test mailbox or a harmless folder and never upload browser captures.
-For native installation, CLI, Codex, Claude Code, and separately authorized
-write gates on another computer, follow the
-[manual test checklist](manual-test-checklist.md).
+Use only an account, device, source export, and recipient/attendee set you are
+authorized to test. Prefer a dedicated test account and synthetic content.
 
-1. Verify the release checksum before extracting or installing it.
-2. Set the account origin to the final Outlook origin shown after sign-in. Do
-   not add identity-provider origins or URL paths.
-3. Run `corresync doctor` and resolve every local failure.
-4. Run `corresync doctor --online --json`, completing SSO, MFA, notices, and
-   Conditional Access only in the visible browser.
-5. Confirm that `session`, `folder_contract`, `mail_contract`, and
-   `calendar_contract` pass.
-6. Stop the daemon with `corresync daemon stop` when the observation is complete.
+1. Verify the selected release checksum and provenance.
+2. Run `corr config validate`, `corr account list`, and `corr doctor`.
+3. Review the selected provider route and required authentication.
+4. Run `corr auth login --account ALIAS` and complete all controls visibly.
+5. Run `corr doctor --online --account ALIAS`.
+6. Exercise metadata-only reads before sensitive reads.
+7. Exercise save-only draft before an external send.
+8. For each write, review the exact preview, commit once, and reconcile remote
+   state after any unknown outcome.
+9. Stop the owner with `corr daemon stop`.
 
-The online doctor requests at most one folder metadata row, one inbox metadata
-row, and a one-hour calendar window, then discards the results. Its report
-contains no folder, message, event, recipient, item count, authorization, or
-OWA response body. Review error text for local paths before sharing even this
-content-free report.
+The online doctor is bounded and content-free in its output. It does not prove
+mutation compatibility. Monitoring, remote egress, permanent deletion, and
+calendar invitations require separate explicit authorization.
 
-Write compatibility is a separate, explicit gate. Test save-only draft creation
-before new-message sending. Test reply, forward, HTML, and attachments only
-against a controlled message and self-recipient. For sending, use a controlled
-recipient, review the exact preview, and inspect Drafts and Sent Items after any
-unknown transport outcome.
-Calendar mutations are not part of online doctor. Do not exercise them without
-separate authorization, a controlled calendar and attendee set, and
-reconciliation after an unknown outcome. All-day creation, recurrence creation,
-reminder changes, and attendee replacement remain unobserved. Recurrence editing
-is not implemented. Move, read-state updates, and hard deletion remain separate
-write-compatibility observations after save-only draft creation; hard deletion
-must use a disposable self-owned message.
-
-The Teams observation used only the signed-in user as attendee. The specialized
-create response returned `TeamsForBusiness` and an HTTPS join URL, after which
-the event was cancelled. The later calendar-view response did not reliably set
-`isOnlineMeeting`; clients must treat the create result as the provisioning
-source of truth and must not expect list results to expose the join URL.
-
-Codex discovered the server, selected `calendar_list`, supplied the requested
-bounded window, consumed structured content, and returned the empty event
-count. Claude Code's native registration and MCP connection health check
-succeeded; an end-to-end model tool call was not recorded because the local
-Claude OAuth session had expired before inference. That client-account state is
-not treated as a server compatibility failure.
+See the [manual test checklist](manual-test-checklist.md) for provider and
+platform recording templates.
 
 ## Recording evidence
 
-A useful compatibility observation contains only:
+A shareable observation contains only:
 
-- exact `corresync version --json` output;
-- operating system and architecture;
-- browser family and version;
-- deployment class, such as Microsoft 365 work/school or Outlook.com;
-- success or the content-free `corresync doctor --online --json` failure stage;
+- exact `corr version --json` output;
+- OS/architecture and browser or credential-store family/version;
+- provider ID and broad deployment class;
+- capability or operation name;
+- content-free success/failure stage;
 - observation date.
 
-Do not include tenant names, mailbox addresses, account IDs, message or event
-IDs, request IDs, subjects, recipients, bodies, cookies, tokens, canaries,
-browser profiles, screenshots, or raw protocol payloads.
+Do not include account aliases/IDs/addresses, tenant names, endpoint hostnames,
+folder/message/event/attachment/request IDs, subjects, recipients, attendees,
+bodies, queries, source paths, screenshots, provider payloads, cookies, tokens,
+canaries, grants, credential references, approval values, or runner arguments.
+Use `corr feedback --last-error` for a locally reviewable report.
 
-## Protocol drift policy
+## Drift policy
 
-OWA is undocumented and can change without a versioned public contract. A live
-failure must be reproduced without sensitive data, represented by a new
-synthetic fixture, and fixed behind the typed transport boundary. Never add an
-arbitrary action passthrough or capture live payloads into the repository.
+A live failure must be reproduced without sensitive data, represented by a
+synthetic fixture, and fixed behind the typed provider boundary. Never add a
+raw protocol escape hatch or commit captured private payloads. A provider that
+loses a capability must report a degradation or unavailable operation rather
+than silently falling back to another route.

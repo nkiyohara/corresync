@@ -1,95 +1,130 @@
-# Interactive authentication
+# Authentication
 
-`Corresync` never accepts a Microsoft username, password, MFA code, OAuth
-client secret, or tenant consent as a command argument, configuration value, or
-structured API field. Authentication belongs to a browser flow controlled by
-the user.
-
-Google Chrome, Chromium, and Microsoft Edge are supported. An explicit
-`browser.executable` is resolved exactly and never falls back to a different
-browser; otherwise `Corresync` discovers a platform-native installation and
-reports a clear prerequisite failure through `corresync doctor`.
-
-## Lifecycle
-
-1. The local session owner creates a dedicated Chromium profile with owner-only
-   permissions.
-2. It launches a visible browser at the configured HTTPS Outlook origin, or an
-   explicitly requested headless browser with a text-only terminal relay.
-3. The user completes SSO, MFA, Conditional Access, and any organization notice
-   through the browser or relay.
-4. A Chrome DevTools Protocol network observer watches only requests whose
-   origin exactly matches the configured Outlook origin.
-5. When Outlook itself sends bearer authorization, the session owner retains a
-   minimal header snapshot in memory.
-6. OWA requests receive the current snapshot only after another exact-origin
-   check. An already-authorized request is rejected rather than overwritten.
-
-The observer supports both orderings of CDP's `requestWillBeSent` and
-`requestWillBeSentExtraInfo` events; the protocol does not guarantee which one
-arrives first. It discards correlation state when requests finish and bounds
-early-event memory.
-
-## Stored state
-
-Chromium may persist its own browser session in the dedicated profile using the
-platform browser's protections. `Corresync` does not create a token cache. The
-captured bearer value and selected routing headers exist only in the session
-owner's memory and have no JSON, text, or logging representation.
-
-The selected headers are limited to authorization and the OWA routing/session
-headers known to be needed by the protocol adapter. Cookies, request bodies,
-response bodies, and unrelated headers are not copied by the observer.
-
-## Text-only SSH login
-
-`corresync auth login --terminal` is an experimental fallback for an
-interactive SSH TTY without a display server. The daemon launches the
-dedicated Chromium profile headlessly. The CLI displays a bounded list of
-visible page controls and sends one activation or key event at a time over
-owner-only authenticated IPC.
+Authentication is interactive, account-scoped, and owned by the selected
+provider surface. Account discovery and addition never authenticate.
 
 ```console
-corresync auth login --terminal
+corr auth login --account work
+corr auth status
+corr auth logout
 ```
 
-Piped input and `--json` are rejected. Password fields are identified only so
-their keystrokes can remain hidden; the CLI does not collect a complete
-password or form value. Press Enter to send the browser's Enter key, Escape to
-return to the control list, `r` to refresh after an out-of-band approval, or
-`q` to cancel and close the headless browser.
+The daemon is the only authenticated session owner. CLI and MCP call it through
+private local IPC and never receive provider credentials.
 
-The relay supports ordinary DOM text fields, buttons, and links. CAPTCHA,
-passkeys, security keys, client certificates, native browser dialogs, and some
-custom controls may not have a safe text representation. Use visible login for
-those cases. The relay does not make an incompatible server or browser satisfy
-device-compliance Conditional Access policy.
+## Outlook Web
 
-## Inspect and clear sessions
+Outlook Web login opens a dedicated visible browser profile for the account.
+SSO, MFA, Conditional Access, consent notices, and identity-provider redirects
+remain in that browser. Corresync:
 
-`corresync auth status` returns content-free state for each configured account.
-It never returns a mailbox identity, cookie, token, captured header, browser
-page, or Outlook payload. `corresync auth logout` closes the config-scoped
-daemon and all of its dedicated browsers, which discards captured authorization
-and pending approvals from memory. Chromium's protected profile remains for a
-later interactive login.
+- never asks for or reads a password or MFA value;
+- never performs TLS interception;
+- accepts session material only for the exact configured final Outlook origin;
+- keeps captured authorization in daemon memory;
+- leaves browser-managed profile state inside the account's private local
+  profile directory.
 
-## Origin policy
+The browser profile is isolated by stable account ID, not mutable alias. Shared
+or delegated mailbox routing reuses the signed-in user session and grants no
+new permission.
 
-Origins must use HTTPS and contain no path, query, fragment, or URL user
-information. Matching includes the full host and optional port; suffix matches
-are forbidden. For example, authorization observed for
-`outlook.cloud.microsoft.example` cannot satisfy a configuration for
-`outlook.cloud.microsoft`.
+### Terminal relay
 
-Redirects through an identity provider are expected, but authorization from
-those origins is ignored. Supporting an additional Outlook API origin requires
-an explicit configuration and a separate session boundary.
+```console
+corr auth login --account work --terminal
+```
 
-## Testing
+The experimental terminal relay is Outlook-Web-only. It starts a dedicated
+headless browser and projects a bounded text view and numbered controls over
+authenticated, caller-bound IPC. It accepts one interactive keystroke at a time
+from a TTY, masks sensitive fields, and never returns complete form values.
 
-Default tests exercise header filtering, origin confusion, malformed bearer
-values, event ordering, lifecycle, and concurrent access with synthetic data.
-They never start a browser or access a live mailbox.
-`corresync doctor --online` is the explicit opt-in browser and mailbox contract
-smoke test.
+Piped input is rejected. CAPTCHA, passkeys, security keys, client
+certificates, native dialogs, and graphical custom login may require the
+visible browser. Do not use the relay to bypass organization policy.
+
+## Google API and Microsoft Graph
+
+These routes require an explicitly configured public OAuth client and a
+registered loopback redirect:
+
+```text
+http://127.0.0.1:<registered-port>/<registered-path>
+```
+
+Login opens the provider authorization page in a browser, binds the redirect
+to an unpredictable state value, and accepts only the exact configured
+loopback URI. Corresync never accepts a client secret, device-code unattended
+flow, password grant, or broad tenant credential.
+
+The resulting grant is stored by the operating-system keyring under the
+configured local reference. The TOML contains only that reference and the
+explicit consent bit. Scopes are selected from the configured mail/calendar
+services; choosing Graph or Google is never an automatic fallback.
+
+Use only an application registration and account you are authorized to use.
+
+## JMAP, IMAP/SMTP, and CalDAV
+
+Standards routes resolve a credential only from:
+
+- the OS keyring service `corresync`; or
+- one absolute, explicitly configured credential helper.
+
+The helper receives a small JSON `get` request on stdin and is executed
+directly without a shell. Output and environment are bounded. Corresync does
+not provide a password prompt, store helper output, or use credentials during
+discovery.
+
+All remote endpoints require encrypted transport. IMAP/SMTP support implicit
+TLS or STARTTLS according to the explicit route. CalDAV and JMAP endpoints must
+be HTTPS. Certificate verification is never disabled.
+
+## Session status and logout
+
+`corr auth status` is content-free. It reports configured alias, provider,
+authenticated/pending/signed-out state, captured time, normalized
+capabilities, and explicit degradations. It returns no address, endpoint,
+cookie, token, page content, or mailbox item.
+
+`corr auth logout` closes all account adapters and browsers owned by the
+config-scoped daemon, clears in-memory sessions, rotates/removes IPC
+credentials, and exits the owner. Provider keyring entries and user-owned
+credential-helper data are external and are not deleted implicitly. Account
+removal may explicitly revoke a Corresync-owned OAuth authorization where the
+configured backend supports it.
+
+## Local IPC authentication
+
+The daemon exposes no TCP port. MCP uses stdio. On Unix:
+
+1. a suitable private `XDG_RUNTIME_DIR` is preferred;
+2. otherwise a current-user-specific private temporary directory is used;
+3. the listener owns an owner-only singleton lock and Unix socket;
+4. before any bearer is sent, the client opens the runtime directory without
+   following symlinks, validates type/owner/mode, pins directory and socket
+   identities, validates the active singleton lock, connects, verifies peer
+   UID, and rechecks the pinned identities;
+5. symlinks, regular files, FIFOs, wrong ownership, permissive directories,
+   socket squatting, and connection-time replacement fail closed.
+
+The legacy migration client uses the same authenticated connection path.
+Windows named pipes reject remote clients and use a protected DACL limited to
+SYSTEM and the current user.
+
+The local bearer is random, owner-only, rotated with daemon ownership, reloaded
+for each operation, and sent only after transport authentication succeeds.
+Server-side bearer, caller, protocol, config-digest, concurrency, request-size,
+and effect-policy checks remain in force.
+
+## Online diagnostics
+
+`corr doctor` is local and does not authenticate. `corr doctor --online` is the
+explicit opt-in provider compatibility check. It may authenticate the selected
+account and request only bounded folder, mail, and calendar metadata contracts.
+It must not be part of default tests or CI.
+
+For shareable support material, use `corr feedback --last-error`. It records
+only generalized error classes and a redacted command shape; it never copies
+authentication values or raw doctor errors.

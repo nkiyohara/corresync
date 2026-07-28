@@ -9,7 +9,7 @@
   "homepage": "https://nkiyohara.github.io/corresync/",
   "repository": "https://github.com/nkiyohara/corresync",
   "license": "Apache-2.0",
-  "keywords": ["outlook", "email", "calendar", "mcp", "local-first"],
+  "keywords": ["email", "calendar", "gmail", "outlook", "mcp", "local-first"],
   "skills": "./skills/",
   "interface": {
     "displayName": "Corresync — Mail & Calendar",
@@ -17,15 +17,15 @@
     "longDescription": "Recognizes inbox, email, calendar, schedule, and meeting requests and routes them to the guarded local Corresync MCP server.",
     "developerName": "Corresync contributors",
     "category": "Productivity",
-    "capabilities": ["Outlook Web mail", "Outlook Web calendar", "Reviewed writes"],
+    "capabilities": ["Multi-account mail", "Multi-account calendar", "Reviewed writes", "Local monitoring"],
     "websiteURL": "https://nkiyohara.github.io/corresync/",
-    "brandColor": "#6B93FF",
+    "brandColor": "#3F7AD6",
     "composerIcon": "./assets/icon.svg",
     "logo": "./assets/icon.svg",
     "defaultPrompt": [
-      "Check my Outlook inbox and summarize what needs attention.",
-      "Show my Outlook calendar for today.",
-      "Find the latest Outlook email about this project."
+      "Check all my inboxes and summarize what needs attention.",
+      "Show my calendars for today.",
+      "Find the latest email about this project across my accounts."
     ]
   }
 }

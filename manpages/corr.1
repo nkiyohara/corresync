@@ -39,8 +39,24 @@ hard-delete, and set read state.
 .TP
 .B calendar
 List calendar event metadata in a bounded time window, or review and create,
-update, or cancel one typed event. Supported Outlook events may request a Teams
-join link; this does not enable general Teams access.
+update, or cancel one typed event. A provider may expose a typed Teams join-link
+creation capability; this does not enable general Teams access.
+.TP
+.B agenda
+Read a bounded, normalized agenda across isolated accounts with account and
+provider provenance and explicit partial failures.
+.TP
+.B import
+Plan and approve a bounded read-only scan of one local export into private
+account-local staging, or purge only that staging.
+.TP
+.B monitor
+Inspect or configure account-scoped monitoring. Collection defaults to off and
+advances explicitly through local notification, durable queue, and an approved
+runner.
+.TP
+.B events
+List, acknowledge, or explicitly purge the durable account-local event queue.
 .TP
 .B daemon
 Start, inspect, or stop the authenticated local session owner.
@@ -58,6 +74,10 @@ owner-specific command for a package-managed installation.
 Generate a Bash, Zsh, or Fish completion script, or detect and idempotently
 install completion for the current shell.
 .TP
+.B feedback
+Print an allowlisted privacy-preserving local report before an explicitly
+selected copy, new-file save, or browser-open action. It never submits an issue.
+.TP
 .B version
 Print build and version information.
 .SH EXAMPLES
@@ -70,8 +90,11 @@ corr account discover reader@example.com
 corr auth login
 corr auth status
 corr mail list --limit 25
+corr mail search --all-accounts --query "subject:review" --limit 25
 corr calendar list --start 2026-07-17T00:00:00Z \
   --end 2026-07-18T00:00:00Z
+corr agenda list --all-accounts --start 2026-07-17T00:00:00Z \
+  --end 2026-07-18T00:00:00Z --time-zone UTC
 corr calendar create --subject "Design review" \
   --start 2026-07-20T09:00:00Z --end 2026-07-20T10:00:00Z
 # Review the output, then repeat with --approve.
@@ -85,6 +108,11 @@ corr mcp setup github-copilot
 corr mcp setup gemini-cli
 corr mcp setup qwen-code
 corr mcp setup qoder
+corr import scan ./synthetic-export --approve-read
+corr monitor enable --mode notify --notification-field sender --approve
+corr monitor status
+corr events list
+corr feedback --last-error
 corr completion install
 corr update
 corr update check
@@ -121,6 +149,10 @@ before committing a write. Approval tokens are short-lived secret capabilities
 and must not be logged or persisted. If a write reports an unknown outcome,
 inspect provider state before retrying.
 .PP
+Import files and event-queue values are also untrusted. Monitoring, runner
+execution, content release, and remote egress are separate consent boundaries.
+An automatically triggered runner does not gain write authority.
+.PP
 Only use
 .B corr
 with accounts and data you are authorized to access. Provider contracts can
@@ -139,8 +171,9 @@ to opt out of startup checks.
 .I config.toml
 The effective path is printed by
 .BR "corr config path" .
-It contains account routes, browser settings, credential references, and policy
-only; it must not contain passwords, cookies, bearer tokens, or canary values.
+It contains account routes, browser settings, credential references, monitoring
+consent, and policy only; it must not contain passwords, cookies, OAuth grants,
+helper results, bearer tokens, or canary values.
 .SH SEE ALSO
 Command-specific help is available from
 .BR "corr command --help"
