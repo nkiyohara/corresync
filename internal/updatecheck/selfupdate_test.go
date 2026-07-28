@@ -24,7 +24,7 @@ func TestInstallerVerifiesAndReplacesDirectRelease(t *testing.T) {
 	if err := os.WriteFile(target, oldBinary, 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
 		t.Fatal(err)
 	}
-	candidate := syntheticCandidate("1.1.0", "linux", "amd64")
+	candidate := syntheticCandidate()
 	release := newSyntheticUpdateRelease(t, candidate, "")
 	defer release.server.Close()
 
@@ -122,7 +122,7 @@ func TestInstallerFailsClosedBeforeReplacement(t *testing.T) {
 			}
 			release := newSyntheticUpdateRelease(
 				t,
-				syntheticCandidate("1.1.0", "linux", "amd64"),
+				syntheticCandidate(),
 				test.checksum,
 			)
 			defer release.server.Close()
@@ -154,6 +154,49 @@ func TestInstallerFailsClosedBeforeReplacement(t *testing.T) {
 	}
 }
 
+func TestInstallerAcceptsExactCorresyncWorkflowIdentity(t *testing.T) {
+	target := filepath.Join(secureTempDir(t), "owa")
+	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
+		t.Fatal(err)
+	}
+	release := newSyntheticUpdateRelease(
+		t,
+		syntheticCandidate(),
+		"",
+	)
+	defer release.server.Close()
+
+	var identities []string
+	installer := Installer{
+		CurrentVersion: "1.0.0",
+		Executable:     target,
+		Endpoint:       release.server.URL + "/latest",
+		Client:         release.server.Client(),
+		GOOS:           "linux",
+		GOARCH:         "amd64",
+		VerifyProvenance: func(
+			_ context.Context,
+			_, _, identity, _ string,
+		) error {
+			identities = append(identities, identity)
+			if strings.Contains(identity, "/nkiyohara/corresync/") {
+				return nil
+			}
+			return errors.New("certificate identity mismatch")
+		},
+	}
+	if _, err := installer.Install(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"https://github.com/nkiyohara/owa-bridge/.github/workflows/release.yml@refs/tags/v1.1.0",
+		"https://github.com/nkiyohara/corresync/.github/workflows/release.yml@refs/tags/v1.1.0",
+	}
+	if fmt.Sprint(identities) != fmt.Sprint(want) {
+		t.Fatalf("verified identities = %v, want %v", identities, want)
+	}
+}
+
 func TestInstallerDoesNotDownloadWhenCurrent(t *testing.T) {
 	target := filepath.Join(secureTempDir(t), "owa")
 	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
@@ -161,7 +204,7 @@ func TestInstallerDoesNotDownloadWhenCurrent(t *testing.T) {
 	}
 	release := newSyntheticUpdateRelease(
 		t,
-		syntheticCandidate("1.1.0", "linux", "amd64"),
+		syntheticCandidate(),
 		"",
 	)
 	defer release.server.Close()
@@ -340,12 +383,12 @@ func tarCandidate(t *testing.T, candidate []byte) []byte {
 	return archive.Bytes()
 }
 
-func syntheticCandidate(version, goos, goarch string) []byte {
+func syntheticCandidate() []byte {
 	payload := fmt.Sprintf(
 		`{"version":%q,"os":%q,"arch":%q}`,
-		version,
-		goos,
-		goarch,
+		"1.1.0",
+		"linux",
+		"amd64",
 	)
 	return []byte("#!/bin/sh\nif [ \"$1\" = version ]; then\nprintf '%s\\n' '" +
 		payload + "'\nfi\n")

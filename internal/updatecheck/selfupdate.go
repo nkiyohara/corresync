@@ -30,6 +30,8 @@ const (
 	maximumReleaseBinary    = 64 << 20
 	maximumArchiveEntries   = 4096
 	sigstoreOIDCIssuer      = "https://token.actions.githubusercontent.com"
+	legacyRepository        = "nkiyohara/owa-bridge"
+	currentRepository       = "nkiyohara/corresync"
 )
 
 // InstallStatus describes the result of an explicit direct self-update.
@@ -179,18 +181,17 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	}
 	installer.progress(InstallStageDownload, "Downloaded the signed release inventory and "+archiveName)
 
-	workflowIdentity := "https://github.com/nkiyohara/owa-bridge/" +
-		".github/workflows/release.yml@refs/tags/" + latest.String()
 	verifyProvenance := installer.VerifyProvenance
 	if verifyProvenance == nil {
 		verifyProvenance = VerifyProvenance
 	}
-	if err := verifyProvenance(
+	if err := verifyReleaseProvenance(
 		ctx,
 		manifestPath,
 		bundlePath,
-		workflowIdentity,
 		installer.TrustCachePath,
+		latest,
+		verifyProvenance,
 	); err != nil {
 		return InstallResult{}, fmt.Errorf("verify release provenance: %w", err)
 	}
@@ -269,6 +270,35 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 		Archive:         archiveName,
 		BackupPath:      backupPath,
 	}, nil
+}
+
+func verifyReleaseProvenance(
+	ctx context.Context,
+	manifestPath, bundlePath, trustCachePath string,
+	version semanticVersion,
+	verify func(context.Context, string, string, string, string) error,
+) error {
+	repositories := []string{legacyRepository, currentRepository}
+	var verificationErrors []error
+	for _, repository := range repositories {
+		identity := "https://github.com/" + repository +
+			"/.github/workflows/release.yml@refs/tags/" + version.String()
+		if err := verify(
+			ctx,
+			manifestPath,
+			bundlePath,
+			identity,
+			trustCachePath,
+		); err == nil {
+			return nil
+		} else {
+			verificationErrors = append(
+				verificationErrors,
+				fmt.Errorf("%s: %w", repository, err),
+			)
+		}
+	}
+	return errors.Join(verificationErrors...)
 }
 
 func (installer Installer) validateExecutable(ctx context.Context) (string, os.FileInfo, error) {
