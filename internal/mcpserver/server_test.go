@@ -911,8 +911,20 @@ func TestAccountToolsUseTypedReadOnlyBackend(t *testing.T) {
 	t.Parallel()
 	account := application.AccountView{
 		ID: "acc_00000000000000000000000000000001", Alias: "work",
-		Address: "reader@example.invalid", Provider: domain.ProviderMicrosoftOWA,
-		Origin: "https://outlook.example.invalid", IsDefault: true,
+		Address: "reader@example.invalid",
+		Mail: &application.AccountRouteView{
+			Provider: domain.ProviderMicrosoftOWA,
+			Endpoints: []application.DiscoveredEndpoint{
+				{Kind: "origin", Value: "https://outlook.example.invalid"},
+			},
+		},
+		Calendar: &application.AccountRouteView{
+			Provider: domain.ProviderMicrosoftOWA,
+			Endpoints: []application.DiscoveredEndpoint{
+				{Kind: "origin", Value: "https://outlook.example.invalid"},
+			},
+		},
+		IsDefault: true,
 	}
 	backend := &fakeBackend{
 		discoveryResult: application.AccountDiscoveryResult{

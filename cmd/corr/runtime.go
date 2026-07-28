@@ -169,14 +169,20 @@ func (app *runtime) accountServices() (
 	accounts, err := application.NewAccountService(
 		store,
 		store,
-		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+		[]domain.ProviderID{
+			domain.ProviderMicrosoftOWA,
+			domain.ProviderJMAP,
+		},
 	)
 	if err != nil {
 		return nil, nil, err
 	}
 	discoverer, err := application.NewAccountDiscoveryService(
 		app.accountDiscoverer,
-		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+		[]domain.ProviderID{
+			domain.ProviderMicrosoftOWA,
+			domain.ProviderJMAP,
+		},
 	)
 	if err != nil {
 		return nil, nil, err

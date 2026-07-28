@@ -167,3 +167,49 @@ func TestSelectAccountCandidateDoesNotAutoSelectExplicitConsent(t *testing.T) {
 		t.Fatal("explicit OAuth candidate was automatically selected")
 	}
 }
+
+func TestAccountAddPersistsJMAPRouteWithoutAuthenticating(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{{
+				Provider:                  domain.ProviderJMAP,
+				Confidence:                85,
+				Authentication:            application.DiscoveryExternalCredential,
+				RequiresExplicitSelection: true,
+				Endpoints: []application.DiscoveredEndpoint{{
+					Kind: "jmap", Value: "https://jmap.example.invalid/.well-known/jmap",
+				}},
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "well_known_jmap", Detail: "example.invalid",
+				}},
+			}},
+		},
+	}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.invalid", Alias: "standards",
+		Provider:          string(domain.ProviderJMAP),
+		SessionURL:        "https://jmap.example.invalid/session",
+		Username:          "reader@example.invalid",
+		CredentialBackend: "os-keyring",
+		CredentialKey:     "jmap-standards",
+		ApproveCredential: true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["standards"]
+	if account.Mail == nil || account.Mail.JMAP == nil ||
+		account.Mail.JMAP.SessionURL != command.SessionURL ||
+		account.Mail.JMAP.Credential.Key != command.CredentialKey ||
+		account.Calendar != nil {
+		t.Fatalf("persisted JMAP account = %#v", account)
+	}
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("output did not preserve authentication boundary: %q", stdout.String())
+	}
+}

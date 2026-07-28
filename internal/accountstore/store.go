@@ -27,10 +27,10 @@ func (store Store) ListAccounts(context.Context) (application.AccountCatalog, er
 	}
 	accounts := make([]application.AccountView, 0, len(configuration.Accounts))
 	for alias, account := range configuration.Accounts {
-		web, _ := account.OutlookWeb()
 		accounts = append(accounts, application.AccountView{
 			ID: account.ID, Alias: alias, Address: account.Address,
-			Provider: account.PrimaryProvider(), Origin: web.Origin, Mailbox: web.Mailbox,
+			Mail:      mailRouteView(account.Mail),
+			Calendar:  calendarRouteView(account.Calendar),
 			IsDefault: alias == configuration.DefaultAccount,
 		})
 	}
@@ -38,7 +38,10 @@ func (store Store) ListAccounts(context.Context) (application.AccountCatalog, er
 }
 
 // AddAccount atomically rejects stale alias/ID conflicts before saving.
-func (store Store) AddAccount(ctx context.Context, account application.AccountView) error {
+func (store Store) AddAccount(
+	ctx context.Context,
+	account application.AccountRegistration,
+) error {
 	return config.Update(ctx, store.ConfigPath, func(configuration *config.Config) error {
 		if len(configuration.Accounts) >= 32 {
 			return errors.New("at most 32 accounts are supported")
@@ -51,27 +54,169 @@ func (store Store) AddAccount(ctx context.Context, account application.AccountVi
 				return fmt.Errorf("account ID already belongs to alias %q", alias)
 			}
 		}
-		if account.Provider != domain.ProviderMicrosoftOWA {
-			return fmt.Errorf("provider %q needs an explicit route definition", account.Provider)
+		mail, err := mailRouteConfig(account.Mail)
+		if err != nil {
+			return err
 		}
-		web := config.OutlookWebRoute{Origin: account.Origin, Mailbox: account.Mailbox}
+		calendar, err := calendarRouteConfig(account.Calendar)
+		if err != nil {
+			return err
+		}
 		configuration.Accounts[account.Alias] = config.Account{
 			ID: account.ID, Address: account.Address,
-			Mail: &config.MailRoute{
-				Provider: domain.ProviderMicrosoftOWA, OutlookWeb: &web,
-			},
-			Calendar: &config.CalendarRoute{
-				Provider: domain.ProviderMicrosoftOWA,
-				OutlookWeb: &config.OutlookWebRoute{
-					Origin: account.Origin, Mailbox: account.Mailbox,
-				},
-			},
+			Mail: mail, Calendar: calendar,
 		}
 		if account.IsDefault {
 			configuration.DefaultAccount = account.Alias
 		}
 		return nil
 	})
+}
+
+func mailRouteView(route *config.MailRoute) *application.AccountRouteView {
+	if route == nil {
+		return nil
+	}
+	switch route.Provider {
+	case domain.ProviderMicrosoftOWA:
+		return outlookWebRouteView(route.Provider, route.OutlookWeb)
+	case domain.ProviderJMAP:
+		if route.JMAP == nil {
+			return &application.AccountRouteView{Provider: route.Provider}
+		}
+		return &application.AccountRouteView{
+			Provider: route.Provider,
+			Endpoints: []application.DiscoveredEndpoint{
+				{Kind: "session", Value: route.JMAP.SessionURL},
+			},
+			Identity: route.JMAP.Username,
+			Credential: &application.AccountCredentialView{
+				Configured: true,
+				Backend:    string(route.JMAP.Credential.Backend),
+				Consented:  route.JMAP.Credential.Consent,
+			},
+		}
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderCalDAV,
+		domain.ProviderPOP3:
+		return &application.AccountRouteView{
+			Provider: route.Provider,
+			Endpoints: []application.DiscoveredEndpoint{
+				{Kind: "configured", Value: "provider-specific"},
+			},
+		}
+	default:
+		return &application.AccountRouteView{Provider: route.Provider}
+	}
+}
+
+func calendarRouteView(route *config.CalendarRoute) *application.AccountRouteView {
+	if route == nil {
+		return nil
+	}
+	switch route.Provider {
+	case domain.ProviderMicrosoftOWA:
+		return outlookWebRouteView(route.Provider, route.OutlookWeb)
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderCalDAV,
+		domain.ProviderPOP3:
+		return &application.AccountRouteView{
+			Provider: route.Provider,
+			Endpoints: []application.DiscoveredEndpoint{
+				{Kind: "configured", Value: "provider-specific"},
+			},
+		}
+	default:
+		return &application.AccountRouteView{Provider: route.Provider}
+	}
+}
+
+func outlookWebRouteView(
+	provider domain.ProviderID,
+	route *config.OutlookWebRoute,
+) *application.AccountRouteView {
+	if route == nil {
+		return &application.AccountRouteView{Provider: provider}
+	}
+	return &application.AccountRouteView{
+		Provider: provider,
+		Endpoints: []application.DiscoveredEndpoint{
+			{Kind: "origin", Value: route.Origin},
+		},
+		Identity: route.Mailbox,
+	}
+}
+
+func mailRouteConfig(
+	route *application.AccountMailRouteInput,
+) (*config.MailRoute, error) {
+	if route == nil {
+		return nil, nil
+	}
+	switch route.Provider {
+	case domain.ProviderMicrosoftOWA:
+		if route.OutlookWeb == nil {
+			return nil, errors.New("outlook web mail settings are missing")
+		}
+		return &config.MailRoute{
+			Provider: route.Provider,
+			OutlookWeb: &config.OutlookWebRoute{
+				Origin: route.OutlookWeb.Origin, Mailbox: route.OutlookWeb.Mailbox,
+			},
+		}, nil
+	case domain.ProviderJMAP:
+		if route.JMAP == nil {
+			return nil, errors.New("JMAP mail settings are missing")
+		}
+		return &config.MailRoute{
+			Provider: route.Provider,
+			JMAP: &config.JMAPRoute{
+				SessionURL: route.JMAP.SessionURL,
+				Username:   route.JMAP.Username,
+				Credential: config.CredentialRef{
+					Backend: config.CredentialBackend(route.JMAP.Credential.Backend),
+					Key:     route.JMAP.Credential.Key,
+					Consent: route.JMAP.Credential.Consent,
+				},
+			},
+		}, nil
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderCalDAV,
+		domain.ProviderPOP3:
+		return nil, fmt.Errorf("mail provider %q is not accepted by account add", route.Provider)
+	default:
+		return nil, fmt.Errorf("unknown mail provider %q", route.Provider)
+	}
+}
+
+func calendarRouteConfig(
+	route *application.AccountCalendarRouteInput,
+) (*config.CalendarRoute, error) {
+	if route == nil {
+		return nil, nil
+	}
+	if route.Provider != domain.ProviderMicrosoftOWA || route.OutlookWeb == nil {
+		return nil, fmt.Errorf(
+			"calendar provider %q is not accepted by account add",
+			route.Provider,
+		)
+	}
+	return &config.CalendarRoute{
+		Provider: route.Provider,
+		OutlookWeb: &config.OutlookWebRoute{
+			Origin: route.OutlookWeb.Origin, Mailbox: route.OutlookWeb.Mailbox,
+		},
+	}, nil
 }
 
 // RenameAccount atomically changes only the mutable alias.

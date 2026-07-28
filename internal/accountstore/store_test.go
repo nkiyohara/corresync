@@ -2,8 +2,10 @@ package accountstore
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -20,10 +22,21 @@ func TestStoreLifecyclePreservesStableID(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := Store{ConfigPath: path}
-	account := application.AccountView{
+	account := application.AccountRegistration{
 		ID: "acc_00000000000000000000000000000002", Alias: "personal",
-		Address: "reader@example.invalid", Provider: domain.ProviderMicrosoftOWA,
-		Origin: "https://outlook.example.invalid",
+		Address: "reader@example.invalid",
+		Mail: &application.AccountMailRouteInput{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &application.AccountOutlookWebInput{
+				Origin: "https://outlook.example.invalid",
+			},
+		},
+		Calendar: &application.AccountCalendarRouteInput{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &application.AccountOutlookWebInput{
+				Origin: "https://outlook.example.invalid",
+			},
+		},
 	}
 	if err := store.AddAccount(context.Background(), account); err != nil {
 		t.Fatal(err)
@@ -103,5 +116,57 @@ func TestPurgeAccountStateRejectsSymlinkRoot(t *testing.T) {
 	}
 	if err := (Store{}).PurgeAccountState(context.Background(), accountID); err == nil {
 		t.Fatal("PurgeAccountState() accepted a symlink root")
+	}
+}
+
+func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.Default()
+	configuration.Credentials.Helper = []string{
+		"private-helper-command",
+		"--private-profile",
+	}
+	configuration.Accounts["work"] = config.Account{
+		ID:      configuration.Accounts["work"].ID,
+		Address: "reader@example.invalid",
+		Mail: &config.MailRoute{
+			Provider: domain.ProviderJMAP,
+			JMAP: &config.JMAPRoute{
+				SessionURL: "https://jmap.example.invalid/session",
+				Username:   "reader@example.invalid",
+				Credential: config.CredentialRef{
+					Backend: config.CredentialHelper,
+					Key:     "private-credential-key",
+					Consent: true,
+				},
+			},
+		},
+	}
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := (Store{ConfigPath: path}).ListAccounts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := string(encoded)
+	for _, private := range []string{
+		"private-credential-key",
+		"private-helper-command",
+		"--private-profile",
+	} {
+		if strings.Contains(output, private) {
+			t.Fatalf("account catalog exposed %q: %s", private, output)
+		}
+	}
+	if !strings.Contains(output, `"backend":"helper"`) ||
+		!strings.Contains(output, `"consented":true`) {
+		t.Fatalf("account catalog omitted safe credential summary: %s", output)
 	}
 }

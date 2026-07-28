@@ -10,7 +10,7 @@ import (
 
 type accountRepositoryStub struct {
 	catalog     AccountCatalog
-	added       AccountView
+	added       AccountRegistration
 	renamedID   domain.AccountID
 	renamed     string
 	removedID   domain.AccountID
@@ -22,7 +22,10 @@ func (stub *accountRepositoryStub) ListAccounts(context.Context) (AccountCatalog
 	return stub.catalog, stub.err
 }
 
-func (stub *accountRepositoryStub) AddAccount(_ context.Context, account AccountView) error {
+func (stub *accountRepositoryStub) AddAccount(
+	_ context.Context,
+	account AccountRegistration,
+) error {
 	stub.added = account
 	return stub.err
 }
@@ -61,8 +64,19 @@ func (stub *accountPurgerStub) PurgeAccountState(
 func accountFixture(alias, id string, isDefault bool) AccountView {
 	return AccountView{
 		ID: domain.AccountID(id), Alias: alias, Address: alias + "@example.invalid",
-		Provider: domain.ProviderMicrosoftOWA,
-		Origin:   "https://outlook.example.invalid", IsDefault: isDefault,
+		Mail: &AccountRouteView{
+			Provider: domain.ProviderMicrosoftOWA,
+			Endpoints: []DiscoveredEndpoint{
+				{Kind: "origin", Value: "https://outlook.example.invalid"},
+			},
+		},
+		Calendar: &AccountRouteView{
+			Provider: domain.ProviderMicrosoftOWA,
+			Endpoints: []DiscoveredEndpoint{
+				{Kind: "origin", Value: "https://outlook.example.invalid"},
+			},
+		},
+		IsDefault: isDefault,
 	}
 }
 
@@ -88,15 +102,26 @@ func TestAccountServiceLifecyclePreservesStableIdentity(t *testing.T) {
 
 	added, err := service.Add(context.Background(), AccountAddInput{
 		Alias: "team", Address: "reader@EXAMPLE.invalid",
-		Provider: domain.ProviderMicrosoftOWA,
-		Origin:   "https://outlook.example.invalid",
+		Mail: &AccountMailRouteInput{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &AccountOutlookWebInput{
+				Origin: "https://outlook.example.invalid",
+			},
+		},
+		Calendar: &AccountCalendarRouteInput{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &AccountOutlookWebInput{
+				Origin: "https://outlook.example.invalid",
+			},
+		},
 	})
 	if err != nil {
 		t.Fatalf("Add() error = %v", err)
 	}
 	if added.ID != "acc_00000000000000000000000000000003" ||
 		added.Address != "reader@example.invalid" ||
-		repository.added != added {
+		repository.added.ID != added.ID ||
+		repository.added.Alias != added.Alias {
 		t.Fatalf("added = %#v, repository = %#v", added, repository.added)
 	}
 
@@ -139,8 +164,17 @@ func TestAccountServiceFailsClosed(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := service.Add(context.Background(), AccountAddInput{
-		Alias: "gmail", Address: "reader@gmail.com",
-		Provider: domain.ProviderGoogleAPI, Origin: "https://gmail.googleapis.com",
+		Alias: "jmap", Address: "reader@example.invalid",
+		Mail: &AccountMailRouteInput{
+			Provider: domain.ProviderJMAP,
+			JMAP: &AccountJMAPInput{
+				SessionURL: "https://jmap.example.invalid/session",
+				Username:   "reader@example.invalid",
+				Credential: AccountCredentialInput{
+					Backend: "os-keyring", Key: "jmap-test", Consent: true,
+				},
+			},
+		},
 	}); err == nil {
 		t.Fatal("Add() accepted an unavailable provider")
 	}

@@ -34,13 +34,18 @@ type accountShowCommand struct {
 }
 
 type accountAddCommand struct {
-	Address  string `arg:"" help:"Bare email address for the account."`
-	Alias    string `help:"Local alias; defaults to the address local part."`
-	Provider string `help:"Explicit provider override."`
-	Origin   string `help:"Explicit HTTPS provider origin override."`
-	Mailbox  string `help:"Optional mailbox identity when it differs from the address."`
-	Default  bool   `help:"Make this the default account."`
-	JSON     bool   `help:"Write machine-readable JSON."`
+	Address           string `arg:"" help:"Bare email address for the account."`
+	Alias             string `help:"Local alias; defaults to the address local part."`
+	Provider          string `help:"Explicit mail provider override."`
+	Origin            string `help:"Outlook Web HTTPS origin override."`
+	Mailbox           string `help:"Optional Outlook mailbox identity."`
+	SessionURL        string `help:"JMAP HTTPS session resource."`
+	Username          string `help:"JMAP login identity; defaults to the address."`
+	CredentialBackend string `default:"os-keyring" enum:"os-keyring,helper" help:"External JMAP credential backend."`
+	CredentialKey     string `help:"External JMAP credential lookup key."`
+	ApproveCredential bool   `help:"Record explicit consent to use the external credential."`
+	Default           bool   `help:"Make this the default account."`
+	JSON              bool   `help:"Write machine-readable JSON."`
 }
 
 type accountRenameCommand struct {
@@ -101,11 +106,12 @@ func (command *accountListCommand) Run(app *runtime) error {
 		if address == "" {
 			address = "address not set"
 		}
+		routes := accountRouteLabel(account)
 		if _, err := view.printf(
-			"  %s %-16s %-18s %s\n",
+			"  %s %-16s %-28s %s\n",
 			marker,
 			sanitizeCell(account.Alias, 64),
-			account.Provider,
+			sanitizeCell(routes, 64),
 			view.muted(sanitizeCell(address, 254)),
 		); err != nil {
 			return err
@@ -127,18 +133,62 @@ func (command *accountShowCommand) Run(app *runtime) error {
 		return writeJSON(app.stdout, account)
 	}
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
-	_, err = view.printf(
-		"%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %t\n",
+	if _, err = view.printf(
+		"%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %t\n",
 		view.info(),
 		view.strong("Account "+sanitizeCell(account.Alias, 64)),
 		"ID", account.ID,
 		"Address", sanitizeCell(account.Address, 254),
-		"Provider", account.Provider,
-		"Origin", sanitizeCell(account.Origin, 2048),
-		"Mailbox", sanitizeCell(account.Mailbox, 254),
 		"Default", account.IsDefault,
-	)
-	return err
+	); err != nil {
+		return err
+	}
+	for _, service := range []struct {
+		name  string
+		route *application.AccountRouteView
+	}{{"Mail", account.Mail}, {"Calendar", account.Calendar}} {
+		if service.route == nil {
+			continue
+		}
+		if _, err := view.printf(
+			"\n  %-10s %s\n  %-10s %s\n",
+			service.name,
+			service.route.Provider,
+			"Available",
+			yesNo(service.route.Available),
+		); err != nil {
+			return err
+		}
+		for _, endpoint := range service.route.Endpoints {
+			if _, err := view.printf(
+				"  %-10s %s\n",
+				endpoint.Kind,
+				sanitizeCell(endpoint.Value, 2048),
+			); err != nil {
+				return err
+			}
+		}
+		if service.route.Identity != "" {
+			if _, err := view.printf(
+				"  %-10s %s\n",
+				"Identity",
+				sanitizeCell(service.route.Identity, 320),
+			); err != nil {
+				return err
+			}
+		}
+		if service.route.Credential != nil {
+			if _, err := view.printf(
+				"  %-10s %s · consent %s\n",
+				"Credential",
+				service.route.Credential.Backend,
+				yesNo(service.route.Credential.Consented),
+			); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (command *accountAddCommand) Run(app *runtime) error {
@@ -153,7 +203,11 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	selected, err := selectAccountCandidate(result, command.Provider, command.Origin)
+	endpointOverride := command.Origin
+	if command.Provider == string(domain.ProviderJMAP) {
+		endpointOverride = command.SessionURL
+	}
+	selected, err := selectAccountCandidate(result, command.Provider, endpointOverride)
 	if err != nil {
 		return err
 	}
@@ -161,18 +215,13 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	if alias == "" {
 		alias = command.Address[:strings.LastIndexByte(command.Address, '@')]
 	}
-	origin := command.Origin
-	if origin == "" {
-		origin = candidateEndpoint(selected, "origin")
-	}
-	if origin == "" {
-		return errors.New(
-			"selected provider has no discovered origin; pass --origin with an explicit HTTPS origin",
-		)
+	mail, calendar, endpoint, err := command.routes(selected, result.Address)
+	if err != nil {
+		return err
 	}
 	account, err := accounts.Add(app.context, application.AccountAddInput{
-		Alias: alias, Address: result.Address, Provider: selected.Provider,
-		Origin: origin, Mailbox: command.Mailbox, Default: command.Default,
+		Alias: alias, Address: result.Address, Mail: mail, Calendar: calendar,
+		Default: command.Default,
 	})
 	if err != nil {
 		return err
@@ -189,11 +238,84 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		"Provider", selected.Provider,
 		"Confidence", selected.Confidence,
 		"Authentication", selected.Authentication,
-		"Origin", sanitizeCell(origin, 2048),
+		"Endpoint", sanitizeCell(endpoint, 2048),
 		view.success(),
 		view.strong("Account "+sanitizeCell(account.Alias, 64)+" added; authentication has not started"),
 	)
 	return err
+}
+
+func (command accountAddCommand) routes(
+	selected application.ProviderCandidate,
+	address string,
+) (*application.AccountMailRouteInput, *application.AccountCalendarRouteInput, string, error) {
+	switch selected.Provider {
+	case domain.ProviderMicrosoftOWA:
+		origin := command.Origin
+		if origin == "" {
+			origin = candidateEndpoint(selected, "origin")
+		}
+		if origin == "" {
+			return nil, nil, "", errors.New(
+				"selected provider has no origin; pass --origin with an explicit HTTPS origin",
+			)
+		}
+		web := &application.AccountOutlookWebInput{
+			Origin: origin, Mailbox: command.Mailbox,
+		}
+		return &application.AccountMailRouteInput{
+				Provider: domain.ProviderMicrosoftOWA, OutlookWeb: web,
+			}, &application.AccountCalendarRouteInput{
+				Provider: domain.ProviderMicrosoftOWA,
+				OutlookWeb: &application.AccountOutlookWebInput{
+					Origin: origin, Mailbox: command.Mailbox,
+				},
+			}, origin, nil
+	case domain.ProviderJMAP:
+		sessionURL := command.SessionURL
+		if sessionURL == "" {
+			sessionURL = candidateHTTPSEndpoint(selected, "jmap")
+		}
+		if sessionURL == "" {
+			return nil, nil, "", errors.New(
+				"selected JMAP provider needs --session-url with an explicit HTTPS session resource",
+			)
+		}
+		username := command.Username
+		if username == "" {
+			username = address
+		}
+		if command.CredentialBackend == "" || command.CredentialKey == "" ||
+			!command.ApproveCredential {
+			return nil, nil, "", errors.New(
+				"JMAP requires --credential-backend, --credential-key, and --approve-credential",
+			)
+		}
+		return &application.AccountMailRouteInput{
+			Provider: domain.ProviderJMAP,
+			JMAP: &application.AccountJMAPInput{
+				SessionURL: sessionURL,
+				Username:   username,
+				Credential: application.AccountCredentialInput{
+					Backend: command.CredentialBackend,
+					Key:     command.CredentialKey,
+					Consent: command.ApproveCredential,
+				},
+			},
+		}, nil, sessionURL, nil
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderCalDAV,
+		domain.ProviderPOP3:
+		return nil, nil, "", fmt.Errorf(
+			"provider %q has no account route builder",
+			selected.Provider,
+		)
+	default:
+		return nil, nil, "", fmt.Errorf("unknown provider %q", selected.Provider)
+	}
 }
 
 func (command *accountRenameCommand) Run(app *runtime) error {
@@ -275,7 +397,7 @@ func selectAccountCandidate(
 				return candidate, nil
 			}
 		}
-		if provider != domain.ProviderMicrosoftOWA {
+		if provider != domain.ProviderMicrosoftOWA && provider != domain.ProviderJMAP {
 			return application.ProviderCandidate{}, fmt.Errorf(
 				"provider %q is not available in this build",
 				provider,
@@ -283,19 +405,25 @@ func selectAccountCandidate(
 		}
 		if originOverride == "" {
 			return application.ProviderCandidate{}, errors.New(
-				"manual provider selection requires --origin",
+				"manual provider selection requires an explicit provider endpoint",
 			)
 		}
 		if _, err := url.ParseRequestURI(originOverride); err != nil {
 			return application.ProviderCandidate{}, errors.New("--origin is not a valid URI")
 		}
+		authentication := application.DiscoveryBrowserFirstParty
+		kind := "origin"
+		if provider == domain.ProviderJMAP {
+			authentication = application.DiscoveryExternalCredential
+			kind = "jmap"
+		}
 		return application.ProviderCandidate{
-			Provider: domain.ProviderMicrosoftOWA, Confidence: 0,
-			Authentication:            application.DiscoveryBrowserFirstParty,
+			Provider: provider, Confidence: 0,
+			Authentication:            authentication,
 			RequiresExplicitSelection: true,
 			Available:                 true,
 			Endpoints: []application.DiscoveredEndpoint{
-				{Kind: "origin", Value: originOverride},
+				{Kind: kind, Value: originOverride},
 			},
 			Evidence: []application.DiscoveryEvidence{
 				{Source: "manual_override", Detail: result.Domain},
@@ -319,6 +447,39 @@ func candidateEndpoint(candidate application.ProviderCandidate, kind string) str
 		}
 	}
 	return ""
+}
+
+func candidateHTTPSEndpoint(
+	candidate application.ProviderCandidate,
+	kind string,
+) string {
+	for _, endpoint := range candidate.Endpoints {
+		if endpoint.Kind == kind && strings.HasPrefix(endpoint.Value, "https://") {
+			return endpoint.Value
+		}
+	}
+	return ""
+}
+
+func accountRouteLabel(account application.AccountView) string {
+	mail, calendar := "–", "–"
+	if account.Mail != nil {
+		mail = string(account.Mail.Provider)
+	}
+	if account.Calendar != nil {
+		calendar = string(account.Calendar.Provider)
+	}
+	if mail == calendar {
+		return mail
+	}
+	return "mail:" + mail + " · cal:" + calendar
+}
+
+func yesNo(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
 }
 
 func writeDiscoveryResult(app *runtime, result application.AccountDiscoveryResult) error {

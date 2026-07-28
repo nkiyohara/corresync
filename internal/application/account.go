@@ -11,15 +11,31 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 )
 
+// AccountCredentialView is the only credential information exposed by account
+// reads. Lookup keys, helper arguments, and credential values are omitted.
+type AccountCredentialView struct {
+	Configured bool   `json:"configured"`
+	Backend    string `json:"backend,omitempty"`
+	Consented  bool   `json:"consented"`
+}
+
+// AccountRouteView is a provider-neutral, secret-free service route summary.
+type AccountRouteView struct {
+	Provider   domain.ProviderID      `json:"provider"`
+	Available  bool                   `json:"available"`
+	Endpoints  []DiscoveredEndpoint   `json:"endpoints"`
+	Identity   string                 `json:"identity,omitempty"`
+	Credential *AccountCredentialView `json:"credential,omitempty"`
+}
+
 // AccountView is the secret-free account lifecycle contract shared by CLI and
-// MCP. Alias is mutable; ID is the stable isolation boundary.
+// MCP. Mail and calendar routes may use different providers.
 type AccountView struct {
 	ID        domain.AccountID  `json:"id"`
 	Alias     string            `json:"alias"`
 	Address   string            `json:"address,omitempty"`
-	Provider  domain.ProviderID `json:"provider"`
-	Origin    string            `json:"origin"`
-	Mailbox   string            `json:"mailbox,omitempty"`
+	Mail      *AccountRouteView `json:"mail,omitempty"`
+	Calendar  *AccountRouteView `json:"calendar,omitempty"`
 	IsDefault bool              `json:"isDefault"`
 }
 
@@ -28,15 +44,59 @@ type AccountCatalog struct {
 	Accounts []AccountView `json:"accounts"`
 }
 
-// AccountAddInput explicitly selects the candidate to persist. Discovery never
-// writes this configuration or starts authentication.
+// AccountCredentialInput is an external lookup selected with explicit consent.
+// It is accepted only as write input and never appears in AccountView.
+type AccountCredentialInput struct {
+	Backend string `json:"backend"`
+	Key     string `json:"key"`
+	Consent bool   `json:"consent"`
+}
+
+// AccountOutlookWebInput configures a first-party browser route.
+type AccountOutlookWebInput struct {
+	Origin  string `json:"origin"`
+	Mailbox string `json:"mailbox,omitempty"`
+}
+
+// AccountJMAPInput configures one RFC 8620 session resource.
+type AccountJMAPInput struct {
+	SessionURL string                 `json:"sessionUrl"`
+	Username   string                 `json:"username"`
+	Credential AccountCredentialInput `json:"credential"`
+}
+
+// AccountMailRouteInput is a closed selection for shipped mail adapters.
+type AccountMailRouteInput struct {
+	Provider   domain.ProviderID       `json:"provider"`
+	OutlookWeb *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
+	JMAP       *AccountJMAPInput       `json:"jmap,omitempty"`
+}
+
+// AccountCalendarRouteInput is the corresponding calendar selection.
+type AccountCalendarRouteInput struct {
+	Provider   domain.ProviderID       `json:"provider"`
+	OutlookWeb *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
+}
+
+// AccountAddInput explicitly selects service routes to persist. Discovery
+// never writes configuration or starts authentication.
 type AccountAddInput struct {
-	Alias    string            `json:"alias"`
-	Address  string            `json:"address"`
-	Provider domain.ProviderID `json:"provider"`
-	Origin   string            `json:"origin"`
-	Mailbox  string            `json:"mailbox,omitempty"`
-	Default  bool              `json:"default"`
+	Alias    string                     `json:"alias"`
+	Address  string                     `json:"address"`
+	Mail     *AccountMailRouteInput     `json:"mail,omitempty"`
+	Calendar *AccountCalendarRouteInput `json:"calendar,omitempty"`
+	Default  bool                       `json:"default"`
+}
+
+// AccountRegistration is the validated write contract passed only to the local
+// configuration repository. It is never serialized as an account read result.
+type AccountRegistration struct {
+	ID        domain.AccountID           `json:"-"`
+	Alias     string                     `json:"-"`
+	Address   string                     `json:"-"`
+	Mail      *AccountMailRouteInput     `json:"-"`
+	Calendar  *AccountCalendarRouteInput `json:"-"`
+	IsDefault bool                       `json:"-"`
 }
 
 // AccountRenameInput changes only the human-facing alias.
@@ -55,7 +115,7 @@ type AccountRemoveInput struct {
 // must perform each mutation atomically against the latest complete config.
 type AccountRepository interface {
 	ListAccounts(context.Context) (AccountCatalog, error)
-	AddAccount(context.Context, AccountView) error
+	AddAccount(context.Context, AccountRegistration) error
 	RenameAccount(context.Context, domain.AccountID, string) error
 	RemoveAccount(context.Context, domain.AccountID, string) error
 }
@@ -112,6 +172,9 @@ func (service *AccountService) List(ctx context.Context) (AccountCatalog, error)
 	if err := validateAccountCatalog(catalog); err != nil {
 		return AccountCatalog{}, fmt.Errorf("validate account repository: %w", err)
 	}
+	for index := range catalog.Accounts {
+		service.markRouteAvailability(&catalog.Accounts[index])
+	}
 	slices.SortFunc(catalog.Accounts, func(left, right AccountView) int {
 		return strings.Compare(left.Alias, right.Alias)
 	})
@@ -150,21 +213,17 @@ func (service *AccountService) Add(
 	if err != nil {
 		return AccountView{}, err
 	}
-	if err := input.Provider.Validate(); err != nil {
-		return AccountView{}, err
+	if input.Mail == nil && input.Calendar == nil {
+		return AccountView{}, errors.New("at least one mail or calendar route is required")
 	}
-	if _, available := service.available[input.Provider]; !available {
-		return AccountView{}, fmt.Errorf(
-			"provider %q is not available in this build",
-			input.Provider,
-		)
+	if input.Mail != nil {
+		if err := service.validateMailRoute(*input.Mail); err != nil {
+			return AccountView{}, fmt.Errorf("mail route: %w", err)
+		}
 	}
-	if err := validateAccountOrigin(input.Origin); err != nil {
-		return AccountView{}, err
-	}
-	if input.Mailbox != "" {
-		if _, _, err := normalizeDiscoveryAddress(input.Mailbox); err != nil {
-			return AccountView{}, errors.New("mailbox must be one bare email address")
+	if input.Calendar != nil {
+		if err := service.validateCalendarRoute(*input.Calendar); err != nil {
+			return AccountView{}, fmt.Errorf("calendar route: %w", err)
 		}
 	}
 	catalog, err := service.List(ctx)
@@ -180,15 +239,17 @@ func (service *AccountService) Add(
 	if err != nil {
 		return AccountView{}, fmt.Errorf("generate account ID: %w", err)
 	}
-	account := AccountView{
+	registration := AccountRegistration{
 		ID: accountID, Alias: input.Alias, Address: normalizedAddress,
-		Provider: input.Provider, Origin: input.Origin, Mailbox: input.Mailbox,
+		Mail: cloneMailRoute(input.Mail), Calendar: cloneCalendarRoute(input.Calendar),
 		IsDefault: input.Default || len(catalog.Accounts) == 0,
 	}
+	account := registration.view()
+	service.markRouteAvailability(&account)
 	if err := validateAccountView(account); err != nil {
 		return AccountView{}, err
 	}
-	if err := service.repository.AddAccount(ctx, account); err != nil {
+	if err := service.repository.AddAccount(ctx, registration); err != nil {
 		return AccountView{}, fmt.Errorf("add account: %w", err)
 	}
 	return account, nil
@@ -308,18 +369,268 @@ func validateAccountView(account AccountView) error {
 			return err
 		}
 	}
-	if err := account.Provider.Validate(); err != nil {
-		return err
+	if account.Mail == nil && account.Calendar == nil {
+		return errors.New("account has no service routes")
 	}
-	if err := validateAccountOrigin(account.Origin); err != nil {
-		return err
+	if account.Mail != nil {
+		if err := validateAccountRouteView(*account.Mail); err != nil {
+			return fmt.Errorf("mail route: %w", err)
+		}
 	}
-	if account.Mailbox != "" {
-		if _, _, err := normalizeDiscoveryAddress(account.Mailbox); err != nil {
-			return errors.New("mailbox must be one bare email address")
+	if account.Calendar != nil {
+		if err := validateAccountRouteView(*account.Calendar); err != nil {
+			return fmt.Errorf("calendar route: %w", err)
 		}
 	}
 	return nil
+}
+
+func (service *AccountService) markRouteAvailability(account *AccountView) {
+	for _, route := range []*AccountRouteView{account.Mail, account.Calendar} {
+		if route != nil {
+			_, route.Available = service.available[route.Provider]
+		}
+	}
+}
+
+func (service *AccountService) requireAvailable(provider domain.ProviderID) error {
+	if err := provider.Validate(); err != nil {
+		return err
+	}
+	if _, available := service.available[provider]; !available {
+		return fmt.Errorf("provider %q is not available in this build", provider)
+	}
+	return nil
+}
+
+func (service *AccountService) validateMailRoute(route AccountMailRouteInput) error {
+	if err := service.requireAvailable(route.Provider); err != nil {
+		return err
+	}
+	present := 0
+	if route.OutlookWeb != nil {
+		present++
+	}
+	if route.JMAP != nil {
+		present++
+	}
+	if present != 1 {
+		return errors.New("exactly one provider-specific mail route is required")
+	}
+	switch route.Provider {
+	case domain.ProviderMicrosoftOWA:
+		if route.OutlookWeb == nil {
+			return errors.New("microsoft-owa requires outlookWeb settings")
+		}
+		return validateOutlookWebInput(*route.OutlookWeb)
+	case domain.ProviderJMAP:
+		if route.JMAP == nil {
+			return errors.New("jmap requires JMAP settings")
+		}
+		return validateJMAPInput(*route.JMAP)
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderCalDAV,
+		domain.ProviderPOP3:
+		return fmt.Errorf("provider %q cannot supply a configured mail route", route.Provider)
+	default:
+		return fmt.Errorf("unknown mail provider %q", route.Provider)
+	}
+}
+
+func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteInput) error {
+	if err := service.requireAvailable(route.Provider); err != nil {
+		return err
+	}
+	if route.Provider != domain.ProviderMicrosoftOWA || route.OutlookWeb == nil {
+		return fmt.Errorf(
+			"provider %q cannot supply a configured calendar route",
+			route.Provider,
+		)
+	}
+	return validateOutlookWebInput(*route.OutlookWeb)
+}
+
+func validateOutlookWebInput(route AccountOutlookWebInput) error {
+	if err := validateAccountOrigin(route.Origin); err != nil {
+		return err
+	}
+	return validateOptionalMailbox(route.Mailbox)
+}
+
+func validateJMAPInput(route AccountJMAPInput) error {
+	if err := validateAccountHTTPSURL("JMAP session URL", route.SessionURL, true); err != nil {
+		return err
+	}
+	if route.Username == "" || len(route.Username) > 320 ||
+		strings.TrimSpace(route.Username) != route.Username ||
+		strings.ContainsAny(route.Username, "\r\n\x00") {
+		return errors.New("JMAP username is malformed")
+	}
+	return validateAccountCredential(route.Credential)
+}
+
+func validateAccountCredential(reference AccountCredentialInput) error {
+	switch reference.Backend {
+	case "os-keyring", "helper":
+	default:
+		return errors.New("credential backend must be os-keyring or helper")
+	}
+	if !reference.Consent {
+		return errors.New("credential use requires explicit consent")
+	}
+	if reference.Key == "" || len(reference.Key) > 256 ||
+		strings.ContainsAny(reference.Key, "\r\n\x00") {
+		return errors.New("credential key is malformed")
+	}
+	return nil
+}
+
+func validateOptionalMailbox(mailbox string) error {
+	if mailbox == "" {
+		return nil
+	}
+	normalized, _, err := normalizeDiscoveryAddress(mailbox)
+	if err != nil || normalized != mailbox {
+		return errors.New("mailbox must be one normalized bare email address")
+	}
+	return nil
+}
+
+func validateAccountHTTPSURL(name, raw string, allowPath bool) error {
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" ||
+		parsed.User != nil || parsed.Fragment != "" {
+		return fmt.Errorf("%s must be an absolute credential-free HTTPS URL", name)
+	}
+	if !allowPath && (parsed.Path != "" && parsed.Path != "/" || parsed.RawQuery != "") {
+		return fmt.Errorf("%s must not contain a path or query", name)
+	}
+	return nil
+}
+
+func validateAccountRouteView(route AccountRouteView) error {
+	if err := route.Provider.Validate(); err != nil {
+		return err
+	}
+	if len(route.Endpoints) == 0 || len(route.Endpoints) > 4 {
+		return errors.New("route endpoint count is invalid")
+	}
+	for _, endpoint := range route.Endpoints {
+		if endpoint.Kind == "" || len(endpoint.Kind) > 32 ||
+			endpoint.Value == "" || len(endpoint.Value) > 2048 ||
+			strings.ContainsAny(endpoint.Kind+endpoint.Value, "\r\n\x00") {
+			return errors.New("route endpoint is malformed")
+		}
+	}
+	if route.Identity != "" && (len(route.Identity) > 320 ||
+		strings.ContainsAny(route.Identity, "\r\n\x00")) {
+		return errors.New("route identity is malformed")
+	}
+	if route.Credential != nil {
+		switch route.Credential.Backend {
+		case "os-keyring", "helper":
+		default:
+			return errors.New("route credential backend is malformed")
+		}
+		if !route.Credential.Configured {
+			return errors.New("route credential summary is inconsistent")
+		}
+	}
+	return nil
+}
+
+func (registration AccountRegistration) view() AccountView {
+	return AccountView{
+		ID: registration.ID, Alias: registration.Alias, Address: registration.Address,
+		Mail: mailRouteView(registration.Mail), Calendar: calendarRouteView(registration.Calendar),
+		IsDefault: registration.IsDefault,
+	}
+}
+
+func mailRouteView(route *AccountMailRouteInput) *AccountRouteView {
+	if route == nil {
+		return nil
+	}
+	switch route.Provider {
+	case domain.ProviderMicrosoftOWA:
+		return outlookWebRouteView(route.Provider, route.OutlookWeb)
+	case domain.ProviderJMAP:
+		if route.JMAP == nil {
+			return &AccountRouteView{Provider: route.Provider}
+		}
+		return &AccountRouteView{
+			Provider: route.Provider,
+			Endpoints: []DiscoveredEndpoint{
+				{Kind: "session", Value: route.JMAP.SessionURL},
+			},
+			Identity: route.JMAP.Username,
+			Credential: &AccountCredentialView{
+				Configured: true, Backend: route.JMAP.Credential.Backend,
+				Consented: route.JMAP.Credential.Consent,
+			},
+		}
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderGoogleAPI,
+		domain.ProviderGoogleWeb,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderCalDAV,
+		domain.ProviderPOP3:
+		return &AccountRouteView{Provider: route.Provider}
+	default:
+		return &AccountRouteView{Provider: route.Provider}
+	}
+}
+
+func calendarRouteView(route *AccountCalendarRouteInput) *AccountRouteView {
+	if route == nil {
+		return nil
+	}
+	return outlookWebRouteView(route.Provider, route.OutlookWeb)
+}
+
+func outlookWebRouteView(
+	provider domain.ProviderID,
+	route *AccountOutlookWebInput,
+) *AccountRouteView {
+	if route == nil {
+		return &AccountRouteView{Provider: provider}
+	}
+	return &AccountRouteView{
+		Provider:  provider,
+		Endpoints: []DiscoveredEndpoint{{Kind: "origin", Value: route.Origin}},
+		Identity:  route.Mailbox,
+	}
+}
+
+func cloneMailRoute(route *AccountMailRouteInput) *AccountMailRouteInput {
+	if route == nil {
+		return nil
+	}
+	cloned := *route
+	if route.OutlookWeb != nil {
+		value := *route.OutlookWeb
+		cloned.OutlookWeb = &value
+	}
+	if route.JMAP != nil {
+		value := *route.JMAP
+		cloned.JMAP = &value
+	}
+	return &cloned
+}
+
+func cloneCalendarRoute(route *AccountCalendarRouteInput) *AccountCalendarRouteInput {
+	if route == nil {
+		return nil
+	}
+	cloned := *route
+	if route.OutlookWeb != nil {
+		value := *route.OutlookWeb
+		cloned.OutlookWeb = &value
+	}
+	return &cloned
 }
 
 func validateAccountOrigin(raw string) error {
