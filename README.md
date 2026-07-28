@@ -12,11 +12,6 @@ where Graph application access is unavailable.
 [Install](docs/install.md) · [MCP guide](docs/mcp.md) ·
 [Feature matrix](docs/features.md) · [JSON contract](docs/json.md)
 
-> [!WARNING]
-> Corresync 0.7 is an early release over undocumented Outlook Web contracts.
-> Use only an account you are authorized to access, review every write, and
-> keep Outlook available for reconciliation after an unknown outcome.
-
 ## Install and sign in
 
 ```console

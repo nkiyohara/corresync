@@ -1,9 +1,5 @@
 # Install and verify
 
-Corresync 0.7 is an early release over undocumented Outlook Web contracts.
-Use only an authorized account and review the
-[compatibility evidence](compatibility.md) before enabling writes.
-
 ## Release targets
 
 Each release contains one native `corresync` executable plus the license,
