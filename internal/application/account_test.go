@@ -205,6 +205,7 @@ func TestAccountLifecycleReviewsNeverMutateRepositoryOrState(t *testing.T) {
 		"acc_00000000000000000000000000000002",
 		false,
 	)
+	personal.Mail.Provider = domain.ProviderMicrosoftGraph
 	repository := &accountRepositoryStub{
 		catalog: AccountCatalog{Accounts: []AccountView{work, personal}},
 	}
@@ -212,7 +213,10 @@ func TestAccountLifecycleReviewsNeverMutateRepositoryOrState(t *testing.T) {
 	service, err := NewAccountService(
 		repository,
 		purger,
-		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+		[]domain.ProviderID{
+			domain.ProviderMicrosoftOWA,
+			domain.ProviderMicrosoftGraph,
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -233,10 +237,14 @@ func TestAccountLifecycleReviewsNeverMutateRepositoryOrState(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.ReviewRemove(t.Context(), AccountRemoveInput{
+	removeReview, err := service.ReviewRemove(t.Context(), AccountRemoveInput{
 		Account: "personal",
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatal(err)
+	}
+	if !removeReview.MayDeleteOwnedOAuth {
+		t.Fatalf("OAuth removal effect was omitted: %+v", removeReview)
 	}
 	if repository.added.ID != "" || repository.renamedID != "" ||
 		repository.removedID != "" || purger.account != "" {

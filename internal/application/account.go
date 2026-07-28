@@ -162,19 +162,20 @@ type AccountRemoveInput struct {
 // AccountChangeReview is the bounded, secret-free account lifecycle summary
 // returned before an MCP configuration mutation.
 type AccountChangeReview struct {
-	Action             string            `json:"action"`
-	Account            domain.AccountID  `json:"account,omitempty"`
-	Alias              string            `json:"alias"`
-	NewAlias           string            `json:"newAlias,omitempty"`
-	Address            string            `json:"address,omitempty"`
-	MailProvider       domain.ProviderID `json:"mailProvider,omitempty"`
-	CalendarProvider   domain.ProviderID `json:"calendarProvider,omitempty"`
-	Mail               *AccountRouteView `json:"mail,omitempty"`
-	Calendar           *AccountRouteView `json:"calendar,omitempty"`
-	MakesDefault       bool              `json:"makesDefault"`
-	ReplacementDefault string            `json:"replacementDefault,omitempty"`
-	PurgesLocalState   bool              `json:"purgesLocalState"`
-	RestartsSessions   bool              `json:"restartsSessions"`
+	Action              string            `json:"action"`
+	Account             domain.AccountID  `json:"account,omitempty"`
+	Alias               string            `json:"alias"`
+	NewAlias            string            `json:"newAlias,omitempty"`
+	Address             string            `json:"address,omitempty"`
+	MailProvider        domain.ProviderID `json:"mailProvider,omitempty"`
+	CalendarProvider    domain.ProviderID `json:"calendarProvider,omitempty"`
+	Mail                *AccountRouteView `json:"mail,omitempty"`
+	Calendar            *AccountRouteView `json:"calendar,omitempty"`
+	MakesDefault        bool              `json:"makesDefault"`
+	ReplacementDefault  string            `json:"replacementDefault,omitempty"`
+	PurgesLocalState    bool              `json:"purgesLocalState"`
+	MayDeleteOwnedOAuth bool              `json:"mayDeleteOwnedOAuth"`
+	RestartsSessions    bool              `json:"restartsSessions"`
 }
 
 // AccountChangeAccess is either an approval-bound preview or a completed
@@ -457,7 +458,28 @@ func (service *AccountService) ReviewRemove(
 	return AccountChangeReview{
 		Action: "remove", Account: account.ID, Alias: account.Alias,
 		ReplacementDefault: replacement, PurgesLocalState: true,
+		MayDeleteOwnedOAuth: accountUsesOAuth(account),
 	}, nil
+}
+
+func accountUsesOAuth(account AccountView) bool {
+	for _, route := range []*AccountRouteView{account.Mail, account.Calendar} {
+		if route == nil {
+			continue
+		}
+		switch route.Provider {
+		case domain.ProviderGoogleAPI, domain.ProviderMicrosoftGraph:
+			return true
+		case
+			domain.ProviderMicrosoftOWA,
+			domain.ProviderGoogleWeb,
+			domain.ProviderJMAP,
+			domain.ProviderIMAPSMTP,
+			domain.ProviderCalDAV,
+			domain.ProviderPOP3:
+		}
+	}
+	return false
 }
 
 func (service *AccountService) reviewRemove(

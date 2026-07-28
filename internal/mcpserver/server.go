@@ -482,7 +482,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "account_remove_commit",
 		Title:       "Commit an approved account removal",
-		Description: "Consume exactly one account_remove approval, close the current session owner, purge only Corresync-owned account state, atomically remove the route, and start a fresh session owner. External credential-owner records are not deleted.",
+		Description: "Consume exactly one account_remove approval, close the current session owner, purge only Corresync-owned account state and any unshared Corresync-owned OAuth grant, atomically remove the route, and start a fresh session owner. Externally owned standards credentials are not deleted.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Commit destructive account removal",
 			ReadOnlyHint:    false,
