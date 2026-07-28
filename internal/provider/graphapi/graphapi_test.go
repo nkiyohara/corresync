@@ -228,7 +228,9 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			Start: "2026-08-01T00:00:00Z", End: "2026-08-02T00:00:00Z",
 		},
 	)
-	if err != nil || len(calendar.Events) != 1 {
+	if err != nil || len(calendar.Events) != 1 ||
+		calendar.Events[0].OriginalStart != "2026-08-01T10:00:00" ||
+		calendar.Events[0].OriginalStartTimeZone != "Pacific Standard Time" {
 		t.Fatalf("calendar = %#v error = %v", calendar, err)
 	}
 	created, err := client.CreateCalendarEvent(
@@ -310,7 +312,9 @@ func graphTestMessage(body bool, etag string) graphMessage {
 func graphTestEvent(etag string) graphEvent {
 	event := graphEvent{
 		ODataETag: etag, ID: "e1", ChangeKey: "change",
-		Subject: "Synthetic event",
+		Subject:               "Synthetic event",
+		OriginalStartTimeZone: "Pacific Standard Time",
+		OriginalEndTimeZone:   "Pacific Standard Time",
 		Start: graphDateTimeZone{
 			DateTime: "2026-08-01T10:00:00", TimeZone: "UTC",
 		},

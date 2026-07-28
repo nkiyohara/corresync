@@ -99,14 +99,15 @@ type mailListCommand struct {
 }
 
 type mailSearchCommand struct {
-	Account  string `help:"Configured account alias; defaults to default_account."`
-	Folder   string `default:"inbox" help:"Well-known folder name."`
-	FolderID string `name:"folder-id" help:"Opaque folder ID from folder discovery."`
-	Query    string `help:"Outlook AQS query (required; 1-1024 UTF-8 bytes)."`
-	Offset   int    `default:"0" help:"Zero-based page offset."`
-	Limit    int    `default:"25" help:"Messages to return (1-50)."`
-	TimeZone string `name:"time-zone" default:"UTC" help:"OWA time-zone identifier."`
-	JSON     bool   `help:"Write the stable machine-readable schema."`
+	Account     string `help:"Configured account alias; defaults to default_account."`
+	AllAccounts bool   `name:"all-accounts" help:"Search every configured mail account as an isolated read-only projection."`
+	Folder      string `default:"inbox" help:"Well-known folder name."`
+	FolderID    string `name:"folder-id" help:"Opaque folder ID from folder discovery; unavailable with all-accounts."`
+	Query       string `help:"Provider search query (required; 1-1024 UTF-8 bytes)."`
+	Offset      int    `default:"0" help:"Zero-based page offset."`
+	Limit       int    `default:"25" help:"Messages to return (1-50)."`
+	TimeZone    string `name:"time-zone" default:"UTC" help:"Provider time-zone identifier; all-accounts requires UTC."`
+	JSON        bool   `help:"Write the stable machine-readable schema."`
 }
 
 type mailMoveCommand struct {
@@ -212,6 +213,46 @@ func (command *mailListCommand) Run(app *runtime) (returnErr error) {
 }
 
 func (command *mailSearchCommand) Run(app *runtime) (returnErr error) {
+	if command.AllAccounts {
+		if command.Account != "" {
+			return errors.New(
+				"mail search --all-accounts cannot select one account",
+			)
+		}
+		if command.FolderID != "" {
+			return errors.New(
+				"mail search --all-accounts cannot reuse one account-specific folder ID",
+			)
+		}
+		input := application.MailProjectionInput{
+			Folder: application.MailFolder{
+				Kind: application.MailFolderDistinguished,
+				ID:   command.Folder,
+			},
+			Query: command.Query, Offset: command.Offset,
+			Limit: command.Limit, TimeZone: command.TimeZone,
+		}
+		if err := input.Validate(); err != nil {
+			return err
+		}
+		client, _, err := app.openDaemon(app.context)
+		if err != nil {
+			return err
+		}
+		defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
+		page, err := client.SearchAllMail(
+			app.context,
+			input,
+			app.caller(),
+		)
+		if err != nil {
+			return err
+		}
+		if command.JSON {
+			return writeJSON(app.stdout, page)
+		}
+		return writeMailProjectionTable(app, page)
+	}
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
@@ -245,6 +286,81 @@ func (command *mailSearchCommand) Run(app *runtime) (returnErr error) {
 		return writeJSON(app.stdout, page)
 	}
 	return writeMailTable(app, page)
+}
+
+func writeMailProjectionTable(
+	app *runtime,
+	page application.MailProjectionPage,
+) error {
+	if len(page.Messages) == 0 {
+		if _, err := fmt.Fprintln(app.stdout, "No messages."); err != nil {
+			return err
+		}
+	} else {
+		writer := tabwriter.NewWriter(app.stdout, 0, 4, 2, ' ', 0)
+		if _, err := fmt.Fprintln(
+			writer,
+			"ACCOUNT\tPROVIDER\tRECEIVED\tFROM\tSUBJECT\tFLAGS\tID",
+		); err != nil {
+			return err
+		}
+		for _, projected := range page.Messages {
+			message := projected.Message
+			from := message.From.Name
+			if from == "" {
+				from = message.From.Address
+			}
+			flags := ""
+			if !message.IsRead {
+				flags += "U"
+			}
+			if message.HasAttachments {
+				flags += "A"
+			}
+			if _, err := fmt.Fprintf(
+				writer,
+				"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				sanitizeCell(projected.AccountAlias, 64),
+				sanitizeCell(string(message.Provenance.Provider), 64),
+				sanitizeCell(message.ReceivedAt, 30),
+				sanitizeCell(from, 32),
+				sanitizeCell(message.Subject, 72),
+				flags,
+				sanitizeCell(message.ID, 4096),
+			); err != nil {
+				return err
+			}
+		}
+		if err := writer.Flush(); err != nil {
+			return err
+		}
+	}
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	for _, status := range page.Accounts {
+		for _, degradation := range status.Degradations {
+			if _, err := view.printf(
+				"%s  %s (%s): %s\n",
+				view.warning(),
+				sanitizeCell(status.Alias, 64),
+				sanitizeCell(string(status.Provider), 64),
+				sanitizeCell(degradation.Reason, 512),
+			); err != nil {
+				return err
+			}
+		}
+	}
+	for _, failure := range page.Failures {
+		if _, err := view.printf(
+			"%s  Incomplete: %s (%s) · %s\n",
+			view.warning(),
+			sanitizeCell(failure.Alias, 64),
+			sanitizeCell(string(failure.Provider), 64),
+			sanitizeCell(failure.Reason, 512),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (command *mailMoveCommand) Run(app *runtime) (returnErr error) {

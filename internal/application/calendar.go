@@ -38,20 +38,26 @@ type CalendarListInput struct {
 // CalendarEvent is metadata only. It excludes body, attendee list, attachment
 // content, and online-meeting join URLs.
 type CalendarEvent struct {
-	ID              string            `json:"id"`
-	ChangeKey       string            `json:"changeKey,omitempty"`
-	Subject         string            `json:"subject,omitempty"`
-	Start           string            `json:"start"`
-	End             string            `json:"end"`
-	Location        string            `json:"location,omitempty"`
-	Organizer       MailAddress       `json:"organizer,omitempty"`
-	IsAllDay        bool              `json:"isAllDay"`
-	IsOnlineMeeting bool              `json:"isOnlineMeeting"`
-	IsOrganizer     bool              `json:"isOrganizer"`
-	IsCancelled     bool              `json:"isCancelled"`
-	MyResponse      string            `json:"myResponse,omitempty"`
-	FreeBusy        string            `json:"freeBusy,omitempty"`
-	Provenance      domain.Provenance `json:"provenance,omitempty"`
+	ID                    string            `json:"id"`
+	ChangeKey             string            `json:"changeKey,omitempty"`
+	Subject               string            `json:"subject,omitempty"`
+	Start                 string            `json:"start"`
+	End                   string            `json:"end"`
+	OriginalStart         string            `json:"originalStart,omitempty"`
+	OriginalEnd           string            `json:"originalEnd,omitempty"`
+	OriginalStartTimeZone string            `json:"originalStartTimeZone,omitempty"`
+	OriginalEndTimeZone   string            `json:"originalEndTimeZone,omitempty"`
+	OriginalStartFloating bool              `json:"originalStartFloating"`
+	OriginalEndFloating   bool              `json:"originalEndFloating"`
+	Location              string            `json:"location,omitempty"`
+	Organizer             MailAddress       `json:"organizer,omitempty"`
+	IsAllDay              bool              `json:"isAllDay"`
+	IsOnlineMeeting       bool              `json:"isOnlineMeeting"`
+	IsOrganizer           bool              `json:"isOrganizer"`
+	IsCancelled           bool              `json:"isCancelled"`
+	MyResponse            string            `json:"myResponse,omitempty"`
+	FreeBusy              string            `json:"freeBusy,omitempty"`
+	Provenance            domain.Provenance `json:"provenance,omitempty"`
 }
 
 // CalendarPage is the stable output contract shared by CLI and MCP.

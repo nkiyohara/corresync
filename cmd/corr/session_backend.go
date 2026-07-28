@@ -189,6 +189,62 @@ func (backend *sessionBackend) ResolveAccount(reference string) (domain.AccountI
 	return account.ID, nil
 }
 
+func (backend *sessionBackend) ProjectionAccounts(
+	ctx context.Context,
+) ([]application.ProjectionAccount, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	if backend.closed {
+		return nil, errors.New("session backend is closed")
+	}
+	aliases := make([]string, 0, len(backend.configuration.Accounts))
+	for alias := range backend.configuration.Accounts {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	accounts := make([]application.ProjectionAccount, 0, len(aliases))
+	for _, alias := range aliases {
+		configured := backend.configuration.Accounts[alias]
+		account := application.ProjectionAccount{
+			Account: configured.ID, Alias: alias,
+			MailProvider:     configured.MailProvider(),
+			CalendarProvider: configured.CalendarProvider(),
+		}
+		active, authenticated := backend.accounts[configured.ID]
+		if authenticated {
+			capabilities := active.capabilities
+			account.Authenticated = true
+			account.Capabilities = &capabilities
+			account.MailDegradations = projectionDegradations(
+				active.degradations,
+				"mail.",
+			)
+			account.CalendarDegradations = projectionDegradations(
+				active.degradations,
+				"calendar.",
+			)
+		}
+		accounts = append(accounts, account)
+	}
+	return accounts, nil
+}
+
+func projectionDegradations(
+	values []domain.Degradation,
+	prefix string,
+) []domain.Degradation {
+	result := make([]domain.Degradation, 0, len(values))
+	for _, degradation := range values {
+		if strings.HasPrefix(degradation.Feature, prefix) {
+			result = append(result, degradation)
+		}
+	}
+	return result
+}
+
 func (backend *sessionBackend) Login(
 	ctx context.Context,
 	accountID domain.AccountID,
@@ -526,6 +582,29 @@ func (backend *sessionBackend) SearchMail(
 		return application.MailPage{}, err
 	}
 	return mail.Search(ctx, input, caller)
+}
+
+func (backend *sessionBackend) SearchAllMail(
+	ctx context.Context,
+	input application.MailProjectionInput,
+	caller domain.Caller,
+) (application.MailProjectionPage, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.MailProjectionPage{}, errors.New(
+			"session backend is closed",
+		)
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+
+	service, err := application.NewProjectionService(backend)
+	if err != nil {
+		return application.MailProjectionPage{}, err
+	}
+	return service.SearchAllMail(ctx, input, caller)
 }
 
 func (backend *sessionBackend) ListMailFolders(
@@ -1000,6 +1079,29 @@ func (backend *sessionBackend) ListCalendar(
 	return calendar.List(ctx, input, caller)
 }
 
+func (backend *sessionBackend) ListAgenda(
+	ctx context.Context,
+	input application.AgendaProjectionInput,
+	caller domain.Caller,
+) (application.AgendaProjectionPage, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.AgendaProjectionPage{}, errors.New(
+			"session backend is closed",
+		)
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+
+	service, err := application.NewProjectionService(backend)
+	if err != nil {
+		return application.AgendaProjectionPage{}, err
+	}
+	return service.ListAgenda(ctx, input, caller)
+}
+
 func (backend *sessionBackend) CreateCalendar(
 	ctx context.Context,
 	input application.CalendarCreateInput,
@@ -1311,6 +1413,16 @@ func (backend *sessionBackend) outlookAccount(
 		closers: []sessionCloser{handle}, mail: mail, calendar: calendar,
 		captured:     credentials.CapturedAt(),
 		capabilities: outlookWebCapabilities(configured),
+	}
+	if calendar != nil {
+		services.degradations = append(
+			services.degradations,
+			domain.Degradation{
+				Feature: "calendar.original_time_zone",
+				Reason:  "Outlook Web calendar views are requested in UTC; an event whose response omits source-zone fields retains the instant but reports UTC as the original zone",
+				Lossy:   true,
+			},
+		)
 	}
 	return services, nil
 }

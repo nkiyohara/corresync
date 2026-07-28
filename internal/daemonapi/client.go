@@ -200,6 +200,35 @@ func (client *Client) SearchMail(ctx context.Context, input application.MailSear
 	return result, client.call(ctx, MethodMailSearch, caller, input, &result)
 }
 
+// SearchAllMail returns one validated read-only projection without exposing
+// daemon-owned account sessions to the caller.
+func (client *Client) SearchAllMail(
+	ctx context.Context,
+	input application.MailProjectionInput,
+	caller domain.Caller,
+) (application.MailProjectionPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailProjectionPage{}, err
+	}
+	var result application.MailProjectionPage
+	if err := client.call(
+		ctx,
+		MethodMailSearchAll,
+		caller,
+		input,
+		&result,
+	); err != nil {
+		return application.MailProjectionPage{}, err
+	}
+	if err := result.Validate(); err != nil {
+		return application.MailProjectionPage{}, fmt.Errorf(
+			"validate daemon mail projection: %w",
+			err,
+		)
+	}
+	return result, nil
+}
+
 // ListMailFolders discovers bounded folder metadata through the session owner.
 func (client *Client) ListMailFolders(ctx context.Context, input application.MailFolderListInput, caller domain.Caller) (application.MailFolderPage, error) {
 	var result application.MailFolderPage
@@ -279,6 +308,34 @@ func (client *Client) CommitMailDelete(ctx context.Context, token string, caller
 func (client *Client) ListCalendar(ctx context.Context, input application.CalendarListInput, caller domain.Caller) (application.CalendarPage, error) {
 	var result application.CalendarPage
 	return result, client.call(ctx, MethodCalendarList, caller, input, &result)
+}
+
+// ListAgenda returns one validated read-only cross-account event projection.
+func (client *Client) ListAgenda(
+	ctx context.Context,
+	input application.AgendaProjectionInput,
+	caller domain.Caller,
+) (application.AgendaProjectionPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.AgendaProjectionPage{}, err
+	}
+	var result application.AgendaProjectionPage
+	if err := client.call(
+		ctx,
+		MethodAgendaList,
+		caller,
+		input,
+		&result,
+	); err != nil {
+		return application.AgendaProjectionPage{}, err
+	}
+	if err := result.Validate(); err != nil {
+		return application.AgendaProjectionPage{}, fmt.Errorf(
+			"validate daemon agenda projection: %w",
+			err,
+		)
+	}
+	return result, nil
 }
 
 // CreateCalendar prepares an immutable calendar event preview.

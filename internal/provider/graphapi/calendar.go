@@ -37,7 +37,9 @@ type graphEvent struct {
 	ResponseStatus struct {
 		Response string `json:"response"`
 	} `json:"responseStatus"`
-	Attendees []struct {
+	OriginalStartTimeZone string `json:"originalStartTimeZone"`
+	OriginalEndTimeZone   string `json:"originalEndTimeZone"`
+	Attendees             []struct {
 		Type         string            `json:"type"`
 		EmailAddress graphEmailAddress `json:"emailAddress"`
 	} `json:"attendees"`
@@ -70,7 +72,8 @@ func (client *Client) ListCalendarEvents(
 			"$top":          {"1000"},
 			"$select": {
 				"id,changeKey,subject,start,end,location,organizer,isAllDay," +
-					"isOnlineMeeting,isOrganizer,isCancelled,showAs,responseStatus",
+					"isOnlineMeeting,isOrganizer,isCancelled,showAs,responseStatus," +
+					"originalStartTimeZone,originalEndTimeZone",
 			},
 			"$orderby": {"start/dateTime"},
 		},
@@ -127,10 +130,22 @@ func graphEventView(
 	if response == "none" || response == "notresponded" {
 		response = "not_responded"
 	}
+	startZone := event.OriginalStartTimeZone
+	if startZone == "" {
+		startZone = event.Start.TimeZone
+	}
+	endZone := event.OriginalEndTimeZone
+	if endZone == "" {
+		endZone = event.End.TimeZone
+	}
 	return application.CalendarEvent{
 		ID: id, ChangeKey: encodeETag(event.ODataETag),
 		Subject: event.Subject, Start: start, End: end,
-		Location: event.Location.DisplayName,
+		OriginalStart:         event.Start.DateTime,
+		OriginalEnd:           event.End.DateTime,
+		OriginalStartTimeZone: startZone,
+		OriginalEndTimeZone:   endZone,
+		Location:              event.Location.DisplayName,
 		Organizer: application.MailAddress{
 			Name:    event.Organizer.EmailAddress.Name,
 			Address: event.Organizer.EmailAddress.Address,

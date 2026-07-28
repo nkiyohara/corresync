@@ -26,6 +26,7 @@ const (
 type fakeBackend struct {
 	mailInput         application.MailListInput
 	searchInput       application.MailSearchInput
+	searchAllInput    application.MailProjectionInput
 	bodyInput         application.MailBodyInput
 	attachmentInput   application.MailAttachmentInput
 	draftInput        application.MailDraftInput
@@ -35,6 +36,7 @@ type fakeBackend struct {
 	deleteInput       application.MailDeleteInput
 	folderInput       application.MailFolderListInput
 	calendarListInput application.CalendarListInput
+	agendaInput       application.AgendaProjectionInput
 	createInput       application.CalendarCreateInput
 	updateInput       application.CalendarUpdateInput
 	cancelInput       application.CalendarCancelInput
@@ -81,6 +83,29 @@ func (backend *fakeBackend) ListMail(_ context.Context, input application.MailLi
 func (backend *fakeBackend) SearchMail(_ context.Context, input application.MailSearchInput, caller domain.Caller) (application.MailPage, error) {
 	backend.searchInput, backend.caller = input, caller
 	return application.MailPage{Messages: []application.MailSummary{{ID: "search-message-1"}}}, nil
+}
+func (backend *fakeBackend) SearchAllMail(_ context.Context, input application.MailProjectionInput, caller domain.Caller) (application.MailProjectionPage, error) {
+	backend.searchAllInput, backend.caller = input, caller
+	capabilities := domain.Capabilities{Mail: true}
+	return application.MailProjectionPage{
+		Messages: []application.ProjectedMail{{
+			AccountAlias: "work",
+			Message: application.MailSummary{
+				ID: "search-all-message-1", ReceivedAt: "2026-07-28T10:00:00Z",
+				Provenance: domain.Provenance{
+					AccountID: testAccountID, Provider: domain.ProviderMicrosoftOWA,
+					MailboxID: "mailbox", SourceObjectID: "search-all-message-1",
+				},
+			},
+		}},
+		Accounts: []application.ProjectionAccountStatus{{
+			Account: testAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA, Service: "mail",
+			Complete: true, FetchedItems: 1, Exhausted: true,
+			Capabilities: &capabilities,
+		}},
+		Offset: input.Offset, Limit: input.Limit, Complete: true,
+	}, nil
 }
 func (backend *fakeBackend) ListMailFolders(_ context.Context, input application.MailFolderListInput, caller domain.Caller) (application.MailFolderPage, error) {
 	backend.folderInput, backend.caller = input, caller
@@ -165,6 +190,37 @@ func (backend *fakeBackend) ListCalendar(_ context.Context, input application.Ca
 	return application.CalendarPage{
 		Events: []application.CalendarEvent{{ID: "event-1", Start: input.Start, End: input.End}},
 		Start:  input.Start, End: input.End,
+	}, nil
+}
+func (backend *fakeBackend) ListAgenda(_ context.Context, input application.AgendaProjectionInput, caller domain.Caller) (application.AgendaProjectionPage, error) {
+	backend.agendaInput, backend.caller = input, caller
+	capabilities := domain.Capabilities{Calendar: true}
+	return application.AgendaProjectionPage{
+		Events: []application.ProjectedAgendaEvent{{
+			AccountAlias: "work", DisplayStart: "2026-07-28T10:00:00Z",
+			DisplayEnd:      "2026-07-28T11:00:00Z",
+			DisplayTimeZone: input.DisplayTimeZone,
+			Event: application.CalendarEvent{
+				ID:    "agenda-event-1",
+				Start: "2026-07-28T10:00:00Z", End: "2026-07-28T11:00:00Z",
+				OriginalStart:         "2026-07-28T10:00:00Z",
+				OriginalEnd:           "2026-07-28T11:00:00Z",
+				OriginalStartTimeZone: "UTC", OriginalEndTimeZone: "UTC",
+				Provenance: domain.Provenance{
+					AccountID: testAccountID, Provider: domain.ProviderMicrosoftOWA,
+					CalendarID: "calendar", SourceObjectID: "agenda-event-1",
+				},
+			},
+		}},
+		Accounts: []application.ProjectionAccountStatus{{
+			Account: testAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA, Service: "calendar",
+			Complete: true, FetchedItems: 1, Exhausted: true,
+			Capabilities: &capabilities,
+		}},
+		Start: input.Start, End: input.End,
+		DisplayTimeZone: input.DisplayTimeZone,
+		Offset:          input.Offset, Limit: input.Limit, Complete: true,
 	}, nil
 }
 func (backend *fakeBackend) CreateCalendar(_ context.Context, input application.CalendarCreateInput, caller domain.Caller) (application.CalendarCreateAccess, error) {
@@ -336,6 +392,22 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	if err != nil || len(search.Messages) != 1 || backend.searchInput.Query != "subject:synthetic" {
 		t.Fatalf("SearchMail() = %+v, %v; backend input=%+v", search, err, backend.searchInput)
 	}
+	searchAll, err := client.SearchAllMail(t.Context(), application.MailProjectionInput{
+		Folder: application.MailFolder{
+			Kind: application.MailFolderDistinguished,
+			ID:   "inbox",
+		},
+		Query: "subject:synthetic", Limit: 25, TimeZone: "UTC",
+	}, caller)
+	if err != nil || len(searchAll.Messages) != 1 ||
+		backend.searchAllInput.Query != "subject:synthetic" {
+		t.Fatalf(
+			"SearchAllMail() = %+v, %v; backend input=%+v",
+			searchAll,
+			err,
+			backend.searchAllInput,
+		)
+	}
 	moved, err := client.MoveMail(t.Context(), application.MailMoveInput{
 		Account: testAccountID, MessageID: "message-1", ChangeKey: "change-1",
 		Destination: application.MailFolder{Kind: application.MailFolderOpaque, ID: "folder-1"},
@@ -415,6 +487,21 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	}, caller)
 	if err != nil || len(calendarPage.Events) != 1 || backend.calendarListInput.Start != "2026-07-20T09:00:00Z" {
 		t.Fatalf("ListCalendar() = %+v, %v; backend input=%+v", calendarPage, err, backend.calendarListInput)
+	}
+	agenda, err := client.ListAgenda(t.Context(), application.AgendaProjectionInput{
+		Start:           "2026-07-20T09:00:00Z",
+		End:             "2026-07-20T12:00:00Z",
+		DisplayTimeZone: "UTC",
+		Limit:           25,
+	}, caller)
+	if err != nil || len(agenda.Events) != 1 ||
+		backend.agendaInput.DisplayTimeZone != "UTC" {
+		t.Fatalf(
+			"ListAgenda() = %+v, %v; backend input=%+v",
+			agenda,
+			err,
+			backend.agendaInput,
+		)
 	}
 	calendarAccess, err := client.CreateCalendar(t.Context(), application.CalendarCreateInput{
 		Account:      testAccountID,

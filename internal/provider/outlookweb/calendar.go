@@ -50,12 +50,16 @@ type calendarViewItemGroup struct {
 }
 
 type calendarViewItem struct {
-	ItemID    itemID        `json:"ItemId"`
-	Subject   string        `json:"Subject"`
-	Start     string        `json:"Start"`
-	End       string        `json:"End"`
-	Location  calendarPlace `json:"Location"`
-	Locations []struct {
+	ItemID          itemID             `json:"ItemId"`
+	Subject         string             `json:"Subject"`
+	Start           string             `json:"Start"`
+	End             string             `json:"End"`
+	StartTimeZone   timeZoneDefinition `json:"StartTimeZone"`
+	EndTimeZone     timeZoneDefinition `json:"EndTimeZone"`
+	StartTimeZoneID string             `json:"StartTimeZoneId"`
+	EndTimeZoneID   string             `json:"EndTimeZoneId"`
+	Location        calendarPlace      `json:"Location"`
+	Locations       []struct {
 		DisplayName string `json:"DisplayName"`
 	} `json:"Locations"`
 	Organizer       recipient `json:"Organizer"`
@@ -136,20 +140,38 @@ func (client *Client) ListCalendarEvents(
 		if location == "" && len(item.Locations) > 0 {
 			location = item.Locations[0].DisplayName
 		}
+		startZone := item.StartTimeZone.ID
+		if startZone == "" {
+			startZone = item.StartTimeZoneID
+		}
+		if startZone == "" {
+			startZone = defaultZone
+		}
+		endZone := item.EndTimeZone.ID
+		if endZone == "" {
+			endZone = item.EndTimeZoneID
+		}
+		if endZone == "" {
+			endZone = defaultZone
+		}
 		page.Events = append(page.Events, application.CalendarEvent{
-			ID:              item.ItemID.ID,
-			ChangeKey:       item.ItemID.ChangeKey,
-			Subject:         item.Subject,
-			Start:           start,
-			End:             end,
-			Location:        location,
-			Organizer:       application.MailAddress{Name: item.Organizer.Mailbox.Name, Address: item.Organizer.Mailbox.EmailAddress},
-			IsAllDay:        item.IsAllDayEvent,
-			IsOnlineMeeting: item.IsOnlineMeeting,
-			IsOrganizer:     item.IsOrganizer,
-			IsCancelled:     item.IsCancelled || item.IsCanceled,
-			MyResponse:      item.MyResponseType,
-			FreeBusy:        item.FreeBusyType,
+			ID:                    item.ItemID.ID,
+			ChangeKey:             item.ItemID.ChangeKey,
+			Subject:               item.Subject,
+			Start:                 start,
+			End:                   end,
+			OriginalStart:         item.Start,
+			OriginalEnd:           item.End,
+			OriginalStartTimeZone: startZone,
+			OriginalEndTimeZone:   endZone,
+			Location:              location,
+			Organizer:             application.MailAddress{Name: item.Organizer.Mailbox.Name, Address: item.Organizer.Mailbox.EmailAddress},
+			IsAllDay:              item.IsAllDayEvent,
+			IsOnlineMeeting:       item.IsOnlineMeeting,
+			IsOrganizer:           item.IsOrganizer,
+			IsCancelled:           item.IsCancelled || item.IsCanceled,
+			MyResponse:            item.MyResponseType,
+			FreeBusy:              item.FreeBusyType,
 		})
 	}
 	return page, nil

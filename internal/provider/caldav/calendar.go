@@ -111,9 +111,21 @@ func (client *Client) eventView(
 		freeBusy = "free"
 	}
 	startProp := event.Props.Get(ical.PropDateTimeStart)
+	endProp := event.Props.Get(ical.PropDateTimeEnd)
+	originalStart, startZone, startFloating := calDAVOriginalTime(
+		startProp,
+		start.UTC().Format(time.RFC3339),
+	)
+	originalEnd, endZone, endFloating := calDAVOriginalTime(
+		endProp,
+		end.UTC().Format(time.RFC3339),
+	)
 	return application.CalendarEvent{
 		ID: id, ChangeKey: etag, Subject: subject,
 		Start: start.UTC().Format(time.RFC3339), End: end.UTC().Format(time.RFC3339),
+		OriginalStart: originalStart, OriginalEnd: originalEnd,
+		OriginalStartTimeZone: startZone, OriginalEndTimeZone: endZone,
+		OriginalStartFloating: startFloating, OriginalEndFloating: endFloating,
 		Location: location,
 		Organizer: application.MailAddress{
 			Name: organizer.name, Address: organizer.address,
@@ -123,6 +135,25 @@ func (client *Client) eventView(
 		IsCancelled: status == ical.EventCancelled,
 		MyResponse:  response, FreeBusy: freeBusy,
 	}, nil
+}
+
+func calDAVOriginalTime(
+	property *ical.Prop,
+	fallback string,
+) (string, string, bool) {
+	if property == nil {
+		return fallback, "UTC", false
+	}
+	zone := property.Params.Get(ical.ParamTimezoneID)
+	if property.ValueType() == ical.ValueDate {
+		return property.Value, zone, false
+	}
+	floating := zone == "" &&
+		!strings.HasSuffix(strings.ToUpper(property.Value), "Z")
+	if !floating && zone == "" {
+		zone = "UTC"
+	}
+	return property.Value, zone, floating
 }
 
 type namedAddress struct {

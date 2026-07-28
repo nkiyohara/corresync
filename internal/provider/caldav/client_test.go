@@ -200,6 +200,35 @@ func fixtureCalendar(uid string, attendees []string) *ical.Calendar {
 	return calendar
 }
 
+func TestCalDAVOriginalTimePreservesFloatingAndZoneSemantics(t *testing.T) {
+	t.Parallel()
+
+	floating := ical.NewProp(ical.PropDateTimeStart)
+	floating.Value = "20260728T090000"
+	value, zone, isFloating := calDAVOriginalTime(floating, "")
+	if value != floating.Value || zone != "" || !isFloating {
+		t.Fatalf(
+			"floating semantics = %q, %q, %t",
+			value,
+			zone,
+			isFloating,
+		)
+	}
+
+	zoned := ical.NewProp(ical.PropDateTimeStart)
+	zoned.Value = "20260728T090000"
+	zoned.Params.Set(ical.ParamTimezoneID, "Europe/London")
+	value, zone, isFloating = calDAVOriginalTime(zoned, "")
+	if value != zoned.Value || zone != "Europe/London" || isFloating {
+		t.Fatalf(
+			"zoned semantics = %q, %q, %t",
+			value,
+			zone,
+			isFloating,
+		)
+	}
+}
+
 func newFixtureServer(
 	t *testing.T,
 ) (*httptest.Server, *fixtureBackend, *http.Client) {
@@ -271,7 +300,10 @@ func TestClientUsesTLSDiscoveryAndConditionalCalendarWrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(page.Events) != 1 || page.Events[0].ChangeKey != "v1" {
+	if len(page.Events) != 1 || page.Events[0].ChangeKey != "v1" ||
+		page.Events[0].OriginalStart != "20260728T090000Z" ||
+		page.Events[0].OriginalStartTimeZone != "UTC" ||
+		page.Events[0].OriginalStartFloating {
 		t.Fatalf("ListCalendarEvents() = %#v", page)
 	}
 	event := page.Events[0]

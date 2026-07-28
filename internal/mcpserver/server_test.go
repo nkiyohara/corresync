@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -27,19 +28,51 @@ func TestDecodeMailAttachmentsRejectsAggregateBeforeApplicationUse(t *testing.T)
 	}
 }
 
+func TestMutationToolsHaveNoAllAccountsInput(t *testing.T) {
+	t.Parallel()
+
+	server, err := New(
+		&fakeBackend{},
+		Options{Version: "dev", Instance: "test-server"},
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	clientSession := connectTestClient(t, server)
+	tools, err := clientSession.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("ListTools() error = %v", err)
+	}
+	for _, tool := range tools.Tools {
+		if tool.Annotations == nil || tool.Annotations.ReadOnlyHint {
+			continue
+		}
+		schema, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(schema), "allAccounts") {
+			t.Fatalf("mutation tool %q exposes allAccounts", tool.Name)
+		}
+	}
+}
+
 type fakeBackend struct {
 	mailInput            application.MailListInput
 	searchInput          application.MailSearchInput
+	searchAllInput       application.MailProjectionInput
 	folderInput          application.MailFolderListInput
 	bodyInput            application.MailBodyInput
 	attachmentInput      application.MailAttachmentInput
 	approvalToken        string
 	calendarInput        application.CalendarListInput
+	agendaInput          application.AgendaProjectionInput
 	calendarCreate       application.CalendarCreateInput
 	calendarUpdate       application.CalendarUpdateInput
 	calendarCancel       application.CalendarCancelInput
 	caller               domain.Caller
 	mailPage             application.MailPage
+	mailProjection       application.MailProjectionPage
 	folderPage           application.MailFolderPage
 	bodyAccess           application.MailBodyAccess
 	attachmentAccess     application.MailAttachmentAccess
@@ -52,6 +85,7 @@ type fakeBackend struct {
 	readStateInput       application.MailReadStateInput
 	readStateAccess      application.MailReadStateAccess
 	calendarPage         application.CalendarPage
+	agendaPage           application.AgendaProjectionPage
 	calendarAccess       application.CalendarCreateAccess
 	calendarUpdateAccess application.CalendarUpdateAccess
 	calendarCancelAccess application.CalendarCancelAccess
@@ -113,6 +147,16 @@ func (backend *fakeBackend) SearchMail(
 	return backend.mailPage, backend.err
 }
 
+func (backend *fakeBackend) SearchAllMail(
+	_ context.Context,
+	input application.MailProjectionInput,
+	caller domain.Caller,
+) (application.MailProjectionPage, error) {
+	backend.searchAllInput = input
+	backend.caller = caller
+	return backend.mailProjection, backend.err
+}
+
 func (backend *fakeBackend) ListMailFolders(
 	_ context.Context,
 	input application.MailFolderListInput,
@@ -131,6 +175,16 @@ func (backend *fakeBackend) ListCalendar(
 	backend.calendarInput = input
 	backend.caller = caller
 	return backend.calendarPage, backend.err
+}
+
+func (backend *fakeBackend) ListAgenda(
+	_ context.Context,
+	input application.AgendaProjectionInput,
+	caller domain.Caller,
+) (application.AgendaProjectionPage, error) {
+	backend.agendaInput = input
+	backend.caller = caller
+	return backend.agendaPage, backend.err
 }
 
 func (backend *fakeBackend) CreateCalendar(
@@ -360,7 +414,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 27 || mailTool == nil {
+	if len(tools.Tools) != 29 || mailTool == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
@@ -391,6 +445,46 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 	structured, ok := result.StructuredContent.(map[string]any)
 	if !ok || structured["totalItemsInView"] != float64(1) {
 		t.Fatalf("unexpected structured output: %#v", result.StructuredContent)
+	}
+}
+
+func TestMailSearchAllToolUsesProjectionDefaults(t *testing.T) {
+	t.Parallel()
+
+	backend := &fakeBackend{}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	clientSession := connectTestClient(t, server)
+	tools, err := clientSession.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("ListTools() error = %v", err)
+	}
+	tool := toolNamed(tools.Tools, "mail_search_all")
+	if tool == nil || tool.Annotations == nil ||
+		!tool.Annotations.ReadOnlyHint ||
+		tool.Annotations.DestructiveHint == nil ||
+		*tool.Annotations.DestructiveHint {
+		t.Fatalf("unsafe cross-account search annotations: %+v", tool)
+	}
+	result, err := clientSession.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "mail_search_all",
+		Arguments: map[string]any{
+			"query": "subject:synthetic",
+		},
+	})
+	if err != nil || result.IsError {
+		t.Fatalf("mail_search_all failed: result=%+v error=%v", result, err)
+	}
+	if backend.searchAllInput.Folder.ID != "inbox" ||
+		backend.searchAllInput.Query != "subject:synthetic" ||
+		backend.searchAllInput.Limit != 25 ||
+		backend.searchAllInput.TimeZone != "UTC" {
+		t.Fatalf(
+			"unexpected cross-account search input: %+v",
+			backend.searchAllInput,
+		)
 	}
 }
 
@@ -560,6 +654,43 @@ func TestCalendarListToolMapsRequiredWindow(t *testing.T) {
 	if backend.calendarInput.Account != "work" || backend.calendarInput.Calendar.ID != "calendar" ||
 		backend.calendarInput.Start != "2026-07-17T00:00:00Z" {
 		t.Fatalf("unexpected calendar input: %+v", backend.calendarInput)
+	}
+}
+
+func TestAgendaListToolUsesProjectionDefaults(t *testing.T) {
+	t.Parallel()
+
+	backend := &fakeBackend{}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	clientSession := connectTestClient(t, server)
+	tools, err := clientSession.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("ListTools() error = %v", err)
+	}
+	tool := toolNamed(tools.Tools, "agenda_list")
+	if tool == nil || tool.Annotations == nil ||
+		!tool.Annotations.ReadOnlyHint ||
+		tool.Annotations.DestructiveHint == nil ||
+		*tool.Annotations.DestructiveHint {
+		t.Fatalf("unsafe agenda annotations: %+v", tool)
+	}
+	result, err := clientSession.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "agenda_list",
+		Arguments: map[string]any{
+			"start": "2026-07-17T00:00:00Z",
+			"end":   "2026-07-18T00:00:00Z",
+		},
+	})
+	if err != nil || result.IsError {
+		t.Fatalf("agenda_list failed: result=%+v error=%v", result, err)
+	}
+	if backend.agendaInput.DisplayTimeZone != "UTC" ||
+		backend.agendaInput.Limit != 50 ||
+		backend.agendaInput.Start != "2026-07-17T00:00:00Z" {
+		t.Fatalf("unexpected agenda input: %+v", backend.agendaInput)
 	}
 }
 

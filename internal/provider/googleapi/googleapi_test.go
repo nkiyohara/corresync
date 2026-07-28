@@ -227,7 +227,10 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(calendar.Events) != 1 || calendar.Events[0].Subject != "Synthetic event" {
+	if len(calendar.Events) != 1 ||
+		calendar.Events[0].Subject != "Synthetic event" ||
+		calendar.Events[0].OriginalStart != "2026-08-01T10:00:00Z" ||
+		calendar.Events[0].OriginalStartTimeZone != "Europe/London" {
 		t.Fatalf("calendar = %#v", calendar)
 	}
 	created, err := client.CreateCalendarEvent(
@@ -321,8 +324,14 @@ func googleTestEvent(etag string) googleEvent {
 	event := googleEvent{
 		ID: "e1", ETag: etag, Status: "confirmed",
 		Summary: "Synthetic event",
-		Start:   googleEventTime{DateTime: "2026-08-01T10:00:00Z"},
-		End:     googleEventTime{DateTime: "2026-08-01T11:00:00Z"},
+		Start: googleEventTime{
+			DateTime: "2026-08-01T10:00:00Z",
+			TimeZone: "Europe/London",
+		},
+		End: googleEventTime{
+			DateTime: "2026-08-01T11:00:00Z",
+			TimeZone: "Europe/London",
+		},
 		Organizer: googleEventPerson{
 			Email: "reader@example.test", Self: true,
 		},

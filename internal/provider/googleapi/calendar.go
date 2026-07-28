@@ -136,6 +136,10 @@ func (client *Client) googleEventView(
 	return application.CalendarEvent{
 		ID: id, ChangeKey: encodeETag(event.ETag), Subject: event.Summary,
 		Start: start, End: end, Location: event.Location,
+		OriginalStart:         googleOriginalEventTime(event.Start),
+		OriginalEnd:           googleOriginalEventTime(event.End),
+		OriginalStartTimeZone: event.Start.TimeZone,
+		OriginalEndTimeZone:   event.End.TimeZone,
 		Organizer: application.MailAddress{
 			Name: event.Organizer.DisplayName, Address: event.Organizer.Email,
 		},
@@ -145,6 +149,13 @@ func (client *Client) googleEventView(
 		IsCancelled: event.Status == "cancelled",
 		MyResponse:  response, FreeBusy: freeBusy,
 	}, nil
+}
+
+func googleOriginalEventTime(value googleEventTime) string {
+	if value.Date != "" {
+		return value.Date
+	}
+	return value.DateTime
 }
 
 func googleEventTimeValue(value googleEventTime) (string, bool, error) {

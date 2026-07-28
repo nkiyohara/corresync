@@ -213,6 +213,12 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.SearchMail(ctx, input, request.Caller)
+	case MethodMailSearchAll:
+		var input application.MailProjectionInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		return server.backend.SearchAllMail(ctx, input, request.Caller)
 	case MethodMailFolders:
 		var input application.MailFolderListInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
@@ -309,6 +315,12 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.ListCalendar(ctx, input, request.Caller)
+	case MethodAgendaList:
+		var input application.AgendaProjectionInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		return server.backend.ListAgenda(ctx, input, request.Caller)
 	case MethodCalendarCreate:
 		var input application.CalendarCreateInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {

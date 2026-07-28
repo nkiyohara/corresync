@@ -30,6 +30,7 @@ type cli struct {
 	Login       loginCommand      `cmd:"" hidden:"" help:"Open the interactive provider sign-in."`
 	Mail        mailCommand       `cmd:"" help:"Read and manage mail."`
 	Calendar    calendarCommand   `cmd:"" help:"Read and manage calendar events."`
+	Agenda      agendaCommand     `cmd:"" help:"Read a normalized cross-account agenda."`
 	Daemon      daemonCommand     `cmd:"" help:"Run and inspect the local session owner."`
 	MCP         mcpCommand        `cmd:"" help:"Expose guarded mail and calendar tools over MCP."`
 	Update      updateCommand     `cmd:"" help:"Install verified updates or show the package-manager command."`

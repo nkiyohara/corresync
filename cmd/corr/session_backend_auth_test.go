@@ -28,6 +28,59 @@ type oauthManagerStub struct {
 	err      error
 }
 
+func TestProjectionAccountsExposeOnlyContentFreePerServiceStatus(t *testing.T) {
+	t.Parallel()
+
+	const personalID domain.AccountID = "acc_00000000000000000000000000000002"
+	configuration := config.Default()
+	configuration.Accounts["personal"] = config.Account{
+		ID: personalID,
+		Mail: &config.MailRoute{
+			Provider: domain.ProviderIMAPSMTP,
+		},
+	}
+	workID := configuration.Accounts["work"].ID
+	backend := &sessionBackend{
+		configuration: configuration,
+		accounts: map[domain.AccountID]sessionAccount{
+			workID: {
+				capabilities: domain.Capabilities{
+					Mail: true, Calendar: true,
+				},
+				degradations: []domain.Degradation{
+					{
+						Feature: "mail.search",
+						Reason:  "synthetic mail degradation",
+					},
+					{
+						Feature: "calendar.selection",
+						Reason:  "synthetic calendar degradation",
+					},
+				},
+			},
+		},
+	}
+	accounts, err := backend.ProjectionAccounts(t.Context())
+	if err != nil {
+		t.Fatalf("ProjectionAccounts() error = %v", err)
+	}
+	if len(accounts) != 2 ||
+		accounts[0].Alias != "personal" ||
+		accounts[1].Alias != "work" {
+		t.Fatalf("unexpected projection account order: %+v", accounts)
+	}
+	if accounts[0].Authenticated || accounts[0].Capabilities != nil ||
+		len(accounts[0].MailDegradations) != 0 {
+		t.Fatalf("inactive account exposed runtime state: %+v", accounts[0])
+	}
+	if !accounts[1].Authenticated ||
+		accounts[1].Capabilities == nil ||
+		len(accounts[1].MailDegradations) != 1 ||
+		len(accounts[1].CalendarDegradations) != 1 {
+		t.Fatalf("active service status was not retained: %+v", accounts[1])
+	}
+}
+
 func (stub *oauthManagerStub) Client(
 	_ context.Context,
 	route config.OAuthRoute,

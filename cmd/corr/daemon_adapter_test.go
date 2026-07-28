@@ -22,6 +22,8 @@ import (
 type adapterTestBackend struct {
 	mailCalls             int
 	searchCalls           int
+	searchAllCalls        int
+	agendaCalls           int
 	moveCalls             int
 	stateCalls            int
 	bodyCommits           int
@@ -75,6 +77,31 @@ func (backend *adapterTestBackend) ListMail(_ context.Context, _ application.Mai
 func (backend *adapterTestBackend) SearchMail(context.Context, application.MailSearchInput, domain.Caller) (application.MailPage, error) {
 	backend.searchCalls++
 	return application.MailPage{Messages: []application.MailSummary{{ID: "search-message-1"}}}, nil
+}
+func (backend *adapterTestBackend) SearchAllMail(_ context.Context, input application.MailProjectionInput, _ domain.Caller) (application.MailProjectionPage, error) {
+	backend.searchAllCalls++
+	capabilities := domain.Capabilities{Mail: true}
+	return application.MailProjectionPage{
+		Messages: []application.ProjectedMail{{
+			AccountAlias: "work",
+			Message: application.MailSummary{
+				ID: "all-message-1", Subject: "Synthetic all-account search",
+				ReceivedAt: "2026-07-28T10:00:00Z",
+				Provenance: domain.Provenance{
+					AccountID: adapterTestAccountID,
+					Provider:  domain.ProviderMicrosoftOWA,
+					MailboxID: "mailbox", SourceObjectID: "all-message-1",
+				},
+			},
+		}},
+		Accounts: []application.ProjectionAccountStatus{{
+			Account: adapterTestAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA, Service: "mail",
+			Complete: true, Exhausted: true, FetchedItems: 1,
+			Capabilities: &capabilities,
+		}},
+		Offset: input.Offset, Limit: input.Limit, Complete: true,
+	}, nil
 }
 func (*adapterTestBackend) ListMailFolders(context.Context, application.MailFolderListInput, domain.Caller) (application.MailFolderPage, error) {
 	return application.MailFolderPage{Folders: []application.MailFolderSummary{{ID: "folder-1"}}}, nil
@@ -171,6 +198,39 @@ func (*adapterTestBackend) CommitMailDelete(context.Context, string, domain.Call
 }
 func (*adapterTestBackend) ListCalendar(context.Context, application.CalendarListInput, domain.Caller) (application.CalendarPage, error) {
 	return application.CalendarPage{}, nil
+}
+func (backend *adapterTestBackend) ListAgenda(_ context.Context, input application.AgendaProjectionInput, _ domain.Caller) (application.AgendaProjectionPage, error) {
+	backend.agendaCalls++
+	capabilities := domain.Capabilities{Calendar: true}
+	return application.AgendaProjectionPage{
+		Events: []application.ProjectedAgendaEvent{{
+			AccountAlias:    "work",
+			DisplayStart:    "2026-07-28T10:00:00Z",
+			DisplayEnd:      "2026-07-28T11:00:00Z",
+			DisplayTimeZone: input.DisplayTimeZone,
+			Event: application.CalendarEvent{
+				ID: "all-event-1", Subject: "Synthetic agenda event",
+				Start: "2026-07-28T10:00:00Z", End: "2026-07-28T11:00:00Z",
+				OriginalStart:         "2026-07-28T10:00:00Z",
+				OriginalEnd:           "2026-07-28T11:00:00Z",
+				OriginalStartTimeZone: "UTC", OriginalEndTimeZone: "UTC",
+				Provenance: domain.Provenance{
+					AccountID:  adapterTestAccountID,
+					Provider:   domain.ProviderMicrosoftOWA,
+					CalendarID: "calendar", SourceObjectID: "all-event-1",
+				},
+			},
+		}},
+		Accounts: []application.ProjectionAccountStatus{{
+			Account: adapterTestAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA, Service: "calendar",
+			Complete: true, Exhausted: true, FetchedItems: 1,
+			Capabilities: &capabilities,
+		}},
+		Start: input.Start, End: input.End,
+		DisplayTimeZone: input.DisplayTimeZone,
+		Offset:          input.Offset, Limit: input.Limit, Complete: true,
+	}, nil
 }
 func (backend *adapterTestBackend) CreateCalendar(_ context.Context, input application.CalendarCreateInput, _ domain.Caller) (application.CalendarCreateAccess, error) {
 	backend.calendarReview = input.Review()
@@ -284,6 +344,37 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	}
 	if backend.searchCalls != 1 || !bytes.Contains(stdout.Bytes(), []byte(`"search-message-1"`)) {
 		t.Fatalf("search calls=%d output=%s", backend.searchCalls, stdout.String())
+	}
+	stdout.Reset()
+	search.AllAccounts = true
+	if err := search.Run(app); err != nil {
+		t.Fatalf("all-account mail search Run() error = %v", err)
+	}
+	if backend.searchAllCalls != 1 ||
+		!bytes.Contains(stdout.Bytes(), []byte(`"all-message-1"`)) {
+		t.Fatalf(
+			"all-account search calls=%d output=%s",
+			backend.searchAllCalls,
+			stdout.String(),
+		)
+	}
+	stdout.Reset()
+	agenda := agendaListCommand{
+		AllAccounts: true,
+		Start:       "2026-07-28T00:00:00Z",
+		End:         "2026-07-29T00:00:00Z",
+		TimeZone:    "UTC", Limit: 50, JSON: true,
+	}
+	if err := agenda.Run(app); err != nil {
+		t.Fatalf("agenda list Run() error = %v", err)
+	}
+	if backend.agendaCalls != 1 ||
+		!bytes.Contains(stdout.Bytes(), []byte(`"all-event-1"`)) {
+		t.Fatalf(
+			"agenda calls=%d output=%s",
+			backend.agendaCalls,
+			stdout.String(),
+		)
 	}
 	stdout.Reset()
 	move := mailMoveCommand{

@@ -62,6 +62,8 @@ func TestListCalendarEventsNormalizesGoldenResponse(t *testing.T) {
 	}
 	first := page.Events[0]
 	if first.ID != "synthetic-event-1" || first.Start != "2026-07-17T09:00:00Z" ||
+		first.OriginalStart != "2026-07-17T09:00:00.000" ||
+		first.OriginalStartTimeZone != "UTC" ||
 		first.Location != "Room 1" || first.Organizer.Address != "alice@example.invalid" ||
 		!first.IsOnlineMeeting || first.IsCancelled {
 		t.Fatalf("unexpected first event: %+v", first)

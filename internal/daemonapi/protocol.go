@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 12
+	ProtocolVersion   = 13
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -39,6 +39,7 @@ const (
 	MethodMailFolders          Method = "mail.folders.list"
 	MethodMailList             Method = "mail.list"
 	MethodMailSearch           Method = "mail.search"
+	MethodMailSearchAll        Method = "mail.search.all"
 	MethodMailGetBody          Method = "mail.get_body"
 	MethodMailCommitBody       Method = "mail.commit_body"
 	MethodMailGetAttachment    Method = "mail.get_attachment"
@@ -54,6 +55,7 @@ const (
 	MethodMailDelete           Method = "mail.delete"
 	MethodMailCommitDelete     Method = "mail.commit_delete"
 	MethodCalendarList         Method = "calendar.list"
+	MethodAgendaList           Method = "agenda.list"
 	MethodCalendarCreate       Method = "calendar.create"
 	MethodCalendarCommit       Method = "calendar.commit_create"
 	MethodCalendarUpdate       Method = "calendar.update"
@@ -300,6 +302,7 @@ type Backend interface {
 	ListMailFolders(context.Context, application.MailFolderListInput, domain.Caller) (application.MailFolderPage, error)
 	ListMail(context.Context, application.MailListInput, domain.Caller) (application.MailPage, error)
 	SearchMail(context.Context, application.MailSearchInput, domain.Caller) (application.MailPage, error)
+	SearchAllMail(context.Context, application.MailProjectionInput, domain.Caller) (application.MailProjectionPage, error)
 	GetMailBody(context.Context, application.MailBodyInput, domain.Caller) (application.MailBodyAccess, error)
 	CommitMailBody(context.Context, string, domain.Caller) (application.MailBodyAccess, error)
 	GetMailAttachment(context.Context, application.MailAttachmentInput, domain.Caller) (application.MailAttachmentAccess, error)
@@ -315,6 +318,7 @@ type Backend interface {
 	DeleteMail(context.Context, application.MailDeleteInput, domain.Caller) (application.MailDeleteAccess, error)
 	CommitMailDelete(context.Context, string, domain.Caller) (application.MailDeleteAccess, error)
 	ListCalendar(context.Context, application.CalendarListInput, domain.Caller) (application.CalendarPage, error)
+	ListAgenda(context.Context, application.AgendaProjectionInput, domain.Caller) (application.AgendaProjectionPage, error)
 	CreateCalendar(context.Context, application.CalendarCreateInput, domain.Caller) (application.CalendarCreateAccess, error)
 	CommitCalendarCreate(context.Context, string, domain.Caller) (application.CalendarCreateAccess, error)
 	UpdateCalendar(context.Context, application.CalendarUpdateInput, domain.Caller) (application.CalendarUpdateAccess, error)
@@ -331,13 +335,13 @@ type TerminalLoginBackend interface {
 
 func (method Method) valid() bool {
 	switch method {
-	case MethodStatus, MethodShutdown, MethodLogin, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailGetBody, MethodMailCommitBody,
+	case MethodStatus, MethodShutdown, MethodLogin, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
 		MethodMailGetAttachment, MethodMailCommitAttachment,
 		MethodMailCreateDraft, MethodMailCommitDraft, MethodMailSend, MethodMailCommitSend,
 		MethodMailMove, MethodMailCommitMove,
 		MethodMailReadState, MethodMailCommitState,
 		MethodMailDelete, MethodMailCommitDelete,
-		MethodCalendarList, MethodCalendarCreate, MethodCalendarCommit,
+		MethodCalendarList, MethodAgendaList, MethodCalendarCreate, MethodCalendarCommit,
 		MethodCalendarUpdate, MethodCalendarCommitUpdate,
 		MethodCalendarCancel, MethodCalendarCommitCancel:
 		return true
