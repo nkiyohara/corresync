@@ -92,11 +92,14 @@ policy.
 
 ## Tool catalog
 
-The server exposes 33 narrow tools.
+The server exposes 39 narrow tools.
 
 Accounts and local monitoring:
 
 - `account_discover`, `account_list`, `account_show`;
+- `account_add`, `account_add_commit`;
+- `account_rename`, `account_rename_commit`;
+- `account_remove`, `account_remove_commit`;
 - `monitor_status`, `events_list`, `event_acknowledge`.
 
 Read and project:
@@ -120,9 +123,15 @@ Calendar writes:
 - `calendar_update`, `calendar_update_commit`;
 - `calendar_cancel`, `calendar_cancel_commit`.
 
-Account addition/removal/rename, authentication, monitor enable/reconfigure,
-runner/egress consent, queue purge, local import reads, updates, and feedback
-external actions remain CLI-only.
+Account changes use the same typed application lifecycle as the CLI. MCP
+addition, rename, and removal are caller-bound preview/commit pairs; commit
+stops and restarts the session owner around the atomic config change so no
+authenticated route can retain stale configuration. Addition never
+authenticates. Removal previews its Corresync-owned state purge and never
+deletes an external credential-owner record.
+
+Authentication, monitor enable/reconfigure, runner/egress consent, queue purge,
+local import reads, updates, and feedback external actions remain CLI-only.
 
 ## Resources
 

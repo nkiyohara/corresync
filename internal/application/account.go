@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/nkiyohara/corresync/internal/approval"
 	"github.com/nkiyohara/corresync/internal/domain"
 )
 
@@ -158,6 +159,33 @@ type AccountRemoveInput struct {
 	ReplacementDefault string `json:"replacementDefault,omitempty"`
 }
 
+// AccountChangeReview is the bounded, secret-free account lifecycle summary
+// returned before an MCP configuration mutation.
+type AccountChangeReview struct {
+	Action             string            `json:"action"`
+	Account            domain.AccountID  `json:"account,omitempty"`
+	Alias              string            `json:"alias"`
+	NewAlias           string            `json:"newAlias,omitempty"`
+	Address            string            `json:"address,omitempty"`
+	MailProvider       domain.ProviderID `json:"mailProvider,omitempty"`
+	CalendarProvider   domain.ProviderID `json:"calendarProvider,omitempty"`
+	Mail               *AccountRouteView `json:"mail,omitempty"`
+	Calendar           *AccountRouteView `json:"calendar,omitempty"`
+	MakesDefault       bool              `json:"makesDefault"`
+	ReplacementDefault string            `json:"replacementDefault,omitempty"`
+	PurgesLocalState   bool              `json:"purgesLocalState"`
+	RestartsSessions   bool              `json:"restartsSessions"`
+}
+
+// AccountChangeAccess is either an approval-bound preview or a completed
+// secret-free account view.
+type AccountChangeAccess struct {
+	Status  string               `json:"status"`
+	Review  *AccountChangeReview `json:"review,omitempty"`
+	Preview *approval.Preview    `json:"preview,omitempty"`
+	Account *AccountView         `json:"account,omitempty"`
+}
+
 // AccountRepository persists secret-free account definitions. Implementations
 // must perform each mutation atomically against the latest complete config.
 type AccountRepository interface {
@@ -253,34 +281,9 @@ func (service *AccountService) Add(
 	ctx context.Context,
 	input AccountAddInput,
 ) (AccountView, error) {
-	if err := domain.AccountAlias(input.Alias).Validate(); err != nil {
-		return AccountView{}, err
-	}
-	normalizedAddress, _, err := normalizeDiscoveryAddress(input.Address)
+	normalizedAddress, catalog, err := service.reviewAdd(ctx, input)
 	if err != nil {
 		return AccountView{}, err
-	}
-	if input.Mail == nil && input.Calendar == nil {
-		return AccountView{}, errors.New("at least one mail or calendar route is required")
-	}
-	if input.Mail != nil {
-		if err := service.validateMailRoute(*input.Mail); err != nil {
-			return AccountView{}, fmt.Errorf("mail route: %w", err)
-		}
-	}
-	if input.Calendar != nil {
-		if err := service.validateCalendarRoute(*input.Calendar); err != nil {
-			return AccountView{}, fmt.Errorf("calendar route: %w", err)
-		}
-	}
-	catalog, err := service.List(ctx)
-	if err != nil {
-		return AccountView{}, err
-	}
-	for _, existing := range catalog.Accounts {
-		if existing.Alias == input.Alias {
-			return AccountView{}, fmt.Errorf("account alias %q already exists", input.Alias)
-		}
 	}
 	accountID, err := service.newID()
 	if err != nil {
@@ -302,8 +305,103 @@ func (service *AccountService) Add(
 	return account, nil
 }
 
+// ReviewAdd validates one exact account addition without generating an ID,
+// authenticating, resolving a credential, or changing configuration.
+func (service *AccountService) ReviewAdd(
+	ctx context.Context,
+	input AccountAddInput,
+) (AccountChangeReview, error) {
+	address, catalog, err := service.reviewAdd(ctx, input)
+	if err != nil {
+		return AccountChangeReview{}, err
+	}
+	review := AccountChangeReview{
+		Action: "add", Alias: input.Alias, Address: address,
+		Mail: mailRouteView(input.Mail), Calendar: calendarRouteView(input.Calendar),
+		MakesDefault: input.Default || len(catalog.Accounts) == 0,
+	}
+	if input.Mail != nil {
+		review.MailProvider = input.Mail.Provider
+	}
+	if input.Calendar != nil {
+		review.CalendarProvider = input.Calendar.Provider
+	}
+	return review, nil
+}
+
+func (service *AccountService) reviewAdd(
+	ctx context.Context,
+	input AccountAddInput,
+) (string, AccountCatalog, error) {
+	if err := domain.AccountAlias(input.Alias).Validate(); err != nil {
+		return "", AccountCatalog{}, err
+	}
+	normalizedAddress, _, err := normalizeDiscoveryAddress(input.Address)
+	if err != nil {
+		return "", AccountCatalog{}, err
+	}
+	if input.Mail == nil && input.Calendar == nil {
+		return "", AccountCatalog{}, errors.New(
+			"at least one mail or calendar route is required",
+		)
+	}
+	if input.Mail != nil {
+		if err := service.validateMailRoute(*input.Mail); err != nil {
+			return "", AccountCatalog{}, fmt.Errorf("mail route: %w", err)
+		}
+	}
+	if input.Calendar != nil {
+		if err := service.validateCalendarRoute(*input.Calendar); err != nil {
+			return "", AccountCatalog{}, fmt.Errorf("calendar route: %w", err)
+		}
+	}
+	catalog, err := service.List(ctx)
+	if err != nil {
+		return "", AccountCatalog{}, err
+	}
+	for _, existing := range catalog.Accounts {
+		if existing.Alias == input.Alias {
+			return "", AccountCatalog{}, fmt.Errorf(
+				"account alias %q already exists",
+				input.Alias,
+			)
+		}
+	}
+	return normalizedAddress, catalog, nil
+}
+
 // Rename preserves the opaque account identity and all account-owned state.
 func (service *AccountService) Rename(
+	ctx context.Context,
+	input AccountRenameInput,
+) (AccountView, error) {
+	account, err := service.reviewRename(ctx, input)
+	if err != nil {
+		return AccountView{}, err
+	}
+	if err := service.repository.RenameAccount(ctx, account.ID, input.NewAlias); err != nil {
+		return AccountView{}, fmt.Errorf("rename account: %w", err)
+	}
+	account.Alias = input.NewAlias
+	return account, nil
+}
+
+// ReviewRename validates an alias change without mutating configuration.
+func (service *AccountService) ReviewRename(
+	ctx context.Context,
+	input AccountRenameInput,
+) (AccountChangeReview, error) {
+	account, err := service.reviewRename(ctx, input)
+	if err != nil {
+		return AccountChangeReview{}, err
+	}
+	return AccountChangeReview{
+		Action: "rename", Account: account.ID, Alias: account.Alias,
+		NewAlias: input.NewAlias,
+	}, nil
+}
+
+func (service *AccountService) reviewRename(
 	ctx context.Context,
 	input AccountRenameInput,
 ) (AccountView, error) {
@@ -323,10 +421,6 @@ func (service *AccountService) Rename(
 			return AccountView{}, fmt.Errorf("account alias %q already exists", input.NewAlias)
 		}
 	}
-	if err := service.repository.RenameAccount(ctx, account.ID, input.NewAlias); err != nil {
-		return AccountView{}, fmt.Errorf("rename account: %w", err)
-	}
-	account.Alias = input.NewAlias
 	return account, nil
 }
 
@@ -337,34 +431,9 @@ func (service *AccountService) Remove(
 	ctx context.Context,
 	input AccountRemoveInput,
 ) (AccountView, error) {
-	account, err := service.Show(ctx, input.Account)
+	account, replacement, err := service.reviewRemove(ctx, input)
 	if err != nil {
 		return AccountView{}, err
-	}
-	catalog, err := service.List(ctx)
-	if err != nil {
-		return AccountView{}, err
-	}
-	if len(catalog.Accounts) == 1 {
-		return AccountView{}, errors.New("cannot remove the only configured account")
-	}
-	replacement := input.ReplacementDefault
-	if account.IsDefault {
-		if replacement == "" {
-			return AccountView{}, errors.New(
-				"removing the default account requires --new-default",
-			)
-		}
-		replacementAccount, resolveErr := service.Show(ctx, replacement)
-		if resolveErr != nil {
-			return AccountView{}, resolveErr
-		}
-		if replacementAccount.ID == account.ID {
-			return AccountView{}, errors.New("replacement default must be a different account")
-		}
-		replacement = replacementAccount.Alias
-	} else if replacement != "" {
-		return AccountView{}, errors.New("--new-default is valid only when removing the default account")
 	}
 	if err := service.purger.PurgeAccountState(ctx, account.ID); err != nil {
 		return AccountView{}, fmt.Errorf("purge account state: %w", err)
@@ -373,6 +442,62 @@ func (service *AccountService) Remove(
 		return AccountView{}, fmt.Errorf("remove account: %w", err)
 	}
 	return account, nil
+}
+
+// ReviewRemove validates the selected account and replacement default without
+// closing sessions, purging local state, or changing configuration.
+func (service *AccountService) ReviewRemove(
+	ctx context.Context,
+	input AccountRemoveInput,
+) (AccountChangeReview, error) {
+	account, replacement, err := service.reviewRemove(ctx, input)
+	if err != nil {
+		return AccountChangeReview{}, err
+	}
+	return AccountChangeReview{
+		Action: "remove", Account: account.ID, Alias: account.Alias,
+		ReplacementDefault: replacement, PurgesLocalState: true,
+	}, nil
+}
+
+func (service *AccountService) reviewRemove(
+	ctx context.Context,
+	input AccountRemoveInput,
+) (AccountView, string, error) {
+	account, err := service.Show(ctx, input.Account)
+	if err != nil {
+		return AccountView{}, "", err
+	}
+	catalog, err := service.List(ctx)
+	if err != nil {
+		return AccountView{}, "", err
+	}
+	if len(catalog.Accounts) == 1 {
+		return AccountView{}, "", errors.New("cannot remove the only configured account")
+	}
+	replacement := input.ReplacementDefault
+	if account.IsDefault {
+		if replacement == "" {
+			return AccountView{}, "", errors.New(
+				"removing the default account requires --new-default",
+			)
+		}
+		replacementAccount, resolveErr := service.Show(ctx, replacement)
+		if resolveErr != nil {
+			return AccountView{}, "", resolveErr
+		}
+		if replacementAccount.ID == account.ID {
+			return AccountView{}, "", errors.New(
+				"replacement default must be a different account",
+			)
+		}
+		replacement = replacementAccount.Alias
+	} else if replacement != "" {
+		return AccountView{}, "", errors.New(
+			"--new-default is valid only when removing the default account",
+		)
+	}
+	return account, replacement, nil
 }
 
 func validateAccountCatalog(catalog AccountCatalog) error {

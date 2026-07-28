@@ -96,6 +96,10 @@ type fakeBackend struct {
 	accountReference     string
 	accountCatalog       application.AccountCatalog
 	accountView          application.AccountView
+	accountAddInput      application.AccountAddInput
+	accountRenameInput   application.AccountRenameInput
+	accountRemoveInput   application.AccountRemoveInput
+	accountChangeAccess  application.AccountChangeAccess
 	monitorStatus        application.MonitorStatus
 	monitorListInput     application.MonitorEventListInput
 	monitorPage          application.MonitorEventPage
@@ -132,6 +136,60 @@ func (backend *fakeBackend) ShowAccount(
 ) (application.AccountView, error) {
 	backend.accountReference = reference
 	return backend.accountView, backend.err
+}
+
+func (backend *fakeBackend) PreviewAccountAdd(
+	_ context.Context,
+	input application.AccountAddInput,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.accountAddInput, backend.caller = input, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitAccountAdd(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) PreviewAccountRename(
+	_ context.Context,
+	input application.AccountRenameInput,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.accountRenameInput, backend.caller = input, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitAccountRename(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) PreviewAccountRemove(
+	_ context.Context,
+	input application.AccountRemoveInput,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.accountRemoveInput, backend.caller = input, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitAccountRemove(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.accountChangeAccess, backend.err
 }
 
 func (backend *fakeBackend) MonitorStatus(
@@ -460,7 +518,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 33 || mailTool == nil {
+	if len(tools.Tools) != 39 || mailTool == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
@@ -1271,6 +1329,106 @@ func TestAccountToolsUseTypedReadOnlyBackend(t *testing.T) {
 		tool := toolNamed(tools.Tools, name)
 		if tool == nil || tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
 			t.Fatalf("%s is missing read-only annotations: %+v", name, tool)
+		}
+	}
+}
+
+func TestAccountMutationToolsUseTypedPreviewCommitBoundary(t *testing.T) {
+	t.Parallel()
+	backend := &fakeBackend{
+		accountChangeAccess: application.AccountChangeAccess{
+			Status: "approval_required",
+		},
+	}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+	for _, call := range []struct {
+		name      string
+		arguments map[string]any
+	}{
+		{
+			"account_add",
+			map[string]any{
+				"alias": "team", "address": "reader@example.invalid",
+				"mail": map[string]any{
+					"provider": "microsoft-owa",
+					"outlookWeb": map[string]any{
+						"origin": "https://outlook.example.invalid",
+					},
+				},
+				"default": false,
+			},
+		},
+		{
+			"account_add_commit",
+			// #nosec G101 -- synthetic non-production approval fixture.
+			map[string]any{"token": "opv1_add_synthetic"}, // gitleaks:allow
+		},
+		{
+			"account_rename",
+			map[string]any{"account": "work", "newAlias": "office"},
+		},
+		{
+			"account_rename_commit",
+			// #nosec G101 -- synthetic non-production approval fixture.
+			map[string]any{"token": "opv1_rename_synthetic"}, // gitleaks:allow
+		},
+		{
+			"account_remove",
+			map[string]any{
+				"account": "work", "replacementDefault": "personal",
+			},
+		},
+		{
+			"account_remove_commit",
+			// #nosec G101 -- synthetic non-production approval fixture.
+			map[string]any{"token": "opv1_remove_synthetic"}, // gitleaks:allow
+		},
+	} {
+		result, callErr := client.CallTool(t.Context(), &mcp.CallToolParams{
+			Name: call.name, Arguments: call.arguments,
+		})
+		if callErr != nil || result.IsError {
+			t.Fatalf("%s failed: result=%+v error=%v", call.name, result, callErr)
+		}
+	}
+	if backend.accountAddInput.Alias != "team" ||
+		backend.accountAddInput.Mail == nil ||
+		backend.accountAddInput.Mail.Provider != domain.ProviderMicrosoftOWA ||
+		backend.accountRenameInput.NewAlias != "office" ||
+		backend.accountRemoveInput.ReplacementDefault != "personal" ||
+		backend.approvalToken != "opv1_remove_synthetic" ||
+		backend.caller != (domain.Caller{
+			Surface: "mcp", Instance: "test-server",
+		}) {
+		t.Fatalf("typed lifecycle inputs were not forwarded: %+v", backend)
+	}
+	tools, err := client.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"account_add", "account_add_commit",
+		"account_rename", "account_rename_commit",
+	} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil ||
+			tool.Annotations.ReadOnlyHint ||
+			tool.Annotations.DestructiveHint == nil ||
+			*tool.Annotations.DestructiveHint {
+			t.Fatalf("%s has unsafe annotations: %+v", name, tool)
+		}
+	}
+	for _, name := range []string{"account_remove", "account_remove_commit"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil ||
+			tool.Annotations.ReadOnlyHint ||
+			tool.Annotations.DestructiveHint == nil ||
+			!*tool.Annotations.DestructiveHint {
+			t.Fatalf("%s has unsafe annotations: %+v", name, tool)
 		}
 	}
 }

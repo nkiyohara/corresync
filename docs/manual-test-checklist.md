@@ -287,8 +287,10 @@ Pass criteria:
 - the MCP process receives no provider/session credential;
 - tool results preserve provenance/degradations;
 - content is treated as untrusted data;
-- MCP cannot add/remove accounts, authenticate, configure monitoring/egress,
-  scan imports, purge queues, update the binary, or submit feedback.
+- account add/rename/remove require the matching short-lived MCP preview token,
+  and a commit restarts the session owner without starting authentication;
+- MCP cannot authenticate, configure monitoring/egress, scan imports, purge
+  queues, update the binary, or submit feedback.
 
 Do not share raw MCP frames.
 

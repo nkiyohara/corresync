@@ -74,8 +74,10 @@ Account add requires explicit selection when evidence is ambiguous. Add,
 rename, and remove use typed application commands over an atomic config store.
 Remove also coordinates deletion of only Corresync-owned account state.
 
-MCP can discover/list/show accounts but cannot add, rename, remove, or
-authenticate them.
+MCP exposes the same typed lifecycle through caller-bound add, rename, and
+remove preview/commit pairs. A commit drains and restarts the session owner
+around the atomic config mutation; authentication remains an explicit local CLI
+action and account preview never resolves credentials or starts OAuth.
 
 ## Authentication ownership
 

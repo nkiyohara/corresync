@@ -48,6 +48,13 @@ endpoint. A provider registry in the outer runtime constructs typed mail and
 calendar ports; the application and domain do not import the registry or an
 adapter.
 
+Google API and delegated Microsoft Graph are in-tree outer-adapter packages,
+not separately versioned plugins. This keeps their typed port contracts,
+target/precondition behavior, OAuth scope profiles, and synthetic fixtures in
+the same verification boundary as Outlook Web and the standards adapters,
+without allowing either provider into the application or domain dependency
+graph.
+
 ### Configuration version 3 represents routes explicitly
 
 Configuration version 3 replaces the single account `provider`, `origin`, and

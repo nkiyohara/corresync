@@ -197,6 +197,57 @@ func TestAccountServiceFailsClosed(t *testing.T) {
 	}
 }
 
+func TestAccountLifecycleReviewsNeverMutateRepositoryOrState(t *testing.T) {
+	t.Parallel()
+	work := accountFixture("work", "acc_00000000000000000000000000000001", true)
+	personal := accountFixture(
+		"personal",
+		"acc_00000000000000000000000000000002",
+		false,
+	)
+	repository := &accountRepositoryStub{
+		catalog: AccountCatalog{Accounts: []AccountView{work, personal}},
+	}
+	purger := &accountPurgerStub{}
+	service, err := NewAccountService(
+		repository,
+		purger,
+		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ReviewAdd(t.Context(), AccountAddInput{
+		Alias: "team", Address: "team@example.invalid",
+		Mail: &AccountMailRouteInput{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &AccountOutlookWebInput{
+				Origin: "https://outlook.example.invalid",
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ReviewRename(t.Context(), AccountRenameInput{
+		Account: "personal", NewAlias: "home",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ReviewRemove(t.Context(), AccountRemoveInput{
+		Account: "personal",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if repository.added.ID != "" || repository.renamedID != "" ||
+		repository.removedID != "" || purger.account != "" {
+		t.Fatalf(
+			"review mutated lifecycle state: repository=%+v purger=%+v",
+			repository,
+			purger,
+		)
+	}
+}
+
 func TestAccountServiceAddsMixedStandardsRoutesWithoutExposingLookupKeys(t *testing.T) {
 	t.Parallel()
 	repository := &accountRepositoryStub{

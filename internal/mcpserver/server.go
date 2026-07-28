@@ -32,6 +32,12 @@ type Backend interface {
 	DiscoverAccounts(context.Context, string) (application.AccountDiscoveryResult, error)
 	ListAccounts(context.Context) (application.AccountCatalog, error)
 	ShowAccount(context.Context, string) (application.AccountView, error)
+	PreviewAccountAdd(context.Context, application.AccountAddInput, domain.Caller) (application.AccountChangeAccess, error)
+	CommitAccountAdd(context.Context, string, domain.Caller) (application.AccountChangeAccess, error)
+	PreviewAccountRename(context.Context, application.AccountRenameInput, domain.Caller) (application.AccountChangeAccess, error)
+	CommitAccountRename(context.Context, string, domain.Caller) (application.AccountChangeAccess, error)
+	PreviewAccountRemove(context.Context, application.AccountRemoveInput, domain.Caller) (application.AccountChangeAccess, error)
+	CommitAccountRemove(context.Context, string, domain.Caller) (application.AccountChangeAccess, error)
 	MonitorStatus(context.Context, domain.AccountID, domain.Caller) (application.MonitorStatus, error)
 	ListMonitorEvents(context.Context, application.MonitorEventListInput, domain.Caller) (application.MonitorEventPage, error)
 	AcknowledgeMonitorEvent(context.Context, application.MonitorAcknowledgeInput, domain.Caller) (application.MonitorEvent, error)
@@ -381,6 +387,114 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input AccountShowInput) (*mcp.CallToolResult, application.AccountView, error) {
 		result, err := backend.ShowAccount(ctx, input.Account)
+		return nil, result, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "account_add",
+		Title:       "Preview adding an account route",
+		Description: "Validate one complete, explicit, secret-free mail/calendar route and return a caller-bound approval preview. No authentication, credential lookup, OAuth, browser, or configuration write occurs. Commit restarts the local session owner so no route uses stale configuration.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Review an account addition",
+			ReadOnlyHint:    false,
+			DestructiveHint: &nonDestructive,
+			OpenWorldHint:   &closedWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "private-account-metadata",
+			"io.github.nkiyohara.corresync/effect":              "reversible_write",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input application.AccountAddInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
+		result, err := backend.PreviewAccountAdd(ctx, input, caller)
+		return nil, result, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "account_add_commit",
+		Title:       "Commit an approved account addition",
+		Description: "Consume exactly one account_add approval, atomically save the reviewed route without authenticating, and restart the local session owner. The token is caller-bound, short-lived, single-use, and bound to the complete route payload.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Commit the reviewed account addition",
+			ReadOnlyHint:    false,
+			DestructiveHint: &nonDestructive,
+			OpenWorldHint:   &closedWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "approval-capability",
+			"io.github.nkiyohara.corresync/effect":              "reversible_write",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input ApprovalInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
+		result, err := backend.CommitAccountAdd(ctx, input.Token, caller)
+		return nil, result, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "account_rename",
+		Title:       "Preview renaming an account",
+		Description: "Resolve an alias or stable account ID, validate the new alias, and return a caller-bound approval preview. The stable account ID, routes, credentials, and provider state remain unchanged.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Review an account rename",
+			ReadOnlyHint:    false,
+			DestructiveHint: &nonDestructive,
+			OpenWorldHint:   &closedWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "private-account-metadata",
+			"io.github.nkiyohara.corresync/effect":              "reversible_write",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input application.AccountRenameInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
+		result, err := backend.PreviewAccountRename(ctx, input, caller)
+		return nil, result, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "account_rename_commit",
+		Title:       "Commit an approved account rename",
+		Description: "Consume exactly one account_rename approval, atomically update only the human alias, and restart the local session owner. The stable ID and account-owned state do not change.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Commit the reviewed account rename",
+			ReadOnlyHint:    false,
+			DestructiveHint: &nonDestructive,
+			OpenWorldHint:   &closedWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "approval-capability",
+			"io.github.nkiyohara.corresync/effect":              "reversible_write",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input ApprovalInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
+		result, err := backend.CommitAccountRename(ctx, input.Token, caller)
+		return nil, result, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "account_remove",
+		Title:       "Preview removing an account",
+		Description: "Resolve one account, validate any replacement default, and return a caller-bound destructive approval preview. Preview does not close sessions, purge state, delete authorization grants, or change configuration.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Review destructive account removal",
+			ReadOnlyHint:    false,
+			DestructiveHint: &destructive,
+			OpenWorldHint:   &closedWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "private-account-metadata",
+			"io.github.nkiyohara.corresync/effect":              "destructive_write",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input application.AccountRemoveInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
+		result, err := backend.PreviewAccountRemove(ctx, input, caller)
+		return nil, result, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "account_remove_commit",
+		Title:       "Commit an approved account removal",
+		Description: "Consume exactly one account_remove approval, close the current session owner, purge only Corresync-owned account state, atomically remove the route, and start a fresh session owner. External credential-owner records are not deleted.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Commit destructive account removal",
+			ReadOnlyHint:    false,
+			DestructiveHint: &destructive,
+			OpenWorldHint:   &closedWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "approval-capability",
+			"io.github.nkiyohara.corresync/effect":              "destructive_write",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input ApprovalInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
+		result, err := backend.CommitAccountRemove(ctx, input.Token, caller)
 		return nil, result, err
 	})
 	mcp.AddTool(server, &mcp.Tool{
