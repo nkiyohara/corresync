@@ -31,34 +31,65 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.x"
+          cache: true
+
       - name: Validate static site
         run: |
           test -s site/index.html
+          test -s site/getting-started.html
+          test -s site/features.html
           test -s site/providers.html
           test -s site/safety.html
           test -s site/styles.css
+          test -s site/copy.js
+          test -s site/install.sh
           test -s site/favicon.svg
           test -s site/corresync-mark.svg
+          test -s site/social-card.svg
+          test -s site/social-card.png
           test -s site/robots.txt
           test -s site/sitemap.xml
-          for page in index providers safety; do
+          for page in index getting-started features providers safety; do
             grep -Fq '<html lang="en">' "site/${page}.html"
             grep -Fq '<link rel="canonical"' "site/${page}.html"
             grep -Fq 'corresync-mark.svg' "site/${page}.html"
-            ! grep -Eiq 'http-equiv=.*refresh|window\.location|location\.(href|replace)' "site/${page}.html"
+            grep -Fq 'https://nkiyohara.github.io/corresync/social-card.png' "site/${page}.html"
+            if grep -Eiq 'http-equiv=.*refresh|window\.location|location\.(href|replace)' "site/${page}.html"; then
+              exit 1
+            fi
+            if grep -Eiq 'on(click|load|error|focus|mouseover)=' "site/${page}.html"; then
+              exit 1
+            fi
           done
           grep -Fq 'https://nkiyohara.github.io/corresync/' site/index.html
+          grep -Fq 'https://nkiyohara.github.io/corresync/getting-started.html' site/getting-started.html
+          grep -Fq 'https://nkiyohara.github.io/corresync/features.html' site/features.html
           grep -Fq 'https://nkiyohara.github.io/corresync/providers.html' site/providers.html
           grep -Fq 'https://nkiyohara.github.io/corresync/safety.html' site/safety.html
+          grep -Fq 'curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh' site/index.html
+          grep -Fq 'curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh' site/getting-started.html
           grep -Fq 'corr mcp setup codex' site/index.html
-          grep -Fq 'corr mcp setup github-copilot' site/index.html
-          grep -Fq 'corr mcp setup gemini-cli' site/index.html
-          grep -Fq 'corr mcp setup qwen-code' site/index.html
+          grep -Fq 'corr mcp setup claude-code' site/getting-started.html
+          grep -Fq 'corr mcp setup github-copilot' site/getting-started.html
+          grep -Fq 'corr mcp setup gemini-cli' site/getting-started.html
+          grep -Fq 'corr mcp setup qwen-code' site/getting-started.html
+          grep -Fq 'corr mcp setup qoder' site/getting-started.html
+          grep -Fq 'corr mcp config kimi-code' site/getting-started.html
           grep -Fq 'https://nkiyohara.github.io/corresync/' site/sitemap.xml
+          grep -Fq 'https://nkiyohara.github.io/corresync/getting-started.html' site/sitemap.xml
+          grep -Fq 'https://nkiyohara.github.io/corresync/features.html' site/sitemap.xml
           grep -Fq 'https://nkiyohara.github.io/corresync/providers.html' site/sitemap.xml
           grep -Fq 'https://nkiyohara.github.io/corresync/safety.html' site/sitemap.xml
-          ! grep -Riq '<script' site --include='*.html'
+          test -z "$(grep -Rh '<script[^>]* src=' site --include='*.html' | grep -Fv 'src="copy.js" defer' || true)"
+          if grep -Eiq 'fetch\\(|XMLHttpRequest|WebSocket|EventSource' site/copy.js; then
+            exit 1
+          fi
           test -z "$(find site -type l -print -quit)"
+          go run ./tools/siteverify
 
       - name: Configure GitHub Pages
         if: github.event_name != 'pull_request'

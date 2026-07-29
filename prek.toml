@@ -16,5 +16,6 @@ hooks = [
 repo = "local"
 hooks = [
   { id = "gofmt", name = "Format Go source", entry = "mise exec -- gofmt -w", language = "system", types = ["go"] },
+  { id = "shfmt", name = "Format shell source", entry = "mise exec -- shfmt -w -i 2 -ci", language = "system", files = "^(site/install|tools/test-install)\\.sh$" },
   { id = "dprint", name = "Format structured project files", entry = "mise exec -- dprint fmt", language = "system", files = "\\.(css|html|json|jsonc|toml|yaml|yml)$", require_serial = true },
 ]

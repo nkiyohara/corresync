@@ -341,6 +341,7 @@ release:
   make_latest: false
   name_template: "corresync {{ .Tag }}"
   header: |
-    Local-first Outlook Web mail and calendar for humans, scripts, and AI
-    agents. Verify the checksum and review the compatibility notes before using
-    this build with an authorized mailbox.
+    Local-first, provider-neutral email and calendar MCP server and CLI for
+    accounts the signed-in human already controls. Verify the checksum,
+    Sigstore identity, and compatibility evidence before connecting a sensitive
+    account.

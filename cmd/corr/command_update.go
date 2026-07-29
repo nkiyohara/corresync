@@ -42,6 +42,7 @@ type updateActionReport struct {
 	ReleaseURL      string                    `json:"releaseUrl,omitempty"`
 	Archive         string                    `json:"archive,omitempty"`
 	BackupPath      string                    `json:"backupPath,omitempty"`
+	CanonicalPath   string                    `json:"canonicalPath,omitempty"`
 	Verification    []string                  `json:"verification,omitempty"`
 }
 
@@ -94,8 +95,9 @@ func (command *updateApplyCommand) Run(app *runtime) error {
 			ReleaseURL:     result.ReleaseURL,
 			Archive:        result.Archive,
 			BackupPath:     result.BackupPath,
+			CanonicalPath:  result.CanonicalPath,
 		}
-		if report.Updated {
+		if report.Updated || result.Status == updatecheck.InstallStatusRepaired {
 			report.PreviousVersion = result.PreviousVersion
 			report.Verification = []string{"sigstore", "sha256", "version", "platform"}
 		}

@@ -3,6 +3,27 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Installation and user documentation
+
+- Add a no-sudo Linux installer at
+  `https://nkiyohara.github.io/corresync/install.sh`. It selects the latest
+  stable amd64/arm64 archive, requires the exact checksum entry, verifies the
+  release workflow identity when `cosign` is available, validates candidate
+  version/OS/architecture, and atomically installs `corr` plus the finite-window
+  `corresync` compatibility command in a user-owned directory.
+- Repair direct v0.7-to-v0.8 command migration: running `corresync update` now
+  installs a missing sibling `corr` from the same verified release, including
+  when the compatibility binary is already at the latest stable version.
+- Rebuild README and the multipage site around an MCP-first user journey with
+  copyable per-OS installation, internal getting-started/features/provider/
+  safety guides, accessible command copying, responsive presentation, unique
+  search metadata, an exact sitemap, and an original social preview card.
+- Add pinned `shfmt` and ShellCheck formatting/lint gates plus deterministic
+  installer tests for fresh install, idempotent PATH setup, v0.7 recovery,
+  custom paths, and fail-closed checksum handling.
+
 ## 0.8.0 - 2026-07-29
 
 ### Accounts and providers

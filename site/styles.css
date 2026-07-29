@@ -267,6 +267,7 @@ h1 {
   letter-spacing: -0.035em;
   line-height: 1.04;
   text-wrap: balance;
+  overflow-wrap: break-word;
 }
 
 h1 em {
@@ -1519,11 +1520,28 @@ pre {
   font-weight: 700;
 }
 
+/* Grid children that contain command blocks must be allowed to shrink below
+   their content's intrinsic width, so a long command scrolls inside its pre
+   instead of widening the page. */
+.hero > *,
+.install-grid > *,
+.journey-grid > *,
+.outcome-grid > *,
+.capability-grid > *,
+.faq-grid > *,
+.duo > *,
+.client-grid > * {
+  min-width: 0;
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 980px) {
+  /* minmax(0, 1fr), not 1fr: a bare 1fr track cannot shrink below its
+     content's min-content width, and the unbreakable install-command URLs
+     inside the panel would force the whole page wider than the viewport. */
   .hero {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .hero-copy {
     max-width: 44rem;
@@ -1697,7 +1715,7 @@ pre {
   html {
     scroll-behavior: auto;
   }
-  .button, .agent-grid article, .skip-link {
+  .button, .agent-grid article, .skip-link, .copy-button {
     transition: none;
   }
   .button:hover, .agent-grid article:hover {
@@ -1705,8 +1723,525 @@ pre {
   }
 }
 
+/* ---------- Screen-reader-only utility ---------- */
+
+.visually-hidden {
+  position: absolute;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+}
+
+/* ---------- Command blocks and copy enhancement ---------- */
+
+.cmd {
+  position: relative;
+}
+
+.cmd pre {
+  min-height: 3.4rem;
+}
+
+/* When the copy button is present, the block chrome and the reserved button
+   strip move to the wrapper. The strip must live OUTSIDE the pre's scroll
+   area: padding inside a scroll container travels with the content, so a
+   padded pre lets long commands scroll underneath the button. */
+.cmd.has-copy {
+  padding-right: 4.6rem;
+  border: 1px solid var(--term-edge);
+  border-radius: 0.8rem;
+  background: var(--term-bg);
+}
+
+.cmd.has-copy pre {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.copy-button {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--term-edge);
+  border-radius: 0.55rem;
+  color: var(--term-ink);
+  background: rgb(255 255 255 / 8%);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.copy-button:hover {
+  border-color: var(--term-dim);
+  background: rgb(255 255 255 / 15%);
+}
+
+.copy-button:focus-visible {
+  outline: 2px solid var(--term-mint);
+  outline-offset: 2px;
+}
+
+/* ---------- Install panel (home) and install blocks ---------- */
+
+.hero-providers {
+  max-width: 36rem;
+  margin: 0 0 1.6rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 0.6rem;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.hero-providers strong {
+  color: var(--ink);
+}
+
+.install-panel {
+  align-self: start;
+  padding: clamp(1.5rem, 3vw, 2.1rem);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.install-head h2 {
+  margin-bottom: 0.35rem;
+  font-size: 1.35rem;
+}
+
+.install-head p {
+  margin-bottom: 1.4rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.install-block + .install-block {
+  margin-top: 1.05rem;
+}
+
+.os-label {
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-family:
+    ui-monospace,
+    "SF Mono",
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    "Liberation Mono",
+    monospace;
+}
+
+.os-label.alt {
+  margin-top: 1.05rem;
+}
+
+.install-note {
+  margin: 1.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.75;
+}
+
+.block-note {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.65;
+}
+
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.install-grid .install-block {
+  margin: 0;
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.verify-block {
+  max-width: 24rem;
+  margin-top: 1.1rem;
+}
+
+/* ---------- Home journey (sign in / connect / ask) ---------- */
+
+.journey {
+  border-top: 1px solid var(--line);
+}
+
+.journey-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.journey-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.4rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.journey-step > p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.journey-step pre {
+  flex: 1 0 auto;
+}
+
+/* ---------- Home outcomes ---------- */
+
+.outcome-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.outcome-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: clamp(1.4rem, 3vw, 1.9rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.outcome-card h3 {
+  margin: 0;
+  font-size: 1.12rem;
+}
+
+.outcome-ask {
+  margin: 0;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.outcome-card pre {
+  flex: 1 0 auto;
+}
+
+.outcome-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.safety-head {
+  max-width: 46rem;
+  margin-bottom: clamp(1.75rem, 4vw, 2.5rem);
+}
+
+/* ---------- Getting-started steps ---------- */
+
+main > .gs-steps {
+  width: var(--container);
+  margin-inline: auto;
+  padding: 0;
+  list-style: none;
+}
+
+.gs-step {
+  padding-block: clamp(2.75rem, 6vw, 4.25rem);
+  border-top: 1px solid var(--line);
+}
+
+.gs-step > header {
+  display: flex;
+  gap: 1.15rem;
+  align-items: flex-start;
+  margin-bottom: 1.75rem;
+}
+
+.gs-step > header h2 {
+  margin-bottom: 0.5rem;
+  font-size: clamp(1.5rem, 2.6vw, 2rem);
+}
+
+.gs-step > header p {
+  max-width: 44rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.step-badge {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  margin-top: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--accent-wash);
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.step-foot {
+  max-width: 52rem;
+  margin: 1.6rem 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.75;
+}
+
+.step-links {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 2;
+}
+
+.duo {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: clamp(1.5rem, 4vw, 2.75rem);
+  align-items: start;
+}
+
+.duo > div > p {
+  max-width: 38rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.client-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.client {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.client h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.client > p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.prompt-list {
+  margin: 0 0 1.4rem;
+  padding: 0;
+  list-style: none;
+}
+
+.prompt-list li {
+  margin-bottom: 0.85rem;
+  padding: 0.15rem 0 0.15rem 0.95rem;
+  border-left: 3px solid var(--accent);
+  color: var(--ink);
+  font-size: 0.96rem;
+  font-style: italic;
+}
+
+/* ---------- Features page grids ---------- */
+
+.capability-grid,
+.faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.capability-grid article,
+.faq-grid article {
+  padding: clamp(1.4rem, 3vw, 1.9rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.capability-grid h3 {
+  font-size: 1.15rem;
+}
+
+.capability-grid article > p {
+  max-width: 40rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.capability-grid article > p:last-child {
+  margin-bottom: 0;
+}
+
+.capability-grid ul {
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capability-grid li {
+  position: relative;
+  padding: 0.28rem 0 0.28rem 1.2rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.capability-grid li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.capability-grid .cmd {
+  margin-top: 0.9rem;
+}
+
+.faq-grid h3 {
+  font-size: 1.05rem;
+}
+
+.faq-grid p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.faq-grid p + p {
+  margin-top: 0.7rem;
+}
+
+/* ---------- Secondary deep-reference lines ---------- */
+
+.deep-refs {
+  max-width: 52rem;
+  margin: 1.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.9;
+}
+
+.deep-refs strong {
+  color: var(--ink);
+}
+
+.final-cta .deep-refs {
+  margin-inline: auto;
+}
+
+/* ---------- Touch targets and footer wrapping ---------- */
+
+.site-nav a,
+.site-footer nav a {
+  padding-block: 0.6rem;
+}
+
+.site-footer nav {
+  flex-wrap: wrap;
+}
+
+/* ---------- New-component responsive rules ---------- */
+
+@media (max-width: 980px) {
+  .install-grid,
+  .journey-grid,
+  .outcome-grid,
+  .capability-grid,
+  .faq-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .duo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .install-panel {
+    max-width: 40rem;
+  }
+}
+
+@media (max-width: 680px) {
+  .gs-step > header {
+    gap: 0.85rem;
+  }
+  .step-badge {
+    width: 2.1rem;
+    height: 2.1rem;
+    font-size: 0.8rem;
+  }
+  .client-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cmd.has-copy {
+    padding-right: 0;
+  }
+  .cmd.has-copy pre {
+    padding-top: 3.4rem;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --line: var(--line-strong);
+    --muted: var(--ink);
+  }
+  .copy-button {
+    border-color: var(--term-ink);
+  }
+}
+
 @media print {
-  .airmail, .skip-link, .dots {
+  .airmail, .skip-link, .dots, .copy-button {
     display: none;
   }
   body {

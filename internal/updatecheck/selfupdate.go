@@ -38,8 +38,9 @@ const (
 type InstallStatus string
 
 const (
-	InstallStatusCurrent InstallStatus = "current"
-	InstallStatusUpdated InstallStatus = "updated"
+	InstallStatusCurrent  InstallStatus = "current"
+	InstallStatusRepaired InstallStatus = "repaired"
+	InstallStatusUpdated  InstallStatus = "updated"
 )
 
 // InstallResult contains no Outlook or machine identity. BackupPath is
@@ -52,6 +53,7 @@ type InstallResult struct {
 	ReleaseURL      string        `json:"releaseUrl"`
 	Archive         string        `json:"archive,omitempty"`
 	BackupPath      string        `json:"backupPath,omitempty"`
+	CanonicalPath   string        `json:"canonicalPath,omitempty"`
 }
 
 // InstallStage identifies a completed self-update stage for human-facing
@@ -124,12 +126,19 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	if err != nil {
 		return InstallResult{}, err
 	}
+	goos, goarch := installer.platform()
+	canonicalPath, installCanonical, err := canonicalCommandTarget(executable, goos)
+	if err != nil {
+		return InstallResult{}, err
+	}
 	release, latest, endpointURL, err := installer.fetchRelease(ctx)
 	if err != nil {
 		return InstallResult{}, err
 	}
 	releaseURL := canonicalReleaseURL(latest)
-	if current.Compare(latest) >= 0 {
+	comparison := current.Compare(latest)
+	repairOnly := comparison == 0 && installCanonical
+	if comparison > 0 || (comparison == 0 && !repairOnly) {
 		return InstallResult{
 			Status:         InstallStatusCurrent,
 			CurrentVersion: strings.TrimPrefix(current.String(), "v"),
@@ -139,7 +148,6 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	}
 	installer.progress(InstallStageRelease, "Found stable release "+latest.String())
 
-	goos, goarch := installer.platform()
 	artifactCandidates, err := releaseArtifactCandidates(latest, goos, goarch)
 	if err != nil {
 		return InstallResult{}, err
@@ -226,17 +234,41 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	}
 	installer.progress(InstallStageCandidate, "Validated candidate version, operating system, and architecture")
 
-	backupPath := executable + ".backup-" + strings.TrimPrefix(current.String(), "v")
-	if _, err := os.Lstat(backupPath); err == nil {
-		return InstallResult{}, fmt.Errorf("refusing to replace existing rollback copy %q", backupPath)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return InstallResult{}, fmt.Errorf("inspect rollback path: %w", err)
+	backupPath := ""
+	stagingPath := ""
+	if !repairOnly {
+		backupPath = executable + ".backup-" + strings.TrimPrefix(current.String(), "v")
+		if _, err := os.Lstat(backupPath); err == nil {
+			return InstallResult{}, fmt.Errorf("refusing to replace existing rollback copy %q", backupPath)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return InstallResult{}, fmt.Errorf("inspect rollback path: %w", err)
+		}
+		stagingPath = filepath.Join(filepath.Dir(executable), "."+filepath.Base(executable)+".new")
+		if _, err := os.Lstat(stagingPath); err == nil {
+			return InstallResult{}, fmt.Errorf("refusing to replace existing update staging file %q", stagingPath)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return InstallResult{}, fmt.Errorf("inspect update staging path: %w", err)
+		}
 	}
-	stagingPath := filepath.Join(filepath.Dir(executable), "."+filepath.Base(executable)+".new")
-	if _, err := os.Lstat(stagingPath); err == nil {
-		return InstallResult{}, fmt.Errorf("refusing to replace existing update staging file %q", stagingPath)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return InstallResult{}, fmt.Errorf("inspect update staging path: %w", err)
+	canonicalStagingPath := ""
+	if installCanonical {
+		canonicalStagingPath = filepath.Join(
+			filepath.Dir(canonicalPath),
+			"."+filepath.Base(canonicalPath)+".new",
+		)
+		if canonicalStagingPath != stagingPath {
+			if _, err := os.Lstat(canonicalStagingPath); err == nil {
+				return InstallResult{}, fmt.Errorf(
+					"refusing to replace existing canonical command staging file %q",
+					canonicalStagingPath,
+				)
+			} else if !errors.Is(err, os.ErrNotExist) {
+				return InstallResult{}, fmt.Errorf(
+					"inspect canonical command staging path: %w",
+					err,
+				)
+			}
+		}
 	}
 	candidate, err := os.Open(candidatePath) // #nosec G304 -- private verified update artifact.
 	if err != nil {
@@ -259,6 +291,30 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	if err := checkUpdatePermissions(executable, info.Mode().Perm()); err != nil {
 		return InstallResult{}, fmt.Errorf("self-update requires write access to %q: %w", filepath.Dir(executable), err)
 	}
+	if installCanonical {
+		if err := installCanonicalCommand(
+			candidatePath,
+			canonicalPath,
+			canonicalStagingPath,
+			info.Mode().Perm(),
+		); err != nil {
+			return InstallResult{}, fmt.Errorf("install primary corr command: %w", err)
+		}
+		if repairOnly {
+			installer.progress(
+				InstallStageReplace,
+				"Installed the missing primary corr command for "+latest.String(),
+			)
+			return InstallResult{
+				Status:         InstallStatusRepaired,
+				CurrentVersion: strings.TrimPrefix(latest.String(), "v"),
+				LatestVersion:  latest.String(),
+				ReleaseURL:     releaseURL,
+				Archive:        archiveName,
+				CanonicalPath:  canonicalPath,
+			}, nil
+		}
+	}
 	if err := binaryupdate.Apply(candidate, options); err != nil {
 		if rollbackErr := binaryupdate.RollbackError(err); rollbackErr != nil {
 			return InstallResult{}, fmt.Errorf(
@@ -267,6 +323,15 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 				rollbackErr,
 				backupPath,
 			)
+		}
+		if installCanonical {
+			if removeErr := os.Remove(canonicalPath); removeErr != nil {
+				return InstallResult{}, fmt.Errorf(
+					"replace executable; original was restored: %w; remove newly installed corr command: %w",
+					err,
+					removeErr,
+				)
+			}
 		}
 		return InstallResult{}, fmt.Errorf("replace executable; original was restored: %w", err)
 	}
@@ -280,7 +345,100 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 		ReleaseURL:      releaseURL,
 		Archive:         archiveName,
 		BackupPath:      backupPath,
+		CanonicalPath:   canonicalPath,
 	}, nil
+}
+
+func canonicalCommandTarget(executable, goos string) (string, bool, error) {
+	canonicalName := "corr"
+	legacyNames := []string{"corresync", "owa"}
+	if goos == "windows" {
+		canonicalName += ".exe"
+		for index := range legacyNames {
+			legacyNames[index] += ".exe"
+		}
+	}
+	base := filepath.Base(executable)
+	equalName := func(left, right string) bool {
+		if goos == "windows" {
+			return strings.EqualFold(left, right)
+		}
+		return left == right
+	}
+	if equalName(base, canonicalName) {
+		return "", false, nil
+	}
+	legacy := false
+	for _, name := range legacyNames {
+		if equalName(base, name) {
+			legacy = true
+			break
+		}
+	}
+	if !legacy {
+		return "", false, nil
+	}
+	target := filepath.Join(filepath.Dir(executable), canonicalName)
+	if _, err := os.Lstat(target); err == nil {
+		return "", false, fmt.Errorf(
+			"primary corr command already exists at %q; run %q instead",
+			target,
+			target+" update",
+		)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return "", false, fmt.Errorf("inspect primary corr command path: %w", err)
+	}
+	return target, true, nil
+}
+
+func installCanonicalCommand(candidatePath, target, stagingPath string, mode os.FileMode) error {
+	source, err := os.Open(candidatePath) // #nosec G304 -- private verified release candidate.
+	if err != nil {
+		return fmt.Errorf("open verified candidate: %w", err)
+	}
+	defer func() { _ = source.Close() }()
+
+	staging, err := os.OpenFile(
+		stagingPath,
+		os.O_WRONLY|os.O_CREATE|os.O_EXCL,
+		mode,
+	) // #nosec G304 -- validated user-owned executable directory and fixed sibling filename.
+	if err != nil {
+		return fmt.Errorf("create primary command staging file: %w", err)
+	}
+	keepStaging := true
+	defer func() {
+		_ = staging.Close()
+		if keepStaging {
+			_ = os.Remove(stagingPath)
+		}
+	}()
+	written, err := io.Copy(staging, io.LimitReader(source, maximumReleaseBinary+1))
+	if err != nil {
+		return fmt.Errorf("copy verified primary command: %w", err)
+	}
+	if written > maximumReleaseBinary {
+		return errors.New("verified primary command exceeds size limit")
+	}
+	if err := staging.Sync(); err != nil {
+		return fmt.Errorf("sync primary command staging file: %w", err)
+	}
+	if err := staging.Close(); err != nil {
+		return fmt.Errorf("close primary command staging file: %w", err)
+	}
+	if err := os.Chmod(stagingPath, mode); err != nil {
+		return fmt.Errorf("set primary command permissions: %w", err)
+	}
+	if _, err := os.Lstat(target); err == nil {
+		return fmt.Errorf("refusing to replace primary corr command created concurrently at %q", target)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect primary corr command before install: %w", err)
+	}
+	if err := os.Rename(stagingPath, target); err != nil {
+		return fmt.Errorf("install primary corr command: %w", err)
+	}
+	keepStaging = false
+	return nil
 }
 
 func verifyReleaseProvenance(

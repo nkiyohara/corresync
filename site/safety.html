@@ -3,20 +3,44 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Safety — Corresync</title>
+    <title>The Corresync safety model — local authority, reviewed writes</title>
     <meta
       name="description"
-      content="See how Corresync keeps credentials local, accounts isolated, writes reviewed, and provider limitations visible."
+      content="How Corresync keeps sign-in browser- or keyring-owned, accounts isolated, and every consequential write previewed before commit."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Corresync safety — visible effects, local authority">
+    <meta
+      property="og:title"
+      content="The Corresync safety model — local authority, reviewed writes"
+    >
     <meta
       property="og:description"
-      content="Credentials stay browser- or keyring-owned, writes use exact preview and commit, and unknown outcomes fail closed."
+      content="How Corresync keeps sign-in browser- or keyring-owned, accounts isolated, and every consequential write previewed before commit."
     >
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://nkiyohara.github.io/corresync/safety.html">
+    <meta property="og:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta
+      name="twitter:title"
+      content="The Corresync safety model — local authority, reviewed writes"
+    >
+    <meta
+      name="twitter:description"
+      content="How Corresync keeps sign-in browser- or keyring-owned, accounts isolated, and every consequential write previewed before commit."
+    >
+    <meta name="twitter:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
     <link rel="canonical" href="https://nkiyohara.github.io/corresync/safety.html">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
@@ -32,15 +56,10 @@
       </a>
       <nav class="site-nav" aria-label="Primary">
         <a href="./">Home</a>
+        <a href="getting-started.html">Getting started</a>
         <a href="providers.html">Providers</a>
+        <a href="features.html">Features</a>
         <a href="safety.html" aria-current="page">Safety</a>
-        <a href="./#quickstart">Quickstart</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/docs/README.md">Docs<span
-            aria-hidden="true"
-          >
-            ↗</span></a>
-        <a href="https://github.com/nkiyohara/corresync">GitHub<span aria-hidden="true">
-            ↗</span></a>
       </nav>
     </header>
 
@@ -55,10 +74,7 @@
         </p>
         <div class="actions">
           <a class="button primary" href="#promises">See the guarantees</a>
-          <a
-            class="button secondary"
-            href="https://github.com/nkiyohara/corresync/blob/main/docs/threat-model.md"
-          >Read the threat model</a>
+          <a class="button secondary" href="getting-started.html">Set up with these defaults</a>
         </div>
       </section>
 
@@ -331,8 +347,12 @@
             A missing observation is never reported as a pass. Default tests and CI never activate a
             live mailbox or calendar.
           </p>
-          <a href="https://github.com/nkiyohara/corresync/blob/main/docs/compatibility.md">Review
-            compatibility evidence<span aria-hidden="true"> →</span></a>
+          <p class="deep-refs">
+            <a href="features.html#evidence">How evidence works, in plain language</a>. Deep
+            reference:
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/compatibility.md"
+            >the full compatibility evidence matrix on GitHub</a>.
+          </p>
         </div>
       </section>
 
@@ -340,19 +360,20 @@
         <p class="eyebrow"><span aria-hidden="true"></span>Inspect the boundary</p>
         <h2 id="safety-cta-title">The design is documented. The checks are executable.</h2>
         <p>
-          Read the threat model, architecture, and security policy before connecting a sensitive
-          account.
+          Start with the safe defaults, or pick your provider route first.
         </p>
         <div class="actions centered">
-          <a
-            class="button primary"
-            href="https://github.com/nkiyohara/corresync/blob/main/docs/threat-model.md"
-          >Read the threat model</a>
-          <a
-            class="button secondary"
-            href="https://github.com/nkiyohara/corresync/blob/main/docs/architecture.md"
-          >Explore the architecture</a>
+          <a class="button primary" href="getting-started.html">Follow getting started</a>
+          <a class="button secondary" href="providers.html">Choose a provider route</a>
         </div>
+        <p class="deep-refs">
+          <strong>Deep technical references on GitHub:</strong>
+          <a href="https://github.com/nkiyohara/corresync/blob/main/docs/threat-model.md"
+          >threat model</a> ·
+          <a href="https://github.com/nkiyohara/corresync/blob/main/docs/architecture.md"
+          >architecture</a> ·
+          <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">security policy</a>
+        </p>
       </section>
     </main>
 
@@ -363,12 +384,15 @@
       </a>
       <p>
         Independent local-first mail and calendar tooling. Not affiliated with or endorsed by
-        Google, Microsoft, or any provider named here.
+        Google, Microsoft, or any provider or agent vendor named here.
       </p>
       <nav aria-label="Footer">
-        <a href="./">Home</a>
+        <a href="getting-started.html">Getting started</a>
         <a href="providers.html">Providers</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security</a>
+        <a href="features.html">Features</a>
+        <a href="safety.html">Safety</a>
+        <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security policy</a>
         <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
         <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
       </nav>

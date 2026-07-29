@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Getting started with Corresync — install to first answer</title>
+    <meta
+      name="description"
+      content="Install Corresync, sign in, connect Codex, Claude Code, or any MCP client, and ask your first cross-account question—four clear steps from install to first answer."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Getting started with Corresync">
+    <meta
+      property="og:description"
+      content="Install with one command, sign in visibly, connect your MCP agent, and ask across every inbox and calendar you connect."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nkiyohara.github.io/corresync/getting-started.html">
+    <meta property="og:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Getting started with Corresync">
+    <meta
+      name="twitter:description"
+      content="Install with one command, sign in visibly, connect your MCP agent, and ask across every inbox and calendar you connect."
+    >
+    <meta name="twitter:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
+    <link rel="canonical" href="https://nkiyohara.github.io/corresync/getting-started.html">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <script src="copy.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="airmail" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync home">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./">Home</a>
+        <a href="getting-started.html" aria-current="page">Getting started</a>
+        <a href="providers.html">Providers</a>
+        <a href="features.html">Features</a>
+        <a href="safety.html">Safety</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>Getting started</p>
+        <h1 id="page-title">Install to first answer, <em>in four clear steps.</em></h1>
+        <p class="lede">
+          Install <code>corr</code>, sign in to an account you control, register the local MCP
+          server with your agent, and ask something that spans every inbox and calendar you
+          connected. Sign-in stays browser-owned or consent-gated through your OS keyring, agents
+          never receive Corresync-managed credentials, and the MCP connection is local stdio—no
+          hosted relay.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#step-install">Start at step 1</a>
+          <a class="button secondary" href="providers.html">Check your provider first</a>
+        </div>
+      </section>
+
+      <ol class="gs-steps">
+        <li class="gs-step" id="step-install" aria-labelledby="install-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">1</span>
+            <div>
+              <h2 id="install-title">Install <code>corr</code></h2>
+              <p>
+                Pick your platform. Installing gives you the <code>corr</code> command—no account
+                is added and nothing signs in until you do.
+              </p>
+            </div>
+          </header>
+          <div class="install-grid">
+            <div class="install-block">
+              <p class="os-label" id="gs-linux">Linux</p>
+              <div class="cmd" data-copy data-copy-label="Linux install command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="gs-linux"
+                ><code>curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh</code></pre>
+              </div>
+              <p class="block-note">
+                The script is short—review <a href="install.sh">install.sh</a> first if you like.
+                Prefer packages? Every release also ships <code>.deb</code>, <code>.rpm</code>, and
+                <code>.apk</code>, and Homebrew works on Linux too.
+              </p>
+            </div>
+            <div class="install-block">
+              <p class="os-label" id="gs-macos">macOS · Homebrew</p>
+              <div class="cmd" data-copy data-copy-label="macOS install command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="gs-macos"
+                ><code>brew install nkiyohara/corresync/corresync</code></pre>
+              </div>
+              <p class="block-note">Homebrew builds the tagged source of the latest release.</p>
+            </div>
+            <div class="install-block">
+              <p class="os-label" id="gs-windows">Windows · Scoop</p>
+              <div class="cmd" data-copy data-copy-label="Windows install commands">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="gs-windows"
+                ><code>scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
+scoop install corresync/corresync</code></pre>
+              </div>
+              <p class="block-note">
+                Prefer not to use Scoop? Download the release <code>.zip</code> directly and verify
+                its checksum before extracting. Corresync never asks you to weaken an execution
+                policy or organization script restriction.
+              </p>
+            </div>
+          </div>
+          <div class="install-block verify-block">
+            <p class="os-label" id="gs-verify">Verify</p>
+            <div class="cmd" data-copy data-copy-label="version check command">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="gs-verify"
+              ><code>corr --version</code></pre>
+            </div>
+          </div>
+          <p class="step-foot">
+            macOS binaries are not yet notarized and Windows binaries are not yet
+            Authenticode-signed—verify downloads instead of overriding Gatekeeper or SmartScreen.
+            Deep reference: direct archives, checksums, and Sigstore provenance verification in the
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/install.md"
+            >install guide on GitHub</a>.
+          </p>
+        </li>
+
+        <li class="gs-step" id="sign-in" aria-labelledby="signin-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">2</span>
+            <div>
+              <h2 id="signin-title">Sign in to an account you control</h2>
+              <p>
+                The default configuration uses Outlook Web in a dedicated, visible browser profile.
+                Your SSO, MFA, and Conditional Access prompts happen with the provider, exactly as
+                they do every morning.
+              </p>
+            </div>
+          </header>
+          <div class="duo">
+            <div>
+              <p>
+                Corresync never asks for a password, and no secret ever enters
+                <code>config.toml</code>. <code>corr doctor</code> confirms the pieces are healthy
+                before you connect anything else.
+              </p>
+              <p>
+                <strong>Different provider?</strong> Discovery gathers credential-free evidence—it
+                never authenticates or adds an account. Google API and Microsoft Graph need a public
+                OAuth client you are authorized to use, with grants kept in the OS keyring. Google
+                Web is a deliberate read-only route. JMAP, IMAP/SMTP, and CalDAV use a keyring entry
+                or an explicitly approved credential helper.
+              </p>
+              <p class="step-links">
+                <a href="providers.html">Compare provider routes</a> ·
+                <a href="safety.html">how sign-in ownership works</a>. Deep references on GitHub:
+                <a href="https://github.com/nkiyohara/corresync/blob/main/docs/configuration.md"
+                >configuration</a> ·
+                <a href="https://github.com/nkiyohara/corresync/blob/main/docs/authentication.md"
+                >authentication</a>
+              </p>
+            </div>
+            <div class="stack">
+              <div class="install-block">
+                <p class="os-label" id="gs-signin-default">Default · Outlook Web</p>
+                <div class="cmd" data-copy data-copy-label="sign-in commands">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-signin-default"
+                  ><code>corr config init
+corr config validate
+corr auth login
+corr doctor</code></pre>
+                </div>
+              </div>
+              <div class="install-block">
+                <p class="os-label" id="gs-signin-discover">Another provider · discover first</p>
+                <div class="cmd" data-copy data-copy-label="discovery commands">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-signin-discover"
+                  ><code>corr account discover reader@example.invalid
+corr account add reader@example.invalid --help</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </li>
+
+        <li class="gs-step" id="connect" aria-labelledby="connect-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">3</span>
+            <div>
+              <h2 id="connect-title">Connect the agent you already use</h2>
+              <p>
+                One command registers Corresync as a local stdio MCP server in the client’s own
+                configuration, with absolute paths and no remote endpoint. Restart the client
+                afterwards.
+              </p>
+            </div>
+          </header>
+          <div class="client-grid">
+            <div class="client">
+              <h3>Codex</h3>
+              <div class="cmd" data-copy data-copy-label="Codex setup command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Codex setup command"
+                ><code>corr mcp setup codex</code></pre>
+              </div>
+              <p>Verify with <code>codex mcp get corresync</code>.</p>
+            </div>
+            <div class="client">
+              <h3>Claude Code</h3>
+              <div class="cmd" data-copy data-copy-label="Claude Code setup command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Claude Code setup command"
+                ><code>corr mcp setup claude-code</code></pre>
+              </div>
+              <p>User or project scope; verify with <code>claude mcp get corresync</code>.</p>
+            </div>
+            <div class="client">
+              <h3>GitHub Copilot CLI</h3>
+              <div class="cmd" data-copy data-copy-label="GitHub Copilot CLI setup command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="GitHub Copilot CLI setup command"
+                ><code>corr mcp setup github-copilot</code></pre>
+              </div>
+              <p>Verify with <code>copilot mcp get corresync</code>.</p>
+            </div>
+            <div class="client">
+              <h3>Gemini CLI</h3>
+              <div class="cmd" data-copy data-copy-label="Gemini CLI setup command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Gemini CLI setup command"
+                ><code>corr mcp setup gemini-cli</code></pre>
+              </div>
+              <p>Verify with <code>gemini mcp list</code>.</p>
+            </div>
+            <div class="client">
+              <h3>Qwen Code</h3>
+              <div class="cmd" data-copy data-copy-label="Qwen Code setup command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Qwen Code setup command"
+                ><code>corr mcp setup qwen-code</code></pre>
+              </div>
+              <p>Verify with <code>qwen mcp list</code>.</p>
+            </div>
+            <div class="client">
+              <h3>Qoder</h3>
+              <div class="cmd" data-copy data-copy-label="Qoder setup command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Qoder setup command"
+                ><code>corr mcp setup qoder</code></pre>
+              </div>
+              <p>Verify with <code>qodercli mcp list</code>.</p>
+            </div>
+            <div class="client">
+              <h3>Kimi Code CLI</h3>
+              <div class="cmd" data-copy data-copy-label="Kimi Code configuration command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Kimi Code configuration command"
+                ><code>corr mcp config kimi-code</code></pre>
+              </div>
+              <p>Prints the registration to add to Kimi’s MCP configuration.</p>
+            </div>
+            <div class="client">
+              <h3>Any MCP client</h3>
+              <div class="cmd" data-copy data-copy-label="generic MCP serve command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Generic MCP serve command"
+                ><code>corr mcp serve</code></pre>
+              </div>
+              <p>Generic stdio transport—point any client at this command.</p>
+            </div>
+          </div>
+          <p class="step-foot">
+            Every client reaches the same 40 narrow tools and two read-only monitor resources—see
+            <a href="features.html#agents">what agents can and cannot do</a>. Codex and Claude Code
+            users can also install the bundled plugin and Agent Skill; deep reference: the
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/mcp.md"
+            >MCP guide on GitHub</a>.
+          </p>
+        </li>
+
+        <li class="gs-step" id="first-asks" aria-labelledby="ask-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">4</span>
+            <div>
+              <h2 id="ask-title">Ask across everything</h2>
+              <p>
+                Reads span accounts without merging them; writes are deliberately different. Try
+                these first:
+              </p>
+            </div>
+          </header>
+          <div class="duo">
+            <div>
+              <ul class="prompt-list">
+                <li>
+                  “Search every account for the message from Ana about the quarterly plan.”
+                </li>
+                <li>“What’s on all my calendars tomorrow morning?”</li>
+                <li>
+                  “Draft a reply to Ana—I’ll review the preview before anything sends.”
+                </li>
+              </ul>
+              <p>
+                Each result keeps its account and provider, and a failed route surfaces as an
+                explicit partial failure instead of hiding what succeeded.
+              </p>
+              <p>
+                When the agent—or you—asks to send, Corresync returns a review of the exact
+                message. Only approving that exact payload (same account, recipients, and bytes)
+                commits it: <code>--approve</code> in the CLI, or the separate
+                <code>mail_send_commit</code> tool over MCP. Approval is short-lived and single-use.
+              </p>
+            </div>
+            <figure class="terminal">
+              <figcaption class="term-bar">
+                <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="term-title">review before effect</span>
+              </figcaption>
+              <pre
+                tabindex="0"
+                role="region"
+                aria-label="Message send preview and commit"
+              ><code><span class="t-prompt">$</span> corr mail send --account work \
+    --to ana@example.invalid \
+    --subject 'Quarterly plan' \
+    --body-file reply.txt
+
+<span class="t-review">REVIEW · send new message</span>
+  account   work · microsoft-owa
+  to        ana@example.invalid
+  body      text/plain · 412 B
+
+<span class="t-dim">Nothing sent.</span>
+
+<span class="t-prompt">$</span> corr mail send … <span class="t-approve">--approve</span>
+<span class="t-sent">SENT · one attempt · review 9f2c1a…</span></code></pre>
+            </figure>
+          </div>
+        </li>
+      </ol>
+
+      <section aria-labelledby="next-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Where next</p>
+          <h2 id="next-title">Go deeper when you need to.</h2>
+        </div>
+        <div class="control-grid">
+          <article>
+            <h3>Providers and limits</h3>
+            <p>
+              What each route can and cannot do, stated per capability.
+              <a href="providers.html">Compare routes</a>.
+            </p>
+          </article>
+          <article>
+            <h3>The safety model</h3>
+            <p>
+              Credentials, isolation, preview→commit, and what is deliberately absent.
+              <a href="safety.html">Read the guarantees</a>.
+            </p>
+          </article>
+          <article>
+            <h3>Everything you can do</h3>
+            <p>
+              Mail, calendar, agents, scripting, import, and monitoring in plain language.
+              <a href="features.html">Tour the features</a>.
+            </p>
+          </article>
+          <article>
+            <h3>Scripts and stable JSON</h3>
+            <p>
+              Automate against the same core and the same policy checks.
+              <a href="features.html#scripting">See how scripting works</a>.
+            </p>
+          </article>
+        </div>
+        <div class="evidence-note">
+          <span class="status-dot" aria-hidden="true"></span>
+          <p>
+            <strong>Before you connect a sensitive account:</strong> provider routes ship with
+            deterministic synthetic contract coverage and remain live-unobserved until a separately
+            authorized, recorded observation exists.
+          </p>
+          <a href="features.html#evidence">How evidence works<span aria-hidden="true">
+              →</span></a>
+        </div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="gs-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>That’s the whole loop</p>
+        <h2 id="gs-cta-title">Install, sign in, connect, ask.</h2>
+        <p>Everything else is detail you can read when you want it.</p>
+        <div class="actions centered">
+          <a class="button primary" href="safety.html">Read the safety model</a>
+          <a class="button secondary" href="features.html">See everything you can do</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <p>
+        Independent local-first mail and calendar tooling. Not affiliated with or endorsed by
+        Google, Microsoft, or any provider or agent vendor named here.
+      </p>
+      <nav aria-label="Footer">
+        <a href="getting-started.html">Getting started</a>
+        <a href="providers.html">Providers</a>
+        <a href="features.html">Features</a>
+        <a href="safety.html">Safety</a>
+        <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security policy</a>
+        <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

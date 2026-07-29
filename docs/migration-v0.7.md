@@ -116,6 +116,25 @@ corr config validate
 corr account list
 ```
 
+If `corresync --version` reports v0.8 but the `corr` command is missing after a
+direct in-place update, the old updater replaced only its own executable path.
+On Linux, install both verified command entries with:
+
+```console
+curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh
+```
+
+Updated direct installers can also repair the missing primary name without
+changing version:
+
+```console
+corresync update
+```
+
+The repair downloads and verifies the same stable release before creating
+`corr`. Package-manager installs and freshly extracted v0.8 archives already
+contain both names.
+
 The identical `corresync` executable remains in v0.8 and v0.9 releases only as
 a script/update compatibility entry. New scripts, MCP registrations,
 completions, examples, and automation should use `corr`. It may be removed no

@@ -3,26 +3,70 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync — all your mail and calendars, one local command</title>
+    <title>Corresync — one local MCP server for all your email and calendars</title>
     <meta
       name="description"
-      content="Use isolated Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts from one local-first CLI and MCP server."
+      content="One local MCP server and CLI for isolated Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts. Agents never hold your credentials; every send is previewed first."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync — all your mail and calendars, one local command"
+      content="Corresync — one local MCP server for all your email and calendars"
     >
     <meta
       property="og:description"
-      content="A local-first mail and calendar CLI plus MCP server for people, scripts, and AI agents."
+      content="One local MCP server and CLI for isolated Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts. Agents never hold your credentials; every send is previewed first."
     >
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://nkiyohara.github.io/corresync/">
+    <meta property="og:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta
+      name="twitter:title"
+      content="Corresync — one local MCP server for all your email and calendars"
+    >
+    <meta
+      name="twitter:description"
+      content="One local MCP server and CLI for isolated Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts. Agents never hold your credentials; every send is previewed first."
+    >
+    <meta name="twitter:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
     <link rel="canonical" href="https://nkiyohara.github.io/corresync/">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
+    <script src="copy.js" defer></script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "name": "Corresync",
+          "url": "https://nkiyohara.github.io/corresync/"
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "Corresync",
+          "url": "https://nkiyohara.github.io/corresync/",
+          "codeRepository": "https://github.com/nkiyohara/corresync",
+          "programmingLanguage": "Go",
+          "runtimePlatform": ["macOS", "Linux", "Windows"],
+          "license": "https://www.apache.org/licenses/LICENSE-2.0",
+          "description": "A local-first, provider-neutral MCP server and CLI that connects AI agents and the terminal to isolated Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts."
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -35,114 +79,294 @@
       </a>
       <nav class="site-nav" aria-label="Primary">
         <a href="./" aria-current="page">Home</a>
+        <a href="getting-started.html">Getting started</a>
         <a href="providers.html">Providers</a>
+        <a href="features.html">Features</a>
         <a href="safety.html">Safety</a>
-        <a href="#quickstart">Quickstart</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/docs/README.md">Docs<span
-            aria-hidden="true"
-          >
-            ↗</span></a>
-        <a href="https://github.com/nkiyohara/corresync">GitHub<span aria-hidden="true">
-            ↗</span></a>
       </nav>
     </header>
 
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span aria-hidden="true"></span>Local-first correspondence</p>
-          <h1 id="hero-title">All your mail and calendars. <em>One local command.</em></h1>
+          <p class="eyebrow"><span aria-hidden="true"></span>Local-first · MCP server + CLI</p>
+          <h1 id="hero-title">One local MCP server for <em>all your email and calendars.</em></h1>
           <p class="lede">
-            <code>corr</code> brings isolated Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP, and
-            CalDAV accounts into one terminal—and one local MCP server for AI agents.
+            Corresync connects Codex, Claude Code, or any MCP agent—and your own terminal—to the
+            isolated work and personal accounts you already control. Search every inbox, see one
+            agenda, and approve every send before it happens.
+          </p>
+          <p class="hero-providers">
+            <strong>Will it work with my accounts?</strong> Outlook Web · Google API · Google Web
+            (read-only) · Microsoft Graph · JMAP · IMAP/SMTP · CalDAV. Capabilities are explicit
+            per account — <a href="providers.html">compare the routes</a>.
           </p>
           <div class="actions">
-            <a class="button primary" href="#quickstart">Get started in five minutes</a>
-            <a class="button secondary" href="providers.html">Find your provider</a>
+            <a class="button primary" href="getting-started.html">Get set up in four steps</a>
+            <a class="button secondary" href="#outcomes">See what you can ask</a>
           </div>
           <p class="hero-note">
-            Sign-in stays in your browser or OS credential store. Monitoring starts off. Nothing
-            sends or deletes without an exact review.
+            Sign-in stays in your browser or OS keyring—agents never hold Corresync-managed
+            credentials, and there is no hosted relay. Consequential writes show an exact preview
+            and commit only when you approve.
           </p>
         </div>
 
-        <figure class="terminal hero-terminal">
-          <figcaption class="term-bar">
-            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span class="term-title">one core · many accounts · two interfaces</span>
-          </figcaption>
-          <pre
-            tabindex="0"
-            role="region"
-            aria-label="A terminal and agent use Corresync across isolated accounts"
-          ><code><span class="t-prompt">$</span> corr mail search --all-accounts \
-    --query 'subject:"Quarterly plan"' --limit 3
-<span class="t-unread">●</span> <span class="t-dim">work · microsoft-owa</span>  Ana Ruiz  Plan review
-<span class="t-read">·</span> <span class="t-dim">personal · google-api</span> Finance   Plan receipt
-
-<span class="t-sep">── the same guarded core, from an agent ──</span>
-
-<span class="t-ask">›</span> What needs my attention before noon?
-  <span class="t-tool">mail_search_all</span> <span class="t-tool">agenda_list</span>
-  Two messages match. Your design review
-  starts at 09:30 on the work calendar.</code></pre>
-        </figure>
+        <div class="install-panel" id="install" aria-labelledby="install-title">
+          <div class="install-head">
+            <h2 id="install-title">Install now</h2>
+            <p>One command per platform. Then connect the agent you already use.</p>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-linux">Linux</p>
+            <div class="cmd" data-copy data-copy-label="Linux install command">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-linux"
+              ><code>curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-macos">macOS · Homebrew</p>
+            <div class="cmd" data-copy data-copy-label="macOS install command">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-macos"
+              ><code>brew install nkiyohara/corresync/corresync</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-windows">Windows · Scoop</p>
+            <div class="cmd" data-copy data-copy-label="Windows install commands">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-windows"
+              ><code>scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
+scoop install corresync/corresync</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-connect">Next · connect your agent</p>
+            <div class="cmd" data-copy data-copy-label="agent setup command">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-connect"
+              ><code>corr mcp setup codex</code></pre>
+            </div>
+          </div>
+          <p class="install-note">
+            Also <code>claude-code</code>, <code>github-copilot</code>, <code>gemini-cli</code>,
+            <code>qwen-code</code>, <code>qoder</code>, and Kimi Code —
+            <a href="getting-started.html#connect">every client</a>. Prefer to read before you run?
+            Review <a href="install.sh">install.sh</a> first. Deep reference: checksum and Sigstore
+            provenance verification in the
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/install.md"
+            >install guide on GitHub</a>.
+          </p>
+        </div>
       </section>
 
-      <section class="trust-row" aria-label="Core promises">
+      <section class="trust-row" aria-label="Why Corresync">
         <div>
-          <strong>Local first</strong>
-          <span>No hosted relay or remote MCP endpoint</span>
+          <strong>One MCP, every account</strong>
+          <span>Work and personal stay isolated; every result keeps its account and provider
+            provenance.</span>
         </div>
         <div>
-          <strong>Your sign-in</strong>
-          <span>Visible browser, public-client OAuth, or approved local credential reference</span>
+          <strong>Agents never hold credentials</strong>
+          <span>Sign-in lives in a visible browser or the OS keyring. No hosted relay, no remote MCP
+            endpoint.</span>
         </div>
         <div>
-          <strong>Preview → commit</strong>
-          <span>External and destructive writes are exact, single-use reviews</span>
-        </div>
-        <div>
-          <strong>Account isolation</strong>
-          <span>Every result keeps account and provider provenance</span>
+          <strong>Preview, then commit</strong>
+          <span>Sends and destructive writes return an exact server-enforced review first. Approval
+            is single-use.</span>
         </div>
       </section>
 
-      <section aria-labelledby="outcomes-title">
+      <section class="journey" id="quickstart" aria-labelledby="journey-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>One place to pay attention</p>
-          <h2 id="outcomes-title">See what matters. Work the way you want.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>After install: three short commands</p>
+          <h2 id="journey-title">Sign in. Connect. Ask.</h2>
           <p>
-            Corresync gives your existing accounts a consistent, bounded surface without pretending
-            that every provider behaves the same.
+            The default account uses Outlook Web in a dedicated, visible browser window—your SSO
+            and MFA, untouched. Other providers are one explicit choice away.
           </p>
         </div>
-        <div class="benefit-grid">
-          <article class="benefit-card">
-            <span class="card-index" aria-hidden="true">01</span>
-            <h3>Read across accounts</h3>
-            <p>
-              Search mail and build one agenda across isolated accounts. A failed route stays
-              visible as a partial result instead of hiding everything that succeeded.
+        <div class="journey-grid">
+          <div class="journey-step">
+            <p class="os-label" id="journey-signin">1 · Sign in</p>
+            <div class="cmd" data-copy data-copy-label="sign-in commands">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="journey-signin"
+              ><code>corr config init
+corr auth login</code></pre>
+            </div>
+            <p>A browser opens and you sign in as usual. Corresync never sees a password.</p>
+          </div>
+          <div class="journey-step">
+            <p class="os-label" id="journey-connect">2 · Connect</p>
+            <div class="cmd" data-copy data-copy-label="agent setup command">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="journey-connect"
+              ><code>corr mcp setup codex</code></pre>
+            </div>
+            <p>Registers the local stdio server with your agent. Restart the client once.</p>
+          </div>
+          <div class="journey-step">
+            <p class="os-label" id="journey-ask">3 · Ask</p>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-labelledby="journey-ask"
+            ><code><span class="t-ask">›</span> What needs my attention
+  before noon, across all
+  my accounts?</code></pre>
+            <p>The agent calls typed tools; answers keep each account’s identity.</p>
+          </div>
+        </div>
+        <p class="center-link">
+          <a href="getting-started.html">Walk through the full getting-started guide<span
+              aria-hidden="true"
+            >
+              →</span></a>
+        </p>
+      </section>
+
+      <section class="outcomes" id="outcomes" aria-labelledby="outcomes-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Day-one outcomes</p>
+          <h2 id="outcomes-title">What you can ask before your coffee cools.</h2>
+          <p>
+            The CLI and MCP agents share the same typed operations, account isolation, and policy
+            checks—so everything below works both ways.
+          </p>
+        </div>
+        <div class="outcome-grid">
+          <article class="outcome-card">
+            <h3>Search every inbox at once</h3>
+            <p class="outcome-ask">
+              “Find the quarterly-plan thread—work or personal, I don’t remember which.”
+            </p>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="Cross-account mail search example"
+            ><code><span class="t-prompt">$</span> corr mail search --all-accounts \
+    --query 'subject:"quarterly plan"'
+<span class="t-unread">●</span> <span class="t-dim">work · microsoft-owa</span>  Ana Ruiz  Plan review
+<span class="t-read">·</span> <span class="t-dim">personal · google-api</span> Finance  Plan receipt</code></pre>
+            <p class="outcome-note">
+              A failed account surfaces as an explicit partial result—never silently hidden.
             </p>
           </article>
-          <article class="benefit-card featured">
-            <span class="card-index" aria-hidden="true">02</span>
-            <h3>Use a terminal or an agent</h3>
-            <p>
-              Humans, scripts, and MCP clients call the same typed operations, policy checks,
-              account selection, and provider adapters.
+          <article class="outcome-card">
+            <h3>See one agenda</h3>
+            <p class="outcome-ask">“What does my day look like across both calendars?”</p>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="Cross-account agenda example"
+            ><code><span class="t-prompt">$</span> corr agenda list --all-accounts \
+    --start 2026-07-29T00:00:00Z \
+    --end 2026-07-30T00:00:00Z
+09:30 <span class="t-dim">work</span>      Design review · Teams
+12:30 <span class="t-dim">personal</span>  Dentist</code></pre>
+            <p class="outcome-note">
+              Time zones, calendars, and provider provenance stay attached to every event.
             </p>
           </article>
-          <article class="benefit-card">
-            <span class="card-index" aria-hidden="true">03</span>
-            <h3>Keep effects deliberate</h3>
-            <p>
-              Lists start with metadata. Sensitive reads stay separate. Sends, destructive changes,
-              and calendar invitations require an exact preview and commit.
+          <article class="outcome-card">
+            <h3>Preview a send before approving it</h3>
+            <p class="outcome-ask">“Draft the reply to Ana. I’ll approve the send myself.”</p>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="Send preview example"
+            ><code><span class="t-ask">›</span> Draft a reply to Ana.
+  <span class="t-tool">mail_send</span>
+<span class="t-review">REVIEW · send new message</span>
+  to    ana@example.invalid
+  body  text/plain · 412 B
+<span class="t-dim">Nothing sent until this exact
+payload is approved.</span></code></pre>
+            <p class="outcome-note">
+              The commit must match the reviewed account, recipients, and bytes exactly.
             </p>
           </article>
         </div>
+        <p class="center-link">
+          <a href="features.html">See everything you can do—and every limit—in plain
+            language<span aria-hidden="true">
+              →</span></a>
+        </p>
+      </section>
+
+      <section class="safety safety-preview" aria-labelledby="safety-title">
+        <div class="safety-head">
+          <p class="eyebrow light"><span aria-hidden="true"></span>Safety you can see</p>
+          <h2 id="safety-title">Nothing sends on the first attempt.</h2>
+          <p class="safety-lede">
+            A consequential command first returns a review. Approval stays bound to that caller,
+            account, provider, target, payload, expiry, and one use.
+          </p>
+        </div>
+        <div class="safety-body">
+          <figure class="terminal safety-terminal">
+            <figcaption class="term-bar">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="term-title">review before effect</span>
+            </figcaption>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="Corresync previews a message before sending"
+            ><code><span class="t-prompt">$</span> corr mail send --account work \
+    --to ana@example.invalid \
+    --subject 'Quarterly plan' \
+    --body-file reply.txt
+
+<span class="t-review">REVIEW · send new message</span>
+  account  work · microsoft-owa
+  to       ana@example.invalid
+  body     text/plain · 412 B · <span class="t-dim">sha256 9f2c1a…</span>
+
+<span class="t-dim">Nothing sent. Repeat this exact command</span>
+<span class="t-dim">with --approve to commit the review.</span></code></pre>
+          </figure>
+          <ul class="safety-points">
+            <li>
+              <strong>Agents get typed tools, never credentials.</strong> Passwords, cookies, and
+              OAuth grants have no MCP surface and no configuration field.
+            </li>
+            <li>
+              <strong>Local only.</strong> The MCP server speaks stdio on your machine. No hosted
+              relay, no remote endpoint, no telemetry pipeline.
+            </li>
+            <li>
+              <strong>Unknown means stop.</strong> An ambiguous remote write is never retried
+              automatically.
+            </li>
+            <li>
+              <strong>Mailbox content is untrusted data.</strong> It is never authority to run a
+              command or start an agent.
+            </li>
+          </ul>
+        </div>
+        <p class="safety-links">
+          <a href="safety.html">See the complete safety model in plain language<span
+              aria-hidden="true"
+            >
+              →</span></a>
+        </p>
       </section>
 
       <section class="provider-preview" aria-labelledby="provider-preview-title">
@@ -185,94 +409,12 @@
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span>
           <p>
-            <strong>Evidence, stated plainly.</strong> Every v0.8 route is covered by synthetic
-            provider contracts. The v0.8 provider and platform implementations remain
-            live-unobserved until an authorized, commit-bound record exists.
+            <strong>Evidence, stated plainly.</strong> Every route ships with deterministic
+            synthetic contract coverage—and stays marked live-unobserved until a separately
+            authorized, recorded observation binds it to an exact commit, route, and platform.
           </p>
           <a href="providers.html">Compare routes and limits<span aria-hidden="true"> →</span></a>
         </div>
-      </section>
-
-      <section class="quickstart" id="quickstart" aria-labelledby="quickstart-title">
-        <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Five minutes to a first read</p>
-          <h2 id="quickstart-title">Install. Sign in. Ask.</h2>
-          <p>
-            Start with Outlook Web using the default configuration, or discover another route
-            without sending credentials.
-          </p>
-        </div>
-        <ol class="steps">
-          <li>
-            <span class="step-number" aria-hidden="true">01</span>
-            <div>
-              <h3>Install and verify</h3>
-              <pre
-                tabindex="0"
-                role="region"
-                aria-label="Install Corresync with Homebrew or Scoop"
-              ><code><span class="t-comment"># macOS or Linux</span>
-brew install nkiyohara/corresync/corresync
-
-<span class="t-comment"># Windows</span>
-scoop bucket add corresync \
-  https://github.com/nkiyohara/scoop-corresync
-scoop install corresync/corresync
-
-corr --version</code></pre>
-              <p>
-                Direct archives, Linux packages, checksums, Sigstore provenance, and current WinGet
-                status are in the
-                <a href="https://github.com/nkiyohara/corresync/blob/main/docs/install.md"
-                >install guide</a>.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span class="step-number" aria-hidden="true">02</span>
-            <div>
-              <h3>Initialize and sign in</h3>
-              <pre
-                tabindex="0"
-                role="region"
-                aria-label="Initialize Corresync and sign in"
-              ><code>corr config init
-corr config validate
-corr auth login
-corr mail folders
-corr calendar folders</code></pre>
-              <p>
-                The default route opens Outlook Web in a dedicated browser profile. SSO, MFA,
-                Conditional Access, and organization notices stay in the provider-owned flow.
-              </p>
-            </div>
-          </li>
-          <li>
-            <span class="step-number" aria-hidden="true">03</span>
-            <div>
-              <h3>Connect an agent—or keep using the CLI</h3>
-              <pre
-                tabindex="0"
-                role="region"
-                aria-label="Connect an MCP client and list a cross-account agenda"
-              ><code><span class="t-comment"># choose the client you use</span>
-corr mcp setup codex
-corr mcp setup claude-code
-corr mcp setup github-copilot
-corr mcp setup gemini-cli
-corr mcp setup qwen-code
-corr mcp setup qoder
-
-corr agenda list --all-accounts \
-  --start 2026-07-29T00:00:00Z \
-  --end 2026-07-30T00:00:00Z</code></pre>
-              <p>
-                Generic MCP clients use <code>corr mcp serve</code>. Every client reaches the same
-                40 narrow tools and two read-only monitor resources.
-              </p>
-            </div>
-          </li>
-        </ol>
       </section>
 
       <section class="agents" aria-labelledby="agents-title">
@@ -280,18 +422,18 @@ corr agenda list --all-accounts \
           <p class="eyebrow"><span aria-hidden="true"></span>Local MCP over stdio</p>
           <h2 id="agents-title">Meet your agent where it already works.</h2>
           <p>
-            Setup records absolute local paths and never creates a remote MCP endpoint. Restart the
-            client after registration.
+            Setup writes absolute local paths into the client you choose and never creates a remote
+            endpoint. Every client reaches the same 40 narrow tools.
           </p>
         </div>
         <div class="agent-grid">
           <article>
             <span class="agent-letter" aria-hidden="true">C</span><h3>Codex</h3><code>corr mcp setup
-              codex</code><p>Plugin and bundled Agent Skill.</p>
+              codex</code><p>Registration plus a bundled plugin and Agent Skill.</p>
           </article>
           <article>
             <span class="agent-letter" aria-hidden="true">A</span><h3>Claude Code</h3><code>corr mcp
-              setup claude-code</code><p>Plugin plus user/project scopes.</p>
+              setup claude-code</code><p>User or project scope; plugin available.</p>
           </article>
           <article>
             <span class="agent-letter" aria-hidden="true">GH</span><h3>GitHub Copilot CLI</h3><code
@@ -299,68 +441,13 @@ corr agenda list --all-accounts \
           </article>
           <article>
             <span class="agent-letter" aria-hidden="true">+</span><h3>More MCP clients</h3><code
-            >corr mcp --help</code><p>Gemini, Qwen, Qoder, Kimi, and generic stdio.</p>
+            >corr mcp --help</code><p>
+              gemini-cli, qwen-code, qoder, kimi-code, and generic stdio.
+            </p>
           </article>
         </div>
         <p class="center-link">
-          <a href="https://github.com/nkiyohara/corresync/blob/main/docs/mcp.md">Open the complete
-            MCP guide<span aria-hidden="true"> →</span></a>
-        </p>
-      </section>
-
-      <section class="safety safety-preview" aria-labelledby="safety-title">
-        <div class="safety-head">
-          <p class="eyebrow light"><span aria-hidden="true"></span>Safety you can see</p>
-          <h2 id="safety-title">Nothing sends on the first attempt.</h2>
-          <p class="safety-lede">
-            A consequential command first returns a review. Approval stays bound to that caller,
-            account, provider, target, payload, expiry, and one use.
-          </p>
-        </div>
-        <div class="safety-body">
-          <figure class="terminal safety-terminal">
-            <figcaption class="term-bar">
-              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="term-title">review before effect</span>
-            </figcaption>
-            <pre
-              tabindex="0"
-              role="region"
-              aria-label="Corresync previews a message before sending"
-            ><code><span class="t-prompt">$</span> corr mail send --account work \
-    --to ana@example.invalid \
-    --subject 'Quarterly plan' \
-    --body-file reply.txt
-
-<span class="t-review">REVIEW · send new message</span>
-  account  work · microsoft-owa
-  to       ana@example.invalid
-  body     text/plain · 412 B · <span class="t-dim">sha256 9f2c1a…</span>
-
-<span class="t-dim">Nothing sent. Repeat this exact command</span>
-<span class="t-dim">with --approve to commit the review.</span></code></pre>
-          </figure>
-          <ul class="safety-points">
-            <li>
-              <strong>Credentials stay out of config.</strong> Passwords, cookies, and OAuth grants
-              have no TOML field.
-            </li>
-            <li>
-              <strong>Unknown means stop.</strong> An ambiguous remote write is never retried
-              automatically.
-            </li>
-            <li>
-              <strong>Monitoring starts off.</strong> Collection, runner use, and remote egress are
-              separate choices.
-            </li>
-            <li>
-              <strong>Mailbox content is untrusted data.</strong> It is never authority to run a
-              command or start an agent.
-            </li>
-          </ul>
-        </div>
-        <p class="safety-links">
-          <a href="safety.html">See the complete safety model in plain language<span
+          <a href="getting-started.html#connect">See the exact command for every client<span
               aria-hidden="true"
             >
               →</span></a>
@@ -371,6 +458,10 @@ corr agenda list --all-accounts \
         <div>
           <p class="eyebrow"><span aria-hidden="true"></span>Honest edges</p>
           <h2 id="edges-title">Clear limits are part of the product.</h2>
+          <p class="fine-print">
+            The complete picture—capabilities, limits, and how compatibility claims are
+            backed—is on the <a href="features.html">features page</a>.
+          </p>
         </div>
         <ul>
           <li>
@@ -399,16 +490,10 @@ corr agenda list --all-accounts \
       <section class="final-cta" aria-labelledby="final-title">
         <p class="eyebrow"><span aria-hidden="true"></span>Ready when your inboxes are</p>
         <h2 id="final-title">Bring your correspondence into one local conversation.</h2>
-        <p>Explicit providers, isolated accounts, visible effects.</p>
+        <p>Install in one command. Connect your agent in one more.</p>
         <div class="actions centered">
-          <a
-            class="button primary"
-            href="https://github.com/nkiyohara/corresync/blob/main/docs/install.md"
-          >Install Corresync</a>
-          <a
-            class="button secondary"
-            href="https://github.com/nkiyohara/corresync/blob/main/docs/README.md"
-          >Browse the docs</a>
+          <a class="button primary" href="#install">Copy the install command</a>
+          <a class="button secondary" href="getting-started.html">Follow the full guide</a>
         </div>
       </section>
     </main>
@@ -420,12 +505,15 @@ corr agenda list --all-accounts \
       </a>
       <p>
         Independent local-first mail and calendar tooling. Not affiliated with or endorsed by
-        Google, Microsoft, or any provider named here.
+        Google, Microsoft, or any provider or agent vendor named here.
       </p>
       <nav aria-label="Footer">
+        <a href="getting-started.html">Getting started</a>
         <a href="providers.html">Providers</a>
+        <a href="features.html">Features</a>
         <a href="safety.html">Safety</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security</a>
+        <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security policy</a>
         <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
         <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
       </nav>

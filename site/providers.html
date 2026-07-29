@@ -3,20 +3,38 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Providers — Corresync</title>
+    <title>Supported providers and account routes — Corresync</title>
     <meta
       name="description"
-      content="Compare Corresync routes for Outlook, Google, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV."
+      content="How Corresync connects Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts: explicit routes, visible sign-in ownership, and stated limits."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Choose your Corresync provider route">
+    <meta property="og:title" content="Supported providers and account routes — Corresync">
     <meta
       property="og:description"
-      content="Explicit browser, OAuth, JMAP, IMAP/SMTP, and CalDAV routes with visible capabilities and limits."
+      content="How Corresync connects Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts: explicit routes, visible sign-in ownership, and stated limits."
     >
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://nkiyohara.github.io/corresync/providers.html">
+    <meta property="og:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Supported providers and account routes — Corresync">
+    <meta
+      name="twitter:description"
+      content="How Corresync connects Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts: explicit routes, visible sign-in ownership, and stated limits."
+    >
+    <meta name="twitter:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
     <link rel="canonical" href="https://nkiyohara.github.io/corresync/providers.html">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="stylesheet" href="styles.css">
@@ -32,15 +50,10 @@
       </a>
       <nav class="site-nav" aria-label="Primary">
         <a href="./">Home</a>
+        <a href="getting-started.html">Getting started</a>
         <a href="providers.html" aria-current="page">Providers</a>
+        <a href="features.html">Features</a>
         <a href="safety.html">Safety</a>
-        <a href="./#quickstart">Quickstart</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/docs/README.md">Docs<span
-            aria-hidden="true"
-          >
-            ↗</span></a>
-        <a href="https://github.com/nkiyohara/corresync">GitHub<span aria-hidden="true">
-            ↗</span></a>
       </nav>
     </header>
 
@@ -54,10 +67,7 @@
         </p>
         <div class="actions">
           <a class="button primary" href="#route-cards">Compare routes</a>
-          <a
-            class="button secondary"
-            href="https://github.com/nkiyohara/corresync/blob/main/docs/configuration.md"
-          >Open setup details</a>
+          <a class="button secondary" href="getting-started.html#sign-in">See the setup steps</a>
         </div>
       </section>
 
@@ -71,8 +81,7 @@
             and platform.
           </p>
         </div>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/docs/compatibility.md">How
-          evidence works<span aria-hidden="true"> →</span></a>
+        <a href="features.html#evidence">How evidence works<span aria-hidden="true"> →</span></a>
       </section>
 
       <section id="route-cards" aria-labelledby="microsoft-title">
@@ -299,6 +308,13 @@
         <div>
           <p class="eyebrow"><span aria-hidden="true"></span>No hidden fallback</p>
           <h2 id="provider-limits-title">A missing capability stays missing.</h2>
+          <p class="fine-print">
+            The plain-language tour of what you can do is on the
+            <a href="features.html">features page</a>. Deep reference: the exact per-action matrix
+            and typed degradations in
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/features.md"
+            >features.md on GitHub</a>.
+          </p>
         </div>
         <ul>
           <li>Provider limitations are returned as typed capabilities or degradations.</li>
@@ -319,14 +335,8 @@
         <h2 id="provider-cta-title">Start with evidence, then authenticate.</h2>
         <p>Discovery reads no credentials and adds no account.</p>
         <div class="actions centered">
-          <a
-            class="button primary"
-            href="https://github.com/nkiyohara/corresync/blob/main/docs/configuration.md"
-          >Configure a route</a>
-          <a
-            class="button secondary"
-            href="https://github.com/nkiyohara/corresync/blob/main/docs/features.md"
-          >See the exact feature matrix</a>
+          <a class="button primary" href="getting-started.html">Set up your first account</a>
+          <a class="button secondary" href="features.html">See everything you can do</a>
         </div>
       </section>
     </main>
@@ -338,12 +348,15 @@
       </a>
       <p>
         Independent local-first mail and calendar tooling. Not affiliated with or endorsed by
-        Google, Microsoft, or any provider named here.
+        Google, Microsoft, or any provider or agent vendor named here.
       </p>
       <nav aria-label="Footer">
-        <a href="./">Home</a>
+        <a href="getting-started.html">Getting started</a>
+        <a href="providers.html">Providers</a>
+        <a href="features.html">Features</a>
         <a href="safety.html">Safety</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security</a>
+        <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security policy</a>
         <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
         <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
       </nav>

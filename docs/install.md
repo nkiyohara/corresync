@@ -5,6 +5,70 @@ finite v0.8–v0.9 command-transition window also contain the identical
 `corresync` compatibility executable; scripts and new documentation should use
 `corr`.
 
+## Install now
+
+### Linux: one command, no sudo
+
+```console
+curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh
+```
+
+The standalone installer supports Linux amd64 and arm64. It:
+
+- resolves only a stable tag from the canonical GitHub repository;
+- downloads the exact archive, checksum inventory, and Sigstore bundle over
+  HTTPS;
+- requires the archive's one exact SHA-256 entry;
+- verifies the exact GitHub Actions workflow identity when `cosign` is already
+  available, or reports clearly that provenance was not checked;
+- bounds archive size, entry count, extraction, candidate output, and time;
+- validates candidate version, operating system, and architecture;
+- installs `corr` and the v0.8-v0.9 `corresync` compatibility entry in
+  `~/.local/bin` through a rollback-capable same-filesystem transaction.
+
+If `~/.local/bin` is not already on `PATH`, the installer adds one marked,
+idempotent line to the current Bash, Zsh, or POSIX profile when that profile is
+a regular user-owned file that is not group- or world-writable. It never
+follows or edits a symlinked profile. Open a new terminal after a PATH update.
+
+The installer does not create configuration, read a credential, sign in,
+connect a provider, start a daemon, or register an MCP client.
+
+Review the exact script before running it:
+
+```console
+curl -LsSf https://nkiyohara.github.io/corresync/install.sh | less
+```
+
+The Pages script is a mutable bootstrap delivered over HTTPS. For a
+commit-bound, high-assurance installation, download a tagged release and
+perform the checksum and Sigstore verification below before extraction.
+
+Pin a version, choose a different absolute destination, or leave shell profiles
+unchanged:
+
+```console
+CORRESYNC_VERSION=v0.8.0 \
+  CORRESYNC_NO_PATH_UPDATE=1 \
+  CORRESYNC_INSTALL_DIR="$HOME/bin" \
+  sh -c 'curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh'
+```
+
+### macOS
+
+```console
+brew install nkiyohara/corresync/corresync
+corr --version
+```
+
+### Windows
+
+```console
+scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
+scoop install corresync/corresync
+corr --version
+```
+
 ## Release targets
 
 <!-- markdownlint-disable MD013 -->
@@ -212,6 +276,19 @@ Package-managed binaries print the exact owner-specific update command and are
 never replaced by Corresync. A direct install verifies release identity,
 checksums, version, OS, and architecture before replacement and retains a
 rollback copy beside the executable. Background checks never modify a binary.
+
+If a direct v0.7 `corresync update` reached v0.8.0 but did not create the new
+`corr` filename, either run the Linux standalone installer above or rerun:
+
+```console
+corresync update
+```
+
+An updater containing the migration repair verifies the exact current release,
+installs the missing sibling `corr`, and leaves the existing compatibility
+command unchanged. If `corr` already exists, it becomes the direct update
+owner; use `corr update` so two independently updated executable paths cannot
+drift.
 
 The updater knows the former repository and archive names only as a finite
 v0.6 migration input. New releases require canonical `corresync_*` assets.

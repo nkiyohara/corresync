@@ -18,9 +18,12 @@ installed binary, its matching release notes remain authoritative.
 
 The [project website](https://nkiyohara.github.io/corresync/) gives a
 user-focused introduction. Its dedicated
-[provider](https://nkiyohara.github.io/corresync/providers.html) and
-[safety](https://nkiyohara.github.io/corresync/safety.html) pages summarize
-the same contracts without replacing the detailed references here.
+[getting-started](https://nkiyohara.github.io/corresync/getting-started.html),
+[features](https://nkiyohara.github.io/corresync/features.html),
+[providers](https://nkiyohara.github.io/corresync/providers.html), and
+[safety](https://nkiyohara.github.io/corresync/safety.html) pages keep normal
+install, MCP setup, provider choice, and safety journeys on readable web pages.
+The references here remain the complete technical and evidence contracts.
 
 ## First run
 
