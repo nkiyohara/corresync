@@ -1,0 +1,254 @@
+// Package restapi provides a bounded, redirect-rejecting HTTP boundary shared
+// by explicit API provider adapters. It contains transport mechanics only, not
+// provider semantics or application policy.
+package restapi
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/nkiyohara/corresync/internal/application"
+)
+
+const (
+	maximumRequestBytes  = 4 << 20
+	maximumResponseBytes = 8 << 20
+)
+
+// ErrPrecondition indicates a server-enforced version condition failed.
+var ErrPrecondition = errors.New("API write precondition failed")
+
+// Client owns one API origin and an already authorized HTTP client.
+type Client struct {
+	base *url.URL
+	http *http.Client
+}
+
+// Options configures one account-scoped API transport.
+type Options struct {
+	BaseURL string
+	HTTP    *http.Client
+}
+
+// New validates a credential-free HTTPS base without contacting it.
+func New(options Options) (*Client, error) {
+	base, err := url.Parse(options.BaseURL)
+	if err != nil || base.Scheme != "https" || base.Hostname() == "" ||
+		base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+		return nil, errors.New("API base must be a credential-free HTTPS URL")
+	}
+	if options.HTTP == nil {
+		return nil, errors.New("authorized API HTTP client is required")
+	}
+	httpClient := *options.HTTP
+	if httpClient.Timeout == 0 {
+		httpClient.Timeout = 30 * time.Second
+	}
+	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return errors.New("API redirects are not accepted")
+	}
+	return &Client{base: base, http: &httpClient}, nil
+}
+
+// Result is one bounded provider response.
+type Result struct {
+	Status int
+	Header http.Header
+	Body   []byte
+}
+
+// DoJSON executes one JSON request and decodes a bounded JSON response.
+func (client *Client) DoJSON(
+	ctx context.Context,
+	method, resource string,
+	query url.Values,
+	requestBody any,
+	responseBody any,
+	write bool,
+	headers http.Header,
+	accepted ...int,
+) (Result, error) {
+	var body io.Reader
+	if requestBody != nil {
+		encoded, err := json.Marshal(requestBody)
+		if err != nil {
+			return Result{}, err
+		}
+		if len(encoded) > maximumRequestBytes {
+			return Result{}, errors.New("API JSON request exceeds the configured limit")
+		}
+		body = bytes.NewReader(encoded)
+	}
+	result, err := client.Do(
+		ctx, method, resource, query, body, write, headers, accepted...,
+	)
+	if err != nil {
+		return Result{}, err
+	}
+	if responseBody != nil && len(result.Body) != 0 {
+		if err := json.Unmarshal(result.Body, responseBody); err != nil {
+			if write {
+				return Result{}, fmt.Errorf(
+					"%w: API write returned malformed JSON",
+					application.ErrWriteOutcomeUnknown,
+				)
+			}
+			return Result{}, errors.New("API returned malformed JSON")
+		}
+	}
+	return result, nil
+}
+
+// Do executes one bounded request. Transport failures for writes are reported
+// as outcome-unknown because the remote service may have committed them.
+func (client *Client) Do(
+	ctx context.Context,
+	method, resource string,
+	query url.Values,
+	body io.Reader,
+	write bool,
+	headers http.Header,
+	accepted ...int,
+) (Result, error) {
+	target, err := client.target(resource, query)
+	if err != nil {
+		return Result{}, err
+	}
+	request, err := http.NewRequestWithContext(ctx, method, target.String(), body)
+	if err != nil {
+		return Result{}, err
+	}
+	for name, values := range headers {
+		for _, value := range values {
+			request.Header.Add(name, value)
+		}
+	}
+	if body != nil && request.Header.Get("Content-Type") == "" {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	response, err := client.http.Do(request)
+	if err != nil {
+		if write {
+			return Result{}, fmt.Errorf("%w: execute API write: %w",
+				application.ErrWriteOutcomeUnknown, err)
+		}
+		return Result{}, err
+	}
+	defer func() { _ = response.Body.Close() }()
+	content, err := io.ReadAll(io.LimitReader(response.Body, maximumResponseBytes+1))
+	if err != nil {
+		if write {
+			return Result{}, fmt.Errorf("%w: read API write response: %w",
+				application.ErrWriteOutcomeUnknown, err)
+		}
+		return Result{}, err
+	}
+	if len(content) > maximumResponseBytes {
+		if write {
+			return Result{}, fmt.Errorf(
+				"%w: API write response exceeds the configured limit",
+				application.ErrWriteOutcomeUnknown,
+			)
+		}
+		return Result{}, errors.New("API response exceeds the configured limit")
+	}
+	result := Result{
+		Status: response.StatusCode,
+		Header: response.Header.Clone(),
+		Body:   content,
+	}
+	for _, status := range accepted {
+		if response.StatusCode == status {
+			return result, nil
+		}
+	}
+	if response.StatusCode == http.StatusPreconditionFailed ||
+		response.StatusCode == http.StatusConflict {
+		return Result{}, ErrPrecondition
+	}
+	statusErr := apiStatusError(response.StatusCode, content)
+	if write &&
+		(response.StatusCode >= http.StatusInternalServerError ||
+			response.StatusCode >= http.StatusOK &&
+				response.StatusCode < http.StatusMultipleChoices) {
+		return Result{}, fmt.Errorf(
+			"%w: %w",
+			application.ErrWriteOutcomeUnknown,
+			statusErr,
+		)
+	}
+	return Result{}, statusErr
+}
+
+func (client *Client) target(resource string, query url.Values) (*url.URL, error) {
+	if resource == "" || strings.HasPrefix(resource, "//") ||
+		strings.ContainsAny(resource, "\r\n\x00") {
+		return nil, errors.New("API resource path is malformed")
+	}
+	raw := strings.TrimRight(client.base.String(), "/") + "/" +
+		strings.TrimLeft(resource, "/")
+	target, err := url.Parse(raw)
+	if err != nil ||
+		target.Scheme != client.base.Scheme ||
+		target.Host != client.base.Host ||
+		target.User != nil ||
+		target.Fragment != "" {
+		return nil, errors.New("API resource escaped the configured origin")
+	}
+	for _, segment := range strings.Split(target.Path, "/") {
+		if segment == "." || segment == ".." {
+			return nil, errors.New("API resource path contains a dot segment")
+		}
+	}
+	basePath := strings.TrimSuffix(client.base.EscapedPath(), "/") + "/"
+	if !strings.HasPrefix(target.EscapedPath(), basePath) {
+		return nil, errors.New("API resource escaped the configured base path")
+	}
+	target.RawQuery = query.Encode()
+	return target, nil
+}
+
+func apiStatusError(status int, body []byte) error {
+	code := ""
+	var envelope struct {
+		Error json.RawMessage `json:"error"`
+	}
+	if json.Unmarshal(body, &envelope) == nil && len(envelope.Error) != 0 {
+		var structured struct {
+			Code json.RawMessage `json:"code"`
+		}
+		if json.Unmarshal(envelope.Error, &structured) == nil {
+			var text string
+			if json.Unmarshal(structured.Code, &text) == nil {
+				code = text
+			} else {
+				var number int
+				if json.Unmarshal(structured.Code, &number) == nil {
+					code = strconv.Itoa(number)
+				}
+			}
+		}
+	}
+	if code != "" && len(code) <= 128 &&
+		!strings.ContainsAny(code, "\r\n\x00") {
+		return fmt.Errorf("API returned HTTP %d (%s)", status, code)
+	}
+	return fmt.Errorf("API returned HTTP %d", status)
+}
+
+// Close releases idle account-scoped network connections.
+func (client *Client) Close() error {
+	if client != nil && client.http != nil {
+		client.http.CloseIdleConnections()
+	}
+	return nil
+}

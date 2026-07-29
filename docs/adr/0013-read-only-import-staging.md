@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-07-28
 
 ## Context
 
@@ -76,3 +77,12 @@ weaker convention for imported files.
 Archive-format support is a separate question. Which PST and OLM implementation
 is acceptable on licensing, fidelity, and security grounds remains open, and
 this decision deliberately does not settle it.
+
+## Initial implementation
+
+The shipped import surface stops at bounded, read-only, account-local staging
+and safe staging purge. It recognizes implemented exports/archives, Maildir,
+and Thunderbird profiles and reports unsupported formats explicitly. There is
+no remote upload command, no provider authentication, and no reuse of another
+application's credentials. Adding staged-data upload remains a separate future
+architectural and product decision.

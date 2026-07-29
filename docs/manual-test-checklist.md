@@ -1,84 +1,61 @@
 # Manual test checklist
 
-Use this runbook to test one published release on another computer.
-It deliberately separates installation, read-only Outlook access, MCP clients,
-and consequential writes so a tester can stop at the authorized boundary.
+Use this runbook for a published candidate on an authorized computer and
+account. Installation, authentication, reads, writes, imports, monitoring, and
+remote egress are separate gates. `SKIP` is the correct result when a gate was
+not explicitly authorized.
 
 > [!WARNING]
-> Use only a device, mailbox, messages, calendar, and recipients you are
-> authorized to test. Complete SSO, MFA, Conditional Access, and organization
-> notices only in the visible browser or the explicit text-only browser relay.
-> Never put a password or MFA code in a shell command, pipe, issue, chat, or
-> test report. Never copy a cookie, bearer value, canary, browser profile, or
-> raw OWA response outside the dedicated session.
+> Never put a password, MFA value, cookie, token, authorization code, canary,
+> credential-helper result, approval token, mailbox/calendar content, or private
+> source path into a shell history, report, issue, chat, screenshot, or fixture.
+> Do not bypass Gatekeeper, SmartScreen, identity policy, consent, or
+> organization controls to make a test pass.
 
-## Test scope
+## Evidence header
 
-Record `PASS`, `FAIL`, or `SKIP` for each applicable gate. A failure at one
-gate does not authorize bypassing an operating-system or organization control.
-
-| Gate | Required for read-only evidence | Separate authorization required |
-| --- | --- | --- |
-| Release download and checksum | Yes | No |
-| Native launch, config, local IPC | Yes | No |
-| Stable-release update check | Yes | No |
-| Interactive browser login and online doctor | Yes | Mailbox read access |
-| CLI folder, mail, and calendar reads | Recommended | Mailbox read access |
-| Codex and Claude Code MCP reads | Per installed client | Mailbox read access |
-| Save-only draft | No | Mailbox write access |
-| Read-state or message move | No | Write access; harmless message |
-| New-message send | No | Controlled recipient; send approval |
-| Calendar create/update/cancel | No | Controlled calendar; write approval |
-
-Do not test attendee invitations, meeting updates, or cancellations during the
-first pass. They can notify other people and require a separately controlled
-attendee set.
-
-## 1. Prepare the computer
-
-Prerequisites:
-
-- a supported native target: macOS, Linux, or Windows on amd64 or arm64;
-- Google Chrome, Chromium, or Microsoft Edge;
-- GitHub CLI or a web browser for the public release download;
-- Cosign for keyless checksum provenance verification;
-- an authorized Outlook Web mailbox;
-- Codex CLI and/or Claude Code only when testing that MCP client.
-
-Prefer a disposable operating-system user or a computer without an existing
-`Corresync` profile. Do not run two releases against the same config
-and daemon state at once.
-
-Record locally, without committing the result file:
+Record locally:
 
 ```text
-Release:
-Commit:
+Release and commit:
 Observation date:
-OS and version:
-Architecture:
-Browser and version:
-Deployment class: Microsoft 365 work/school | Outlook.com | other
-Install surface: Homebrew | WinGet | Scoop | archive | deb | RPM | APK
-Codex version or SKIP:
-Claude Code version or SKIP:
+OS and architecture:
+Browser/keyring family and version:
+Provider ID and deployment class:
+Install surface:
+MCP client/version or SKIP:
 ```
 
-Do not record a tenant name, mailbox address, account ID, message or event ID,
-request ID, subject, recipient, body, token, or screenshot.
+Do not record account alias/ID/address, tenant/endpoint, message/event/folder
+identifier, subject, recipient, attendee, body, query, join URL, source path,
+request ID, runner arguments, or any authorization material.
 
-## 2. Download the release
+## Gate map
 
-The current supported release is `v0.7.0`. Change both variables together when
-testing another version.
+<!-- markdownlint-disable MD013 -->
+| Gate | Minimum authority | Consequence |
+| --- | --- | --- |
+| Verify/download/launch | Local files | None outside test directory |
+| Config/offline doctor/IPC | Local app state | Starts/stops local owner |
+| Account discovery | Public DNS/well-known network | No authentication |
+| Login/online doctor | Selected account read access | Interactive provider session |
+| Metadata/body/attachment reads | Selected account read access | Private data returned locally |
+| Cross-account projections | Every selected account | Private aggregate returned locally |
+| MCP reads | Same account access plus local client | Private data reaches MCP host/model |
+| Import scan | Selected local export | Private data enters local staging |
+| Draft/organization | Mailbox write access | Remote mailbox mutation |
+| Send/calendar change | Controlled targets | External notification/write |
+| Monitoring notify/queue | Ongoing account read access | Persistent local collection |
+| Agent runner/remote egress | Separate runner/egress consent | Automated disclosure/execution |
+<!-- markdownlint-enable MD013 -->
 
-### macOS or Linux download
+## 1. Verify release assets
 
-Run from a new empty directory:
+Download into a new empty directory:
 
 ```console
-VERSION=v0.7.0
-RELEASE=0.7.0
+VERSION=vX.Y.Z
+RELEASE="${VERSION#v}"
 mkdir corresync-test-assets
 gh release download "$VERSION" \
   --repo nkiyohara/corresync \
@@ -86,64 +63,17 @@ gh release download "$VERSION" \
 cd corresync-test-assets
 ```
 
-### Windows PowerShell download
-
-Run from a new empty directory:
-
-```powershell
-$Version = "v0.7.0"
-$Release = "0.7.0"
-New-Item -ItemType Directory -Path corresync-test-assets | Out-Null
-gh release download $Version `
-  --repo nkiyohara/corresync `
-  --dir corresync-test-assets
-Set-Location corresync-test-assets
-```
-
-Expected inventory: 41 files consisting of `checksums.txt`, its Sigstore
-bundle, seven archives, six native Linux packages, and 26 SBOM documents. No
-filename may contain `~`.
-
-## 3. Verify every downloaded asset
-
-Do this before extracting an archive or invoking a privileged package manager.
-
-### Linux
+Before extraction or package installation:
 
 ```console
+# Linux
 sha256sum --check checksums.txt
+
+# macOS
+shasum -a 256 --check checksums.txt
 ```
 
-### macOS
-
-```console
-shasum -a 256 -c checksums.txt
-```
-
-### Windows checksum in PowerShell
-
-```powershell
-Get-Content .\checksums.txt | ForEach-Object {
-  if ($_ -notmatch '^([0-9a-f]{64})\s+(.+)$') {
-    throw "Malformed checksum line: $_"
-  }
-  $Expected = $Matches[1]
-  $Name = $Matches[2].Trim()
-  if (-not (Test-Path -LiteralPath $Name)) {
-    throw "Missing release asset: $Name"
-  }
-  $Actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Name).Hash.ToLowerInvariant()
-  if ($Actual -ne $Expected) {
-    throw "Checksum mismatch: $Name"
-  }
-}
-Write-Host "All release checksums passed."
-```
-
-Expected result: all 39 entries report success. Stop immediately on a missing
-file or mismatch.
-
-Verify that the checksum manifest came from the tagged release workflow:
+Verify exact workflow provenance:
 
 ```console
 WORKFLOW_ID="https://github.com/nkiyohara/corresync/"
@@ -155,436 +85,379 @@ cosign verify-blob \
   checksums.txt
 ```
 
-The certificate identity must equal the exact repository, workflow, and tag.
+Confirm the inventory matches [release engineering](releasing.md): archives,
+Linux packages, source archive, per-artifact SPDX/CycloneDX SBOMs, checksum
+manifest, and signature bundle. Stop on any missing, extra, or mismatched file.
 
-## 4. Launch the native archive
+## 2. Launch the native artifact
 
-Archive testing is required even when a native Linux package will also be
-tested. Select the filename matching the actual computer.
-
-### macOS or Linux archive
-
-Example for Linux amd64:
+Extract the matching archive into a new directory and put it first on `PATH`.
+For example:
 
 ```console
-ASSET="corresync_${RELEASE}_linux_amd64.tar.gz"
 mkdir ../corresync-under-test
-tar -xzf "$ASSET" -C ../corresync-under-test
+tar -xzf "corresync_${RELEASE}_linux_amd64.tar.gz" \
+  -C ../corresync-under-test
 export PATH="$(cd ../corresync-under-test && pwd):$PATH"
+
+corr version --json
+corr --help
 corresync version --json
-corresync --help
 ```
 
-Use `darwin_amd64`, `darwin_arm64`, `linux_amd64`, or `linux_arm64` as
-appropriate. The version must equal the selected release and the commit must
-match the tag in GitHub. On macOS, record a Gatekeeper failure rather than
-removing quarantine metadata or weakening system policy.
+The last command checks only the finite v0.8–v0.9 compatibility entry. Both
+executables must report the same version/commit. New help/examples must use
+`corr`.
 
-### Windows archive in PowerShell
+On Windows, extract the matching zip and invoke `corr.exe`. On macOS/Windows,
+record a platform-policy failure instead of weakening it.
 
-Example for Windows amd64:
+When testing a Linux package, review its contents before privileged install.
+Confirm `corr`, the compatibility entry in its supported window, `corr(1)`,
+completion, plugin/Skill, license material, and essential docs are installed.
 
-```powershell
-$Asset = "corresync_${Release}_windows_amd64.zip"
-New-Item -ItemType Directory -Path ..\corresync-under-test | Out-Null
-Expand-Archive -LiteralPath $Asset -DestinationPath ..\corresync-under-test
-$Corresync = (Resolve-Path ..\corresync-under-test\corresync.exe).Path
-& $Corresync version --json
-& $Corresync --help
-```
+## 3. Offline and IPC checks
 
-Use `windows_amd64` or `windows_arm64` as appropriate. Record a
-SmartScreen or application-control failure; do not bypass organization policy.
-In later PowerShell examples, replace `corresync` with `& $Corresync` when it
-is not on `PATH`.
-
-## 5. Optionally test a native Linux package
-
-Review the matching package before using `sudo`. Install only one format on a
-compatible disposable host:
+Use an isolated config/state root. These commands must not authenticate or
+access a mailbox:
 
 ```console
-# Debian or Ubuntu
-sudo apt install ./corresync_0.7.0-1_amd64.deb
-dpkg -L corresync
-
-# Fedora or another RPM-based distribution
-sudo dnf install ./corresync-0.7.0-1.x86_64.rpm
-rpm -ql corresync
-
-# Alpine
-sudo apk add ./corresync_0.7.0-r1_x86_64.apk
-apk info -L corresync
+corr config init
+corr config path
+corr config validate
+corr account list
+corr doctor --json
+corr daemon start
+corr daemon status --json
+corr daemon stop
+corr completion install
+corr completion install
 ```
-
-Confirm that the package installs `corresync`, the `corresync(1)` manual, shell
-completions, the project license, `third_party_licenses`, and the agent plugin
-under `/usr/share/corresync`. Then run `corresync version --json`. Adjust only
-the architecture suffix, not the release number, for arm64.
-
-## 6. Initialize without Outlook access
-
-These commands must not open a browser or contact Outlook. The offline doctor
-may read bounded public release metadata unless update checks are disabled:
-
-```console
-corresync config init
-corresync config path
-corresync config validate
-corresync --version
-corresync help auth
-corresync doctor --json
-corresync daemon start
-corresync daemon status --json
-corresync daemon stop
-```
-
-Expected results:
-
-- the config contains no password, cookie, OAuth token, or authorization field;
-- `config validate` succeeds;
-- the offline doctor identifies the selected browser and local IPC readiness;
-- daemon status reports the same config digest and release version;
-- no TCP listening port is created.
-
-If normal Outlook Web sign-in finishes on a service host other than the
-generated `https://outlook.cloud.microsoft` origin, edit only
-`accounts.<alias>.origin` to that final HTTPS origin with no path. Do not add an
-identity-provider origin or a redirecting vanity host. Validate again and stop
-the daemon after every config edit.
-
-### 6.1 Verify update-check isolation
-
-```console
-corresync update check
-corresync update check --json
-corresync update --json
-```
-
-The first command should report the current stable release or an
-installation-specific upgrade action. The second output must be one valid JSON
-object with no human `Update available:` line before or after it. Repeat it and
-confirm `cached` is `true`; do not expect a second network request within 24
-hours. Run the third command only from the release version under test: it must
-return one unstyled action-result object and report `current` without changing
-files. When rehearsing an older direct archive in a disposable directory, it
-must instead verify provenance, update to the selected release, retain the old
-binary as a rollback copy, and report `updated`. A package-managed rehearsal
-must report `action_required` and the exact owner command without changing
-files. Temporarily set `updates.disable_automatic_checks = true`, validate the
-config, and confirm the offline doctor's `update` row is `skip`. Restore the
-setting afterward. MCP and completion byte streams are covered by deterministic
-tests and must never be modified for a startup notice.
-
-## 7. Run the bounded read-only compatibility check
-
-This is the first step that accesses a live mailbox. Confirm authorization
-before continuing.
-
-```console
-corresync auth login --json
-corresync auth status --json
-corresync doctor --online --json
-corresync daemon status --json
-```
-
-For the default path, complete sign-in, MFA, notices, and Conditional Access in
-the visible dedicated browser; do not type credentials at a shell prompt. The
-online doctor may request at most one folder metadata row, one inbox metadata
-row, and one one-hour calendar window, then discards them.
 
 Pass criteria:
 
-- `auth status` contains configured aliases and content-free state only;
-- `session`, `folder_contract`, `mail_contract`, and `calendar_contract` pass;
-- stdout contains no mailbox address, folder or item data, authorization, or
-  OWA response body;
-- no Outlook item changes.
+- config contains no password, token, cookie, grant, or client secret;
+- schema/version/account routes validate;
+- daemon status is content-free and reports protocol/version/config digest;
+- no TCP listener appears;
+- the second completion install is an exact no-op and no startup line is
+  appended;
+- a symlink or differently owned/permissive IPC path fails closed.
 
-For the optional SSH relay check, run `corresync auth login --terminal` instead
-of `corresync auth login --json`. Enter browser-field keystrokes only while its
-interactive relay is active; piped input is rejected. Record only whether the
-flow passed, not identity-provider page text or entered values. Then run the
-remaining JSON commands unchanged.
+Do not create hostile IPC paths outside an isolated disposable user or test
+directory.
 
-The JSON report is designed to be content-free, but review error strings for
-local paths before sharing it.
-
-## 8. Exercise read-only CLI commands
-
-Keep all output on the test computer. Use small limits first:
+## 4. Update and feedback isolation
 
 ```console
-corresync mail folders --json
-corresync mail list --limit 5 --json
-corresync mail search --query 'kind:email' --limit 5 --json
+corr update check
+corr update check --json
+corr feedback
+corr feedback --last-error
 ```
 
-Choose one harmless message from the local output and test its bounded
-plain-text body without copying its ID into the result memo:
+The update JSON is one unstyled object. A repeated bounded public check may use
+the local cache. A package-managed binary prints its owner-specific update
+action and is not replaced. A direct update verifies provenance/checksum before
+replacement and retains rollback.
+
+Feedback must print a deterministic allowlisted report with no network
+request. Review it manually for private values. If testing an external action,
+select exactly one:
 
 ```console
-corresync mail body --message-id 'opaque-message-id' --json
+corr feedback --copy
+corr feedback --save ./feedback-review.json
+corr feedback --open-github
 ```
 
-Choose an authorized one-hour calendar window and replace both example values:
+The report must appear before the action. Save must not overwrite. Opening
+GitHub must not submit.
+
+## 5. Discover and configure a route
+
+Credential-free discovery:
 
 ```console
-corresync calendar list \
-  --start 2026-07-20T09:00:00Z \
-  --end 2026-07-20T10:00:00Z \
+corr account discover reader@example.invalid
+corr account add reader@example.invalid --help
+```
+
+Pass criteria:
+
+- candidates explain evidence, confidence, auth type, and availability;
+- no browser/keyring/helper opens during discovery;
+- ambiguous evidence requires an explicit provider;
+- unavailable routes and the reserved `pop3` provider cannot be selected.
+
+Add only a route approved for the test. Use synthetic aliases and follow
+[configuration.md](configuration.md). For standards routes, preload a
+dedicated OS-keyring/helper reference out of band. For Google/Graph, use an
+authorized public OAuth registration and approve the displayed scopes. Never
+place a secret in a flag or config.
+
+```console
+corr account list
+corr account show ALIAS
+corr config validate
+```
+
+## 6. Authenticate and run bounded doctor
+
+This is the first mailbox/calendar access:
+
+```console
+corr auth login --account ALIAS
+corr auth status
+corr doctor --online --account ALIAS --json
+```
+
+Complete SSO, MFA, consent, and policy only in the visible browser. A helper
+must be an explicitly configured absolute executable invoked without a shell.
+
+Pass criteria:
+
+- status contains only local aliases, lifecycle state, capabilities, and
+  degradations;
+- online doctor reuses the existing session, shows configured OAuth scopes,
+  performs bounded checks, and never opens another login/consent flow;
+- no secret or provider response body reaches stdout/logs;
+- no mailbox/calendar write occurs;
+- unavailable behavior appears as a degradation, not a silent provider
+  fallback.
+
+The Outlook-Web-only `--terminal` relay is optional, requires a real TTY, and
+must reject piped input. Do not record entered or rendered identity values.
+
+For a separately authorized managed Google Web observation, use its opt-in
+read-only harness from a source checkout:
+
+```console
+read -r -p "Authorized Google address: " CORRESYNC_LIVE_GOOGLE_ADDRESS
+export CORRESYNC_LIVE_GOOGLE_ADDRESS
+CORRESYNC_LIVE_CONFIRM=google-web-read-only \
+CORRESYNC_LIVE_GOOGLE_PROFILE_DIR="$(mktemp -d)" \
+mise exec -- go test -tags=live \
+  -run TestLiveGoogleWebVisibleRead ./internal/provider/googleweb
+unset CORRESYNC_LIVE_GOOGLE_ADDRESS
+```
+
+Verify the browser stays visible, both Google surfaces match the configured
+identity, only bounded metadata is read, and no cookie/token/storage export or
+write occurs. Use a dedicated profile and remove it only through a reviewed
+local cleanup after the test. Record only the content-free evidence header.
+
+## 7. Read-only CLI
+
+Keep output on the test machine:
+
+```console
+corr mail folders --account ALIAS --json
+corr mail list --account ALIAS --limit 5 --json
+corr mail search --account ALIAS --query 'provider-specific query' \
+  --limit 5 --json
+corr calendar list --account ALIAS \
+  --start 2026-07-28T09:00:00Z \
+  --end 2026-07-28T10:00:00Z \
   --json
 ```
 
-Pass criteria:
+Optionally test one explicit body and bounded attachment without copying IDs
+into the evidence memo. Verify list/search omit bodies/bytes and all terminal
+control characters are safely rendered.
 
-- folder discovery is bounded and returns no credentials;
-- mail list and search return metadata, not bodies or attachment content;
-- body output is plain text and at most 1 MiB;
-- calendar output excludes bodies, attendees, attachments, and meeting links;
-- terminal control characters do not affect the terminal.
-
-Record only pass/fail and the failing command class. Do not record returned
-names, counts, IDs, change keys, subjects, senders, times, or bodies.
-
-## 9. Test Codex MCP
-
-Skip this section when Codex is not installed. Review before registration:
+With two authorized accounts:
 
 ```console
-corresync mcp setup codex --dry-run
-corresync mcp config codex
+corr mail search --all-accounts --query 'synthetic query' \
+  --limit 10 --time-zone UTC --json
+corr agenda list --all-accounts \
+  --start 2026-07-28T09:00:00Z \
+  --end 2026-07-28T10:00:00Z \
+  --time-zone UTC --limit 10 --json
 ```
 
-Register through the official client CLI and inspect the entry:
+Verify deterministic ordering, provider/account provenance, global bounds, and
+explicit partial failures. No cross-account write must be available.
+
+## 8. Read-only MCP
+
+Inspect before registering:
 
 ```console
-corresync mcp setup codex
+corr mcp setup codex --dry-run
+corr mcp config codex
+corr mcp setup codex
 codex mcp get corresync
 ```
 
-In a new Codex session, ask it to perform only these read-only operations, one
-at a time:
+Replace `codex` with another supported client and its documented verification
+command. Start a fresh client session and request:
 
 ```text
-Use corresync mail_list_folders only. Read no bodies; make no writes.
-Use only the corresync mail_list tool with limit 5. Do not write.
-Use corresync calendar_list for a one-hour RFC3339 window. Make no writes.
+List at most five mail metadata rows from one account. Do not read bodies or write.
+List one bounded calendar hour. Do not write.
+Show monitor status only. Do not enable or change monitoring.
 ```
 
-Pass criteria: Codex starts `corresync mcp serve`, the first account call can
-reuse or open the visible browser session, structured results return, and no
-Outlook write or authorization material enters the client logs.
+Pass criteria:
 
-## 10. Test Claude Code MCP
+- client starts `corr mcp serve` over stdio;
+- the MCP process receives no provider/session credential;
+- tool results preserve provenance/degradations;
+- content is treated as untrusted data;
+- account add/rename/remove honor read-only policy, require the matching
+  short-lived MCP preview token, and record prepare/commit/execution audit
+  phases;
+- account-add review displays each exact credential backend/key handle, rejects
+  cross-account reuse, and commit restarts the session owner without starting
+  authentication;
+- account removal review discloses any unshared Corresync-owned OAuth grant
+  deletion and retains external standards credentials;
+- MCP cannot authenticate, configure monitoring/egress, scan imports, purge
+  queues, update the binary, or submit feedback.
 
-Skip this section when Claude Code is not installed. Review before
-registration:
+Do not share raw MCP frames.
+
+## 9. Read-only import staging
+
+Use a disposable synthetic export, never a production profile for a first
+test:
 
 ```console
-corresync mcp setup claude-code --dry-run
-corresync mcp config claude-code
+corr import scan ./synthetic-export
+corr import scan ./synthetic-export --format auto --approve-read --json
+corr import purge --account ALIAS --approve
 ```
 
-Register and inspect the entry:
+The first call must perform no filesystem scan and must request
+`--approve-read`. The approved call binds the exact resolved source identity,
+reads it, and creates the bounded account-local plan in one operation. Verify
+bounds and recognized-format counts locally, then verify purge removes only
+account-local Corresync staging and never changes the source.
 
-```console
-corresync mcp setup claude-code --scope user
-claude mcp get corresync
-```
+## 10. Consequential writes
 
-In a new Claude Code session, use the same three read-only prompts from the
-Codex section. Pass criteria are identical. Do not copy MCP payloads containing
-mailbox data into the result memo.
-
-## 11. Optional write-compatibility gates
-
-Stop here unless each operation class is separately authorized. Use synthetic
-subjects and bodies, a harmless dedicated message, a controlled calendar, and
-a recipient you control. Never use production recipients or attendees for a
-first test.
-
-Before reversible writes, set this in the generated config and restart the
-daemon:
+Stop unless each operation and target is separately authorized. Use a
+disposable message, controlled recipient, controlled calendar, and synthetic
+body. Enable reversible-write previews for the test:
 
 ```toml
 [policy]
 preview_reversible_writes = true
 ```
 
-```console
-corresync config validate
-corresync daemon stop
-```
+Restart the daemon after validation. For each applicable operation:
 
-Every first call below must be treated as a preview. Review it, then repeat the
-exact command with `--approve`. A write request is attempted once. If the CLI
-reports an unknown outcome, do not retry; reconcile the corresponding Outlook
-folder or calendar first.
+1. run it without `--approve`;
+2. review account/provider/target/version/recipients and content digests;
+3. repeat the exact command once with `--approve`;
+4. reconcile provider state;
+5. never retry an unknown outcome.
 
-### 11.1 Save-only draft
+Test in increasing consequence:
 
-Use a controlled address and a synthetic body file:
+- save-only `corr mail draft` and confirm nothing was sent;
+- `corr mail mark` then restore using the refreshed version;
+- `corr mail move` then reconcile both folders;
+- `corr mail send` to a recipient controlled by the tester;
+- `corr calendar create`, update with the refreshed version, then cancel.
 
-```console
-corresync mail draft \
-  --to tester-controlled@example.com \
-  --subject 'Corresync synthetic draft' \
-  --body-file ./synthetic-body.txt
-```
+Do not add attendees in the first calendar test. A Teams or Google Meet link
+test is permitted only when the selected calendar reports capability and the
+sole attendee is controlled by the tester. Never include the returned join URL
+in evidence.
 
-After reviewing, repeat with `--approve`. Confirm exactly one new item in
-Drafts and no item in Sent Items. On an unknown outcome, inspect Drafts before
-another attempt.
+Permanent delete requires a disposable self-owned message and separate
+authorization. Gmail permanent delete requires the explicitly reviewed
+full-mailbox grant; do not test it with non-disposable mail.
 
-### 11.2 Read-state update
+## 11. Monitoring and dispatch
 
-Select one dedicated test message and use its current ID and change key:
-
-```console
-corresync mail mark \
-  --message-id 'opaque-test-message-id' \
-  --change-key 'opaque-current-change-key' \
-  --state read
-```
-
-Repeat with `--approve`, refresh the message list, and confirm only that one
-property changed. Refresh the change key before any later operation.
-
-### 11.3 Message move
-
-Discover a harmless destination folder ID first, then preview one dedicated
-test-message move:
+Use a dedicated account with synthetic incoming messages.
 
 ```console
-corresync mail move \
-  --message-id 'opaque-test-message-id' \
-  --change-key 'opaque-current-change-key' \
-  --destination-id 'opaque-test-folder-id'
+corr monitor status --account ALIAS
+corr monitor enable --account ALIAS --mode notify \
+  --notification-field sender \
+  --notification-field subject \
+  --approve
+corr events list --account ALIAS --state all
 ```
 
-Repeat with `--approve` and list both source and destination. Never retry an
-unknown outcome without checking both folders.
+On Windows, the `notify` command must fail before changing configuration with
+the registered-AppUserModelID explanation. Continue the queue/agent checks
+without claiming desktop-notification compatibility.
 
-### 11.4 Controlled self-send
+Verify old/new/imported accounts begin `off`; collection starts only after
+authentication and approval; Sent/Drafts/self messages are suppressed where
+possible; restart recovery does not duplicate an event; notification values
+are bounded and treated as untrusted. During quiet hours or rate limiting,
+confirm the provider cursor remains advanced while notification events stay
+pending, then confirm a later poll drains them once delivery is allowed.
+With a synthetic adapter only, place the prior cursor beyond the 1000-message
+recovery window and confirm the poll returns an explicit overflow, monitor
+status increments the durable overflow counter/time, and the inspected window
+still becomes the new bounded baseline. Also return short non-terminal pages
+and confirm offsets advance by the returned item count; an empty non-terminal
+page must return the same degraded result without replacing the prior cursor.
+Do not perform these load tests against a live mailbox.
 
-Use only a recipient you control:
+Queue mode requires a separate step. Test acknowledgement twice and confirm
+idempotence. Agent mode requires a disposable absolute runner, direct execution
+without a shell, bounded JSON stdin, hourly/circuit limits, and explicit field
+allowlist. Remote egress requires a second separate approval.
+
+Disable with an explicit queue decision:
 
 ```console
-corresync mail send \
-  --to tester-controlled@example.com \
-  --subject 'Corresync synthetic self-send' \
-  --body-file ./synthetic-body.txt
+corr monitor disable --account ALIAS --retain-queue --approve
+# or, only when authorized:
+corr monitor disable --account ALIAS --purge-queue --approve
 ```
 
-Mail send always previews. Review every recipient, subject, body preview, byte
-count, and digest before repeating with `--approve`. Confirm one Sent Items
-copy and one controlled delivery. On an unknown outcome, inspect Sent Items
-before doing anything else.
+Confirm disabled monitoring collects nothing. Queue purge must remove only the
+selected account's local events.
 
-### 11.5 Appointment without attendees
-
-First test an appointment that cannot notify another person:
+## 12. Finish and record
 
 ```console
-corresync calendar create \
-  --subject 'Corresync synthetic appointment' \
-  --start 2026-07-20T09:00:00Z \
-  --end 2026-07-20T09:15:00Z \
-  --body-file ./synthetic-body.txt
+corr daemon status --json
+corr daemon stop
 ```
 
-Repeat with `--approve`, list that window, and capture the ID and change key
-only in the local terminal. Then preview an update:
+Record `PASS`, `FAIL`, or `SKIP`:
 
-```console
-corresync calendar update \
-  --event-id 'opaque-test-event-id' \
-  --change-key 'opaque-current-change-key' \
-  --subject 'Corresync synthetic appointment updated'
-```
+<!-- markdownlint-disable MD013 -->
+| Gate | Result | Content-free note |
+| --- | --- | --- |
+| Checksum and Sigstore identity | | |
+| Native archive/package and command compatibility | | |
+| Config, completion, offline doctor, authenticated IPC | | |
+| Update and feedback isolation | | |
+| Discovery/account route | | |
+| Interactive auth and online doctor | | |
+| Single-account CLI reads | | |
+| Cross-account projections | | |
+| MCP reads | | |
+| Import staging | | |
+| Draft/mail organization/send | | |
+| Calendar create/update/cancel | | |
+| Monitor notify/queue | | |
+| Agent runner/remote egress | | |
+<!-- markdownlint-enable MD013 -->
 
-Repeat with `--approve`, list again to obtain the refreshed change key, then
-preview cancellation:
-
-```console
-corresync calendar cancel \
-  --event-id 'opaque-test-event-id' \
-  --change-key 'opaque-refreshed-change-key'
-```
-
-Repeat with `--approve` only after verifying the exact event scope. Confirm the
-event is absent from the original window. Do not add attendees during this
-runbook.
-
-### 11.6 Teams link with a controlled self attendee
-
-Only when the organizer address is also a recipient you control, prepare a
-second event with that address as the sole attendee:
-
-```console
-corresync calendar create \
-  --subject 'Corresync synthetic Teams appointment' \
-  --start 2026-07-21T09:00:00Z \
-  --end 2026-07-21T09:15:00Z \
-  --required-attendee tester-controlled@example.com \
-  --teams-meeting
-```
-
-Confirm the preview lists exactly one controlled attendee, invitations enabled,
-and the Teams option enabled before repeating with `--approve`. A successful
-JSON commit should contain one HTTPS `onlineMeetingJoinUrl` on a Microsoft Teams
-domain. CalendarView may not reliably report its online-meeting flag; do not
-expose or persist the join URL in shared evidence. Cancel the event with its
-latest change key and confirm it leaves the original window. Never substitute a
-third-party attendee merely to test delivery.
-
-## 12. Stop and record content-free evidence
-
-```console
-corresync daemon status --json
-corresync daemon stop
-```
-
-Complete this table locally:
-
-| Gate                                      | Result | Content-free note |
-| ----------------------------------------- | ------ | ----------------- |
-| Checksum 39/39                            |        |                   |
-| Native archive launch                     |        |                   |
-| Native package, if applicable             |        |                   |
-| Stable-release update check               |        |                   |
-| Config and offline doctor                 |        |                   |
-| Local IPC start/status/stop               |        |                   |
-| Visible login                             |        |                   |
-| Online doctor contracts                   |        |                   |
-| CLI mail reads                            |        |                   |
-| CLI calendar read                         |        |                   |
-| Codex MCP or SKIP                         |        |                   |
-| Claude Code MCP or SKIP                   |        |                   |
-| Save-only draft or SKIP                   |        |                   |
-| Read-state or SKIP                        |        |                   |
-| Move or SKIP                              |        |                   |
-| Controlled send or SKIP                   |        |                   |
-| Calendar create/update/cancel or SKIP     |        |                   |
-
-A shareable report contains only `corresync version --json`, OS and
-architecture, browser family and version, deployment class, observation date,
-and the content-free pass/fail stages above. Review even those files before
-sharing.
-Do not upload the dedicated browser profile, config directory, state directory,
-audit log, screenshots, raw stdout from mailbox commands, or MCP transcripts.
+A shareable report contains only the evidence header and content-free stages.
+Use `corr feedback --last-error` and review it before attaching. Do not upload
+config/state/cache, browser profiles, keyring/helper output, audit/event/import
+files, raw command output, screenshots, or MCP transcripts.
 
 ## Failure handling
 
-- Preserve the failing release binary and its verified checksum.
-- Record the command class and exit code, not mailbox data.
-- For protocol drift, reduce the failure to a synthetic fixture before adding
-  it to the repository.
-- For an unknown write outcome, reconcile Outlook state and do not retry.
-- For Gatekeeper, SmartScreen, Conditional Access, or organization-policy
-  rejection, record the boundary and do not bypass it.
-- Stop the daemon before changing config, binary version, or test account.
-
-The evidence policy and smaller bounded smoke test are documented in
-[compatibility evidence](compatibility.md).
+- Preserve the verified release binary and checksum.
+- Record command class, exit code, and generalized failure stage only.
+- Reconcile remote state before any action after an unknown outcome.
+- Reduce provider drift or malformed-import behavior to a synthetic fixture.
+- Do not bypass platform, provider, tenant, or organization controls.
+- Stop the daemon before changing config, binary version, or test identity.
+- Report security issues privately through [SECURITY.md](../SECURITY.md).

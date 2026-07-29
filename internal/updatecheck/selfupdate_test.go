@@ -351,7 +351,7 @@ func TestReleaseArtifactCandidatesCoverPublishedPlatforms(t *testing.T) {
 				"corresync_1.2.3_linux_amd64.tar.gz",
 				"owa-bridge_1.2.3_linux_amd64.tar.gz",
 			},
-			[]string{"corresync", "owa"},
+			[]string{"corr", "owa"},
 		},
 		{
 			"darwin",
@@ -360,7 +360,7 @@ func TestReleaseArtifactCandidatesCoverPublishedPlatforms(t *testing.T) {
 				"corresync_1.2.3_darwin_arm64.tar.gz",
 				"owa-bridge_1.2.3_darwin_arm64.tar.gz",
 			},
-			[]string{"corresync", "owa"},
+			[]string{"corr", "owa"},
 		},
 		{
 			"windows",
@@ -369,7 +369,7 @@ func TestReleaseArtifactCandidatesCoverPublishedPlatforms(t *testing.T) {
 				"corresync_1.2.3_windows_amd64.zip",
 				"owa-bridge_1.2.3_windows_amd64.zip",
 			},
-			[]string{"corresync.exe", "owa.exe"},
+			[]string{"corr.exe", "owa.exe"},
 		},
 	}
 	for _, test := range tests {
@@ -426,7 +426,7 @@ func newSyntheticCorresyncUpdateRelease(
 		candidate,
 		"",
 		"corresync_1.1.0_linux_amd64.tar.gz",
-		"corresync",
+		"corr",
 	)
 }
 

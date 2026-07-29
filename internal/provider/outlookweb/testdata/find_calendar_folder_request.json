@@ -1,0 +1,42 @@
+{
+  "__type": "FindFolderJsonRequest:#Exchange",
+  "Header": {
+    "__type": "JsonRequestHeaders:#Exchange",
+    "RequestServerVersion": "Exchange2013",
+    "TimeZoneContext": {
+      "__type": "TimeZoneContext:#Exchange",
+      "TimeZoneDefinition": {
+        "__type": "TimeZoneDefinitionType:#Exchange",
+        "Id": "UTC"
+      }
+    }
+  },
+  "Body": {
+    "__type": "FindFolderRequest:#Exchange",
+    "FolderShape": {
+      "__type": "FolderResponseShape:#Exchange",
+      "BaseShape": "IdOnly",
+      "AdditionalProperties": [
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "folder:DisplayName" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "folder:ParentFolderId" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "folder:FolderClass" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "folder:DistinguishedFolderId" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "folder:ChildFolderCount" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "folder:TotalCount" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "folder:UnreadCount" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "folder:EffectiveRights" }
+      ]
+    },
+    "Paging": {
+      "__type": "IndexedPageView:#Exchange",
+      "BasePoint": "Beginning",
+      "Offset": 0,
+      "MaxEntriesReturned": 100
+    },
+    "ParentFolderIds": [
+      { "__type": "DistinguishedFolderId:#Exchange", "Id": "calendar" }
+    ],
+    "ReturnParentFolder": true,
+    "Traversal": "Deep"
+  }
+}

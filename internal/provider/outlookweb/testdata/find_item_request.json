@@ -17,12 +17,12 @@
       "__type": "ItemResponseShape:#Exchange",
       "BaseShape": "IdOnly",
       "AdditionalProperties": [
-        {"__type": "PropertyUri:#Exchange", "FieldURI": "item:Subject"},
-        {"__type": "PropertyUri:#Exchange", "FieldURI": "message:From"},
-        {"__type": "PropertyUri:#Exchange", "FieldURI": "item:DateTimeReceived"},
-        {"__type": "PropertyUri:#Exchange", "FieldURI": "item:Importance"},
-        {"__type": "PropertyUri:#Exchange", "FieldURI": "message:IsRead"},
-        {"__type": "PropertyUri:#Exchange", "FieldURI": "item:HasAttachments"}
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "item:Subject" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "message:From" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "item:DateTimeReceived" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "item:Importance" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "message:IsRead" },
+        { "__type": "PropertyUri:#Exchange", "FieldURI": "item:HasAttachments" }
       ]
     },
     "Paging": {
@@ -32,7 +32,7 @@
       "MaxEntriesReturned": 25
     },
     "ParentFolderIds": [
-      {"__type": "DistinguishedFolderId:#Exchange", "Id": "inbox"}
+      { "__type": "DistinguishedFolderId:#Exchange", "Id": "inbox" }
     ],
     "Traversal": "Shallow",
     "ViewFilter": "All",

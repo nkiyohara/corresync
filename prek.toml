@@ -1,0 +1,20 @@
+minimum_prek_version = "0.4.11"
+default_stages = ["pre-commit"]
+
+[[repos]]
+repo = "https://github.com/pre-commit/pre-commit-hooks"
+rev = "3e8a8703264a2f4a69428a0aa4dcb512790b2c8c" # v6.0.0
+hooks = [
+  { id = "check-case-conflict" },
+  { id = "check-merge-conflict" },
+  { id = "end-of-file-fixer", exclude = "(^|/)(testdata|vendor)/" },
+  { id = "mixed-line-ending", args = ["--fix=lf"], exclude = "(^|/)(testdata|vendor)/" },
+  { id = "trailing-whitespace", args = ["--markdown-linebreak-ext=md"], exclude = "(^|/)(testdata|vendor)/" },
+]
+
+[[repos]]
+repo = "local"
+hooks = [
+  { id = "gofmt", name = "Format Go source", entry = "mise exec -- gofmt -w", language = "system", types = ["go"] },
+  { id = "dprint", name = "Format structured project files", entry = "mise exec -- dprint fmt", language = "system", files = "\\.(css|html|json|jsonc|toml|yaml|yml)$", require_serial = true },
+]

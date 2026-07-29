@@ -44,7 +44,7 @@ func TestMailBodyPreviewAndCommitAreCallerBound(t *testing.T) {
 		t.Fatalf("NewGuard() error = %v", err)
 	}
 	reader := &fakeMailReader{}
-	service, err := NewMailService(guard, reader, MailOptions{MaxRecipients: 20})
+	service, err := NewMailService(guard, reader, testMailOptions())
 	if err != nil {
 		t.Fatalf("NewMailService() error = %v", err)
 	}

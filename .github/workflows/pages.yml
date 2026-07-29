@@ -34,18 +34,30 @@ jobs:
       - name: Validate static site
         run: |
           test -s site/index.html
+          test -s site/providers.html
+          test -s site/safety.html
           test -s site/styles.css
           test -s site/favicon.svg
           test -s site/corresync-mark.svg
           test -s site/robots.txt
           test -s site/sitemap.xml
-          grep -Fq '<html lang="en">' site/index.html
+          for page in index providers safety; do
+            grep -Fq '<html lang="en">' "site/${page}.html"
+            grep -Fq '<link rel="canonical"' "site/${page}.html"
+            grep -Fq 'corresync-mark.svg' "site/${page}.html"
+            ! grep -Eiq 'http-equiv=.*refresh|window\.location|location\.(href|replace)' "site/${page}.html"
+          done
           grep -Fq 'https://nkiyohara.github.io/corresync/' site/index.html
-          grep -Fq 'corresync mcp setup codex' site/index.html
-          grep -Fq 'corresync mcp setup github-copilot' site/index.html
-          grep -Fq 'corresync mcp setup gemini-cli' site/index.html
-          grep -Fq 'corresync mcp setup qwen-code' site/index.html
-          grep -Fq 'docs/migration-v0.7.md' site/index.html
+          grep -Fq 'https://nkiyohara.github.io/corresync/providers.html' site/providers.html
+          grep -Fq 'https://nkiyohara.github.io/corresync/safety.html' site/safety.html
+          grep -Fq 'corr mcp setup codex' site/index.html
+          grep -Fq 'corr mcp setup github-copilot' site/index.html
+          grep -Fq 'corr mcp setup gemini-cli' site/index.html
+          grep -Fq 'corr mcp setup qwen-code' site/index.html
+          grep -Fq 'https://nkiyohara.github.io/corresync/' site/sitemap.xml
+          grep -Fq 'https://nkiyohara.github.io/corresync/providers.html' site/sitemap.xml
+          grep -Fq 'https://nkiyohara.github.io/corresync/safety.html' site/sitemap.xml
+          ! grep -Riq '<script' site --include='*.html'
           test -z "$(find site -type l -print -quit)"
 
       - name: Configure GitHub Pages

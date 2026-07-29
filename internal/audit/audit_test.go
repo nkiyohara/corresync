@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
 )
 
@@ -130,6 +131,41 @@ func TestFileRecorderSerializesConcurrentEvents(t *testing.T) {
 	}
 	if count != 32 {
 		t.Fatalf("event lines = %d, want 32", count)
+	}
+}
+
+func TestFileRecorderAuditsMonitorDisclosureWithoutMailboxContent(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "events.jsonl")
+	recorder, err := NewFileRecorder(path, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := testEvent(t)
+	event.Monitor = &application.MonitorAudit{
+		Stage: "runner", Filter: "matched",
+		Fields:      []string{"event_id", "subject", "trust"},
+		Destination: "runner_0123456789abcdef",
+		Result:      "completed", Count: 2,
+	}
+	if err := recorder.Record(t.Context(), event); err != nil {
+		t.Fatal(err)
+	}
+	if err := recorder.Close(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path) // #nosec G304 -- synthetic private path.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"destination":"runner_0123456789abcdef"`) ||
+		!strings.Contains(string(data), `"fields":["event_id","subject","trust"]`) {
+		t.Fatalf("monitor disclosure was not audited: %s", data)
+	}
+	for _, forbidden := range []string{"attacker@example", "ignore previous", "/home/person"} {
+		if strings.Contains(strings.ToLower(string(data)), forbidden) {
+			t.Fatalf("monitor audit leaked %q: %s", forbidden, data)
+		}
 	}
 }
 

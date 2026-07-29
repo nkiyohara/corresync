@@ -26,7 +26,7 @@ type MailSendInput struct {
 	Attachments        []MailFileAttachment `json:"attachments,omitempty"`
 }
 
-// MailSendResult identifies a sent copy only when OWA returns an item ID.
+// MailSendResult identifies a sent copy only when the provider returns one.
 // A successful SendAndSaveCopy response is allowed to omit it.
 type MailSendResult struct {
 	ID         string            `json:"id,omitempty"`
@@ -42,7 +42,7 @@ type MailSendAccess struct {
 	Preview *approval.Preview `json:"preview,omitempty"`
 }
 
-// MailSender is the narrow OWA port for a new external message.
+// MailSender is the narrow provider-neutral port for one external message.
 type MailSender interface {
 	SendMail(context.Context, MailSendInput) (MailSendResult, error)
 }

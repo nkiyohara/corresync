@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-07-28
 
 ## Context
 
@@ -51,15 +52,27 @@ administrator review or approval request.
 Microsoft therefore defaults to the authenticated Outlook Web adapter. Graph is
 used only when a valid Graph authorization is already configured or the user
 explicitly selects it. It is never an implicit dependency, an automatic
-fallback, or a capability probe.
+fallback, or a capability probe. Known Microsoft domains and
+Microsoft-hosted MX evidence may advertise Graph as a separate discovery
+candidate, but that candidate is always labelled as requiring explicit OAuth
+selection; merely discovering it never opens a browser or reads a grant.
 
-Google distinguishes account types. An existing valid grant is used where one
-exists; consumer accounts may prefer the API with a web-session fallback;
-managed Workspace accounts default to the web session. A Workspace API failure
-may offer the web-session adapter, but submitting an admin-review request
-requires an explicit human action. Where the service itself is disabled or
-normal browser access is denied, the failure is reported plainly and no bypass
-is attempted.
+Google consumer domains and Google-hosted Workspace MX evidence produce two
+separate candidates. Automatic mode may select the first-party `google-web`
+route because it opens only Google-owned Gmail and Calendar applications in an
+isolated, browser-owned profile and requests no third-party OAuth consent. The
+web adapter has a closed, read-only semantic DOM surface: its process cannot
+read browser cookies, browser storage, passwords, bearer tokens, or arbitrary
+page state, and it reports bounded visible-snapshot limitations explicitly.
+
+The separate `google-api` route is used only after explicit selection or when an
+existing configured route names it. Before an authorization browser opens, the
+CLI displays the exact mail and calendar scopes. Submitting consent or an
+admin-review request always requires an explicit human action. A blocked API
+grant never falls through to another grant, and disabled Gmail, Calendar, or
+browser access fails clearly rather than attempting to bypass organization
+policy. Consumer-versus-managed inference remains evidence, not proof, and both
+routes remain manually overridable.
 
 ### Password-bearing providers use an external credential facility
 
@@ -77,10 +90,17 @@ configuration, state, logs, audit records, or MCP output, and is never accepted
 as a command-line flag or as the value of an inherited environment variable.
 
 Neither backend is consulted during discovery, capability probing, or automatic
-selection, and no MCP tool can read a secret or trigger a credential prompt.
-This is the single narrow exception to "no secrets in core": the secret belongs
-to an external facility that the human already trusts, and this project holds a
-reference to it rather than a copy of it.
+selection, and no MCP tool can read a secret, resolve a reference, trigger a
+credential prompt, or authenticate. An MCP account-add preview may persist a
+reviewed private handle reference, but its result explicitly requires a later
+`corr auth login` invocation from the local CLI before the reference can be
+used. The approval digest binds the complete input. Ordinary account reads omit
+the private lookup key; the account-add approval review deliberately displays
+the exact backend/key handle and rejects cross-account reuse so the human can
+see where later login will resolve a secret. This is the single narrow
+exception to "no secrets in core": the secret belongs to an external facility
+that the human already trusts, and this project holds a reference to it rather
+than a copy of it.
 
 ## Consequences
 
@@ -96,7 +116,13 @@ trade against storing one in a file this project controls.
 
 Discovery will sometimes be wrong. It is built to be explainable and
 overridable rather than authoritative, so a wrong guess costs a manual
-configuration instead of an unwanted authorization request. Whether consumer
-Google accounts should prefer the API or a web session while the project ships
-no centrally verified OAuth client remains open and is deliberately not settled
-here.
+configuration instead of an unwanted authorization request. Corresync ships no
+centrally held OAuth client secret; Google API and Graph use an explicitly
+selected bring-your-own public-client registration as detailed in
+[ADR 0015](0015-per-service-provider-routes.md).
+
+The Google web route trades API completeness for consent safety: it can expose
+only provider-owned UI projections that pass the closed adapter contract, and
+it never pretends that a virtualized DOM snapshot is a complete remote page.
+Users who need API writes or complete pagination must explicitly select and
+authorize `google-api`.

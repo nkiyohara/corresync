@@ -182,10 +182,14 @@ func (client *Client) CreateCalendarEvent(
 	if joinURL == "" {
 		joinURL = message.Items[0].JoinOnlineMeetingURL
 	}
+	provider := ""
+	if message.Items[0].IsOnlineMeeting {
+		provider = "teams"
+	}
 	return application.CalendarCreateResult{
 		ID: created.ID, ChangeKey: created.ChangeKey,
 		IsOnlineMeeting:       message.Items[0].IsOnlineMeeting,
-		OnlineMeetingProvider: message.Items[0].OnlineMeetingProvider,
+		OnlineMeetingProvider: provider,
 		OnlineMeetingJoinURL:  joinURL,
 	}, nil
 }
@@ -207,7 +211,7 @@ func buildCalendarCreateEnvelope(
 		sendInvitations = "SendToAllAndSaveCopy"
 	}
 	onlineMeetingProvider := ""
-	if input.TeamsMeeting {
+	if input.OnlineMeeting || input.TeamsMeeting {
 		onlineMeetingProvider = teamsForBusinessProvider
 	}
 	zoneID := input.TimeZone
@@ -246,7 +250,7 @@ func buildCalendarCreateEnvelope(
 			},
 			StartTimeZone:         zone,
 			EndTimeZone:           zone,
-			IsOnlineMeeting:       input.TeamsMeeting,
+			IsOnlineMeeting:       input.OnlineMeeting || input.TeamsMeeting,
 			OnlineMeetingProvider: onlineMeetingProvider,
 			Recurrence:            recurrence,
 		}},

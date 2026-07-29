@@ -3,6 +3,149 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.0 - 2026-07-29
+
+### Accounts and providers
+
+- Add atomic account discovery/add/rename/remove with stable opaque identities,
+  explicit mail/calendar routes, account-local state, and credential-free
+  discovery.
+- Add idempotent account-targeted logout that drains in-flight operations,
+  cancels account-local monitors and previews, closes only that account's
+  provider sessions, and preserves every other account and the daemon.
+- Keep independently authorized mail and calendar providers isolated within
+  each account and across accounts, including hybrid Google/Graph routes with
+  service-minimal OAuth scopes and provider-qualified result provenance.
+- Offer Microsoft Graph as a credential-free discovery candidate for known
+  Microsoft domains and Microsoft-hosted MX records, while requiring explicit
+  selection before any OAuth authorization begins.
+- Add a read-only MCP `account_status` tool that exposes content-free runtime
+  state, separate mail/calendar providers, observed capabilities, and typed
+  degradations without opening authentication or reading credentials.
+- Add a bounded read-only Google Web adapter plus write-capable Google API,
+  Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters alongside Outlook Web,
+  with typed capabilities, visible degradations, synthetic contracts, explicit
+  selection, and no automatic provider fallback.
+- Make calendar create/update/cancel reviews carry the selected route's typed
+  attendee-notification and cancellation-disposition semantics instead of
+  inheriting Outlook-specific behavior.
+- Complete Gmail API read-state, label/folder movement, Trash movement, and
+  permanent deletion after exact source-version revalidation. The permanent
+  deletion contract requires an explicit `https://mail.google.com/` grant and
+  therefore forces fresh consent instead of silently reusing an older grant.
+- Complete Graph reply, reply-all, forward, and message move through
+  source-version revalidation followed by the provider's typed action and
+  response-draft flow.
+- Preserve provider-derived Reply-To semantics and remove reply-all duplicates
+  across To/Cc for Gmail, Graph, JMAP, IMAP/SMTP, and Outlook Web.
+- Assemble Graph file attachments through the created draft's attachment
+  collection for new, reply, reply-all, and forward flows, refresh the final
+  draft identity before returning it, and report any partial draft as an
+  outcome requiring reconciliation rather than risking a duplicate send.
+- Report Gmail Trash-to-label moves and Graph/JMAP draft-then-submit failures
+  as partial outcomes requiring reconciliation after any confirmed first
+  stage, and never retry them automatically.
+- Traverse Microsoft Graph mail-folder hierarchies through bounded child-folder
+  collections and origin-checked provider continuation URLs.
+- Add Microsoft Graph v1.0 permanent message deletion after exact source-version
+  revalidation, using the delegated account's confirmed immutable user identity
+  and a single outcome-safe provider action.
+- Expand CalDAV recurrence safely whether a server returns expanded instances
+  or an unexpanded recurrence master, with unique instance identities and
+  bounded local expansion.
+- Keep CalDAV recurring-instance updates and cancellation scoped through
+  `RECURRENCE-ID` exceptions and master `EXDATE` updates instead of mutating or
+  deleting the complete series.
+- Detect RFC 6638 server-managed CalDAV scheduling and protect attendee
+  invitation, update, and cancellation writes with schedule-tag conditions;
+  unsupported servers now fail before silently changing an attendee event.
+- Add recurrence replacement and removal to the shared CLI/MCP calendar update
+  contract and implement it for Outlook Web, Google Calendar, Microsoft Graph,
+  and CalDAV. Recurrence removal no longer requires an unrelated start/end
+  rewrite.
+- Add provider-neutral online-meeting creation: Microsoft routes provision
+  Teams, while Google Calendar requests a unique Google Meet conference only
+  after observing `hangoutsMeet` support. Keep the v0.7 Teams-only input as a
+  compatibility alias that fails on non-Microsoft routes.
+- Preserve short bounded Google Web result snapshots in cross-account mail
+  search instead of misclassifying their honest non-terminal marker as a
+  provider failure.
+- Fail closed when Gmail or Google Calendar exposes neither recognized semantic
+  rows nor a structural empty-state marker, and collect every UTC date in a
+  bounded multi-day Google Web agenda window with deterministic deduplication.
+- Discover bounded Outlook Web calendar hierarchies through the existing typed
+  `FindFolder` action, filter exact calendar folder classes, expose observed
+  effective rights, and keep the distinguished calendar as the stable default.
+- Save successful SMTP submissions to the discovered IMAP Sent mailbox and
+  return its resolvable message identity; fail before SMTP when no Sent mailbox
+  exists, and report an unknown partial outcome if post-submit append fails.
+- Add a targeted IMAP move fallback using UID COPY, deleted marking, and UID
+  EXPUNGE only when UIDPLUS makes it safe for the selected message.
+- Treat IMAP APPEND/STORE confirmation failures and JMAP attachment-upload
+  followed by draft rejection as partial outcomes requiring reconciliation.
+- Add interactive public-client OAuth with PKCE and OS-keyring grants for
+  Google/Graph, plus approved external credential handles for standards
+  providers. No password, token, helper output, or client secret enters config.
+
+### Read, import, and monitoring workflows
+
+- Add isolated cross-account mail search and agenda projections with stable
+  ordering, provenance, global bounds, and explicit partial failures.
+- Add read-only, identity-bound local import scanning/staging for recognized
+  exports, archives, Maildir, and Thunderbird profiles, plus safe account-local
+  purge.
+- Add opt-in monitoring modes (`off -> notify -> queue -> agent`) with durable
+  recovery/deduplication, quiet hours, bounds, loop prevention, rate limits,
+  circuit breaking, direct no-shell runners, and separate remote-egress
+  approval.
+- Add read-only MCP monitor/event resources and tools; monitoring setup, runner
+  consent, egress approval, and queue purge remain CLI-only.
+
+### Safety and experience
+
+- Make `corr` the primary command while keeping an identical `corresync`
+  compatibility entry for the finite v0.8–v0.9 transition. Completion detection
+  installs one idempotent `corr` file and never appends shell startup lines.
+- Authenticate and pin Unix runtime directories, locks, sockets, identities,
+  and peer UIDs before transmitting the rotating daemon bearer; reject
+  symlinks, wrong types/owners/modes, squatters, and replacement races.
+- Authenticate the Windows named-pipe owner, server process SID, protected
+  DACL, and credential-file owner before transmitting the daemon bearer, and
+  explicitly assign both IPC objects to the current user.
+- Bind account lifecycle commits to previewed opaque identities even if aliases
+  change, including the replacement default during removal; reject alias/ID
+  ambiguity, and require explicit local CLI login after an MCP account addition.
+- Restrict JMAP API/upload/download URLs to the configured session origin,
+  require absolute credential-helper executables, drop malformed inherited IMAP
+  reply headers, reject LF-only IMAP control lines, and give each response to
+  the pinned IMAP parser once through a forward-only, CPU-bounded capture that
+  bounds literals individually and per operation across implicit TLS and
+  STARTTLS.
+- Route MCP account add/rename/remove through effect policy and content-free
+  prepare/commit/execution audit; show exact credential handles in add review
+  and reject cross-account handle reuse before preview and atomic persistence.
+- Keep attacker-controlled notification metadata behind native argument
+  boundaries, escape Linux notification markup, reject NUL metadata, time-bound
+  notification utilities, persist notification events in a delivery-bound
+  outbox, advance provider cursors monotonically across deferrals and failures,
+  drain pending deliveries before new scan commits, expire terminal events
+  without evicting pending data or their dedup identities, bound matched-only
+  deduplication with safe oldest-first eviction, paginate recovery by returned
+  item count, distinguish provider-attested mailbox end from incomplete bounded
+  recovery, preserve valid cursors across empty listings and ACKs that race
+  delivery completion, and reject Windows `notify` setup until Corresync has a
+  registered AppUserModelID.
+- Reject plain and percent-encoded dot path segments at the shared authorized
+  REST boundary, with provider ID validation as a second guard, so opaque
+  provider identifiers cannot be normalized into a different collection path.
+- Add `corr feedback`, an allowlisted deterministic report with an optional
+  bounded generalized last-error record. Generation is local; copy/save/open
+  actions occur only after full display, and GitHub is never submitted
+  automatically.
+- Refresh CLI/MCP help, README, Pages, plugin/Skill, feature/evidence tables,
+  architecture, security guidance, runbooks, and icon for the implemented
+  multi-provider surface.
+
 ## 0.7.0 - 2026-07-28
 
 ### Corresync

@@ -25,7 +25,7 @@ Graph, EWS, OWA, setup plugins, skills, raw actions, and enterprise rollout
 machinery at the reviewed revision. Removing most of that surface would produce
 a harder-to-review fork than a small OWA-only core.
 
-`Corresync` therefore starts independently and keeps these non-negotiable
+`Corresync` therefore started independently and keeps these non-negotiable
 invariants:
 
 - a visible browser owns the Outlook session;
@@ -34,7 +34,7 @@ invariants:
 - there is no TLS interception and no arbitrary raw-action tool;
 - CLI and MCP are adapters over one typed application/policy/audit core;
 - undocumented OWA contracts are isolated behind synthetic golden fixtures;
-- the repository is OWA-only until that boundary is stable.
+- each undocumented or standard protocol remains behind a typed adapter.
 
 Public implementations are used as independent compatibility observations,
 not as source to copy. A wire shape is accepted only after it agrees with more
@@ -99,6 +99,26 @@ request envelope agree with the pinned historical Outlook Web modules and an
 authorized live observation. The bridge narrows update to reviewed fields,
 requires a change key, leaves attendee notification behavior to Outlook,
 treats cancellation as destructive, and never retries either submission.
+
+## Multi-provider amendment
+
+On 2026-07-28 the project expanded the stable application boundary with
+independent Google API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters.
+This does not reverse the independent-implementation decision:
+
+- each adapter was written against its published protocol documentation and
+  synthetic fixtures;
+- provider wire types remain outside the domain/application core;
+- mail and calendar routes are explicitly selected and never fall back
+  silently;
+- public behavior is the typed application contract, not a copied provider
+  client surface; and
+- deterministic and live evidence remain labeled separately.
+
+Graph is now an optional explicit adapter rather than an upstream architecture
+dependency. The browser-owned Outlook Web route remains available for users
+who cannot or do not want to register a Graph public client. No route embeds a
+shared secret or operates through a hosted relay.
 
 ## When to reconsider
 

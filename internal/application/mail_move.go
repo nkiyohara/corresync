@@ -25,7 +25,8 @@ type MailMoveReview struct {
 	Destination MailFolder `json:"destination"`
 }
 
-// MailMoveResult identifies the moved item when OWA returns its new identity.
+// MailMoveResult identifies the moved item when the provider returns a new
+// identity.
 type MailMoveResult struct {
 	ID         string            `json:"id,omitempty"`
 	ChangeKey  string            `json:"changeKey,omitempty"`
@@ -40,7 +41,7 @@ type MailMoveAccess struct {
 	Preview *approval.Preview `json:"preview,omitempty"`
 }
 
-// MailMover is the narrow OWA port for one move in the selected account.
+// MailMover is the narrow provider-neutral port for one selected-account move.
 type MailMover interface {
 	MoveMail(context.Context, MailMoveInput) (MailMoveResult, error)
 }

@@ -15,8 +15,9 @@ would create an unnecessary ambient network surface.
 ## Decision
 
 Run one session-owner daemon per absolute config-path and state-directory
-namespace. It owns browsers, in-memory Outlook authorization, the policy guard,
-approval tokens, and audit recorder. CLI and MCP remain unprivileged adapters.
+namespace. It owns browsers, authenticated provider clients and in-memory
+authorization, the policy guard, approval tokens, and audit recorder. CLI and
+MCP remain unprivileged adapters.
 
 Use a Unix-domain socket on Linux and macOS. Hold a non-blocking file lock for
 singleton ownership, set the socket and runtime directory to owner-only modes,
@@ -58,6 +59,31 @@ state, and an optional capture time. Protocol version 12 replaces editable
 aliases in routing contracts with stable opaque account IDs, carries provider
 capabilities and provenance, and binds consequential operations to explicit
 mailbox or calendar targets.
+Protocol version 13 adds isolated cross-account mail-search and agenda
+projections with provenance and partial-failure results. Protocol version 14
+adds content-free monitor status plus bounded local event listing and
+acknowledgement; monitor configuration and purge are intentionally absent.
+Protocol version 15 adds the selected calendar route's typed attendee-
+notification and cancellation-disposition semantics to review results.
+Protocol version 16 adds bounded `calendar.folders.list` discovery so every
+provider can expose selectable opaque calendar IDs through the same typed
+application, CLI, and MCP boundary. Protocol version 17 extends content-free
+session status with separate mail and calendar provider identities so a
+mixed-provider account is never collapsed to a misleading primary route.
+Protocol version 18 adds the provider-neutral online-meeting creation field and
+provider-bound review result without reinterpreting the v0.7 Teams-only field.
+Protocol version 19 adds a CLI-only, account-targeted logout method that closes
+one account's in-memory sessions without stopping or exposing the session owner.
+
+Before a client reads the rotating bearer, it authenticates the endpoint
+itself. On Unix it opens the runtime directory without following symlinks,
+validates ownership/type/mode, pins and validates the singleton lock and socket,
+proves an active owner, connects, verifies peer UID, then rechecks directory,
+socket, and lock identities. Untrusted `XDG_RUNTIME_DIR` values, symlinks,
+regular files, FIFOs, permissive directories, wrong owners, socket squatters,
+and replacement races fail closed. The legacy migration client follows the
+same endpoint-authentication path. Listener-side checks and the rotating bearer
+remain defense in depth rather than substitutes.
 
 Keep `status` and `shutdown` as the only stable lifecycle controls across
 protocol versions. After an authenticated daemon proves that a request was
@@ -72,7 +98,7 @@ login, preview, or commit call may use this compatibility path.
 
 ## Consequences
 
-- Outlook authorization never crosses the daemon boundary.
+- Provider authorization never crosses the daemon boundary.
 - A stolen approval token remains caller-bound and short-lived, while IPC also
   requires same-user OS access and the rotating credential.
 - Multiple configs can run concurrently without revealing their paths in socket

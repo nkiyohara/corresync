@@ -77,9 +77,13 @@ func NewServer(backend Backend, options ServerOptions) (*Server, error) {
 	server.http = &http.Server{
 		Handler:           server,
 		ReadHeaderTimeout: 5 * time.Second,
-		IdleTimeout:       30 * time.Second,
-		MaxHeaderBytes:    8 << 10,
-		ErrorLog:          log.New(io.Discard, "", 0),
+		ReadTimeout:       30 * time.Second,
+		// Login is the only deliberately long request and configuration caps
+		// its interactive browser wait at 30 minutes.
+		WriteTimeout:   31 * time.Minute,
+		IdleTimeout:    30 * time.Second,
+		MaxHeaderBytes: 8 << 10,
+		ErrorLog:       log.New(io.Discard, "", 0),
 	}
 	return server, nil
 }
@@ -182,12 +186,60 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.Login(ctx, input.Account, request.Caller)
+	case MethodLogout:
+		var input LogoutInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Account.ValidateOpaque(); err != nil {
+			return nil, err
+		}
+		return server.backend.Logout(ctx, input.Account, request.Caller)
 	case MethodSessionStatus:
 		var input struct{}
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
 			return nil, err
 		}
 		return server.backend.SessionStatus(ctx, request.Caller)
+	case MethodMonitorStatus:
+		var input MonitorStatusInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Account.ValidateOpaque(); err != nil {
+			return nil, err
+		}
+		backend, supported := server.backend.(MonitoringBackend)
+		if !supported {
+			return nil, errors.New("monitoring is not supported by this session owner")
+		}
+		return backend.MonitorStatus(ctx, input.Account, request.Caller)
+	case MethodEventsList:
+		var input application.MonitorEventListInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, supported := server.backend.(MonitoringBackend)
+		if !supported {
+			return nil, errors.New("monitoring is not supported by this session owner")
+		}
+		return backend.ListMonitorEvents(ctx, input, request.Caller)
+	case MethodEventAcknowledge:
+		var input application.MonitorAcknowledgeInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, supported := server.backend.(MonitoringBackend)
+		if !supported {
+			return nil, errors.New("monitoring is not supported by this session owner")
+		}
+		return backend.AcknowledgeMonitorEvent(ctx, input, request.Caller)
 	case MethodTerminalLogin:
 		var input TerminalLoginInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
@@ -213,6 +265,12 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.SearchMail(ctx, input, request.Caller)
+	case MethodMailSearchAll:
+		var input application.MailProjectionInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		return server.backend.SearchAllMail(ctx, input, request.Caller)
 	case MethodMailFolders:
 		var input application.MailFolderListInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
@@ -303,12 +361,24 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.CommitMailDelete(ctx, input.Token, request.Caller)
+	case MethodCalendarFolders:
+		var input application.CalendarFolderListInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		return server.backend.ListCalendarFolders(ctx, input, request.Caller)
 	case MethodCalendarList:
 		var input application.CalendarListInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
 			return nil, err
 		}
 		return server.backend.ListCalendar(ctx, input, request.Caller)
+	case MethodAgendaList:
+		var input application.AgendaProjectionInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		return server.backend.ListAgenda(ctx, input, request.Caller)
 	case MethodCalendarCreate:
 		var input application.CalendarCreateInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {

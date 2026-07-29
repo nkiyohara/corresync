@@ -22,6 +22,7 @@ import (
 
 const (
 	expectedArchives = 6
+	expectedBinaries = 12
 	expectedPackages = 6
 	expectedSBOMs    = 26
 	expectedSources  = 1
@@ -39,8 +40,9 @@ type artifact struct {
 
 type scoopManifest struct {
 	Architecture map[string]struct {
-		URL  string `json:"url"`
-		Hash string `json:"hash"`
+		URL  string   `json:"url"`
+		Bin  []string `json:"bin"`
+		Hash string   `json:"hash"`
 	} `json:"architecture"`
 }
 
@@ -149,11 +151,18 @@ func validateGitHubAssetName(name string) error {
 func verifyInventory(dist string, artifacts []artifact, hashes map[string]string) error {
 	counts := make(map[string]int)
 	targets := make(map[string]bool)
+	binaries := make(map[string]map[string]int)
 	packageFormats := make(map[string]int)
 	sbomFormats := make(map[string]int)
 	for _, item := range artifacts {
 		counts[item.Type]++
 		switch item.Type {
+		case "Binary":
+			target := item.GOOS + "/" + item.GOARCH
+			if binaries[target] == nil {
+				binaries[target] = make(map[string]int)
+			}
+			binaries[target][item.Name]++
 		case "Archive":
 			if filepath.Base(item.Name) != item.Name {
 				return fmt.Errorf("archive name %q is not a basename", item.Name)
@@ -195,7 +204,7 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 
 	wantCounts := map[string]int{
 		"Archive":       expectedArchives,
-		"Binary":        expectedArchives,
+		"Binary":        expectedBinaries,
 		"Checksum":      1,
 		"Linux Package": expectedPackages,
 		"Metadata":      1,
@@ -212,6 +221,23 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 			target := goos + "/" + goarch
 			if !targets[target] {
 				return fmt.Errorf("release target %s is missing", target)
+			}
+			wantNames := []string{"corr", "corresync"}
+			if goos == "windows" {
+				wantNames = []string{"corr.exe", "corresync.exe"}
+			}
+			if len(binaries[target]) != len(wantNames) {
+				return fmt.Errorf("release target %s has binaries %#v", target, binaries[target])
+			}
+			for _, name := range wantNames {
+				if binaries[target][name] != 1 {
+					return fmt.Errorf(
+						"release target %s has %d copies of %s, want one",
+						target,
+						binaries[target][name],
+						name,
+					)
+				}
 			}
 		}
 	}
@@ -235,11 +261,12 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 
 func packageMissingFiles(extra map[string]any) []string {
 	required := map[string]bool{
+		"/usr/bin/corr":      false,
 		"/usr/bin/corresync": false,
-		"/usr/share/bash-completion/completions/corresync":      false,
-		"/usr/share/zsh/site-functions/_corresync":              false,
-		"/usr/share/fish/vendor_completions.d/corresync.fish":   false,
-		"/usr/share/man/man1/corresync.1":                       false,
+		"/usr/share/bash-completion/completions/corr":           false,
+		"/usr/share/zsh/site-functions/_corr":                   false,
+		"/usr/share/fish/vendor_completions.d/corr.fish":        false,
+		"/usr/share/man/man1/corr.1":                            false,
 		"/usr/share/doc/corresync/CHANGELOG.md":                 false,
 		"/usr/share/doc/corresync/third_party_licenses":         false,
 		"/usr/share/corresync/plugins/corresync":                false,
@@ -389,12 +416,12 @@ func verifyArchive(path, goos string) error {
 		"LICENSE",
 		"README.md",
 		"SECURITY.md",
-		"completions/_corresync",
-		"completions/corresync.bash",
-		"completions/corresync.fish",
+		"completions/_corr",
+		"completions/corr.bash",
+		"completions/corr.fish",
 		"docs/install.md",
 		"docs/mcp.md",
-		"manpages/corresync.1",
+		"manpages/corr.1",
 		"plugins/corresync/.claude-plugin/plugin.json",
 		"plugins/corresync/.codex-plugin/plugin.json",
 		"plugins/corresync/README.md",
@@ -406,10 +433,10 @@ func verifyArchive(path, goos string) error {
 		licensePrefix + "github.com/hashicorp/go-multierror/multierror.go",
 	}
 	if goos == "windows" {
-		want = append(want, "corresync.exe")
+		want = append(want, "corr.exe", "corresync.exe")
 		return verifyZip(path, want)
 	}
-	want = append(want, "corresync")
+	want = append(want, "corr", "corresync")
 	return verifyTarGzip(path, want)
 }
 
@@ -496,14 +523,16 @@ func verifyCatalogs(dist string, hashes map[string]string) error {
 	}
 	for _, snippet := range []string{
 		`depends_on "go" => :build`,
-		`std_go_args(output: bin/"corresync"`,
-		`bash_completion.install "completions/corresync.bash" => "corresync"`,
-		`zsh_completion.install "completions/_corresync"`,
-		`fish_completion.install "completions/corresync.fish"`,
-		`man1.install "manpages/corresync.1"`,
+		`std_go_args(output: bin/"corr"`,
+		`bin.install_symlink "corr" => "corresync"`,
+		`bash_completion.install "completions/corr.bash" => "corr"`,
+		`zsh_completion.install "completions/_corr"`,
+		`fish_completion.install "completions/corr.fish"`,
+		`man1.install "manpages/corr.1"`,
 		`pkgshare.install "plugins"`,
 		`(pkgshare/".agents").install ".agents/plugins"`,
 		`(pkgshare/".claude-plugin").install ".claude-plugin/marketplace.json"`,
+		`shell_output("#{bin}/corr version --json")`,
 		`shell_output("#{bin}/corresync version --json")`,
 	} {
 		if !strings.Contains(string(formula), snippet) {
@@ -533,6 +562,9 @@ func verifyCatalogs(dist string, hashes map[string]string) error {
 		if hashes[name] != item.Hash {
 			return fmt.Errorf("scoop %s hash does not match %q", architecture, name)
 		}
+		if len(item.Bin) != 2 || item.Bin[0] != "corr.exe" || item.Bin[1] != "corresync.exe" {
+			return fmt.Errorf("scoop %s commands are %#v", architecture, item.Bin)
+		}
 	}
 
 	wingetFiles, err := filepath.Glob(filepath.Join(dist, "winget", "manifests", "*", "*", "*", "*", "*"))
@@ -552,8 +584,9 @@ func verifyCatalogs(dist string, hashes map[string]string) error {
 			installer = string(data)
 		}
 	}
-	if !strings.Contains(installer, "PortableCommandAlias: corresync") {
-		return errors.New("WinGet manifest does not install the corresync command")
+	if !strings.Contains(installer, "PortableCommandAlias: corr") ||
+		!strings.Contains(installer, "PortableCommandAlias: corresync") {
+		return errors.New("WinGet manifest does not install corr and its compatibility command")
 	}
 	for name, hash := range hashes {
 		if strings.Contains(name, "_windows_") && strings.HasSuffix(name, ".zip") {
@@ -583,13 +616,13 @@ func verifySourceArchive(archivePath string) error {
 		"LICENSE":                                     false,
 		"go.mod":                                      false,
 		"go.sum":                                      false,
-		"cmd/corresync/main.go":                       false,
+		"cmd/corr/main.go":                            false,
 		"internal/buildinfo/buildinfo.go":             false,
-		"manpages/corresync.1":                        false,
+		"manpages/corr.1":                             false,
 		"vendor/modules.txt":                          false,
-		"completions/corresync.bash":                  false,
-		"completions/_corresync":                      false,
-		"completions/corresync.fish":                  false,
+		"completions/corr.bash":                       false,
+		"completions/_corr":                           false,
+		"completions/corr.fish":                       false,
 		"plugins/corresync/.codex-plugin/plugin.json": false,
 		"plugins/corresync/skills/corresync/SKILL.md": false,
 	}

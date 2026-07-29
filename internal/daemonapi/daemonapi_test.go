@@ -24,23 +24,28 @@ const (
 )
 
 type fakeBackend struct {
-	mailInput         application.MailListInput
-	searchInput       application.MailSearchInput
-	bodyInput         application.MailBodyInput
-	attachmentInput   application.MailAttachmentInput
-	draftInput        application.MailDraftInput
-	sendInput         application.MailSendInput
-	moveInput         application.MailMoveInput
-	stateInput        application.MailReadStateInput
-	deleteInput       application.MailDeleteInput
-	folderInput       application.MailFolderListInput
-	calendarListInput application.CalendarListInput
-	createInput       application.CalendarCreateInput
-	updateInput       application.CalendarUpdateInput
-	cancelInput       application.CalendarCancelInput
-	terminalInput     TerminalLoginInput
-	commitToken       string
-	caller            domain.Caller
+	mailInput           application.MailListInput
+	searchInput         application.MailSearchInput
+	searchAllInput      application.MailProjectionInput
+	bodyInput           application.MailBodyInput
+	attachmentInput     application.MailAttachmentInput
+	draftInput          application.MailDraftInput
+	sendInput           application.MailSendInput
+	moveInput           application.MailMoveInput
+	stateInput          application.MailReadStateInput
+	deleteInput         application.MailDeleteInput
+	folderInput         application.MailFolderListInput
+	calendarFolderInput application.CalendarFolderListInput
+	calendarListInput   application.CalendarListInput
+	agendaInput         application.AgendaProjectionInput
+	createInput         application.CalendarCreateInput
+	updateInput         application.CalendarUpdateInput
+	cancelInput         application.CalendarCancelInput
+	terminalInput       TerminalLoginInput
+	monitorListInput    application.MonitorEventListInput
+	monitorAckInput     application.MonitorAcknowledgeInput
+	commitToken         string
+	caller              domain.Caller
 }
 
 func (backend *fakeBackend) DefaultAccount() domain.AccountID { return testAccountID }
@@ -52,12 +57,67 @@ func (backend *fakeBackend) SessionStatus(
 	return SessionStatusResult{
 		Accounts: []SessionStatus{{
 			Account: testAccountID, Alias: "work",
-			Provider: domain.ProviderMicrosoftOWA, State: "signed_out",
+			Provider:     domain.ProviderMicrosoftOWA,
+			MailProvider: domain.ProviderMicrosoftOWA, State: "signed_out",
 		}},
 	}, nil
 }
+
+func (backend *fakeBackend) MonitorStatus(
+	context.Context,
+	domain.AccountID,
+	domain.Caller,
+) (application.MonitorStatus, error) {
+	return application.MonitorStatus{
+		Account: testAccountID, Alias: "work", Mode: domain.MonitorOff,
+	}, nil
+}
+
+func (backend *fakeBackend) ListMonitorEvents(
+	_ context.Context,
+	input application.MonitorEventListInput,
+	caller domain.Caller,
+) (application.MonitorEventPage, error) {
+	backend.monitorListInput, backend.caller = input, caller
+	return application.MonitorEventPage{
+		Events: []application.MonitorEvent{monitorTestEvent("pending")},
+		Offset: input.Offset, Limit: input.Limit, Total: 1,
+	}, nil
+}
+
+func (backend *fakeBackend) AcknowledgeMonitorEvent(
+	_ context.Context,
+	input application.MonitorAcknowledgeInput,
+	caller domain.Caller,
+) (application.MonitorEvent, error) {
+	backend.monitorAckInput, backend.caller = input, caller
+	return monitorTestEvent("acknowledged"), nil
+}
+
+func monitorTestEvent(state string) application.MonitorEvent {
+	event := application.MonitorEvent{
+		ID:      "evt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Account: testAccountID, AccountAlias: "work",
+		Provider: domain.ProviderJMAP, SourceObjectID: "synthetic-message",
+		Trust:    application.MonitorTrustMarker,
+		Delivery: application.MonitorDeliveryQueue, State: state,
+		DeliveryCount: 1, DetectedAt: time.Unix(4, 0).UTC(),
+	}
+	if state == "acknowledged" {
+		acknowledged := time.Unix(5, 0).UTC()
+		event.AcknowledgedAt = &acknowledged
+	}
+	return event
+}
 func (*fakeBackend) Login(_ context.Context, account domain.AccountID, _ domain.Caller) (LoginResult, error) {
 	return LoginResult{Account: account, Authenticated: true, CapturedAt: time.Unix(2, 0)}, nil
+}
+func (*fakeBackend) Logout(
+	_ context.Context,
+	account domain.AccountID,
+	_ domain.Caller,
+) (LogoutResult, error) {
+	return LogoutResult{Account: account, LoggedOut: true}, nil
 }
 func (backend *fakeBackend) TerminalLogin(_ context.Context, input TerminalLoginInput, caller domain.Caller) (TerminalLoginResult, error) {
 	backend.terminalInput, backend.caller = input, caller
@@ -81,6 +141,29 @@ func (backend *fakeBackend) ListMail(_ context.Context, input application.MailLi
 func (backend *fakeBackend) SearchMail(_ context.Context, input application.MailSearchInput, caller domain.Caller) (application.MailPage, error) {
 	backend.searchInput, backend.caller = input, caller
 	return application.MailPage{Messages: []application.MailSummary{{ID: "search-message-1"}}}, nil
+}
+func (backend *fakeBackend) SearchAllMail(_ context.Context, input application.MailProjectionInput, caller domain.Caller) (application.MailProjectionPage, error) {
+	backend.searchAllInput, backend.caller = input, caller
+	capabilities := domain.Capabilities{Mail: true}
+	return application.MailProjectionPage{
+		Messages: []application.ProjectedMail{{
+			AccountAlias: "work",
+			Message: application.MailSummary{
+				ID: "search-all-message-1", ReceivedAt: "2026-07-28T10:00:00Z",
+				Provenance: domain.Provenance{
+					AccountID: testAccountID, Provider: domain.ProviderMicrosoftOWA,
+					MailboxID: "mailbox", SourceObjectID: "search-all-message-1",
+				},
+			},
+		}},
+		Accounts: []application.ProjectionAccountStatus{{
+			Account: testAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA, Service: "mail",
+			Complete: true, FetchedItems: 1, Exhausted: true,
+			Capabilities: &capabilities,
+		}},
+		Offset: input.Offset, Limit: input.Limit, Complete: true,
+	}, nil
 }
 func (backend *fakeBackend) ListMailFolders(_ context.Context, input application.MailFolderListInput, caller domain.Caller) (application.MailFolderPage, error) {
 	backend.folderInput, backend.caller = input, caller
@@ -160,11 +243,52 @@ func (backend *fakeBackend) CommitMailDelete(_ context.Context, token string, ca
 	backend.commitToken, backend.caller = token, caller
 	return application.MailDeleteAccess{}, nil
 }
+func (backend *fakeBackend) ListCalendarFolders(_ context.Context, input application.CalendarFolderListInput, caller domain.Caller) (application.CalendarFolderPage, error) {
+	backend.calendarFolderInput, backend.caller = input, caller
+	return application.CalendarFolderPage{
+		Calendars: []application.CalendarFolderSummary{{
+			ID: "calendar-1", DisplayName: "Work", IsDefault: true,
+			CanEdit: true, AccessRole: "owner",
+		}},
+		TotalCalendars: 1, IncludesLastItem: true,
+	}, nil
+}
 func (backend *fakeBackend) ListCalendar(_ context.Context, input application.CalendarListInput, caller domain.Caller) (application.CalendarPage, error) {
 	backend.calendarListInput, backend.caller = input, caller
 	return application.CalendarPage{
 		Events: []application.CalendarEvent{{ID: "event-1", Start: input.Start, End: input.End}},
 		Start:  input.Start, End: input.End,
+	}, nil
+}
+func (backend *fakeBackend) ListAgenda(_ context.Context, input application.AgendaProjectionInput, caller domain.Caller) (application.AgendaProjectionPage, error) {
+	backend.agendaInput, backend.caller = input, caller
+	capabilities := domain.Capabilities{Calendar: true}
+	return application.AgendaProjectionPage{
+		Events: []application.ProjectedAgendaEvent{{
+			AccountAlias: "work", DisplayStart: "2026-07-28T10:00:00Z",
+			DisplayEnd:      "2026-07-28T11:00:00Z",
+			DisplayTimeZone: input.DisplayTimeZone,
+			Event: application.CalendarEvent{
+				ID:    "agenda-event-1",
+				Start: "2026-07-28T10:00:00Z", End: "2026-07-28T11:00:00Z",
+				OriginalStart:         "2026-07-28T10:00:00Z",
+				OriginalEnd:           "2026-07-28T11:00:00Z",
+				OriginalStartTimeZone: "UTC", OriginalEndTimeZone: "UTC",
+				Provenance: domain.Provenance{
+					AccountID: testAccountID, Provider: domain.ProviderMicrosoftOWA,
+					CalendarID: "calendar", SourceObjectID: "agenda-event-1",
+				},
+			},
+		}},
+		Accounts: []application.ProjectionAccountStatus{{
+			Account: testAccountID, Alias: "work",
+			Provider: domain.ProviderMicrosoftOWA, Service: "calendar",
+			Complete: true, FetchedItems: 1, Exhausted: true,
+			Capabilities: &capabilities,
+		}},
+		Start: input.Start, End: input.End,
+		DisplayTimeZone: input.DisplayTimeZone,
+		Offset:          input.Offset, Limit: input.Limit, Complete: true,
 	}, nil
 }
 func (backend *fakeBackend) CreateCalendar(_ context.Context, input application.CalendarCreateInput, caller domain.Caller) (application.CalendarCreateAccess, error) {
@@ -222,7 +346,8 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 	signedOut := func(account, alias string) SessionStatus {
 		return SessionStatus{
 			Account: domain.AccountID(account), Alias: alias,
-			Provider: domain.ProviderMicrosoftOWA, State: "signed_out",
+			Provider:     domain.ProviderMicrosoftOWA,
+			MailProvider: domain.ProviderMicrosoftOWA, State: "signed_out",
 		}
 	}
 	tests := []SessionStatusResult{
@@ -247,6 +372,12 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 			Account: testAccountID, Alias: "work",
 			Provider: domain.ProviderMicrosoftOWA,
 			State:    "signed_out", CapturedAt: &capturedAt,
+		}}},
+		{Accounts: []SessionStatus{{
+			Account: testAccountID, Alias: "work",
+			Provider:     domain.ProviderMicrosoftOWA,
+			MailProvider: domain.ProviderGoogleAPI,
+			State:        "signed_out",
 		}}},
 	}
 	for index, result := range tests {
@@ -300,12 +431,39 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	if err != nil || !login.Authenticated || login.Account != testAccountID {
 		t.Fatalf("Login() = %+v, %v", login, err)
 	}
+	logout, err := client.Logout(t.Context(), testAccountID, caller)
+	if err != nil || !logout.LoggedOut || logout.Account != testAccountID {
+		t.Fatalf("Logout() = %+v, %v", logout, err)
+	}
 	sessions, err := client.SessionStatus(t.Context(), caller)
 	if err != nil ||
 		len(sessions.Accounts) != 1 ||
 		sessions.Accounts[0].Account != testAccountID ||
 		sessions.Accounts[0].State != "signed_out" {
 		t.Fatalf("SessionStatus() = %+v, %v", sessions, err)
+	}
+	monitorStatus, err := client.MonitorStatus(t.Context(), testAccountID, caller)
+	if err != nil || monitorStatus.Mode != domain.MonitorOff {
+		t.Fatalf("MonitorStatus() = %+v, %v", monitorStatus, err)
+	}
+	monitorPage, err := client.ListMonitorEvents(
+		t.Context(),
+		application.MonitorEventListInput{Account: testAccountID, Limit: 50},
+		caller,
+	)
+	if err != nil || len(monitorPage.Events) != 1 {
+		t.Fatalf("ListMonitorEvents() = %+v, %v", monitorPage, err)
+	}
+	acknowledged, err := client.AcknowledgeMonitorEvent(
+		t.Context(),
+		application.MonitorAcknowledgeInput{
+			Account: testAccountID,
+			EventID: monitorPage.Events[0].ID,
+		},
+		caller,
+	)
+	if err != nil || acknowledged.State != "acknowledged" {
+		t.Fatalf("AcknowledgeMonitorEvent() = %+v, %v", acknowledged, err)
 	}
 	terminalLogin, err := client.TerminalLogin(t.Context(), TerminalLoginInput{Account: testAccountID}, caller)
 	if err != nil || terminalLogin.Status != "pending" || terminalLogin.View == nil ||
@@ -336,6 +494,22 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	if err != nil || len(search.Messages) != 1 || backend.searchInput.Query != "subject:synthetic" {
 		t.Fatalf("SearchMail() = %+v, %v; backend input=%+v", search, err, backend.searchInput)
 	}
+	searchAll, err := client.SearchAllMail(t.Context(), application.MailProjectionInput{
+		Folder: application.MailFolder{
+			Kind: application.MailFolderDistinguished,
+			ID:   "inbox",
+		},
+		Query: "subject:synthetic", Limit: 25, TimeZone: "UTC",
+	}, caller)
+	if err != nil || len(searchAll.Messages) != 1 ||
+		backend.searchAllInput.Query != "subject:synthetic" {
+		t.Fatalf(
+			"SearchAllMail() = %+v, %v; backend input=%+v",
+			searchAll,
+			err,
+			backend.searchAllInput,
+		)
+	}
 	moved, err := client.MoveMail(t.Context(), application.MailMoveInput{
 		Account: testAccountID, MessageID: "message-1", ChangeKey: "change-1",
 		Destination: application.MailFolder{Kind: application.MailFolderOpaque, ID: "folder-1"},
@@ -358,6 +532,18 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	}, caller)
 	if err != nil || len(folders.Folders) != 1 || backend.folderInput.Account != testAccountID {
 		t.Fatalf("ListMailFolders() = %+v, %v; backend input=%+v", folders, err, backend.folderInput)
+	}
+	calendars, err := client.ListCalendarFolders(t.Context(), application.CalendarFolderListInput{
+		Account: testAccountID, Limit: 100,
+	}, caller)
+	if err != nil || len(calendars.Calendars) != 1 ||
+		backend.calendarFolderInput.Account != testAccountID {
+		t.Fatalf(
+			"ListCalendarFolders() = %+v, %v; backend input=%+v",
+			calendars,
+			err,
+			backend.calendarFolderInput,
+		)
 	}
 	body, err := client.GetMailBody(t.Context(), application.MailBodyInput{
 		Account: testAccountID, MessageID: "message-1",
@@ -415,6 +601,21 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	}, caller)
 	if err != nil || len(calendarPage.Events) != 1 || backend.calendarListInput.Start != "2026-07-20T09:00:00Z" {
 		t.Fatalf("ListCalendar() = %+v, %v; backend input=%+v", calendarPage, err, backend.calendarListInput)
+	}
+	agenda, err := client.ListAgenda(t.Context(), application.AgendaProjectionInput{
+		Start:           "2026-07-20T09:00:00Z",
+		End:             "2026-07-20T12:00:00Z",
+		DisplayTimeZone: "UTC",
+		Limit:           25,
+	}, caller)
+	if err != nil || len(agenda.Events) != 1 ||
+		backend.agendaInput.DisplayTimeZone != "UTC" {
+		t.Fatalf(
+			"ListAgenda() = %+v, %v; backend input=%+v",
+			agenda,
+			err,
+			backend.agendaInput,
+		)
 	}
 	calendarAccess, err := client.CreateCalendar(t.Context(), application.CalendarCreateInput{
 		Account:      testAccountID,

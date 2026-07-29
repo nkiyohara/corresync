@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 12
+	ProtocolVersion   = 19
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -34,11 +34,13 @@ const (
 	MethodStatus               Method = "status"
 	MethodShutdown             Method = "shutdown"
 	MethodLogin                Method = "login"
+	MethodLogout               Method = "logout"
 	MethodSessionStatus        Method = "session.status"
 	MethodTerminalLogin        Method = "login.terminal"
 	MethodMailFolders          Method = "mail.folders.list"
 	MethodMailList             Method = "mail.list"
 	MethodMailSearch           Method = "mail.search"
+	MethodMailSearchAll        Method = "mail.search.all"
 	MethodMailGetBody          Method = "mail.get_body"
 	MethodMailCommitBody       Method = "mail.commit_body"
 	MethodMailGetAttachment    Method = "mail.get_attachment"
@@ -53,13 +55,18 @@ const (
 	MethodMailCommitState      Method = "mail.commit_read_state"
 	MethodMailDelete           Method = "mail.delete"
 	MethodMailCommitDelete     Method = "mail.commit_delete"
+	MethodCalendarFolders      Method = "calendar.folders.list"
 	MethodCalendarList         Method = "calendar.list"
+	MethodAgendaList           Method = "agenda.list"
 	MethodCalendarCreate       Method = "calendar.create"
 	MethodCalendarCommit       Method = "calendar.commit_create"
 	MethodCalendarUpdate       Method = "calendar.update"
 	MethodCalendarCommitUpdate Method = "calendar.commit_update"
 	MethodCalendarCancel       Method = "calendar.cancel"
 	MethodCalendarCommitCancel Method = "calendar.commit_cancel"
+	MethodMonitorStatus        Method = "monitor.status"
+	MethodEventsList           Method = "events.list"
+	MethodEventAcknowledge     Method = "events.acknowledge"
 )
 
 var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{16,96}$`)
@@ -176,22 +183,27 @@ type LoginResult struct {
 	CapturedAt    time.Time        `json:"capturedAt"`
 }
 
-// SessionStatus contains only local routing metadata, observed capabilities,
-// and in-memory authentication freshness. It never exposes remote identities
-// or authorization material.
-type SessionStatus struct {
-	Account       domain.AccountID     `json:"account"`
-	Alias         string               `json:"alias"`
-	Provider      domain.ProviderID    `json:"provider"`
-	State         string               `json:"state"`
-	Authenticated bool                 `json:"authenticated"`
-	CapturedAt    *time.Time           `json:"capturedAt,omitempty"`
-	Capabilities  *domain.Capabilities `json:"capabilities,omitempty"`
+// LogoutInput selects one configured account whose in-memory session closes.
+type LogoutInput struct {
+	Account domain.AccountID `json:"account"`
 }
 
-// SessionStatusResult reports every configured account in stable alias order.
-type SessionStatusResult struct {
-	Accounts []SessionStatus `json:"accounts"`
+// LogoutResult confirms the exact account boundary without exposing session
+// or credential material.
+type LogoutResult struct {
+	Account   domain.AccountID `json:"account"`
+	LoggedOut bool             `json:"loggedOut"`
+}
+
+// SessionStatus is the application-owned, content-free session status schema.
+type SessionStatus = application.SessionStatus
+
+// SessionStatusResult is the application-owned bounded account status result.
+type SessionStatusResult = application.SessionStatusResult
+
+// MonitorStatusInput selects one stable account.
+type MonitorStatusInput struct {
+	Account domain.AccountID `json:"account"`
 }
 
 // TerminalLoginInput starts or advances one caller-bound text-only browser
@@ -295,10 +307,12 @@ func (action TerminalLoginAction) validate() error {
 type Backend interface {
 	DefaultAccount() domain.AccountID
 	Login(context.Context, domain.AccountID, domain.Caller) (LoginResult, error)
+	Logout(context.Context, domain.AccountID, domain.Caller) (LogoutResult, error)
 	SessionStatus(context.Context, domain.Caller) (SessionStatusResult, error)
 	ListMailFolders(context.Context, application.MailFolderListInput, domain.Caller) (application.MailFolderPage, error)
 	ListMail(context.Context, application.MailListInput, domain.Caller) (application.MailPage, error)
 	SearchMail(context.Context, application.MailSearchInput, domain.Caller) (application.MailPage, error)
+	SearchAllMail(context.Context, application.MailProjectionInput, domain.Caller) (application.MailProjectionPage, error)
 	GetMailBody(context.Context, application.MailBodyInput, domain.Caller) (application.MailBodyAccess, error)
 	CommitMailBody(context.Context, string, domain.Caller) (application.MailBodyAccess, error)
 	GetMailAttachment(context.Context, application.MailAttachmentInput, domain.Caller) (application.MailAttachmentAccess, error)
@@ -313,7 +327,9 @@ type Backend interface {
 	CommitMailReadState(context.Context, string, domain.Caller) (application.MailReadStateAccess, error)
 	DeleteMail(context.Context, application.MailDeleteInput, domain.Caller) (application.MailDeleteAccess, error)
 	CommitMailDelete(context.Context, string, domain.Caller) (application.MailDeleteAccess, error)
+	ListCalendarFolders(context.Context, application.CalendarFolderListInput, domain.Caller) (application.CalendarFolderPage, error)
 	ListCalendar(context.Context, application.CalendarListInput, domain.Caller) (application.CalendarPage, error)
+	ListAgenda(context.Context, application.AgendaProjectionInput, domain.Caller) (application.AgendaProjectionPage, error)
 	CreateCalendar(context.Context, application.CalendarCreateInput, domain.Caller) (application.CalendarCreateAccess, error)
 	CommitCalendarCreate(context.Context, string, domain.Caller) (application.CalendarCreateAccess, error)
 	UpdateCalendar(context.Context, application.CalendarUpdateInput, domain.Caller) (application.CalendarUpdateAccess, error)
@@ -328,17 +344,26 @@ type TerminalLoginBackend interface {
 	TerminalLogin(context.Context, TerminalLoginInput, domain.Caller) (TerminalLoginResult, error)
 }
 
+// MonitoringBackend is the optional local event extension. It has no method
+// for enabling monitoring, widening filters, configuring a runner, or purging.
+type MonitoringBackend interface {
+	MonitorStatus(context.Context, domain.AccountID, domain.Caller) (application.MonitorStatus, error)
+	ListMonitorEvents(context.Context, application.MonitorEventListInput, domain.Caller) (application.MonitorEventPage, error)
+	AcknowledgeMonitorEvent(context.Context, application.MonitorAcknowledgeInput, domain.Caller) (application.MonitorEvent, error)
+}
+
 func (method Method) valid() bool {
 	switch method {
-	case MethodStatus, MethodShutdown, MethodLogin, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailGetBody, MethodMailCommitBody,
+	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
 		MethodMailGetAttachment, MethodMailCommitAttachment,
 		MethodMailCreateDraft, MethodMailCommitDraft, MethodMailSend, MethodMailCommitSend,
 		MethodMailMove, MethodMailCommitMove,
 		MethodMailReadState, MethodMailCommitState,
 		MethodMailDelete, MethodMailCommitDelete,
-		MethodCalendarList, MethodCalendarCreate, MethodCalendarCommit,
+		MethodCalendarFolders, MethodCalendarList, MethodAgendaList, MethodCalendarCreate, MethodCalendarCommit,
 		MethodCalendarUpdate, MethodCalendarCommitUpdate,
-		MethodCalendarCancel, MethodCalendarCommitCancel:
+		MethodCalendarCancel, MethodCalendarCommitCancel,
+		MethodMonitorStatus, MethodEventsList, MethodEventAcknowledge:
 		return true
 	default:
 		return false

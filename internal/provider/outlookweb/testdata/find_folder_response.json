@@ -9,8 +9,8 @@
             "Folders": [
               {
                 "__type": "Folder:#Exchange",
-                "FolderId": {"Id": "synthetic-folder-1", "ChangeKey": "synthetic-change-1"},
-                "ParentFolderId": {"Id": "synthetic-root-1"},
+                "FolderId": { "Id": "synthetic-folder-1", "ChangeKey": "synthetic-change-1" },
+                "ParentFolderId": { "Id": "synthetic-root-1" },
                 "DisplayName": "Synthetic inbox child",
                 "FolderClass": "IPF.Note",
                 "DistinguishedFolderId": "",
@@ -20,8 +20,8 @@
               },
               {
                 "__type": "Folder:#Exchange",
-                "FolderId": {"Id": "synthetic-folder-2", "ChangeKey": "synthetic-change-2"},
-                "ParentFolderId": {"Id": "synthetic-root-1"},
+                "FolderId": { "Id": "synthetic-folder-2", "ChangeKey": "synthetic-change-2" },
+                "ParentFolderId": { "Id": "synthetic-root-1" },
                 "DisplayName": "Synthetic archive",
                 "FolderClass": "IPF.Note",
                 "DistinguishedFolderId": "archive",

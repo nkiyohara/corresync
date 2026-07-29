@@ -15,7 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CurrentVersion = 2
+const CurrentVersion = 3
 
 const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
@@ -27,6 +27,7 @@ type Config struct {
 	Accounts       map[string]Account `json:"accounts" toml:"accounts"`
 	Policy         Policy             `json:"policy" toml:"policy"`
 	Browser        Browser            `json:"browser" toml:"browser"`
+	Credentials    Credentials        `json:"credentials,omitempty" toml:"credentials,omitempty"`
 	Updates        Updates            `json:"updates" toml:"updates"`
 }
 
@@ -34,11 +35,60 @@ type Config struct {
 // Config.Accounts is its mutable local alias; ID is an opaque, stable storage
 // and policy key that does not change when the alias or address changes.
 type Account struct {
-	ID       domain.AccountID  `json:"id" toml:"id"`
-	Provider domain.ProviderID `json:"provider" toml:"provider"`
-	Address  string            `json:"address,omitempty" toml:"address,omitempty"`
-	Origin   string            `json:"origin" toml:"origin"`
-	Mailbox  string            `json:"mailbox,omitempty" toml:"mailbox,omitempty"`
+	ID       domain.AccountID `json:"id" toml:"id"`
+	Address  string           `json:"address,omitempty" toml:"address,omitempty"`
+	Mail     *MailRoute       `json:"mail,omitempty" toml:"mail,omitempty"`
+	Calendar *CalendarRoute   `json:"calendar,omitempty" toml:"calendar,omitempty"`
+	Monitor  *Monitor         `json:"monitor,omitempty" toml:"monitor,omitempty"`
+}
+
+// Monitor is an explicit, account-local consent record. A nil value is always
+// equivalent to off, including for every older configuration and import.
+type Monitor struct {
+	Mode          domain.MonitorMode `json:"mode" toml:"mode"`
+	PollInterval  Duration           `json:"pollInterval" toml:"poll_interval"`
+	Debounce      Duration           `json:"debounce" toml:"debounce"`
+	Retention     Duration           `json:"retention" toml:"retention"`
+	RateLimitHour int                `json:"rateLimitHour" toml:"rate_limit_hour"`
+	QuietHours    *QuietHours        `json:"quietHours,omitempty" toml:"quiet_hours,omitempty"`
+	Filter        MonitorFilter      `json:"filter" toml:"filter"`
+	Notification  *Notification      `json:"notification,omitempty" toml:"notification,omitempty"`
+	Runner        *Runner            `json:"runner,omitempty" toml:"runner,omitempty"`
+}
+
+// MonitorFilter is deliberately metadata-only. It can never inspect a body or
+// attachment and matching cannot grant broader execution policy.
+type MonitorFilter struct {
+	SenderDomains   []string `json:"senderDomains,omitempty" toml:"sender_domains,omitempty"`
+	SubjectContains []string `json:"subjectContains,omitempty" toml:"subject_contains,omitempty"`
+	ImportantOnly   bool     `json:"importantOnly,omitempty" toml:"important_only,omitempty"`
+}
+
+// QuietHours suppresses notification and dispatch in one IANA time zone. Queue
+// collection may continue so restart recovery does not lose an event.
+type QuietHours struct {
+	Start    string `json:"start" toml:"start"`
+	End      string `json:"end" toml:"end"`
+	TimeZone string `json:"timeZone" toml:"time_zone"`
+}
+
+// Notification identifies a local-only adapter and the bounded metadata fields
+// it may display.
+type Notification struct {
+	Adapter string   `json:"adapter" toml:"adapter"`
+	Fields  []string `json:"fields" toml:"fields"`
+}
+
+// Runner is an explicitly selected local process. Egress is a human
+// declaration shown by status and audit; remote declarations require a second
+// affirmative field so a mode change cannot silently authorize disclosure.
+type Runner struct {
+	Command       string   `json:"command" toml:"command"`
+	Arguments     []string `json:"arguments,omitempty" toml:"arguments,omitempty"`
+	Egress        string   `json:"egress" toml:"egress"`
+	ApproveRemote bool     `json:"approveRemote,omitempty" toml:"approve_remote,omitempty"`
+	Fields        []string `json:"fields" toml:"fields"`
+	Timeout       Duration `json:"timeout" toml:"timeout"`
 }
 
 // Policy maps persisted settings into the deterministic policy core.
@@ -57,7 +107,7 @@ type Browser struct {
 }
 
 // Updates controls only opportunistic public release checks. Explicit
-// `corresync update` and `corresync update check` remain available when automatic
+// `corr update` and `corr update check` remain available when automatic
 // checks are disabled.
 type Updates struct {
 	DisableAutomaticChecks bool `json:"disableAutomaticChecks" toml:"disable_automatic_checks"`
@@ -93,9 +143,19 @@ func Default() Config {
 		DefaultAccount: "work",
 		Accounts: map[string]Account{
 			"work": {
-				ID:       defaultAccountID,
-				Provider: domain.ProviderMicrosoftOWA,
-				Origin:   "https://outlook.cloud.microsoft",
+				ID: defaultAccountID,
+				Mail: &MailRoute{
+					Provider: domain.ProviderMicrosoftOWA,
+					OutlookWeb: &OutlookWebRoute{
+						Origin: "https://outlook.cloud.microsoft",
+					},
+				},
+				Calendar: &CalendarRoute{
+					Provider: domain.ProviderMicrosoftOWA,
+					OutlookWeb: &OutlookWebRoute{
+						Origin: "https://outlook.cloud.microsoft",
+					},
+				},
 			},
 		},
 		Policy: Policy{
@@ -160,24 +220,16 @@ func (configuration Config) Validate() error {
 			)
 		}
 		accountIDs[account.ID] = alias
-		if err := account.Provider.Validate(); err != nil {
-			return fmt.Errorf("validate account %q provider: %w", alias, err)
-		}
-		if account.Provider != domain.ProviderMicrosoftOWA {
-			return fmt.Errorf(
-				"validate account %q: provider %q is not available in this release",
-				alias,
-				account.Provider,
-			)
-		}
 		if err := validateAddress(account.Address); err != nil {
 			return fmt.Errorf("validate account %q: %w", alias, err)
 		}
-		if err := validateOrigin(account.Origin); err != nil {
-			return fmt.Errorf("validate account %q: %w", alias, err)
+		if err := account.validate(); err != nil {
+			return fmt.Errorf("validate account %q routes: %w", alias, err)
 		}
-		if err := validateMailbox(account.Mailbox); err != nil {
-			return fmt.Errorf("validate account %q: %w", alias, err)
+	}
+	for _, alias := range aliases {
+		if _, conflicts := accountIDs[domain.AccountID(alias)]; conflicts {
+			return fmt.Errorf("account alias %q conflicts with an opaque account ID", alias)
 		}
 	}
 
@@ -196,6 +248,9 @@ func (configuration Config) Validate() error {
 	}
 	if strings.ContainsAny(configuration.Browser.Executable, "\r\n\x00") {
 		return errors.New("browser executable contains a forbidden character")
+	}
+	if err := configuration.Credentials.validate(); err != nil {
+		return err
 	}
 	return nil
 }

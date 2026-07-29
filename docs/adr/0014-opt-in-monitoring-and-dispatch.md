@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-07-28
 
 ## Context
 
@@ -31,10 +32,16 @@ Modes are strictly ordered:
 off -> notify -> queue -> agent
 ```
 
-`off` collects nothing. `notify` emits a local notification. `queue` persists
-matching events in a durable local outbox. `agent` dispatches to an explicitly
-configured runner. `notify` and `queue` are fully functional with no AI provider
-configured, and neither implies that one exists.
+`off` collects nothing. Every collecting mode first persists matching events
+in a durable local outbox with an immutable delivery kind. `notify` drains
+notification events through a validated local adapter. `queue` retains events
+for manual inspection without automatic delivery. `agent` drains runner events
+to an explicitly configured executable. `notify` and `queue` require no AI
+provider, and neither implies that one exists. Linux uses `notify-send` and
+macOS uses `osascript`, with native argument separation and a short execution
+timeout. Windows `notify` is unavailable until the product installs a
+registered AppUserModelID, so setup fails before configuration changes while
+`queue` and `agent` remain usable.
 
 The pipeline is a provider watcher, cursor and watermark recovery,
 deduplication, a metadata-first policy filter, a durable local queue, and then
@@ -42,6 +49,28 @@ sinks. Every adapter persists its own cursor and recovers after a restart or a
 missed notification. Duplicate delivery is identifiable and safe rather than
 assumed away. Disabling monitoring stops collection and requires an explicit
 choice to retain or purge the local queue.
+
+The provider cursor advances monotonically in the same commit that creates
+first-seen outbox events. Quiet hours, debounce, rate limits, cancellation, and
+sink failures leave events pending instead of rolling back the cursor. Pending
+events are drained before a new scan commit and filtered by their original
+delivery kind, so saturation can self-recover and changing mode cannot redirect
+old data to a different sink. Only matched messages consume deduplication
+state; retention and capacity eviction preserve every identity referenced by a
+queued event, and explicit purge clears queue and dedup state together.
+Pagination advances by the number of items actually returned. A cursor that
+falls outside the bounded 1000-item recovery window is re-baselined at the
+newest inspected window; all inspected items still pass through deduplication
+and normal delivery. An empty non-terminal provider page is incomplete, not
+mailbox end. Either incomplete case increments a durable recovery-overflow
+counter, records its time, and returns an explicit error that uninspected
+messages were not emitted. A provider-attested mailbox end after a cursor
+disappears is a complete normal re-baseline; an attested empty mailbox preserves
+the existing cursor. Neither increments overflow. Terminal notification,
+runner, and acknowledged records expire by their completion time. At the hard
+event bound, the oldest terminal record may yield capacity, but pending events
+are never evicted. State schema v1 entries migrate to local-only `queue`
+delivery rather than guessing an external destination.
 
 Events are metadata first: event identifier, account, source object identity,
 sender, subject, received time, and a trust marker. Bodies and attachments are
@@ -59,11 +88,15 @@ an MCP client, or an automatically started agent can never broaden its own
 watcher scope, filters, accounts, tools, or egress. Those change only through
 human configuration.
 
-The MCP surface is read-only with one local exception. It may expose
+The monitoring MCP surface is read-only with one local exception. It may expose
 `monitor_status` and `events_list`, and an `event_acknowledge` whose only target
 is the local event queue. No MCP tool enables monitoring, changes mode, widens a
-filter, enables automatic agent execution, enables egress, adds an account, or
-approves a commit. Resource change notifications may be published where a client
+filter, enables automatic agent execution, enables egress, or purges monitoring
+state. Separate account lifecycle tools may add, rename, or remove a route
+through the server-enforced caller-bound preview/commit protocol. Account add
+cannot authenticate or resolve a credential and explicitly requires a later
+local CLI login; account removal discloses its local-state and owned-grant
+effects. Resource change notifications may be published where a client
 subscribes, but a resource update is not a model turn, carries no write
 authority, and implies no permission to start a hosted-model request. New
 implementation does not depend on deprecated MCP Sampling.

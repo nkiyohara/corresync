@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Safety — Corresync</title>
+    <meta
+      name="description"
+      content="See how Corresync keeps credentials local, accounts isolated, writes reviewed, and provider limitations visible."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Corresync safety — visible effects, local authority">
+    <meta
+      property="og:description"
+      content="Credentials stay browser- or keyring-owned, writes use exact preview and commit, and unknown outcomes fail closed."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nkiyohara.github.io/corresync/safety.html">
+    <link rel="canonical" href="https://nkiyohara.github.io/corresync/safety.html">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="airmail" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync home">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./">Home</a>
+        <a href="providers.html">Providers</a>
+        <a href="safety.html" aria-current="page">Safety</a>
+        <a href="./#quickstart">Quickstart</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/docs/README.md">Docs<span
+            aria-hidden="true"
+          >
+            ↗</span></a>
+        <a href="https://github.com/nkiyohara/corresync">GitHub<span aria-hidden="true">
+            ↗</span></a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="page-hero safety-page-hero" aria-labelledby="page-title">
+        <p class="eyebrow light"><span aria-hidden="true"></span>Safety is the architecture</p>
+        <h1 id="page-title">Agents get typed tools. <em>Never your credentials.</em></h1>
+        <p class="lede">
+          Corresync keeps provider authority in one local, account-isolated session owner. CLI and
+          MCP share the same use cases and policy checks; neither receives a generic provider escape
+          hatch.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#promises">See the guarantees</a>
+          <a
+            class="button secondary"
+            href="https://github.com/nkiyohara/corresync/blob/main/docs/threat-model.md"
+          >Read the threat model</a>
+        </div>
+      </section>
+
+      <section id="promises" aria-labelledby="promises-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Plain-language guarantees</p>
+          <h2 id="promises-title">Your authority stays narrow and visible.</h2>
+          <p>
+            These are enforced application boundaries, not suggestions to an AI client and not
+            claims inferred from an MCP annotation.
+          </p>
+        </div>
+        <div class="promise-grid">
+          <article>
+            <span class="promise-mark" aria-hidden="true">01</span>
+            <h3>Credentials stay where they belong</h3>
+            <p>
+              Passwords, browser cookies, OAuth grants, and credential-helper output have no
+              configuration field. Browser sign-in stays visible; grants stay in the OS keyring.
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">02</span>
+            <h3>Every write chooses one account</h3>
+            <p>
+              Accounts keep separate sessions, profiles, credentials, cursors, caches, previews,
+              queues, and audit context. There is no broadcast write.
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">03</span>
+            <h3>Consequences require a review</h3>
+            <p>
+              External sends, destructive changes, account lifecycle, and calendar invitations bind
+              approval to the exact reviewed caller, account, target, and payload.
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">04</span>
+            <h3>Unknown outcomes stop</h3>
+            <p>
+              If a provider may have changed remote state but confirmation fails, Corresync reports
+              reconciliation instead of risking a duplicate through automatic retry.
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">05</span>
+            <h3>Nothing watches by default</h3>
+            <p>
+              Monitoring starts off. Collection, local notification, durable queueing, runner
+              execution, content release, and remote egress remain distinct choices.
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">06</span>
+            <h3>Limits remain visible</h3>
+            <p>
+              Provider capability and degradation travel with results. A missing precondition fails
+              closed instead of being emulated unsafely or routed to another provider.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="architecture-panel" aria-labelledby="architecture-title">
+        <div class="section-heading">
+          <p class="eyebrow light"><span aria-hidden="true"></span>One guarded path</p>
+          <h2 id="architecture-title">The same boundary for people, scripts, and agents.</h2>
+        </div>
+        <div
+          class="flow"
+          role="img"
+          aria-label="AI agents over local MCP and people or scripts over the CLI enter typed use cases and effect policy. Authenticated local IPC reaches an account-isolated session owner, which connects over valid TLS only to explicit providers."
+        >
+          <div class="flow-in">
+            <p class="flow-lane">
+              <span class="chip-node">AI agents</span><span class="flow-edge">MCP · stdio</span>
+            </p>
+            <p class="flow-lane">
+              <span class="chip-node">You &amp; scripts</span><span class="flow-edge">CLI</span>
+            </p>
+          </div>
+          <p class="flow-chain">
+            <span class="chip-node strong">typed use cases<small>effect policy</small></span>
+            <span class="flow-edge">authenticated IPC</span>
+            <span class="chip-node">session owner<small>account-isolated clients</small></span>
+            <span class="flow-edge">valid TLS</span>
+            <span class="chip-node">explicit providers</span>
+          </p>
+        </div>
+        <p class="panel-caption">
+          MCP uses stdio. The session owner exposes no TCP listener. Unix socket or Windows
+          named-pipe identity is authenticated before the local bearer can be transmitted.
+        </p>
+      </section>
+
+      <section aria-labelledby="review-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Preview, then commit</p>
+          <h2 id="review-title">The first command shows the effect. The second must match it.</h2>
+          <p>
+            Changing a recipient, body byte, attachment, event field, item version, account, or
+            caller invalidates the approval.
+          </p>
+        </div>
+        <div class="review-grid">
+          <figure class="terminal">
+            <figcaption class="term-bar">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="term-title">human-readable review</span>
+            </figcaption>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="Message send preview and commit"
+            ><code><span class="t-prompt">$</span> corr mail send --account work \
+    --to ana@example.invalid \
+    --subject 'Quarterly plan' \
+    --body-file reply.txt
+
+<span class="t-review">REVIEW · send new message</span>
+  account   work · microsoft-owa
+  to        ana@example.invalid
+  body      text/plain · 412 B
+  digest    <span class="t-dim">sha256 9f2c1a…</span>
+
+<span class="t-dim">Nothing sent.</span>
+
+<span class="t-prompt">$</span> corr mail send … <span class="t-approve">--approve</span>
+<span class="t-sent">SENT · one attempt · review 9f2c1a…</span></code></pre>
+          </figure>
+          <div class="review-copy">
+            <article>
+              <h3>Short-lived</h3>
+              <p>The approval expires and stays only in the local daemon that issued it.</p>
+            </article>
+            <article>
+              <h3>Single-use</h3>
+              <p>
+                A successful or terminal commit consumes the approval. It cannot authorize a later
+                action.
+              </p>
+            </article>
+            <article>
+              <h3>Target-bound</h3>
+              <p>
+                The reviewed account, provider, folder or calendar, version, recipients, content,
+                and effect stay exact.
+              </p>
+            </article>
+            <article>
+              <h3>Shared by CLI and MCP</h3>
+              <p>
+                MCP keeps preview and commit as separate typed tools. Tool annotations never replace
+                server policy.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="tinted-section" aria-labelledby="auth-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Authentication ownership</p>
+          <h2 id="auth-title">Choose a route first. Authenticate only when you ask.</h2>
+          <p>
+            Credential-free discovery returns evidence and required authentication. It never opens a
+            browser, requests administrator consent, or adds an account.
+          </p>
+        </div>
+        <div class="auth-grid">
+          <article>
+            <p class="chip">Visible browser</p>
+            <h3>Outlook Web and Google Web</h3>
+            <p>
+              SSO, MFA, Conditional Access, account selection, and provider notices stay inside a
+              dedicated browser profile.
+            </p>
+          </article>
+          <article>
+            <p class="chip">Public-client OAuth</p>
+            <h3>Google API and Graph</h3>
+            <p>
+              Explicit selection, PKCE, registered loopback redirect, service-minimal scopes, no
+              client secret, and OS-keyring grant storage.
+            </p>
+          </article>
+          <article>
+            <p class="chip">Local credential reference</p>
+            <h3>JMAP, IMAP/SMTP, and CalDAV</h3>
+            <p>
+              An OS-keyring entry or approved absolute helper is resolved only for the selected
+              account and encrypted endpoint.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section aria-labelledby="data-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Private data remains data</p>
+          <h2 id="data-title">An email can never grant itself authority.</h2>
+          <p>
+            Messages, attachments, calendar fields, imports, links, and monitor queue values are
+            private, attacker-controlled input—not instructions to an agent or permission to
+            execute.
+          </p>
+        </div>
+        <div class="control-grid">
+          <article>
+            <h3>Metadata first</h3>
+            <p>
+              Lists omit bodies and file bytes. Sensitive reads are explicit, bounded operations
+              with optional preview policy.
+            </p>
+          </article>
+          <article>
+            <h3>Read-only import staging</h3>
+            <p>
+              One approved local path can be scanned into account-local staging. No upload,
+              authentication, or source mutation is reachable.
+            </p>
+          </article>
+          <article>
+            <h3>Opt-in monitoring</h3>
+            <p>
+              Move deliberately from off to notification, queue, and then one approved no-shell
+              runner. Remote egress is separate.
+            </p>
+          </article>
+          <article>
+            <h3>Reviewable feedback</h3>
+            <p>
+              <code>corr feedback</code> builds an allowlisted report locally and displays it before
+              any copy, save, or browser action. It never submits automatically.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="absent-panel" aria-labelledby="absent-title">
+        <div>
+          <p class="eyebrow light"><span aria-hidden="true"></span>Deliberately absent</p>
+          <h2 id="absent-title">Corresync does not widen your account authority.</h2>
+        </div>
+        <ul>
+          <li>No hosted relay, remote MCP gateway, or telemetry pipeline</li>
+          <li>No password prompt, unattended login, token field, or TLS interception</li>
+          <li>
+            No tenant-wide access, administrator capability probe, or automatic Graph authorization
+          </li>
+          <li>No generic provider property or arbitrary action escape hatch</li>
+          <li>No Teams chat, channels, calls, recordings, or meeting lifecycle management</li>
+          <li>No automatic retry after an ambiguous write</li>
+        </ul>
+      </section>
+
+      <section class="evidence-explainer" aria-labelledby="evidence-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>Claims follow evidence</p>
+          <h2 id="evidence-title">Synthetic coverage is not a live-provider promise.</h2>
+        </div>
+        <div>
+          <p>
+            v0.8 routes are implemented against synthetic provider contracts. They remain <strong
+            >live-unobserved</strong> until an authorized, content-free observation names the exact
+            Corresync commit, provider route, platform, and outcome.
+          </p>
+          <p>
+            A missing observation is never reported as a pass. Default tests and CI never activate a
+            live mailbox or calendar.
+          </p>
+          <a href="https://github.com/nkiyohara/corresync/blob/main/docs/compatibility.md">Review
+            compatibility evidence<span aria-hidden="true"> →</span></a>
+        </div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="safety-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>Inspect the boundary</p>
+        <h2 id="safety-cta-title">The design is documented. The checks are executable.</h2>
+        <p>
+          Read the threat model, architecture, and security policy before connecting a sensitive
+          account.
+        </p>
+        <div class="actions centered">
+          <a
+            class="button primary"
+            href="https://github.com/nkiyohara/corresync/blob/main/docs/threat-model.md"
+          >Read the threat model</a>
+          <a
+            class="button secondary"
+            href="https://github.com/nkiyohara/corresync/blob/main/docs/architecture.md"
+          >Explore the architecture</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <p>
+        Independent local-first mail and calendar tooling. Not affiliated with or endorsed by
+        Google, Microsoft, or any provider named here.
+      </p>
+      <nav aria-label="Footer">
+        <a href="./">Home</a>
+        <a href="providers.html">Providers</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security</a>
+        <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

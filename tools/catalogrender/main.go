@@ -211,19 +211,21 @@ func renderFormula(release metadata, hashes map[string]string) (string, error) {
       -X github.com/nkiyohara/corresync/internal/buildinfo.buildDate=%s
     ]
     system "go", "build", "-mod=vendor",
-           *std_go_args(output: bin/"corresync", ldflags: ldflags.join(" ")),
-           "./cmd/corresync"
+           *std_go_args(output: bin/"corr", ldflags: ldflags.join(" ")),
+           "./cmd/corr"
+    bin.install_symlink "corr" => "corresync"
 
-    man1.install "manpages/corresync.1"
-    bash_completion.install "completions/corresync.bash" => "corresync"
-    zsh_completion.install "completions/_corresync"
-    fish_completion.install "completions/corresync.fish"
+    man1.install "manpages/corr.1"
+    bash_completion.install "completions/corr.bash" => "corr"
+    zsh_completion.install "completions/_corr"
+    fish_completion.install "completions/corr.fish"
     pkgshare.install "plugins"
     (pkgshare/".agents").install ".agents/plugins"
     (pkgshare/".claude-plugin").install ".claude-plugin/marketplace.json"
   end
 
   test do
+    assert_match version.to_s, shell_output("#{bin}/corr version --json")
     assert_match version.to_s, shell_output("#{bin}/corresync version --json")
   end
 end
@@ -254,7 +256,7 @@ func renderScoop(release metadata, hashes map[string]string) ([]byte, error) {
 		}
 		manifest.Architecture[scoopArch] = scoopArchitecture{
 			URL:  fmt.Sprintf("%s/releases/download/%s/%s", repositoryURL, release.Tag, name),
-			Bin:  []string{"corresync.exe"},
+			Bin:  []string{"corr.exe", "corresync.exe"},
 			Hash: hash,
 		}
 		manifest.Autoupdate.Architecture[scoopArch] = scoopAutoupdateArchitecture{
@@ -292,6 +294,8 @@ func renderWinget(release metadata, hashes map[string]string) (map[string]string
 		_, _ = fmt.Fprintf(&installerEntries, `  - Architecture: %s
     NestedInstallerType: portable
     NestedInstallerFiles:
+      - RelativeFilePath: corr.exe
+        PortableCommandAlias: corr
       - RelativeFilePath: corresync.exe
         PortableCommandAlias: corresync
     InstallerUrl: %s/releases/download/%s/%s
@@ -322,9 +326,9 @@ PackageName: Corresync
 PackageUrl: %s
 License: Apache-2.0
 LicenseUrl: %s/blob/main/LICENSE
-ShortDescription: Local-first Outlook Web CLI and MCP server
-Description: Manage an authorized Outlook Web mail and calendar session through a guarded CLI or local MCP server without a Microsoft Graph application.
-Moniker: corresync
+ShortDescription: Local-first guarded mail and calendar CLI and MCP server
+Description: Manage explicitly authorized mail and calendar accounts through a guarded CLI or local MCP server.
+Moniker: corr
 Tags:
   - outlook
   - email
@@ -332,7 +336,7 @@ Tags:
   - cli
   - mcp
 ReleaseNotesUrl: %s/releases/tag/%s
-InstallationNotes: Run `+"`corresync auth login`"+` interactively, then register your agent with `+"`corresync mcp setup <client>`"+`. See the MCP guide for all supported clients.
+InstallationNotes: Run `+"`corr auth login`"+` interactively, then register your agent with `+"`corr mcp setup <client>`"+`. See the MCP guide for all supported clients.
 ManifestType: defaultLocale
 ManifestVersion: 1.12.0
 `, release.Version, repositoryURL, repositoryURL, repositoryURL, repositoryURL, release.Tag)

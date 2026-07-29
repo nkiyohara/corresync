@@ -18,25 +18,27 @@ const CalendarMeetingUpdateModeProviderDefault = "provider_default"
 // CalendarUpdateInput applies a closed patch to one exact event version.
 // Nil fields remain unchanged; an empty pointed-to string clears that field.
 type CalendarUpdateInput struct {
-	Account           domain.AccountID  `json:"account"`
-	EventID           string            `json:"eventId"`
-	ChangeKey         string            `json:"changeKey"`
-	Subject           *string           `json:"subject,omitempty"`
-	Body              *string           `json:"body,omitempty"`
-	Start             *string           `json:"start,omitempty"`
-	End               *string           `json:"end,omitempty"`
-	TimeZone          *string           `json:"timeZone,omitempty"`
-	Location          *string           `json:"location,omitempty"`
-	AllDay            *bool             `json:"allDay,omitempty"`
-	Reminder          *CalendarReminder `json:"reminder,omitempty"`
-	ReplaceAttendees  bool              `json:"replaceAttendees,omitempty"`
-	RequiredAttendees []string          `json:"requiredAttendees,omitempty"`
-	OptionalAttendees []string          `json:"optionalAttendees,omitempty"`
+	Account           domain.AccountID    `json:"account"`
+	EventID           string              `json:"eventId"`
+	ChangeKey         string              `json:"changeKey"`
+	Subject           *string             `json:"subject,omitempty"`
+	Body              *string             `json:"body,omitempty"`
+	Start             *string             `json:"start,omitempty"`
+	End               *string             `json:"end,omitempty"`
+	TimeZone          *string             `json:"timeZone,omitempty"`
+	Location          *string             `json:"location,omitempty"`
+	AllDay            *bool               `json:"allDay,omitempty"`
+	Reminder          *CalendarReminder   `json:"reminder,omitempty"`
+	ReplaceRecurrence bool                `json:"replaceRecurrence,omitempty"`
+	Recurrence        *CalendarRecurrence `json:"recurrence,omitempty"`
+	ReplaceAttendees  bool                `json:"replaceAttendees,omitempty"`
+	RequiredAttendees []string            `json:"requiredAttendees,omitempty"`
+	OptionalAttendees []string            `json:"optionalAttendees,omitempty"`
 }
 
 // CalendarUpdateReview displays the exact patch without exposing an unbounded
-// body. MeetingUpdateMode records that attendee notification behavior remains
-// under OWA's default calendar policy.
+// body. MeetingUpdateMode records how the selected provider controls attendee
+// notification behavior.
 type CalendarUpdateReview struct {
 	EventID                string              `json:"eventId"`
 	ChangeKey              string              `json:"changeKey"`
@@ -48,6 +50,8 @@ type CalendarUpdateReview struct {
 	Location               *string             `json:"location,omitempty"`
 	AllDay                 *bool               `json:"allDay,omitempty"`
 	Reminder               *CalendarReminder   `json:"reminder,omitempty"`
+	ReplaceRecurrence      bool                `json:"replaceRecurrence"`
+	Recurrence             *CalendarRecurrence `json:"recurrence,omitempty"`
 	ReplaceAttendees       bool                `json:"replaceAttendees"`
 	RequiredAttendees      []string            `json:"requiredAttendees,omitempty"`
 	OptionalAttendees      []string            `json:"optionalAttendees,omitempty"`
@@ -55,7 +59,8 @@ type CalendarUpdateReview struct {
 	MeetingUpdateMode      string              `json:"meetingUpdateMode"`
 }
 
-// CalendarUpdateResult contains a refreshed identity when OWA returns one.
+// CalendarUpdateResult contains a refreshed identity when the provider returns
+// one.
 type CalendarUpdateResult struct {
 	ID         string            `json:"id,omitempty"`
 	ChangeKey  string            `json:"changeKey,omitempty"`
@@ -70,7 +75,7 @@ type CalendarUpdateAccess struct {
 	Preview *approval.Preview     `json:"preview,omitempty"`
 }
 
-// CalendarUpdater is the narrow OWA port for the supported calendar fields.
+// CalendarUpdater is the narrow provider-neutral port for supported fields.
 type CalendarUpdater interface {
 	UpdateCalendarEvent(context.Context, CalendarUpdateInput) (CalendarUpdateResult, error)
 }
@@ -101,7 +106,8 @@ func (service *CalendarService) Update(
 	switch prepared.Decision.Verdict {
 	case policy.VerdictPreview:
 		return CalendarUpdateAccess{
-			Status: "approval_required", Review: input.Review(), Preview: prepared.Preview,
+			Status: "approval_required",
+			Review: input.reviewWithEffects(service.effects), Preview: prepared.Preview,
 		}, nil
 	case policy.VerdictDeny:
 		return CalendarUpdateAccess{}, errors.New("calendar update operation was denied")
@@ -136,7 +142,8 @@ func (service *CalendarService) CommitUpdate(
 		return CalendarUpdateAccess{}, err
 	}
 	return CalendarUpdateAccess{
-		Status: "updated", Updated: &updated, Review: input.Review(),
+		Status: "updated", Updated: &updated,
+		Review: input.reviewWithEffects(service.effects),
 	}, nil
 }
 
@@ -187,7 +194,8 @@ func (input CalendarUpdateInput) ValidateWithAttendeeLimit(maxAttendees int) err
 	}
 	if input.Subject == nil && input.Body == nil && input.Start == nil &&
 		input.End == nil && input.TimeZone == nil && input.Location == nil &&
-		input.AllDay == nil && input.Reminder == nil && !input.ReplaceAttendees {
+		input.AllDay == nil && input.Reminder == nil &&
+		!input.ReplaceRecurrence && !input.ReplaceAttendees {
 		return errors.New("calendar update must change at least one supported field")
 	}
 	if input.Subject != nil && (!utf8.ValidString(*input.Subject) ||
@@ -251,6 +259,28 @@ func (input CalendarUpdateInput) ValidateWithAttendeeLimit(maxAttendees int) err
 			return errors.New("disabled calendar reminder must use zero minutes")
 		}
 	}
+	if input.Recurrence != nil && !input.ReplaceRecurrence {
+		return errors.New(
+			"calendar recurrence requires replaceRecurrence=true",
+		)
+	}
+	if input.ReplaceRecurrence && input.Recurrence != nil {
+		if input.Start == nil {
+			return errors.New(
+				"calendar recurrence replacement requires start and end",
+			)
+		}
+		start, _ := time.Parse(time.RFC3339, *input.Start)
+		zone := ""
+		if input.TimeZone != nil {
+			zone = *input.TimeZone
+		}
+		if err := input.Recurrence.Validate(
+			calendarBoundaryForTimeZone(start, zone),
+		); err != nil {
+			return err
+		}
+	}
 	if !input.ReplaceAttendees && (len(input.RequiredAttendees) != 0 || len(input.OptionalAttendees) != 0) {
 		return errors.New("calendar attendee lists require replaceAttendees=true")
 	}
@@ -276,15 +306,27 @@ func (input CalendarUpdateInput) ValidateWithAttendeeLimit(maxAttendees int) err
 
 // Review returns an immutable bounded representation of the exact patch.
 func (input CalendarUpdateInput) Review() CalendarUpdateReview {
+	return input.reviewWithEffects(CalendarEffects{
+		UpdateAttendeeNotifications: true,
+		CancellationMode:            CalendarCancellationProviderManaged,
+		CancellationDisposition:     CalendarDispositionRemoteDelete,
+	})
+}
+
+func (input CalendarUpdateInput) reviewWithEffects(
+	effects CalendarEffects,
+) CalendarUpdateReview {
 	review := CalendarUpdateReview{
 		EventID: input.EventID, ChangeKey: input.ChangeKey,
 		Subject: cloneString(input.Subject), Start: cloneString(input.Start),
 		End: cloneString(input.End), TimeZone: cloneString(input.TimeZone), Location: cloneString(input.Location),
 		AllDay: cloneBool(input.AllDay), Reminder: cloneCalendarReminder(input.Reminder),
+		ReplaceRecurrence:      input.ReplaceRecurrence,
+		Recurrence:             cloneCalendarRecurrence(input.Recurrence),
 		ReplaceAttendees:       input.ReplaceAttendees,
 		RequiredAttendees:      append([]string(nil), input.RequiredAttendees...),
 		OptionalAttendees:      append([]string(nil), input.OptionalAttendees...),
-		AttendeeUpdatesMaySend: input.ReplaceAttendees,
+		AttendeeUpdatesMaySend: effects.UpdateAttendeeNotifications,
 		MeetingUpdateMode:      CalendarMeetingUpdateModeProviderDefault,
 	}
 	if input.Body != nil {

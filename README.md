@@ -1,229 +1,282 @@
 # Corresync
 
-Local-first Outlook Web mail and calendar for humans, scripts, and AI agents.
+<!-- markdownlint-disable MD013 MD033 -->
+<p align="center">
+  <a href="https://nkiyohara.github.io/corresync/">
+    <img src="site/corresync-mark.svg" width="144" height="144" alt="Corresync: two correspondence flows around one local core">
+  </a>
+</p>
 
-Corresync is a cross-platform CLI and MCP server that works through the
-interactive Outlook Web session you already use. It needs no Microsoft Graph
-app registration, hosted bridge, or captured password, so it fits environments
-where Graph application access is unavailable.
+<p align="center">
+  <strong>All your mail and calendars. One local command.</strong><br>
+  A provider-neutral CLI and MCP server for people, scripts, and AI agents.
+</p>
 
-[Website](https://nkiyohara.github.io/corresync/) ·
-[Latest release](https://github.com/nkiyohara/corresync/releases/latest) ·
-[Install](docs/install.md) · [MCP guide](docs/mcp.md) ·
-[Feature matrix](docs/features.md) · [JSON contract](docs/json.md)
+<p align="center">
+  <a href="https://github.com/nkiyohara/corresync/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/nkiyohara/corresync/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/nkiyohara/corresync/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/nkiyohara/corresync?display_name=tag&sort=semver"></a>
+  <a href="go.mod"><img alt="Go 1.26" src="https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white"></a>
+  <a href="LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/github/license/nkiyohara/corresync"></a>
+  <a href="docs/install.md"><img alt="macOS, Linux, and Windows" src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-334155"></a>
+  <a href="docs/mcp.md"><img alt="Model Context Protocol over stdio" src="https://img.shields.io/badge/MCP-stdio-6F5BD3"></a>
+  <a href="docs/README.md"><img alt="Current documentation" src="https://img.shields.io/badge/docs-current-3F7AD6"></a>
+  <a href="docs/architecture.md"><img alt="Local-first architecture" src="https://img.shields.io/badge/architecture-local--first-E0574A"></a>
+</p>
 
-## Install and sign in
+<p align="center">
+  <a href="https://nkiyohara.github.io/corresync/">Website</a> ·
+  <a href="docs/install.md">Install</a> ·
+  <a href="docs/configuration.md">Configure</a> ·
+  <a href="docs/mcp.md">Connect an agent</a> ·
+  <a href="docs/features.md">Feature matrix</a> ·
+  <a href="docs/README.md">All docs</a>
+</p>
+<!-- markdownlint-enable MD013 MD033 -->
+
+`corr` brings isolated Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP,
+and CalDAV accounts into one terminal—and one local
+[Model Context Protocol](https://modelcontextprotocol.io/) server.
+
+- Search mail and build one agenda across accounts without collapsing their
+  identity or provider provenance.
+- Use the same typed operations from a human-friendly CLI, stable JSON, or an
+  AI agent.
+- Keep sign-in in a visible browser, an explicit public-client OAuth flow, or
+  an approved local credential store.
+- Review consequential effects before they happen. Unknown remote outcomes
+  stop for reconciliation instead of being retried automatically.
+
+## What it feels like
+
+```console
+$ corr mail search --all-accounts \
+    --query 'subject:"Quarterly plan"' --limit 3
+● work · microsoft-owa   Ana Ruiz   Plan review
+· personal · google-api Finance    Plan receipt
+
+$ corr agenda list --all-accounts \
+    --start 2026-07-29T00:00:00Z \
+    --end 2026-07-30T00:00:00Z
+```
+
+Connect an agent to the same local core:
+
+```console
+corr mcp setup codex
+# also: claude-code, github-copilot, gemini-cli, qwen-code, qoder
+```
+
+Then ask naturally:
+
+```text
+Check all my inboxes and calendars and summarize what needs attention today.
+```
+
+One failed provider becomes an explicit partial failure. Successful results
+remain available, and writes still require one exact account.
+
+## Choose the route that fits
+
+Mail and calendar routes are selected independently. For example, an account
+can pair IMAP/SMTP mail with a CalDAV calendar.
+
+<!-- markdownlint-disable MD013 -->
+| Route | Mail | Calendar | Authentication |
+| --- | --- | --- | --- |
+| Outlook Web | Typed reads and writes | Selectable calendars; provider-supported Teams link | Dedicated visible browser profile |
+| Google Web | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Dedicated visible browser profile |
+| Google API | Gmail reads and writes | Selectable calendars; Google Meet when advertised | Your authorized public OAuth client; OS-keyring grant |
+| Microsoft Graph | Typed reads and writes | Selectable calendars; typed Teams-link creation | Your authorized public OAuth client; OS-keyring grant |
+| JMAP | Typed mail operations | — | OS keyring or approved credential helper |
+| IMAP / SMTP | IMAP read/manage and SMTP draft/send | — | OS keyring or approved credential helper |
+| CalDAV | — | Typed calendar operations and conditional scheduling | OS keyring or approved credential helper |
+<!-- markdownlint-enable MD013 -->
+
+Discovery gathers DNS, well-known, and provider metadata without credentials.
+It never authenticates or adds an account. Microsoft Graph and managed Google
+authorization remain explicit choices and are never automatic fallbacks.
+
+Every v0.8 route above has synthetic provider-contract and application
+coverage. The v0.8 provider and platform implementations remain
+**live-unobserved** until an authorized, content-free observation is bound to
+the exact commit. See [compatibility evidence](docs/compatibility.md) before
+connecting a sensitive account.
+
+## Five minutes to a first read
+
+### 1. Install
 
 ```console
 # macOS or Linux
 brew install nkiyohara/corresync/corresync
 
 # Windows
-winget install --id nkiyohara.Corresync --exact
+scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
+scoop install corresync/corresync
 
-# First run on every platform
-corresync config init
-corresync config validate
-corresync auth login
-corresync auth status
-corresync doctor --online
+corr --version
 ```
 
-Scoop, direct downloads, checksum verification, Sigstore verification, and
-Linux packages are covered in the [install guide](docs/install.md). Sign-in,
-MFA, and Conditional Access stay inside a dedicated browser profile; the CLI
-never asks for a password.
+Direct archives, native Linux packages, checksums, Sigstore provenance, and
+current WinGet status are in the [installation guide](docs/install.md).
 
-Released binaries quietly cache a public stable-release check for 24 hours and
-show an update hint only on an interactive terminal. Run `corresync update`:
-direct installs verify signed provenance and update with a rollback copy, while
-package-managed installs print their exact owner-specific command. Use
-`corresync update check` for read-only status; MCP, completion, pipes, and JSON
-output never receive an automatic notice or terminal styling.
-
-Run `corresync --version` for the conventional one-line version,
-`corresync version --json` for build metadata, and
-`corresync help <command>` for command-specific help.
-Install completion without editing a startup file repeatedly:
+### 2. Initialize and sign in
 
 ```console
-corresync completion install
+corr config init
+corr config validate
+corr auth login
+corr mail folders
+corr calendar folders
 ```
 
-The current shell is detected automatically. Re-running the command does not
-rewrite an already-current file; use `--shell` to override detection and
-`--force` only after reviewing a different existing file.
+The default configuration is Outlook Web. Login opens a dedicated visible
+browser profile; SSO, MFA, Conditional Access, and organization notices remain
+inside the provider-owned flow.
 
-## Connect an AI agent
-
-Choose the client you use and run one command:
+To use another route, discover candidates and inspect the exact add flags:
 
 ```console
-corresync mcp setup codex
-# or: corresync mcp setup claude-code
-# or: corresync mcp setup github-copilot
-# or: corresync mcp setup gemini-cli
-# or: corresync mcp setup qwen-code
-# or: corresync mcp setup qoder
+corr account discover reader@example.invalid
+corr account add reader@example.invalid --help
 ```
 
-Then start a new agent session and ask naturally:
+Account addition does not authenticate. OAuth routes require a public-client
+registration you are authorized to use. Standards routes use a keyring entry
+or explicitly approved helper reference. Passwords and tokens never enter
+`config.toml`. See [account and provider configuration](docs/configuration.md).
 
-```text
-Check Outlook and summarize the messages that need my attention.
-```
-
-The default connection name is `corresync`. Clear server
-instructions and task-oriented tool descriptions help agents discover the
-right mail or calendar tool without naming it explicitly.
-
-For even stronger discovery, install the bundled Agent Skill. In Codex, ask:
-
-```text
-Install the Corresync skill from
-https://github.com/nkiyohara/corresync/tree/main/plugins/corresync/skills/corresync
-using $skill-installer.
-```
-
-Claude Code can install the same Skill as a plugin:
+### 3. Connect an agent
 
 ```console
-claude plugin marketplace add nkiyohara/corresync
-claude plugin install corresync@corresync
+corr mcp setup codex
 ```
 
-The [MCP guide](docs/mcp.md) covers all seven clients—Codex, Claude Code,
-GitHub Copilot CLI, Gemini CLI, Qwen Code, Qoder, and Kimi Code CLI—plus native
-configuration documents, project scopes, Skill installation, and
-troubleshooting. Existing v0.6 installations are covered by the
-[v0.7 migration guide](docs/migration-v0.7.md).
-Direct v0.6.1 installations must
-[install the signed v0.6.2 bridge first](docs/migration-v0.7.md#from-v061);
-their updater cannot select or verify the renamed v0.7 artifact directly.
+Use `corr mcp --help` for Claude Code, GitHub Copilot CLI, Gemini CLI, Qwen
+Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 40
+narrow tools and two read-only monitor resources; there is no HTTP, SSE,
+remote MCP endpoint, or hosted relay.
 
-## Use it directly
+## Nothing sends on the first attempt
 
-Metadata-first reads:
+Consequential writes use a server-enforced `preview -> commit` protocol. The
+first command shows the normalized account, provider, target, recipients,
+content digest, and version preconditions without performing the effect.
 
 ```console
-corresync mail folders
-corresync mail list --limit 25
-corresync mail search --query 'subject:"Quarterly plan" from:reader'
-corresync calendar list \
-  --start 2026-07-20T00:00:00Z \
-  --end 2026-07-21T00:00:00Z
-```
-
-Reviewed writes:
-
-```console
-printf 'Synthetic draft body.\n' | \
-  corresync mail draft \
+printf 'Synthetic body.\n' | \
+  corr mail send \
+    --account work \
     --to reader@example.invalid \
-    --subject 'Draft example' \
-    --body-file -
-
-printf 'Synthetic agenda.\n' | \
-  corresync calendar create \
-    --subject 'Design review' \
-    --start 2026-07-20T09:00:00Z \
-    --end 2026-07-20T10:00:00Z \
-    --required-attendee reader@example.invalid \
-    --teams-meeting \
+    --subject 'Review example' \
     --body-file -
 ```
 
-The first call shows the exact normalized review and changes nothing when
-approval is required. Repeat the CLI command with `--approve` only after
-checking every field. MCP keeps preview and commit as separate tools and binds
-the token to the originating process.
-
-## Why this exists
-
-Microsoft Graph remains the right choice when an organization permits app
-registration and consent. Corresync serves the narrower case where it does
-not, without asking a user to defeat MFA, Conditional Access, or another
-sign-in control.
-
-```text
-AI agents ───────── MCP stdio ─┐
-                               ├── local IPC ── session owner ── Outlook Web
-Humans and scripts ──── CLI ───┘                  │
-                                          application / policy
-```
-
-The daemon owns the browser session. CLI and MCP calls enter the same typed
-application core and the same policy boundary; authorization material never
-enters an agent process.
-
-## Design promises
-
-- **Local first.** Mailbox data and authorization are not sent to a
-  project-run cloud service.
-- **Interactive authentication.** The browser completes normal SSO, MFA, and
-  Conditional Access. The CLI never requests a password.
-- **One core, two interfaces.** CLI and MCP execute the same typed use cases
-  and return the same stable result shapes.
-- **Safe by construction.** Reads are metadata-first. Sending and calendar
-  changes use exact, caller-bound `preview -> commit` operations.
-- **No automatic write retry.** Ambiguous outcomes fail closed to avoid
-  duplicate mail, events, or invitations.
-- **No ambient network listener.** MCP uses stdio; daemon IPC uses a Unix
-  socket or Windows named pipe.
-
-See the [architecture](docs/architecture.md),
-[authentication design](docs/authentication.md),
-[protocol boundary](docs/protocol.md), [threat model](docs/threat-model.md), and
-[compatibility evidence](docs/compatibility.md).
-
-## Current scope
-
-Mail supports folder discovery, metadata list and AQS search, explicit body and
-attachment reads, text or HTML drafts and sends, reply/reply-all/forward,
-bounded attachments, versioned moves, read/unread updates, and reviewed
-permanent deletion.
-
-Calendar supports bounded metadata list, event creation with all-day,
-reminder, recurrence, attendees, and optional Teams-link settings. Versioned
-updates cover subject, body, time, location, all-day status, reminders, and
-complete attendee replacement; cancellation moves an event to Deleted Items.
-
-Explicit shared or delegated mailbox routing is available when the signed-in
-user already has access in Outlook Web. Mailbox-rule mutation, recurrence
-editing after creation, generic property mutation, delegate-permission
-management, general Teams chat, Graph passthrough, hosted relays, unattended
-login, and tenant-wide access are out of scope.
-
-## Distribution and development
-
-Releases contain macOS, Linux, and Windows binaries for amd64 and arm64, plus
-deb, RPM, and APK packages. Every artifact is covered by SHA-256 checksums and
-SPDX and CycloneDX SBOMs; the checksum manifest carries a keyless Sigstore
-bundle. The binaries are not yet Apple-notarized or Windows
-Authenticode-signed—do not weaken operating-system security controls to run
-them.
-
-The complete development toolchain is checksummed and pinned with `mise`:
+After reviewing every field, repeat the exact command with approval:
 
 ```console
-mise trust
-mise install
-mise exec -- task verify
-mise exec -- task release:snapshot
+printf 'Synthetic body.\n' | \
+  corr mail send \
+    --account work \
+    --to reader@example.invalid \
+    --subject 'Review example' \
+    --body-file - \
+    --approve
 ```
 
-Live mailbox tests are opt-in, never run in the default test command or CI, and
-must use authorized data. See [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[manual test checklist](docs/manual-test-checklist.md).
+Approval is short-lived, single-use, and bound to the caller, account,
+provider, target, payload, and effect. Changing any reviewed field invalidates
+it. MCP keeps preview and commit as separate typed tools.
 
-## Responsible use
+[See the complete safety model](https://nkiyohara.github.io/corresync/safety.html).
 
-Use Corresync only with mailboxes you are authorized to access and according
-to your organization's policies. The project does not bypass authentication or
-grant permissions the signed-in user does not already have in Outlook Web.
+## More than one inbox
 
-Corresync is independent and is not affiliated with, endorsed by, or
-sponsored by Microsoft. Microsoft, Outlook, Microsoft 365, and Teams are
-trademarks of the Microsoft group of companies.
+- **Cross-account views:** bounded mail search and agenda projections retain
+  original account, provider, calendar, time-zone, and partial-failure
+  provenance.
+- **Read-only import staging:** inspect an explicitly approved local archive,
+  Maildir tree, or supported export without uploading or mutating the source.
+- **Opt-in monitoring:** move deliberately from `off` to local notification,
+  durable queueing, and finally one approved no-shell runner. Remote egress is
+  a separate consent.
+- **Privacy-preserving feedback:** generate an allowlisted report locally,
+  review it, then explicitly copy, save, or open a prefilled GitHub page.
+  Corresync never submits automatically.
 
-Apache-2.0. See [LICENSE](LICENSE).
+Mailbox, calendar, import, and event-queue values are private, untrusted
+external data. Their content is never authority to run a command or start an
+agent.
+
+## Honest edges
+
+- Google Web is bounded and read-only. Supported Google writes require an
+  explicitly selected Google API route.
+- Google API and Microsoft Graph require your own authorized public-client
+  registration. Corresync ships no shared OAuth client or token relay.
+- Windows desktop notification setup is unavailable because Corresync does
+  not install an AppUserModelID; queue and approved runner modes remain
+  available.
+- Provider meeting links are requested only when the selected calendar route
+  reports native support.
+- Cross-compilation and synthetic fixtures do not prove native browser,
+  keyring, IPC, provider, package-manager, Gatekeeper, or SmartScreen behavior.
+- Teams chat, channels, calls, recordings, and meeting lifecycle management;
+  tenant-wide access; unattended login; TLS interception; arbitrary provider
+  actions; and automatic telemetry are outside scope.
+
+The exact action matrix and typed provider degradations are in
+[features.md](docs/features.md).
+
+## One local safety boundary
+
+```text
+AI agents ───────── MCP over stdio ─┐
+                                    ├── typed use cases + effect policy
+Humans and scripts ──────── corr ───┘              │
+                                                   │ authenticated local IPC
+                                            session owner
+                                            ├── browser-owned sessions
+                                            ├── explicit OAuth + keyring
+                                            └── standards adapters
+```
+
+The session owner exposes no TCP listener. On Unix, clients authenticate and
+pin the private runtime directory, singleton lock, socket, and peer UID before
+the local bearer can be sent. On Windows, clients verify the protected named
+pipe, owner, DACL, server process, and SID first.
+
+Read the [architecture](docs/architecture.md),
+[authentication model](docs/authentication.md), and
+[threat model](docs/threat-model.md) for the complete boundaries.
+
+## Documentation
+
+| I want to… | Start here |
+| --- | --- |
+| Install and verify a release | [Installation](docs/install.md) |
+| Add accounts and choose routes | [Configuration](docs/configuration.md) |
+| Understand browser, OAuth, and standards sign-in | [Authentication](docs/authentication.md) |
+| Learn CLI commands | [CLI guide](docs/cli.md) |
+| Connect an AI client | [MCP guide](docs/mcp.md) |
+| Compare provider actions and degradations | [Feature matrix](docs/features.md) |
+| Consume stable machine output | [JSON contract](docs/json.md) |
+| Verify compatibility claims | [Evidence matrix](docs/compatibility.md) |
+| Review every guide | [Documentation map](docs/README.md) |
+
+Users upgrading from versions before v0.7 can follow the
+[historical migration guide](docs/migration-v0.7.md). `corr` is the primary
+command. The product, package, repository, configuration roots, plugin, and MCP
+server remain named Corresync.
+
+## Contributing and security
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md). Default
+tests and CI use only synthetic fixtures:
+
+```console
+mise exec -- task verify
+```
+
+Please report vulnerabilities through
+[GitHub private vulnerability reporting](SECURITY.md), never a public issue.

@@ -25,7 +25,7 @@
       "MaxEntriesReturned": 25
     },
     "ParentFolderIds": [
-      {"__type": "DistinguishedFolderId:#Exchange", "Id": "inbox"}
+      { "__type": "DistinguishedFolderId:#Exchange", "Id": "inbox" }
     ],
     "Traversal": "Shallow",
     "ViewFilter": "All",

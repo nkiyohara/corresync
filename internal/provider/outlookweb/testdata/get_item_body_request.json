@@ -18,14 +18,14 @@
       "BaseShape": "IdOnly",
       "BodyType": "Text",
       "AdditionalProperties": [
-          {
-            "__type": "PropertyUri:#Exchange",
-            "FieldURI": "item:Body"
-          },
-          {
-            "__type": "PropertyUri:#Exchange",
-            "FieldURI": "item:Attachments"
-          }
+        {
+          "__type": "PropertyUri:#Exchange",
+          "FieldURI": "item:Body"
+        },
+        {
+          "__type": "PropertyUri:#Exchange",
+          "FieldURI": "item:Attachments"
+        }
       ]
     },
     "ItemIds": [

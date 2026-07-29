@@ -1,145 +1,197 @@
-# Outlook Web protocol boundary
+# Provider protocol boundary
 
-Outlook Web's internal service is undocumented and can change without notice.
-`Corresync` treats it as a replaceable transport adapter, not as part of the
-domain or public CLI/MCP contract.
+Corresync presents one typed mail/calendar model while preserving the
+capabilities, degradations, and provenance of each configured provider route.
+Provider protocols are replaceable outer adapters; none of their wire formats
+is part of the public CLI, MCP, domain, or stable JSON contract.
 
-## HTTP invariants
+## Shared transport rules
 
-- Every request targets one configured HTTPS origin and
-  `/owa/service.svc?action=<registered-action>`.
-- The browser session authorizes the final request only after an exact-origin
-  check.
-- Redirects are never followed. This prevents authorization from crossing an
-  origin boundary and makes unexpected login redirects explicit.
-- Request and response bodies are bounded before decoding.
-- Error values contain HTTP status and a sanitized request ID, never a response
-  body or authorization material.
-- HTTP 401, 403, and OWA's 440 login timeout become a stable
-  `session expired` error.
-- Only read and sensitive-read actions can retry. Writes make exactly one
-  network attempt because a remote service may have committed before returning
-  an error.
-- A write transport failure after submission, or a malformed success response
-  whose postcondition cannot be established, becomes a stable unknown-outcome
-  error and content-free audit event. Callers are told to inspect remote state,
-  not to retry automatically.
-- `Retry-After` is honored for retryable reads and capped at 30 seconds.
+Every provider adapter must:
 
-## Closed action registry
+- connect only to the explicitly selected HTTPS/TLS endpoint or provider API;
+- reject redirects that could carry authorization across an origin boundary;
+- bound request, response, collection, body, and attachment sizes;
+- return typed results with account and provider provenance;
+- declare reviewed attendee-notification and cancellation-disposition
+  semantics when constructing a calendar service;
+- map authentication expiry, throttling, conflicts, and unsupported behavior
+  into stable application errors and capability degradations;
+- keep response bodies, authorization material, private queries, addresses,
+  and provider request IDs out of ordinary errors and audit records;
+- make at most one network attempt for a consequential write;
+- report an unknown outcome when a remote commit cannot be established; and
+- expose only closed typed operations, never raw actions, URLs, headers,
+  methods, MIME parts, Graph properties, JMAP method calls, or WebDAV bodies.
 
-Protocol actions are an immutable enum compiled into the OWA package. There is
-no parser from arbitrary strings and no raw-action tool. Each action carries a
-conservative risk classification used to decide whether transport retries are
-safe:
+Discovery is a separate unauthenticated boundary. DNS and well-known metadata
+may suggest ranked routes, but discovery cannot read credentials, start OAuth,
+launch a login, create an account, or choose a provider silently.
 
-- Read: `FindFolder`, `FindItem`, `GetCalendarView`, and
-  `GetUserAvailabilityInternal`.
-- Sensitive read: `GetItem` and `GetAttachment`.
-- Reversible write: `MoveItem`.
-- External write: `CreateItem`, `CreateAttachment`, `SendItem`,
-  `CreateCalendarEvent`, `UpdateItem`, and `UpdateCalendarEvent`.
-- Destructive write: `DeleteItem`.
+## Shared application operations
 
-Adding an action requires a typed request/response contract, synthetic fixture,
-effect review, and explicit application use case. Registering an action alone
-does not expose it through CLI or MCP.
+The closed application surface covers:
 
-The application classifies the more specific typed use case independently. For
-example, a save-only `CreateItem` draft is a reversible write for policy, while
-the broader protocol action remains an external write for retry purposes. This
-deliberate asymmetry prevents an ambiguous network failure from creating a
-duplicate draft.
+- bounded folder discovery, mail list/search, explicit body and attachment
+  reads;
+- save-only drafts, reviewed send/reply/forward, move, read state, and reviewed
+  permanent deletion;
+- bounded selectable-calendar discovery and calendar list, reviewed
+  create/update/cancel, and provider-supported online-meeting creation;
+- isolated cross-account mail and agenda projections;
+- content-free session/capability status and local monitor/event state.
 
-## Implemented contracts
+Adding a protocol operation does not expose it automatically. It also needs a
+typed application port, normalized result, capability and effect review,
+synthetic contract coverage, CLI/MCP parity where appropriate, and
+documentation of any degradation.
 
-- `FindFolder` discovers a bounded shallow or deep page under the message
-  folder root, a supported distinguished parent, or one opaque parent ID. It
-  returns folder names, IDs, classes, and aggregate counts, but not rules,
-  permissions, delegates, or item content.
-- `FindItem` lists bounded message metadata from a distinguished or opaque
-  folder. Its OWA JSON contract uses `Paging` with an
-  `IndexedPageView:#Exchange` value (not the similarly named SOAP
-  `IndexedPageItemView` element) and sorts by received time descending so
-  pagination has an explicit order.
-- `FindItem` also performs a folder-scoped AQS search through a typed
-  `QueryStringType:#Exchange` value. The search uses the OWA mail-list shape,
-  waits for completion, has an independent 50-result page limit, and returns
-  the same body-free metadata schema as listing. Its per-request search-folder
-  identity is random; the private query is never written to audit data. The
-  CLI and MCP cannot supply an action name or arbitrary request fields.
-- `GetItem` reads a maximum 1 MiB plain-text body plus bounded file-attachment
-  metadata for one explicit message ID. HTML, bulk IDs, MIME, headers, and
-  attachment content are not requested. `GetAttachment` separately returns one
-  explicit file attachment up to 2 MiB; item attachments are not exposed.
-- `MoveItem` moves exactly one opaque item ID and change key to one typed
-  distinguished or discovered opaque destination under the selected account.
-  The response may contain one new item identity or omit it; multiple returned
-  items are rejected. The request has no bulk surface and is attempted once.
-  Any ambiguous HTTP or transport failure becomes an unknown outcome that
-  callers must reconcile by listing mailbox state.
-- `UpdateItem` changes only `IsRead` on one opaque item ID and change key. The
-  contract uses `NeverOverwrite`, `SaveOnly`, `SendToNone`, and suppressed read
-  receipts. It accepts no field URI, generic item shape, or batch from an
-  adapter. A response may omit its refreshed ID; multiple items are rejected.
-- `GetCalendarView` lists event metadata in a maximum 31-day absolute window.
-  The adapter normalizes request and response times to UTC, accepts both direct
-  `Body.Items` and response-message envelopes, and bounds the decoded event
-  count. Bodies, attendees, attachments, and join URLs are not exposed.
-- `CreateItem` creates exactly one text or HTML new-message, reply, reply-all,
-  or forward in the distinguished drafts folder with both disposition fields
-  set to `SaveOnly`. Response shapes bind an exact reference item ID and change
-  key. Recipients are bounded and validated as bare addresses. A bounded
-  `CreateAttachment` batch can then add file attachments and refresh the draft
-  change key. Neither write is retried.
-- `CreateItem` also sends a reviewed composition without attachments using
-  `SendAndSaveCopy`. Compositions with attachments use `SaveOnly`, one
-  `CreateAttachment` batch, then `SendItem` for the exact refreshed draft.
-  The application always requires an exact external-write preview and commit.
-  A successful response may omit the sent-copy ID; no write is retried and any
-  partial multi-step outcome is reported conservatively.
-- `CreateCalendarEvent` creates exactly one bounded calendar
-  item in the selected primary or opaque calendar. Its JSON body remains the
-  closed `CreateItemRequest:#Exchange` shape, while the specialized action is
-  required for online-meeting properties. RFC3339 inputs use UTC by default or
-  the reviewed Exchange/Windows time-zone context. The item uses plain text,
-  optional all-day boundaries, reminders, a closed daily/weekly/
-  absolute-monthly/absolute-yearly recurrence shape, bounded unique bare
-  attendee addresses, `Busy` free/busy state, and an enhanced plain-text
-  location. It selects `SendToAllAndSaveCopy` only when
-  attendees are present and `SendToNone` otherwise. A reviewed
-  `teamsMeeting=true` adds only `IsOnlineMeeting=true` and the closed
-  `TeamsForBusiness` provider; the single-event commit result may include the
-  returned join URL, while bulk calendar list never does. The application
-  always requires an exact external-write preview and commit, the response must
-  contain exactly one event ID, and submission is never retried.
-- `UpdateCalendarEvent` applies a fixed set of calendar `SetItemField` values to
-  one exact event ID and change key: subject, plain-text body, start plus end,
-  time-zone IDs, enhanced locations, all-day status, reminder, and complete
-  required/optional attendee replacement. The request
-  repeats the exact identity in `EventId` and `ItemChange.ItemId`, uses the
-  default event scope, and requires exactly one updated item in a successful
-  response. Empty strings are explicit clears; omitted fields remain unchanged.
-  Attendee notification follows OWA's calendar policy and may occur for meeting
-  changes. Recurrence editing, arbitrary field URIs, and batches are not
-  exposed.
-- `DeleteItem` cancels one exact event ID and change key with
-  `MoveToDeletedItems` and `SendToAllAndSaveCopy`. The application classifies it
-  as destructive and always requires a caller-bound preview/commit. A response
-  must contain exactly one successful result. The request is attempted once and
-  an ambiguous result must be reconciled against Calendar and Deleted Items.
-- `DeleteItem` also performs a separate reviewed `HardDelete` for one exact
-  message ID and change key. It suppresses receipts, never retries, and cannot
-  be mistaken for the reversible `MoveItem` flow.
+Lists remain metadata-first. Bodies, attachment bytes, attendee detail, and
+meeting links are exposed only by the narrow use case that needs them.
+Consequential operations use the server-enforced preview/commit protocol.
 
-Explicit shared/delegated mailbox aliases add bounded `X-AnchorMailbox` and
-`X-OWA-ExplicitLogonUser` headers only after browser authorization is applied.
-They do not alter the exact configured origin or grant mailbox permissions.
+## Outlook Web
+
+The undocumented Outlook Web service is isolated in
+`internal/provider/outlookweb`. Requests target the configured HTTPS origin and
+the closed `/owa/service.svc?action=<registered-action>` registry.
+
+The browser authorizes a request only after exact-origin validation. Redirects
+are not followed. HTTP 401, 403, and login timeout become `session expired`.
+Only reads may retry; `Retry-After` is bounded. OWA actions retain their
+synthetic `__type` metadata and are normalized behind typed contracts.
+
+The registry includes only the actions required for implemented folder, mail,
+attachment, calendar, and reviewed write operations. The typed `FindFolder`
+action also performs a bounded deep scan below the distinguished calendar,
+filters exact calendar folder classes, and reports effective read/write rights.
+Shared/delegated mailbox headers are added only for an explicitly configured
+route and never broaden the signed-in user's existing permissions.
+
+OWA can provision a Teams join URL as a provider-native calendar-event creation
+property. Teams chat, channels, calls, recordings, and meeting lifecycle
+management are not exposed.
+
+## Google API
+
+The Google adapter uses an explicitly selected public OAuth client and a grant
+held by the operating-system credential facility. It implements bounded Gmail
+and primary Google Calendar contracts. When the authenticated primary calendar
+advertises `hangoutsMeet`, a reviewed provider-native online-meeting request
+uses a unique conference request ID and returns only that event's Meet link.
+
+Gmail search retains provider query syntax. Label/move operations do not claim
+an atomic history precondition, and permanent delete requires the explicit
+full-mailbox scope because Gmail exposes it through that scope only. The
+adapter revalidates the reviewed message immediately before the operation. If
+a Trash-to-label move confirms untrash but not the destination label update,
+the result requires reconciliation. The adapter does not enable push/history
+monitoring or scheduled send.
+
+## Google Web
+
+The managed Google Web route opens only the exact Gmail and Google Calendar
+origins in one dedicated visible browser profile. Authentication, SSO, MFA,
+account selection, and organization notices remain browser-owned. The adapter
+never reads cookies, browser storage, or authorization tokens.
+
+After confirming the configured identity on both surfaces, a bounded semantic
+DOM driver returns visible mail and calendar metadata. It treats the snapshot
+as read-only and incomplete: pagination beyond the rendered set is not
+invented, an unrecognized DOM fails instead of becoming a false empty result,
+multi-day agenda reads visit each UTC date and deduplicate exact occurrences,
+unsupported details are degradations, and all draft/send/organization and
+calendar mutation operations fail as unavailable without touching the browser.
+
+## Microsoft Graph
+
+The Graph adapter is an explicit route, never an automatic fallback for a
+Microsoft address. It uses a public OAuth client and an OS-keyring grant; no
+client secret or hosted relay is supported.
+
+Graph search retains provider query syntax. Reply, forward, and move report the
+absence of an atomic source ETag where applicable, and a successful send may
+not return a sent-item identity. Permanent message deletion revalidates the
+reviewed source, binds the delegated account's immutable user identity, and
+invokes Graph's explicit `permanentDelete` action once. Provider-native
+calendar creation can request a Teams meeting link only through the typed
+supported field. A response or attachment send creates and assembles a draft
+first; if submission is not confirmed, the retained draft is reported as a
+partial outcome and is never recreated automatically.
+
+## JMAP
+
+The JMAP adapter uses a selected session endpoint and an external credential
+handle. It validates advertised capabilities, keeps account and mailbox IDs
+opaque, batches only within application limits, and exposes incremental state
+when the server supports it.
+
+The session resource and every advertised API, upload, and download target must
+share one exact HTTPS origin, including the effective port. This deliberately
+rejects cross-origin JMAP deployments so Basic authorization cannot be
+redirected to a server that was not explicitly configured.
+
+JMAP method calls and arbitrary property maps never cross the adapter boundary.
+State mismatch becomes a visible conflict or degradation rather than an
+unreviewed retry.
+
+A server may provide usable mail without JMAP Submission. In that case reads
+and save-only drafts remain available while send reports a `mail.send`
+degradation. A read-only advertised account likewise remains readable and
+rejects every write explicitly. JMAP identity is resolved before a send draft
+is created; if submission then fails, the retained draft is reported as a
+partial outcome requiring reconciliation. If attachment upload succeeds before
+draft creation fails, retained blobs are likewise reported as a partial
+outcome.
+
+## IMAP and SMTP Submission
+
+The standards mail route separates IMAP reads/organization from SMTP
+Submission drafts/sends while keeping one account identity. Endpoints, ports,
+and TLS modes are closed configuration fields. Plaintext transport and silent
+TLS downgrade are rejected.
+
+The adapter advertises only behavior supported by server capabilities. MIME is
+parsed and constructed behind bounded typed operations; callers cannot submit
+raw commands or arbitrary headers. Server literal declarations are bounded
+before client allocation from the first greeting onward. A forward-only capture
+feeds each response exactly once to the pinned client parser, separately bounds
+parser-recognized literal payload and control bytes, and stops excessive parser
+CPU work internally. STARTTLS is negotiated with a bounded pre-TLS control
+exchange, then the complete decrypted IMAP stream is checked. Reply message IDs
+and References are normalized as bounded angle-bracket identifiers before
+header construction. SMTP acceptance without a returned message identity is
+represented explicitly. Errors after a mutating IMAP command or an accepted
+SMTP submission are partial outcomes requiring reconciliation; Corresync does
+not repeat the operation automatically.
+
+## CalDAV
+
+The CalDAV route uses an explicit HTTPS collection endpoint and external
+credential handle. WebDAV and iCalendar documents are parsed with bounds and
+mapped to the normalized event contract. Conditional writes use the available
+entity version; unsupported fields remain visible as degradations.
+
+Callers cannot submit arbitrary WebDAV methods, XML, iCalendar properties, or
+collection paths. The adapter detects RFC 6638 server-managed scheduling on
+the authenticated principal. When the capability is present, attendee
+create/update/cancel uses the reviewed scheduling behavior and schedule-tag
+preconditions; without it, attendee writes fail before the calendar object is
+changed.
+
+Recurring-instance writes remain scoped to that instance. Update creates or
+replaces a `RECURRENCE-ID` exception. Cancellation adds the occurrence to the
+master's `EXDATE`, removes any matching exception, advances `SEQUENCE`, and
+updates the calendar object conditionally rather than deleting the series.
 
 ## Compatibility workflow
 
-Protocol structs preserve OWA's JSON `__type` metadata. Synthetic golden
-fixtures verify encoding and response normalization. Live smoke tests are
-separate, opt-in commands and initially cover read-only operations. A protocol
-change is released only after capability detection can distinguish supported,
-degraded, and unavailable behavior.
+Deterministic tests use synthetic fixtures with no credentials or personal
+data. They cover encoding, malformed input, bounds, capability mapping,
+degradations, conflict handling, and ambiguous writes. Cross-compilation covers
+platform-specific code.
+
+Live mailbox observations are separate, opt-in, and never part of the default
+test command or CI. A live failure is reduced to a synthetic reproducer before
+it enters the repository. See [compatibility evidence](compatibility.md) and
+the [manual test checklist](manual-test-checklist.md).

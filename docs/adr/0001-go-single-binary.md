@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-07-17
+- Amended: 2026-07-28 by
+  [ADR 0016](0016-short-corr-command.md)
 
 ## Context
 
@@ -11,7 +13,9 @@ or a dependency tree.
 
 ## Decision
 
-Use supported Go releases and produce one `owa` binary. Use the official MCP Go
+Use supported Go releases and produce one `corr` primary binary. During the
+finite command transition defined by ADR 0016, the same command package also
+produces an identical `corresync` compatibility entry. Use the official MCP Go
 SDK. Keep browser control behind an interface so its CDP implementation can be
 changed without affecting commands or tool contracts.
 

@@ -21,6 +21,74 @@ func validCalendarInput() application.CalendarListInput {
 	}
 }
 
+func TestListCalendarFoldersDiscoversTypedCalendarHierarchy(t *testing.T) {
+	t.Parallel()
+
+	fixture := readFixture(t, "find_calendar_folder_response.json")
+	expectedRequest := readFixture(t, "find_calendar_folder_request.json")
+	requests := make(chan []byte, 1)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			t.Errorf("ReadAll() error = %v", err)
+			return
+		}
+		requests <- body
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write(fixture)
+	}))
+	defer server.Close()
+
+	page, err := testClient(t, server, nil).ListCalendarFolders(
+		t.Context(),
+		application.CalendarFolderListInput{Account: "work", Limit: 10},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertJSONEqual(t, <-requests, expectedRequest)
+	if len(page.Calendars) != 3 || page.TotalCalendars != 3 ||
+		page.Calendars[0].ID != "calendar" ||
+		!page.Calendars[0].IsDefault ||
+		!page.Calendars[0].CanEdit ||
+		page.Calendars[1].ID != "team-calendar" ||
+		!page.Calendars[1].CanEdit ||
+		page.Calendars[1].AccessRole != "writer" ||
+		page.Calendars[2].ID != "birthdays-calendar" ||
+		page.Calendars[2].CanEdit ||
+		page.Calendars[2].AccessRole != "reader" ||
+		!page.IncludesLastItem {
+		t.Fatalf("ListCalendarFolders() = %#v, %v", page, err)
+	}
+}
+
+func TestListCalendarFoldersRejectsProviderPaginationWithoutProgress(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		_ *http.Request,
+	) {
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(
+			`{"Body":{"ResponseMessages":{"Items":[{"ResponseClass":"Success","ResponseCode":"NoError","RootFolder":{"Folders":[],"TotalItemsInView":1,"IncludesLastItemInRange":false}}]}}}`,
+		))
+	}))
+	defer server.Close()
+	_, err := testClient(t, server, nil).ListCalendarFolders(
+		t.Context(),
+		application.CalendarFolderListInput{Account: "work", Limit: 10},
+	)
+	if err == nil {
+		t.Fatal("ListCalendarFolders() accepted pagination without progress")
+	}
+}
+
 func TestCalendarViewRequestMatchesGoldenFixture(t *testing.T) {
 	t.Parallel()
 
@@ -62,6 +130,8 @@ func TestListCalendarEventsNormalizesGoldenResponse(t *testing.T) {
 	}
 	first := page.Events[0]
 	if first.ID != "synthetic-event-1" || first.Start != "2026-07-17T09:00:00Z" ||
+		first.OriginalStart != "2026-07-17T09:00:00.000" ||
+		first.OriginalStartTimeZone != "UTC" ||
 		first.Location != "Room 1" || first.Organizer.Address != "alice@example.invalid" ||
 		!first.IsOnlineMeeting || first.IsCancelled {
 		t.Fatalf("unexpected first event: %+v", first)

@@ -15,6 +15,7 @@ import (
 )
 
 const legacyVersion = 1
+const routeLegacyVersion = 2
 
 type legacyConfig struct {
 	Version        int                      `toml:"version"`
@@ -30,7 +31,24 @@ type legacyAccount struct {
 	Mailbox string `toml:"mailbox,omitempty"`
 }
 
-// MigrateV1 converts an exact legacy config snapshot to v2. Account IDs are
+type routeLegacyConfig struct {
+	Version        int                           `toml:"version"`
+	DefaultAccount string                        `toml:"default_account"`
+	Accounts       map[string]routeLegacyAccount `toml:"accounts"`
+	Policy         Policy                        `toml:"policy"`
+	Browser        Browser                       `toml:"browser"`
+	Updates        Updates                       `toml:"updates"`
+}
+
+type routeLegacyAccount struct {
+	ID       domain.AccountID  `toml:"id"`
+	Provider domain.ProviderID `toml:"provider"`
+	Address  string            `toml:"address,omitempty"`
+	Origin   string            `toml:"origin"`
+	Mailbox  string            `toml:"mailbox,omitempty"`
+}
+
+// MigrateV1 converts an exact legacy config snapshot to v3. Account IDs are
 // generated once and must be persisted by the caller before use.
 func MigrateV1(data []byte) (Config, error) {
 	if len(data) > maximumConfigBytes {
@@ -69,12 +87,12 @@ func MigrateV1(data []byte) (Config, error) {
 			return Config{}, err
 		}
 		account := legacy.Accounts[alias]
-		configuration.Accounts[alias] = Account{
-			ID:       accountID,
-			Provider: domain.ProviderMicrosoftOWA,
-			Origin:   account.Origin,
-			Mailbox:  account.Mailbox,
-		}
+		configuration.Accounts[alias] = migratedOutlookAccount(
+			accountID,
+			"",
+			account.Origin,
+			account.Mailbox,
+		)
 	}
 	if err := configuration.Validate(); err != nil {
 		return Config{}, fmt.Errorf("validate migrated config: %w", err)
@@ -82,8 +100,75 @@ func MigrateV1(data []byte) (Config, error) {
 	return configuration, nil
 }
 
+// MigrateV2 converts the single-provider account schema to separate mail and
+// calendar routes without changing stable account IDs or browser-profile keys.
+func MigrateV2(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var legacy routeLegacyConfig
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&legacy); err != nil {
+		return Config{}, fmt.Errorf("decode v2 config: %w", err)
+	}
+	if legacy.Version != routeLegacyVersion {
+		return Config{}, fmt.Errorf("route legacy config version must be %d", routeLegacyVersion)
+	}
+	if len(legacy.Accounts) == 0 {
+		return Config{}, errors.New("at least one account is required")
+	}
+	configuration := Config{
+		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
+		Accounts: make(map[string]Account, len(legacy.Accounts)),
+		Policy:   legacy.Policy, Browser: legacy.Browser, Updates: legacy.Updates,
+	}
+	for alias, account := range legacy.Accounts {
+		if account.Provider != domain.ProviderMicrosoftOWA {
+			return Config{}, fmt.Errorf(
+				"v2 account %q uses unsupported provider %q",
+				alias,
+				account.Provider,
+			)
+		}
+		configuration.Accounts[alias] = migratedOutlookAccount(
+			account.ID,
+			account.Address,
+			account.Origin,
+			account.Mailbox,
+		)
+	}
+	if err := configuration.Validate(); err != nil {
+		return Config{}, fmt.Errorf("validate migrated v2 config: %w", err)
+	}
+	return configuration, nil
+}
+
+func migratedOutlookAccount(
+	accountID domain.AccountID,
+	address string,
+	origin string,
+	mailbox string,
+) Account {
+	return Account{
+		ID: accountID, Address: address,
+		Mail: &MailRoute{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &OutlookWebRoute{
+				Origin: origin, Mailbox: mailbox,
+			},
+		},
+		Calendar: &CalendarRoute{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &OutlookWebRoute{
+				Origin: origin, Mailbox: mailbox,
+			},
+		},
+	}
+}
+
 // EnsureDefaultPath performs the one-way, rollback-safe default migration.
-// The legacy file remains byte-for-byte unchanged; the returned file is v2.
+// The legacy file remains byte-for-byte unchanged; the returned file is v3.
 func EnsureDefaultPath() (path string, migrated bool, err error) {
 	path, err = DefaultPath()
 	if err != nil {

@@ -77,7 +77,7 @@ type MailDraftInput struct {
 	Attachments        []MailFileAttachment `json:"attachments,omitempty"`
 }
 
-// MailDraft identifies the saved draft returned by OWA.
+// MailDraft identifies the saved draft returned by the selected provider.
 type MailDraft struct {
 	ID         string            `json:"id"`
 	ChangeKey  string            `json:"changeKey,omitempty"`
@@ -108,7 +108,7 @@ type MailDraftAccess struct {
 	Preview *approval.Preview `json:"preview,omitempty"`
 }
 
-// MailDraftWriter is the narrow OWA port for save-only drafts.
+// MailDraftWriter is the narrow provider-neutral port for save-only drafts.
 type MailDraftWriter interface {
 	CreateMailDraft(context.Context, MailDraftInput) (MailDraft, error)
 }

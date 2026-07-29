@@ -4,16 +4,16 @@
 
 Build Corresync, a local-first, provider-neutral mail and calendar CLI and MCP
 server for accounts the signed-in human already controls. Mail and calendar are
-in scope across providers, including a Teams join link provisioned as a property
-of one calendar event. See
+in scope across providers, including a provider-native Teams or Google Meet
+join link provisioned as a property of one calendar event. See
 [ADR 0008](docs/adr/0008-provider-neutral-product-scope.md) for the accepted
 scope and [ADR 0011](docs/adr/0011-coordinated-corresync-rename.md) for the
 rename.
 
-Scope is not capability. The released binary implements exactly one provider
-adapter, Outlook Web. Never document a provider or capability as available
-before it has synthetic fixture contract tests and a documented opt-in live
-observation.
+Scope is not capability. The latest stable v0.7 binary implements exactly one
+provider adapter, Outlook Web. Development-route claims require synthetic
+fixture contract tests and remain live-unobserved until a documented opt-in
+live observation exists.
 
 Teams chat, channels, calls, recordings, and meeting lifecycle management stay
 out of scope, exactly as decided in
@@ -63,3 +63,42 @@ selection or with an authorization the user already granted.
 - Update an ADR when changing an accepted architectural decision.
 - Run `mise exec -- task verify` before committing.
 - Never weaken a security invariant to make a test pass.
+
+## Agent and model operating guide
+
+Model output is review input, not evidence by itself. The primary Codex agent
+owns requirements, architecture, edits, integration, test interpretation, and
+the final decision. It must reproduce every external-agent finding against the
+current tree and provider contract before changing code or documentation.
+
+Use Claude Opus through `claude -p` for bounded, read-only exploration when a
+task benefits from a second broad pass: repository-wide capability matrices,
+cross-provider omission searches, long control-flow traces, and edge-case
+brainstorming. In this repository it has been useful at finding breadth gaps,
+but it can be slow, infer an implementation gap from a symbol or error string
+without following the reachable route, and recommend plausible provider
+behavior without proving the remote API contract. Give it the exact revision,
+scope, invariants, and requested output shape. Verify each claim in code,
+synthetic contract tests, and primary provider documentation. Do not let an
+Opus run edit concurrently with the primary agent. Repository-wide Opus runs
+have also produced no incremental output for minutes; time-box a silent run,
+interrupt it when it stops the critical path, and continue from executable
+evidence rather than waiting indefinitely.
+
+Use Fable through `claude -p` as the independent final security reviewer after
+the candidate is clean and `mise exec -- task verify` passes. Ask it to inspect
+the complete candidate diff and threat boundaries, with emphasis on
+authentication ownership, secret handling, account isolation, preview/commit
+binding, provider write outcomes, SSRF/redirect controls, bounded parsing, and
+live-test isolation. Fable is deliberately the last adversarial pass, not the
+implementation driver: it may lack product history or mistake an explicitly
+documented provider limitation for a bypass. Require severity, file/line
+evidence, an exploit or failure path, and a clear final verdict. The primary
+agent must validate and fix confirmed findings, rerun verification, and repeat
+the Fable review until there are no unresolved critical, high, or medium
+findings.
+
+Keep these roles distinct. Opus broadens discovery before and during
+implementation; Codex implements and integrates; Fable challenges the finished
+security posture. None of them may override repository scope, accepted ADRs,
+provider primary sources, or executable evidence.

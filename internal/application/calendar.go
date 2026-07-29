@@ -26,8 +26,8 @@ type CalendarFolder struct {
 	ID   string             `json:"id"`
 }
 
-// CalendarListInput selects a bounded absolute time window. RFC3339 inputs are
-// normalized to UTC at the OWA boundary.
+// CalendarListInput selects a bounded absolute time window. Provider adapters
+// normalize RFC3339 inputs without changing the absolute instants.
 type CalendarListInput struct {
 	Account  domain.AccountID `json:"account"`
 	Calendar CalendarFolder   `json:"calendar"`
@@ -38,20 +38,26 @@ type CalendarListInput struct {
 // CalendarEvent is metadata only. It excludes body, attendee list, attachment
 // content, and online-meeting join URLs.
 type CalendarEvent struct {
-	ID              string            `json:"id"`
-	ChangeKey       string            `json:"changeKey,omitempty"`
-	Subject         string            `json:"subject,omitempty"`
-	Start           string            `json:"start"`
-	End             string            `json:"end"`
-	Location        string            `json:"location,omitempty"`
-	Organizer       MailAddress       `json:"organizer,omitempty"`
-	IsAllDay        bool              `json:"isAllDay"`
-	IsOnlineMeeting bool              `json:"isOnlineMeeting"`
-	IsOrganizer     bool              `json:"isOrganizer"`
-	IsCancelled     bool              `json:"isCancelled"`
-	MyResponse      string            `json:"myResponse,omitempty"`
-	FreeBusy        string            `json:"freeBusy,omitempty"`
-	Provenance      domain.Provenance `json:"provenance,omitempty"`
+	ID                    string            `json:"id"`
+	ChangeKey             string            `json:"changeKey,omitempty"`
+	Subject               string            `json:"subject,omitempty"`
+	Start                 string            `json:"start"`
+	End                   string            `json:"end"`
+	OriginalStart         string            `json:"originalStart,omitempty"`
+	OriginalEnd           string            `json:"originalEnd,omitempty"`
+	OriginalStartTimeZone string            `json:"originalStartTimeZone,omitempty"`
+	OriginalEndTimeZone   string            `json:"originalEndTimeZone,omitempty"`
+	OriginalStartFloating bool              `json:"originalStartFloating"`
+	OriginalEndFloating   bool              `json:"originalEndFloating"`
+	Location              string            `json:"location,omitempty"`
+	Organizer             MailAddress       `json:"organizer,omitempty"`
+	IsAllDay              bool              `json:"isAllDay"`
+	IsOnlineMeeting       bool              `json:"isOnlineMeeting"`
+	IsOrganizer           bool              `json:"isOrganizer"`
+	IsCancelled           bool              `json:"isCancelled"`
+	MyResponse            string            `json:"myResponse,omitempty"`
+	FreeBusy              string            `json:"freeBusy,omitempty"`
+	Provenance            domain.Provenance `json:"provenance,omitempty"`
 }
 
 // CalendarPage is the stable output contract shared by CLI and MCP.
@@ -61,7 +67,7 @@ type CalendarPage struct {
 	End    string          `json:"end"`
 }
 
-// CalendarReader is the application port implemented by the OWA adapter.
+// CalendarReader is the provider-neutral application read port.
 type CalendarReader interface {
 	ListCalendarEvents(context.Context, CalendarListInput) (CalendarPage, error)
 }
@@ -70,6 +76,7 @@ type CalendarReader interface {
 // application service. It intentionally exposes no generic item mutation.
 type CalendarPort interface {
 	CalendarReader
+	CalendarFolderReader
 	CalendarCreator
 	CalendarUpdater
 	CalendarCanceller
@@ -77,19 +84,62 @@ type CalendarPort interface {
 
 // CalendarOptions applies configured limits at the application boundary.
 type CalendarOptions struct {
-	MaxAttendees int
-	Provenance   domain.Provenance
+	MaxAttendees          int
+	Provenance            domain.Provenance
+	Effects               CalendarEffects
+	OnlineMeetingProvider string
+}
+
+// CalendarEffects describes externally visible provider behavior that must be
+// shown in a review. It contains no provider wire type or policy decision.
+type CalendarEffects struct {
+	CreateAttendeeNotifications bool
+	UpdateAttendeeNotifications bool
+	CancelAttendeeNotifications bool
+	CancellationMode            string
+	CancellationDisposition     string
+}
+
+const (
+	CalendarCancellationProviderManaged = "provider_managed"
+	CalendarCancellationNoScheduling    = "no_scheduling"
+	CalendarDispositionRemoteDelete     = "remote_delete"
+	CalendarDispositionCalendarObject   = "update_or_delete_calendar_object"
+	CalendarDispositionDeletedItems     = "move_to_deleted_items"
+)
+
+func (effects CalendarEffects) validate() error {
+	switch {
+	case effects.CancellationMode == CalendarCancellationModeAll &&
+		effects.CancellationDisposition == CalendarDispositionDeletedItems:
+	case effects.CancellationMode == CalendarCancellationProviderManaged &&
+		effects.CancellationDisposition == CalendarDispositionRemoteDelete:
+	case effects.CancellationMode == CalendarCancellationProviderManaged &&
+		effects.CancellationDisposition == CalendarDispositionCalendarObject:
+	case effects.CancellationMode == CalendarCancellationNoScheduling &&
+		effects.CancellationDisposition == CalendarDispositionCalendarObject:
+	default:
+		return errors.New("calendar cancellation effects are inconsistent")
+	}
+	if effects.CancellationMode == CalendarCancellationNoScheduling &&
+		effects.CancelAttendeeNotifications {
+		return errors.New("calendar cancellation without scheduling cannot notify attendees")
+	}
+	return nil
 }
 
 // CalendarService applies policy and audit around calendar use cases.
 type CalendarService struct {
-	guard        *Guard
-	reader       CalendarReader
-	creator      CalendarCreator
-	updater      CalendarUpdater
-	canceller    CalendarCanceller
-	maxAttendees int
-	provenance   domain.Provenance
+	guard                 *Guard
+	reader                CalendarReader
+	folderReader          CalendarFolderReader
+	creator               CalendarCreator
+	updater               CalendarUpdater
+	canceller             CalendarCanceller
+	maxAttendees          int
+	provenance            domain.Provenance
+	effects               CalendarEffects
+	onlineMeetingProvider string
 }
 
 // NewCalendarService requires the shared guard and a transport port.
@@ -107,15 +157,29 @@ func NewCalendarService(
 	if options.MaxAttendees < 1 || options.MaxAttendees > MaxCalendarAttendees {
 		return nil, fmt.Errorf("max calendar attendees must be between 1 and %d", MaxCalendarAttendees)
 	}
+	if err := options.Effects.validate(); err != nil {
+		return nil, err
+	}
+	switch options.OnlineMeetingProvider {
+	case "", "teams", "google-meet":
+	default:
+		return nil, errors.New("calendar online meeting provider is unsupported")
+	}
 	return &CalendarService{
-		guard: guard, reader: port, creator: port, updater: port, canceller: port,
+		guard: guard, reader: port, folderReader: port,
+		creator: port, updater: port, canceller: port,
 		maxAttendees: options.MaxAttendees, provenance: options.Provenance,
+		effects:               options.Effects,
+		onlineMeetingProvider: options.OnlineMeetingProvider,
 	}, nil
 }
 
 func (service *CalendarService) validateExecutionAccount(operation domain.Operation) error {
 	expected := service.provenance.AccountID
-	if expected != "" && operation.Account() != expected {
+	if expected == "" {
+		return errors.New("calendar service lacks routed account provenance")
+	}
+	if operation.Account() != expected {
 		return errors.New("calendar operation account does not match the routed service")
 	}
 	return nil

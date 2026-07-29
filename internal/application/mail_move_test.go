@@ -32,7 +32,7 @@ func TestMailMovePreviewCommitsExactImmutableInputOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewGuard() error = %v", err)
 	}
-	service, err := NewMailService(guard, reader, MailOptions{MaxRecipients: 20})
+	service, err := NewMailService(guard, reader, testMailOptions())
 	if err != nil {
 		t.Fatalf("NewMailService() error = %v", err)
 	}

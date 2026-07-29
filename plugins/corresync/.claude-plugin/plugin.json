@@ -8,5 +8,5 @@
   "homepage": "https://nkiyohara.github.io/corresync/",
   "repository": "https://github.com/nkiyohara/corresync",
   "license": "Apache-2.0",
-  "keywords": ["outlook", "email", "calendar", "mcp", "local-first"]
+  "keywords": ["email", "calendar", "gmail", "outlook", "mcp", "local-first"]
 }

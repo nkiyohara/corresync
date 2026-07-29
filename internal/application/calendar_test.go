@@ -11,6 +11,7 @@ import (
 
 type fakeCalendarReader struct {
 	page         CalendarPage
+	folderPage   CalendarFolderPage
 	err          error
 	calls        int
 	createInput  CalendarCreateInput
@@ -24,6 +25,13 @@ type fakeCalendarReader struct {
 	cancelInput  CalendarCancelInput
 	cancelErr    error
 	cancelCalls  int
+}
+
+func (reader *fakeCalendarReader) ListCalendarFolders(
+	context.Context,
+	CalendarFolderListInput,
+) (CalendarFolderPage, error) {
+	return reader.folderPage, reader.err
 }
 
 func (reader *fakeCalendarReader) UpdateCalendarEvent(
@@ -63,6 +71,12 @@ func (reader *fakeCalendarReader) CreateCalendarEvent(
 	reader.createInput = input
 	if reader.createResult.ID == "" {
 		reader.createResult = CalendarCreateResult{ID: "event-created", ChangeKey: "change-created"}
+		if input.OnlineMeeting || input.TeamsMeeting {
+			reader.createResult.IsOnlineMeeting = true
+			reader.createResult.OnlineMeetingProvider = "teams"
+			reader.createResult.OnlineMeetingJoinURL =
+				"https://teams.example.invalid/l/meetup-join/synthetic"
+		}
 	}
 	return reader.createResult, reader.createErr
 }
@@ -70,7 +84,22 @@ func (reader *fakeCalendarReader) CreateCalendarEvent(
 func testCalendarService(t *testing.T, reader CalendarPort) (*CalendarService, *memoryAudit) {
 	t.Helper()
 	guard, recorder := newTestGuard(t, policy.DefaultRules())
-	service, err := NewCalendarService(guard, reader, CalendarOptions{MaxAttendees: 50})
+	service, err := NewCalendarService(guard, reader, CalendarOptions{
+		MaxAttendees:          50,
+		OnlineMeetingProvider: "teams",
+		Provenance: domain.Provenance{
+			AccountID:  "work",
+			Provider:   domain.ProviderCalDAV,
+			CalendarID: "synthetic-calendar",
+		},
+		Effects: CalendarEffects{
+			CreateAttendeeNotifications: true,
+			UpdateAttendeeNotifications: true,
+			CancelAttendeeNotifications: true,
+			CancellationMode:            CalendarCancellationModeAll,
+			CancellationDisposition:     CalendarDispositionDeletedItems,
+		},
+	})
 	if err != nil {
 		t.Fatalf("NewCalendarService() error = %v", err)
 	}
@@ -106,6 +135,22 @@ func TestCalendarServiceListsThroughPolicyAndAudit(t *testing.T) {
 		recorder.events[1].Phase != AuditPhaseExecuted ||
 		recorder.events[1].Outcome != AuditOutcomeSuccess {
 		t.Fatalf("unexpected audit events: %+v", recorder.events)
+	}
+}
+
+func TestCalendarServiceFailsClosedWithoutRoutedProvenance(t *testing.T) {
+	t.Parallel()
+	operation, err := domain.NewOperation(
+		"calendar.create",
+		domain.EffectExternalWrite,
+		"work",
+		struct{}{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&CalendarService{}).validateExecutionAccount(operation); err == nil {
+		t.Fatal("calendar execution accepted missing routed provenance")
 	}
 }
 
@@ -165,5 +210,45 @@ func TestNewCalendarServiceRequiresDependencies(t *testing.T) {
 	}
 	if _, err := NewCalendarService(guard, reader, CalendarOptions{}); err == nil {
 		t.Fatal("NewCalendarService() unexpectedly accepted an invalid attendee limit")
+	}
+	if _, err := NewCalendarService(
+		guard,
+		reader,
+		CalendarOptions{MaxAttendees: 50},
+	); err == nil {
+		t.Fatal("NewCalendarService() unexpectedly accepted missing effect semantics")
+	}
+	if _, err := NewCalendarService(
+		guard,
+		reader,
+		CalendarOptions{
+			MaxAttendees: 50,
+			Effects: CalendarEffects{
+				CancellationMode:        CalendarCancellationNoScheduling,
+				CancellationDisposition: CalendarDispositionDeletedItems,
+			},
+		},
+	); err == nil {
+		t.Fatal("NewCalendarService() unexpectedly accepted inconsistent effects")
+	}
+}
+
+func TestCalendarEffectsAcceptTruthfulCalDAVObjectMutations(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []string{
+		CalendarCancellationNoScheduling,
+		CalendarCancellationProviderManaged,
+	} {
+		effects := CalendarEffects{
+			CancellationMode:        mode,
+			CancellationDisposition: CalendarDispositionCalendarObject,
+		}
+		if mode == CalendarCancellationProviderManaged {
+			effects.CancelAttendeeNotifications = true
+		}
+		if err := effects.validate(); err != nil {
+			t.Fatalf("CalDAV effects for %q: %v", mode, err)
+		}
 	}
 }

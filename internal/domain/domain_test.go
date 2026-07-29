@@ -163,6 +163,19 @@ func TestGeneratedAccountIDsAreOpaqueAndUnique(t *testing.T) {
 	}
 }
 
+func TestAccountAliasRejectsOpaqueAccountIDForm(t *testing.T) {
+	t.Parallel()
+
+	if err := AccountAlias("personal").Validate(); err != nil {
+		t.Fatalf("ordinary alias rejected: %v", err)
+	}
+	if err := AccountAlias(
+		"acc_00112233445566778899aabbccddeeff",
+	).Validate(); err == nil {
+		t.Fatal("opaque account ID form was accepted as an alias")
+	}
+}
+
 func TestCapabilitiesAndProvenanceValidation(t *testing.T) {
 	t.Parallel()
 

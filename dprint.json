@@ -1,0 +1,33 @@
+{
+  "lineWidth": 100,
+  "indentWidth": 2,
+  "useTabs": false,
+  "newLineKind": "lf",
+  "includes": [
+    "**/*.css",
+    "**/*.html",
+    "**/*.json",
+    "**/*.jsonc",
+    "**/*.toml",
+    "**/*.yaml",
+    "**/*.yml"
+  ],
+  "excludes": [
+    "**/.git/**",
+    "**/.release/**",
+    "**/dist/**",
+    "**/vendor/**"
+  ],
+  "json": {},
+  "toml": {},
+  "malva": {},
+  "markup": {},
+  "yaml": {},
+  "plugins": [
+    "https://plugins.dprint.dev/json-0.23.0.wasm@3e1f1b7c1427df6bd8981a11aaa2c466fde8d1115e9dde4c652130458539443c",
+    "https://plugins.dprint.dev/toml-0.7.0.wasm@0126c8112691542d30b52a639076ecc83e07bace877638cee7c6915fd36b8629",
+    "https://plugins.dprint.dev/g-plane/malva-v0.16.0.wasm@1c1b31f972ef5aae052f97b6723aaf962e0175c5bbe4ba877e092512af354113",
+    "https://plugins.dprint.dev/g-plane/markup_fmt-v0.27.3.wasm@07cebe7cebf3660d15a92ad94888f2b04903ee0c1aabbb6a5b8a018720d04568",
+    "https://plugins.dprint.dev/g-plane/pretty_yaml-v0.6.0.wasm@40a2fdda7040317eb1b23520f3a00769a5571eedb049c4ca9175c1b9eeba01ae"
+  ]
+}

@@ -22,12 +22,12 @@ decoration or update progress.
 
 ## Decision
 
-Keep startup update discovery read-only and add an explicit `corresync update`
+Keep startup update discovery read-only and add an explicit `corr update`
 action. It performs one fresh stable-release check. Homebrew, WinGet, Scoop,
 deb, RPM, and APK installations are never modified; the command displays and
 returns the exact package-manager action instead.
 
-For a direct installation, `corresync update` may replace only the running regular
+For a direct installation, `corr update` may replace only the running regular
 file, never a symlink. It:
 
 1. accepts only the exact stable GitHub release and matching OS/architecture
@@ -38,10 +38,11 @@ file, never a symlink. It:
    transparency entry, observer timestamp, embedded certificate-transparency
    proof, OIDC issuer, and exact tagged release-workflow identity;
 4. verifies the archive SHA-256 from that signed manifest;
-5. extracts only the bounded regular `corresync` or `corresync.exe` entry
-   (with the exact old entry accepted only during ADR 0011's migration window)
-   and runs its content-free version report to require the exact release
-   version, operating system, and architecture; and
+5. extracts only the bounded regular `corr` or `corr.exe` entry, with the
+   identical `corresync` entry accepted during ADR 0016's finite command
+   transition and the exact older entry accepted only during ADR 0011's
+   repository migration window, then runs its content-free version report to
+   require the exact release version, operating system, and architecture; and
 6. replaces the executable with rollback support while preserving the prior
    version beside it as an explicit backup.
 
@@ -61,7 +62,7 @@ documented compatibility window ends.
 
 ## Consequences
 
-Direct users get the short, memorable path `corresync update` without giving
+Direct users get the short, memorable path `corr update` without giving
 background checks write authority. Managed users can use the same entry point
 to discover the owner-specific command without risking mixed ownership.
 

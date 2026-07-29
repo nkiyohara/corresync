@@ -10,7 +10,10 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const MaxMailPageSize = 100
+const (
+	MaxMailPageSize = 100
+	MaxMailOffset   = 10_000
+)
 
 // MailFolderKind distinguishes named folders from discovered opaque IDs.
 type MailFolderKind string
@@ -61,7 +64,7 @@ type MailPage struct {
 	IncludesLastItem bool          `json:"includesLastItem"`
 }
 
-// MailReader is the application port implemented by the OWA adapter.
+// MailReader is the provider-neutral application read port.
 type MailReader interface {
 	ListMessages(context.Context, MailListInput) (MailPage, error)
 }
@@ -130,7 +133,10 @@ func NewMailService(guard *Guard, reader MailPort, options MailOptions) (*MailSe
 
 func (service *MailService) validateExecutionAccount(operation domain.Operation) error {
 	expected := service.provenance.AccountID
-	if expected != "" && operation.Account() != expected {
+	if expected == "" {
+		return errors.New("mail service lacks routed account provenance")
+	}
+	if operation.Account() != expected {
 		return errors.New("mail operation account does not match the routed service")
 	}
 	return nil
@@ -186,8 +192,8 @@ func (input MailListInput) Validate() error {
 	if err := validateMessageFolder(input.Folder); err != nil {
 		return err
 	}
-	if input.Offset < 0 {
-		return errors.New("mail offset must not be negative")
+	if input.Offset < 0 || input.Offset > MaxMailOffset {
+		return fmt.Errorf("mail offset must be between 0 and %d", MaxMailOffset)
 	}
 	if input.Limit < 1 || input.Limit > MaxMailPageSize {
 		return fmt.Errorf("mail limit must be between 1 and %d", MaxMailPageSize)

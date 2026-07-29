@@ -76,6 +76,31 @@ func (client *Client) Login(ctx context.Context, account domain.AccountID, calle
 	return result, nil
 }
 
+// Logout closes exactly one account's in-memory provider sessions.
+func (client *Client) Logout(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (LogoutResult, error) {
+	if err := account.ValidateOpaque(); err != nil {
+		return LogoutResult{}, err
+	}
+	var result LogoutResult
+	if err := client.call(
+		ctx,
+		MethodLogout,
+		caller,
+		LogoutInput{Account: account},
+		&result,
+	); err != nil {
+		return LogoutResult{}, err
+	}
+	if result.Account != account || !result.LoggedOut {
+		return LogoutResult{}, errors.New("daemon returned invalid logout state")
+	}
+	return result, nil
+}
+
 // SessionStatus returns content-free in-memory authentication state.
 func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (SessionStatusResult, error) {
 	var result SessionStatusResult
@@ -84,6 +109,81 @@ func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (
 	}
 	if err := validateSessionStatusResult(result); err != nil {
 		return SessionStatusResult{}, err
+	}
+	return result, nil
+}
+
+// MonitorStatus reads one account's consent and local queue health.
+func (client *Client) MonitorStatus(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (application.MonitorStatus, error) {
+	if err := account.ValidateOpaque(); err != nil {
+		return application.MonitorStatus{}, err
+	}
+	var result application.MonitorStatus
+	if err := client.call(
+		ctx,
+		MethodMonitorStatus,
+		caller,
+		MonitorStatusInput{Account: account},
+		&result,
+	); err != nil {
+		return application.MonitorStatus{}, err
+	}
+	if err := result.Validate(account); err != nil {
+		return application.MonitorStatus{}, fmt.Errorf(
+			"daemon returned invalid monitor status: %w",
+			err,
+		)
+	}
+	return result, nil
+}
+
+// ListMonitorEvents returns one bounded account-local queue page.
+func (client *Client) ListMonitorEvents(
+	ctx context.Context,
+	input application.MonitorEventListInput,
+	caller domain.Caller,
+) (application.MonitorEventPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MonitorEventPage{}, err
+	}
+	var result application.MonitorEventPage
+	if err := client.call(ctx, MethodEventsList, caller, input, &result); err != nil {
+		return application.MonitorEventPage{}, err
+	}
+	if err := result.Validate(input); err != nil {
+		return application.MonitorEventPage{}, fmt.Errorf(
+			"daemon returned invalid monitor event page: %w",
+			err,
+		)
+	}
+	return result, nil
+}
+
+// AcknowledgeMonitorEvent changes only one account-local queue item.
+func (client *Client) AcknowledgeMonitorEvent(
+	ctx context.Context,
+	input application.MonitorAcknowledgeInput,
+	caller domain.Caller,
+) (application.MonitorEvent, error) {
+	if err := input.Validate(); err != nil {
+		return application.MonitorEvent{}, err
+	}
+	var result application.MonitorEvent
+	if err := client.call(ctx, MethodEventAcknowledge, caller, input, &result); err != nil {
+		return application.MonitorEvent{}, err
+	}
+	if result.ID != input.EventID || result.State != "acknowledged" {
+		return application.MonitorEvent{}, errors.New("daemon returned invalid acknowledgement")
+	}
+	if err := result.Validate(input.Account); err != nil {
+		return application.MonitorEvent{}, fmt.Errorf(
+			"daemon returned invalid acknowledgement: %w",
+			err,
+		)
 	}
 	return result, nil
 }
@@ -100,6 +200,23 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 		if err := account.Provider.Validate(); err != nil {
 			return errors.New("daemon returned an invalid session provider")
 		}
+		if account.MailProvider != "" {
+			if err := account.MailProvider.Validate(); err != nil {
+				return errors.New("daemon returned an invalid mail session provider")
+			}
+		}
+		if account.CalendarProvider != "" {
+			if err := account.CalendarProvider.Validate(); err != nil {
+				return errors.New("daemon returned an invalid calendar session provider")
+			}
+		}
+		if account.MailProvider == "" && account.CalendarProvider == "" {
+			return errors.New("daemon returned a session without a provider route")
+		}
+		if account.Provider != account.MailProvider &&
+			(account.MailProvider != "" || account.Provider != account.CalendarProvider) {
+			return errors.New("daemon returned an inconsistent primary session provider")
+		}
 		if _, exists := seen[account.Account]; exists {
 			return errors.New("daemon returned duplicate session accounts")
 		}
@@ -115,8 +232,17 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 			if account.Capabilities == nil || account.Capabilities.Validate() != nil {
 				return errors.New("daemon returned invalid account capabilities")
 			}
+			if len(account.Degradations) > 32 {
+				return errors.New("daemon returned unbounded account degradations")
+			}
+			for _, degradation := range account.Degradations {
+				if degradation.Validate() != nil {
+					return errors.New("daemon returned invalid account degradation")
+				}
+			}
 		case "pending", "signed_out":
-			if account.Authenticated || account.CapturedAt != nil || account.Capabilities != nil {
+			if account.Authenticated || account.CapturedAt != nil ||
+				account.Capabilities != nil || len(account.Degradations) != 0 {
 				return errors.New("daemon returned invalid inactive session state")
 			}
 		default:
@@ -189,6 +315,35 @@ func (client *Client) ListMail(ctx context.Context, input application.MailListIn
 func (client *Client) SearchMail(ctx context.Context, input application.MailSearchInput, caller domain.Caller) (application.MailPage, error) {
 	var result application.MailPage
 	return result, client.call(ctx, MethodMailSearch, caller, input, &result)
+}
+
+// SearchAllMail returns one validated read-only projection without exposing
+// daemon-owned account sessions to the caller.
+func (client *Client) SearchAllMail(
+	ctx context.Context,
+	input application.MailProjectionInput,
+	caller domain.Caller,
+) (application.MailProjectionPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailProjectionPage{}, err
+	}
+	var result application.MailProjectionPage
+	if err := client.call(
+		ctx,
+		MethodMailSearchAll,
+		caller,
+		input,
+		&result,
+	); err != nil {
+		return application.MailProjectionPage{}, err
+	}
+	if err := result.Validate(); err != nil {
+		return application.MailProjectionPage{}, fmt.Errorf(
+			"validate daemon mail projection: %w",
+			err,
+		)
+	}
+	return result, nil
 }
 
 // ListMailFolders discovers bounded folder metadata through the session owner.
@@ -267,9 +422,47 @@ func (client *Client) CommitMailDelete(ctx context.Context, token string, caller
 	return result, client.call(ctx, MethodMailCommitDelete, caller, ApprovalInput{Token: token}, &result)
 }
 
+// ListCalendarFolders discovers bounded selectable calendar metadata.
+func (client *Client) ListCalendarFolders(
+	ctx context.Context,
+	input application.CalendarFolderListInput,
+	caller domain.Caller,
+) (application.CalendarFolderPage, error) {
+	var result application.CalendarFolderPage
+	return result, client.call(ctx, MethodCalendarFolders, caller, input, &result)
+}
+
 func (client *Client) ListCalendar(ctx context.Context, input application.CalendarListInput, caller domain.Caller) (application.CalendarPage, error) {
 	var result application.CalendarPage
 	return result, client.call(ctx, MethodCalendarList, caller, input, &result)
+}
+
+// ListAgenda returns one validated read-only cross-account event projection.
+func (client *Client) ListAgenda(
+	ctx context.Context,
+	input application.AgendaProjectionInput,
+	caller domain.Caller,
+) (application.AgendaProjectionPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.AgendaProjectionPage{}, err
+	}
+	var result application.AgendaProjectionPage
+	if err := client.call(
+		ctx,
+		MethodAgendaList,
+		caller,
+		input,
+		&result,
+	); err != nil {
+		return application.AgendaProjectionPage{}, err
+	}
+	if err := result.Validate(); err != nil {
+		return application.AgendaProjectionPage{}, fmt.Errorf(
+			"validate daemon agenda projection: %w",
+			err,
+		)
+	}
+	return result, nil
 }
 
 // CreateCalendar prepares an immutable calendar event preview.

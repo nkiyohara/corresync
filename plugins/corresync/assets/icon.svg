@@ -1,20 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="csp-title csp-desc">
-  <title id="csp-title">Corresync</title>
-  <desc id="csp-desc">A cream airmail envelope with a red-and-blue striped border and a red unread dot, circled by two blue arrows syncing clockwise, on a deep navy rounded square.</desc>
-  <!-- Corresync canonical mark (plugin copy, kept in sync with
-       site/corresync-mark.svg). Geometry rules: site/icon-readme.md -->
-  <rect width="128" height="128" rx="28" fill="#0e1523"/>
-  <rect x="1.25" y="1.25" width="125.5" height="125.5" rx="26.75" fill="none" stroke="#9db4ea" stroke-opacity="0.14" stroke-width="2.5"/>
-  <path d="M28.328 68.845A36 36 0 0 1 83.218 33.559" fill="none" stroke="#6b93ff" stroke-width="10" stroke-linecap="round"/>
-  <path d="M99.672 59.155A36 36 0 0 1 44.782 94.441" fill="none" stroke="#6b93ff" stroke-width="10" stroke-linecap="round"/>
-  <path d="M86.821 27.851L92.277 41.72L79.615 39.266Z" fill="#6b93ff"/>
-  <path d="M41.179 100.149L35.723 86.28L48.385 88.734Z" fill="#6b93ff"/>
-  <rect x="43" y="50.5" width="42" height="29" rx="4" fill="#f2ede2"/>
-  <path d="M50.85 72.5h3.9l-3.6 3.6h-3.9Z" fill="#c03b2d"/>
-  <path d="M57.35 72.5h3.9l-3.6 3.6h-3.9Z" fill="#2148cc"/>
-  <path d="M63.85 72.5h3.9l-3.6 3.6h-3.9Z" fill="#c03b2d"/>
-  <path d="M70.35 72.5h3.9l-3.6 3.6h-3.9Z" fill="#2148cc"/>
-  <path d="M76.85 72.5h3.9l-3.6 3.6h-3.9Z" fill="#c03b2d"/>
-  <path d="M49.2 55.9L64 65.58L78.8 55.9" fill="none" stroke="#0e1523" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="86.094" cy="49.797" r="6" fill="#e0574a" stroke="#0e1523" stroke-width="2.6"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"
+  role="img" aria-labelledby="corresync-plugin-title corresync-plugin-description">
+  <title id="corresync-plugin-title">Corresync</title>
+  <desc id="corresync-plugin-description">
+    Cream and coral chevrons orbit a blue local core on a navy tile.
+  </desc>
+  <rect width="256" height="256" rx="58" fill="#13233b"/>
+  <path d="M56 112 116 52 176 112" fill="none" stroke="#f2ede2"
+    stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M80 144 140 204 200 144" fill="none" stroke="#e0574a"
+    stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="128" cy="128" r="18" fill="#3f7ad6"/>
 </svg>

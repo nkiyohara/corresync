@@ -43,6 +43,18 @@ type AuditEvent struct {
 	Reason        string               `json:"reason,omitempty"`
 	Caller        domain.Caller        `json:"caller"`
 	Operation     domain.OperationView `json:"operation"`
+	Monitor       *MonitorAudit        `json:"monitor,omitempty"`
+}
+
+// MonitorAudit contains only bounded policy metadata. It records disclosure
+// decisions without persisting sender, subject, body, address, or object IDs.
+type MonitorAudit struct {
+	Stage       string   `json:"stage"`
+	Filter      string   `json:"filter,omitempty"`
+	Fields      []string `json:"fields,omitempty"`
+	Destination string   `json:"destination,omitempty"`
+	Result      string   `json:"result,omitempty"`
+	Count       int      `json:"count,omitempty"`
 }
 
 // AuditRecorder is a required application port. Implementations must not add

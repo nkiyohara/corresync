@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -155,6 +156,39 @@ func validateEvent(event Event) error {
 	}
 	if event.Reason != "" && !reasonPattern.MatchString(event.Reason) {
 		return errors.New("audit reason must be a short machine-readable code")
+	}
+	if event.Monitor != nil {
+		if err := validateMonitorAudit(*event.Monitor); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateMonitorAudit(details application.MonitorAudit) error {
+	switch details.Stage {
+	case "detection", "filter", "queue", "notification", "runner", "acknowledgement", "purge":
+	default:
+		return errors.New("audit monitor stage is invalid")
+	}
+	if details.Filter != "" && !reasonPattern.MatchString(details.Filter) {
+		return errors.New("audit monitor filter is invalid")
+	}
+	if details.Result != "" && !reasonPattern.MatchString(details.Result) {
+		return errors.New("audit monitor result is invalid")
+	}
+	if details.Count < 0 || details.Count > 10_000 || len(details.Fields) > 16 {
+		return errors.New("audit monitor bounds are invalid")
+	}
+	for _, field := range details.Fields {
+		if !reasonPattern.MatchString(field) {
+			return errors.New("audit monitor field is invalid")
+		}
+	}
+	if len(details.Destination) > 4096 ||
+		strings.TrimSpace(details.Destination) != details.Destination ||
+		strings.ContainsAny(details.Destination, "\r\n\x00") {
+		return errors.New("audit monitor destination is invalid")
 	}
 	return nil
 }

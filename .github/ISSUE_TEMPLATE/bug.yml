@@ -7,13 +7,14 @@ body:
     attributes:
       value: |
         Security concerns belong in the security reporting channel. Never attach
-        a browser profile, capture, OWA payload, mailbox data, or authorization.
+        a browser profile, capture, provider payload, mailbox/calendar/import
+        data, credential reference, runner argument, or authorization.
 
   - type: input
     id: version
     attributes:
       label: Corresync version
-      description: Paste version and commit only.
+      description: Prefer the reviewed output from `corr feedback --last-error`.
     validations:
       required: true
 
@@ -46,4 +47,6 @@ body:
       label: Safety confirmation
       options:
         - label: This report contains no mailbox, tenant, or session data.
+          required: true
+        - label: I did not paste raw command, MCP, provider, or monitor output.
           required: true

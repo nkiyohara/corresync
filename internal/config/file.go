@@ -40,6 +40,13 @@ func Load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	version, err := encodedVersion(data)
+	if err != nil {
+		return Config{}, err
+	}
+	if version == 2 {
+		return MigrateV2(data)
+	}
 	return Parse(data)
 }
 
@@ -58,6 +65,22 @@ func Parse(data []byte) (Config, error) {
 		return Config{}, err
 	}
 	return configuration, nil
+}
+
+func encodedVersion(data []byte) (int, error) {
+	if len(data) > maximumConfigBytes {
+		return 0, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var header struct {
+		Version int `toml:"version"`
+	}
+	if err := toml.Unmarshal(data, &header); err != nil {
+		return 0, fmt.Errorf("decode config version: %w", err)
+	}
+	if header.Version == 0 {
+		return 0, errors.New("config version is required")
+	}
+	return header.Version, nil
 }
 
 // Fingerprint hashes the exact bounded config file so a daemon cannot silently

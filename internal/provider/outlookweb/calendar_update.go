@@ -29,9 +29,9 @@ type calendarItemChange struct {
 }
 
 type calendarSetItemField struct {
-	Type string             `json:"__type"`
-	Item calendarUpdateItem `json:"Item"`
-	Path propertyURI        `json:"Path"`
+	Type string              `json:"__type"`
+	Item *calendarUpdateItem `json:"Item,omitempty"`
+	Path propertyURI         `json:"Path"`
 }
 
 type calendarUpdateItem struct {
@@ -48,6 +48,7 @@ type calendarUpdateItem struct {
 	ReminderMinutesBeforeStart *int                      `json:"ReminderMinutesBeforeStart,omitempty"`
 	RequiredAttendees          *[]calendarAttendee       `json:"RequiredAttendees,omitempty"`
 	OptionalAttendees          *[]calendarAttendee       `json:"OptionalAttendees,omitempty"`
+	Recurrence                 *calendarRecurrence       `json:"Recurrence,omitempty"`
 }
 
 // UpdateCalendarEvent applies only the closed application patch to one exact
@@ -193,6 +194,29 @@ func buildCalendarUpdateEnvelope(
 			Type: "CalendarItem:#Exchange", Locations: &locations,
 		}))
 	}
+	if input.ReplaceRecurrence {
+		if input.Recurrence == nil {
+			updates = append(updates, calendarDeleteUpdateField("Recurrence"))
+		} else {
+			start, _ := time.Parse(time.RFC3339, *input.Start)
+			zone := defaultZone
+			if input.TimeZone != nil {
+				zone = *input.TimeZone
+			}
+			recurrence := calendarCreateRecurrence(
+				input.Recurrence,
+				start,
+				zone,
+			)
+			updates = append(
+				updates,
+				calendarUpdateField("Recurrence", calendarUpdateItem{
+					Type:       "CalendarItem:#Exchange",
+					Recurrence: recurrence,
+				}),
+			)
+		}
+	}
 	identifier := itemID{
 		Type: "ItemId:#Exchange", ID: input.EventID, ChangeKey: input.ChangeKey,
 	}
@@ -216,8 +240,17 @@ func buildCalendarUpdateEnvelope(
 
 func calendarUpdateField(fieldURI string, item calendarUpdateItem) calendarSetItemField {
 	return calendarSetItemField{
-		Type: "SetItemField:#Exchange", Item: item,
+		Type: "SetItemField:#Exchange", Item: &item,
 		Path: propertyURI{Type: "PropertyUri:#Exchange", FieldURI: fieldURI},
+	}
+}
+
+func calendarDeleteUpdateField(fieldURI string) calendarSetItemField {
+	return calendarSetItemField{
+		Type: "DeleteItemField:#Exchange",
+		Path: propertyURI{
+			Type: "PropertyUri:#Exchange", FieldURI: fieldURI,
+		},
 	}
 }
 

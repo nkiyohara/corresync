@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -27,20 +28,54 @@ func TestDecodeMailAttachmentsRejectsAggregateBeforeApplicationUse(t *testing.T)
 	}
 }
 
+func TestMutationToolsHaveNoAllAccountsInput(t *testing.T) {
+	t.Parallel()
+
+	server, err := New(
+		&fakeBackend{},
+		Options{Version: "dev", Instance: "test-server"},
+	)
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	clientSession := connectTestClient(t, server)
+	tools, err := clientSession.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("ListTools() error = %v", err)
+	}
+	for _, tool := range tools.Tools {
+		if tool.Annotations == nil || tool.Annotations.ReadOnlyHint {
+			continue
+		}
+		schema, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(schema), "allAccounts") {
+			t.Fatalf("mutation tool %q exposes allAccounts", tool.Name)
+		}
+	}
+}
+
 type fakeBackend struct {
 	mailInput            application.MailListInput
 	searchInput          application.MailSearchInput
+	searchAllInput       application.MailProjectionInput
 	folderInput          application.MailFolderListInput
+	calendarFolderInput  application.CalendarFolderListInput
 	bodyInput            application.MailBodyInput
 	attachmentInput      application.MailAttachmentInput
 	approvalToken        string
 	calendarInput        application.CalendarListInput
+	agendaInput          application.AgendaProjectionInput
 	calendarCreate       application.CalendarCreateInput
 	calendarUpdate       application.CalendarUpdateInput
 	calendarCancel       application.CalendarCancelInput
 	caller               domain.Caller
 	mailPage             application.MailPage
+	mailProjection       application.MailProjectionPage
 	folderPage           application.MailFolderPage
+	calendarFolderPage   application.CalendarFolderPage
 	bodyAccess           application.MailBodyAccess
 	attachmentAccess     application.MailAttachmentAccess
 	draftInput           application.MailDraftInput
@@ -52,9 +87,25 @@ type fakeBackend struct {
 	readStateInput       application.MailReadStateInput
 	readStateAccess      application.MailReadStateAccess
 	calendarPage         application.CalendarPage
+	agendaPage           application.AgendaProjectionPage
 	calendarAccess       application.CalendarCreateAccess
 	calendarUpdateAccess application.CalendarUpdateAccess
 	calendarCancelAccess application.CalendarCancelAccess
+	discoveryAddress     string
+	discoveryResult      application.AccountDiscoveryResult
+	accountReference     string
+	accountCatalog       application.AccountCatalog
+	accountView          application.AccountView
+	sessionStatus        application.SessionStatusResult
+	accountAddInput      application.AccountAddInput
+	accountRenameInput   application.AccountRenameInput
+	accountRemoveInput   application.AccountRemoveInput
+	accountChangeAccess  application.AccountChangeAccess
+	monitorStatus        application.MonitorStatus
+	monitorListInput     application.MonitorEventListInput
+	monitorPage          application.MonitorEventPage
+	monitorAckInput      application.MonitorAcknowledgeInput
+	monitorEvent         application.MonitorEvent
 	err                  error
 }
 
@@ -63,7 +114,123 @@ func (backend *fakeBackend) ResolveAccount(reference string) (domain.AccountID, 
 	if reference == "" {
 		return backend.DefaultAccount(), nil
 	}
+	if backend.accountView.Alias == reference {
+		return backend.accountView.ID, nil
+	}
 	return domain.AccountID(reference), nil
+}
+
+func (backend *fakeBackend) DiscoverAccounts(
+	_ context.Context,
+	address string,
+) (application.AccountDiscoveryResult, error) {
+	backend.discoveryAddress = address
+	return backend.discoveryResult, backend.err
+}
+
+func (backend *fakeBackend) ListAccounts(
+	context.Context,
+) (application.AccountCatalog, error) {
+	return backend.accountCatalog, backend.err
+}
+
+func (backend *fakeBackend) ShowAccount(
+	_ context.Context,
+	reference string,
+) (application.AccountView, error) {
+	backend.accountReference = reference
+	return backend.accountView, backend.err
+}
+
+func (backend *fakeBackend) SessionStatus(
+	_ context.Context,
+	caller domain.Caller,
+) (application.SessionStatusResult, error) {
+	backend.caller = caller
+	return backend.sessionStatus, backend.err
+}
+
+func (backend *fakeBackend) PreviewAccountAdd(
+	_ context.Context,
+	input application.AccountAddInput,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.accountAddInput, backend.caller = input, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitAccountAdd(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) PreviewAccountRename(
+	_ context.Context,
+	input application.AccountRenameInput,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.accountRenameInput, backend.caller = input, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitAccountRename(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) PreviewAccountRemove(
+	_ context.Context,
+	input application.AccountRemoveInput,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.accountRemoveInput, backend.caller = input, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitAccountRemove(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.AccountChangeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.accountChangeAccess, backend.err
+}
+
+func (backend *fakeBackend) MonitorStatus(
+	_ context.Context,
+	_ domain.AccountID,
+	caller domain.Caller,
+) (application.MonitorStatus, error) {
+	backend.caller = caller
+	return backend.monitorStatus, backend.err
+}
+
+func (backend *fakeBackend) ListMonitorEvents(
+	_ context.Context,
+	input application.MonitorEventListInput,
+	caller domain.Caller,
+) (application.MonitorEventPage, error) {
+	backend.monitorListInput = input
+	backend.caller = caller
+	return backend.monitorPage, backend.err
+}
+
+func (backend *fakeBackend) AcknowledgeMonitorEvent(
+	_ context.Context,
+	input application.MonitorAcknowledgeInput,
+	caller domain.Caller,
+) (application.MonitorEvent, error) {
+	backend.monitorAckInput = input
+	backend.caller = caller
+	return backend.monitorEvent, backend.err
 }
 
 func (backend *fakeBackend) ListMail(
@@ -86,6 +253,16 @@ func (backend *fakeBackend) SearchMail(
 	return backend.mailPage, backend.err
 }
 
+func (backend *fakeBackend) SearchAllMail(
+	_ context.Context,
+	input application.MailProjectionInput,
+	caller domain.Caller,
+) (application.MailProjectionPage, error) {
+	backend.searchAllInput = input
+	backend.caller = caller
+	return backend.mailProjection, backend.err
+}
+
 func (backend *fakeBackend) ListMailFolders(
 	_ context.Context,
 	input application.MailFolderListInput,
@@ -96,6 +273,16 @@ func (backend *fakeBackend) ListMailFolders(
 	return backend.folderPage, backend.err
 }
 
+func (backend *fakeBackend) ListCalendarFolders(
+	_ context.Context,
+	input application.CalendarFolderListInput,
+	caller domain.Caller,
+) (application.CalendarFolderPage, error) {
+	backend.calendarFolderInput = input
+	backend.caller = caller
+	return backend.calendarFolderPage, backend.err
+}
+
 func (backend *fakeBackend) ListCalendar(
 	_ context.Context,
 	input application.CalendarListInput,
@@ -104,6 +291,16 @@ func (backend *fakeBackend) ListCalendar(
 	backend.calendarInput = input
 	backend.caller = caller
 	return backend.calendarPage, backend.err
+}
+
+func (backend *fakeBackend) ListAgenda(
+	_ context.Context,
+	input application.AgendaProjectionInput,
+	caller domain.Caller,
+) (application.AgendaProjectionPage, error) {
+	backend.agendaInput = input
+	backend.caller = caller
+	return backend.agendaPage, backend.err
 }
 
 func (backend *fakeBackend) CreateCalendar(
@@ -333,14 +530,14 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 24 || mailTool == nil {
+	if len(tools.Tools) != 40 || mailTool == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
 	if annotation == nil || !annotation.ReadOnlyHint || annotation.DestructiveHint == nil || *annotation.DestructiveHint {
 		t.Fatalf("unsafe or missing annotations: %+v", annotation)
 	}
-	if !strings.HasPrefix(mailTool.Description, "Use when the user asks to check Outlook") {
+	if !strings.HasPrefix(mailTool.Description, "Use when the user asks to check mail") {
 		t.Fatalf("mail_list description does not front-load discovery guidance: %q", mailTool.Description)
 	}
 
@@ -364,6 +561,140 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 	structured, ok := result.StructuredContent.(map[string]any)
 	if !ok || structured["totalItemsInView"] != float64(1) {
 		t.Fatalf("unexpected structured output: %#v", result.StructuredContent)
+	}
+}
+
+func TestMonitoringToolsAndResourcesCannotEnableOrBroadenPolicy(t *testing.T) {
+	t.Parallel()
+	account := domain.AccountID("acc_00000000000000000000000000000001")
+	eventID := "evt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+	backend := &fakeBackend{
+		monitorStatus: application.MonitorStatus{
+			Account: account, Alias: "work", Mode: domain.MonitorQueue,
+			CollectionEnabled: true,
+		},
+		monitorPage: application.MonitorEventPage{
+			Events: []application.MonitorEvent{{
+				ID: eventID, Account: account, AccountAlias: "work",
+				Provider: domain.ProviderJMAP, SourceObjectID: "synthetic",
+				Trust:    application.MonitorTrustMarker,
+				Delivery: application.MonitorDeliveryQueue, State: "pending",
+				DeliveryCount: 1,
+			}},
+			Limit: 50, Total: 1,
+		},
+		monitorEvent: application.MonitorEvent{
+			ID: eventID, Account: account, AccountAlias: "work",
+			Provider: domain.ProviderJMAP, SourceObjectID: "synthetic",
+			Trust:    application.MonitorTrustMarker,
+			Delivery: application.MonitorDeliveryQueue, State: "acknowledged",
+		},
+	}
+	server, err := New(
+		backend,
+		Options{Version: "v0.1.0", Instance: "test-server"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+	tools, err := client.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"monitor_status", "events_list", "event_acknowledge"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil {
+			t.Fatalf("missing tool %q", name)
+		}
+		schema, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, forbidden := range []string{"mode", "runner", "egress", "filter", "purge", "approve"} {
+			if strings.Contains(strings.ToLower(string(schema)), forbidden) {
+				t.Fatalf("tool %q exposes forbidden configuration input %q: %s", name, forbidden, schema)
+			}
+		}
+	}
+	if _, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "monitor_status", Arguments: map[string]any{"account": string(account)},
+	}); err != nil {
+		t.Fatalf("monitor_status error = %v", err)
+	}
+	if _, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "events_list", Arguments: map[string]any{"account": string(account)},
+	}); err != nil {
+		t.Fatalf("events_list error = %v", err)
+	}
+	if backend.monitorListInput.Limit != 50 {
+		t.Fatalf("events_list limit = %d", backend.monitorListInput.Limit)
+	}
+	if _, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "event_acknowledge",
+		Arguments: map[string]any{
+			"account": string(account),
+			"eventId": eventID,
+		},
+	}); err != nil {
+		t.Fatalf("event_acknowledge error = %v", err)
+	}
+	templates, err := client.ListResourceTemplates(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(templates.ResourceTemplates) != 2 {
+		t.Fatalf("resource templates = %+v", templates.ResourceTemplates)
+	}
+	resource, err := client.ReadResource(t.Context(), &mcp.ReadResourceParams{
+		URI: "corresync://events/" + string(account),
+	})
+	if err != nil {
+		t.Fatalf("ReadResource() error = %v", err)
+	}
+	if len(resource.Contents) != 1 ||
+		!strings.Contains(resource.Contents[0].Text, application.MonitorTrustMarker) {
+		t.Fatalf("resource contents = %+v", resource.Contents)
+	}
+}
+
+func TestMailSearchAllToolUsesProjectionDefaults(t *testing.T) {
+	t.Parallel()
+
+	backend := &fakeBackend{}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	clientSession := connectTestClient(t, server)
+	tools, err := clientSession.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("ListTools() error = %v", err)
+	}
+	tool := toolNamed(tools.Tools, "mail_search_all")
+	if tool == nil || tool.Annotations == nil ||
+		!tool.Annotations.ReadOnlyHint ||
+		tool.Annotations.DestructiveHint == nil ||
+		*tool.Annotations.DestructiveHint {
+		t.Fatalf("unsafe cross-account search annotations: %+v", tool)
+	}
+	result, err := clientSession.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "mail_search_all",
+		Arguments: map[string]any{
+			"query": "subject:synthetic",
+		},
+	})
+	if err != nil || result.IsError {
+		t.Fatalf("mail_search_all failed: result=%+v error=%v", result, err)
+	}
+	if backend.searchAllInput.Folder.ID != "inbox" ||
+		backend.searchAllInput.Query != "subject:synthetic" ||
+		backend.searchAllInput.Limit != 25 ||
+		backend.searchAllInput.TimeZone != "UTC" {
+		t.Fatalf(
+			"unexpected cross-account search input: %+v",
+			backend.searchAllInput,
+		)
 	}
 }
 
@@ -536,6 +867,74 @@ func TestCalendarListToolMapsRequiredWindow(t *testing.T) {
 	}
 }
 
+func TestCalendarFolderListToolUsesBoundedDefaults(t *testing.T) {
+	t.Parallel()
+
+	backend := &fakeBackend{calendarFolderPage: application.CalendarFolderPage{
+		Calendars: []application.CalendarFolderSummary{{
+			ID: "calendar-1", DisplayName: "Synthetic", IsDefault: true,
+			CanEdit: true, AccessRole: "owner",
+		}},
+		TotalCalendars: 1, IncludesLastItem: true,
+	}}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	clientSession := connectTestClient(t, server)
+	result, err := clientSession.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "calendar_list_folders", Arguments: map[string]any{},
+	})
+	if err != nil || result.IsError {
+		t.Fatalf("calendar_list_folders failed: result=%+v error=%v", result, err)
+	}
+	if backend.calendarFolderInput.Account != "work" ||
+		backend.calendarFolderInput.Limit != application.MaxCalendarFolderPageSize {
+		t.Fatalf("unexpected calendar folder input: %+v", backend.calendarFolderInput)
+	}
+	structured, ok := result.StructuredContent.(map[string]any)
+	if !ok || structured["totalCalendars"] != float64(1) {
+		t.Fatalf("unexpected structured output: %#v", result.StructuredContent)
+	}
+}
+
+func TestAgendaListToolUsesProjectionDefaults(t *testing.T) {
+	t.Parallel()
+
+	backend := &fakeBackend{}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	clientSession := connectTestClient(t, server)
+	tools, err := clientSession.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("ListTools() error = %v", err)
+	}
+	tool := toolNamed(tools.Tools, "agenda_list")
+	if tool == nil || tool.Annotations == nil ||
+		!tool.Annotations.ReadOnlyHint ||
+		tool.Annotations.DestructiveHint == nil ||
+		*tool.Annotations.DestructiveHint {
+		t.Fatalf("unsafe agenda annotations: %+v", tool)
+	}
+	result, err := clientSession.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "agenda_list",
+		Arguments: map[string]any{
+			"start": "2026-07-17T00:00:00Z",
+			"end":   "2026-07-18T00:00:00Z",
+		},
+	})
+	if err != nil || result.IsError {
+		t.Fatalf("agenda_list failed: result=%+v error=%v", result, err)
+	}
+	if backend.agendaInput.DisplayTimeZone != "UTC" ||
+		backend.agendaInput.Limit != 50 ||
+		backend.agendaInput.Start != "2026-07-17T00:00:00Z" {
+		t.Fatalf("unexpected agenda input: %+v", backend.agendaInput)
+	}
+}
+
 func TestCalendarCreateToolsKeepMandatoryPreviewAndCommitSeparate(t *testing.T) {
 	t.Parallel()
 
@@ -571,7 +970,7 @@ func TestCalendarCreateToolsKeepMandatoryPreviewAndCommitSeparate(t *testing.T) 
 			"location":          "Room Example",
 			"requiredAttendees": []string{"alice@example.invalid"},
 			"optionalAttendees": []string{"bob@example.invalid"},
-			"teamsMeeting":      true,
+			"onlineMeeting":     true,
 			"allDay":            true,
 			"timeZone":          "GMT Standard Time",
 			"reminder": map[string]any{
@@ -588,7 +987,8 @@ func TestCalendarCreateToolsKeepMandatoryPreviewAndCommitSeparate(t *testing.T) 
 	}
 	if backend.calendarCreate.Account != "work" || backend.calendarCreate.Calendar.ID != "calendar" ||
 		backend.calendarCreate.Subject != "Synthetic event" || len(backend.calendarCreate.RequiredAttendees) != 1 ||
-		len(backend.calendarCreate.OptionalAttendees) != 1 || !backend.calendarCreate.TeamsMeeting ||
+		len(backend.calendarCreate.OptionalAttendees) != 1 ||
+		!backend.calendarCreate.OnlineMeeting ||
 		!backend.calendarCreate.AllDay || backend.calendarCreate.TimeZone != "GMT Standard Time" ||
 		backend.calendarCreate.Reminder == nil || backend.calendarCreate.Recurrence == nil {
 		t.Fatalf("unexpected calendar create input: %+v", backend.calendarCreate)
@@ -630,6 +1030,12 @@ func TestCalendarUpdateToolsExposeOnlyClosedVersionedPatch(t *testing.T) {
 			"start": "2026-07-20T09:00:00Z", "end": "2026-07-20T10:00:00Z",
 			"timeZone": "UTC", "allDay": false,
 			"reminder":          map[string]any{"enabled": true, "minutesBeforeStart": 10},
+			"replaceRecurrence": true,
+			"recurrence": map[string]any{
+				"pattern": "weekly", "interval": 1,
+				"daysOfWeek":          []string{"Monday"},
+				"numberOfOccurrences": 4,
+			},
 			"replaceAttendees":  true,
 			"requiredAttendees": []string{"alice@example.invalid"},
 		},
@@ -642,7 +1048,11 @@ func TestCalendarUpdateToolsExposeOnlyClosedVersionedPatch(t *testing.T) {
 		backend.calendarUpdate.Location == nil || *backend.calendarUpdate.Location != "" ||
 		backend.calendarUpdate.Start == nil || backend.calendarUpdate.End == nil ||
 		backend.calendarUpdate.TimeZone == nil || backend.calendarUpdate.AllDay == nil ||
-		backend.calendarUpdate.Reminder == nil || !backend.calendarUpdate.ReplaceAttendees ||
+		backend.calendarUpdate.Reminder == nil ||
+		!backend.calendarUpdate.ReplaceRecurrence ||
+		backend.calendarUpdate.Recurrence == nil ||
+		backend.calendarUpdate.Recurrence.NumberOfOccurrences != 4 ||
+		!backend.calendarUpdate.ReplaceAttendees ||
 		len(backend.calendarUpdate.RequiredAttendees) != 1 {
 		t.Fatalf("unexpected calendar update input: %+v", backend.calendarUpdate)
 	}
@@ -877,6 +1287,210 @@ func TestMailListToolPropagatesApplicationErrorsAsToolErrors(t *testing.T) {
 	}
 	if !result.IsError {
 		t.Fatalf("CallTool() IsError = false, want true: %+v", result)
+	}
+}
+
+func TestAccountToolsUseTypedReadOnlyBackend(t *testing.T) {
+	t.Parallel()
+	account := application.AccountView{
+		ID: "acc_00000000000000000000000000000001", Alias: "work",
+		Address: "reader@example.invalid",
+		Mail: &application.AccountRouteView{
+			Provider: domain.ProviderMicrosoftOWA,
+			Endpoints: []application.DiscoveredEndpoint{
+				{Kind: "origin", Value: "https://outlook.example.invalid"},
+			},
+		},
+		Calendar: &application.AccountRouteView{
+			Provider: domain.ProviderMicrosoftOWA,
+			Endpoints: []application.DiscoveredEndpoint{
+				{Kind: "origin", Value: "https://outlook.example.invalid"},
+			},
+		},
+		IsDefault: true,
+	}
+	backend := &fakeBackend{
+		discoveryResult: application.AccountDiscoveryResult{
+			Address: "reader@example.invalid",
+			Domain:  "example.invalid",
+		},
+		accountCatalog: application.AccountCatalog{Accounts: []application.AccountView{account}},
+		accountView:    account,
+		sessionStatus: application.SessionStatusResult{
+			Accounts: []application.SessionStatus{{
+				Account:          account.ID,
+				Alias:            account.Alias,
+				Provider:         domain.ProviderMicrosoftOWA,
+				MailProvider:     domain.ProviderMicrosoftOWA,
+				CalendarProvider: domain.ProviderMicrosoftGraph,
+				State:            "authenticated",
+				Authenticated:    true,
+				Capabilities:     &domain.Capabilities{Mail: true, Calendar: true},
+			}},
+		},
+	}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+
+	for _, call := range []struct {
+		name      string
+		arguments map[string]any
+	}{
+		{"account_discover", map[string]any{"address": "reader@example.invalid"}},
+		{"account_list", map[string]any{}},
+		{"account_show", map[string]any{"account": "work"}},
+		{"account_status", map[string]any{"account": "work"}},
+	} {
+		result, callErr := client.CallTool(t.Context(), &mcp.CallToolParams{
+			Name: call.name, Arguments: call.arguments,
+		})
+		if callErr != nil || result.IsError {
+			t.Fatalf("%s failed: result=%+v error=%v", call.name, result, callErr)
+		}
+	}
+	if backend.discoveryAddress != "reader@example.invalid" ||
+		backend.accountReference != "work" {
+		t.Fatalf(
+			"typed account inputs were not forwarded: address=%q reference=%q",
+			backend.discoveryAddress,
+			backend.accountReference,
+		)
+	}
+	statusResult, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "account_status", Arguments: map[string]any{"account": "work"},
+	})
+	if err != nil || statusResult.IsError {
+		t.Fatalf(
+			"account_status failed: result=%+v error=%v",
+			statusResult,
+			err,
+		)
+	}
+	structured, ok := statusResult.StructuredContent.(map[string]any)
+	accounts, accountsOK := structured["accounts"].([]any)
+	if !ok || !accountsOK || len(accounts) != 1 {
+		t.Fatalf("account_status output = %#v", statusResult.StructuredContent)
+	}
+	status, statusOK := accounts[0].(map[string]any)
+	if !statusOK ||
+		status["mailProvider"] != string(domain.ProviderMicrosoftOWA) ||
+		status["calendarProvider"] != string(domain.ProviderMicrosoftGraph) {
+		t.Fatalf("account_status route output = %#v", accounts[0])
+	}
+	tools, err := client.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"account_discover", "account_list", "account_show", "account_status",
+	} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
+			t.Fatalf("%s is missing read-only annotations: %+v", name, tool)
+		}
+	}
+}
+
+func TestAccountMutationToolsUseTypedPreviewCommitBoundary(t *testing.T) {
+	t.Parallel()
+	backend := &fakeBackend{
+		accountChangeAccess: application.AccountChangeAccess{
+			Status: "approval_required",
+		},
+	}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+	for _, call := range []struct {
+		name      string
+		arguments map[string]any
+	}{
+		{
+			"account_add",
+			map[string]any{
+				"alias": "team", "address": "reader@example.invalid",
+				"mail": map[string]any{
+					"provider": "microsoft-owa",
+					"outlookWeb": map[string]any{
+						"origin": "https://outlook.example.invalid",
+					},
+				},
+				"default": false,
+			},
+		},
+		{
+			"account_add_commit",
+			// #nosec G101 -- synthetic non-production approval fixture.
+			map[string]any{"token": "opv1_add_synthetic"}, // gitleaks:allow
+		},
+		{
+			"account_rename",
+			map[string]any{"account": "work", "newAlias": "office"},
+		},
+		{
+			"account_rename_commit",
+			// #nosec G101 -- synthetic non-production approval fixture.
+			map[string]any{"token": "opv1_rename_synthetic"}, // gitleaks:allow
+		},
+		{
+			"account_remove",
+			map[string]any{
+				"account": "work", "replacementDefault": "personal",
+			},
+		},
+		{
+			"account_remove_commit",
+			// #nosec G101 -- synthetic non-production approval fixture.
+			map[string]any{"token": "opv1_remove_synthetic"}, // gitleaks:allow
+		},
+	} {
+		result, callErr := client.CallTool(t.Context(), &mcp.CallToolParams{
+			Name: call.name, Arguments: call.arguments,
+		})
+		if callErr != nil || result.IsError {
+			t.Fatalf("%s failed: result=%+v error=%v", call.name, result, callErr)
+		}
+	}
+	if backend.accountAddInput.Alias != "team" ||
+		backend.accountAddInput.Mail == nil ||
+		backend.accountAddInput.Mail.Provider != domain.ProviderMicrosoftOWA ||
+		backend.accountRenameInput.NewAlias != "office" ||
+		backend.accountRemoveInput.ReplacementDefault != "personal" ||
+		backend.approvalToken != "opv1_remove_synthetic" ||
+		backend.caller != (domain.Caller{
+			Surface: "mcp", Instance: "test-server",
+		}) {
+		t.Fatalf("typed lifecycle inputs were not forwarded: %+v", backend)
+	}
+	tools, err := client.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{
+		"account_add", "account_add_commit",
+		"account_rename", "account_rename_commit",
+	} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil ||
+			tool.Annotations.ReadOnlyHint ||
+			tool.Annotations.DestructiveHint == nil ||
+			*tool.Annotations.DestructiveHint {
+			t.Fatalf("%s has unsafe annotations: %+v", name, tool)
+		}
+	}
+	for _, name := range []string{"account_remove", "account_remove_commit"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil ||
+			tool.Annotations.ReadOnlyHint ||
+			tool.Annotations.DestructiveHint == nil ||
+			!*tool.Annotations.DestructiveHint {
+			t.Fatalf("%s has unsafe annotations: %+v", name, tool)
+		}
 	}
 }
 

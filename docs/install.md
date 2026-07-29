@@ -1,47 +1,48 @@
 # Install and verify
 
+The package is Corresync and the primary executable is `corr`. Releases in the
+finite v0.8–v0.9 command-transition window also contain the identical
+`corresync` compatibility executable; scripts and new documentation should use
+`corr`.
+
 ## Release targets
 
-Each release contains one native `corresync` executable plus the license,
-security policy, manual, shell completions, and essential documentation.
-
-| Operating system | Architecture | Artifacts |
+<!-- markdownlint-disable MD013 -->
+| Operating system | Architectures | Artifacts |
 | --- | --- | --- |
-| macOS | Intel, Apple silicon | `.tar.gz` |
+| macOS | amd64, arm64 | `.tar.gz` |
 | Linux | amd64, arm64 | `.tar.gz`, `.deb`, `.rpm`, `.apk` |
 | Windows | amd64, arm64 | `.zip` |
+<!-- markdownlint-enable MD013 -->
 
-Release assets include SHA-256 checksums and SPDX JSON and CycloneDX JSON SBOMs
-for every archive and Linux package. Each archive and package includes the
-third-party license material required by its linked dependencies.
+Every archive includes the license, security policy, changelog, essential
+guides, `corr(1)`, Bash/Zsh/Fish completion, plugin metadata, the Agent Skill,
+and required third-party licenses. Each archive and Linux package has SPDX JSON
+and CycloneDX JSON SBOMs.
 
-## Download
-
-Install from a package catalog when available:
+## Package managers
 
 ```console
-# macOS or Linux (source-building Formula)
+# Homebrew on macOS or Linux
 brew install nkiyohara/corresync/corresync
 
-# Windows with Scoop
+# Scoop on Windows
 scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
 scoop install corresync/corresync
 
-# Windows Package Manager
+# WinGet after its manifest has passed Microsoft review
 winget install --id nkiyohara.Corresync --exact
 ```
 
-Homebrew builds the tagged source locally instead of downloading an
-unnotarized macOS binary. Scoop and WinGet install the exact Windows release
-archive recorded in the catalog. If a newly published version has not reached
-a catalog yet, use the signed GitHub release directly.
+Homebrew builds the tagged source. Scoop and WinGet install checksum-pinned
+Windows release archives. Catalog publication follows the canonical GitHub
+release, so a new version can briefly be available only as a direct download.
 
-### Direct release download
-
-Use the release page in a browser or GitHub CLI. For example:
+## Direct download
 
 ```console
-VERSION=v0.7.0
+VERSION=vX.Y.Z
+RELEASE="${VERSION#v}"
 mkdir corresync-release
 gh release download "$VERSION" \
   --repo nkiyohara/corresync \
@@ -49,27 +50,33 @@ gh release download "$VERSION" \
 cd corresync-release
 ```
 
-Choose the archive matching `darwin`, `linux`, or `windows` and `amd64` or
-`arm64`. Extract it, place `corresync` or `corresync.exe` on `PATH`, and run
-`corresync version --json` to record the version, source commit, build time, Go
-version, operating system, and architecture. Use `corresync --version` for a
-conventional one-line check.
-
-On Linux, download the matching native package when preferred:
+Select `corresync_${RELEASE}_{darwin|linux}_{amd64|arm64}.tar.gz` or the
+equivalent Windows `.zip`. Extract it, place `corr` or `corr.exe` on `PATH`,
+then check:
 
 ```console
-gh release download "$VERSION" \
-  --repo nkiyohara/corresync \
-  --pattern '*.deb'
-sudo apt install ./corresync_*.deb
+corr --version
+corr version --json
 ```
 
-Use the matching `.rpm` with `dnf install` or `.apk` with `apk add`. Review and
-verify the package before invoking a privileged package manager.
+Linux users can instead install the verified native package:
+
+```console
+# Debian or Ubuntu
+sudo apt install ./corresync_*_amd64.deb
+
+# Fedora or another RPM distribution
+sudo dnf install ./corresync-*.x86_64.rpm
+
+# Alpine
+sudo apk add ./corresync_*-r1_x86_64.apk
+```
+
+Review a package before passing it to a privileged package manager.
 
 ## Verify checksums and provenance
 
-Verify downloaded release assets before extracting or installing them:
+Verify downloads before extraction or installation:
 
 ```console
 # Linux
@@ -79,9 +86,8 @@ sha256sum --ignore-missing --check checksums.txt
 shasum -a 256 --check checksums.txt
 ```
 
-The release workflow signs `checksums.txt` with GitHub Actions keyless Sigstore
-identity after verifying the complete artifact inventory. Verify the bundle
-against the exact repository workflow:
+The release workflow signs the verified `checksums.txt` with GitHub Actions
+keyless Sigstore identity:
 
 ```console
 WORKFLOW_ID="https://github.com/nkiyohara/corresync/"
@@ -93,173 +99,125 @@ cosign verify-blob \
   checksums.txt
 ```
 
-The binaries are not yet Apple-notarized or Windows Authenticode-signed. Do not
-disable or weaken operating-system protection merely to run a download. If
-local policy requires a platform signature, inspect and build from the tagged
-source or wait for a future signed distribution.
+The identity must match the repository, release workflow, and selected tag
+exactly. Do not accept a wildcard identity.
+
+macOS binaries are not yet notarized and Windows binaries are not yet
+Authenticode-signed. Do not disable Gatekeeper, SmartScreen, or organization
+policy to run them. If platform signing is required, build from the verified
+tag or wait for a signed distribution.
 
 ## First run
 
-Create and validate the secret-free local configuration before starting the
-browser session owner:
-
 ```console
-corresync config init
-corresync config validate
-corresync doctor
+corr config init
+corr config validate
+corr account list
+corr doctor
 ```
 
-Edit only the configured account alias and final HTTPS Outlook origin used
-after sign-in. `corresync config edit` validates changes before replacing the
-file; typed automation can use `corresync config get` and
-`corresync config set`. `corresync auth login` opens a dedicated browser
-profile. Sign-in, MFA, and Conditional Access remain inside that browser; the
-CLI does not accept a password or persist an authorization header.
+The default account uses Outlook Web. Sign in visibly:
 
 ```console
-corresync auth login
-corresync auth status
-corresync doctor --online
+corr auth login
+corr auth status
+corr doctor --online
 ```
 
-For an interactive SSH session without a display server, the experimental
-`corresync auth login --terminal` command can relay ordinary text-based browser
-controls through the TTY. CAPTCHA, passkeys, security keys, client
-certificates, and native dialogs may still require visible login.
+The browser owns sign-in, MFA, Conditional Access, and session cookies.
+Corresync never asks for a password or copies an authorization header into its
+configuration. Online doctor reuses that authenticated session and never starts
+login or OAuth itself.
 
-## Shell completion and manual
-
-Homebrew metadata and native deb, RPM, and APK packages install `corresync(1)`
-plus Bash, Zsh, and Fish completions into platform-standard locations. Archive
-users can detect and install completion without repeatedly changing a shell
-startup file:
+For another provider:
 
 ```console
-corresync completion install
+corr account discover reader@example.invalid
+corr account add --help
 ```
 
-The command recognizes Bash, Zsh, and Fish from `SHELL`, accepts
-`--shell bash|zsh|fish` as an override, and is idempotent when the installed
-file is already current. A different existing file is preserved unless
-`--force` is explicit. Zsh prints one `fpath` instruction when its install
-directory is not already active.
+Discovery is credential-free. Review its candidates and choose one explicitly.
+Google API and Microsoft Graph require a registered public OAuth client and an
+OS-keyring authorization handle. Managed accounts can explicitly choose the
+read-only `google-web` route and authenticate in a visible browser without an
+OAuth client. JMAP, IMAP/SMTP, and CalDAV use an OS-keyring entry or an
+explicitly approved credential helper. See
+[configuration.md](configuration.md) and
+[authentication.md](authentication.md).
 
-Generated scripts also remain available for temporary use:
+## Completion and manual
+
+Native Linux packages and Homebrew install `corr(1)` and completion in standard
+locations. Archive users can install completion idempotently:
 
 ```console
-source <(corresync completion bash)
-source <(corresync completion zsh)
-corresync completion fish | source
+corr completion install
 ```
 
-Persist only the command appropriate for the current shell. Completion derives
-commands, flags, and enum values from the same CLI model and does not contact
-Outlook.
+The shell is detected from `SHELL`; use `--shell bash|zsh|fish` to override.
+Re-running with current contents is a no-op. A different regular file is
+preserved unless `--force` is explicit, and symlinks are rejected.
 
-## Configure an MCP client
-
-After initializing `corresync`, register the client you use with one command:
+Temporary completion remains available:
 
 ```console
-corresync mcp setup codex
-# or: corresync mcp setup claude-code
-# or: corresync mcp setup github-copilot
-# or: corresync mcp setup gemini-cli
-# or: corresync mcp setup qwen-code
-# or: corresync mcp setup qoder
+source <(corr completion bash)
+source <(corr completion zsh)
+corr completion fish | source
 ```
 
-Start a new agent session, then ask it to check Outlook without naming a tool.
-Use `--dry-run` to inspect the exact process invocation first. Scope flags are
-available for Claude Code, Gemini CLI, Qwen Code, and Qoder. Setup delegates to
-the installed client's official command and does not rewrite unrelated
-settings.
-
-For offline review, Kimi Code CLI, project configuration, or advanced client
-settings, print the client's native document:
+## Connect an MCP client
 
 ```console
-corresync mcp config codex
-corresync mcp config claude-code
-corresync mcp config github-copilot
-corresync mcp config gemini-cli
-corresync mcp config qwen-code
-corresync mcp config qoder
-corresync mcp config kimi-code
+corr mcp setup codex
+# or: claude-code, github-copilot, gemini-cli, qwen-code, or qoder
 ```
 
-The default connection name is `corresync`. See [MCP integration](mcp.md) for
-Agent Skill installation, verification commands, and troubleshooting. Read
-[interactive authentication](authentication.md) before the first login. For
-an existing v0.6 installation, follow the
-[v0.7 migration guide](migration-v0.7.md).
+Use `--dry-run` to inspect an official client registration command. Kimi Code
+CLI and generic clients can use:
+
+```console
+corr mcp config kimi-code
+corr mcp serve
+```
+
+See [mcp.md](mcp.md) for client scopes, verification, and the Agent Skill.
 
 ## Stay current
 
-Released binaries check the latest stable public release at interactive CLI
-startup and display a quiet notice when an update is available. Apply the
-appropriate update path with one command:
-
 ```console
-corresync update
+corr update check
+corr update
 ```
 
-For check-only automation or diagnostics:
+An interactive released CLI may perform a quiet public stable-release check,
+cached locally for 24 hours. It sends the Corresync version as a user agent and
+no account, tenant, config, mailbox, or machine identifier. It is disabled for
+MCP, daemon, completion, feedback, pipes, and JSON output.
 
-```console
-corresync update check
-corresync update check --json
-```
-
-The startup check is read-only. A success or failure is cached in the private
-state directory for 24 hours. Network failure never fails an Outlook
-operation, and automatic notices never enter MCP stdio, generated completions,
-daemon output, pipes, or any command using `--json`.
-
-The request is an unauthenticated `GET` for the repository's public latest
-release metadata. It sends the Corresync version as its user agent and sends
-no mailbox, account, tenant, configuration, or machine identifier. Disable
-automatic checks while retaining the explicit command with either:
+Disable automatic checks while keeping explicit update commands:
 
 ```toml
 [updates]
 disable_automatic_checks = true
 ```
 
+or:
+
 ```console
 export CORRESYNC_NO_UPDATE_CHECK=1
 ```
 
-When a newer stable version exists, the hint follows the detected installation
-surface:
+Package-managed binaries print the exact owner-specific update command and are
+never replaced by Corresync. A direct install verifies release identity,
+checksums, version, OS, and architecture before replacement and retains a
+rollback copy beside the executable. Background checks never modify a binary.
 
-<!-- markdownlint-disable MD013 -->
+The updater knows the former repository and archive names only as a finite
+v0.6 migration input. New releases require canonical `corresync_*` assets.
 
-| Installation | Suggested action |
-| --- | --- |
-| Homebrew | `brew upgrade nkiyohara/corresync/corresync` |
-| WinGet | `winget upgrade --id nkiyohara.Corresync --exact` |
-| Scoop | `scoop update corresync` |
-| deb, RPM, APK | Download and verify the new native package, then install it with the matching package manager |
-| Direct archive | `corresync update` |
+## Upgrade from v0.6
 
-<!-- markdownlint-enable MD013 -->
-
-`corresync update` never modifies files owned by a package manager; it prints
-the command above instead. For a direct archive it refreshes stable metadata,
-verifies the exact release workflow's Sigstore identity, signed checksum,
-candidate version, OS, and architecture, then performs a rollback-capable
-replacement. The previous executable is retained beside the installation as
-`corresync.backup-VERSION` or `corresync.exe.backup-VERSION`. Background checks
-never replace a binary. The explicit direct path contacts the GitHub release
-endpoints and Sigstore's public TUF service, sending only component user-agent
-strings—never Outlook, account, tenant, configuration, or machine identity.
-
-## Package catalogs
-
-GitHub releases remain canonical. Every release renders and verifies a
-source-building Homebrew Formula, Scoop manifest, and WinGet manifest from the
-same checksum inventory. Dedicated catalog repositories consume those
-manifests only after the release is public; they never rebuild or replace an
-existing release artifact. WinGet updates additionally pass Microsoft's
-upstream review.
+Install the v0.6.2 bridge before crossing the repository and asset rename, then
+follow [migration-v0.7.md](migration-v0.7.md). The current application never
+uses old command, config, state, or IPC names as canonical output.

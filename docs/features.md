@@ -1,103 +1,229 @@
 # Feature and evidence matrix
 
-The CLI and MCP server call the same typed application use cases. This matrix
-is the public contract for the current release: a missing row is not available
-through an arbitrary protocol escape hatch.
+CLI and MCP call the same typed application use cases. A missing operation is
+not available through a raw protocol escape hatch.
+
+## Provider routes
+
+<!-- markdownlint-disable MD013 -->
+| Provider ID | Mail | Calendar | Authentication | v0.8 evidence |
+| --- | --- | --- | --- | --- |
+| `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
+| `google-web` | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Visible browser-owned Google session | Implemented; synthetic DOM/integration contracts; live-unobserved |
+| `google-api` | Gmail | Selectable Google calendars, observed Google Meet link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
+| `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
+| `jmap` | Mail | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
+| `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts; live-unobserved |
+| `caldav` | — | Calendar | OS keyring or approved credential helper | Implemented; synthetic WebDAV/iCalendar contracts; live-unobserved |
+<!-- markdownlint-enable MD013 -->
+
+Mail and calendar are selected independently. For example, one account may use
+IMAP/SMTP for mail and CalDAV for calendar. `pop3` is reserved without a route
+builder and cannot be selected.
+
+“Implemented” means the typed route and synthetic contracts ship in v0.8. It is
+not a universal provider-compatibility claim. See
+[compatibility evidence](compatibility.md) before connecting a live account.
+
+Discovery uses DNS and well-known metadata without credentials. It returns
+ranked evidence, confidence, required authentication, and availability; it
+never authenticates or silently adds an account. `corr account add` requires
+explicit provider selection whenever discovery is ambiguous. Microsoft domain
+or hosted-MX evidence offers both Outlook Web and Microsoft Graph, but Graph is
+always marked as an explicit OAuth choice and is never selected as a fallback.
 
 ## Mail
 
 <!-- markdownlint-disable MD013 -->
-
-| Capability | CLI | MCP | Stable result | Live observation |
-| --- | --- | --- | --- | --- |
-| Discover folders | `corresync mail folders` | `mail_list_folders` | `MailFolderPage` | Observed |
-| List metadata | `corresync mail list` | `mail_list` | `MailPage` | Observed |
-| Search metadata with AQS | `corresync mail search` | `mail_search` | `MailPage` | Observed |
-| Read one plain-text body and attachment metadata | `corresync mail body` | `mail_get_body` + commit when required | `MailBodyAccess` | Body observed; metadata contract-tested |
-| Retrieve one bounded file attachment | `corresync mail attachment` | `mail_get_attachment` + commit when required | `MailAttachmentAccess` | Observed |
-| Save a text/HTML new, reply, reply-all, or forward draft | `corresync mail draft` | `mail_create_draft` + commit when required | `MailDraftAccess` | New text observed; extensions contract-tested |
-| Send a text/HTML new message, reply, reply-all, or forward | `corresync mail send` + `--approve` | `mail_send` + `mail_send_commit` | `MailSendAccess` | New text self-send observed; extensions contract-tested |
-| Add bounded file attachments to a draft or send | `--attachment` | `attachments` | Attachment hashes in `MailReview` | Contract-tested; live unobserved |
-| Move one message version | `corresync mail move` | `mail_move` + commit when required | `MailMoveAccess` | Observed, including restore |
-| Set read or unread | `corresync mail mark` | `mail_set_read_state` + commit when required | `MailReadStateAccess` | Observed, including restore |
-| Permanently delete one exact message version | `corresync mail delete` + `--approve` | `mail_delete` + `mail_delete_commit` | `MailDeleteAccess` | Contract-tested; live unobserved |
-
+| Capability | CLI | MCP | Safety |
+| --- | --- | --- | --- |
+| Discover folders | `corr mail folders` | `mail_list_folders` | Bounded metadata |
+| List messages | `corr mail list` | `mail_list` | Metadata only |
+| Search one account | `corr mail search` | `mail_search` | Bounded provider query |
+| Search all accounts | `corr mail search --all-accounts` | `mail_search_all` | Isolated fan-out with provenance and partial failures |
+| Read body | `corr mail body` | `mail_get_body` + optional commit | Explicit sensitive read |
+| Retrieve attachment | `corr mail attachment` | `mail_get_attachment` + optional commit | One bounded file |
+| Save draft | `corr mail draft` | `mail_create_draft` + optional commit | Save-only; never sends |
+| Send/reply/forward | `corr mail send` | `mail_send` + `mail_send_commit` | Exact preview and commit |
+| Move | `corr mail move` | `mail_move` + optional commit | Exact source version where provider supports it |
+| Read/unread state | `corr mail mark` | `mail_set_read_state` + optional commit | Reviewed versioned update |
+| Permanent delete | `corr mail delete` | `mail_delete` + `mail_delete_commit` | Destructive approval |
 <!-- markdownlint-enable MD013 -->
 
-Metadata listing excludes bodies and attachment content. A body read returns
-bounded attachment metadata; content retrieval is a separate sensitive read
-limited to 2 MiB. Draft creation uses `SaveOnly` and never sends. Every send
-requires a separate exact commit and every write request is attempted once; a
-successful Outlook response may omit a Sent Items identity, so `sent.id` and
-`sent.changeKey` are optional.
+Lists exclude body and attachment content. Attachment reads are separately
+bounded. Compose supports text or HTML, new/reply/reply-all/forward modes, and
+bounded file attachments. Every write is attempted once; an unknown outcome is
+reported and never automatically retried.
+
+Provider differences remain visible:
+
+- Google Web is a bounded visible-browser snapshot: metadata reads are
+  available, pagination beyond the visible snapshot is explicitly incomplete,
+  and every mail/calendar write is unavailable;
+- Gmail uses Gmail query syntax and has no atomic history precondition for
+  label changes, moves, or permanent deletion. Corresync revalidates the exact
+  reviewed message immediately before each reviewed operation; a multi-stage
+  move reports any confirmed partial change. Full Gmail support requires the
+  explicitly displayed `https://mail.google.com/` OAuth grant;
+- Graph query syntax differs from Outlook AQS. Reply/forward and move
+  revalidate the exact reviewed source before invoking actions that expose no
+  atomic source ETag precondition. Permanent deletion uses Graph's explicit
+  `permanentDelete` action after revalidation. Successful asynchronous sends
+  may return no sent-item identity;
+- JMAP exposes incremental state and strong state preconditions where the
+  server supports them; a missing Submission capability blocks send while
+  save-only drafts and mail reads remain available, and a read-only account
+  reports every write unavailable;
+- IMAP/SMTP saves accepted submissions to the discovered Sent mailbox and
+  returns the appended message identity. It fails before SMTP when no Sent
+  mailbox exists. Message move uses native MOVE or a targeted UIDPLUS
+  copy/delete/UID-EXPUNGE fallback; permanent delete requires UIDPLUS. Any
+  failure after APPEND, STORE, COPY, MOVE, or deleted marking requires remote
+  reconciliation;
+- Outlook Web supports explicit shared/delegated mailbox routing only when the
+  signed-in user already has that permission.
 
 ## Calendar
 
 <!-- markdownlint-disable MD013 -->
-
-| Capability | CLI | MCP | Stable result | Live observation |
-| --- | --- | --- | --- | --- |
-| List bounded event metadata | `corresync calendar list` | `calendar_list` | `CalendarPage` | Observed |
-| Create an appointment or meeting | `corresync calendar create` + `--approve` | `calendar_create` + `calendar_create_commit` | `CalendarCreateAccess` | Observed |
-| Add a Teams join link at creation | `--teams-meeting` | `teamsMeeting: true` | `created.onlineMeetingJoinUrl` | Observed, self-attendee only |
-| Create all-day events, reminders, and recurrence | create flags | `allDay`, `reminder`, `recurrence` | `CalendarCreateAccess` review | Contract-tested; live unobserved |
-| Update supported fields | `corresync calendar update` + `--approve` | `calendar_update` + `calendar_update_commit` | `CalendarUpdateAccess` | Observed |
-| Replace reminders, all-day status, or attendee lists | update flags | typed update fields | `CalendarUpdateAccess` review | Contract-tested; live unobserved |
-| Cancel one event version | `corresync calendar cancel` + `--approve` | `calendar_cancel` + `calendar_cancel_commit` | `CalendarCancelAccess` | Observed |
-
+| Capability | CLI | MCP | Safety |
+| --- | --- | --- | --- |
+| Discover calendars | `corr calendar folders` | `calendar_list_folders` | Bounded metadata and opaque IDs |
+| List one account | `corr calendar list` | `calendar_list` | Bounded absolute window |
+| List all accounts | `corr agenda list --all-accounts` | `agenda_list` | Normalized isolated projection |
+| Create | `corr calendar create` | `calendar_create` + `calendar_create_commit` | Mandatory preview and commit |
+| Update supported fields | `corr calendar update` | `calendar_update` + `calendar_update_commit` | Exact event version |
+| Cancel | `corr calendar cancel` | `calendar_cancel` + `calendar_cancel_commit` | Destructive approval |
+| Provider meeting link | create flag/capability | typed create field | Only when the selected provider reports support |
 <!-- markdownlint-enable MD013 -->
 
-Creation supports subject, plain-text body, start, end, Exchange time-zone ID,
-location, all-day status, reminders, daily/weekly/absolute-monthly/
-absolute-yearly recurrence, required and optional attendees, and one closed
-Teams option. Update is deliberately limited to subject, plain-text body, start
-plus end and time zone, location, all-day status, reminder, and complete
-replacement of both attendee lists. Cancellation moves the selected event
-version to Deleted Items and asks Outlook to notify meeting attendees.
+The normalized contract includes bounded subject/body, absolute start/end,
+time zone, location, all-day state, reminder, supported recurrence creation,
+replacement and removal, and required/optional attendees. Capability and
+degradation records state when a provider cannot preserve a field. Google Web
+exposes only bounded read-only visible snapshots, rejects unrecognized DOM as
+selector drift instead of reporting an empty mailbox/calendar, and visits each
+UTC date in a multi-day agenda window; it still cannot prove remote DOM
+completeness. Google API discovers
+selectable calendars and provisions a unique Google Meet link only when the
+authenticated calendar advertises that conference solution. Graph discovers
+selectable calendars and reports Teams meeting support. Outlook Web can
+provision a Teams join link as a creation property. `--online-meeting` selects
+the configured provider's native service; the transitional `--teams-meeting`
+alias requires a Teams-capable route. CalDAV discovers VEVENT
+collections, maps typed events through WebDAV/iCalendar, safely consumes
+server-expanded recurrence or performs bounded local expansion, and uses
+conditional writes. A recurring-instance update materializes a
+`RECURRENCE-ID` exception; cancelling one instance adds `EXDATE` to the master
+and removes a matching exception without deleting the series.
 
-Outlook's calendar-view response may report `isOnlineMeeting: false` even for
-an event whose creation response returned a Teams link. The authoritative
-provisioning result is `calendar_create_commit.created`; bounded calendar lists
-never return join URLs.
+Create/update/cancel reviews also name the selected route's attendee-
+notification and cancellation disposition. Outlook Web, Google API, and Graph
+use their reviewed provider-managed notification behavior. CalDAV detects RFC
+6638 server-managed scheduling on the authenticated principal. When available,
+attendee create/update/cancel operations use that route and schedule-tag
+preconditions; when unavailable, attendee writes fail before changing the
+calendar object and the account reports an explicit degradation.
 
-## Agent ergonomics and safety
+Teams chat, channels, calls, recordings, and meeting lifecycle management are
+outside scope.
 
-- Every consequential operation has a review tool or CLI preview. Commit tools
-  accept only a short-lived token bound to the originating process and exact
-  operation digest.
-- Tool names are narrow verbs, schemas reject unknown fields, and updates do
-  not accept arbitrary property names or OWA actions.
-- IDs and change keys are returned together wherever Outlook supplies them so
-  an agent can perform stale-safe follow-up actions.
-- Mail and calendar output is labelled private, untrusted external content.
-  Message bodies and Teams join URLs carry the sensitive classification.
-- Unknown write outcomes fail closed and are never retried automatically.
+## Accounts and projections
 
-See the [JSON contract](json.md) for field-level output shapes and
-[compatibility evidence](compatibility.md) for the limits of the live
-observations.
+- Every account has a stable opaque ID independent of its editable alias and
+  address.
+- Profile, cursor, import, queue, deduplication, and policy state are keyed by
+  that ID.
+- Mail and calendar provider routes are independent.
+- Rename preserves identity and state. Remove requires approval and an explicit
+  replacement when removing the default account.
+- Remove purges account-local state and any unshared OAuth grant owned by
+  Corresync; external standards credential records remain owned by their
+  keyring/helper.
+- Cross-account search and agenda merge normalized results deterministically,
+  retain provenance, enforce global bounds, and return explicit partial
+  failures.
+- Writes always select exactly one account; there is no broadcast write.
 
-## Shared and delegated mailboxes
+## Import staging
 
-An account alias can set a bare `mailbox` SMTP address. The session still signs
-in interactively as the user, stays on the configured Outlook origin, and sends
-explicit OWA mailbox-routing headers. This grants no permission: the signed-in
-user must already be authorized for that mailbox in Outlook Web. Delegate and
-folder-permission management are not exposed.
+`corr import scan` accepts one explicit local source path and supports bounded
+inspection of recognized archives/exports, Maildir, and Thunderbird profiles.
+Without `--approve-read`, it performs no filesystem scan and asks the operator
+to review the privacy boundary. Rerunning with `--approve-read` grants read-only
+access to that exact resolved source and creates the bounded account-local
+staging plan in one operation. It never authenticates, uploads, sends, or
+mutates the source. `corr import purge` removes only Corresync-owned staging.
 
-## Intentionally not implemented
+## Monitoring and event dispatch
 
-The current release does not expose mailbox-rule mutation, delegate-permission
-management, recurrence editing after event creation, item attachments,
-arbitrary recurrence patterns, or a generic property update API. Updating
-Inbox rules through EWS can remove client-only rules according to Microsoft's
-[Inbox management guidance][inbox-guidance], so it is not treated as a safe
-generic write. Teams chat, channels, calls, recordings, and meeting
-lifecycle management are outside the project boundary. Microsoft Graph,
-hosted relays, unattended login, and tenant-wide access are also out of scope.
+Monitoring defaults to `off` for every old, migrated, and new account. Consent
+advances one boundary at a time:
 
-These omissions are deliberate. They avoid weak approximations and keep the
-review surface small; they are not coverage gaps to fill without a concrete use
-case and a typed safety contract.
+```text
+off → notify → queue → agent
+```
 
-[inbox-guidance]: https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/inbox-management-and-ews-in-exchange
+Collection begins only after interactive account authentication. The monitor
+uses two mailbox scans to establish a stable provider window before committing
+its cursor. It ignores Sent and Drafts and suppresses self-message loops.
+
+Account-local state provides deterministic event IDs, deduplication, atomic
+cursor/event updates, acknowledgement, retention, quiet hours, debounce,
+hourly limits, batching, and a circuit breaker. The provider cursor advances
+monotonically with an atomic outbox commit. Notify-mode events remain pending
+in that outbox through quiet hours, debounce, rate limiting, cancellation, or
+adapter failure and are drained before new scan commits and again after a
+successful commit; the cursor is never rewound.
+Each event records whether it belongs to manual queueing, desktop notification,
+or runner delivery so a later policy change cannot redirect old pending data.
+Terminal deliveries expire by completion time under retention; if the 10,000
+event bound is reached, the oldest terminal record yields capacity while
+pending data is never evicted. Only matching messages occupy the bounded
+deduplication window; the oldest identity not protecting a queued event yields
+capacity, retention preserves identities for queued events, and an explicit
+purge clears both queue and dedup state. Recovery advances by actual returned
+item count. If it reaches neither the saved cursor nor a provider-attested
+mailbox end within the 1000-message bound, the inspected window is committed
+for continued operation, but status increments `recoveryOverflows`, records the
+time, and the poll returns an explicit overflow error because uninspected
+messages were not emitted. A missing cursor in a completely inspected shorter
+mailbox is a normal rebaseline; an attested empty mailbox preserves the prior
+cursor. Neither is an overflow.
+Runner and notification completion preserve an acknowledgement that races with
+delivery without redelivering the event. Desktop notification adapters are
+local and time-bound: Linux uses `notify-send`, macOS uses `osascript`, and
+Windows rejects `notify` until Corresync has a registered AppUserModelID. Agent
+mode invokes one absolute executable directly—never through a shell—and sends
+bounded JSON on stdin. A runner claiming remote egress requires a separate
+explicit approval.
+
+CLI exposes configuration, status, listing, acknowledgement, and purge. MCP
+exposes only `monitor_status`, `events_list`, and `event_acknowledge`, plus
+read-only monitor/event resources. Enabling, reconfiguring, and purging remain
+CLI-only consequential actions.
+
+## Privacy-preserving feedback
+
+`corr feedback` creates a deterministic, redacted local report with allowlisted
+build data, platform, installation method, config validation, aggregate
+provider capabilities, and optionally the latest sanitized error class and
+command shape.
+
+Raw errors, argument values, account IDs, addresses, credentials, lookup keys,
+mail/calendar content, attachment names, queries, environment values, helper
+arguments, browser data, and private paths are excluded by construction. The
+latest error record replaces the previous record rather than appending history.
+Malformed or oversized records become visible degraded sections.
+
+Report generation makes no network request. Copy, save, and opening a prefilled
+GitHub page each require an explicit flag after the complete report is shown.
+Opening GitHub never submits an issue automatically.
+
+## Intentionally absent
+
+Corresync does not implement mailbox-rule mutation, delegate-permission
+management, generic provider properties/actions, arbitrary recurrence,
+item-attachment writes, automatic provider fallback, unattended credential
+login, tenant-wide access, a remote MCP endpoint, a hosted relay, telemetry, or
+automatic crash upload.

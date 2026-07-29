@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Providers — Corresync</title>
+    <meta
+      name="description"
+      content="Compare Corresync routes for Outlook, Google, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Choose your Corresync provider route">
+    <meta
+      property="og:description"
+      content="Explicit browser, OAuth, JMAP, IMAP/SMTP, and CalDAV routes with visible capabilities and limits."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nkiyohara.github.io/corresync/providers.html">
+    <link rel="canonical" href="https://nkiyohara.github.io/corresync/providers.html">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="airmail" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync home">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./">Home</a>
+        <a href="providers.html" aria-current="page">Providers</a>
+        <a href="safety.html">Safety</a>
+        <a href="./#quickstart">Quickstart</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/docs/README.md">Docs<span
+            aria-hidden="true"
+          >
+            ↗</span></a>
+        <a href="https://github.com/nkiyohara/corresync">GitHub<span aria-hidden="true">
+            ↗</span></a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>Explicit routes, visible tradeoffs</p>
+        <h1 id="page-title">Choose the route that matches <em>your account.</em></h1>
+        <p class="lede">
+          Corresync never guesses capability from a logo. Discovery gathers credential-free
+          evidence; you select mail and calendar routes before authentication begins.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#route-cards">Compare routes</a>
+          <a
+            class="button secondary"
+            href="https://github.com/nkiyohara/corresync/blob/main/docs/configuration.md"
+          >Open setup details</a>
+        </div>
+      </section>
+
+      <section class="evidence-banner" aria-label="Provider evidence status">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div>
+          <strong>v0.8 evidence level: deterministic.</strong>
+          <p>
+            All routes below have synthetic provider-contract and application coverage. They remain
+            live-unobserved until an authorized record is tied to the exact commit, provider route,
+            and platform.
+          </p>
+        </div>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/docs/compatibility.md">How
+          evidence works<span aria-hidden="true"> →</span></a>
+      </section>
+
+      <section id="route-cards" aria-labelledby="microsoft-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Microsoft routes</p>
+          <h2 id="microsoft-title">Use the browser you already trust—or opt into Graph.</h2>
+          <p>
+            Outlook Web is browser-owned. Microsoft Graph is a separate, explicitly configured
+            public OAuth client and is never an automatic fallback.
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">OW</span>
+              <div>
+                <p class="chip">Browser-owned</p>
+                <h3>Outlook Web</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>Mail</dt>
+                <dd>Read, compose, organize, and reviewed destructive actions</dd>
+              </div>
+              <div>
+                <dt>Calendar</dt>
+                <dd>Selectable calendars and provider-supported Teams join links</dd>
+              </div>
+              <div>
+                <dt>Sign-in</dt>
+                <dd>Dedicated visible browser profile</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              SSO, MFA, Conditional Access, and organization notices remain inside the browser.
+            </p>
+          </article>
+          <article class="route-card accent-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">G</span>
+              <div>
+                <p class="chip">Explicit OAuth</p>
+                <h3>Microsoft Graph</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>Mail</dt>
+                <dd>Read, compose, organize, and reviewed destructive actions</dd>
+              </div>
+              <div>
+                <dt>Calendar</dt>
+                <dd>Selectable calendars and typed Teams join-link creation</dd>
+              </div>
+              <div>
+                <dt>Sign-in</dt>
+                <dd>Your authorized public client; grant stored in the OS keyring</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              Graph is offered only as an explicit choice or for an authorization you already
+              granted.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="tinted-section" aria-labelledby="google-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Google routes</p>
+          <h2 id="google-title">Read through a visible browser—or choose the API for writes.</h2>
+          <p>
+            The Web and API routes are intentionally separate. Corresync never turns a read-only
+            managed-browser route into OAuth behind your back.
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">GW</span>
+              <div>
+                <p class="chip">Browser-owned · read-only</p>
+                <h3>Google Web</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>Mail</dt>
+                <dd>Bounded Gmail metadata snapshots</dd>
+              </div>
+              <div>
+                <dt>Calendar</dt>
+                <dd>Bounded Google Calendar snapshots</dd>
+              </div>
+              <div>
+                <dt>Sign-in</dt>
+                <dd>Dedicated visible browser profile; no OAuth client</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              Visible snapshot bounds and selector drift are reported as degradations, never hidden.
+            </p>
+          </article>
+          <article class="route-card accent-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">GA</span>
+              <div>
+                <p class="chip">Explicit OAuth</p>
+                <h3>Google API</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>Mail</dt>
+                <dd>Gmail reads, composition, labels, Trash, and reviewed permanent deletion</dd>
+              </div>
+              <div>
+                <dt>Calendar</dt>
+                <dd>Selectable calendars and Google Meet when the calendar advertises it</dd>
+              </div>
+              <div>
+                <dt>Sign-in</dt>
+                <dd>Your authorized public client; grant stored in the OS keyring</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              The exact service-minimal scopes are shown before the provider page opens.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section aria-labelledby="standards-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Open standards</p>
+          <h2 id="standards-title">Mix the services your provider actually exposes.</h2>
+          <p>
+            Standards routes use valid TLS and an OS-keyring entry or one explicitly approved
+            absolute credential-helper reference.
+          </p>
+        </div>
+        <div class="route-grid three">
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">J</span>
+              <div>
+                <p class="chip">Mail</p>
+                <h3>JMAP</h3>
+              </div>
+            </header>
+            <p>
+              Mail reads, drafts, submission where advertised, moves, state changes, and reviewed
+              deletion through typed RFC 8620 contracts.
+            </p>
+            <p class="route-foot">
+              A read-only account or missing Submission capability stays explicitly unavailable.
+            </p>
+          </article>
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">IM</span>
+              <div>
+                <p class="chip">Mail</p>
+                <h3>IMAP / SMTP</h3>
+              </div>
+            </header>
+            <p>
+              IMAP folders, reads, MIME, drafts, safe moves, and SMTP submission with a resolvable
+              Sent-mailbox outcome.
+            </p>
+            <p class="route-foot">
+              Operations that need UIDPLUS or a Sent mailbox fail before unsafe emulation.
+            </p>
+          </article>
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">C</span>
+              <div>
+                <p class="chip">Calendar</p>
+                <h3>CalDAV</h3>
+              </div>
+            </header>
+            <p>
+              Calendar discovery, bounded recurrence, create, update, and cancellation with
+              conditional WebDAV/iCalendar writes.
+            </p>
+            <p class="route-foot">
+              Attendee scheduling requires observed RFC 6638 support and schedule-tag protection.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="mix-panel" aria-labelledby="mix-title">
+        <div>
+          <p class="eyebrow light"><span aria-hidden="true"></span>One account, two routes</p>
+          <h2 id="mix-title">Mail and calendar do not have to come from the same protocol.</h2>
+          <p>
+            Pair IMAP/SMTP with CalDAV, use a Google route for both services, or configure a
+            mail-only or calendar-only account. Stable account identity keeps profiles, credentials,
+            cursors, previews, and audit context isolated.
+          </p>
+        </div>
+        <figure class="terminal">
+          <figcaption class="term-bar">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="term-title">credential-free discovery</span>
+          </figcaption>
+          <pre
+            tabindex="0"
+            role="region"
+            aria-label="Discover and add an explicit provider route"
+          ><code><span class="t-prompt">$</span> corr account discover reader@example.invalid
+<span class="t-dim">evidence  DNS · well-known · provider metadata</span>
+<span class="t-dim">action    none — discovery never authenticates</span>
+
+<span class="t-prompt">$</span> corr account add reader@example.invalid --help
+<span class="t-dim">choose one mail route and one calendar route</span></code></pre>
+        </figure>
+      </section>
+
+      <section class="honest-edges" aria-labelledby="provider-limits-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>No hidden fallback</p>
+          <h2 id="provider-limits-title">A missing capability stays missing.</h2>
+        </div>
+        <ul>
+          <li>Provider limitations are returned as typed capabilities or degradations.</li>
+          <li>Google Web writes never fall through to Google API.</li>
+          <li>Graph and managed Google authorization never start from automatic discovery.</li>
+          <li>
+            Meeting links are requested only from the selected calendar route when it reports
+            support.
+          </li>
+          <li>
+            Unknown write outcomes require reconciliation and are never retried automatically.
+          </li>
+        </ul>
+      </section>
+
+      <section class="final-cta" aria-labelledby="provider-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>Choose deliberately</p>
+        <h2 id="provider-cta-title">Start with evidence, then authenticate.</h2>
+        <p>Discovery reads no credentials and adds no account.</p>
+        <div class="actions centered">
+          <a
+            class="button primary"
+            href="https://github.com/nkiyohara/corresync/blob/main/docs/configuration.md"
+          >Configure a route</a>
+          <a
+            class="button secondary"
+            href="https://github.com/nkiyohara/corresync/blob/main/docs/features.md"
+          >See the exact feature matrix</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <p>
+        Independent local-first mail and calendar tooling. Not affiliated with or endorsed by
+        Google, Microsoft, or any provider named here.
+      </p>
+      <nav aria-label="Footer">
+        <a href="./">Home</a>
+        <a href="safety.html">Safety</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security</a>
+        <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

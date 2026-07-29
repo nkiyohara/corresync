@@ -1,20 +1,22 @@
 name: Compatibility observation
-description: Report a content-free opt-in Outlook Web compatibility result.
+description: Report a content-free opt-in provider compatibility result.
 title: "compat: "
 labels: ["compatibility"]
 body:
   - type: markdown
     attributes:
       value: |
-        Do not include tenant names, addresses, message/event IDs, request IDs,
-        subjects, bodies, screenshots, browser captures, cookies, or tokens.
+        Use `corr feedback --last-error` where possible. Do not include account
+        aliases/IDs/addresses, tenant or endpoint names, item/request IDs,
+        subjects, bodies, queries, source paths, screenshots, provider payloads,
+        credentials, grants, tokens, helper output, or approval values.
 
   - type: input
     id: version
     attributes:
       label: Corresync version
-      description: Paste the version and commit from `corresync version --json`.
-      placeholder: v0.7.0 / 0123456789abcdef
+      description: Paste the version and commit from `corr version --json`.
+      placeholder: vX.Y.Z / 0123456789abcdef
     validations:
       required: true
 
@@ -40,51 +42,60 @@ body:
       required: true
 
   - type: dropdown
-    id: browser
+    id: provider
     attributes:
-      label: Browser family
+      label: Provider route
       options:
-        - Google Chrome
-        - Chromium
-        - Microsoft Edge
-    validations:
-      required: true
-
-  - type: dropdown
-    id: deployment
-    attributes:
-      label: Mail deployment class
-      options:
-        - Microsoft 365 work or school
-        - Outlook.com personal
-        - Exchange hybrid
-        - Exchange on-premises
-    validations:
-      required: true
-
-  - type: textarea
-    id: doctor
-    attributes:
-      label: Content-free doctor result
-      description: Review local paths, then paste `corresync doctor --online --json`.
-      render: json
+        - microsoft-owa
+        - google-api
+        - microsoft-graph
+        - jmap
+        - imap-smtp
+        - caldav
     validations:
       required: true
 
   - type: input
-    id: browser-version
+    id: auth-runtime
     attributes:
-      label: Browser version
-      placeholder: 140.0.0.0
+      label: Authentication runtime
+      description: Browser or OS credential-store/helper family and version only.
+      placeholder: Chromium 140 or macOS Keychain 15
     validations:
       required: true
+
+  - type: input
+    id: deployment
+    attributes:
+      label: Broad deployment class
+      description: Provider plan/class only; no tenant, domain, server, or address.
+      placeholder: Microsoft 365 work/school or consumer JMAP
+    validations:
+      required: true
+
+  - type: textarea
+    id: observation
+    attributes:
+      label: Content-free observation
+      description: Name the operation/capability and generalized success/failure stage.
+    validations:
+      required: true
+
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Reviewed feedback report
+      description: Optional output from `corr feedback --last-error`; review before pasting.
+      render: json
 
   - type: checkboxes
     id: confirmation
     attributes:
       label: Safety confirmation
       options:
-        - label: I was authorized to access the tested mailbox.
+        - label: I was authorized to access the tested account and device.
           required: true
-        - label: I reviewed this report and removed mailbox and session data.
+        - label: I reviewed this report and removed private data and authorization material.
+          required: true
+        - label: I did not paste raw CLI, MCP, provider, import, event, or monitor output.
           required: true

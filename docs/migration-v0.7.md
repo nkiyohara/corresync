@@ -1,25 +1,28 @@
-# Migrate to Corresync 0.7
+# Migrate from the v0.6 Outlook bridge
 
-Corresync 0.7 is the coordinated rename release. The repository, executable,
-Go module, release assets, package catalogs, configuration and state
-directories, MCP identity, plugin, Skill, completions, and manual all use the
-Corresync name.
+Corresync 0.7 coordinated the product/repository/package rename. Corresync 0.8
+makes `corr` the primary interactive command and upgrades configuration to
+schema v3 with explicit mail/calendar provider routes.
 
-The upgrade preserves account routing and normally preserves the dedicated
-browser profile. It does not preserve old command or MCP registration names as
-new public interfaces.
+Old names in this guide are migration inputs only. They are not current command
+or directory aliases.
 
-## Before the rename
+## Cross the release-asset rename safely
+
+A direct v0.6.1 updater looks only for an old archive name in the 0.7 release
+and therefore reports a missing asset. Published release assets are immutable;
+the fix is the v0.6.2 bridge release, whose updater trusts both exact workflow
+identities and understands the canonical Corresync archive.
 
 Package-manager users can install the renamed package directly. A direct
-v0.6.2 installation can use the built-in updater:
+v0.6.2 installation can use the built-in updater after finishing or abandoning
+pending preview tokens:
 
 ```console
 owa update
 ```
 
-Finish or abandon pending preview tokens before upgrading; daemon replacement
-intentionally invalidates them.
+Daemon replacement intentionally invalidates pending previews.
 
 ## From v0.6.1
 
@@ -72,7 +75,7 @@ Corresync v0.7. Its updater accepts the canonical archive and both exact
 workflow identities. Move the resulting `corresync` executable to a private
 directory on `PATH`, preserving the installed v0.6.1 file until first-run
 migration succeeds. Then continue with
-[local-data migration](#let-corresync-migrate-local-data).
+[local-data migration](#local-data-migration).
 
 Alternatively, verify and install the canonical v0.7 archive directly using
 [install.md](install.md#direct-release-download). Corresync itself performs
@@ -97,94 +100,109 @@ scoop install corresync/corresync
 # WinGet
 winget uninstall --id nkiyohara.OWABridge --exact
 winget install --id nkiyohara.Corresync --exact
-
-# Debian or Ubuntu
-sudo apt remove owa-bridge
-
-# Fedora or RHEL
-sudo dnf remove owa-bridge
-
-# Alpine
-sudo apk del owa-bridge
 ```
 
-Then install the Corresync `.deb`, `.rpm`, or `.apk` from the matching release
-when using a native Linux package. For a direct archive, extract the new
-release and put `corresync` or `corresync.exe` on `PATH`. If v0.6.2 updated an
-existing executable in place, rename that file to the canonical executable
-name after it exits.
+For deb/RPM/APK, remove the former package and install the matching verified
+Corresync package. Do not run two package owners for the same executable.
 
-Confirm that the canonical command resolves before removing any rollback copy:
+## Adopt the short command
+
+The product, repository, package, MCP connection, plugin, config/state paths,
+and release assets remain named Corresync. The primary command is now:
 
 ```console
-corresync --version
+corr --version
+corr config validate
+corr account list
 ```
 
-## Let Corresync migrate local data
+The identical `corresync` executable remains in v0.8 and v0.9 releases only as
+a script/update compatibility entry. New scripts, MCP registrations,
+completions, examples, and automation should use `corr`. It may be removed no
+earlier than v0.10.
+
+There is no current `owa` command or provider-specific public directory alias.
+
+## Local data migration
 
 Run a normal command without an explicit config path:
 
 ```console
-corresync config validate
-corresync auth status
+corr config validate
+corr auth status
 ```
 
-On first use, Corresync:
+The migration:
 
-1. reads the v0.6 version-1 config only when no Corresync config exists;
-2. writes a version-2 config with a stable opaque ID and provider ID for every
-   account, leaving the old config byte-for-byte unchanged;
-3. stops the old authenticated session owner before touching browser state;
-4. copies rollback-safe state such as content-free audit and update metadata;
-5. never copies IPC credentials; and
-6. moves each browser profile into the stable account-ID namespace so two
+1. reads the old config only when no canonical Corresync config exists;
+2. preserves every stable opaque account ID;
+3. converts schema v1/v2 accounts to schema v3 mail/calendar routes;
+4. leaves the original config byte-for-byte unchanged;
+5. stops the old authenticated session owner before browser-state changes;
+6. copies only rollback-safe state such as content-free audit/update metadata;
+7. never copies an IPC credential; and
+8. moves each browser profile into its stable account-ID namespace so two
    readable authenticated copies do not exist.
 
-The profile move is atomic and must stay on one filesystem. A fresh interactive
-sign-in is a normal outcome if the browser or tenant invalidates the relocated
-profile.
+A fresh interactive sign-in is normal after a browser-profile move. Explicit
+custom config/state paths are never guessed or migrated; continue to pass
+`--config`, `CORRESYNC_CONFIG`, or `CORRESYNC_STATE_DIR`.
 
-Explicit custom config or state paths are never guessed or moved. Continue to
-pass `--config`, set `CORRESYNC_CONFIG`, or set `CORRESYNC_STATE_DIR` as
-appropriate.
+After migration, review the explicit routes:
+
+```console
+corr account show work
+corr doctor
+corr auth login --account work
+```
+
+New provider routes, imports, and monitoring do not turn on automatically.
+Monitoring remains `off` for every migrated account.
 
 ## Re-register MCP and completion
 
-Existing MCP documents may contain both an old connection label and an absolute
-path to the removed executable. Register the canonical connection again, verify
-it, then remove the stale client entry:
+Client registrations often store an absolute executable path. Register the new
+path, verify it in a fresh client session, and remove the stale entry:
 
 ```console
-corresync mcp setup codex
-corresync completion install
+corr mcp setup codex
+corr completion install
 ```
 
-Replace `codex` with the client in use. The default MCP connection is
-`corresync`; the Registry ID is `io.github.nkiyohara/corresync`. Re-running
-completion installation is idempotent and does not append shell startup lines.
+Replace `codex` with the client in use. The MCP connection name remains
+`corresync` and the Registry ID remains
+`io.github.nkiyohara/corresync`.
+
+Completion installation writes one canonical `corr` file. Re-running is
+idempotent and does not append startup lines. A different file is preserved
+unless `--force` is explicit; symlinks are rejected.
 
 ## Repository and Pages
 
-The existing GitHub repository is renamed to
-`https://github.com/nkiyohara/corresync`, preserving issues, pull requests,
-stars, releases, and Git redirects. Update the local remote explicitly:
+The canonical repository is:
+
+```text
+https://github.com/nkiyohara/corresync
+```
+
+Update a local remote explicitly:
 
 ```console
 git remote set-url origin https://github.com/nkiyohara/corresync.git
 ```
 
-Pages moves to `https://nkiyohara.github.io/corresync/`. There is deliberately
-no Pages redirect; update bookmarks and documentation links.
+Pages is `https://nkiyohara.github.io/corresync/`. There is deliberately no
+Pages redirect; update bookmarks.
 
-## Roll back
+## Rollback
 
 Stop Corresync before rollback:
 
 ```console
-corresync daemon stop
+corr daemon stop
 ```
 
-The original v0.6 config remains unchanged, but authenticated browser profiles
-were moved rather than duplicated. A rollback can therefore require signing in
-again. Do not copy a live profile between the old and new state trees, and
-never run both daemon generations against the same explicit state directory.
+The original v0.6 config remains unchanged, but browser profiles were moved
+rather than duplicated. Rollback can require signing in again. Never copy a
+live browser profile between state trees or run two daemon generations against
+the same explicit state directory.

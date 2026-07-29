@@ -151,3 +151,24 @@ func TestProfileDirDoesNotContainAccountAlias(t *testing.T) {
 		t.Fatalf("ProfileDir() exposed alias as path: %q", path)
 	}
 }
+
+func TestProviderProfileDirIsolatesWebProviders(t *testing.T) {
+	t.Setenv("OWA_STATE_DIR", t.TempDir())
+	account := domain.AccountID("acc_00000000000000000000000000000001")
+	outlook, err := ProviderProfileDir(account, domain.ProviderMicrosoftOWA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := ProfileDir(account)
+	if err != nil {
+		t.Fatal(err)
+	}
+	google, err := ProviderProfileDir(account, domain.ProviderGoogleWeb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outlook != legacy || google == outlook ||
+		!strings.Contains(google, "browser-profiles") {
+		t.Fatalf("outlook=%q legacy=%q google=%q", outlook, legacy, google)
+	}
+}

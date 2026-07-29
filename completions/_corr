@@ -1,0 +1,4 @@
+#compdef corr
+# zsh completion for Corresync through its bash-compatible completion protocol.
+autoload -U +X bashcompinit && bashcompinit
+complete -o default -o bashdefault -C corr corr

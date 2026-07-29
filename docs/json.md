@@ -1,194 +1,213 @@
-# JSON output contract
+# Stable JSON contract
 
-`--json` and MCP structured content serialize the same application result
-types. Field names use lower camel case. Optional scalar fields are omitted
-when Outlook does not return a value; result arrays are empty arrays rather
-than `null`. Empty nested address metadata can appear as `{}`. Mailbox content
-and identifiers in the examples below are synthetic.
+Commands with `--json` emit exactly one unstyled JSON value to stdout. MCP
+returns the same typed application results through MCP structured content.
+Human notices, browser prompts, progress, and diagnostics use stderr and never
+prefix a JSON document.
 
-## Read results
+## Compatibility rules
 
-<!-- markdownlint-disable MD013 -->
+- Existing field meanings do not change within a major version.
+- Additive optional fields may appear in a minor release.
+- Enum additions are possible only where the documented consumer contract
+  allows unknown values; otherwise they require a major version.
+- Unknown input fields are rejected.
+- Omitted optional IDs mean the provider did not return a reliable identity;
+  clients must not invent one.
+- Timestamps are RFC3339. Absolute instants are normalized; display zones are
+  explicit.
+- IDs and change keys are opaque strings. Never parse or reuse one across
+  accounts/providers.
+- Account aliases are display/selectors; stable opaque account IDs own state
+  and provenance.
+- Message, calendar, event-queue, and import values are private, untrusted
+  external data.
 
-| Command or tool | Top-level fields | Item fields |
-| --- | --- | --- |
-| Mail folders | `folders`, `totalFolders`, `includesLastItem` | `id`, optional `changeKey`, `parentId`, `displayName`, `class`, `distinguishedId`; `childFolderCount`, `totalItemCount`, `unreadItemCount` |
-| Mail list and search | `messages`, `totalItemsInView`, `includesLastItem` | `id`, optional `changeKey`, `subject`, `from`, `receivedAt`, `importance`; `isRead`, `hasAttachments` |
-| Mail attachment | `status`, `attachment` | metadata plus `contentBase64`, bounded to 2 MiB decoded |
-| Calendar list | `events`, `start`, `end` | `id`, optional `changeKey`, `subject`, `location`, `organizer`, `myResponse`, `freeBusy`; `start`, `end`, `isAllDay`, `isOnlineMeeting`, `isOrganizer`, `isCancelled` |
+Exit status remains authoritative: `0` success or intentional preview, `1`
+runtime/policy/provider failure, `2` usage failure.
 
-<!-- markdownlint-enable MD013 -->
+## Provenance and capability
 
-`from` and `organizer` contain optional `name` and `address` fields. Calendar
-list results exclude bodies, attendee lists, attachments, and meeting join
-URLs.
-
-An immediate body result has this shape:
+Provider-backed results include or inherit provenance:
 
 ```json
 {
-  "status": "completed",
-  "body": {
-    "id": "message-1",
-    "changeKey": "change-2",
-    "text": "Synthetic plain-text body",
-    "attachments": [
-      {
-        "id": "attachment-1",
-        "kind": "file",
-        "name": "fixture.txt",
-        "contentType": "text/plain",
-        "size": 17,
-        "isInline": false
-      }
-    ]
+  "accountId": "acc_0123456789abcdef0123456789abcdef",
+  "provider": "google-api",
+  "mailboxId": "gmail-me",
+  "sourceObjectId": "opaque-provider-id"
+}
+```
+
+Cross-account projections additionally include the local account alias and
+explicit failures. Never expose account IDs in a feedback report; normal JSON
+application output is private and may contain them.
+
+Authenticated status reports normalized capabilities such as mail, calendar,
+folders, labels, online meeting kind, incremental sync, and attachment
+read/write. A false value means unavailable or not confirmed. Provider
+degradations contain a bounded feature code, reason, and `lossy` flag.
+
+## Account lifecycle
+
+`corr account discover --json` returns:
+
+- normalized input address;
+- sorted provider candidates;
+- confidence;
+- required authentication;
+- availability;
+- bounded evidence and endpoint hints.
+
+It performs no authentication or configuration write.
+
+`account list/show/add/rename/remove --json` use account views containing alias,
+stable ID, address when configured, mail/calendar route summaries, default
+status, and operation status. Route documents are secret-free but still
+private: addresses, endpoints, OAuth client IDs, and helper configuration must
+not be posted publicly. Credential-reference keys are accepted only as private
+account-add input and omitted from every read/review view; an approval digest
+binds the complete write input without echoing the key.
+
+## Mail
+
+Folder pages contain bounded items and paging metadata. Message pages contain
+metadata such as ID, change key when available, received time, sender, subject,
+read/importance state, attachment presence, and provenance. They never include
+recipients, a body, or attachment bytes.
+
+Body access contains a policy decision plus either a review/approval token or a
+bounded body result with attachment metadata. Attachment access similarly
+returns a review or one bounded base64 payload when JSON output is explicitly
+selected.
+
+Draft, send, move, state, and delete results are access envelopes:
+
+```json
+{
+  "decision": "preview",
+  "review": {},
+  "approval": {
+    "token": "secret-single-use-capability",
+    "expiresAt": "2026-07-28T12:02:00Z"
   }
 }
 ```
 
-## Preview results
+After commit, the same result type contains the created/moved/updated/deleted
+outcome. Approval tokens are secrets: never log, persist, or share them.
+Reviews contain normalized fields and content digests, not raw body text.
 
-A gated operation first returns `status: "approval_required"`, an operation-
-specific `review`, and a `preview`:
+Cross-account mail search returns globally paged projected messages plus
+per-account statuses/failures. It is read-only.
 
-```json
-{
-  "status": "approval_required",
-  "review": {
-    "to": ["reader@example.invalid"],
-    "subject": "Synthetic message",
-    "bodyPreview": "Synthetic body",
-    "bodyBytes": 14,
-    "bodySha256": "24a225060015d36ac2507b199f561043ed5374faada4fb75c880c19017f40038",
-    "bodyFormat": "text",
-    "composeMode": "new"
-  },
-  "preview": {
-    "token": "REDACTED",
-    "expiresAt": "2026-07-18T12:02:00Z",
-    "operation": {
-      "name": "mail.send",
-      "effect": "external_write",
-      "account": "work",
-      "digest": "1e6887a57c5e7f647590cc3beef1be2f3c1f3e2ff018e80ccfeea349652b7184"
-    }
-  }
-}
-```
+## Calendar
 
-The token is a secret, one-time capability. Do not log or persist it. CLI
-`--approve` regenerates and consumes the in-process preview from the same exact
-arguments; MCP passes the returned token only to the matching commit tool.
+Calendar pages contain bounded normalized event metadata, event ID/change key,
+start/end, display values, time zone, all-day state, location,
+organizer/cancellation/response/free-busy state, online-meeting presence, and
+provenance. They exclude the body, attendee list, recurrence/reminder detail,
+attachments, and online-meeting join URL.
 
-Reviews bind the complete input while bounding displayed content:
+Create, update, and cancellation use preview/commit access envelopes. Creation
+review binds attendees, the provider meeting-link request, and whether the
+configured route sends attendee notifications. Update review records whether
+the provider may notify attendees. Cancellation review records the exact
+provider disposition, cancellation mode, and notification possibility.
 
-<!-- markdownlint-disable MD013 -->
+A committed create may return `onlineMeetingJoinUrl` only when the provider
+created one. That URL is sensitive.
 
-| Operation | Review fields |
-| --- | --- |
-| Draft or send | optional recipients, subject, body preview, reference identity, attachments; required body size/hash, `bodyFormat`, `composeMode`; attachment content is represented by size and SHA-256 |
-| Mail hard delete | `messageId`, `changeKey`, `deleteType` |
-| Mail move | `messageId`, `changeKey`, `destination` |
-| Read-state update | `messageId`, `changeKey`, `state` |
-| Calendar create | calendar, optional subject/body/location/attendees/reminder/recurrence, start/end/time zone, all-day and invitation/Teams flags, body size/hash |
-| Calendar update | identity, only supplied patch fields, optional reminder and attendee replacement, bounded body review, `meetingUpdateMode` |
-| Calendar cancellation | `eventId`, `changeKey`, `cancellationMode`, `deleteType` |
+Cross-account agenda returns projected events with alias/provider provenance,
+global paging, and explicit partial failures. It never performs a write.
 
-<!-- markdownlint-enable MD013 -->
+## Monitoring and events
 
-## Commit results
+Monitor status is content-free with:
 
-<!-- markdownlint-disable MD013 -->
+- account alias/provider and consent mode;
+- configured sink type, disclosed field names, and egress declaration;
+- cursor/dedup health;
+- queue counts;
+- persistent cursor-recovery overflow count and last-overflow time;
+- rate-limit/circuit-breaker state;
+- collection/dispatch timestamps where available.
 
-| Operation | Success status | Result object and fields |
-| --- | --- | --- |
-| Body read | `completed` | `body`: `id`, optional `changeKey`, `text`, optional attachment metadata |
-| Attachment read | `completed` | `attachment`: metadata and `contentBase64` |
-| Draft save | `completed` | `draft`: `id`, optional `changeKey` |
-| Send | `sent` | `sent`: optional `id`, `changeKey` |
-| Mail move | `completed` | `moved`: optional `id`, `changeKey` |
-| Read-state update | `completed` | `updated`: optional `id`, `changeKey`; required `state` |
-| Mail hard delete | `deleted` | `deleted`: `id` |
-| Calendar create | `created` | `created`: `id`, optional `changeKey`, required `isOnlineMeeting`, optional `onlineMeetingProvider`, `onlineMeetingJoinUrl` |
-| Calendar update | `updated` | `updated`: optional `id`, `changeKey` |
-| Calendar cancellation | `cancelled` | `cancelled`: `id` |
+Event pages contain bounded metadata selected by the account's consent policy,
+deterministic `evt_` IDs, a `delivery` value (`queue`, `notification`, or
+`runner`), delivery state/count, and timestamps. Sender/subject values are
+private untrusted data. Acknowledgement returns the same event with state
+`acknowledged` and is idempotent.
 
-<!-- markdownlint-enable MD013 -->
+When cursor recovery reaches neither the saved cursor nor a provider-attested
+mailbox end, the inspected bounded window is committed so monitoring can
+continue, but the poll fails explicitly and status records `recoveryOverflows`
+plus `lastRecoveryOverflowAt`. Uninspected messages are not claimed as emitted.
+A deleted cursor in a shorter mailbox does not count as overflow when the
+provider reports mailbox end. An attested empty mailbox preserves the prior
+cursor. Event purge clears the private deduplication window; ordinary retention
+preserves identities referenced by queued events.
 
-Write success objects also include the exact bounded `review`. Empty optional
-identities do not mean failure: Outlook sometimes confirms a write without
-returning a refreshed item identity. A transport failure after submission is
-reported as an unknown outcome instead of being converted into success or
-automatically retried.
+## Imports
 
-## Update status
+Import scan JSON is an upload-free local plan. It reports source format,
+bounded counts/sizes, exact approval identity/digest, detected degradations,
+and staging status. Paths and discovered local metadata are private. No import
+shape means data was sent to a provider.
 
-`corresync update check --json` returns `status`, `currentVersion`,
-`updateAvailable`, and `cached`; successful comparisons also include
-`latestVersion`, `releaseUrl`, and `checkedAt`.
-`status` is `current`, `available`, `development`, or `unavailable`. This
-content-free result is separate from the Outlook application result types.
-`installMethod` and `upgrade` appear only when `status` is `available`.
+## Auth, daemon, config, doctor, version, and update
 
-`corresync update --json` returns the explicit action result. It always includes
-`status`, `currentVersion`, `updated`, and `installMethod`. A direct successful
-replacement uses `status: "updated"` and also returns `previousVersion`,
-`latestVersion`, `releaseUrl`, `archive`, `backupPath`, and the completed
-`verification` checks. A managed installation uses
-`status: "action_required"` with the exact external `command`; `updated`
-remains false.
-Automatic human notices are never appended to JSON output.
+- `auth status --json`: content-free account lifecycle, capability, and
+  degradation state.
+- `auth logout --account work --json`: exact account ID and alias with
+  `scope: "account"`; the daemon remains active.
+- `auth logout --json`: whole-owner shutdown result with `scope: "all"`.
+- `daemon status --json`: process/protocol/version/config-digest health; no
+  credential.
+- `config validate --json`: validity and local path. The path is private.
+- `config show --json`: complete validated secret-free configuration; still
+  private for the reasons above.
+- `doctor --json`: local check rows; `--online` is opt-in.
+- `version --json`: version, commit, source build date, Go version, OS, and
+  architecture.
+- `update check --json`: current/latest version, cache and release status.
+- `update --json`: explicit action result, installation method, verification
+  steps, and rollback path where applicable.
 
-## Local CLI state
+Automatic update notices never appear around these objects.
 
-`corresync auth status --json` is deliberately content-free:
+## Feedback report
 
-```json
-{
-  "daemonVersion": "0.7.0",
-  "processId": 4242,
-  "accounts": [
-    {
-      "account": "acc_0123456789abcdef0123456789abcdef",
-      "alias": "work",
-      "provider": "microsoft-owa",
-      "state": "authenticated",
-      "authenticated": true,
-      "capturedAt": "2026-07-28T12:00:00Z",
-      "capabilities": {
-        "mail": true,
-        "calendar": true,
-        "folders": true,
-        "labels": false,
-        "push": false,
-        "freeBusy": false,
-        "onlineMeeting": "teams",
-        "incrementalSync": false,
-        "scheduledSend": false,
-        "sharedMailboxes": true,
-        "sharedCalendars": false,
-        "attachmentReads": true,
-        "attachmentWrites": true
-      }
-    }
-  ]
-}
-```
+`corr feedback` intentionally prints explanatory prose plus a complete
+deterministic JSON report. `--copy`, `--save`, and the GitHub prefill use only
+the JSON report bytes.
 
-State is `authenticated`, `pending`, or `signed_out`; `capturedAt` exists only
-for an authenticated session. `corresync auth logout --json` returns
-`{"loggedOut":true,"scope":"all"}` after the owner has exited.
+Its schema is separate from application JSON and contains:
 
-`corresync config show --json` serializes the validated secret-free configuration
-with lower-camel field names. `config get --json` returns `key` and typed
-`value`; `config set --json` additionally returns `updated: true`. Config
-initialization, validation, editing, and path inspection similarly emit one
-small action object. `corresync version --json` returns version, commit, build time,
-Go version, operating system, and architecture.
+- schema version and explicit privacy booleans;
+- allowlisted build/platform data;
+- installation collection status;
+- config validation status and schema version;
+- aggregate provider IDs with mail/calendar capability only;
+- last-error status, or a sanitized local ID/classes/command shape when
+  requested.
 
-## Compatibility policy
+Malformed or unavailable sections report `degraded` with a fixed reason. It
+never contains raw errors or arguments, account IDs, addresses, endpoints,
+credential keys, helper arguments, mailbox/calendar content, attachment names,
+queries, environment values, or private paths.
 
-These are stable adapter contracts, not raw Outlook payloads. OWA wire changes
-are normalized behind the transport boundary and represented by synthetic
-contract fixtures. Additive fields can appear in a future minor release;
-renames or semantic changes require a versioned compatibility decision.
+## Content handling
+
+JSON safety is structural, not a claim that data is non-sensitive. Keep output
+local by default. Do not:
+
+- execute strings from subjects, bodies, event fields, attachments, or queue
+  events;
+- interpolate values into a shell;
+- use opaque IDs outside their provenance boundary;
+- persist approval tokens;
+- retry a write whose outcome is unknown;
+- post normal application JSON to a public issue.
+
+Use `corr feedback` when you need a deliberately redacted support artifact.

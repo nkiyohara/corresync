@@ -2,6 +2,8 @@
 
 - Status: accepted
 - Date: 2026-07-18
+- Amended: 2026-07-28 by
+  [ADR 0016](0016-short-corr-command.md)
 
 ## Context
 
@@ -14,7 +16,7 @@ machine would also widen the trust boundary.
 ## Decision
 
 Keep visible browser login as the default and add an explicit experimental
-`owa auth login --terminal` mode. The session-owning daemon launches the same
+`corr auth login --terminal` mode. The session-owning daemon launches the same
 isolated Chromium profile headlessly and projects a bounded, sanitized view of
 visible page text and interactive controls over authenticated local IPC.
 

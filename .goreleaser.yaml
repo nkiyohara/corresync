@@ -6,26 +6,51 @@ before:
   hooks:
     - go mod vendor
     - >-
-        go-licenses check ./cmd/corresync
-        --ignore github.com/nkiyohara/corresync
+      go-licenses check ./cmd/corr
+      --ignore github.com/nkiyohara/corresync
     - >-
-        go-licenses save ./cmd/corresync
-        --ignore github.com/nkiyohara/corresync
-        --save_path .release/third_party_licenses
-        --force
+      go-licenses save ./cmd/corr
+      --ignore github.com/nkiyohara/corresync
+      --save_path .release/third_party_licenses
+      --force
     - >-
-        go run ./tools/normalizefiles
-        --root .release/third_party_licenses
-        --time {{ .CommitDate }}
+      go run ./tools/normalizefiles
+      --root .release/third_party_licenses
+      --time {{ .CommitDate }}
     - >-
-        go build -trimpath
-        -ldflags=-X=main.releaseTimestamp={{ .CommitDate }}
-        -o .release/syft-reproducible
-        ./tools/syftreproducible
+      go build -trimpath
+      -ldflags=-X=main.releaseTimestamp={{ .CommitDate }}
+      -o .release/syft-reproducible
+      ./tools/syftreproducible
 
 builds:
-  - id: corresync
-    main: ./cmd/corresync
+  - id: corr
+    main: ./cmd/corr
+    binary: corr
+    env:
+      - CGO_ENABLED=0
+      - GOFLAGS=-mod=readonly
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+      - -buildvcs=false
+    ldflags:
+      - >-
+        -s -w -buildid=
+        -X github.com/nkiyohara/corresync/internal/buildinfo.version={{ .Version }}
+        -X github.com/nkiyohara/corresync/internal/buildinfo.commit={{ .Commit }}
+        -X github.com/nkiyohara/corresync/internal/buildinfo.buildDate={{ .CommitDate }}
+  # Keep one finite compatibility entry in v0.8-v0.9. It is built from the
+  # exact same package and flags as corr so neither surface can drift.
+  - id: corresync-compat
+    main: ./cmd/corr
     binary: corresync
     env:
       - CGO_ENABLED=0
@@ -51,7 +76,8 @@ builds:
 archives:
   - id: release
     ids:
-      - corresync
+      - corr
+      - corresync-compat
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     formats:
@@ -104,19 +130,19 @@ archives:
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/corresync.bash
+      - src: completions/corr.bash
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/_corresync
+      - src: completions/_corr
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/corresync.fish
+      - src: completions/corr.fish
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: manpages/corresync.1
+      - src: manpages/corr.1
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
@@ -129,7 +155,8 @@ archives:
 nfpms:
   - id: linux-packages
     ids:
-      - corresync
+      - corr
+      - corresync-compat
     package_name: corresync
     # GitHub rewrites '~' in release asset names, which otherwise makes the
     # checksum manifest unverifiable for prerelease deb and RPM packages.
@@ -165,23 +192,23 @@ nfpms:
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/corresync.bash
-        dst: /usr/share/bash-completion/completions/corresync
+      - src: completions/corr.bash
+        dst: /usr/share/bash-completion/completions/corr
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/_corresync
-        dst: /usr/share/zsh/site-functions/_corresync
+      - src: completions/_corr
+        dst: /usr/share/zsh/site-functions/_corr
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: completions/corresync.fish
-        dst: /usr/share/fish/vendor_completions.d/corresync.fish
+      - src: completions/corr.fish
+        dst: /usr/share/fish/vendor_completions.d/corr.fish
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: manpages/corresync.1
-        dst: /usr/share/man/man1/corresync.1
+      - src: manpages/corr.1
+        dst: /usr/share/man/man1/corr.1
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"

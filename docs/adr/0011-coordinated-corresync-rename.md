@@ -1,6 +1,7 @@
 # ADR 0011: Coordinated Corresync rename and compatibility window
 
-- Status: accepted
+- Status: accepted; primary-CLI and alias decisions superseded by
+  [ADR 0016](0016-short-corr-command.md)
 - Date: 2026-07-28
 
 ## Context
