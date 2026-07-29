@@ -5,6 +5,11 @@ returns the same typed application results through MCP structured content.
 Human notices, browser prompts, progress, and diagnostics use stderr and never
 prefix a JSON document.
 
+The accepted
+[public and local versioning policy](adr/0020-public-and-local-versioning.md)
+defines additive and breaking changes, deprecation signaling, support windows,
+and the compatibility-fixture release gate for this schema.
+
 ## Compatibility rules
 
 - Existing field meanings do not change within a major version.

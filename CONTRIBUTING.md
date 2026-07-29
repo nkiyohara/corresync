@@ -40,6 +40,10 @@ live-compatible until it also has the evidence required by
 
 See [architecture.md](docs/architecture.md) for the component map and
 [threat-model.md](docs/threat-model.md) for required controls.
+Classify public and durable changes with the
+[versioning policy](docs/adr/0020-public-and-local-versioning.md). A new
+optional field, daemon method, config version, deprecation, or migration must
+update its documented inventory and oldest-supported synthetic fixture.
 
 ## Developer setup
 

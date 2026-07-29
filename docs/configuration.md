@@ -11,6 +11,10 @@ Use `CORRESYNC_CONFIG` or global `--config` for an explicit file. The directory
 is protected and the file is atomically written with owner-only permissions
 where supported.
 
+Supported schema versions, fail-safe defaults, migration, downgrade refusal,
+and support-window rules are defined by the
+[public and local versioning policy](adr/0020-public-and-local-versioning.md).
+
 ## Prefer lifecycle commands
 
 ```console

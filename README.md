@@ -288,6 +288,7 @@ Read the [architecture](docs/architecture.md),
 | Connect an AI client | [MCP guide](docs/mcp.md) |
 | Compare provider actions and degradations | [Feature matrix](docs/features.md) |
 | Consume stable machine output | [JSON contract](docs/json.md) |
+| Integrate versioned public/local contracts | [Versioning policy](docs/adr/0020-public-and-local-versioning.md) |
 | Verify compatibility claims | [Evidence matrix](docs/compatibility.md) |
 | Review every guide | [Documentation map](docs/README.md) |
 
