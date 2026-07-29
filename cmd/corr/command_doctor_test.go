@@ -24,7 +24,7 @@ func TestDoctorOfflineProducesContentFreeHealthyReport(t *testing.T) {
 	if err := os.WriteFile(executable, []byte("synthetic executable"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Browser.Executable = executable
 	configPath := filepath.Join(root, "config.toml")
 	if err := config.Save(configPath, configuration); err != nil {
@@ -62,7 +62,7 @@ func TestDoctorDoesNotRequireBrowserForStandardsRoutes(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	account := configuration.Accounts[configuration.DefaultAccount]
 	account.Address = "reader@example.invalid"
 	account.Mail = &config.MailRoute{
@@ -138,7 +138,7 @@ func TestDoctorOfflineRejectsIncompatibleRunningDaemon(t *testing.T) {
 			if err := os.WriteFile(executable, []byte("synthetic executable"), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			configuration := config.Default()
+			configuration := config.OutlookDefault()
 			configuration.Browser.Executable = executable
 			configPath := filepath.Join(root, "config.toml")
 			if err := config.Save(configPath, configuration); err != nil {
@@ -226,7 +226,7 @@ func TestDoctorOnlineRequiresAnExistingSessionWithoutStartingLogin(t *testing.T)
 	if err := os.WriteFile(executable, []byte("synthetic executable"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Browser.Executable = executable
 	configuration.Updates.DisableAutomaticChecks = true
 	configPath := filepath.Join(root, "config.toml")

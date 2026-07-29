@@ -46,7 +46,7 @@ func TestImportScanAndPurgeJSON(t *testing.T) {
 	root := t.TempDir()
 	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(root, "state"))
 	configPath := filepath.Join(root, "config.toml")
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	if err := config.Save(configPath, configuration); err != nil {
 		t.Fatal(err)
 	}

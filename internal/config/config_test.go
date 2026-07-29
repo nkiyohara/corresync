@@ -36,15 +36,49 @@ func TestDefaultIsValidAndSecretFree(t *testing.T) {
 			t.Fatalf("saved config contains forbidden secret field %q: %s", forbidden, contents)
 		}
 	}
-	if configuration.Accounts[configuration.DefaultAccount].Monitor != nil {
-		t.Fatal("fresh configuration unexpectedly enabled monitoring")
+	if configuration.DefaultAccount != "" || len(configuration.Accounts) != 0 {
+		t.Fatalf("Default() selected a provider route: %+v", configuration)
+	}
+}
+
+func TestDefaultRoundTripIsProviderNeutral(t *testing.T) {
+	t.Parallel()
+
+	configuration := Default()
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("Default().Validate() error = %v", err)
+	}
+	if configuration.DefaultAccount != "" || len(configuration.Accounts) != 0 {
+		t.Fatalf("Default() selected a provider route: %+v", configuration)
+	}
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := Save(path, configuration); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if loaded.DefaultAccount != "" || len(loaded.Accounts) != 0 {
+		t.Fatalf("round trip selected a provider route: %+v", loaded)
+	}
+}
+
+func TestDefaultRejectsDefaultWithoutAccount(t *testing.T) {
+	t.Parallel()
+
+	configuration := Default()
+	configuration.DefaultAccount = "work"
+	if err := configuration.Validate(); err == nil {
+		t.Fatal("empty configuration accepted a dangling default account")
 	}
 }
 
 func TestValidateRejectsAliasThatLooksLikeOpaqueAccountID(t *testing.T) {
 	t.Parallel()
 
-	configuration := Default()
+	configuration := OutlookDefault()
 	account := configuration.Accounts["work"]
 	delete(configuration.Accounts, "work")
 	alias := "acc_11111111111111111111111111111111"
@@ -58,7 +92,7 @@ func TestValidateRejectsAliasThatLooksLikeOpaqueAccountID(t *testing.T) {
 func TestMonitorConsentBoundariesValidateIndependently(t *testing.T) {
 	t.Parallel()
 
-	configuration := Default()
+	configuration := OutlookDefault()
 	account := configuration.Accounts["work"]
 
 	notify := NewMonitor(domain.MonitorNotify)
@@ -103,7 +137,7 @@ func TestMonitorConsentBoundariesValidateIndependently(t *testing.T) {
 func TestMonitoringCannotBeEnabledForCalendarOnlyAccount(t *testing.T) {
 	t.Parallel()
 
-	configuration := Default()
+	configuration := OutlookDefault()
 	account := configuration.Accounts["work"]
 	account.Mail = nil
 	monitor := NewMonitor(domain.MonitorQueue)
@@ -118,7 +152,7 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "nested", "config.toml")
-	want := Default()
+	want := OutlookDefault()
 	want.Policy.PreviewSensitiveReads = true
 	want.Accounts["personal"] = testOutlookAccount(
 		"acc_00000000000000000000000000000002",
@@ -153,7 +187,7 @@ func TestSaveTOMLPreservesValidatedComments(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "config.toml")
 	encoded := []byte("# retained\nversion = 3\n")
-	defaultConfig, err := toml.Marshal(Default())
+	defaultConfig, err := toml.Marshal(OutlookDefault())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +208,7 @@ func TestFingerprintChangesWithExactConfig(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	configuration := Default()
+	configuration := OutlookDefault()
 	if err := Save(path, configuration); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
@@ -265,7 +299,7 @@ func TestValidateRejectsUnsafeValues(t *testing.T) {
 		func(configuration *Config) { configuration.Browser.Executable = "chrome\n--dangerous" },
 	}
 	for index, mutate := range tests {
-		configuration := Default()
+		configuration := OutlookDefault()
 		mutate(&configuration)
 		if err := configuration.Validate(); err == nil {
 			t.Fatalf("case %d unexpectedly passed validation: %+v", index, configuration)
@@ -273,16 +307,16 @@ func TestValidateRejectsUnsafeValues(t *testing.T) {
 	}
 }
 
-func TestNewDefaultUsesFreshOpaqueAccountID(t *testing.T) {
+func TestNewOutlookDefaultUsesFreshOpaqueAccountID(t *testing.T) {
 	t.Parallel()
 
-	first, err := NewDefault()
+	first, err := NewOutlookDefault()
 	if err != nil {
-		t.Fatalf("NewDefault() error = %v", err)
+		t.Fatalf("NewOutlookDefault() error = %v", err)
 	}
-	second, err := NewDefault()
+	second, err := NewOutlookDefault()
 	if err != nil {
-		t.Fatalf("NewDefault() second error = %v", err)
+		t.Fatalf("NewOutlookDefault() second error = %v", err)
 	}
 	firstID := first.Accounts[first.DefaultAccount].ID
 	secondID := second.Accounts[second.DefaultAccount].ID
@@ -290,14 +324,14 @@ func TestNewDefaultUsesFreshOpaqueAccountID(t *testing.T) {
 		t.Fatalf("first ID = %q: %v", firstID, err)
 	}
 	if firstID == secondID {
-		t.Fatalf("NewDefault() repeated account ID %q", firstID)
+		t.Fatalf("NewOutlookDefault() repeated account ID %q", firstID)
 	}
 }
 
 func TestResolveAccountSupportsAliasAndStableID(t *testing.T) {
 	t.Parallel()
 
-	configuration := Default()
+	configuration := OutlookDefault()
 	want := configuration.Accounts["work"]
 	for _, reference := range []string{"", "work", string(want.ID)} {
 		alias, got, err := configuration.ResolveAccount(reference)
@@ -417,7 +451,7 @@ login_timeout = "5m"
 
 func TestMixedStandardsRoutesAreStrictAndSecretFree(t *testing.T) {
 	t.Parallel()
-	configuration := Default()
+	configuration := OutlookDefault()
 	configuration.Accounts["work"] = Account{
 		ID:      defaultAccountID,
 		Address: "reader@example.invalid",
@@ -477,7 +511,7 @@ func TestMixedStandardsRoutesAreStrictAndSecretFree(t *testing.T) {
 
 func TestOAuthRouteRequiresLoopbackPKCEAndOSKeyring(t *testing.T) {
 	t.Parallel()
-	configuration := Default()
+	configuration := OutlookDefault()
 	configuration.Accounts["work"] = Account{
 		ID: defaultAccountID,
 		Mail: &MailRoute{
@@ -523,7 +557,7 @@ func TestOAuthRouteRequiresLoopbackPKCEAndOSKeyring(t *testing.T) {
 
 func TestGoogleWebRoutesRequireExactProviderOwnedOrigins(t *testing.T) {
 	t.Parallel()
-	configuration := Default()
+	configuration := OutlookDefault()
 	configuration.Accounts["work"] = Account{
 		ID: defaultAccountID,
 		Mail: &MailRoute{
@@ -579,8 +613,33 @@ func TestSaveRejectsNonRegularTarget(t *testing.T) {
 	if err := os.Mkdir(path, 0o700); err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
 	}
-	if err := Save(path, Default()); err == nil {
+	if err := Save(path, OutlookDefault()); err == nil {
 		t.Fatal("Save() unexpectedly accepted directory target")
+	}
+}
+
+func TestCreateNeverReplacesExistingConfiguration(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	created, err := Create(t.Context(), path, Default())
+	if err != nil || !created {
+		t.Fatalf("Create(first) = %t, %v", created, err)
+	}
+	before, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err = Create(t.Context(), path, OutlookDefault())
+	if err != nil || created {
+		t.Fatalf("Create(existing) = %t, %v", created, err)
+	}
+	after, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("Create replaced an existing configuration")
 	}
 }
 

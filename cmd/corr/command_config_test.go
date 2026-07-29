@@ -18,7 +18,7 @@ func TestConfigGetAndSetTypedValues(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := config.Save(path, config.Default()); err != nil {
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
@@ -60,7 +60,7 @@ func TestConfigGetAndSetTypedValues(t *testing.T) {
 func TestConfigSetSupportsDottedAccountAliases(t *testing.T) {
 	t.Parallel()
 
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	if err := setConfigValue(
 		&configuration,
 		"accounts.shared.finance.origin",
@@ -78,7 +78,7 @@ func TestConfigSetRejectsInvalidValueWithoutWriting(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := config.Save(path, config.Default()); err != nil {
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
 		t.Fatal(err)
 	}
 	before, err := config.Fingerprint(path)
@@ -103,7 +103,7 @@ func TestConfigEditValidatesBeforePreservingEditedTOML(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := config.Save(path, config.Default()); err != nil {
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
 		t.Fatal(err)
 	}
 	app := newRuntime(t.Context(), path, &bytes.Buffer{}, &bytes.Buffer{}, buildinfo.Current())
@@ -144,7 +144,7 @@ func TestConfigEditRejectsInvalidTOMLWithoutChangingOriginal(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := config.Save(path, config.Default()); err != nil {
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
 		t.Fatal(err)
 	}
 	before, err := os.ReadFile(path) // #nosec G304 -- private test path.

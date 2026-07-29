@@ -14,6 +14,7 @@ where supported.
 ## Prefer lifecycle commands
 
 ```console
+corr setup you@example.com --alias personal
 corr config init
 corr config validate
 corr config show
@@ -24,6 +25,12 @@ corr account show work
 corr account rename work primary
 corr account remove old --approve
 ```
+
+`setup` is the provider-neutral first-run path. It creates an empty,
+secret-free configuration when needed, performs credential-free discovery,
+and adds an automatically selectable first-party route. It does not
+authenticate. `config init` creates only the empty configuration for users who
+want to inspect candidates and select every route manually.
 
 Discovery is read-only and credential-free. Adding a route never
 authenticates. The account receives a generated opaque ID, monitoring remains
@@ -37,8 +44,29 @@ remain in their keyring/helper. Removing the default account requires
 
 ## Schema v3
 
-Schema v3 separates mail and calendar routes. A minimal Outlook Web
-configuration looks like:
+Schema v3 separates mail and calendar routes. A freshly initialized
+provider-neutral configuration contains no account and has an empty
+`default_account`. The first account added becomes the default:
+
+```toml
+version = 3
+default_account = ""
+
+[policy]
+mode = "guarded"
+preview_sensitive_reads = false
+preview_reversible_writes = false
+max_recipients = 20
+max_attendees = 50
+
+[browser]
+login_timeout = "5m0s"
+
+[updates]
+disable_automatic_checks = false
+```
+
+A configured Outlook Web account then looks like:
 
 ```toml
 version = 3

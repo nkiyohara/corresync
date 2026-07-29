@@ -17,6 +17,7 @@ unstyled machine-readable value.
 ## Configuration and accounts
 
 ```console
+corr setup you@example.com --alias personal
 corr config init
 corr config path
 corr config validate
@@ -25,6 +26,12 @@ corr config get policy.max_recipients
 corr config set policy.max_recipients 25
 corr config edit
 ```
+
+`setup` is the user-first path: it creates a provider-neutral configuration
+when absent, performs credential-free discovery, and adds an automatically
+selectable first-party route. It does not authenticate. `config init` is the
+lower-level alternative and creates a valid configuration with zero accounts
+and no selected provider.
 
 Provider route changes belong to the account lifecycle:
 

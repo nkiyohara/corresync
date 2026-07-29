@@ -330,7 +330,7 @@ func TestDaemonMCPAccountLifecycleHonorsReadOnlyPolicy(t *testing.T) {
 func TestDaemonMCPAccountMutationRestartsAroundConfigurationChange(t *testing.T) {
 	root := t.TempDir()
 	configPath := filepath.Join(root, "config.toml")
-	if err := config.Save(configPath, config.Default()); err != nil {
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 		t.Fatal(err)
 	}
 	initialDigest, err := config.Fingerprint(configPath)

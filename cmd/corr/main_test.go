@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/buildinfo"
+	"github.com/nkiyohara/corresync/internal/config"
 )
 
 func TestRunShowsHelpWithoutArguments(t *testing.T) {
@@ -193,6 +194,13 @@ func TestRunInitializesAndValidatesConfig(t *testing.T) {
 	}
 	if !initialized.Created || initialized.Path != path {
 		t.Fatalf("unexpected config init output: %+v", initialized)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("load initialized config: %v", err)
+	}
+	if configuration.DefaultAccount != "" || len(configuration.Accounts) != 0 {
+		t.Fatalf("config init selected a provider route: %+v", configuration)
 	}
 
 	stdout.Reset()

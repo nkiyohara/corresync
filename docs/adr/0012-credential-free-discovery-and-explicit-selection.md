@@ -26,6 +26,22 @@ requests or persists one and its configuration schema cannot represent one.
 
 ## Decision
 
+### Fresh configuration is provider-neutral
+
+A new configuration contains zero accounts, an empty default-account field,
+and no provider route. Configuration initialization never manufactures an
+Outlook placeholder or opens authentication. The user-first `corr setup
+ADDRESS` command creates that empty local state when necessary, performs the
+same credential-free discovery use case as `corr account discover`, and may
+add only a candidate that the automatic-selection rules below permit.
+
+Authentication remains a later, explicit, account-specific local CLI action.
+The first added account becomes the default; later additions cannot change the
+default unless the human requests it. Session-backed commands and MCP client
+registration fail with setup guidance while the account catalog is empty.
+Existing configurations are never rewritten to this empty state during an
+upgrade.
+
 ### Discovery is credential-free
 
 Discovery collects evidence without authenticating. It may recognize well-known

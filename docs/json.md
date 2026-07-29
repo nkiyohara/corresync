@@ -61,6 +61,10 @@ degradations contain a bounded feature code, reason, and `lossy` flag.
 
 It performs no authentication or configuration write.
 
+`corr setup ADDRESS --json` returns the same selected-candidate and account
+view as `account add --json`. It may first create an empty local configuration,
+but it never authenticates, resolves a credential, or starts a browser.
+
 `account list/show/add/rename/remove --json` use account views containing alias,
 stable ID, address when configured, mail/calendar route summaries, default
 status, and operation status. Route documents are secret-free but still

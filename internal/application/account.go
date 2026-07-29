@@ -632,7 +632,7 @@ func (service *AccountService) reviewRemove(
 }
 
 func validateAccountCatalog(catalog AccountCatalog) error {
-	if len(catalog.Accounts) == 0 || len(catalog.Accounts) > 32 {
+	if len(catalog.Accounts) > 32 {
 		return errors.New("account catalog size is invalid")
 	}
 	ids := make(map[domain.AccountID]struct{}, len(catalog.Accounts))
@@ -654,7 +654,11 @@ func validateAccountCatalog(catalog AccountCatalog) error {
 			defaults++
 		}
 	}
-	if defaults != 1 {
+	expectedDefaults := 1
+	if len(catalog.Accounts) == 0 {
+		expectedDefaults = 0
+	}
+	if defaults != expectedDefaults {
 		return errors.New("account catalog must contain exactly one default")
 	}
 	return nil

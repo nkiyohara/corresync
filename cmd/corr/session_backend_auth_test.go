@@ -119,7 +119,7 @@ func TestProjectionAccountsExposeOnlyContentFreePerServiceStatus(t *testing.T) {
 	t.Parallel()
 
 	const personalID domain.AccountID = "acc_00000000000000000000000000000002"
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Accounts["personal"] = config.Account{
 		ID: personalID,
 		Mail: &config.MailRoute{
@@ -196,7 +196,7 @@ func TestSessionBackendOnlyResolvesJMAPCredentialForExplicitCLILogin(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Accounts["work"] = config.Account{
 		ID: accountID,
 		Mail: &config.MailRoute{
@@ -315,7 +315,7 @@ func TestSessionBackendOnlyResolvesCalDAVCredentialForExplicitCLILogin(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Accounts["work"] = config.Account{
 		ID: accountID,
 		Calendar: &config.CalendarRoute{
@@ -417,7 +417,7 @@ func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
 			Consent: true,
 		},
 	}
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Accounts["work"] = config.Account{
 		ID: accountID, Address: "reader@example.test",
 		Mail: &config.MailRoute{
@@ -512,7 +512,7 @@ func TestSessionBackendOnlyAuthorizesGraphForExplicitCLILogin(t *testing.T) {
 			Consent: true,
 		},
 	}
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Accounts["work"] = config.Account{
 		ID: accountID, Address: "reader@example.test",
 		Mail: &config.MailRoute{
@@ -586,7 +586,7 @@ func TestSessionBackendOnlyOpensBrowserOwnedGoogleForExplicitCLILogin(
 	t.Parallel()
 
 	const accountID domain.AccountID = "acc_00000000000000000000000000000001"
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Accounts["work"] = config.Account{
 		ID: accountID, Address: "reader@example.test",
 		Mail: &config.MailRoute{
@@ -736,7 +736,7 @@ func TestSessionBackendKeepsHybridProvidersAndAccountsIsolated(t *testing.T) {
 	graphAlphaRoute := sessionOAuthRoute(graphAlpha.URL, "graph-alpha")
 	graphBetaRoute := sessionOAuthRoute(graphBeta.URL, "graph-beta")
 	googleBetaRoute := sessionOAuthRoute(googleBeta.URL, "google-beta")
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.DefaultAccount = "alpha"
 	configuration.Accounts = map[string]config.Account{
 		"alpha": {

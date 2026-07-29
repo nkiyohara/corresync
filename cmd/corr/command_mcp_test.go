@@ -187,7 +187,7 @@ func TestMCPSetupUsesOfficialClientCommands(t *testing.T) {
 	t.Parallel()
 
 	configPath := filepath.Join(t.TempDir(), "config.toml")
-	if err := config.Save(configPath, config.Default()); err != nil {
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
 	executable := filepath.Join(t.TempDir(), "corresync")
@@ -371,7 +371,7 @@ func TestMCPSetupDryRunDoesNotInvokeClient(t *testing.T) {
 	t.Parallel()
 
 	configPath := filepath.Join(t.TempDir(), "config.toml")
-	if err := config.Save(configPath, config.Default()); err != nil {
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
 	executable := filepath.Join(t.TempDir(), "corresync binary")
@@ -396,16 +396,36 @@ func TestMCPSetupDryRunDoesNotInvokeClient(t *testing.T) {
 	}
 }
 
-func TestMCPSetupRequiresInitializedConfiguration(t *testing.T) {
+func TestMCPSetupRequiresConfiguredAccount(t *testing.T) {
 	t.Parallel()
 
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	app := newRuntime(t.Context(), filepath.Join(t.TempDir(), "missing.toml"), &stdout, &stderr, buildinfo.Current())
-	command := mcpCodexSetupCommand{mcpSetupFlags: mcpSetupFlags{
-		mcpClientConfigFlags: mcpClientConfigFlags{Name: "corresync", Executable: os.Args[0]},
-	}}
-	if err := command.Run(app); err == nil || !strings.Contains(err.Error(), "corr config init") {
-		t.Fatalf("Run() error = %v, want config initialization guidance", err)
+	for _, fixture := range []struct {
+		name        string
+		initialize  bool
+		wantMessage string
+	}{
+		{name: "missing", wantMessage: "corr setup <email-address>"},
+		{name: "empty", initialize: true, wantMessage: "configure an account before MCP setup"},
+	} {
+		t.Run(fixture.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			path := filepath.Join(t.TempDir(), "config.toml")
+			if fixture.initialize {
+				if err := config.Save(path, config.Default()); err != nil {
+					t.Fatal(err)
+				}
+			}
+			app := newRuntime(t.Context(), path, &stdout, &stderr, buildinfo.Current())
+			command := mcpCodexSetupCommand{mcpSetupFlags: mcpSetupFlags{
+				mcpClientConfigFlags: mcpClientConfigFlags{
+					Name: "corresync", Executable: os.Args[0],
+				},
+			}}
+			if err := command.Run(app); err == nil ||
+				!strings.Contains(err.Error(), fixture.wantMessage) {
+				t.Fatalf("Run() error = %v, want %q guidance", err, fixture.wantMessage)
+			}
+		})
 	}
 }

@@ -136,28 +136,14 @@ func (duration *Duration) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// Default returns a safe, immediately valid configuration.
+// Default returns a provider-neutral, secret-free onboarding state.
+// It is valid for account discovery and configuration, but session-backed
+// commands require the human to add at least one explicit provider route.
 func Default() Config {
 	return Config{
 		Version:        CurrentVersion,
-		DefaultAccount: "work",
-		Accounts: map[string]Account{
-			"work": {
-				ID: defaultAccountID,
-				Mail: &MailRoute{
-					Provider: domain.ProviderMicrosoftOWA,
-					OutlookWeb: &OutlookWebRoute{
-						Origin: "https://outlook.cloud.microsoft",
-					},
-				},
-				Calendar: &CalendarRoute{
-					Provider: domain.ProviderMicrosoftOWA,
-					OutlookWeb: &OutlookWebRoute{
-						Origin: "https://outlook.cloud.microsoft",
-					},
-				},
-			},
-		},
+		DefaultAccount: "",
+		Accounts:       make(map[string]Account),
 		Policy: Policy{
 			Mode:          policy.ModeGuarded,
 			MaxRecipients: 20,
@@ -167,11 +153,33 @@ func Default() Config {
 	}
 }
 
-// NewDefault returns a safe default with a freshly generated local account ID.
-// It is used for persisted user configuration; Default remains deterministic
-// so callers can use it as an in-memory baseline and in fixtures.
-func NewDefault() (Config, error) {
+// OutlookDefault returns the deterministic Outlook route used by provider
+// fixtures and legacy migration tests. Product onboarding must use Default.
+func OutlookDefault() Config {
 	configuration := Default()
+	configuration.DefaultAccount = "work"
+	configuration.Accounts["work"] = Account{
+		ID: defaultAccountID,
+		Mail: &MailRoute{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &OutlookWebRoute{
+				Origin: "https://outlook.cloud.microsoft",
+			},
+		},
+		Calendar: &CalendarRoute{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &OutlookWebRoute{
+				Origin: "https://outlook.cloud.microsoft",
+			},
+		},
+	}
+	return configuration
+}
+
+// NewOutlookDefault returns the explicit Outlook fixture route with a freshly
+// generated local account ID.
+func NewOutlookDefault() (Config, error) {
+	configuration := OutlookDefault()
 	accountID, err := domain.NewAccountID()
 	if err != nil {
 		return Config{}, err
@@ -187,14 +195,16 @@ func (configuration Config) Validate() error {
 	if configuration.Version != CurrentVersion {
 		return fmt.Errorf("unsupported config version %d", configuration.Version)
 	}
-	if len(configuration.Accounts) == 0 {
-		return errors.New("at least one account is required")
-	}
 	if len(configuration.Accounts) > 32 {
 		return errors.New("at most 32 accounts are supported")
 	}
-	if _, exists := configuration.Accounts[configuration.DefaultAccount]; !exists {
-		return fmt.Errorf("default account %q is not configured", configuration.DefaultAccount)
+	if len(configuration.Accounts) == 0 && configuration.DefaultAccount != "" {
+		return errors.New("default_account must be empty until an account is configured")
+	}
+	if len(configuration.Accounts) > 0 {
+		if _, exists := configuration.Accounts[configuration.DefaultAccount]; !exists {
+			return fmt.Errorf("default account %q is not configured", configuration.DefaultAccount)
+		}
 	}
 
 	accountIDs := make(map[domain.AccountID]string, len(configuration.Accounts))
@@ -258,6 +268,11 @@ func (configuration Config) Validate() error {
 // ResolveAccount accepts either a human-facing alias or an opaque account ID.
 // It always returns the canonical alias and persisted account definition.
 func (configuration Config) ResolveAccount(reference string) (string, Account, error) {
+	if len(configuration.Accounts) == 0 {
+		return "", Account{}, errors.New(
+			"no account is configured; run `corr setup <email-address>` first",
+		)
+	}
 	if reference == "" {
 		reference = configuration.DefaultAccount
 	}

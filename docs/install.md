@@ -174,30 +174,27 @@ tag or wait for a signed distribution.
 ## First run
 
 ```console
-corr config init
-corr config validate
-corr account list
-corr doctor
-```
-
-The default account uses Outlook Web. Sign in visibly:
-
-```console
-corr auth login
+corr setup you@example.com --alias personal
+corr auth login --account personal
 corr auth status
-corr doctor --online
+corr doctor --account personal
 ```
+
+Replace the example address and alias. `setup` creates a provider-neutral local
+configuration, performs credential-free discovery, and adds an automatically
+selectable first-party route. It never starts authentication. The following
+`auth login` is explicit and account-specific.
 
 The browser owns sign-in, MFA, Conditional Access, and session cookies.
 Corresync never asks for a password or copies an authorization header into its
 configuration. Online doctor reuses that authenticated session and never starts
 login or OAuth itself.
 
-For another provider:
+If automatic selection is unavailable, or you want an API or standards route:
 
 ```console
 corr account discover reader@example.invalid
-corr account add --help
+corr account add reader@example.invalid --help
 ```
 
 Discovery is credential-free. Review its candidates and choose one explicitly.

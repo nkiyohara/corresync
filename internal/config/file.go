@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 
 	"github.com/pelletier/go-toml/v2"
+
+	"github.com/nkiyohara/corresync/internal/filelock"
 )
 
 const maximumConfigBytes = 1 << 20
@@ -126,6 +129,36 @@ func Save(path string, configuration Config) error {
 		return fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
 	}
 	return writeConfigFile(path, encoded)
+}
+
+// Create atomically coordinates first-time configuration creation with every
+// read-modify-write transaction. It never replaces an existing path.
+func Create(ctx context.Context, path string, configuration Config) (created bool, returnErr error) {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return false, fmt.Errorf("resolve config create path: %w", err)
+	}
+	absolute = filepath.Clean(absolute)
+	lock, err := filelock.Acquire(ctx, absolute+".lock")
+	if err != nil {
+		return false, fmt.Errorf("acquire config create lock: %w", err)
+	}
+	defer func() { returnErr = errors.Join(returnErr, lock.Close()) }()
+
+	info, err := os.Lstat(absolute)
+	if err == nil {
+		if !info.Mode().IsRegular() {
+			return false, errors.New("config path exists and is not a regular file")
+		}
+		return false, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("inspect config path: %w", err)
+	}
+	if err := Save(absolute, configuration); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // SaveTOML validates and atomically preserves caller-provided TOML, including

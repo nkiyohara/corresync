@@ -325,7 +325,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 
 	root := t.TempDir()
 	configPath := filepath.Join(root, "config.toml")
-	if err := config.Save(configPath, config.Default()); err != nil {
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 		t.Fatalf("config.Save() error = %v", err)
 	}
 	endpoint, err := localipc.ResolveInState(configPath, filepath.Join(root, "state"))

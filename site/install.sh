@@ -454,8 +454,8 @@ else
 fi
 say ""
 say "Next:"
-say "  corr config init"
-say "  corr auth login"
+say "  corr setup you@example.com --alias personal"
+say "  corr auth login --account personal"
 say "  corr mcp setup codex"
 say ""
 say "No account was configured, no login was started, and no MCP client was changed."

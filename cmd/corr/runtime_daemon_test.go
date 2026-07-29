@@ -28,6 +28,34 @@ type lifecycleTestDaemon struct {
 	shutdowns *atomic.Int32
 }
 
+func TestOpenDaemonRejectsProviderNeutralEmptyConfig(t *testing.T) {
+	t.Parallel()
+
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(configPath, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	var starts atomic.Int32
+	app := newRuntime(
+		t.Context(),
+		configPath,
+		&bytes.Buffer{},
+		&bytes.Buffer{},
+		buildinfo.Current(),
+	)
+	app.startDaemon = func(context.Context, string) error {
+		starts.Add(1)
+		return errors.New("unexpected daemon start")
+	}
+	if _, _, err := app.openDaemon(t.Context()); err == nil ||
+		!strings.Contains(err.Error(), "corr setup <email-address>") {
+		t.Fatalf("openDaemon() error = %v, want setup guidance", err)
+	}
+	if starts.Load() != 0 {
+		t.Fatalf("empty configuration started daemon %d times", starts.Load())
+	}
+}
+
 func TestOpenDaemonReplacesOutdatedOwner(t *testing.T) {
 	t.Parallel()
 
@@ -40,7 +68,7 @@ func TestOpenDaemonReplacesOutdatedOwner(t *testing.T) {
 
 			root := t.TempDir()
 			configPath := filepath.Join(root, "config.toml")
-			if err := config.Save(configPath, config.Default()); err != nil {
+			if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 				t.Fatalf("config.Save() error = %v", err)
 			}
 			configDigest, err := config.Fingerprint(configPath)
@@ -129,7 +157,7 @@ func TestOpenDaemonDoesNotApplyChangedConfigDuringReplacement(t *testing.T) {
 
 			root := t.TempDir()
 			configPath := filepath.Join(root, "config.toml")
-			if err := config.Save(configPath, config.Default()); err != nil {
+			if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 				t.Fatalf("config.Save() error = %v", err)
 			}
 			endpoint, err := localipc.ResolveInState(
@@ -188,7 +216,7 @@ func TestReplaceDaemonDoesNotStopNewGeneration(t *testing.T) {
 
 	root := t.TempDir()
 	configPath := filepath.Join(root, "config.toml")
-	if err := config.Save(configPath, config.Default()); err != nil {
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 		t.Fatalf("config.Save() error = %v", err)
 	}
 	configDigest, err := config.Fingerprint(configPath)

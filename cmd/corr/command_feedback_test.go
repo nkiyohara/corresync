@@ -205,7 +205,7 @@ func newFeedbackTestRuntime(t *testing.T) (*runtime, *bytes.Buffer) {
 	t.Helper()
 
 	configPath := filepath.Join(t.TempDir(), "config.toml")
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	account := configuration.Accounts["work"]
 	account.Address = "person@example.test"
 	account.Mail.OutlookWeb.Mailbox = "person@example.test"
