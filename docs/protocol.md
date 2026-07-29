@@ -83,7 +83,10 @@ uses a unique conference request ID and returns only that event's Meet link.
 Gmail search retains provider query syntax. Label/move operations do not claim
 an atomic history precondition, and permanent delete requires the explicit
 full-mailbox scope because Gmail exposes it through that scope only. The
-adapter does not enable push/history monitoring or scheduled send.
+adapter revalidates the reviewed message immediately before the operation. If
+a Trash-to-label move confirms untrash but not the destination label update,
+the result requires reconciliation. The adapter does not enable push/history
+monitoring or scheduled send.
 
 ## Google Web
 
@@ -108,10 +111,13 @@ client secret or hosted relay is supported.
 
 Graph search retains provider query syntax. Reply, forward, and move report the
 absence of an atomic source ETag where applicable, and a successful send may
-not return a sent-item identity. The destructive permanent-delete use case is
-unavailable because Graph message DELETE does not guarantee irreversible
-disposal. Provider-native calendar creation can request a Teams meeting link
-only through the typed supported field.
+not return a sent-item identity. Permanent message deletion revalidates the
+reviewed source, binds the delegated account's immutable user identity, and
+invokes Graph's explicit `permanentDelete` action once. Provider-native
+calendar creation can request a Teams meeting link only through the typed
+supported field. A response or attachment send creates and assembles a draft
+first; if submission is not confirmed, the retained draft is reported as a
+partial outcome and is never recreated automatically.
 
 ## JMAP
 
@@ -130,9 +136,11 @@ State mismatch becomes a visible conflict or degradation rather than an
 unreviewed retry.
 
 A server may provide usable mail without JMAP Submission. In that case reads
-remain available while draft/send report a `mail.write`/`mail.send`
+and save-only drafts remain available while send reports a `mail.send`
 degradation. A read-only advertised account likewise remains readable and
-rejects every write explicitly.
+rejects every write explicitly. JMAP identity is resolved before a send draft
+is created; if submission then fails, the retained draft is reported as a
+partial outcome requiring reconciliation.
 
 ## IMAP and SMTP Submission
 
@@ -161,9 +169,16 @@ mapped to the normalized event contract. Conditional writes use the available
 entity version; unsupported fields remain visible as degradations.
 
 Callers cannot submit arbitrary WebDAV methods, XML, iCalendar properties, or
-collection paths. The current adapter is calendar-object storage, not a CalDAV
-scheduling agent: reviews claim no attendee notification, and cancellation of
-an attendee event is refused rather than silently deleting without notice.
+collection paths. The adapter detects RFC 6638 server-managed scheduling on
+the authenticated principal. When the capability is present, attendee
+create/update/cancel uses the reviewed scheduling behavior and schedule-tag
+preconditions; without it, attendee writes fail before the calendar object is
+changed.
+
+Recurring-instance writes remain scoped to that instance. Update creates or
+replaces a `RECURRENCE-ID` exception. Cancellation adds the occurrence to the
+master's `EXDATE`, removes any matching exception, advances `SEQUENCE`, and
+updates the calendar object conditionally rather than deleting the series.
 
 ## Compatibility workflow
 

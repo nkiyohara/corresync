@@ -64,17 +64,18 @@ Provider differences remain visible:
   and every mail/calendar write is unavailable;
 - Gmail uses Gmail query syntax and has no atomic history precondition for
   label changes, moves, or permanent deletion. Corresync revalidates the exact
-  reviewed message immediately before each write; full Gmail support requires
-  the explicitly displayed `https://mail.google.com/` OAuth grant;
+  reviewed message immediately before each reviewed operation; a multi-stage
+  move reports any confirmed partial change. Full Gmail support requires the
+  explicitly displayed `https://mail.google.com/` OAuth grant;
 - Graph query syntax differs from Outlook AQS. Reply/forward and move
   revalidate the exact reviewed source before invoking actions that expose no
-  atomic source ETag precondition. Stable Graph does not provide the
-  permanently destructive operation required by Corresync's delete contract,
-  and successful asynchronous sends may return no sent-item identity;
+  atomic source ETag precondition. Permanent deletion uses Graph's explicit
+  `permanentDelete` action after revalidation. Successful asynchronous sends
+  may return no sent-item identity;
 - JMAP exposes incremental state and strong state preconditions where the
-  server supports them; a missing Submission capability degrades draft/send
-  while mail reads remain available, and a read-only account reports writes
-  unavailable;
+  server supports them; a missing Submission capability blocks send while
+  save-only drafts and mail reads remain available, and a read-only account
+  reports every write unavailable;
 - IMAP/SMTP saves accepted submissions to the discovered Sent mailbox and
   returns the appended message identity. It fails before SMTP when no Sent
   mailbox exists. Message move uses native MOVE or a targeted UIDPLUS
@@ -112,7 +113,9 @@ the configured provider's native service; the transitional `--teams-meeting`
 alias requires a Teams-capable route. CalDAV discovers VEVENT
 collections, maps typed events through WebDAV/iCalendar, safely consumes
 server-expanded recurrence or performs bounded local expansion, and uses
-conditional writes.
+conditional writes. A recurring-instance update materializes a
+`RECURRENCE-ID` exception; cancelling one instance adds `EXDATE` to the master
+and removes a matching exception without deleting the series.
 
 Create/update/cancel reviews also name the selected route's attendee-
 notification and cancellation disposition. Outlook Web, Google API, and Graph

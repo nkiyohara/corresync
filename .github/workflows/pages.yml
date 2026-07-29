@@ -46,6 +46,7 @@ jobs:
           grep -Fq 'corr mcp setup gemini-cli' site/index.html
           grep -Fq 'corr mcp setup qwen-code' site/index.html
           grep -Fq 'docs/migration-v0.7.md' site/index.html
+          ! grep -Eiq 'http-equiv=.*refresh|window\.location|location\.(href|replace)' site/index.html
           test -z "$(find site -type l -print -quit)"
 
       - name: Configure GitHub Pages

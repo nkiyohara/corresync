@@ -72,9 +72,9 @@ binds the complete write input without echoing the key.
 ## Mail
 
 Folder pages contain bounded items and paging metadata. Message pages contain
-metadata such as ID, change key when available, received time, sender,
-recipients, subject, read/importance state, attachment presence, and
-provenance. They never include a body or attachment bytes.
+metadata such as ID, change key when available, received time, sender, subject,
+read/importance state, attachment presence, and provenance. They never include
+recipients, a body, or attachment bytes.
 
 Body access contains a policy decision plus either a review/approval token or a
 bounded body result with attachment metadata. Attachment access similarly
@@ -104,9 +104,10 @@ per-account statuses/failures. It is read-only.
 ## Calendar
 
 Calendar pages contain bounded normalized event metadata, event ID/change key,
-start/end, display values, time zone, all-day state, location, organizer,
-attendee summaries, recurrence/reminder state, and provenance according to the
-selected operation.
+start/end, display values, time zone, all-day state, location,
+organizer/cancellation/response/free-busy state, online-meeting presence, and
+provenance. They exclude the body, attendee list, recurrence/reminder detail,
+attachments, and online-meeting join URL.
 
 Create, update, and cancellation use preview/commit access envelopes. Creation
 review binds attendees, the provider meeting-link request, and whether the

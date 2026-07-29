@@ -80,7 +80,10 @@ without following the reachable route, and recommend plausible provider
 behavior without proving the remote API contract. Give it the exact revision,
 scope, invariants, and requested output shape. Verify each claim in code,
 synthetic contract tests, and primary provider documentation. Do not let an
-Opus run edit concurrently with the primary agent.
+Opus run edit concurrently with the primary agent. Repository-wide Opus runs
+have also produced no incremental output for minutes; time-box a silent run,
+interrupt it when it stops the critical path, and continue from executable
+evidence rather than waiting indefinitely.
 
 Use Fable through `claude -p` as the independent final security reviewer after
 the candidate is clean and `mise exec -- task verify` passes. Ask it to inspect

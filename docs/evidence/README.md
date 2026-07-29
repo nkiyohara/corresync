@@ -14,6 +14,9 @@ The published v0.7.0 distribution evidence applies only to commit `ec868d8`.
 Historical Outlook Web, local terminal, macOS IPC, Codex, and Claude notes did
 not capture an exact commit and therefore remain non-evidentiary context.
 
+The [v0.8 acceptance map](acceptance-v0.8.md) links roadmap criteria to code
+and deterministic tests. It does not promote any row to live-observed.
+
 ## Record template
 
 Add a separate Markdown file only after an authorized opt-in run. Keep it

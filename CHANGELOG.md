@@ -36,10 +36,15 @@ All notable user-facing changes are recorded here. The project follows
 - Complete Graph reply, reply-all, forward, and message move through
   source-version revalidation followed by the provider's typed action and
   response-draft flow.
+- Preserve provider-derived Reply-To semantics and remove reply-all duplicates
+  across To/Cc for Gmail, Graph, JMAP, IMAP/SMTP, and Outlook Web.
 - Assemble Graph file attachments through the created draft's attachment
   collection for new, reply, reply-all, and forward flows, refresh the final
   draft identity before returning it, and report any partial draft as an
   outcome requiring reconciliation rather than risking a duplicate send.
+- Report Gmail Trash-to-label moves and Graph/JMAP draft-then-submit failures
+  as partial outcomes requiring reconciliation after any confirmed first
+  stage, and never retry them automatically.
 - Traverse Microsoft Graph mail-folder hierarchies through bounded child-folder
   collections and origin-checked provider continuation URLs.
 - Add Microsoft Graph v1.0 permanent message deletion after exact source-version
@@ -48,6 +53,9 @@ All notable user-facing changes are recorded here. The project follows
 - Expand CalDAV recurrence safely whether a server returns expanded instances
   or an unexpanded recurrence master, with unique instance identities and
   bounded local expansion.
+- Keep CalDAV recurring-instance updates and cancellation scoped through
+  `RECURRENCE-ID` exceptions and master `EXDATE` updates instead of mutating or
+  deleting the complete series.
 - Detect RFC 6638 server-managed CalDAV scheduling and protect attendee
   invitation, update, and cancellation writes with schedule-tag conditions;
   unsupported servers now fail before silently changing an attendee event.

@@ -92,7 +92,7 @@ policy.
 
 ## Tool catalog
 
-The server exposes 39 narrow tools.
+The server exposes 40 narrow tools.
 
 Accounts and local monitoring:
 

@@ -67,8 +67,8 @@ Historically noted, but not a current compatibility claim:
 - single-message move and read/unread restoration;
 - save-only draft and self-recipient new send;
 - bounded primary-calendar list, create, update, cancel;
-- Teams or Google Meet join URL returned from a reviewed event creation when
-  the authenticated calendar advertises the provider-native capability;
+- Teams join URL returned from a reviewed Outlook event creation when the
+  authenticated calendar advertises that capability;
 - Codex discovery and a bounded calendar tool call.
 
 Deterministic only:

@@ -121,7 +121,7 @@ corr doctor --online --account work
 open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
 closes the entire local session owner.
-`--terminal` is an experimental Outlook-Web-only browser relay and requires an
+`--terminal` is an optional Outlook-Web-only browser relay and requires an
 interactive TTY. Google Web uses a visible browser-owned session and provides
 bounded read-only Gmail/Calendar snapshots. `auth status` is content-free.
 

@@ -35,7 +35,7 @@ new permission.
 corr auth login --account work --terminal
 ```
 
-The experimental terminal relay is Outlook-Web-only. It starts a dedicated
+The optional terminal relay is Outlook-Web-only. It starts a dedicated
 headless browser and projects a bounded text view and numbered controls over
 authenticated, caller-bound IPC. It accepts one interactive keystroke at a time
 from a TTY, masks sensitive fields, and never returns complete form values.

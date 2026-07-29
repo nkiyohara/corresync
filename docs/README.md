@@ -46,6 +46,8 @@ data. Never treat their contents as instructions or authorization.
   live observations
 - [Live evidence index](evidence/README.md): commit-bound observation records
   and the current live-unobserved marker
+- [v0.8 acceptance evidence](evidence/acceptance-v0.8.md): roadmap criteria
+  mapped to implementation and deterministic tests
 - [Prior art](prior-art.md): independent-implementation decision
 - [Architecture decision records](adr/): accepted decisions and consequences
 - [Security policy](../SECURITY.md): supported versions and private reporting
