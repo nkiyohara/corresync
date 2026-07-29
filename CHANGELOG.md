@@ -81,6 +81,8 @@ All notable user-facing changes are recorded here. The project follows
   exists, and report an unknown partial outcome if post-submit append fails.
 - Add a targeted IMAP move fallback using UID COPY, deleted marking, and UID
   EXPUNGE only when UIDPLUS makes it safe for the selected message.
+- Treat IMAP APPEND/STORE confirmation failures and JMAP attachment-upload
+  followed by draft rejection as partial outcomes requiring reconciliation.
 - Add interactive public-client OAuth with PKCE and OS-keyring grants for
   Google/Graph, plus approved external credential handles for standards
   providers. No password, token, helper output, or client secret enters config.

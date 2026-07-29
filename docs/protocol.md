@@ -140,7 +140,9 @@ and save-only drafts remain available while send reports a `mail.send`
 degradation. A read-only advertised account likewise remains readable and
 rejects every write explicitly. JMAP identity is resolved before a send draft
 is created; if submission then fails, the retained draft is reported as a
-partial outcome requiring reconciliation.
+partial outcome requiring reconciliation. If attachment upload succeeds before
+draft creation fails, retained blobs are likewise reported as a partial
+outcome.
 
 ## IMAP and SMTP Submission
 
@@ -159,7 +161,9 @@ CPU work internally. STARTTLS is negotiated with a bounded pre-TLS control
 exchange, then the complete decrypted IMAP stream is checked. Reply message IDs
 and References are normalized as bounded angle-bracket identifiers before
 header construction. SMTP acceptance without a returned message identity is
-represented explicitly.
+represented explicitly. Errors after a mutating IMAP command or an accepted
+SMTP submission are partial outcomes requiring reconciliation; Corresync does
+not repeat the operation automatically.
 
 ## CalDAV
 

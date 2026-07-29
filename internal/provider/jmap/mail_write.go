@@ -252,6 +252,7 @@ func (client *Client) createDraft(
 		"body": map[string]string{"value": composition.Body},
 	}
 	parts := []any{bodyPart}
+	uploadedParts := 0
 	for index, attachment := range input.Attachments {
 		uploaded, err := client.upload(
 			ctx,
@@ -260,8 +261,12 @@ func (client *Client) createDraft(
 			attachment.Content,
 		)
 		if err != nil {
+			if uploadedParts != 0 {
+				return application.MailDraft{}, jmapUploadedDraftError(err)
+			}
 			return application.MailDraft{}, err
 		}
+		uploadedParts++
 		contentType := uploaded.Type
 		if contentType == "" {
 			contentType = attachment.ContentType
@@ -290,13 +295,20 @@ func (client *Client) createDraft(
 		"accountId": client.accountID,
 		"create":    map[string]any{"draft": create},
 	}, &response); err != nil {
+		if uploadedParts != 0 {
+			return application.MailDraft{}, jmapUploadedDraftError(err)
+		}
 		return application.MailDraft{}, err
 	}
 	if failure, exists := response.NotCreated["draft"]; exists {
-		return application.MailDraft{}, fmt.Errorf(
+		err := fmt.Errorf(
 			"JMAP draft creation failed: %s",
 			sanitizeProviderError(methodError(failure)),
 		)
+		if uploadedParts != 0 {
+			return application.MailDraft{}, jmapUploadedDraftError(err)
+		}
+		return application.MailDraft{}, err
 	}
 	created, exists := response.Created["draft"]
 	if !exists || created.ID == "" || response.NewState == "" {
@@ -308,6 +320,14 @@ func (client *Client) createDraft(
 	return application.MailDraft{
 		ID: created.ID, ChangeKey: response.NewState,
 	}, nil
+}
+
+func jmapUploadedDraftError(err error) error {
+	return fmt.Errorf(
+		"%w: JMAP retained uploaded attachment blobs but did not confirm the draft: %w",
+		application.ErrWriteOutcomeUnknown,
+		err,
+	)
 }
 
 type composition struct {

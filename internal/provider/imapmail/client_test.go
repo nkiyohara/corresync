@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -259,6 +260,10 @@ func TestClientReadsConditionallyUpdatesAndSubmitsSyntheticStandardsMail(t *test
 		To:      []string{"recipient@example.invalid"},
 		Subject: "Synthetic submission",
 		Body:    "Hello over SMTP",
+		Attachments: []application.MailFileAttachment{{
+			Name: "fixture.txt", ContentType: "text/plain",
+			Content: []byte("fixture"),
+		}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -289,6 +294,8 @@ func TestClientReadsConditionallyUpdatesAndSubmitsSyntheticStandardsMail(t *test
 	defer fixture.out.mu.Unlock()
 	if len(fixture.out.messages) != 1 ||
 		!bytes.Contains(fixture.out.messages[0], []byte("Synthetic submission")) ||
+		!bytes.Contains(fixture.out.messages[0], []byte("fixture.txt")) ||
+		!bytes.Contains(fixture.out.messages[0], []byte("Zml4dHVyZQ==")) ||
 		len(fixture.out.recipients) != 1 ||
 		len(fixture.out.recipients[0]) != 1 ||
 		fixture.out.recipients[0][0] != "recipient@example.invalid" {
@@ -347,6 +354,23 @@ func TestSendFailsBeforeSMTPWhenSentMailboxWasNotDiscovered(t *testing.T) {
 	if err == nil ||
 		!strings.Contains(err.Error(), "SMTP submission was not attempted") {
 		t.Fatalf("SendMail() error = %v", err)
+	}
+}
+
+func TestIMAPCommittedWriteErrorsRequireReconciliation(t *testing.T) {
+	t.Parallel()
+	for _, source := range []error{
+		errors.New("synthetic confirmation failure"),
+		fmt.Errorf(
+			"%w: synthetic transport failure",
+			application.ErrWriteOutcomeUnknown,
+		),
+	} {
+		err := imapCommittedWriteError("confirm synthetic write", source)
+		if !errors.Is(err, application.ErrWriteOutcomeUnknown) ||
+			!errors.Is(err, source) {
+			t.Fatalf("imapCommittedWriteError() = %v", err)
+		}
 	}
 }
 

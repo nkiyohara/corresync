@@ -79,7 +79,9 @@ Provider differences remain visible:
 - IMAP/SMTP saves accepted submissions to the discovered Sent mailbox and
   returns the appended message identity. It fails before SMTP when no Sent
   mailbox exists. Message move uses native MOVE or a targeted UIDPLUS
-  copy/delete/UID-EXPUNGE fallback; permanent delete requires UIDPLUS;
+  copy/delete/UID-EXPUNGE fallback; permanent delete requires UIDPLUS. Any
+  failure after APPEND, STORE, COPY, MOVE, or deleted marking requires remote
+  reconciliation;
 - Outlook Web supports explicit shared/delegated mailbox routing only when the
   signed-in user already has that permission.
 

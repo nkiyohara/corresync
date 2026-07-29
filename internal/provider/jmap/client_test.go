@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -25,9 +26,11 @@ type syntheticJMAP struct {
 	created             [][]emailAddress
 	submit              bool
 	readOnly            bool
+	draftFailure        bool
 	submissionFailure   bool
 	brokenWriteResponse bool
 	writeStatus         int
+	uploads             int
 }
 
 func newSyntheticJMAP(t *testing.T) *syntheticJMAP {
@@ -78,6 +81,22 @@ func (fixture *syntheticJMAP) serveHTTP(writer http.ResponseWriter, request *htt
 		fixture.serveAPI(writer, request)
 	case "/download/account-1/blob-1/report.txt":
 		_, _ = writer.Write([]byte("fixture"))
+	case "/upload/account-1":
+		content, err := io.ReadAll(request.Body)
+		if err != nil {
+			fixture.t.Errorf("read upload: %v", err)
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		fixture.mu.Lock()
+		fixture.uploads++
+		fixture.mu.Unlock()
+		fixture.writeJSON(writer, map[string]any{
+			"accountId": "account-1",
+			"blobId":    "uploaded-blob-1",
+			"type":      request.Header.Get("Content-Type"),
+			"size":      len(content),
+		})
 	default:
 		writer.WriteHeader(http.StatusNotFound)
 	}
@@ -101,6 +120,7 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 	fixture.requests = append(fixture.requests, method)
 	state := fixture.state
 	brokenWriteResponse := fixture.brokenWriteResponse
+	draftFailure := fixture.draftFailure
 	submissionFailure := fixture.submissionFailure
 	writeStatus := fixture.writeStatus
 	fixture.mu.Unlock()
@@ -185,11 +205,25 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 			fixture.mu.Lock()
 			fixture.created = append(fixture.created, createdTo)
 			fixture.mu.Unlock()
-			result = map[string]any{
-				"accountId": "account-1", "oldState": state, "newState": "state-2",
-				"created": map[string]any{
-					"draft": map[string]any{"id": "draft-1", "blobId": "draft-blob"},
-				},
+			if draftFailure {
+				result = map[string]any{
+					"accountId": "account-1",
+					"oldState":  state,
+					"newState":  state,
+					"notCreated": map[string]any{
+						"draft": map[string]any{
+							"type":        "invalidProperties",
+							"description": "synthetic draft rejection",
+						},
+					},
+				}
+			} else {
+				result = map[string]any{
+					"accountId": "account-1", "oldState": state, "newState": "state-2",
+					"created": map[string]any{
+						"draft": map[string]any{"id": "draft-1", "blobId": "draft-blob"},
+					},
+				}
 			}
 		}
 	case "Identity/get":
@@ -586,6 +620,39 @@ func TestJMAPSubmissionFailureReportsRetainedDraft(t *testing.T) {
 			},
 		) {
 		t.Fatalf("SendMail() error = %v, requests = %#v", err, requests)
+	}
+}
+
+func TestJMAPDraftFailureReportsUploadedAttachment(t *testing.T) {
+	t.Parallel()
+	fixture := newSyntheticJMAP(t)
+	fixture.mu.Lock()
+	fixture.draftFailure = true
+	fixture.mu.Unlock()
+	client, err := New(t.Context(), Options{
+		SessionURL: fixture.server.URL + "/session",
+		Username:   "reader@example.invalid",
+		Password:   []byte("synthetic-secret"),
+		Client:     fixture.server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+
+	_, err = client.CreateMailDraft(t.Context(), application.MailDraftInput{
+		To:      []string{"recipient@example.invalid"},
+		Subject: "Synthetic attachment draft",
+		Attachments: []application.MailFileAttachment{{
+			Name: "fixture.txt", ContentType: "text/plain",
+			Content: []byte("fixture"),
+		}},
+	})
+	fixture.mu.Lock()
+	uploads := fixture.uploads
+	fixture.mu.Unlock()
+	if !errors.Is(err, application.ErrWriteOutcomeUnknown) || uploads != 1 {
+		t.Fatalf("CreateMailDraft() error = %v, uploads = %d", err, uploads)
 	}
 }
 

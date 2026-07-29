@@ -143,16 +143,17 @@ func (client *Client) appendMessage(
 			time.Now(),
 			bytes.NewReader(raw),
 		); err != nil {
-			return fmt.Errorf(
-				"%w: append IMAP %s: %w",
-				application.ErrWriteOutcomeUnknown,
-				kind,
+			return imapCommittedWriteError(
+				"append IMAP "+kind,
 				err,
 			)
 		}
 		status, err := connection.Select(mailbox, true)
 		if err != nil {
-			return err
+			return imapCommittedWriteError(
+				"confirm appended IMAP "+kind,
+				err,
+			)
 		}
 		criteria := imap.NewSearchCriteria()
 		criteria.Header = textproto.MIMEHeader{
@@ -160,36 +161,55 @@ func (client *Client) appendMessage(
 		}
 		uids, err := connection.UidSearch(criteria)
 		if err != nil {
-			return err
+			return imapCommittedWriteError(
+				"identify appended IMAP "+kind,
+				err,
+			)
 		}
 		if len(uids) != 1 {
-			return fmt.Errorf(
-				"%w: appended IMAP %s could not be identified uniquely",
-				application.ErrWriteOutcomeUnknown,
-				kind,
+			return imapCommittedWriteError(
+				"identify appended IMAP "+kind,
+				errors.New("message could not be identified uniquely"),
 			)
 		}
 		messages, err := fetchUIDs(connection, uids, metadataItems)
 		if err != nil {
-			return err
+			return imapCommittedWriteError(
+				"read appended IMAP "+kind,
+				err,
+			)
 		}
 		if len(messages) != 1 {
-			return fmt.Errorf(
-				"%w: appended IMAP %s metadata was omitted",
-				application.ErrWriteOutcomeUnknown,
-				kind,
+			return imapCommittedWriteError(
+				"read appended IMAP "+kind,
+				errors.New("message metadata was omitted"),
 			)
 		}
 		id, err = encodeMessageID(messageReference{
 			Mailbox: mailbox, UIDValidity: status.UidValidity, UID: uids[0],
 		})
 		if err != nil {
-			return err
+			return imapCommittedWriteError(
+				"encode appended IMAP "+kind+" identity",
+				err,
+			)
 		}
 		changeKey = snapshot(status, messages[0])
 		return nil
 	})
 	return id, changeKey, returnErr
+}
+
+func imapCommittedWriteError(action string, err error) error {
+	if errors.Is(err, application.ErrWriteOutcomeUnknown) {
+		return err
+	}
+	return fmt.Errorf(
+		"%w: %s: %w",
+		application.ErrWriteOutcomeUnknown,
+		action,
+		err,
+	)
 }
 
 func (client *Client) MoveMail(
@@ -307,14 +327,23 @@ func (client *Client) SetMailReadState(
 			[]interface{}{imap.SeenFlag},
 			nil,
 		); err != nil {
-			return err
+			return imapCommittedWriteError(
+				"set IMAP message read state",
+				err,
+			)
 		}
 		messages, err := fetchUIDs(connection, []uint32{reference.UID}, metadataItems)
 		if err != nil {
-			return err
+			return imapCommittedWriteError(
+				"confirm IMAP message read state",
+				err,
+			)
 		}
 		if len(messages) != 1 {
-			return errors.New("IMAP updated message metadata was omitted")
+			return imapCommittedWriteError(
+				"confirm IMAP message read state",
+				errors.New("updated message metadata was omitted"),
+			)
 		}
 		result = application.MailReadStateResult{
 			ID: input.MessageID, ChangeKey: snapshot(status, messages[0]),
@@ -354,7 +383,10 @@ func (client *Client) DeleteMail(
 			[]interface{}{imap.DeletedFlag},
 			nil,
 		); err != nil {
-			return err
+			return imapCommittedWriteError(
+				"mark IMAP message deleted",
+				err,
+			)
 		}
 		status, err := connection.Execute(&imap.Command{
 			Name: "UID",

@@ -256,13 +256,19 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 		application.MailDraftInput{
 			To: []string{"to@example.test"}, BCC: []string{"hidden@example.test"},
 			Subject: "Draft", Body: "body",
+			Attachments: []application.MailFileAttachment{{
+				Name: "draft.txt", ContentType: "text/plain",
+				Content: []byte("draft"),
+			}},
 		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if draft.ID == "" || len(draftRaws) != 1 ||
-		!strings.Contains(draftRaws[0], "Bcc: hidden@example.test") {
+		!strings.Contains(draftRaws[0], "Bcc: hidden@example.test") ||
+		!strings.Contains(draftRaws[0], "draft.txt") ||
+		!strings.Contains(draftRaws[0], "ZHJhZnQ=") {
 		t.Fatalf("draft = %#v raw = %q", draft, draftRaws)
 	}
 	_, err = client.CreateMailDraft(
@@ -302,13 +308,19 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 		application.MailSendInput{
 			To: []string{"to@example.test"}, BCC: []string{"hidden@example.test"},
 			Subject: "Sent", Body: "body",
+			Attachments: []application.MailFileAttachment{{
+				Name: "send.txt", ContentType: "text/plain",
+				Content: []byte("send"),
+			}},
 		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if sent.ID == "" || sent.ChangeKey == "" ||
-		!strings.Contains(sendRaw, "Bcc: hidden@example.test") {
+		!strings.Contains(sendRaw, "Bcc: hidden@example.test") ||
+		!strings.Contains(sendRaw, "send.txt") ||
+		!strings.Contains(sendRaw, "c2VuZA==") {
 		t.Fatalf("sent = %#v raw = %q", sent, sendRaw)
 	}
 	readState, err := client.SetMailReadState(
