@@ -14,13 +14,77 @@ and therefore reports a missing asset. Published release assets are immutable;
 the fix is the v0.6.2 bridge release, whose updater trusts both exact workflow
 identities and understands the canonical Corresync archive.
 
-Upgrade/install v0.6.2 first, then run its historical update command:
+Package-manager users can install the renamed package directly. A direct
+v0.6.2 installation can use the built-in updater after finishing or abandoning
+pending preview tokens:
 
 ```console
 owa update
 ```
 
-Package-manager users may replace the former package directly:
+Daemon replacement intentionally invalidates pending previews.
+
+## From v0.6.1
+
+Do not run `owa update` directly from v0.6.1. That updater reads the latest
+v0.7 release number but constructs the removed
+`owa-bridge_0.7.0_<os>_<arch>` archive name. It also trusts only the exact
+pre-rename Sigstore workflow identity, so adding an unsigned legacy-named asset
+to v0.7 would still fail closed at provenance verification.
+
+Install the signed v0.6.2 bridge first. For example, on Linux amd64:
+
+```console
+mkdir corresync-bridge
+cd corresync-bridge
+
+gh release download v0.6.2 \
+  --repo nkiyohara/corresync \
+  --pattern checksums.txt \
+  --pattern checksums.txt.sigstore.json \
+  --pattern owa-bridge_0.6.2_linux_amd64.tar.gz
+
+WORKFLOW_ID="https://github.com/nkiyohara/owa-bridge/"
+WORKFLOW_ID="${WORKFLOW_ID}.github/workflows/release.yml@refs/tags/v0.6.2"
+cosign verify-blob \
+  --bundle checksums.txt.sigstore.json \
+  --certificate-identity "$WORKFLOW_ID" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+
+sha256sum --ignore-missing --check checksums.txt
+tar -xzf owa-bridge_0.6.2_linux_amd64.tar.gz
+./owa --version
+```
+
+Use `darwin_amd64`, `darwin_arm64`, `linux_arm64`, `windows_amd64.zip`, or
+`windows_arm64.zip` for another release target. On macOS, replace
+`sha256sum` with `shasum -a 256`.
+
+After verification, update the extracted bridge copy. This leaves the installed
+v0.6.1 executable untouched:
+
+```console
+./owa update
+./owa --version
+mv ./owa ./corresync
+```
+
+The first version check above must report v0.6.2; the second must report
+Corresync v0.7. Its updater accepts the canonical archive and both exact
+workflow identities. Move the resulting `corresync` executable to a private
+directory on `PATH`, preserving the installed v0.6.1 file until first-run
+migration succeeds. Then continue with
+[local-data migration](#let-corresync-migrate-local-data).
+
+Alternatively, verify and install the canonical v0.7 archive directly using
+[install.md](install.md#direct-release-download). Corresync itself performs
+the same config and state migration on first use; the bridge is required only
+for an in-place update through the old command.
+
+## Install the renamed package
+
+Choose one installation owner:
 
 ```console
 # Homebrew

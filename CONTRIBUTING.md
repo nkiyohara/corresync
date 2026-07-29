@@ -131,3 +131,19 @@ mise exec -- task docs
 Suspected vulnerabilities must use
 [private vulnerability reporting](https://github.com/nkiyohara/corresync/security/advisories/new),
 not a public issue or pull request.
+
+## GitHub metadata
+
+Human-authored issues and pull requests use exactly one category label:
+`bug`, `enhancement`, `documentation`, `security`, `testing`, `release`,
+`roadmap`, or `compatibility`. Add only the `area:` labels needed to identify
+the affected product surface. Automation labels such as `dependencies`, `go`,
+and `github_actions` are reserved for dependency-update pull requests.
+
+Release work belongs to the milestone whose acceptance criteria it delivers.
+Standalone maintenance and dependency updates may omit a milestone. Milestones
+do not carry due dates: a release is ready when its tracked scope, verification,
+documentation, and security review are complete.
+
+Pull requests close or reference their tracking issue. A standalone maintenance
+pull request explains why no issue or release milestone is needed.

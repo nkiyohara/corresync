@@ -1,6 +1,7 @@
 name: Bug report
 description: Report a reproducible bug using synthetic or content-free data.
 title: "bug: "
+labels: ["bug"]
 body:
   - type: markdown
     attributes:

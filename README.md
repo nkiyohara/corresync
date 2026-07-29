@@ -297,6 +297,9 @@ same build; new examples use `corr`.
 The former `owa` command and `owa-bridge` paths are migration inputs only and
 are never canonical output. Users coming from v0.6 should follow the
 [v0.7 migration guide](docs/migration-v0.7.md).
+Direct v0.6.1 installations must
+[install the signed v0.6.2 bridge first](docs/migration-v0.7.md#from-v061);
+their updater cannot select or verify the renamed v0.7 artifact directly.
 
 ## Contributing
 
