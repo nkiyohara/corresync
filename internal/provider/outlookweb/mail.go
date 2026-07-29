@@ -4,11 +4,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/nkiyohara/corresync/internal/application"
 )
+
+const maxOWAMailPageSize = 25
+
+var ErrMailSearchUnavailable = errors.New("outlook web mailbox search is unavailable")
 
 type folderKind uint8
 
@@ -163,6 +168,15 @@ func (client *Client) ListMessages(
 	if err := input.Validate(); err != nil {
 		return application.MailPage{}, err
 	}
+	if input.Limit > maxOWAMailPageSize {
+		return application.MailPage{}, fmt.Errorf(
+			"outlook web mail limit must be between 1 and %d; use offset to request another page",
+			maxOWAMailPageSize,
+		)
+	}
+	if err := validateMailZone(input.TimeZone); err != nil {
+		return application.MailPage{}, err
+	}
 	kind := folderOpaque
 	folderID := input.Folder.ID
 	if input.Folder.Kind == application.MailFolderDistinguished {
@@ -190,6 +204,9 @@ func (client *Client) SearchMessages(
 	if err := input.Validate(); err != nil {
 		return application.MailPage{}, err
 	}
+	if err := validateMailZone(input.TimeZone); err != nil {
+		return application.MailPage{}, err
+	}
 	kind := folderOpaque
 	folderID := input.Folder.ID
 	if input.Folder.Kind == application.MailFolderDistinguished {
@@ -209,6 +226,10 @@ func (client *Client) SearchMessages(
 		TimeZone:             input.TimeZone,
 	})
 	if err != nil {
+		var httpFailure *HTTPError
+		if errors.As(err, &httpFailure) && httpFailure.StatusCode >= http.StatusInternalServerError {
+			return application.MailPage{}, errors.Join(ErrMailSearchUnavailable, err)
+		}
 		return application.MailPage{}, err
 	}
 	return normalizeMailPage(page), nil
@@ -288,7 +309,7 @@ func buildFindItemEnvelope(input listMessagesRequest) (findItemEnvelope, error) 
 	if input.Limit < 1 || input.Limit > application.MaxMailPageSize {
 		return findItemEnvelope{}, fmt.Errorf("mail limit must be between 1 and %d", application.MaxMailPageSize)
 	}
-	if err := validateZone(input.TimeZone); err != nil {
+	if err := validateMailZone(input.TimeZone); err != nil {
 		return findItemEnvelope{}, err
 	}
 	searching := input.Query != "" || input.SearchFolderIdentity != ""
@@ -368,6 +389,19 @@ func buildFindItemEnvelope(input listMessagesRequest) (findItemEnvelope, error) 
 		envelope.Body.SearchFolderID = input.SearchFolderIdentity
 	}
 	return envelope, nil
+}
+
+func validateMailZone(zone string) error {
+	if err := validateZone(zone); err != nil {
+		return err
+	}
+	if strings.Contains(zone, "/") {
+		return errors.New(
+			"outlook web mail time zone must be an Exchange/Windows identifier, " +
+				`for example "GMT Standard Time"; omit timeZone to use UTC`,
+		)
+	}
+	return nil
 }
 
 func validUUID(value string) bool {

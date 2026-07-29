@@ -144,6 +144,51 @@ func TestListMessagesValidatesBeforeNetwork(t *testing.T) {
 	}
 }
 
+func TestListMessagesRejectsUnsupportedOWAWindowBeforeNetwork(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Error("server must not be called for an unsupported OWA result window")
+	}))
+	defer server.Close()
+	client := testClient(t, server, nil)
+
+	_, err := client.ListMessages(context.Background(), application.MailListInput{
+		Account:  "work",
+		Folder:   application.MailFolder{Kind: application.MailFolderDistinguished, ID: "inbox"},
+		Limit:    100,
+		TimeZone: "UTC",
+	})
+	if err == nil || !bytes.Contains([]byte(err.Error()), []byte("use offset to request another page")) {
+		t.Fatalf("ListMessages() error = %v, want actionable OWA paging error", err)
+	}
+}
+
+func TestMailReadsRejectIANATimeZoneBeforeNetwork(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Error("server must not be called for an IANA OWA mail time zone")
+	}))
+	defer server.Close()
+	client := testClient(t, server, nil)
+	folder := application.MailFolder{Kind: application.MailFolderDistinguished, ID: "inbox"}
+
+	_, listErr := client.ListMessages(context.Background(), application.MailListInput{
+		Account: "work", Folder: folder, Limit: 25, TimeZone: "Europe/London",
+	})
+	if listErr == nil || !bytes.Contains([]byte(listErr.Error()), []byte("Exchange/Windows identifier")) {
+		t.Fatalf("ListMessages() error = %v, want actionable time-zone error", listErr)
+	}
+
+	_, searchErr := client.SearchMessages(context.Background(), application.MailSearchInput{
+		Account: "work", Folder: folder, Query: "synthetic", Limit: 25, TimeZone: "Europe/London",
+	})
+	if searchErr == nil || !bytes.Contains([]byte(searchErr.Error()), []byte("Exchange/Windows identifier")) {
+		t.Fatalf("SearchMessages() error = %v, want actionable time-zone error", searchErr)
+	}
+}
+
 func TestListMessagesPreservesOpaqueFolderID(t *testing.T) {
 	t.Parallel()
 
@@ -253,6 +298,33 @@ func TestSearchMessagesValidatesBeforeNetwork(t *testing.T) {
 		if _, err := client.SearchMessages(context.Background(), input); err == nil {
 			t.Fatalf("SearchMessages(%+v) unexpectedly succeeded", input)
 		}
+	}
+}
+
+func TestSearchMessagesClassifiesProviderServerFailure(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	client := testClient(t, server, func(options *Options) {
+		options.ReadAttempts = 1
+	})
+
+	_, err := client.SearchMessages(context.Background(), application.MailSearchInput{
+		Account:  "work",
+		Folder:   application.MailFolder{Kind: application.MailFolderDistinguished, ID: "inbox"},
+		Query:    "synthetic",
+		Limit:    25,
+		TimeZone: "UTC",
+	})
+	if !errors.Is(err, ErrMailSearchUnavailable) {
+		t.Fatalf("SearchMessages() error = %v, want ErrMailSearchUnavailable", err)
+	}
+	var httpFailure *HTTPError
+	if !errors.As(err, &httpFailure) || httpFailure.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("SearchMessages() error = %v, want retained HTTP 500 metadata", err)
 	}
 }
 
