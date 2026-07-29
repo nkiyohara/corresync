@@ -68,13 +68,13 @@ actions.
   discovery returns evidence and an explicit-selection marker; the account
   command accepts independent mail and calendar provider overrides.
 - Multiple Google accounts remain isolated:
-  `cmd/corr/session_backend_auth_test.go` covers independent OAuth/browser
-  routes and mixed-provider accounts.
-- API and web capability separation:
+  `cmd/corr/session_backend_auth_test.go` covers independent OAuth routes and
+  mixed-provider accounts.
+- Google API and legacy web separation:
   `internal/provider/googleapi/googleapi_test.go` covers write-capable REST
-  contracts; `internal/provider/googleweb/googleweb_test.go` covers bounded
-  browser-owned reads and proves every write fails without touching the
-  driver.
+  contracts. The old semantic-DOM tests remain synthetic evidence only;
+  v0.8.2 disables Google Web selection and fails legacy activation before
+  browser launch after Google rejected the live sign-in surface.
 
 ## Issue 27: explicit Microsoft Graph
 

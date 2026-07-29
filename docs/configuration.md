@@ -117,13 +117,11 @@ Each account may have mail, calendar, or both. Supported route payloads are:
 | Service | Provider | Nested table |
 | --- | --- | --- |
 | mail | `microsoft-owa` | `mail.outlook_web` |
-| mail | `google-web` | `mail.google_web` |
 | mail | `google-api` | `mail.google_api` |
 | mail | `microsoft-graph` | `mail.microsoft_graph` |
 | mail | `jmap` | `mail.jmap` |
 | mail | `imap-smtp` | `mail.imap_smtp` |
 | calendar | `microsoft-owa` | `calendar.outlook_web` |
-| calendar | `google-web` | `calendar.google_web` |
 | calendar | `google-api` | `calendar.google_api` |
 | calendar | `microsoft-graph` | `calendar.microsoft_graph` |
 | calendar | `caldav` | `calendar.caldav` |
@@ -216,27 +214,18 @@ Prefix the calendar settings with `calendar-`, for example
 calendar-only account uses `--mail-provider none`; `--calendar-provider none`
 creates a mail-only account.
 
-## Google Web routing
+## Legacy Google Web configuration
 
-Managed Google accounts may use a browser-owned, read-only route without a
-public OAuth client:
+Schema v3 can still parse `mail.google_web` and `calendar.google_web` only so
+v0.8.0 and v0.8.1 accounts can be inspected and removed safely. New
+`google-web` selection is rejected, and login fails before launching a browser.
+Google rejects sign-in from software-controlled browsers; Corresync does not
+disguise automation or bypass that protection.
 
-```console
-corr account add reader@example.invalid \
-  --alias managed \
-  --mail-provider google-web \
-  --calendar-provider google-web \
-  --origin https://mail.google.com \
-  --calendar-origin https://calendar.google.com
-```
-
-Only the exact provider-owned origins above are accepted. Authentication and
-identity confirmation remain inside one visible, stable-ID-isolated browser
-profile. The adapter reads a bounded semantic snapshot of Gmail and Google
-Calendar; it exposes incomplete pagination as a degradation and implements no
-mail or calendar writes. Credential-free discovery may rank this route for a
-managed Workspace address, but never opens a browser or requests OAuth/admin
-consent.
+Replace the account with an explicitly authorized `google-api` route or with
+IMAP/SMTP and CalDAV routes that the provider and account administrator permit.
+Workspace policy can require OAuth app approval or disable either API or
+standards access; Corresync never silently falls back around those controls.
 
 ## Outlook Web routing
 

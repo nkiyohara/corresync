@@ -90,18 +90,12 @@ monitoring or scheduled send.
 
 ## Google Web
 
-The managed Google Web route opens only the exact Gmail and Google Calendar
-origins in one dedicated visible browser profile. Authentication, SSO, MFA,
-account selection, and organization notices remain browser-owned. The adapter
-never reads cookies, browser storage, or authorization tokens.
-
-After confirming the configured identity on both surfaces, a bounded semantic
-DOM driver returns visible mail and calendar metadata. It treats the snapshot
-as read-only and incomplete: pagination beyond the rendered set is not
-invented, an unrecognized DOM fails instead of becoming a false empty result,
-multi-day agenda reads visit each UTC date and deduplicate exact occurrences,
-unsupported details are degradations, and all draft/send/organization and
-calendar mutation operations fail as unavailable without touching the browser.
+Runtime Google Web sign-in is disabled before browser launch. Google rejects
+sign-in from software-controlled browsers, and Corresync does not hide
+automation signals or otherwise bypass that protection. The old semantic-DOM
+adapter remains covered by synthetic tests only while v0.8.0-v0.8.1
+configuration can still be parsed for safe inspection and removal. It is not a
+supported provider protocol.
 
 ## Microsoft Graph
 

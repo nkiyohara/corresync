@@ -88,9 +88,11 @@ monitoring.
 
 ## Implementation amendment
 
-The read-only Google Web, Google API, Microsoft Graph, JMAP, IMAP/SMTP, and
-CalDAV adapters are now implemented behind the shared application boundary.
-Their evidence is deterministic-only until separately recorded in
-[compatibility.md](../compatibility.md). Outlook Web remains the only provider
-with bounded live observations; this evidence difference is not a capability
-fallback.
+Google API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters are
+implemented behind the shared application boundary. The former read-only
+Google Web route is disabled before browser launch by
+[ADR 0018](0018-disable-automated-google-web-sign-in.md); its legacy schema and
+synthetic fixtures are not a runtime capability. Remaining route evidence is
+deterministic-only until separately recorded in
+[compatibility.md](../compatibility.md). This evidence difference is not a
+capability fallback.

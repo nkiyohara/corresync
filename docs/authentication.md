@@ -46,16 +46,18 @@ visible browser. Do not use the relay to bypass organization policy.
 
 ## Google Web
 
-The `google-web` route uses one dedicated visible browser profile to open the
-exact `https://mail.google.com` and `https://calendar.google.com` origins. It
-confirms that both surfaces show the configured account identity, then exposes
-only a bounded read-only semantic snapshot.
+Automated `google-web` sign-in is unavailable. Google rejects sign-in from
+software-controlled browsers; hiding automation signals would be an
+unsupported attempt to bypass an account-protection control. Corresync does not
+do that. New discovery does not offer this route, explicit selection is
+rejected, and a v0.8.0 or v0.8.1 configuration that still names it fails before
+any browser is launched.
 
-Sign-in, SSO, MFA, organization notices, and account selection stay inside the
-browser. Corresync does not request a password, inspect cookies or browser
-storage, extract an authorization token, or invoke Google administrator
-consent. The profile is isolated by stable account ID. Google Web and Google
-API are separate explicit routes: neither silently falls back to the other.
+Choose `google-api` explicitly with a public OAuth client you are authorized to
+use, or choose a standards route that the account and its administrator permit.
+Google Workspace administrators can restrict third-party OAuth, Gmail API,
+Calendar API, IMAP, and other client access. A rejected or unapproved route
+fails clearly and never falls through to another provider.
 
 ## Google API and Microsoft Graph
 

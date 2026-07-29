@@ -93,6 +93,12 @@ type accountAddResult struct {
 	Account  application.AccountView       `json:"account"`
 }
 
+var errGoogleWebSignInUnavailable = errors.New(
+	`google-web sign-in is unavailable because Google rejects sign-in from ` +
+		`software-controlled browsers; use an explicitly authorized google-api ` +
+		`route, or a standards route approved by the account administrator`,
+)
+
 func (command *accountDiscoverCommand) Run(app *runtime) error {
 	_, discoverer, err := app.accountServices()
 	if err != nil {
@@ -849,6 +855,9 @@ func selectAccountCandidate(
 		if err := provider.Validate(); err != nil {
 			return application.ProviderCandidate{}, err
 		}
+		if provider == domain.ProviderGoogleWeb {
+			return application.ProviderCandidate{}, errGoogleWebSignInUnavailable
+		}
 		for _, candidate := range result.Candidates {
 			if candidate.Provider == provider {
 				if !candidate.Available {
@@ -865,7 +874,6 @@ func selectAccountCandidate(
 			provider != domain.ProviderIMAPSMTP &&
 			provider != domain.ProviderCalDAV &&
 			provider != domain.ProviderGoogleAPI &&
-			provider != domain.ProviderGoogleWeb &&
 			provider != domain.ProviderMicrosoftGraph {
 			return application.ProviderCandidate{}, fmt.Errorf(
 				"provider %q is not available in this build",
@@ -911,6 +919,18 @@ func selectAccountCandidate(
 	for _, candidate := range result.Candidates {
 		if candidate.Available && !candidate.RequiresExplicitSelection {
 			return candidate, nil
+		}
+	}
+	for _, candidate := range result.Candidates {
+		if candidate.Provider == domain.ProviderGoogleAPI && candidate.Available {
+			return application.ProviderCandidate{}, errors.New(
+				"google account discovered, but no route can be selected " +
+					"automatically; configure google-api explicitly with your " +
+					"OAuth public-client settings (managed Workspace accounts " +
+					"may require administrator approval). Automated google-web " +
+					"sign-in is unavailable because Google rejects " +
+					"software-controlled browsers",
+			)
 		}
 	}
 	return application.ProviderCandidate{}, errors.New(

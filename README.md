@@ -84,7 +84,6 @@ can pair IMAP/SMTP mail with a CalDAV calendar.
 | Route | Mail | Calendar | Authentication |
 | --- | --- | --- | --- |
 | Outlook Web | Typed reads and writes | Selectable calendars; provider-supported Teams link | Dedicated visible browser profile |
-| Google Web | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Dedicated visible browser profile |
 | Google API | Gmail reads and writes | Selectable calendars; Google Meet when advertised | Your authorized public OAuth client; OS-keyring grant |
 | Microsoft Graph | Typed reads and writes | Selectable calendars; typed Teams-link creation | Your authorized public OAuth client; OS-keyring grant |
 | JMAP | Typed mail operations | — | OS keyring or approved credential helper |
@@ -95,6 +94,10 @@ can pair IMAP/SMTP mail with a CalDAV calendar.
 Discovery gathers DNS, well-known, and provider metadata without credentials.
 It never authenticates or adds an account. Microsoft Graph and managed Google
 authorization remain explicit choices and are never automatic fallbacks.
+Automated Google Web sign-in is not supported: Google rejects sign-in from
+software-controlled browsers, and Corresync neither disguises automation nor
+bypasses that account protection. Google Workspace administrators may also
+restrict API and standards access.
 
 Every v0.8 route above has synthetic provider-contract and application
 coverage. The v0.8 provider and platform implementations remain
@@ -163,9 +166,10 @@ Account addition does not authenticate. OAuth routes require a public-client
 registration you are authorized to use. Standards routes use a keyring entry
 or explicitly approved helper reference. Passwords and tokens never enter
 `config.toml`. See [account and provider configuration](docs/configuration.md).
-Browser-owned routes open a dedicated visible profile only during the later
+The Outlook Web route opens a dedicated visible profile only during the later
 `auth login`; SSO, MFA, Conditional Access, and organization notices remain
-inside the provider-owned flow.
+inside the provider-owned flow. Google uses an explicitly authorized API or a
+standards route permitted by the account administrator.
 
 ### 3. Connect an agent
 
@@ -231,8 +235,10 @@ agent.
 
 ## Honest edges
 
-- Google Web is bounded and read-only. Supported Google writes require an
-  explicitly selected Google API route.
+- Automated Google Web login is unavailable because Google rejects
+  software-controlled browsers. Corresync does not disguise automation;
+  supported Google operations require an explicitly authorized API or
+  administrator-approved standards route.
 - Google API and Microsoft Graph require your own authorized public-client
   registration. Corresync ships no shared OAuth client or token relay.
 - Windows desktop notification setup is unavailable because Corresync does

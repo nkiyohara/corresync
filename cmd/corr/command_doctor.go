@@ -68,14 +68,17 @@ func (command *doctorCommand) Run(app *runtime) error {
 	command.addOAuthScopes(configured, &report)
 	command.addUpdateStatus(app, configuration, &report)
 
-	if hasBrowserRoute(configured) {
+	switch {
+	case hasGoogleWebRoute(configured):
+		report.add("browser", "fail", errGoogleWebSignInUnavailable.Error())
+	case hasBrowserRoute(configured):
 		executable, err := browser.ResolveExecutable(configuration.Browser.Executable)
 		if err != nil {
 			report.add("browser", "fail", doctorError(err))
 		} else {
 			report.add("browser", "pass", "resolved "+sanitizeCell(filepath.Base(executable), 80))
 		}
-	} else {
+	default:
 		report.add("browser", "skip", "not required by the selected provider routes")
 	}
 

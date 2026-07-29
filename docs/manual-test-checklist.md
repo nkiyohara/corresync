@@ -231,23 +231,10 @@ Pass criteria:
 The Outlook-Web-only `--terminal` relay is optional, requires a real TTY, and
 must reject piped input. Do not record entered or rendered identity values.
 
-For a separately authorized managed Google Web observation, use its opt-in
-read-only harness from a source checkout:
-
-```console
-read -r -p "Authorized Google address: " CORRESYNC_LIVE_GOOGLE_ADDRESS
-export CORRESYNC_LIVE_GOOGLE_ADDRESS
-CORRESYNC_LIVE_CONFIRM=google-web-read-only \
-CORRESYNC_LIVE_GOOGLE_PROFILE_DIR="$(mktemp -d)" \
-mise exec -- go test -tags=live \
-  -run TestLiveGoogleWebVisibleRead ./internal/provider/googleweb
-unset CORRESYNC_LIVE_GOOGLE_ADDRESS
-```
-
-Verify the browser stays visible, both Google surfaces match the configured
-identity, only bounded metadata is read, and no cookie/token/storage export or
-write occurs. Use a dedicated profile and remove it only through a reviewed
-local cleanup after the test. Record only the content-free evidence header.
+Do not attempt a Google Web live observation. Google rejects sign-in from
+software-controlled browsers, and browser fingerprint spoofing or automation
+hiding is outside the product and test scope. Test Google only through an
+explicitly authorized API client or an administrator-approved standards route.
 
 ## 7. Read-only CLI
 

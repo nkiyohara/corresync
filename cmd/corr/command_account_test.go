@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -55,16 +56,16 @@ func newAccountCommandRuntime(
 	return app, path, &stdout
 }
 
-func TestSetupCreatesProviderNeutralConfigThenAddsFirstDiscoveredAccount(t *testing.T) {
+func TestSetupCreatesProviderNeutralConfigThenRequiresExplicitGoogleRoute(
+	t *testing.T,
+) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{{
-				Provider:       domain.ProviderGoogleWeb,
-				Confidence:     98,
-				Authentication: application.DiscoveryBrowserFirstParty,
-				Endpoints: []application.DiscoveredEndpoint{{
-					Kind: "origin", Value: "https://mail.google.com",
-				}},
+				Provider:                  domain.ProviderGoogleAPI,
+				Confidence:                98,
+				Authentication:            application.DiscoveryExplicitOAuth,
+				RequiresExplicitSelection: true,
 				Evidence: []application.DiscoveryEvidence{{
 					Source: "known_domain", Detail: "gmail.com",
 				}},
@@ -87,28 +88,29 @@ func TestSetupCreatesProviderNeutralConfigThenAddsFirstDiscoveredAccount(t *test
 	}
 
 	command := setupCommand{Address: "reader@gmail.com", Alias: "personal"}
-	if err := command.Run(app); err != nil {
-		t.Fatalf("setup: %v", err)
+	err := command.Run(app)
+	if err == nil {
+		t.Fatal("setup automatically selected a Google route")
+	}
+	for _, expected := range []string{
+		"google account discovered",
+		"google-api",
+		"Workspace accounts may require administrator approval",
+		"software-controlled browsers",
+	} {
+		if !strings.Contains(err.Error(), expected) {
+			t.Fatalf("setup error missing %q: %v", expected, err)
+		}
 	}
 	configuration, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if configuration.DefaultAccount != "personal" || len(configuration.Accounts) != 1 {
-		t.Fatalf("setup default/account count = %+v", configuration)
-	}
-	account := configuration.Accounts["personal"]
-	if account.Address != command.Address ||
-		account.Mail == nil ||
-		account.Mail.Provider != domain.ProviderGoogleWeb ||
-		account.Calendar == nil ||
-		account.Calendar.Provider != domain.ProviderGoogleWeb {
-		t.Fatalf("setup account = %+v", account)
+	if configuration.DefaultAccount != "" || len(configuration.Accounts) != 0 {
+		t.Fatalf("setup persisted a Google route = %+v", configuration)
 	}
 	for _, expected := range []string{
 		"Provider-neutral configuration created",
-		"authentication has not started",
-		"corr auth login --account 'personal'",
 	} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("setup output missing %q: %q", expected, stdout.String())
@@ -232,7 +234,7 @@ func TestSelectAccountCandidateDoesNotAutoSelectExplicitConsent(t *testing.T) {
 	}
 }
 
-func TestAccountAddAutoSelectsBrowserOwnedGoogleWithoutOAuth(t *testing.T) {
+func TestAccountAddRejectsGoogleWebEvenWhenDiscovered(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{
@@ -260,29 +262,66 @@ func TestAccountAddAutoSelectsBrowserOwnedGoogleWithoutOAuth(t *testing.T) {
 		},
 	}
 	app, path, stdout := newAccountCommandRuntime(t, discoverer)
-	if err := (&accountAddCommand{
-		Address: "reader@gmail.com",
-		Alias:   "google-web",
-	}).Run(app); err != nil {
-		t.Fatal(err)
+	err := (&accountAddCommand{
+		Address:  "reader@gmail.com",
+		Alias:    "google-web",
+		Provider: string(domain.ProviderGoogleWeb),
+	}).Run(app)
+	if !errors.Is(err, errGoogleWebSignInUnavailable) {
+		t.Fatalf("google-web error = %v", err)
 	}
 	configuration, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	account := configuration.Accounts["google-web"]
-	if account.Mail == nil || account.Mail.Provider != domain.ProviderGoogleWeb ||
-		account.Mail.GoogleWeb == nil ||
-		account.Mail.GoogleWeb.Origin != "https://mail.google.com" ||
-		account.Calendar == nil ||
-		account.Calendar.Provider != domain.ProviderGoogleWeb ||
-		account.Calendar.GoogleWeb == nil ||
-		account.Calendar.GoogleWeb.Origin != "https://calendar.google.com" {
-		t.Fatalf("browser-owned Google account = %#v", account)
+	if _, exists := configuration.Accounts["google-web"]; exists {
+		t.Fatalf("google-web route was persisted: %#v", configuration)
 	}
-	if strings.Contains(stdout.String(), "OAuth") ||
-		!strings.Contains(stdout.String(), "authentication has not started") {
-		t.Fatalf("automatic Google output = %q", stdout.String())
+	if stdout.Len() != 0 {
+		t.Fatalf("rejected Google output = %q", stdout.String())
+	}
+}
+
+func TestAccountAddRejectsGoogleWebOnOneServiceOfMixedRoute(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{{
+				Provider:       domain.ProviderMicrosoftOWA,
+				Confidence:     98,
+				Authentication: application.DiscoveryBrowserFirstParty,
+				Endpoints: []application.DiscoveredEndpoint{{
+					Kind: "origin", Value: "https://outlook.cloud.microsoft",
+				}},
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "known_domain", Detail: "example.test",
+				}},
+			}},
+		},
+	}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	err := (&accountAddCommand{
+		Address:          "reader@example.test",
+		Alias:            "mixed-web",
+		Provider:         string(domain.ProviderMicrosoftOWA),
+		Origin:           "https://outlook.cloud.microsoft",
+		CalendarProvider: string(domain.ProviderGoogleWeb),
+		CalendarOrigin:   "https://calendar.google.com",
+	}).Run(app)
+	if err == nil || !strings.Contains(
+		err.Error(),
+		`provider "google-web" is not available in this build`,
+	) {
+		t.Fatalf("mixed google-web error = %v", err)
+	}
+	configuration, loadErr := config.Load(path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if _, exists := configuration.Accounts["mixed-web"]; exists {
+		t.Fatalf("mixed google-web route was persisted: %#v", configuration)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("rejected mixed route output = %q", stdout.String())
 	}
 }
 
