@@ -202,6 +202,9 @@ func TestCalendarUpdateSupportsRecurrenceReplacementAndRemoval(t *testing.T) {
 	}
 
 	input.Recurrence = nil
+	input.Start = nil
+	input.End = nil
+	input.Subject = nil
 	if err := input.Validate(); err != nil {
 		t.Fatalf("recurrence removal validation = %v", err)
 	}
@@ -258,6 +261,10 @@ func TestCalendarUpdateRejectsUnsafeExtendedPatches(t *testing.T) {
 		func() CalendarUpdateInput {
 			value := valid
 			value.ReplaceRecurrence = true
+			value.Recurrence = &CalendarRecurrence{
+				Pattern: CalendarRecurrenceDaily, Interval: 1,
+				NumberOfOccurrences: 2,
+			}
 			value.Start = nil
 			value.End = nil
 			return value

@@ -264,23 +264,21 @@ func (input CalendarUpdateInput) ValidateWithAttendeeLimit(maxAttendees int) err
 			"calendar recurrence requires replaceRecurrence=true",
 		)
 	}
-	if input.ReplaceRecurrence {
+	if input.ReplaceRecurrence && input.Recurrence != nil {
 		if input.Start == nil {
 			return errors.New(
 				"calendar recurrence replacement requires start and end",
 			)
 		}
-		if input.Recurrence != nil {
-			start, _ := time.Parse(time.RFC3339, *input.Start)
-			zone := ""
-			if input.TimeZone != nil {
-				zone = *input.TimeZone
-			}
-			if err := input.Recurrence.Validate(
-				calendarBoundaryForTimeZone(start, zone),
-			); err != nil {
-				return err
-			}
+		start, _ := time.Parse(time.RFC3339, *input.Start)
+		zone := ""
+		if input.TimeZone != nil {
+			zone = *input.TimeZone
+		}
+		if err := input.Recurrence.Validate(
+			calendarBoundaryForTimeZone(start, zone),
+		); err != nil {
+			return err
 		}
 	}
 	if !input.ReplaceAttendees && (len(input.RequiredAttendees) != 0 || len(input.OptionalAttendees) != 0) {
