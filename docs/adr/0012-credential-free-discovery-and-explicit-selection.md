@@ -52,7 +52,10 @@ administrator review or approval request.
 Microsoft therefore defaults to the authenticated Outlook Web adapter. Graph is
 used only when a valid Graph authorization is already configured or the user
 explicitly selects it. It is never an implicit dependency, an automatic
-fallback, or a capability probe.
+fallback, or a capability probe. Known Microsoft domains and
+Microsoft-hosted MX evidence may advertise Graph as a separate discovery
+candidate, but that candidate is always labelled as requiring explicit OAuth
+selection; merely discovering it never opens a browser or reads a grant.
 
 Google consumer domains and Google-hosted Workspace MX evidence produce two
 separate candidates. Automatic mode may select the first-party `google-web`

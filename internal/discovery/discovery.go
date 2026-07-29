@@ -257,6 +257,17 @@ func addKnownDomainCandidates(collector *candidateCollector, domainName string) 
 				Source: "known_domain", Detail: domainName,
 			},
 		})
+		collector.add(candidateInput{
+			provider: domain.ProviderMicrosoftGraph, confidence: 92,
+			authentication: application.DiscoveryExplicitOAuth,
+			explicit:       true,
+			endpoint: application.DiscoveredEndpoint{
+				Kind: "api", Value: "https://graph.microsoft.com/v1.0",
+			},
+			evidence: application.DiscoveryEvidence{
+				Source: "known_domain", Detail: domainName,
+			},
+		})
 	case "gmail.com", "googlemail.com":
 		collector.add(candidateInput{
 			provider: domain.ProviderGoogleAPI, confidence: 98,
@@ -288,6 +299,17 @@ func addMXCandidates(collector *candidateCollector, records []*net.MX) {
 				authentication: application.DiscoveryBrowserFirstParty,
 				endpoint: application.DiscoveredEndpoint{
 					Kind: "origin", Value: "https://outlook.office.com",
+				},
+				evidence: application.DiscoveryEvidence{
+					Source: "mx", Detail: "mail.protection.outlook.com",
+				},
+			})
+			collector.add(candidateInput{
+				provider: domain.ProviderMicrosoftGraph, confidence: 50,
+				authentication: application.DiscoveryExplicitOAuth,
+				explicit:       true,
+				endpoint: application.DiscoveredEndpoint{
+					Kind: "api", Value: "https://graph.microsoft.com/v1.0",
 				},
 				evidence: application.DiscoveryEvidence{
 					Source: "mx", Detail: "mail.protection.outlook.com",

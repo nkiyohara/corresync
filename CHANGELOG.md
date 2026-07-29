@@ -10,6 +10,9 @@ All notable user-facing changes are recorded here. The project follows
 - Add atomic account discovery/add/rename/remove with stable opaque identities,
   explicit mail/calendar routes, account-local state, and credential-free
   discovery.
+- Offer Microsoft Graph as a credential-free discovery candidate for known
+  Microsoft domains and Microsoft-hosted MX records, while requiring explicit
+  selection before any OAuth authorization begins.
 - Add a bounded read-only Google Web adapter plus write-capable Google API,
   Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters alongside Outlook Web,
   with typed capabilities, visible degradations, synthetic contracts, explicit

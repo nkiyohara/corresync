@@ -75,11 +75,19 @@ func TestDiscoverCombinesCredentialFreeEvidence(t *testing.T) {
 	for _, candidate := range observation.Candidates {
 		providers[candidate.Provider] = candidate
 	}
-	if len(providers) != 3 {
+	if len(providers) != 4 {
 		t.Fatalf("providers = %#v", providers)
 	}
 	if providers[domain.ProviderMicrosoftOWA].Confidence != 55 {
 		t.Fatalf("Outlook candidate = %#v", providers[domain.ProviderMicrosoftOWA])
+	}
+	graph := providers[domain.ProviderMicrosoftGraph]
+	if graph.Confidence != 50 ||
+		graph.Authentication != application.DiscoveryExplicitOAuth ||
+		!graph.RequiresExplicitSelection ||
+		len(graph.Endpoints) != 1 ||
+		graph.Endpoints[0].Value != "https://graph.microsoft.com/v1.0" {
+		t.Fatalf("Graph candidate = %#v", graph)
 	}
 	standards := providers[domain.ProviderIMAPSMTP]
 	if len(standards.Endpoints) != 2 ||
@@ -123,6 +131,42 @@ func TestDiscoverKnownGoogleDoesNotAuthenticate(t *testing.T) {
 				candidate.Authentication != application.DiscoveryExplicitOAuth) {
 			t.Fatalf("Google API candidate could trigger implicit consent: %#v", candidate)
 		}
+	}
+}
+
+func TestDiscoverKnownMicrosoftOffersGraphOnlyByExplicitSelection(t *testing.T) {
+	t.Parallel()
+
+	discoverer := New(Options{
+		Resolver: resolverStub{
+			mxErr: errors.New("offline"),
+			srvErr: map[string]error{
+				"imaps": errors.New("offline"), "submission": errors.New("offline"),
+				"caldavs": errors.New("offline"), "jmap": errors.New("offline"),
+			},
+		},
+		Prober: proberStub{errors: map[string]error{
+			"https://outlook.com/.well-known/jmap":   errors.New("offline"),
+			"https://outlook.com/.well-known/caldav": errors.New("offline"),
+		}},
+	})
+	observation, err := discoverer.Discover(
+		context.Background(),
+		"reader@outlook.com",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	providers := make(map[domain.ProviderID]application.ProviderCandidate)
+	for _, candidate := range observation.Candidates {
+		providers[candidate.Provider] = candidate
+	}
+	if len(providers) != 2 ||
+		providers[domain.ProviderMicrosoftOWA].RequiresExplicitSelection ||
+		!providers[domain.ProviderMicrosoftGraph].RequiresExplicitSelection ||
+		providers[domain.ProviderMicrosoftGraph].Authentication !=
+			application.DiscoveryExplicitOAuth {
+		t.Fatalf("Microsoft candidates = %#v", providers)
 	}
 }
 
