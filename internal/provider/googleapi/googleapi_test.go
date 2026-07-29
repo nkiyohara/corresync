@@ -732,6 +732,13 @@ func TestGmailReplyTargetFallsBackOnlyWhenReplyToIsAbsent(t *testing.T) {
 	if got := gmailReplyTarget(headers); got != "sender@example.test" {
 		t.Fatalf("fallback reply target = %q", got)
 	}
+	cc := gmailAddressesExcluding(
+		[]string{"observer@example.test", "replies@example.test"},
+		[]string{"replies@example.test"},
+	)
+	if !slices.Equal(cc, []string{"observer@example.test"}) {
+		t.Fatalf("reply-all Cc recipients = %#v", cc)
+	}
 }
 
 func googleTestEvent(etag string) googleEvent {

@@ -444,6 +444,16 @@ func TestJMAPReplyTargetRejectsMalformedProviderAddress(t *testing.T) {
 	if len(got) != 1 || got[0].Email != "sender@example.invalid" {
 		t.Fatalf("fallback reply target = %#v", got)
 	}
+	cc := jmapAddressesExcluding(
+		[]emailAddress{
+			{Email: "observer@example.invalid"},
+			{Email: "sender@example.invalid"},
+		},
+		got,
+	)
+	if len(cc) != 1 || cc[0].Email != "observer@example.invalid" {
+		t.Fatalf("reply-all Cc recipients = %#v", cc)
+	}
 }
 
 func TestJMAPMarksUnverifiableSuccessfulWriteAsAmbiguous(t *testing.T) {

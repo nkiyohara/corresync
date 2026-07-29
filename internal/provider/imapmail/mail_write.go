@@ -473,6 +473,7 @@ func (client *Client) compose(
 				nil,
 				client.sender,
 			)
+			result.CC = imapAddressesExcluding(result.CC, result.To)
 		}
 	case application.MailComposeForward:
 		if parsed.Text != "" {
@@ -559,6 +560,22 @@ func derivedIMAPAddresses(
 		result = append(result, value)
 	}
 	return result, nil
+}
+
+func imapAddressesExcluding(
+	values, excluded []string,
+) []string {
+	seen := make(map[string]struct{}, len(excluded))
+	for _, value := range excluded {
+		seen[strings.ToLower(value)] = struct{}{}
+	}
+	result := values[:0]
+	for _, value := range values {
+		if _, exists := seen[strings.ToLower(value)]; !exists {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 func (client *Client) buildMessage(

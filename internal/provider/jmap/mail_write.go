@@ -370,6 +370,7 @@ func (client *Client) composition(
 		)
 		if err == nil {
 			result.CC, err = uniqueDerivedAddresses(source.CC, client.username)
+			result.CC = jmapAddressesExcluding(result.CC, result.To)
 		}
 	case application.MailComposeForward:
 		sourceText, bodyErr := boundedBodyText(source)
@@ -518,4 +519,20 @@ func uniqueDerivedAddresses(
 		result = append(result, value)
 	}
 	return result, nil
+}
+
+func jmapAddressesExcluding(
+	values, excluded []emailAddress,
+) []emailAddress {
+	seen := make(map[string]struct{}, len(excluded))
+	for _, value := range excluded {
+		seen[strings.ToLower(value.Email)] = struct{}{}
+	}
+	result := values[:0]
+	for _, value := range values {
+		if _, exists := seen[strings.ToLower(value.Email)]; !exists {
+			result = append(result, value)
+		}
+	}
+	return result
 }

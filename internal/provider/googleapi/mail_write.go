@@ -172,6 +172,7 @@ func (client *Client) composition(
 				headerValue(message.Payload.Headers, "Cc"),
 				client.address,
 			)
+			result.CC = gmailAddressesExcluding(result.CC, result.To)
 		}
 	case application.MailComposeForward:
 		body, err := client.GetMessageBody(ctx, application.MailBodyInput{
@@ -261,6 +262,19 @@ func gmailAddresses(raw, exclude string) ([]string, error) {
 		result = append(result, value.Address)
 	}
 	return result, nil
+}
+
+func gmailAddressesExcluding(
+	values, excluded []string,
+) []string {
+	seen := make(map[string]struct{}, len(excluded))
+	for _, value := range excluded {
+		seen[strings.ToLower(value)] = struct{}{}
+	}
+	return slices.DeleteFunc(values, func(value string) bool {
+		_, exists := seen[strings.ToLower(value)]
+		return exists
+	})
 }
 
 func (client *Client) requireMessage(

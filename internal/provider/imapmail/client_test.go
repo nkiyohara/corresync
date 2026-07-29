@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -542,6 +543,13 @@ func TestIMAPReplyTargetPrefersReplyToWithoutMixingFrom(t *testing.T) {
 	}
 	if len(got) != 1 || got[0] != "replies@example.invalid" {
 		t.Fatalf("reply recipients = %#v", got)
+	}
+	cc := imapAddressesExcluding(
+		[]string{"observer@example.invalid", "replies@example.invalid"},
+		got,
+	)
+	if !slices.Equal(cc, []string{"observer@example.invalid"}) {
+		t.Fatalf("reply-all Cc recipients = %#v", cc)
 	}
 
 	envelope.ReplyTo = nil
