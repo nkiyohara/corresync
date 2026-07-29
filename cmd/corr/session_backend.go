@@ -398,8 +398,12 @@ func (backend *sessionBackend) SessionStatus(
 		configured := backend.configuration.Accounts[alias]
 		accountID := configured.ID
 		state := daemonapi.SessionStatus{
-			Account: accountID, Alias: alias, Provider: configured.PrimaryProvider(),
-			State: "signed_out",
+			Account:          accountID,
+			Alias:            alias,
+			Provider:         configured.PrimaryProvider(),
+			MailProvider:     configured.MailProvider(),
+			CalendarProvider: configured.CalendarProvider(),
+			State:            "signed_out",
 		}
 		if account, exists := backend.accounts[accountID]; exists {
 			capturedAt := account.captured.UTC()

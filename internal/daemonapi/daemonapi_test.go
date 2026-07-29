@@ -57,7 +57,8 @@ func (backend *fakeBackend) SessionStatus(
 	return SessionStatusResult{
 		Accounts: []SessionStatus{{
 			Account: testAccountID, Alias: "work",
-			Provider: domain.ProviderMicrosoftOWA, State: "signed_out",
+			Provider:     domain.ProviderMicrosoftOWA,
+			MailProvider: domain.ProviderMicrosoftOWA, State: "signed_out",
 		}},
 	}, nil
 }
@@ -338,7 +339,8 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 	signedOut := func(account, alias string) SessionStatus {
 		return SessionStatus{
 			Account: domain.AccountID(account), Alias: alias,
-			Provider: domain.ProviderMicrosoftOWA, State: "signed_out",
+			Provider:     domain.ProviderMicrosoftOWA,
+			MailProvider: domain.ProviderMicrosoftOWA, State: "signed_out",
 		}
 	}
 	tests := []SessionStatusResult{
@@ -363,6 +365,12 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 			Account: testAccountID, Alias: "work",
 			Provider: domain.ProviderMicrosoftOWA,
 			State:    "signed_out", CapturedAt: &capturedAt,
+		}}},
+		{Accounts: []SessionStatus{{
+			Account: testAccountID, Alias: "work",
+			Provider:     domain.ProviderMicrosoftOWA,
+			MailProvider: domain.ProviderGoogleAPI,
+			State:        "signed_out",
 		}}},
 	}
 	for index, result := range tests {

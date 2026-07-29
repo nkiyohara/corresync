@@ -25,14 +25,16 @@ type authStatusReport struct {
 }
 
 type sessionStatusView struct {
-	Account       string               `json:"account"`
-	Alias         string               `json:"alias"`
-	Provider      string               `json:"provider"`
-	State         string               `json:"state"`
-	Authenticated bool                 `json:"authenticated"`
-	CapturedAt    string               `json:"capturedAt,omitempty"`
-	Capabilities  *domain.Capabilities `json:"capabilities,omitempty"`
-	Degradations  []domain.Degradation `json:"degradations,omitempty"`
+	Account          string               `json:"account"`
+	Alias            string               `json:"alias"`
+	Provider         string               `json:"provider"`
+	MailProvider     string               `json:"mailProvider,omitempty"`
+	CalendarProvider string               `json:"calendarProvider,omitempty"`
+	State            string               `json:"state"`
+	Authenticated    bool                 `json:"authenticated"`
+	CapturedAt       string               `json:"capturedAt,omitempty"`
+	Capabilities     *domain.Capabilities `json:"capabilities,omitempty"`
+	Degradations     []domain.Degradation `json:"degradations,omitempty"`
 }
 
 func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
@@ -67,13 +69,15 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 			continue
 		}
 		item := sessionStatusView{
-			Account:       string(account.Account),
-			Alias:         account.Alias,
-			Provider:      string(account.Provider),
-			State:         account.State,
-			Authenticated: account.Authenticated,
-			Capabilities:  account.Capabilities,
-			Degradations:  account.Degradations,
+			Account:          string(account.Account),
+			Alias:            account.Alias,
+			Provider:         string(account.Provider),
+			MailProvider:     string(account.MailProvider),
+			CalendarProvider: string(account.CalendarProvider),
+			State:            account.State,
+			Authenticated:    account.Authenticated,
+			Capabilities:     account.Capabilities,
+			Degradations:     account.Degradations,
 		}
 		if account.CapturedAt != nil {
 			item.CapturedAt = account.CapturedAt.UTC().Format("2006-01-02T15:04:05Z")

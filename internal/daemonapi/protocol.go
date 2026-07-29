@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 16
+	ProtocolVersion   = 17
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -182,24 +182,11 @@ type LoginResult struct {
 	CapturedAt    time.Time        `json:"capturedAt"`
 }
 
-// SessionStatus contains only local routing metadata, observed capabilities,
-// and in-memory authentication freshness. It never exposes remote identities
-// or authorization material.
-type SessionStatus struct {
-	Account       domain.AccountID     `json:"account"`
-	Alias         string               `json:"alias"`
-	Provider      domain.ProviderID    `json:"provider"`
-	State         string               `json:"state"`
-	Authenticated bool                 `json:"authenticated"`
-	CapturedAt    *time.Time           `json:"capturedAt,omitempty"`
-	Capabilities  *domain.Capabilities `json:"capabilities,omitempty"`
-	Degradations  []domain.Degradation `json:"degradations,omitempty"`
-}
+// SessionStatus is the application-owned, content-free session status schema.
+type SessionStatus = application.SessionStatus
 
-// SessionStatusResult reports every configured account in stable alias order.
-type SessionStatusResult struct {
-	Accounts []SessionStatus `json:"accounts"`
-}
+// SessionStatusResult is the application-owned bounded account status result.
+type SessionStatusResult = application.SessionStatusResult
 
 // MonitorStatusInput selects one stable account.
 type MonitorStatusInput struct {

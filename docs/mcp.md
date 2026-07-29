@@ -96,7 +96,7 @@ The server exposes 39 narrow tools.
 
 Accounts and local monitoring:
 
-- `account_discover`, `account_list`, `account_show`;
+- `account_discover`, `account_list`, `account_show`, `account_status`;
 - `account_add`, `account_add_commit`;
 - `account_rename`, `account_rename_commit`;
 - `account_remove`, `account_remove_commit`;

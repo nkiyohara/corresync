@@ -435,8 +435,9 @@ func startLifecycleTestDaemon(
 				encoded, encodeErr := json.Marshal(daemonapi.SessionStatusResult{
 					Accounts: []daemonapi.SessionStatus{{
 						Account: adapterTestAccountID, Alias: "work",
-						Provider: domain.ProviderMicrosoftOWA,
-						State:    "signed_out",
+						Provider:     domain.ProviderMicrosoftOWA,
+						MailProvider: domain.ProviderMicrosoftOWA,
+						State:        "signed_out",
 					}},
 				})
 				response.Result = encoded

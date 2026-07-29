@@ -21,7 +21,15 @@ func TestSessionBackendReportsContentFreeAccountState(t *testing.T) {
 	backend := &sessionBackend{
 		configuration: config.Config{
 			Accounts: map[string]config.Account{
-				"work":     {ID: "acc_00000000000000000000000000000001"},
+				"work": {
+					ID: "acc_00000000000000000000000000000001",
+					Mail: &config.MailRoute{
+						Provider: domain.ProviderIMAPSMTP,
+					},
+					Calendar: &config.CalendarRoute{
+						Provider: domain.ProviderCalDAV,
+					},
+				},
 				"personal": {ID: "acc_00000000000000000000000000000002"},
 				"pending":  {ID: "acc_00000000000000000000000000000003"},
 			},
@@ -44,6 +52,9 @@ func TestSessionBackendReportsContentFreeAccountState(t *testing.T) {
 		result.Accounts[1].State != "signed_out" ||
 		result.Accounts[2].Account != "acc_00000000000000000000000000000001" ||
 		result.Accounts[2].State != "authenticated" ||
+		result.Accounts[2].Provider != domain.ProviderIMAPSMTP ||
+		result.Accounts[2].MailProvider != domain.ProviderIMAPSMTP ||
+		result.Accounts[2].CalendarProvider != domain.ProviderCalDAV ||
 		result.Accounts[2].CapturedAt == nil ||
 		!result.Accounts[2].CapturedAt.Equal(capturedAt) {
 		t.Fatalf("SessionStatus() = %+v", result)
@@ -92,6 +103,7 @@ func TestAuthStatusReportsContentFreeDaemonState(t *testing.T) {
 		len(report.Accounts) != 1 ||
 		report.Accounts[0].Account != adapterTestAccountID ||
 		report.Accounts[0].Alias != "work" ||
+		report.Accounts[0].MailProvider != string(domain.ProviderMicrosoftOWA) ||
 		report.Accounts[0].State != "signed_out" ||
 		report.Accounts[0].CapturedAt != "" {
 		t.Fatalf("auth status = %+v", report)

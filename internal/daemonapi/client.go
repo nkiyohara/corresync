@@ -175,6 +175,23 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 		if err := account.Provider.Validate(); err != nil {
 			return errors.New("daemon returned an invalid session provider")
 		}
+		if account.MailProvider != "" {
+			if err := account.MailProvider.Validate(); err != nil {
+				return errors.New("daemon returned an invalid mail session provider")
+			}
+		}
+		if account.CalendarProvider != "" {
+			if err := account.CalendarProvider.Validate(); err != nil {
+				return errors.New("daemon returned an invalid calendar session provider")
+			}
+		}
+		if account.MailProvider == "" && account.CalendarProvider == "" {
+			return errors.New("daemon returned a session without a provider route")
+		}
+		if account.Provider != account.MailProvider &&
+			(account.MailProvider != "" || account.Provider != account.CalendarProvider) {
+			return errors.New("daemon returned an inconsistent primary session provider")
+		}
 		if _, exists := seen[account.Account]; exists {
 			return errors.New("daemon returned duplicate session accounts")
 		}

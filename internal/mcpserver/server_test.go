@@ -96,6 +96,7 @@ type fakeBackend struct {
 	accountReference     string
 	accountCatalog       application.AccountCatalog
 	accountView          application.AccountView
+	sessionStatus        application.SessionStatusResult
 	accountAddInput      application.AccountAddInput
 	accountRenameInput   application.AccountRenameInput
 	accountRemoveInput   application.AccountRemoveInput
@@ -112,6 +113,9 @@ func (backend *fakeBackend) DefaultAccount() domain.AccountID { return "work" }
 func (backend *fakeBackend) ResolveAccount(reference string) (domain.AccountID, error) {
 	if reference == "" {
 		return backend.DefaultAccount(), nil
+	}
+	if backend.accountView.Alias == reference {
+		return backend.accountView.ID, nil
 	}
 	return domain.AccountID(reference), nil
 }
@@ -136,6 +140,14 @@ func (backend *fakeBackend) ShowAccount(
 ) (application.AccountView, error) {
 	backend.accountReference = reference
 	return backend.accountView, backend.err
+}
+
+func (backend *fakeBackend) SessionStatus(
+	_ context.Context,
+	caller domain.Caller,
+) (application.SessionStatusResult, error) {
+	backend.caller = caller
+	return backend.sessionStatus, backend.err
 }
 
 func (backend *fakeBackend) PreviewAccountAdd(
@@ -518,7 +530,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 39 || mailTool == nil {
+	if len(tools.Tools) != 40 || mailTool == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
@@ -1303,6 +1315,18 @@ func TestAccountToolsUseTypedReadOnlyBackend(t *testing.T) {
 		},
 		accountCatalog: application.AccountCatalog{Accounts: []application.AccountView{account}},
 		accountView:    account,
+		sessionStatus: application.SessionStatusResult{
+			Accounts: []application.SessionStatus{{
+				Account:          account.ID,
+				Alias:            account.Alias,
+				Provider:         domain.ProviderMicrosoftOWA,
+				MailProvider:     domain.ProviderMicrosoftOWA,
+				CalendarProvider: domain.ProviderMicrosoftGraph,
+				State:            "authenticated",
+				Authenticated:    true,
+				Capabilities:     &domain.Capabilities{Mail: true, Calendar: true},
+			}},
+		},
 	}
 	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
 	if err != nil {
@@ -1317,6 +1341,7 @@ func TestAccountToolsUseTypedReadOnlyBackend(t *testing.T) {
 		{"account_discover", map[string]any{"address": "reader@example.invalid"}},
 		{"account_list", map[string]any{}},
 		{"account_show", map[string]any{"account": "work"}},
+		{"account_status", map[string]any{"account": "work"}},
 	} {
 		result, callErr := client.CallTool(t.Context(), &mcp.CallToolParams{
 			Name: call.name, Arguments: call.arguments,
@@ -1333,11 +1358,34 @@ func TestAccountToolsUseTypedReadOnlyBackend(t *testing.T) {
 			backend.accountReference,
 		)
 	}
+	statusResult, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "account_status", Arguments: map[string]any{"account": "work"},
+	})
+	if err != nil || statusResult.IsError {
+		t.Fatalf(
+			"account_status failed: result=%+v error=%v",
+			statusResult,
+			err,
+		)
+	}
+	structured, ok := statusResult.StructuredContent.(map[string]any)
+	accounts, accountsOK := structured["accounts"].([]any)
+	if !ok || !accountsOK || len(accounts) != 1 {
+		t.Fatalf("account_status output = %#v", statusResult.StructuredContent)
+	}
+	status, statusOK := accounts[0].(map[string]any)
+	if !statusOK ||
+		status["mailProvider"] != string(domain.ProviderMicrosoftOWA) ||
+		status["calendarProvider"] != string(domain.ProviderMicrosoftGraph) {
+		t.Fatalf("account_status route output = %#v", accounts[0])
+	}
 	tools, err := client.ListTools(t.Context(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"account_discover", "account_list", "account_show"} {
+	for _, name := range []string{
+		"account_discover", "account_list", "account_show", "account_status",
+	} {
 		tool := toolNamed(tools.Tools, name)
 		if tool == nil || tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
 			t.Fatalf("%s is missing read-only annotations: %+v", name, tool)

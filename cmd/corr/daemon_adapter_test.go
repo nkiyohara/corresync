@@ -59,7 +59,8 @@ func (*adapterTestBackend) SessionStatus(
 	return daemonapi.SessionStatusResult{
 		Accounts: []daemonapi.SessionStatus{{
 			Account: adapterTestAccountID, Alias: "work",
-			Provider: domain.ProviderMicrosoftOWA, State: "signed_out",
+			Provider:     domain.ProviderMicrosoftOWA,
+			MailProvider: domain.ProviderMicrosoftOWA, State: "signed_out",
 		}},
 	}, nil
 }

@@ -13,6 +13,9 @@ All notable user-facing changes are recorded here. The project follows
 - Offer Microsoft Graph as a credential-free discovery candidate for known
   Microsoft domains and Microsoft-hosted MX records, while requiring explicit
   selection before any OAuth authorization begins.
+- Add a read-only MCP `account_status` tool that exposes content-free runtime
+  state, separate mail/calendar providers, observed capabilities, and typed
+  degradations without opening authentication or reading credentials.
 - Add a bounded read-only Google Web adapter plus write-capable Google API,
   Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters alongside Outlook Web,
   with typed capabilities, visible degradations, synthetic contracts, explicit
