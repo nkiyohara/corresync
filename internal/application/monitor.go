@@ -154,8 +154,9 @@ type MonitorAcknowledgeInput struct {
 	EventID string           `json:"eventId"`
 }
 
-// MonitorDetection is one provider metadata observation. Matched records may
-// be released to the configured sink; all others update deduplication only.
+// MonitorDetection is one provider metadata observation. Matched records occupy
+// deduplication state and may be released to the configured sink; unmatched
+// records remain audit-only and do not consume the bounded deduplication map.
 type MonitorDetection struct {
 	Account        domain.AccountID
 	AccountAlias   string

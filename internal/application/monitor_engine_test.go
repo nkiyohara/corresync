@@ -18,12 +18,13 @@ import (
 const monitorTestAccount domain.AccountID = "acc_00000000000000000000000000000001"
 
 type memoryMonitorStore struct {
-	status       MonitorQueueStatus
-	events       []MonitorEvent
-	lastScan     MonitorScan
-	dispatches   [][]string
-	failures     int
-	acknowledged bool
+	status                   MonitorQueueStatus
+	events                   []MonitorEvent
+	lastScan                 MonitorScan
+	dispatches               [][]string
+	failures                 int
+	acknowledged             bool
+	rejectCommitWhilePending bool
 }
 
 func (store *memoryMonitorStore) Status(
@@ -80,6 +81,9 @@ func (store *memoryMonitorStore) CommitScan(
 	_ context.Context,
 	scan MonitorScan,
 ) (MonitorScanResult, error) {
+	if store.rejectCommitWhilePending && store.status.Pending > 0 {
+		return MonitorScanResult{}, errors.New("synthetic saturated queue")
+	}
 	if scan.Bootstrap != !store.status.Initialized {
 		return MonitorScanResult{}, errors.New("bootstrap mismatch")
 	}
@@ -193,6 +197,18 @@ func (notifier *failingNotifier) Notify(
 type cancelingNotifier struct {
 	cancel context.CancelFunc
 	calls  int
+}
+
+type succeedingNotifier struct {
+	calls int
+}
+
+func (notifier *succeedingNotifier) Notify(
+	context.Context,
+	MonitorRelease,
+) error {
+	notifier.calls++
+	return nil
 }
 
 func (notifier *cancelingNotifier) Notify(
@@ -498,6 +514,116 @@ func TestMonitorCursorRebaselinesAfterBoundedRecoveryWindow(t *testing.T) {
 			store.status,
 			len(store.lastScan.Detections),
 			wantCursor,
+		)
+	}
+}
+
+func TestMonitorCursorRebaselineAtMailboxEndIsNotAnOverflow(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name     string
+		messages []MailSummary
+	}{
+		{
+			name: "deleted cursor",
+			messages: []MailSummary{
+				{ID: "new-1", Provenance: domain.Provenance{Provider: domain.ProviderJMAP}},
+				{ID: "new-2", Provenance: domain.Provenance{Provider: domain.ProviderJMAP}},
+			},
+		},
+		{name: "empty mailbox"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			page := MailPage{
+				Messages:         test.messages,
+				IncludesLastItem: true,
+			}
+			reader := &fakeMailReader{pages: []MailPage{page, page}}
+			store := &memoryMonitorStore{status: MonitorQueueStatus{
+				Initialized: true,
+				Cursor:      monitorCursor(domain.ProviderJMAP, "deleted"),
+			}}
+			engine, err := NewMonitorEngine(store, &memoryAudit{}, nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			engine.now = func() time.Time {
+				return time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+			}
+			if err := engine.Poll(
+				t.Context(),
+				testMonitorPolicy(domain.MonitorQueue),
+				monitorMailService(t, reader),
+			); err != nil {
+				t.Fatalf("Poll() error = %v", err)
+			}
+			if store.lastScan.RecoveryOverflow ||
+				store.status.RecoveryOverflows != 0 ||
+				len(store.lastScan.Detections) != len(test.messages) ||
+				store.status.Cursor == monitorCursor(domain.ProviderJMAP, "deleted") {
+				t.Fatalf(
+					"rebaseline status=%+v scan=%+v",
+					store.status,
+					store.lastScan,
+				)
+			}
+		})
+	}
+}
+
+func TestMonitorDrainsPendingDeliveryBeforeQueueCommit(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	cursor := monitorCursor(domain.ProviderJMAP, "current")
+	event := MonitorEvent{
+		ID:      "evt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+		Account: monitorTestAccount, AccountAlias: "work",
+		Provider: domain.ProviderJMAP, SourceObjectID: "pending",
+		Trust: MonitorTrustMarker, Delivery: MonitorDeliveryNotification,
+		State: "pending", DeliveryCount: 1, DetectedAt: now.Add(-time.Minute),
+	}
+	store := &memoryMonitorStore{
+		status: MonitorQueueStatus{
+			Initialized: true,
+			Cursor:      cursor,
+			Pending:     1,
+		},
+		events:                   []MonitorEvent{event},
+		rejectCommitWhilePending: true,
+	}
+	notifier := &succeedingNotifier{}
+	engine, err := NewMonitorEngine(store, &memoryAudit{}, notifier, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine.now = func() time.Time { return now }
+	page := MailPage{
+		Messages: []MailSummary{{
+			ID:         "current",
+			Provenance: domain.Provenance{Provider: domain.ProviderJMAP},
+		}},
+		IncludesLastItem: true,
+	}
+	reader := &fakeMailReader{pages: []MailPage{page, page}}
+	policy := testMonitorPolicy(domain.MonitorNotify)
+	policy.NotificationTarget = "desktop"
+	policy.NotificationFields = []string{"event_id"}
+	if err := engine.Poll(
+		t.Context(),
+		policy,
+		monitorMailService(t, reader),
+	); err != nil {
+		t.Fatalf("Poll() error = %v", err)
+	}
+	if notifier.calls != 1 || store.status.Pending != 0 ||
+		store.status.Dispatched != 1 ||
+		store.lastScan.Cursor != cursor {
+		t.Fatalf(
+			"drain calls=%d status=%+v scan=%+v",
+			notifier.calls,
+			store.status,
+			store.lastScan,
 		)
 	}
 }

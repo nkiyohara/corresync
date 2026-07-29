@@ -67,6 +67,14 @@ func (engine *MonitorEngine) Poll(
 	if err != nil {
 		return err
 	}
+	var pendingDrainErr error
+	if state.Initialized {
+		pendingDrainErr = engine.releasePending(ctx, policy)
+		state, err = engine.store.Status(ctx, policy.Account)
+		if err != nil {
+			return errors.Join(pendingDrainErr, err)
+		}
+	}
 	detections, cursor, recoveryOverflow, err := engine.scanMailbox(
 		ctx,
 		policy,
@@ -90,7 +98,7 @@ func (engine *MonitorEngine) Poll(
 			"failed",
 			0,
 		)
-		return errors.Join(err, storeErr, auditErr)
+		return errors.Join(pendingDrainErr, err, storeErr, auditErr)
 	}
 	now := engine.now()
 	if !state.Initialized {
@@ -136,10 +144,10 @@ func (engine *MonitorEngine) Poll(
 			now,
 			"scan_commit_failed",
 		)
-		return errors.Join(err, storeErr, auditErr)
+		return errors.Join(pendingDrainErr, err, storeErr, auditErr)
 	}
 	if !state.Initialized {
-		return nil
+		return pendingDrainErr
 	}
 	if policy.Mode.Queues() {
 		if len(result.Events) > 0 {
@@ -169,13 +177,37 @@ func (engine *MonitorEngine) Poll(
 	}
 	switch policy.Mode {
 	case domain.MonitorOff, domain.MonitorQueue:
-		return overflowErr
+		return errors.Join(pendingDrainErr, overflowErr)
 	case domain.MonitorNotify:
-		return errors.Join(overflowErr, engine.notifyPending(ctx, policy))
+		return errors.Join(
+			pendingDrainErr,
+			overflowErr,
+			engine.notifyPending(ctx, policy),
+		)
 	case domain.MonitorAgent:
-		return errors.Join(overflowErr, engine.dispatchPending(ctx, policy))
+		return errors.Join(
+			pendingDrainErr,
+			overflowErr,
+			engine.dispatchPending(ctx, policy),
+		)
 	}
-	return overflowErr
+	return errors.Join(pendingDrainErr, overflowErr)
+}
+
+func (engine *MonitorEngine) releasePending(
+	ctx context.Context,
+	policy MonitorPolicy,
+) error {
+	switch policy.Mode {
+	case domain.MonitorNotify:
+		return engine.notifyPending(ctx, policy)
+	case domain.MonitorAgent:
+		return engine.dispatchPending(ctx, policy)
+	case domain.MonitorOff, domain.MonitorQueue:
+		return nil
+	default:
+		return errors.New("monitor policy has an unknown delivery mode")
+	}
 }
 
 func (engine *MonitorEngine) scanMailbox(
@@ -239,6 +271,7 @@ func (engine *MonitorEngine) readMailboxWindow(
 	messages := make([]MailSummary, 0, monitorPageSize)
 	newCursor := state.Cursor
 	recovered := !state.Initialized
+	reachedEnd := false
 	for offset := 0; offset < monitorRecoveryLimit; offset += monitorPageSize {
 		page, err := mail.List(ctx, MailListInput{
 			Account: policy.Account,
@@ -248,11 +281,14 @@ func (engine *MonitorEngine) readMailboxWindow(
 		if err != nil {
 			return nil, "", false, err
 		}
-		if offset == 0 && len(page.Messages) > 0 {
-			newCursor = monitorCursor(
-				page.Messages[0].Provenance.Provider,
-				page.Messages[0].ID,
-			)
+		if offset == 0 {
+			newCursor = ""
+			if len(page.Messages) > 0 {
+				newCursor = monitorCursor(
+					page.Messages[0].Provenance.Provider,
+					page.Messages[0].ID,
+				)
+			}
 		}
 		for _, message := range page.Messages {
 			messageCursor := monitorCursor(message.Provenance.Provider, message.ID)
@@ -262,19 +298,26 @@ func (engine *MonitorEngine) readMailboxWindow(
 			}
 			messages = append(messages, message)
 		}
-		if recovered || page.IncludesLastItem || len(page.Messages) == 0 {
+		if recovered {
+			break
+		}
+		if page.IncludesLastItem || len(page.Messages) == 0 {
+			reachedEnd = true
 			break
 		}
 	}
-	// When recovered is false, the old cursor has fallen outside the bounded
-	// recovery window. The inspected messages and newCursor intentionally
-	// continue below: committing them establishes the newest bounded window as
-	// the baseline without an unbounded mailbox walk.
+	// Only exhausting the complete bounded window without reaching the end is
+	// an overflow. A deleted cursor in a short or empty mailbox is a complete
+	// inspection and therefore a normal re-baseline.
+	recoveryOverflow := state.Initialized &&
+		!recovered &&
+		!reachedEnd &&
+		len(messages) >= monitorRecoveryLimit
 	if newCursor == "" {
 		empty := sha256.Sum256([]byte("empty:" + string(policy.Account)))
 		newCursor = hex.EncodeToString(empty[:])
 	}
-	return messages, newCursor, !recovered, nil
+	return messages, newCursor, recoveryOverflow, nil
 }
 
 func sameMonitorWindow(left, right []MailSummary) bool {

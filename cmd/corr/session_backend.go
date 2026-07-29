@@ -1569,7 +1569,8 @@ func (backend *sessionBackend) monitorLoop(
 			backend.lifecycle.Err() == nil {
 			_, _ = fmt.Fprintf(
 				backend.app.stderr,
-				"monitor %s paused after a safe failure; inspect monitor status and the local audit\n",
+				"monitor %s encountered a safe failure and will retry; inspect monitor status and the local audit; if the pending queue is saturated, run `corr events purge --account %s --approve`\n",
+				policy.Alias,
 				policy.Alias,
 			)
 		}

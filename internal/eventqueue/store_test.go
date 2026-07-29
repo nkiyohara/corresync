@@ -3,6 +3,7 @@ package eventqueue
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -147,6 +148,13 @@ func TestAcknowledgeIsIdempotentAndPurgeIsAccountScoped(t *testing.T) {
 	purged, err := store.Purge(t.Context(), testAccountA)
 	if err != nil || purged != 1 {
 		t.Fatalf("Purge() = %d, %v", purged, err)
+	}
+	purgedState, _, err := store.load(testAccountA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(purgedState.Seen) != 0 {
+		t.Fatalf("Purge() retained %d deduplication records", len(purgedState.Seen))
 	}
 	other, err := store.List(t.Context(), application.MonitorEventListInput{
 		Account: testAccountB, Limit: 10,
@@ -432,6 +440,61 @@ func TestTerminalEventsExpireAndYieldCapacity(t *testing.T) {
 		if event.ID == "oldest-terminal" {
 			t.Fatal("capacity eviction retained the oldest terminal event")
 		}
+	}
+}
+
+func TestDeduplicationTracksOnlyMatchesAndEvictsOldestUnqueuedEntry(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	store := NewAt(t.TempDir())
+	scan := testScan(
+		testAccountA,
+		start,
+		true,
+		"baseline",
+		[]application.MonitorDetection{
+			testDetection(testAccountA, "matched", true),
+			testDetection(testAccountA, "unmatched", false),
+		},
+	)
+	if _, err := store.CommitScan(t.Context(), scan); err != nil {
+		t.Fatal(err)
+	}
+	state, _, err := store.load(testAccountA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Seen) != 1 {
+		t.Fatalf("deduplication records = %d, want only the match", len(state.Seen))
+	}
+
+	protectedDetection := testDetection(testAccountA, "protected", true)
+	protectedKey := sourceKey(
+		protectedDetection.Provider,
+		protectedDetection.SourceObjectID,
+	)
+	state.Seen = make(map[string]seenObject, maximumSeenObjects)
+	for index := range maximumSeenObjects - 1 {
+		key := fmt.Sprintf("%064x", index)
+		state.Seen[key] = seenObject{
+			Count:      1,
+			LastSeenAt: start.Add(time.Duration(index) * time.Second),
+		}
+	}
+	state.Seen[protectedKey] = seenObject{
+		Count:      1,
+		LastSeenAt: start.Add(-time.Hour),
+	}
+	state.Events = []application.MonitorEvent{{
+		Provider:       protectedDetection.Provider,
+		SourceObjectID: protectedDetection.SourceObjectID,
+		State:          "pending",
+	}}
+	if !makeSeenCapacity(&state) || len(state.Seen) != maximumSeenObjects-1 {
+		t.Fatalf("makeSeenCapacity() retained %d records", len(state.Seen))
+	}
+	if _, exists := state.Seen[protectedKey]; !exists {
+		t.Fatal("deduplication eviction removed a pending event's identity")
 	}
 }
 

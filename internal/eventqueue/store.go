@@ -223,6 +223,7 @@ func (store *Store) Purge(ctx context.Context, account domain.AccountID) (int, e
 	}
 	count := len(state.Events)
 	state.Events = nil
+	state.Seen = make(map[string]seenObject)
 	if err := store.save(path, state); err != nil {
 		return 0, err
 	}
@@ -251,8 +252,16 @@ func (store *Store) CommitScan(
 	prune(&state, scan.RetainAfter)
 	result := application.MonitorScanResult{}
 	for _, detection := range scan.Detections {
+		if !detection.Matched {
+			continue
+		}
 		key := sourceKey(detection.Provider, detection.SourceObjectID)
 		seen, duplicate := state.Seen[key]
+		if !duplicate && !makeSeenCapacity(&state) {
+			return application.MonitorScanResult{}, errors.New(
+				"monitor deduplication window cannot retain another pending event",
+			)
+		}
 		seen.Count++
 		seen.LastSeenAt = scan.ObservedAt.UTC()
 		state.Seen[key] = seen
@@ -266,7 +275,7 @@ func (store *Store) CommitScan(
 			}
 			continue
 		}
-		if scan.Bootstrap || !detection.Matched {
+		if scan.Bootstrap {
 			continue
 		}
 		event := monitorEvent(detection, scan.Delivery, scan.ObservedAt)
@@ -279,11 +288,6 @@ func (store *Store) CommitScan(
 			state.Events = append(state.Events, event)
 		}
 		result.Events = append(result.Events, event)
-	}
-	if len(state.Seen) > maximumSeenObjects {
-		return application.MonitorScanResult{}, errors.New(
-			"monitor deduplication window reached its safety bound; shorten retention or rescan",
-		)
 	}
 	scanned := scan.ObservedAt.UTC()
 	state.SchemaVersion = stateSchemaVersion
@@ -585,6 +589,34 @@ func makeEventCapacity(state *persistedState) bool {
 	}
 	copy(state.Events[oldestIndex:], state.Events[oldestIndex+1:])
 	state.Events = state.Events[:len(state.Events)-1]
+	return true
+}
+
+func makeSeenCapacity(state *persistedState) bool {
+	if len(state.Seen) < maximumSeenObjects {
+		return true
+	}
+	protected := make(map[string]struct{}, len(state.Events))
+	for _, event := range state.Events {
+		protected[sourceKey(event.Provider, event.SourceObjectID)] = struct{}{}
+	}
+	oldestKey := ""
+	var oldest time.Time
+	for key, seen := range state.Seen {
+		if _, exists := protected[key]; exists {
+			continue
+		}
+		if oldestKey == "" ||
+			seen.LastSeenAt.Before(oldest) ||
+			(seen.LastSeenAt.Equal(oldest) && key < oldestKey) {
+			oldestKey = key
+			oldest = seen.LastSeenAt
+		}
+	}
+	if oldestKey == "" {
+		return false
+	}
+	delete(state.Seen, oldestKey)
 	return true
 }
 
