@@ -19,6 +19,7 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 	var replyDraftBody []byte
 	var forwardBody []byte
 	var responseDraftSent bool
+	var messagePermanentlyDeleted bool
 	var calendarRecurrenceUpdated bool
 	var calendarRecurrenceRemoved bool
 	server := httptest.NewTLSServer(http.HandlerFunc(func(
@@ -106,6 +107,9 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			moved := graphTestMessage(false, `W/"m4"`)
 			moved.ID = "moved1"
 			writeGraphJSONStatus(t, writer, moved, http.StatusCreated)
+		case "POST /users/user1/messages/m1/permanentDelete":
+			messagePermanentlyDeleted = true
+			writer.WriteHeader(http.StatusNoContent)
 		case "GET /me/calendarView":
 			if request.Header.Get("Prefer") != `outlook.timezone="UTC"` ||
 				request.URL.Query().Get("$top") != "1000" {
@@ -300,8 +304,12 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			MessageID: messages.Messages[0].ID,
 			ChangeKey: messages.Messages[0].ChangeKey,
 		},
-	); err == nil || !strings.Contains(err.Error(), "permanent") {
-		t.Fatalf("delete degradation = %v", err)
+	); err != nil || !messagePermanentlyDeleted {
+		t.Fatalf(
+			"permanent delete error = %v requested = %t",
+			err,
+			messagePermanentlyDeleted,
+		)
 	}
 
 	calendars, err := client.ListCalendarFolders(

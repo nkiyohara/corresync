@@ -31,6 +31,7 @@ type Options struct {
 type Client struct {
 	api      *restapi.Client
 	apiBase  *url.URL
+	userID   string
 	address  string
 	mail     bool
 	calendar bool
@@ -87,6 +88,7 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		_ = api.Close()
 		return nil, errors.New("graph returned no delegated user identity")
 	}
+	client.userID = identity.ID
 	address := identity.Mail
 	if address == "" {
 		address = identity.UserPrincipalName

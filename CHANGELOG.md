@@ -35,6 +35,9 @@ All notable user-facing changes are recorded here. The project follows
   response-draft flow.
 - Traverse Microsoft Graph mail-folder hierarchies through bounded child-folder
   collections and origin-checked provider continuation URLs.
+- Add Microsoft Graph v1.0 permanent message deletion after exact source-version
+  revalidation, using the delegated account's confirmed immutable user identity
+  and a single outcome-safe provider action.
 - Expand CalDAV recurrence safely whether a server returns expanded instances
   or an unexpanded recurrence master, with unique instance identities and
   bounded local expansion.
@@ -63,9 +66,6 @@ All notable user-facing changes are recorded here. The project follows
   exists, and report an unknown partial outcome if post-submit append fails.
 - Add a targeted IMAP move fallback using UID COPY, deleted marking, and UID
   EXPUNGE only when UIDPLUS makes it safe for the selected message.
-- Fail closed on Graph permanent mail deletion because its permanent-delete
-  action exposes no atomic ETag precondition; expose the limitation as a typed
-  account degradation.
 - Add interactive public-client OAuth with PKCE and OS-keyring grants for
   Google/Graph, plus approved external credential handles for standards
   providers. No password, token, helper output, or client secret enters config.

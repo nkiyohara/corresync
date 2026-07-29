@@ -2318,7 +2318,7 @@ func (backend *sessionBackend) graphAPIAccount(
 			},
 			domain.Degradation{
 				Feature: "mail.delete",
-				Reason:  "Graph permanentDelete exposes no atomic ETag precondition",
+				Reason:  "Graph permanentDelete exposes no atomic ETag precondition; Corresync revalidates the exact reviewed message immediately before the action",
 			},
 			domain.Degradation{
 				Feature: "mail.send_identity",
