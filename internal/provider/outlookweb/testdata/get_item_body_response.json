@@ -18,7 +18,7 @@
               "Attachments": [
                 {
                   "__type": "FileAttachment:#Exchange",
-                  "AttachmentId": {"Id": "synthetic-attachment-1"},
+                  "AttachmentId": { "Id": "synthetic-attachment-1" },
                   "Name": "fixture.txt",
                   "ContentType": "text/plain",
                   "Size": 17,

@@ -17,7 +17,12 @@
     "longDescription": "Recognizes inbox, email, calendar, schedule, and meeting requests and routes them to the guarded local Corresync MCP server.",
     "developerName": "Corresync contributors",
     "category": "Productivity",
-    "capabilities": ["Multi-account mail", "Multi-account calendar", "Reviewed writes", "Local monitoring"],
+    "capabilities": [
+      "Multi-account mail",
+      "Multi-account calendar",
+      "Reviewed writes",
+      "Local monitoring"
+    ],
     "websiteURL": "https://nkiyohara.github.io/corresync/",
     "brandColor": "#3F7AD6",
     "composerIcon": "./assets/icon.svg",

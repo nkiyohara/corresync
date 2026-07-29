@@ -48,17 +48,22 @@ verification tool on macOS, Linux, and Windows:
 
 ```console
 mise trust
-mise install
+mise exec -- task setup
 mise exec -- task build
 mise exec -- task verify
 ```
 
 Go 1.26 is the minimum supported compiler. The checked-in toolchain follows the
 latest pinned Go 1.26 patch instead of downloading an undeclared compiler.
+Setup also installs repository-managed prek hooks. From then on, changed
+Go, HTML, CSS, YAML, JSON, and TOML files are formatted automatically before a
+commit completes; safe whitespace and merge-conflict checks cover every text
+file. Run `mise exec -- task format` to apply the same formatters explicitly or
+`mise exec -- task hooks:run` to check the complete tree.
 
 `task verify` checks:
 
-- Go and Markdown formatting;
+- Go and structured-file formatting plus Markdown lint;
 - vet, golangci-lint, unit tests, and the race detector;
 - repository-history and working-tree secret scans;
 - reachable vulnerabilities and linked dependency licenses;

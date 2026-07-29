@@ -91,6 +91,16 @@ jobs:
             **/*.md
             #.git
 
+      - name: Install locked structured-file formatter
+        uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+        with:
+          version: 2026.7.7
+          experimental: true
+          install_args: dprint
+
+      - name: Check structured file formatting
+        run: mise exec -- dprint check
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

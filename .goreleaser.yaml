@@ -6,22 +6,22 @@ before:
   hooks:
     - go mod vendor
     - >-
-        go-licenses check ./cmd/corr
-        --ignore github.com/nkiyohara/corresync
+      go-licenses check ./cmd/corr
+      --ignore github.com/nkiyohara/corresync
     - >-
-        go-licenses save ./cmd/corr
-        --ignore github.com/nkiyohara/corresync
-        --save_path .release/third_party_licenses
-        --force
+      go-licenses save ./cmd/corr
+      --ignore github.com/nkiyohara/corresync
+      --save_path .release/third_party_licenses
+      --force
     - >-
-        go run ./tools/normalizefiles
-        --root .release/third_party_licenses
-        --time {{ .CommitDate }}
+      go run ./tools/normalizefiles
+      --root .release/third_party_licenses
+      --time {{ .CommitDate }}
     - >-
-        go build -trimpath
-        -ldflags=-X=main.releaseTimestamp={{ .CommitDate }}
-        -o .release/syft-reproducible
-        ./tools/syftreproducible
+      go build -trimpath
+      -ldflags=-X=main.releaseTimestamp={{ .CommitDate }}
+      -o .release/syft-reproducible
+      ./tools/syftreproducible
 
 builds:
   - id: corr

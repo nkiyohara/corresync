@@ -12,19 +12,32 @@ tasks:
       - task --list
 
   setup:
-    desc: Install the pinned development toolchain with mise
+    desc: Install the pinned toolchain and automatic commit-time formatting
     cmds:
       - mise install
+      - mise exec -- prek install --prepare-hooks
 
   format:
-    desc: Format Go source files
+    desc: Format Go and structured project files
     cmds:
       - gofmt -w $(rg --files -g '*.go' -g '!vendor/**')
+      - dprint fmt
 
   format:check:
-    desc: Verify Go source formatting
+    desc: Verify Go and structured project file formatting
     cmds:
       - test -z "$(gofmt -l $(rg --files -g '*.go' -g '!vendor/**'))"
+      - dprint check
+
+  hooks:install:
+    desc: Install the repository-managed commit hooks
+    cmds:
+      - prek install --prepare-hooks
+
+  hooks:run:
+    desc: Run every repository-managed commit hook
+    cmds:
+      - prek run --all-files
 
   docs:
     desc: Lint Markdown documentation
