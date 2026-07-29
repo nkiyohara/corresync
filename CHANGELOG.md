@@ -5,6 +5,8 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.1 - 2026-07-29
+
 ### Installation and user documentation
 
 - Add a no-sudo Linux installer at
