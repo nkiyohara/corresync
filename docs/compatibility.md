@@ -1,13 +1,13 @@
 # Compatibility evidence
 
 Compatibility is an evidence claim, not an inference from a fixture or a
-provider brand. This page distinguishes deterministic coverage on the current
-development branch from authorized live observations.
+provider brand. This page distinguishes deterministic v0.8 coverage from
+authorized live observations.
 
-## Current branch evidence
+## v0.8 evidence
 
 <!-- markdownlint-disable MD013 -->
-| Boundary | Deterministic evidence | Recorded live evidence | Current branch status |
+| Boundary | Deterministic evidence | Recorded live evidence | v0.8 status |
 | --- | --- | --- | --- |
 | CLI, stable JSON, configuration schema v3 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
@@ -24,14 +24,14 @@ development branch from authorized live observations.
 | Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
 | Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | MCP clients | Native setup-plan and schema tests | Historical Codex/Claude notes, not commit-bound | Deterministic only; live-unobserved |
-| Distribution | Archive/package/SBOM/inventory verification | v0.7.0 release at `ec868d8`; no post-v0.7 candidate | Published tag only; current branch unobserved |
+| Distribution | Archive/package/SBOM/inventory verification in candidate and tag workflows | Tagged release workflow and published assets provide release-bound evidence | Provider/platform observations remain separate |
 <!-- markdownlint-enable MD013 -->
 
 Historical Outlook Web notes were made on 2026-07-18, 2026-07-19, and
 2026-07-25 using synthetic content and no third-party recipient. Those notes did
 not record the exact commit, so they are context only and do not substantiate
-this branch. No provider or platform has a commit-bound live observation for
-the post-v0.7 implementation. The explicit marker and required template live
+v0.8. No provider or platform has a commit-bound live observation for the v0.8
+implementation. The explicit marker and required template live
 in the [live evidence index](evidence/README.md).
 
 Cross-compilation proves platform-specific code builds; it does not replace
@@ -41,8 +41,8 @@ evidence.
 ## Provider claims
 
 - `microsoft-owa`: mail and calendar are implemented; historical live notes
-  exist, but the current branch remains live-unobserved because those notes are
-  not tied to an exact commit.
+  exist, but v0.8 remains live-unobserved because those notes are not tied to
+  its exact commit.
 - `google-web`: bounded read-only Gmail and Calendar snapshots are implemented
   through an isolated visible browser session, but have no recorded live
   observation.

@@ -4,13 +4,14 @@ Live compatibility requires a content-free record tied to the exact commit
 that was exercised. Passing fixtures, cross-compilation, or an observation of
 an earlier build does not promote a current implementation to “observed.”
 
-## Current marker
+## v0.8 marker
 
-The post-v0.7 branch is **live-unobserved** for every provider, platform IPC
-implementation, MCP client, and distribution artifact. No live observation
-record is committed for the current code.
+The v0.8 provider routes, native platform IPC implementations, and MCP clients
+are **live-unobserved**. No live observation record is committed for the v0.8
+code.
 
-The published v0.7.0 distribution evidence applies only to commit `ec868d8`.
+Published distribution evidence remains bound to its exact tag and workflow;
+it does not promote provider or native-platform rows to live-observed.
 Historical Outlook Web, local terminal, macOS IPC, Codex, and Claude notes did
 not capture an exact commit and therefore remain non-evidentiary context.
 

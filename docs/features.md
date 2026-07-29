@@ -6,26 +6,24 @@ not available through a raw protocol escape hatch.
 ## Provider routes
 
 <!-- markdownlint-disable MD013 -->
-| Provider ID | Mail | Calendar | Authentication | Evidence on this branch |
+| Provider ID | Mail | Calendar | Authentication | v0.8 evidence |
 | --- | --- | --- | --- | --- |
-| `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | Visible browser-owned Outlook Web session | Implemented; synthetic contracts on current branch, historical live notes are not commit-bound |
-| `google-web` | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Visible browser-owned Google session | Implemented; synthetic DOM and integration contracts only |
-| `google-api` | Gmail | Selectable Google calendars, observed Google Meet link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
-| `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
-| `jmap` | Mail | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts only |
-| `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts only |
-| `caldav` | — | Calendar | OS keyring or approved credential helper | Implemented; synthetic WebDAV/iCalendar contracts only |
+| `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
+| `google-web` | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Visible browser-owned Google session | Implemented; synthetic DOM/integration contracts; live-unobserved |
+| `google-api` | Gmail | Selectable Google calendars, observed Google Meet link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
+| `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
+| `jmap` | Mail | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
+| `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts; live-unobserved |
+| `caldav` | — | Calendar | OS keyring or approved credential helper | Implemented; synthetic WebDAV/iCalendar contracts; live-unobserved |
 <!-- markdownlint-enable MD013 -->
 
 Mail and calendar are selected independently. For example, one account may use
 IMAP/SMTP for mail and CalDAV for calendar. `pop3` is reserved without a route
 builder and cannot be selected.
 
-“Implemented” means the route and synthetic contracts exist on this development
-branch; it is not a universal compatibility claim. The latest stable v0.7
-release remains Outlook-Web-only. See
-[compatibility evidence](compatibility.md) before using a development build
-with a live account.
+“Implemented” means the typed route and synthetic contracts ship in v0.8. It is
+not a universal provider-compatibility claim. See
+[compatibility evidence](compatibility.md) before connecting a live account.
 
 Discovery uses DNS and well-known metadata without credentials. It returns
 ranked evidence, confidence, required authentication, and availability; it

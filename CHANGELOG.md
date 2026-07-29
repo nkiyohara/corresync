@@ -3,7 +3,7 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.8.0 - 2026-07-29
 
 ### Accounts and providers
 

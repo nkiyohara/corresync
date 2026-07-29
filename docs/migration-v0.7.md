@@ -1,8 +1,8 @@
 # Migrate from the v0.6 Outlook bridge
 
-Corresync 0.7 coordinated the product/repository/package rename. The next
-release makes `corr` the primary interactive command and upgrades configuration
-to schema v3 with explicit mail/calendar provider routes.
+Corresync 0.7 coordinated the product/repository/package rename. Corresync 0.8
+makes `corr` the primary interactive command and upgrades configuration to
+schema v3 with explicit mail/calendar provider routes.
 
 Old names in this guide are migration inputs only. They are not current command
 or directory aliases.
@@ -75,7 +75,7 @@ Corresync v0.7. Its updater accepts the canonical archive and both exact
 workflow identities. Move the resulting `corresync` executable to a private
 directory on `PATH`, preserving the installed v0.6.1 file until first-run
 migration succeeds. Then continue with
-[local-data migration](#let-corresync-migrate-local-data).
+[local-data migration](#local-data-migration).
 
 Alternatively, verify and install the canonical v0.7 archive directly using
 [install.md](install.md#direct-release-download). Corresync itself performs
