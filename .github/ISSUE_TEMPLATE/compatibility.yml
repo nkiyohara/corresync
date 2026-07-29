@@ -1,6 +1,7 @@
 name: Compatibility observation
 description: Report a content-free opt-in Outlook Web compatibility result.
 title: "compat: "
+labels: ["compatibility"]
 body:
   - type: markdown
     attributes:

@@ -97,6 +97,9 @@ GitHub Copilot CLI, Gemini CLI, Qwen Code, Qoder, and Kimi Code CLI—plus nativ
 configuration documents, project scopes, Skill installation, and
 troubleshooting. Existing v0.6 installations are covered by the
 [v0.7 migration guide](docs/migration-v0.7.md).
+Direct v0.6.1 installations must
+[install the signed v0.6.2 bridge first](docs/migration-v0.7.md#from-v061);
+their updater cannot select or verify the renamed v0.7 artifact directly.
 
 ## Use it directly
 
