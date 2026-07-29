@@ -10,9 +10,9 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/emersion/go-imap"
 	imapclient "github.com/emersion/go-imap/client"
@@ -23,6 +23,7 @@ const (
 	maximumIMAPResponseControl  = 1 << 20
 	maximumIMAPOperationBytes   = 32 << 20
 	maximumIMAPUpgradeLines     = 100
+	maximumIMAPParserCPU        = 5 * time.Second
 	imapStartTLSTag             = "C0"
 )
 
@@ -160,15 +161,13 @@ type boundedIMAPConn struct {
 	net.Conn
 	maximumLiteral uint64
 
-	readMu           sync.Mutex
-	pending          []byte
-	controlLine      []byte
-	literalRemaining uint64
-	terminalErr      error
-	errorReturned    bool
-	maximumTotal     uint64
-	literalTotal     uint64
-	literalProbe     []byte
+	readMu        sync.Mutex
+	reader        *bufio.Reader
+	pending       []byte
+	terminalErr   error
+	errorReturned bool
+	maximumTotal  uint64
+	literalTotal  uint64
 }
 
 func newBoundedIMAPConn(
@@ -184,7 +183,10 @@ func newBoundedIMAPConn(
 		maximumLiteral: uint64(maximumLiteral),
 		maximumTotal:   maximumIMAPOperationBytes,
 		pending:        append([]byte(nil), prefix...),
-		controlLine:    make([]byte, 0, 4096),
+		reader: bufio.NewReaderSize(
+			connection,
+			maximumIMAPControlLineBytes+1,
+		),
 	}, nil
 }
 
@@ -195,20 +197,9 @@ func (connection *boundedIMAPConn) Read(destination []byte) (int, error) {
 		return 0, nil
 	}
 	for len(connection.pending) == 0 && connection.terminalErr == nil {
-		buffer := make([]byte, 32<<10)
-		count, readErr := connection.Conn.Read(buffer)
-		if count > 0 {
-			if err := connection.inspect(buffer[:count]); err != nil {
-				connection.terminalErr = err
-				_ = connection.Close()
-			}
-		}
-		if readErr != nil && connection.terminalErr == nil {
-			if connection.literalRemaining != 0 {
-				connection.terminalErr = io.ErrUnexpectedEOF
-			} else {
-				connection.terminalErr = readErr
-			}
+		if err := connection.readResponse(); err != nil {
+			connection.terminalErr = err
+			_ = connection.Close()
 		}
 	}
 	if len(connection.pending) > 0 {
@@ -223,130 +214,182 @@ func (connection *boundedIMAPConn) Read(destination []byte) (int, error) {
 	return 0, io.EOF
 }
 
-func (connection *boundedIMAPConn) inspect(input []byte) error {
-	for len(input) > 0 {
-		if connection.literalRemaining > 0 {
-			count := min(uint64(len(input)), connection.literalRemaining)
-			connection.pending = append(connection.pending, input[:count]...)
-			connection.literalRemaining -= count
-			input = input[count:]
-			continue
-		}
-		character := input[0]
-		input = input[1:]
-		if len(connection.controlLine) == maximumIMAPControlLineBytes {
-			return errors.New("IMAP response control line exceeds its size bound")
-		}
-		connection.controlLine = append(connection.controlLine, character)
-		if character != '\n' {
-			connection.pending = append(connection.pending, character)
-			continue
-		}
-		size, literal, err := imapLiteralSize(connection.controlLine)
-		if err != nil {
-			return err
-		}
-		var nextProbe []byte
-		if literal {
-			literal, nextProbe, err = imapLiteralAllowed(
-				connection.controlLine,
-				connection.literalProbe,
-			)
-			if err != nil {
-				return err
-			}
-		}
-		if literal && size > connection.maximumLiteral {
-			return fmt.Errorf(
-				"IMAP literal declares %d bytes, exceeding the %d-byte limit",
-				size,
-				connection.maximumLiteral,
-			)
-		}
-		if len(connection.controlLine) < 2 ||
-			connection.controlLine[len(connection.controlLine)-2] != '\r' {
-			return errors.New("IMAP response control line does not use CRLF")
-		}
-		if literal &&
-			(size > connection.maximumTotal ||
-				connection.literalTotal > connection.maximumTotal-size) {
-			return fmt.Errorf(
-				"IMAP response literals exceed the %d-byte operation limit",
-				connection.maximumTotal,
-			)
-		}
-		connection.pending = append(connection.pending, character)
-		connection.controlLine = connection.controlLine[:0]
-		if literal {
-			connection.literalTotal += size
-			connection.literalRemaining = size
-			connection.literalProbe = nextProbe
-		} else {
-			connection.literalProbe = nil
-		}
+func (connection *boundedIMAPConn) readResponse() error {
+	if connection.maximumLiteral > uint64(^uint32(0)) {
+		return errors.New("IMAP literal limit exceeds the parser range")
 	}
+	capture := &imapResponseCapture{
+		source:       connection.reader,
+		maximumTotal: connection.maximumTotal,
+		literalTotal: connection.literalTotal,
+		cpuDeadline:  time.Now().Add(maximumIMAPParserCPU),
+	}
+	parser := imap.NewReader(capture)
+	parser.MaxLiteralSize = uint32(connection.maximumLiteral)
+	if _, err := imap.ReadResp(parser); err != nil {
+		if errors.Is(err, io.EOF) && capture.bytes.Len() == 0 {
+			return io.EOF
+		}
+		return fmt.Errorf(
+			"validate bounded IMAP response after %d control and %d literal bytes: %w",
+			capture.controlTotal,
+			capture.literalTotal,
+			err,
+		)
+	}
+	connection.literalTotal = capture.literalTotal
+	connection.pending = append(connection.pending, capture.bytes.Bytes()...)
 	return nil
 }
 
-func imapLiteralAllowed(line, prefix []byte) (bool, []byte, error) {
-	limitedLine, err := replaceIMAPLiteralSize(line, "2")
-	if err != nil {
-		return false, nil, err
-	}
-	probe := make([]byte, 0, len(prefix)+len(limitedLine))
-	probe = append(probe, prefix...)
-	probe = append(probe, limitedLine...)
-	reader := imap.NewReader(bufio.NewReader(bytes.NewReader(probe)))
-	reader.MaxLiteralSize = 1
-	_, parseErr := imap.ReadResp(reader)
-	if parseErr == nil {
-		// Status and continuation response text is opaque to go-imap. A
-		// trailing {N} there is text, so the following bytes remain visible
-		// to this filter as a new response.
-		return false, nil, nil
-	}
-	if !strings.Contains(parseErr.Error(), "literal exceeding maximum size") {
-		return false, nil, fmt.Errorf(
-			"IMAP literal declaration disagrees with response grammar: %w",
-			parseErr,
-		)
-	}
-	zeroLine, err := replaceIMAPLiteralSize(line, "0")
-	if err != nil {
-		return false, nil, err
-	}
-	if len(prefix)+len(zeroLine) > maximumIMAPResponseControl {
-		return false, nil, errors.New(
-			"IMAP response control data exceeds its aggregate size bound",
-		)
-	}
-	next := make([]byte, 0, len(prefix)+len(zeroLine))
-	next = append(next, prefix...)
-	next = append(next, zeroLine...)
-	return true, next, nil
+// imapResponseCapture gives the pinned go-imap parser the authoritative view
+// of one response while preserving the exact bytes for the real client. Parser
+// control reads and literal payload reads use different interface methods, so
+// grammar, CRLF, line, aggregate-control, literal, and CPU bounds are enforced
+// in one forward-only pass.
+type imapResponseCapture struct {
+	source       *bufio.Reader
+	bytes        bytes.Buffer
+	maximumTotal uint64
+	literalTotal uint64
+	controlTotal int
+	controlLine  int
+	previous     byte
+	cpuDeadline  time.Time
+
+	lastRuneBytes    int
+	lastControlLine  int
+	lastControlTotal int
+	lastPrevious     byte
 }
 
-func replaceIMAPLiteralSize(line []byte, replacement string) ([]byte, error) {
-	end := len(line)
-	if end == 0 || line[end-1] != '\n' {
-		return nil, errors.New("IMAP literal declaration has no line terminator")
+func (capture *imapResponseCapture) Read(destination []byte) (int, error) {
+	capture.lastRuneBytes = 0
+	if len(destination) == 0 {
+		return 0, nil
 	}
-	end--
-	if end > 0 && line[end-1] == '\r' {
-		end--
+	if capture.literalTotal >= capture.maximumTotal {
+		return 0, fmt.Errorf(
+			"IMAP response literals exceed the %d-byte operation limit",
+			capture.maximumTotal,
+		)
 	}
-	if end == 0 || line[end-1] != '}' {
-		return nil, errors.New("IMAP literal declaration has no closing brace")
+	remaining := capture.maximumTotal - capture.literalTotal
+	exhaustsBudget := uint64(len(destination)) >= remaining
+	if uint64(len(destination)) > remaining {
+		destination = destination[:remaining]
 	}
-	open := bytes.LastIndexByte(line[:end], '{')
-	if open < 0 {
-		return nil, errors.New("IMAP literal declaration has no opening brace")
+	started := time.Now()
+	count, err := capture.source.Read(destination)
+	capture.cpuDeadline = capture.cpuDeadline.Add(time.Since(started))
+	if count > 0 {
+		capture.literalTotal += uint64(count)
+		_, _ = capture.bytes.Write(destination[:count])
 	}
-	replaced := make([]byte, 0, open+len(replacement)+len(line)-end+1)
-	replaced = append(replaced, line[:open+1]...)
-	replaced = append(replaced, replacement...)
-	replaced = append(replaced, line[end-1:]...)
-	return replaced, nil
+	if err == nil && exhaustsBudget && count == len(destination) {
+		return count, fmt.Errorf(
+			"IMAP response literals exceed the %d-byte operation limit",
+			capture.maximumTotal,
+		)
+	}
+	return count, err
+}
+
+func (capture *imapResponseCapture) ReadRune() (rune, int, error) {
+	if err := capture.checkCPUBudget(); err != nil {
+		return 0, 0, err
+	}
+	capture.lastControlLine = capture.controlLine
+	capture.lastControlTotal = capture.controlTotal
+	capture.lastPrevious = capture.previous
+	started := time.Now()
+	character, size, err := capture.source.ReadRune()
+	capture.cpuDeadline = capture.cpuDeadline.Add(time.Since(started))
+	if err != nil {
+		return 0, 0, err
+	}
+	if character == utf8.RuneError && size == 1 {
+		return 0, 0, errors.New("IMAP response control data is not valid UTF-8")
+	}
+	var encoded [utf8.UTFMax]byte
+	count := utf8.EncodeRune(encoded[:], character)
+	if count != size {
+		return 0, 0, errors.New("IMAP response control rune encoding changed")
+	}
+	raw := encoded[:count]
+	if err := capture.acceptControl(raw); err != nil {
+		return 0, 0, err
+	}
+	capture.lastRuneBytes = len(raw)
+	return character, size, nil
+}
+
+func (capture *imapResponseCapture) UnreadRune() error {
+	if capture.lastRuneBytes == 0 {
+		return errors.New("IMAP parser attempted an invalid rune rewind")
+	}
+	if err := capture.source.UnreadRune(); err != nil {
+		return err
+	}
+	capture.bytes.Truncate(capture.bytes.Len() - capture.lastRuneBytes)
+	capture.controlLine = capture.lastControlLine
+	capture.controlTotal = capture.lastControlTotal
+	capture.previous = capture.lastPrevious
+	capture.lastRuneBytes = 0
+	return nil
+}
+
+func (capture *imapResponseCapture) ReadString(delimiter byte) (string, error) {
+	capture.lastRuneBytes = 0
+	var result bytes.Buffer
+	for {
+		if err := capture.checkCPUBudget(); err != nil {
+			return result.String(), err
+		}
+		started := time.Now()
+		fragment, err := capture.source.ReadSlice(delimiter)
+		capture.cpuDeadline = capture.cpuDeadline.Add(time.Since(started))
+		if len(fragment) > 0 {
+			if controlErr := capture.acceptControl(fragment); controlErr != nil {
+				return result.String(), controlErr
+			}
+			_, _ = result.Write(fragment)
+		}
+		if !errors.Is(err, bufio.ErrBufferFull) {
+			return result.String(), err
+		}
+	}
+}
+
+func (capture *imapResponseCapture) acceptControl(input []byte) error {
+	for _, character := range input {
+		capture.controlTotal++
+		capture.controlLine++
+		if capture.controlTotal > maximumIMAPResponseControl {
+			return errors.New(
+				"IMAP response control data exceeds its aggregate size bound",
+			)
+		}
+		if capture.controlLine > maximumIMAPControlLineBytes {
+			return errors.New("IMAP response control line exceeds its size bound")
+		}
+		if character == '\n' {
+			if capture.previous != '\r' {
+				return errors.New("IMAP response control line does not use CRLF")
+			}
+			capture.controlLine = 0
+		}
+		capture.previous = character
+	}
+	_, _ = capture.bytes.Write(input)
+	return capture.checkCPUBudget()
+}
+
+func (capture *imapResponseCapture) checkCPUBudget() error {
+	if time.Now().After(capture.cpuDeadline) {
+		return errors.New("IMAP response parsing exceeded its CPU time bound")
+	}
+	return nil
 }
 
 func imapLiteralSize(line []byte) (uint64, bool, error) {

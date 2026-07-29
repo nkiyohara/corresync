@@ -3,6 +3,7 @@ package imapmail
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -99,43 +100,6 @@ func TestBoundedIMAPConnRejectsStatusTextDesynchronization(t *testing.T) {
 	}
 }
 
-func TestIMAPLiteralClassificationMatchesResponseGrammar(t *testing.T) {
-	t.Parallel()
-	for _, test := range []struct {
-		line    string
-		prefix  string
-		allowed bool
-		wantErr bool
-	}{
-		{line: "* OK text {4}\r\n"},
-		{line: "A1 NO text {4}\r\n"},
-		{line: "+ continue {4}\r\n"},
-		{line: "* 1 FETCH (BODY[] {4}\r\n", allowed: true},
-		{
-			line:    " BODY[2] {4}\r\n",
-			prefix:  "* 1 FETCH (BODY[1] {0}\r\n",
-			allowed: true,
-		},
-		{line: "* OK [SYNTHETIC {4}\r\n", allowed: true},
-		{line: "* 1 FETCH atom{4}\r\n", wantErr: true},
-		{line: "* 1 FETCH (\"open quote {4}\r\n", wantErr: true},
-	} {
-		allowed, _, err := imapLiteralAllowed(
-			[]byte(test.line),
-			[]byte(test.prefix),
-		)
-		if (err != nil) != test.wantErr || allowed != test.allowed {
-			t.Fatalf(
-				"imapLiteralAllowed(%q, %q) = %t, %v",
-				test.line,
-				test.prefix,
-				allowed,
-				err,
-			)
-		}
-	}
-}
-
 func TestBoundedIMAPConnTracksMultipleParserLiterals(t *testing.T) {
 	t.Parallel()
 	server, client := net.Pipe()
@@ -156,6 +120,39 @@ func TestBoundedIMAPConnTracksMultipleParserLiterals(t *testing.T) {
 	_, err = io.ReadAll(bounded)
 	if err == nil || !strings.Contains(err.Error(), "exceeding") {
 		t.Fatalf("ReadAll() error = %v, want second literal limit", err)
+	}
+}
+
+func TestBoundedIMAPConnParsesLiteralHeavyResponseInOneForwardPass(t *testing.T) {
+	t.Parallel()
+	server, client := net.Pipe()
+	t.Cleanup(func() {
+		_ = server.Close()
+		_ = client.Close()
+	})
+	var input strings.Builder
+	input.WriteString("* 1 FETCH (")
+	input.WriteString("BODY[")
+	input.WriteString(strings.Repeat("A", 8<<10))
+	input.WriteString("] {1}\r\nx")
+	for index := range 200 {
+		_, _ = fmt.Fprintf(&input, " BODY[%d] {1}\r\nx", index+1)
+	}
+	input.WriteString(")\r\n")
+	bounded, err := newBoundedIMAPConn(client, 8, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		_, _ = io.WriteString(server, input.String())
+		_ = server.Close()
+	}()
+	output, err := io.ReadAll(bounded)
+	if err != nil {
+		t.Fatalf("ReadAll() error = %v", err)
+	}
+	if string(output) != input.String() {
+		t.Fatalf("output length = %d, want %d", len(output), input.Len())
 	}
 }
 
