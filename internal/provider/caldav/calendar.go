@@ -492,7 +492,7 @@ func (client *Client) CreateCalendarEvent(
 	ctx context.Context,
 	input application.CalendarCreateInput,
 ) (application.CalendarCreateResult, error) {
-	if input.TeamsMeeting {
+	if input.OnlineMeeting || input.TeamsMeeting {
 		return application.CalendarCreateResult{}, errors.New(
 			"CalDAV cannot provision a Teams meeting",
 		)

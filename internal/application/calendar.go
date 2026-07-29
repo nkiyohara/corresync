@@ -84,9 +84,10 @@ type CalendarPort interface {
 
 // CalendarOptions applies configured limits at the application boundary.
 type CalendarOptions struct {
-	MaxAttendees int
-	Provenance   domain.Provenance
-	Effects      CalendarEffects
+	MaxAttendees          int
+	Provenance            domain.Provenance
+	Effects               CalendarEffects
+	OnlineMeetingProvider string
 }
 
 // CalendarEffects describes externally visible provider behavior that must be
@@ -127,15 +128,16 @@ func (effects CalendarEffects) validate() error {
 
 // CalendarService applies policy and audit around calendar use cases.
 type CalendarService struct {
-	guard        *Guard
-	reader       CalendarReader
-	folderReader CalendarFolderReader
-	creator      CalendarCreator
-	updater      CalendarUpdater
-	canceller    CalendarCanceller
-	maxAttendees int
-	provenance   domain.Provenance
-	effects      CalendarEffects
+	guard                 *Guard
+	reader                CalendarReader
+	folderReader          CalendarFolderReader
+	creator               CalendarCreator
+	updater               CalendarUpdater
+	canceller             CalendarCanceller
+	maxAttendees          int
+	provenance            domain.Provenance
+	effects               CalendarEffects
+	onlineMeetingProvider string
 }
 
 // NewCalendarService requires the shared guard and a transport port.
@@ -156,11 +158,17 @@ func NewCalendarService(
 	if err := options.Effects.validate(); err != nil {
 		return nil, err
 	}
+	switch options.OnlineMeetingProvider {
+	case "", "teams", "google-meet":
+	default:
+		return nil, errors.New("calendar online meeting provider is unsupported")
+	}
 	return &CalendarService{
 		guard: guard, reader: port, folderReader: port,
 		creator: port, updater: port, canceller: port,
 		maxAttendees: options.MaxAttendees, provenance: options.Provenance,
-		effects: options.Effects,
+		effects:               options.Effects,
+		onlineMeetingProvider: options.OnlineMeetingProvider,
 	}, nil
 }
 

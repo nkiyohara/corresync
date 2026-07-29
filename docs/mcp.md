@@ -123,6 +123,11 @@ Calendar writes:
 - `calendar_update`, `calendar_update_commit`;
 - `calendar_cancel`, `calendar_cancel_commit`.
 
+`calendar_create.onlineMeeting` requests the selected account route's observed
+native meeting service: Teams for Microsoft routes or Google Meet for a Google
+calendar that advertises it. The compatibility `teamsMeeting` field is
+Microsoft-only.
+
 Account changes use the same typed application lifecycle as the CLI. MCP
 addition, rename, and removal are caller-bound preview/commit pairs; commit
 stops and restarts the session owner around the atomic config change so no

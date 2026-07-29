@@ -27,6 +27,7 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 	var movedToArchive bool
 	var permanentlyDeleted bool
 	var calendarRecurrenceUpdated bool
+	var meetRequested bool
 	server := httptest.NewTLSServer(http.HandlerFunc(func(
 		writer http.ResponseWriter,
 		request *http.Request,
@@ -40,6 +41,9 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 		case "GET /calendar/v3/users/me/calendarList/primary":
 			writeGoogleJSON(t, writer, map[string]any{
 				"id": "reader@example.test", "accessRole": "owner",
+				"conferenceProperties": map[string]any{
+					"allowedConferenceSolutionTypes": []string{"hangoutsMeet"},
+				},
 			})
 		case "GET /calendar/v3/users/me/calendarList":
 			writeGoogleJSON(t, writer, map[string]any{
@@ -119,15 +123,38 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 				"items": []googleEvent{googleTestEvent(`"etag1"`)},
 			})
 		case "POST /calendar/v3/calendars/primary/events":
-			if request.URL.Query().Get("sendUpdates") != "all" {
+			if request.URL.Query().Get("sendUpdates") != "all" ||
+				request.URL.Query().Get("conferenceDataVersion") != "1" {
 				t.Errorf("calendar create query = %q", request.URL.RawQuery)
 			}
-			writeGoogleJSON(t, writer, googleTestEvent(`"etag2"`))
+			var payload struct {
+				ConferenceData struct {
+					CreateRequest struct {
+						RequestID             string `json:"requestId"`
+						ConferenceSolutionKey struct {
+							Type string `json:"type"`
+						} `json:"conferenceSolutionKey"`
+					} `json:"createRequest"`
+				} `json:"conferenceData"`
+			}
+			if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+				t.Fatal(err)
+			}
+			meetRequested =
+				len(payload.ConferenceData.CreateRequest.RequestID) >= 32 &&
+					payload.ConferenceData.CreateRequest.
+						ConferenceSolutionKey.Type == "hangoutsMeet"
+			event := googleTestEvent(`"etag2"`)
+			event.HangoutLink = "https://meet.google.com/abc-defg-hij"
+			event.ConferenceData.CreateRequest.Status.StatusCode = "success"
+			event.ConferenceData.ConferenceSolution.Key.Type = "hangoutsMeet"
+			writeGoogleJSON(t, writer, event)
 		case "GET /calendar/v3/calendars/primary/events/e1":
 			writeGoogleJSON(t, writer, googleTestEvent(`"etag1"`))
 		case "PATCH /calendar/v3/calendars/primary/events/e1":
 			if request.Header.Get("If-Match") != `"etag1"` ||
-				request.URL.Query().Get("sendUpdates") != "all" {
+				request.URL.Query().Get("sendUpdates") != "all" ||
+				request.URL.Query().Get("conferenceDataVersion") != "1" {
 				t.Errorf(
 					"calendar update condition = %q query = %q",
 					request.Header.Get("If-Match"),
@@ -165,6 +192,9 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !client.MeetAvailable() {
+		t.Fatal("authenticated calendar capability omitted Google Meet")
 	}
 	defer func() {
 		if err := client.Close(); err != nil {
@@ -318,9 +348,15 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 			Subject: "Created", Start: "2026-08-01T10:00:00Z",
 			End:               "2026-08-01T11:00:00Z",
 			RequiredAttendees: []string{"person@example.test"},
+			OnlineMeeting:     true,
 		},
 	)
-	if err != nil || created.ID == "" || created.ChangeKey == "" {
+	if err != nil || created.ID == "" || created.ChangeKey == "" ||
+		!created.IsOnlineMeeting ||
+		created.OnlineMeetingProvider != "google-meet" ||
+		created.OnlineMeetingJoinURL !=
+			"https://meet.google.com/abc-defg-hij" ||
+		!meetRequested {
 		t.Fatalf("created = %#v error = %v", created, err)
 	}
 	subject := "Updated"
@@ -381,6 +417,111 @@ func TestGoogleAPICalendarOnlyRouteBindsTheConfiguredIdentity(t *testing.T) {
 	}
 	if err == nil || !strings.Contains(err.Error(), "identity") {
 		t.Fatalf("New() error = %v, want calendar identity mismatch", err)
+	}
+}
+
+func TestGoogleMeetStatusFailsClosedOnUntrustedOrPendingLinks(t *testing.T) {
+	t.Parallel()
+
+	success := googleTestEvent(`"etag1"`)
+	success.HangoutLink = "https://meet.google.com/abc-defg-hij"
+	success.ConferenceData.CreateRequest.Status.StatusCode = "success"
+	success.ConferenceData.ConferenceSolution.Key.Type = "hangoutsMeet"
+	link, status, err := googleMeetStatus(success)
+	if err != nil || status != "success" ||
+		link != "https://meet.google.com/abc-defg-hij" {
+		t.Fatalf("valid Meet status = %q, %q, %v", link, status, err)
+	}
+
+	pending := success
+	pending.ConferenceData.CreateRequest.Status.StatusCode = "pending"
+	if link, status, err := googleMeetStatus(pending); err != nil ||
+		link != "" || status != "pending" {
+		t.Fatalf("pending Meet status = %q, %q, %v", link, status, err)
+	}
+
+	for _, unsafe := range []string{
+		"https://attacker.invalid/abc-defg-hij",
+		"https://meet.google.com:444/abc-defg-hij",
+		"https://user@meet.google.com/abc-defg-hij",
+	} {
+		event := success
+		event.HangoutLink = unsafe
+		if _, _, err := googleMeetStatus(event); err == nil {
+			t.Fatalf("accepted unsafe Meet link %q", unsafe)
+		}
+	}
+}
+
+func TestGoogleMeetPendingCreateUsesBoundedReadAfterWriteWithoutRetry(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	var createCalls int
+	var confirmationReads int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.Method + " " + request.URL.Path {
+		case "GET /calendar/v3/users/me/calendarList/primary":
+			writeGoogleJSON(t, writer, map[string]any{
+				"id": "reader@example.test", "accessRole": "owner",
+				"conferenceProperties": map[string]any{
+					"allowedConferenceSolutionTypes": []string{"hangoutsMeet"},
+				},
+			})
+		case "POST /calendar/v3/calendars/primary/events":
+			createCalls++
+			event := googleTestEvent(`"etag1"`)
+			event.ConferenceData.CreateRequest.Status.StatusCode = "pending"
+			writeGoogleJSON(t, writer, event)
+		case "GET /calendar/v3/calendars/primary/events/e1":
+			confirmationReads++
+			event := googleTestEvent(`"etag2"`)
+			event.HangoutLink = "https://meet.google.com/abc-defg-hij"
+			event.ConferenceData.CreateRequest.Status.StatusCode = "success"
+			event.ConferenceData.ConferenceSolution.Key.Type = "hangoutsMeet"
+			writeGoogleJSON(t, writer, event)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	client, err := New(t.Context(), Options{
+		APIBase: server.URL, Address: "reader@example.test",
+		Calendar: true, HTTP: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	created, err := client.CreateCalendarEvent(
+		t.Context(),
+		application.CalendarCreateInput{
+			Calendar: application.CalendarFolder{
+				Kind: application.CalendarFolderDistinguished,
+				ID:   "calendar",
+			},
+			Start:         "2026-08-01T10:00:00Z",
+			End:           "2026-08-01T11:00:00Z",
+			OnlineMeeting: true,
+		},
+	)
+	if err != nil ||
+		created.OnlineMeetingJoinURL !=
+			"https://meet.google.com/abc-defg-hij" ||
+		createCalls != 1 || confirmationReads != 1 {
+		t.Fatalf(
+			"pending create = %+v error=%v creates=%d reads=%d",
+			created,
+			err,
+			createCalls,
+			confirmationReads,
+		)
 	}
 }
 

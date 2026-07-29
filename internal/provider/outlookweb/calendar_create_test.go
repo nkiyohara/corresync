@@ -24,7 +24,7 @@ func testCalendarCreateInput() application.CalendarCreateInput {
 		Location:          "Room Example",
 		RequiredAttendees: []string{"alice@example.invalid"},
 		OptionalAttendees: []string{"bob@example.invalid"},
-		TeamsMeeting:      true,
+		OnlineMeeting:     true,
 	}
 }
 
@@ -69,7 +69,7 @@ func TestCreateCalendarEventNormalizesResponseAndNeverRetries(t *testing.T) {
 	}
 	assertJSONEqual(t, <-requestBodies, expectedRequest)
 	if created.ID != "synthetic-event-created-1" || created.ChangeKey != "synthetic-change-created-1" ||
-		!created.IsOnlineMeeting || created.OnlineMeetingProvider != teamsForBusinessProvider ||
+		!created.IsOnlineMeeting || created.OnlineMeetingProvider != "teams" ||
 		created.OnlineMeetingJoinURL != "https://teams.example.invalid/l/meetup-join/synthetic" {
 		t.Fatalf("unexpected created event: %+v", created)
 	}
@@ -99,7 +99,7 @@ func TestCalendarCreateWithoutTeamsMeetingOmitsOnlineMeetingFields(t *testing.T)
 	t.Parallel()
 
 	input := testCalendarCreateInput()
-	input.TeamsMeeting = false
+	input.OnlineMeeting = false
 	payload, err := buildCalendarCreateEnvelope(input)
 	if err != nil {
 		t.Fatalf("buildCalendarCreateEnvelope() error = %v", err)

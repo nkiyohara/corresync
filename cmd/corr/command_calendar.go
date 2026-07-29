@@ -43,7 +43,8 @@ type calendarCreateCommand struct {
 	Location             string   `help:"Plain-text location; CR/LF are rejected."`
 	RequiredAttendees    []string `name:"required-attendee" help:"Bare required attendee address; repeat as needed."`
 	OptionalAttendees    []string `name:"optional-attendee" help:"Bare optional attendee address; repeat as needed."`
-	TeamsMeeting         bool     `name:"teams-meeting" help:"Create a Microsoft Teams online meeting link."`
+	OnlineMeeting        bool     `name:"online-meeting" help:"Create the selected provider's native online meeting link (Teams or Google Meet)."`
+	TeamsMeeting         bool     `name:"teams-meeting" help:"Compatibility alias requiring a Microsoft Teams-capable calendar."`
 	AllDay               bool     `name:"all-day" help:"Create an all-day event; start and end must be midnight in the reviewed time zone."`
 	TimeZone             string   `name:"time-zone" help:"Exchange/Windows time-zone ID; defaults to UTC."`
 	ReminderMinutes      *int     `name:"reminder-minutes" help:"Enable a reminder this many minutes before start; omit to disable."`
@@ -229,6 +230,7 @@ func (command *calendarCreateCommand) Run(app *runtime) (returnErr error) {
 		Start: command.Start, End: command.End, Location: command.Location,
 		RequiredAttendees: command.RequiredAttendees,
 		OptionalAttendees: command.OptionalAttendees,
+		OnlineMeeting:     command.OnlineMeeting,
 		TeamsMeeting:      command.TeamsMeeting,
 		AllDay:            command.AllDay, TimeZone: command.TimeZone,
 		Reminder: reminder, Recurrence: recurrence,
@@ -270,7 +272,10 @@ func (command *calendarCreateCommand) Run(app *runtime) (returnErr error) {
 	}
 	if access.Created.OnlineMeetingJoinURL != "" {
 		_, err = fmt.Fprintf(
-			app.stdout, "Teams join URL: %s\n", sanitizeCell(access.Created.OnlineMeetingJoinURL, 8192),
+			app.stdout,
+			"%s join URL: %s\n",
+			sanitizeCell(access.Created.OnlineMeetingProvider, 64),
+			sanitizeCell(access.Created.OnlineMeetingJoinURL, 8192),
 		)
 		if err != nil {
 			return err
@@ -532,9 +537,9 @@ func writeCalendarCreateReview(
 	if review.InvitationsWillBeSent {
 		invitations = "yes"
 	}
-	teamsMeeting := "no"
-	if review.TeamsMeeting {
-		teamsMeeting = "yes"
+	onlineMeeting := "no"
+	if review.OnlineMeeting {
+		onlineMeeting = review.OnlineMeetingProvider
 	}
 	allDay := "no"
 	if review.AllDay {
@@ -555,7 +560,7 @@ func writeCalendarCreateReview(
 	}
 	_, err := fmt.Fprintf(
 		writer,
-		"%s\nCalendar: %s\nStart: %s\nEnd: %s\nTime zone: %s\nAll day: %s\nReminder: %s\nRecurrence: %s\nLocation: %s\nRequired: %s\nOptional: %s\nInvitations will be sent: %s\nTeams meeting link: %s\nSubject: %s\nBody (%d bytes, SHA-256 %s):\n%s\n",
+		"%s\nCalendar: %s\nStart: %s\nEnd: %s\nTime zone: %s\nAll day: %s\nReminder: %s\nRecurrence: %s\nLocation: %s\nRequired: %s\nOptional: %s\nInvitations will be sent: %s\nOnline meeting: %s\nSubject: %s\nBody (%d bytes, SHA-256 %s):\n%s\n",
 		action,
 		sanitizeCell(calendar, 4096),
 		sanitizeCell(review.Start, 64),
@@ -568,7 +573,7 @@ func writeCalendarCreateReview(
 		sanitizeCell(joinReviewValues(review.RequiredAttendees), 8192),
 		sanitizeCell(joinReviewValues(review.OptionalAttendees), 8192),
 		invitations,
-		teamsMeeting,
+		sanitizeCell(onlineMeeting, 64),
 		sanitizeCell(review.Subject, application.MaxCalendarSubjectBytes),
 		review.BodyBytes,
 		sanitizeCell(review.BodySHA256, 64),

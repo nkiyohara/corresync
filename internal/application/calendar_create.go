@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -53,20 +54,23 @@ type CalendarRecurrence struct {
 // CalendarCreateInput creates one bounded calendar item. Whether attendees
 // receive provider notifications is described by CalendarEffects.
 type CalendarCreateInput struct {
-	Account           domain.AccountID    `json:"account"`
-	Calendar          CalendarFolder      `json:"calendar"`
-	Subject           string              `json:"subject,omitempty"`
-	Body              string              `json:"body,omitempty"`
-	Start             string              `json:"start"`
-	End               string              `json:"end"`
-	Location          string              `json:"location,omitempty"`
-	RequiredAttendees []string            `json:"requiredAttendees,omitempty"`
-	OptionalAttendees []string            `json:"optionalAttendees,omitempty"`
-	TeamsMeeting      bool                `json:"teamsMeeting,omitempty"`
-	AllDay            bool                `json:"allDay,omitempty"`
-	TimeZone          string              `json:"timeZone,omitempty"`
-	Reminder          *CalendarReminder   `json:"reminder,omitempty"`
-	Recurrence        *CalendarRecurrence `json:"recurrence,omitempty"`
+	Account           domain.AccountID `json:"account"`
+	Calendar          CalendarFolder   `json:"calendar"`
+	Subject           string           `json:"subject,omitempty"`
+	Body              string           `json:"body,omitempty"`
+	Start             string           `json:"start"`
+	End               string           `json:"end"`
+	Location          string           `json:"location,omitempty"`
+	RequiredAttendees []string         `json:"requiredAttendees,omitempty"`
+	OptionalAttendees []string         `json:"optionalAttendees,omitempty"`
+	OnlineMeeting     bool             `json:"onlineMeeting,omitempty"`
+	// TeamsMeeting is the v0.7 compatibility input. New callers should use
+	// OnlineMeeting so the selected provider can provision its native service.
+	TeamsMeeting bool                `json:"teamsMeeting,omitempty"`
+	AllDay       bool                `json:"allDay,omitempty"`
+	TimeZone     string              `json:"timeZone,omitempty"`
+	Reminder     *CalendarReminder   `json:"reminder,omitempty"`
+	Recurrence   *CalendarRecurrence `json:"recurrence,omitempty"`
 }
 
 // CalendarCreateReview is the exact bounded review shown before creation.
@@ -82,6 +86,8 @@ type CalendarCreateReview struct {
 	RequiredAttendees     []string            `json:"requiredAttendees,omitempty"`
 	OptionalAttendees     []string            `json:"optionalAttendees,omitempty"`
 	InvitationsWillBeSent bool                `json:"invitationsWillBeSent"`
+	OnlineMeeting         bool                `json:"onlineMeeting"`
+	OnlineMeetingProvider string              `json:"onlineMeetingProvider,omitempty"`
 	TeamsMeeting          bool                `json:"teamsMeeting"`
 	AllDay                bool                `json:"allDay"`
 	TimeZone              string              `json:"timeZone"`
@@ -129,6 +135,9 @@ func (service *CalendarService) Create(
 	if err := input.Validate(service.maxAttendees); err != nil {
 		return CalendarCreateAccess{}, err
 	}
+	if err := service.validateOnlineMeeting(input); err != nil {
+		return CalendarCreateAccess{}, err
+	}
 	operation, err := domain.NewTargetedOperation(
 		"calendar.create",
 		domain.EffectExternalWrite,
@@ -147,7 +156,10 @@ func (service *CalendarService) Create(
 	case policy.VerdictPreview:
 		return CalendarCreateAccess{
 			Status: "approval_required",
-			Review: input.reviewWithEffects(service.effects), Preview: prepared.Preview,
+			Review: input.reviewWithEffects(
+				service.effects,
+				service.onlineMeetingProvider,
+			), Preview: prepared.Preview,
 		}, nil
 	case policy.VerdictDeny:
 		return CalendarCreateAccess{}, errors.New("calendar create operation was denied")
@@ -178,14 +190,37 @@ func (service *CalendarService) CommitCreate(
 	if err := input.Validate(service.maxAttendees); err != nil {
 		return CalendarCreateAccess{}, err
 	}
+	if err := service.validateOnlineMeeting(input); err != nil {
+		return CalendarCreateAccess{}, err
+	}
 	created, err := service.executeCreate(ctx, input, caller, operation)
 	if err != nil {
 		return CalendarCreateAccess{}, err
 	}
 	return CalendarCreateAccess{
 		Status: "created", Created: &created,
-		Review: input.reviewWithEffects(service.effects),
+		Review: input.reviewWithEffects(
+			service.effects,
+			service.onlineMeetingProvider,
+		),
 	}, nil
+}
+
+func (service *CalendarService) validateOnlineMeeting(
+	input CalendarCreateInput,
+) error {
+	if input.TeamsMeeting && service.onlineMeetingProvider != "teams" {
+		return errors.New(
+			"the selected calendar provider cannot provision a Microsoft Teams meeting",
+		)
+	}
+	if (input.OnlineMeeting || input.TeamsMeeting) &&
+		service.onlineMeetingProvider == "" {
+		return errors.New(
+			"the selected calendar provider cannot provision an online meeting",
+		)
+	}
+	return nil
 }
 
 func (service *CalendarService) executeCreate(
@@ -198,6 +233,15 @@ func (service *CalendarService) executeCreate(
 		return CalendarCreateResult{}, err
 	}
 	created, callErr := service.creator.CreateCalendarEvent(ctx, input)
+	if callErr == nil {
+		if err := validateCalendarCreateResult(
+			created,
+			input.OnlineMeeting || input.TeamsMeeting,
+			service.onlineMeetingProvider,
+		); err != nil {
+			callErr = errors.Join(ErrWriteOutcomeUnknown, err)
+		}
+	}
 	outcome, reason := calendarWriteAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{
 		Phase: AuditPhaseExecuted, Outcome: outcome, Reason: reason,
@@ -210,6 +254,48 @@ func (service *CalendarService) executeCreate(
 		created.Provenance = service.calendarProvenance(created.ID)
 	}
 	return created, nil
+}
+
+func validateCalendarCreateResult(
+	created CalendarCreateResult,
+	requested bool,
+	expectedProvider string,
+) error {
+	if created.ID == "" || len(created.ID) > 8192 ||
+		strings.ContainsAny(created.ID, "\r\n\x00") ||
+		len(created.ChangeKey) > 8192 ||
+		strings.ContainsAny(created.ChangeKey, "\r\n\x00") {
+		return errors.New("calendar provider returned an invalid created event identity")
+	}
+	if requested {
+		if !created.IsOnlineMeeting ||
+			created.OnlineMeetingProvider != expectedProvider ||
+			created.OnlineMeetingJoinURL == "" {
+			return errors.New(
+				"calendar provider did not confirm the requested native online meeting",
+			)
+		}
+	}
+	if !created.IsOnlineMeeting {
+		if created.OnlineMeetingProvider != "" ||
+			created.OnlineMeetingJoinURL != "" {
+			return errors.New("calendar provider returned inconsistent meeting metadata")
+		}
+		return nil
+	}
+	switch created.OnlineMeetingProvider {
+	case "teams", "google-meet":
+	default:
+		return errors.New("calendar provider returned an unknown meeting service")
+	}
+	joinURL, err := url.ParseRequestURI(created.OnlineMeetingJoinURL)
+	if err != nil || joinURL.Scheme != "https" ||
+		joinURL.Hostname() == "" || joinURL.User != nil ||
+		joinURL.Fragment != "" || len(created.OnlineMeetingJoinURL) > 8192 ||
+		strings.ContainsAny(created.OnlineMeetingJoinURL, "\r\n\x00") {
+		return errors.New("calendar provider returned an invalid meeting join URL")
+	}
+	return nil
 }
 
 // Validate bounds all content, addresses, and absolute times before policy or
@@ -298,11 +384,17 @@ func (input CalendarCreateInput) Review() CalendarCreateReview {
 		CreateAttendeeNotifications: true,
 		CancellationMode:            CalendarCancellationProviderManaged,
 		CancellationDisposition:     CalendarDispositionRemoteDelete,
-	})
+	}, func() string {
+		if input.TeamsMeeting {
+			return "teams"
+		}
+		return ""
+	}())
 }
 
 func (input CalendarCreateInput) reviewWithEffects(
 	effects CalendarEffects,
+	onlineMeetingProvider string,
 ) CalendarCreateReview {
 	body := reviewCalendarBody(input.Body)
 	return CalendarCreateReview{
@@ -313,11 +405,13 @@ func (input CalendarCreateInput) reviewWithEffects(
 		OptionalAttendees: append([]string(nil), input.OptionalAttendees...),
 		InvitationsWillBeSent: effects.CreateAttendeeNotifications &&
 			len(input.RequiredAttendees)+len(input.OptionalAttendees) > 0,
-		TeamsMeeting: input.TeamsMeeting,
-		AllDay:       input.AllDay,
-		TimeZone:     effectiveCalendarTimeZone(input.TimeZone),
-		Reminder:     cloneCalendarReminder(input.Reminder),
-		Recurrence:   cloneCalendarRecurrence(input.Recurrence),
+		OnlineMeeting:         input.OnlineMeeting || input.TeamsMeeting,
+		OnlineMeetingProvider: onlineMeetingProvider,
+		TeamsMeeting:          input.TeamsMeeting,
+		AllDay:                input.AllDay,
+		TimeZone:              effectiveCalendarTimeZone(input.TimeZone),
+		Reminder:              cloneCalendarReminder(input.Reminder),
+		Recurrence:            cloneCalendarRecurrence(input.Recurrence),
 	}
 }
 

@@ -244,6 +244,9 @@ func (backend *adapterTestBackend) ListAgenda(_ context.Context, input applicati
 }
 func (backend *adapterTestBackend) CreateCalendar(_ context.Context, input application.CalendarCreateInput, _ domain.Caller) (application.CalendarCreateAccess, error) {
 	backend.calendarReview = input.Review()
+	if backend.calendarReview.OnlineMeeting {
+		backend.calendarReview.OnlineMeetingProvider = "teams"
+	}
 	return application.CalendarCreateAccess{
 		Status: "approval_required", Review: backend.calendarReview,
 		Preview: &approval.Preview{
@@ -475,7 +478,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 		Start:             "2026-07-20T09:00:00Z",
 		End:               "2026-07-20T10:00:00Z",
 		RequiredAttendees: []string{"alice@example.invalid"},
-		TeamsMeeting:      true,
+		OnlineMeeting:     true,
 	}
 	if err := calendarCreate.Run(app); err != nil {
 		t.Fatalf("calendar create preview Run() error = %v", err)
@@ -489,7 +492,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	if err := calendarCreate.Run(app); err != nil {
 		t.Fatalf("calendar create commit Run() error = %v", err)
 	}
-	if backend.calendarCommits != 1 || !backend.calendarReview.TeamsMeeting ||
+	if backend.calendarCommits != 1 || !backend.calendarReview.OnlineMeeting ||
 		!bytes.Contains(stdout.Bytes(), []byte("event-created-1")) ||
 		!bytes.Contains(stdout.Bytes(), []byte("https://teams.microsoft.com/")) ||
 		!bytes.Contains(stderr.Bytes(), []byte("Committing this exact calendar event")) {

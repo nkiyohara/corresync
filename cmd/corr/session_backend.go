@@ -1634,8 +1634,9 @@ func (backend *sessionBackend) outlookAccount(
 			backend.guard,
 			client,
 			application.CalendarOptions{
-				MaxAttendees: backend.configuration.Policy.MaxAttendees,
-				Effects:      providerCalendarEffects(domain.ProviderMicrosoftOWA),
+				MaxAttendees:          backend.configuration.Policy.MaxAttendees,
+				Effects:               providerCalendarEffects(domain.ProviderMicrosoftOWA),
+				OnlineMeetingProvider: "teams",
 				Provenance: domain.Provenance{
 					AccountID:  configured.ID,
 					Provider:   configured.CalendarProvider(),
@@ -1962,12 +1963,15 @@ func (backend *sessionBackend) googleAPIAccount(
 			},
 		)
 	}
-	if calendarEnabled {
+	if calendarEnabled && client.MeetAvailable() {
+		result.capabilities.OnlineMeeting = "google-meet"
+	}
+	if calendarEnabled && !client.MeetAvailable() {
 		result.degradations = append(
 			result.degradations,
 			domain.Degradation{
 				Feature: "calendar.online_meeting_create",
-				Reason:  "the Google API route does not provision online meetings",
+				Reason:  "the authenticated Google calendar does not advertise hangoutsMeet as an allowed conference solution",
 			},
 		)
 	}
@@ -1995,6 +1999,12 @@ func (backend *sessionBackend) googleAPIAccount(
 			application.CalendarOptions{
 				MaxAttendees: backend.configuration.Policy.MaxAttendees,
 				Effects:      providerCalendarEffects(domain.ProviderGoogleAPI),
+				OnlineMeetingProvider: func() string {
+					if client.MeetAvailable() {
+						return "google-meet"
+					}
+					return ""
+				}(),
 				Provenance: domain.Provenance{
 					AccountID:  configured.ID,
 					Provider:   domain.ProviderGoogleAPI,
@@ -2109,7 +2119,8 @@ func (backend *sessionBackend) graphAPIAccount(
 			backend.guard,
 			client,
 			application.CalendarOptions{
-				MaxAttendees: backend.configuration.Policy.MaxAttendees,
+				MaxAttendees:          backend.configuration.Policy.MaxAttendees,
+				OnlineMeetingProvider: "teams",
 				Effects: providerCalendarEffects(
 					domain.ProviderMicrosoftGraph,
 				),

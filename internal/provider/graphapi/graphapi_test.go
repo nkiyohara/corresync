@@ -332,7 +332,7 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 				Kind: application.CalendarFolderDistinguished, ID: "calendar",
 			},
 			Subject: "Created", Start: "2026-08-01T10:00:00Z",
-			End: "2026-08-01T11:00:00Z", TeamsMeeting: true,
+			End: "2026-08-01T11:00:00Z", OnlineMeeting: true,
 		},
 	)
 	if err != nil || created.ID == "" ||

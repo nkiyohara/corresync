@@ -2,6 +2,8 @@ package googleapi
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -27,6 +29,23 @@ type googleEventPerson struct {
 	ResponseStatus string `json:"responseStatus,omitempty"`
 }
 
+type googleConferenceData struct {
+	CreateRequest struct {
+		Status struct {
+			StatusCode string `json:"statusCode"`
+		} `json:"status"`
+	} `json:"createRequest"`
+	ConferenceSolution struct {
+		Key struct {
+			Type string `json:"type"`
+		} `json:"key"`
+	} `json:"conferenceSolution"`
+	EntryPoints []struct {
+		EntryPointType string `json:"entryPointType"`
+		URI            string `json:"uri"`
+	} `json:"entryPoints"`
+}
+
 type googleEvent struct {
 	ID           string              `json:"id"`
 	ETag         string              `json:"etag"`
@@ -47,13 +66,8 @@ type googleEvent struct {
 			Minutes int    `json:"minutes"`
 		} `json:"overrides,omitempty"`
 	} `json:"reminders,omitempty"`
-	HangoutLink    string `json:"hangoutLink,omitempty"`
-	ConferenceData struct {
-		EntryPoints []struct {
-			EntryPointType string `json:"entryPointType"`
-			URI            string `json:"uri"`
-		} `json:"entryPoints"`
-	} `json:"conferenceData,omitempty"`
+	HangoutLink    string               `json:"hangoutLink,omitempty"`
+	ConferenceData googleConferenceData `json:"conferenceData,omitempty"`
 }
 
 type googleCalendarListEntry struct {
@@ -326,9 +340,25 @@ func (client *Client) CreateCalendarEvent(
 			"google Calendar cannot provision a Teams meeting",
 		)
 	}
+	if input.OnlineMeeting && !client.MeetAvailable() {
+		return application.CalendarCreateResult{}, errors.New(
+			"the authenticated Google account does not advertise Google Meet creation",
+		)
+	}
 	calendarID, err := client.calendarID(input.Calendar)
 	if err != nil {
 		return application.CalendarCreateResult{}, err
+	}
+	if input.OnlineMeeting {
+		available, err := client.calendarMeetAvailable(ctx, calendarID)
+		if err != nil {
+			return application.CalendarCreateResult{}, err
+		}
+		if !available {
+			return application.CalendarCreateResult{}, errors.New(
+				"the selected Google calendar does not advertise Google Meet creation",
+			)
+		}
 	}
 	event, err := googleCreateEvent(input)
 	if err != nil {
@@ -337,6 +367,9 @@ func (client *Client) CreateCalendarEvent(
 	query := url.Values{}
 	if len(input.RequiredAttendees)+len(input.OptionalAttendees) != 0 {
 		query.Set("sendUpdates", "all")
+	}
+	if input.OnlineMeeting {
+		query.Set("conferenceDataVersion", "1")
 	}
 	var created googleEvent
 	if _, err := client.api.DoJSON(
@@ -352,21 +385,178 @@ func (client *Client) CreateCalendarEvent(
 			application.ErrWriteOutcomeUnknown,
 		)
 	}
+	joinURL := ""
+	if input.OnlineMeeting {
+		created, joinURL, err = client.waitForGoogleMeet(
+			ctx,
+			calendarID,
+			created,
+		)
+		if err != nil {
+			return application.CalendarCreateResult{}, err
+		}
+	}
 	id, err := encodeEventID(calendarID, created.ID)
 	if err != nil {
 		return application.CalendarCreateResult{}, err
 	}
 	return application.CalendarCreateResult{
 		ID: id, ChangeKey: encodeETag(created.ETag),
-		IsOnlineMeeting: created.HangoutLink != "" ||
-			len(created.ConferenceData.EntryPoints) != 0,
-		OnlineMeetingProvider: func() string {
-			if created.HangoutLink != "" || len(created.ConferenceData.EntryPoints) != 0 {
-				return "google-meet"
-			}
-			return ""
-		}(),
+		IsOnlineMeeting:       input.OnlineMeeting,
+		OnlineMeetingProvider: googleMeetingProvider(input.OnlineMeeting),
+		OnlineMeetingJoinURL:  joinURL,
 	}, nil
+}
+
+func (client *Client) calendarMeetAvailable(
+	ctx context.Context,
+	calendarID string,
+) (bool, error) {
+	if calendarID == "primary" {
+		return client.MeetAvailable(), nil
+	}
+	var calendar struct {
+		ConferenceProperties struct {
+			AllowedSolutionTypes []string `json:"allowedConferenceSolutionTypes"`
+		} `json:"conferenceProperties"`
+	}
+	if _, err := client.api.DoJSON(
+		ctx,
+		http.MethodGet,
+		"calendar/v3/calendars/"+escaped(calendarID),
+		nil,
+		nil,
+		&calendar,
+		false,
+		nil,
+		http.StatusOK,
+	); err != nil {
+		return false, fmt.Errorf(
+			"inspect selected Google calendar conference support: %w",
+			err,
+		)
+	}
+	for _, solution := range calendar.ConferenceProperties.AllowedSolutionTypes {
+		if solution == "hangoutsMeet" {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func googleMeetingProvider(requested bool) string {
+	if requested {
+		return "google-meet"
+	}
+	return ""
+}
+
+func (client *Client) waitForGoogleMeet(
+	ctx context.Context,
+	calendarID string,
+	event googleEvent,
+) (googleEvent, string, error) {
+	const maximumReads = 4
+	for attempt := 0; attempt < maximumReads; attempt++ {
+		joinURL, status, err := googleMeetStatus(event)
+		if err != nil {
+			return googleEvent{}, "", fmt.Errorf(
+				"%w: Google Calendar created the event but returned invalid conference data",
+				application.ErrWriteOutcomeUnknown,
+			)
+		}
+		switch status {
+		case "success":
+			return event, joinURL, nil
+		case "failure":
+			return googleEvent{}, "", fmt.Errorf(
+				"%w: Google Calendar created the event but failed to provision Google Meet",
+				application.ErrWriteOutcomeUnknown,
+			)
+		}
+		if attempt == maximumReads-1 {
+			break
+		}
+		delay := time.Duration(1<<attempt) * 100 * time.Millisecond
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return googleEvent{}, "", errors.Join(
+				application.ErrWriteOutcomeUnknown,
+				ctx.Err(),
+			)
+		case <-timer.C:
+		}
+		var refreshed googleEvent
+		if _, err := client.api.DoJSON(
+			ctx,
+			http.MethodGet,
+			"calendar/v3/calendars/"+escaped(calendarID)+
+				"/events/"+escaped(event.ID),
+			nil,
+			nil,
+			&refreshed,
+			false,
+			nil,
+			http.StatusOK,
+		); err != nil {
+			return googleEvent{}, "", fmt.Errorf(
+				"%w: confirm Google Meet provisioning: %w",
+				application.ErrWriteOutcomeUnknown,
+				err,
+			)
+		}
+		if refreshed.ID != event.ID || !validETag(refreshed.ETag) {
+			return googleEvent{}, "", fmt.Errorf(
+				"%w: Google Calendar returned an invalid conference confirmation",
+				application.ErrWriteOutcomeUnknown,
+			)
+		}
+		event = refreshed
+	}
+	return googleEvent{}, "", fmt.Errorf(
+		"%w: Google Calendar created the event but Meet provisioning remains pending",
+		application.ErrWriteOutcomeUnknown,
+	)
+}
+
+func googleMeetStatus(event googleEvent) (string, string, error) {
+	status := event.ConferenceData.CreateRequest.Status.StatusCode
+	if status != "" && status != "pending" &&
+		status != "success" && status != "failure" {
+		return "", "", errors.New("unknown conference creation status")
+	}
+	solution := event.ConferenceData.ConferenceSolution.Key.Type
+	if solution != "" && solution != "hangoutsMeet" {
+		return "", "", errors.New("unexpected conference solution")
+	}
+	if status == "pending" || status == "failure" {
+		return "", status, nil
+	}
+	candidates := make([]string, 0, 2)
+	if event.HangoutLink != "" {
+		candidates = append(candidates, event.HangoutLink)
+	}
+	for _, entry := range event.ConferenceData.EntryPoints {
+		if entry.EntryPointType == "video" {
+			candidates = append(candidates, entry.URI)
+		}
+	}
+	for _, candidate := range candidates {
+		parsed, err := url.ParseRequestURI(candidate)
+		if err == nil && parsed.Scheme == "https" &&
+			strings.EqualFold(parsed.Hostname(), "meet.google.com") &&
+			parsed.Port() == "" &&
+			parsed.User == nil &&
+			!strings.ContainsAny(candidate, "\r\n\x00") {
+			return candidate, "success", nil
+		}
+	}
+	if status == "success" {
+		return "", "", errors.New("successful conference omitted a valid video link")
+	}
+	return "", status, nil
 }
 
 func googleCreateEvent(
@@ -390,6 +580,20 @@ func googleCreateEvent(
 			return nil, err
 		}
 		event["recurrence"] = []string{"RRULE:" + rule}
+	}
+	if input.OnlineMeeting {
+		requestID := make([]byte, 24)
+		if _, err := rand.Read(requestID); err != nil {
+			return nil, fmt.Errorf("generate Google Meet request ID: %w", err)
+		}
+		event["conferenceData"] = map[string]any{
+			"createRequest": map[string]any{
+				"requestId": base64.RawURLEncoding.EncodeToString(requestID),
+				"conferenceSolutionKey": map[string]any{
+					"type": "hangoutsMeet",
+				},
+			},
+		}
 	}
 	return event, nil
 }
@@ -487,6 +691,7 @@ func (client *Client) UpdateCalendarEvent(
 	}
 	headers := http.Header{"If-Match": []string{etag}}
 	query := url.Values{}
+	query.Set("conferenceDataVersion", "1")
 	if input.ReplaceAttendees || len(existing.Attendees) != 0 {
 		query.Set("sendUpdates", "all")
 	}

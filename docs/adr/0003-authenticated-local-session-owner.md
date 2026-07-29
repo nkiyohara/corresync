@@ -70,6 +70,8 @@ provider can expose selectable opaque calendar IDs through the same typed
 application, CLI, and MCP boundary. Protocol version 17 extends content-free
 session status with separate mail and calendar provider identities so a
 mixed-provider account is never collapsed to a misleading primary route.
+Protocol version 18 adds the provider-neutral online-meeting creation field and
+provider-bound review result without reinterpreting the v0.7 Teams-only field.
 
 Before a client reads the rotating bearer, it authenticates the endpoint
 itself. On Unix it opens the runtime directory without following symlinks,

@@ -281,7 +281,8 @@ type CalendarCreateInput struct {
 	Location          string                   `json:"location,omitempty" jsonschema:"Plain-text event location"`
 	RequiredAttendees []string                 `json:"requiredAttendees,omitempty" jsonschema:"Bare required attendee addresses"`
 	OptionalAttendees []string                 `json:"optionalAttendees,omitempty" jsonschema:"Bare optional attendee addresses"`
-	TeamsMeeting      bool                     `json:"teamsMeeting,omitempty" jsonschema:"Create a Microsoft Teams online meeting link"`
+	OnlineMeeting     bool                     `json:"onlineMeeting,omitempty" jsonschema:"Create the selected calendar provider's native online meeting link: Teams or Google Meet"`
+	TeamsMeeting      bool                     `json:"teamsMeeting,omitempty" jsonschema:"Compatibility field requiring a Microsoft Teams-capable calendar"`
 	AllDay            bool                     `json:"allDay,omitempty" jsonschema:"Create an all-day event; start and end must be midnight in the reviewed time zone"`
 	TimeZone          string                   `json:"timeZone,omitempty" jsonschema:"Exchange/Windows time-zone ID; omit for UTC"`
 	Reminder          *CalendarReminderInput   `json:"reminder,omitempty" jsonschema:"Reminder configuration; omit to disable"`
@@ -760,6 +761,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			Start: input.Start, End: input.End, Location: input.Location,
 			RequiredAttendees: input.RequiredAttendees,
 			OptionalAttendees: input.OptionalAttendees,
+			OnlineMeeting:     input.OnlineMeeting,
 			TeamsMeeting:      input.TeamsMeeting,
 			AllDay:            input.AllDay, TimeZone: input.TimeZone,
 			Reminder:   applicationCalendarReminder(input.Reminder),
@@ -770,7 +772,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "calendar_create_commit",
 		Title:       "Create one reviewed calendar event",
-		Description: "Consume one caller-bound preview and create its exact immutable event once. Provider attendee-notification behavior is shown in the preview. A requested Teams meeting returns its join URL when provisioned; the request is never retried.",
+		Description: "Consume one caller-bound preview and create its exact immutable event once. Provider attendee-notification behavior is shown in the preview. A requested native online meeting returns its Teams or Google Meet join URL when provisioned; the event-creation request is never retried.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Create one reviewed calendar event",
 			ReadOnlyHint:    false,

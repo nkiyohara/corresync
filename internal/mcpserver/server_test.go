@@ -970,7 +970,7 @@ func TestCalendarCreateToolsKeepMandatoryPreviewAndCommitSeparate(t *testing.T) 
 			"location":          "Room Example",
 			"requiredAttendees": []string{"alice@example.invalid"},
 			"optionalAttendees": []string{"bob@example.invalid"},
-			"teamsMeeting":      true,
+			"onlineMeeting":     true,
 			"allDay":            true,
 			"timeZone":          "GMT Standard Time",
 			"reminder": map[string]any{
@@ -987,7 +987,8 @@ func TestCalendarCreateToolsKeepMandatoryPreviewAndCommitSeparate(t *testing.T) 
 	}
 	if backend.calendarCreate.Account != "work" || backend.calendarCreate.Calendar.ID != "calendar" ||
 		backend.calendarCreate.Subject != "Synthetic event" || len(backend.calendarCreate.RequiredAttendees) != 1 ||
-		len(backend.calendarCreate.OptionalAttendees) != 1 || !backend.calendarCreate.TeamsMeeting ||
+		len(backend.calendarCreate.OptionalAttendees) != 1 ||
+		!backend.calendarCreate.OnlineMeeting ||
 		!backend.calendarCreate.AllDay || backend.calendarCreate.TimeZone != "GMT Standard Time" ||
 		backend.calendarCreate.Reminder == nil || backend.calendarCreate.Recurrence == nil {
 		t.Fatalf("unexpected calendar create input: %+v", backend.calendarCreate)

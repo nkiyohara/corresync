@@ -259,6 +259,7 @@ printf 'Synthetic agenda.\n' | \
     --end 2026-07-28T10:00:00Z \
     --time-zone UTC \
     --required-attendee reader@example.invalid \
+    --online-meeting \
     --body-file -
 ```
 
@@ -292,6 +293,10 @@ required/optional attendee lists. Use `--recurrence none` with replacement
 start/end boundaries to remove a series rule. Provider meeting-link creation
 is accepted only when the authenticated calendar route reports a supported
 capability.
+
+`--online-meeting` requests the selected route's observed native provider
+(Teams or Google Meet). The transitional `--teams-meeting` spelling requires a
+Teams-capable route and fails on Google rather than silently changing meaning.
 
 ## Read-only import staging
 

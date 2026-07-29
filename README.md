@@ -280,8 +280,8 @@ updates, and content-free audit records.
 It deliberately excludes Teams chat, channels, calls, recordings, and meeting
 lifecycle management; tenant-wide access; unattended credential login; hosted
 relays; TLS interception; arbitrary provider actions; and automatic telemetry.
-Teams join links are supported only as a typed calendar-event property where
-the selected calendar provider reports that capability.
+Teams and Google Meet join links are supported only as typed calendar-event
+properties where the selected calendar provider reports that capability.
 
 Exact coverage and provider degradations are in the
 [feature matrix](docs/features.md). Security assumptions are in the

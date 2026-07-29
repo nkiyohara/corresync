@@ -4,16 +4,16 @@
 
 Build Corresync, a local-first, provider-neutral mail and calendar CLI and MCP
 server for accounts the signed-in human already controls. Mail and calendar are
-in scope across providers, including a Teams join link provisioned as a property
-of one calendar event. See
+in scope across providers, including a provider-native Teams or Google Meet
+join link provisioned as a property of one calendar event. See
 [ADR 0008](docs/adr/0008-provider-neutral-product-scope.md) for the accepted
 scope and [ADR 0011](docs/adr/0011-coordinated-corresync-rename.md) for the
 rename.
 
-Scope is not capability. The released binary implements exactly one provider
-adapter, Outlook Web. Never document a provider or capability as available
-before it has synthetic fixture contract tests and a documented opt-in live
-observation.
+Scope is not capability. The latest stable v0.7 binary implements exactly one
+provider adapter, Outlook Web. Development-route claims require synthetic
+fixture contract tests and remain live-unobserved until a documented opt-in
+live observation exists.
 
 Teams chat, channels, calls, recordings, and meeting lifecycle management stay
 out of scope, exactly as decided in

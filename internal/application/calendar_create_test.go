@@ -30,7 +30,7 @@ func TestCalendarCreateAlwaysPreviewsThenCommitsExactEvent(t *testing.T) {
 	port := &fakeCalendarReader{
 		createResult: CalendarCreateResult{
 			ID: "event-1", ChangeKey: "change-1",
-			IsOnlineMeeting: true, OnlineMeetingProvider: "TeamsForBusiness",
+			IsOnlineMeeting: true, OnlineMeetingProvider: "teams",
 			OnlineMeetingJoinURL: "https://teams.example.invalid/l/meetup-join/synthetic",
 		},
 	}
@@ -48,6 +48,8 @@ func TestCalendarCreateAlwaysPreviewsThenCommitsExactEvent(t *testing.T) {
 	if access.Preview.Operation.Name != "calendar.create" ||
 		access.Preview.Operation.Effect != domain.EffectExternalWrite ||
 		!access.Review.InvitationsWillBeSent || !access.Review.TeamsMeeting ||
+		!access.Review.OnlineMeeting ||
+		access.Review.OnlineMeetingProvider != "teams" ||
 		access.Review.BodySHA256 == "" {
 		t.Fatalf("unsafe preview: %+v", access)
 	}
@@ -58,7 +60,7 @@ func TestCalendarCreateAlwaysPreviewsThenCommitsExactEvent(t *testing.T) {
 	}
 	if committed.Status != "created" || committed.Created == nil ||
 		committed.Created.ID != "event-1" || port.createCalls != 1 ||
-		!committed.Created.IsOnlineMeeting || committed.Created.OnlineMeetingProvider != "TeamsForBusiness" ||
+		!committed.Created.IsOnlineMeeting || committed.Created.OnlineMeetingProvider != "teams" ||
 		committed.Created.OnlineMeetingJoinURL == "" ||
 		port.createInput.Subject != input.Subject || port.createInput.Body != input.Body ||
 		!port.createInput.TeamsMeeting {
@@ -71,6 +73,34 @@ func TestCalendarCreateAlwaysPreviewsThenCommitsExactEvent(t *testing.T) {
 		recorder.events[2].Phase != AuditPhaseExecuted ||
 		recorder.events[2].Outcome != AuditOutcomeSuccess {
 		t.Fatalf("unexpected audit events: %+v", recorder.events)
+	}
+}
+
+func TestCalendarCreateUsesSelectedNativeOnlineMeetingProvider(t *testing.T) {
+	t.Parallel()
+
+	port := &fakeCalendarReader{}
+	service, _ := testCalendarService(t, port)
+	service.onlineMeetingProvider = "google-meet"
+	input := validCalendarCreateInput()
+	input.TeamsMeeting = false
+	input.OnlineMeeting = true
+	caller := domain.Caller{Surface: "mcp", Instance: "session-1"}
+
+	access, err := service.Create(t.Context(), input, caller)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if !access.Review.OnlineMeeting ||
+		access.Review.OnlineMeetingProvider != "google-meet" ||
+		access.Review.TeamsMeeting {
+		t.Fatalf("native online-meeting review = %+v", access.Review)
+	}
+
+	input.OnlineMeeting = false
+	input.TeamsMeeting = true
+	if _, err := service.Create(t.Context(), input, caller); err == nil {
+		t.Fatal("Google Meet route accepted the Teams compatibility input")
 	}
 }
 
@@ -157,6 +187,34 @@ func TestCalendarCreateAuditsAmbiguousOutcome(t *testing.T) {
 	last := recorder.events[len(recorder.events)-1]
 	if last.Outcome != AuditOutcomeUnknown || last.Reason != "outcome_unknown" {
 		t.Fatalf("unexpected audit event: %+v", last)
+	}
+}
+
+func TestCalendarCreateTreatsInconsistentMeetingResultAsUnknown(t *testing.T) {
+	t.Parallel()
+
+	port := &fakeCalendarReader{
+		createResult: CalendarCreateResult{
+			ID: "event-1", ChangeKey: "change-1",
+			IsOnlineMeeting:       true,
+			OnlineMeetingProvider: "google-meet",
+			OnlineMeetingJoinURL:  "https://meet.google.com/abc-defg-hij",
+		},
+	}
+	service, recorder := testCalendarService(t, port)
+	caller := domain.Caller{Surface: "cli", Instance: "process-1"}
+	access, err := service.Create(t.Context(), validCalendarCreateInput(), caller)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	_, err = service.CommitCreate(t.Context(), access.Preview.Token, caller)
+	if !errors.Is(err, ErrWriteOutcomeUnknown) {
+		t.Fatalf("CommitCreate() error = %v, want ErrWriteOutcomeUnknown", err)
+	}
+	last := recorder.events[len(recorder.events)-1]
+	if last.Outcome != AuditOutcomeUnknown ||
+		last.Reason != "outcome_unknown" {
+		t.Fatalf("inconsistent response audit = %+v", last)
 	}
 }
 

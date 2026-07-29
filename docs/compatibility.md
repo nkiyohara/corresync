@@ -14,7 +14,7 @@ development branch from authorized live observations.
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
 | Outlook Web mail/calendar | Synthetic typed wire contracts | Historical Microsoft 365 notes, not commit-bound | Deterministic only; live-unobserved |
 | Google Web read-only mail/calendar | Synthetic semantic-DOM and application integration contracts; opt-in live harness compiles | Not run | Deterministic only |
-| Google API mail/calendar | Synthetic REST and application integration contracts | Not run | Deterministic only |
+| Google API mail/calendar/Google Meet field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
 | IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
@@ -46,8 +46,9 @@ evidence.
 - `google-web`: bounded read-only Gmail and Calendar snapshots are implemented
   through an isolated visible browser session, but have no recorded live
   observation.
-- `google-api`: Gmail and selectable Google calendars are implemented with a BYO
-  public OAuth client, but have no recorded live observation.
+- `google-api`: Gmail, selectable Google calendars, and Google Meet creation
+  after observed calendar capability are implemented with a BYO public OAuth
+  client, but have no recorded live observation.
 - `microsoft-graph`: mail, selectable calendars, and typed Teams-link creation are
   implemented with a BYO public OAuth client, but have no recorded live
   observation.
@@ -66,7 +67,8 @@ Historically noted, but not a current compatibility claim:
 - single-message move and read/unread restoration;
 - save-only draft and self-recipient new send;
 - bounded primary-calendar list, create, update, cancel;
-- Teams join URL returned from a reviewed event creation;
+- Teams or Google Meet join URL returned from a reviewed event creation when
+  the authenticated calendar advertises the provider-native capability;
 - Codex discovery and a bounded calendar tool call.
 
 Deterministic only:

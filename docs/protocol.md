@@ -66,21 +66,22 @@ attachment, calendar, and reviewed write operations. Shared/delegated mailbox
 headers are added only for an explicitly configured route and never broaden
 the signed-in user's existing permissions.
 
-OWA can provision a Teams join URL as a calendar-event creation property.
-Teams chat, channels, calls, recordings, and meeting lifecycle management are
-not exposed.
+OWA can provision a Teams join URL as a provider-native calendar-event creation
+property. Teams chat, channels, calls, recordings, and meeting lifecycle
+management are not exposed.
 
 ## Google API
 
 The Google adapter uses an explicitly selected public OAuth client and a grant
 held by the operating-system credential facility. It implements bounded Gmail
-and primary Google Calendar operations.
+and primary Google Calendar contracts. When the authenticated primary calendar
+advertises `hangoutsMeet`, a reviewed provider-native online-meeting request
+uses a unique conference request ID and returns only that event's Meet link.
 
 Gmail search retains provider query syntax. Label/move operations do not claim
-an atomic history precondition, least-privilege scopes exclude permanent
-delete, and send may not yield a stable sent-item identity. The adapter does
-not enable push/history monitoring or scheduled send. Calendar operations do
-not claim online-meeting creation.
+an atomic history precondition, and permanent delete requires the explicit
+full-mailbox scope because Gmail exposes it through that scope only. The
+adapter does not enable push/history monitoring or scheduled send.
 
 ## Google Web
 
@@ -106,8 +107,8 @@ Graph search retains provider query syntax. Reply, forward, and move report the
 absence of an atomic source ETag where applicable, and a successful send may
 not return a sent-item identity. The destructive permanent-delete use case is
 unavailable because Graph message DELETE does not guarantee irreversible
-disposal. Calendar creation can request a Teams meeting link only through the
-typed supported field.
+disposal. Provider-native calendar creation can request a Teams meeting link
+only through the typed supported field.
 
 ## JMAP
 

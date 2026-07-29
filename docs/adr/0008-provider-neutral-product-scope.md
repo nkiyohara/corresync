@@ -58,8 +58,8 @@ unimplemented:
 - silently reading or copying passwords, tokens, or cookies that belong to
   another application;
 - Teams chat, channels, calls, recordings, and meeting lifecycle management. A
-  join link provisioned as a property of one calendar event remains calendar
-  scope exactly as decided in
+  provider-native Teams or Google Meet join link provisioned as a property of
+  one calendar event remains calendar scope exactly as decided in
   [ADR 0005](0005-calendar-hosted-teams-links.md).
 
 Scope is not capability. At the time of this decision, the current release

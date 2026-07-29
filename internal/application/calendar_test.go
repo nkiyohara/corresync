@@ -71,6 +71,12 @@ func (reader *fakeCalendarReader) CreateCalendarEvent(
 	reader.createInput = input
 	if reader.createResult.ID == "" {
 		reader.createResult = CalendarCreateResult{ID: "event-created", ChangeKey: "change-created"}
+		if input.OnlineMeeting || input.TeamsMeeting {
+			reader.createResult.IsOnlineMeeting = true
+			reader.createResult.OnlineMeetingProvider = "teams"
+			reader.createResult.OnlineMeetingJoinURL =
+				"https://teams.example.invalid/l/meetup-join/synthetic"
+		}
 	}
 	return reader.createResult, reader.createErr
 }
@@ -79,7 +85,8 @@ func testCalendarService(t *testing.T, reader CalendarPort) (*CalendarService, *
 	t.Helper()
 	guard, recorder := newTestGuard(t, policy.DefaultRules())
 	service, err := NewCalendarService(guard, reader, CalendarOptions{
-		MaxAttendees: 50,
+		MaxAttendees:          50,
+		OnlineMeetingProvider: "teams",
 		Provenance: domain.Provenance{
 			AccountID:  "work",
 			Provider:   domain.ProviderCalDAV,

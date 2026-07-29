@@ -10,7 +10,7 @@ not available through a raw protocol escape hatch.
 | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Mail | Calendar | Visible browser-owned Outlook Web session | Implemented; synthetic contracts on current branch, historical live notes are not commit-bound |
 | `google-web` | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Visible browser-owned Google session | Implemented; synthetic DOM and integration contracts only |
-| `google-api` | Gmail | Selectable Google calendars | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
+| `google-api` | Gmail | Selectable Google calendars, observed Google Meet link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
 | `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
 | `jmap` | Mail | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts only |
 | `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts only |
@@ -101,9 +101,12 @@ time zone, location, all-day state, reminder, supported recurrence creation,
 replacement and removal, and required/optional attendees. Capability and
 degradation records state when a provider cannot preserve a field. Google Web
 exposes only its bounded read-only visible snapshot; Google API discovers
-selectable calendars but does not provision an online meeting. Graph discovers
+selectable calendars and provisions a unique Google Meet link only when the
+authenticated calendar advertises that conference solution. Graph discovers
 selectable calendars and reports Teams meeting support. Outlook Web can
-provision a Teams join link as a creation property. CalDAV discovers VEVENT
+provision a Teams join link as a creation property. `--online-meeting` selects
+the configured provider's native service; the transitional `--teams-meeting`
+alias requires a Teams-capable route. CalDAV discovers VEVENT
 collections, maps typed events through WebDAV/iCalendar, safely consumes
 server-expanded recurrence or performs bounded local expansion, and uses
 conditional writes.

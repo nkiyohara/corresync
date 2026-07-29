@@ -39,6 +39,10 @@ All notable user-facing changes are recorded here. The project follows
 - Add recurrence replacement and removal to the shared CLI/MCP calendar update
   contract and implement it for Outlook Web, Google Calendar, Microsoft Graph,
   and CalDAV.
+- Add provider-neutral online-meeting creation: Microsoft routes provision
+  Teams, while Google Calendar requests a unique Google Meet conference only
+  after observing `hangoutsMeet` support. Keep the v0.7 Teams-only input as a
+  compatibility alias that fails on non-Microsoft routes.
 - Preserve short bounded Google Web result snapshots in cross-account mail
   search instead of misclassifying their honest non-terminal marker as a
   provider failure.

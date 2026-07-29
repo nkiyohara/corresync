@@ -561,7 +561,7 @@ func TestClientUsesTLSDiscoveryAndConditionalCalendarWrites(t *testing.T) {
 	}
 	if _, err := client.CreateCalendarEvent(
 		t.Context(),
-		application.CalendarCreateInput{TeamsMeeting: true},
+		application.CalendarCreateInput{OnlineMeeting: true},
 	); err == nil || !strings.Contains(err.Error(), "cannot provision a Teams meeting") {
 		t.Fatalf("Teams CreateCalendarEvent() error = %v", err)
 	}

@@ -34,6 +34,7 @@ type Client struct {
 	address  string
 	mail     bool
 	calendar bool
+	meet     bool
 }
 
 // New confirms only the explicitly configured services with read-only profile
@@ -79,8 +80,11 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	}
 	if options.Calendar {
 		var calendar struct {
-			ID         string `json:"id"`
-			AccessRole string `json:"accessRole"`
+			ID                   string `json:"id"`
+			AccessRole           string `json:"accessRole"`
+			ConferenceProperties struct {
+				AllowedSolutionTypes []string `json:"allowedConferenceSolutionTypes"`
+			} `json:"conferenceProperties"`
 		}
 		if _, err := api.DoJSON(
 			ctx, http.MethodGet, "calendar/v3/users/me/calendarList/primary", nil,
@@ -104,8 +108,20 @@ func New(ctx context.Context, options Options) (*Client, error) {
 			_ = api.Close()
 			return nil, errors.New("google primary calendar is not editable")
 		}
+		for _, solution := range calendar.ConferenceProperties.AllowedSolutionTypes {
+			if solution == "hangoutsMeet" {
+				client.meet = true
+				break
+			}
+		}
 	}
 	return client, nil
+}
+
+// MeetAvailable reports the authenticated primary calendar's observed,
+// side-effect-free conference capability.
+func (client *Client) MeetAvailable() bool {
+	return client != nil && client.calendar && client.meet
 }
 
 // Close releases account-scoped idle connections.

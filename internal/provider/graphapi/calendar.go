@@ -334,7 +334,7 @@ func graphCreateEvent(
 		),
 		"isAllDay": input.AllDay,
 	}
-	if input.TeamsMeeting {
+	if input.OnlineMeeting || input.TeamsMeeting {
 		request["isOnlineMeeting"] = true
 		request["onlineMeetingProvider"] = "teamsForBusiness"
 	}

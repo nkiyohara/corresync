@@ -363,13 +363,14 @@ Test in increasing consequence:
 - `corr mail send` to a recipient controlled by the tester;
 - `corr calendar create`, update with the refreshed version, then cancel.
 
-Do not add attendees in the first calendar test. A Teams-link test is permitted
-only when the provider reports capability and the sole attendee is controlled
-by the tester. Never include the returned join URL in evidence.
+Do not add attendees in the first calendar test. A Teams or Google Meet link
+test is permitted only when the selected calendar reports capability and the
+sole attendee is controlled by the tester. Never include the returned join URL
+in evidence.
 
 Permanent delete requires a disposable self-owned message and separate
-authorization. Gmail least-privilege configuration should report it
-unavailable.
+authorization. Gmail permanent delete requires the explicitly reviewed
+full-mailbox grant; do not test it with non-disposable mail.
 
 ## 11. Monitoring and dispatch
 

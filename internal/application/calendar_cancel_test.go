@@ -65,7 +65,9 @@ func TestCalendarReviewsUseConfiguredProviderEffects(t *testing.T) {
 		t.Fatalf("NewCalendarService() error = %v", err)
 	}
 	caller := domain.Caller{Surface: "cli", Instance: "process-1"}
-	create, err := service.Create(t.Context(), validCalendarCreateInput(), caller)
+	createInput := validCalendarCreateInput()
+	createInput.TeamsMeeting = false
+	create, err := service.Create(t.Context(), createInput, caller)
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
