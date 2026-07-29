@@ -20,6 +20,7 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 	var forwardBody []byte
 	var responseDraftSent bool
 	var calendarRecurrenceUpdated bool
+	var calendarRecurrenceRemoved bool
 	server := httptest.NewTLSServer(http.HandlerFunc(func(
 		writer http.ResponseWriter,
 		request *http.Request,
@@ -136,6 +137,8 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 				string(patch["recurrence"]),
 				`"type":"weekly"`,
 			)
+			calendarRecurrenceRemoved =
+				string(patch["recurrence"]) == "null"
 			writeGraphJSON(t, writer, graphTestEvent(`W/"e3"`))
 		case "DELETE /me/events/e1":
 			requireGraphCondition(t, request, `W/"e1"`)
@@ -363,6 +366,17 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 		!calendarRecurrenceUpdated {
 		t.Fatalf("updated = %#v error = %v", updated, err)
 	}
+	updated, err = client.UpdateCalendarEvent(
+		t.Context(),
+		application.CalendarUpdateInput{
+			EventID: calendar.Events[0].ID, ChangeKey: calendar.Events[0].ChangeKey,
+			ReplaceRecurrence: true,
+		},
+	)
+	if err != nil || updated.ChangeKey == calendar.Events[0].ChangeKey ||
+		!calendarRecurrenceRemoved {
+		t.Fatalf("recurrence removal = %#v error = %v", updated, err)
+	}
 	if err := client.CancelCalendarEvent(
 		t.Context(),
 		application.CalendarCancelInput{
@@ -371,6 +385,105 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 		},
 	); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGraphDeepMailFolderTraversalIsBoundedAndFollowsSafePages(t *testing.T) {
+	t.Parallel()
+
+	var server *httptest.Server
+	server = httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/me":
+			writeGraphJSON(t, writer, map[string]string{
+				"id": "user1", "mail": "reader@example.test",
+			})
+		case "/me/mailFolders/inbox":
+			writeGraphJSON(t, writer, map[string]string{"id": "inbox1"})
+		case "/me/mailFolders":
+			if request.URL.Query().Get("$skiptoken") == "next" {
+				writeGraphJSON(t, writer, map[string]any{
+					"@odata.count": 2,
+					"value": []graphFolder{
+						{ID: "B", DisplayName: "B"},
+					},
+				})
+			} else {
+				writeGraphJSON(t, writer, map[string]any{
+					"@odata.count":    2,
+					"@odata.nextLink": server.URL + "/me/mailFolders?$skiptoken=next",
+					"value": []graphFolder{
+						{ID: "A", DisplayName: "A", ChildFolderCount: 2},
+					},
+				})
+			}
+		case "/me/mailFolders/A/childFolders":
+			writeGraphJSON(t, writer, map[string]any{
+				"@odata.count": 2,
+				"value": []graphFolder{
+					{
+						ID: "C", ParentFolderID: "A",
+						DisplayName: "C", ChildFolderCount: 1,
+					},
+					{ID: "D", ParentFolderID: "A", DisplayName: "D"},
+				},
+			})
+		case "/me/mailFolders/C/childFolders":
+			writeGraphJSON(t, writer, map[string]any{
+				"@odata.count": 1,
+				"value": []graphFolder{{
+					ID: "E", ParentFolderID: "C", DisplayName: "E",
+				}},
+			})
+		default:
+			http.Error(writer, "unexpected request", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := New(t.Context(), Options{
+		APIBase: server.URL, Address: "reader@example.test",
+		Mail: true, HTTP: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	for _, unsafe := range []string{
+		"https://attacker.invalid/me/mailFolders?$skiptoken=next",
+		server.URL + "/me/messages?$skiptoken=next",
+	} {
+		if _, _, err := client.folderContinuation(unsafe); err == nil {
+			t.Fatalf("unsafe folder continuation accepted: %s", unsafe)
+		}
+	}
+
+	page, err := client.ListMailFolders(
+		t.Context(),
+		application.MailFolderListInput{
+			Parent: application.MailFolder{
+				Kind: application.MailFolderDistinguished,
+				ID:   "msgfolderroot",
+			},
+			Traversal: application.MailFolderTraversalDeep,
+			Offset:    1,
+			Limit:     3,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.TotalFolders != 5 ||
+		page.IncludesLastItem ||
+		len(page.Folders) != 3 ||
+		page.Folders[0].DisplayName != "B" ||
+		page.Folders[1].DisplayName != "C" ||
+		page.Folders[2].DisplayName != "D" {
+		t.Fatalf("deep folder page = %#v", page)
 	}
 }
 

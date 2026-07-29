@@ -372,79 +372,230 @@ type graphFolder struct {
 	UnreadItemCount  int    `json:"unreadItemCount"`
 }
 
+const (
+	graphFolderPageSize        = 100
+	maximumGraphFolders        = 10_000
+	maximumGraphFolderRequests = 10_001
+)
+
+type graphFolderPage struct {
+	Count    *int          `json:"@odata.count"`
+	NextLink string        `json:"@odata.nextLink"`
+	Value    []graphFolder `json:"value"`
+}
+
 func (client *Client) ListMailFolders(
 	ctx context.Context,
 	input application.MailFolderListInput,
 ) (application.MailFolderPage, error) {
-	if input.Traversal != application.MailFolderTraversalShallow {
-		return application.MailFolderPage{}, errors.New(
-			"graph folder discovery currently supports shallow traversal only",
-		)
-	}
 	resource, err := client.folderCollection(input.Parent)
 	if err != nil {
 		return application.MailFolderPage{}, err
 	}
-	var response struct {
-		Count    int           `json:"@odata.count"`
-		NextLink string        `json:"@odata.nextLink"`
-		Value    []graphFolder `json:"value"`
+	if input.Traversal == application.MailFolderTraversalDeep {
+		return client.listMailFolderHierarchy(ctx, resource, input)
 	}
+	query := graphFolderQuery(input.Limit)
+	query.Set("$skip", strconv.Itoa(input.Offset))
+	var response graphFolderPage
 	if _, err := client.api.DoJSON(
-		ctx,
-		http.MethodGet,
-		resource,
-		url.Values{
-			"$select": {
-				"id,displayName,parentFolderId,childFolderCount,totalItemCount,unreadItemCount",
-			},
-			"$top":   {strconv.Itoa(input.Limit)},
-			"$skip":  {strconv.Itoa(input.Offset)},
-			"$count": {"true"},
-		},
-		nil,
-		&response,
-		false,
-		nil,
+		ctx, http.MethodGet, resource, query, nil, &response, false, nil,
 		http.StatusOK,
 	); err != nil {
 		return application.MailFolderPage{}, err
 	}
-	if len(response.Value) > input.Limit {
+	if response.Count == nil ||
+		*response.Count < len(response.Value) ||
+		len(response.Value) > input.Limit {
 		return application.MailFolderPage{}, errors.New(
-			"graph returned an oversized folder page",
+			"graph returned an invalid folder page",
 		)
 	}
-	page := application.MailFolderPage{
-		Folders:          make([]application.MailFolderSummary, 0, len(response.Value)),
-		TotalFolders:     response.Count,
-		IncludesLastItem: response.NextLink == "",
+	folders, err := graphFolderSummaries(response.Value)
+	if err != nil {
+		return application.MailFolderPage{}, err
 	}
-	for _, folder := range response.Value {
-		if !validGraphID(folder.ID) {
+	return application.MailFolderPage{
+		Folders: folders, TotalFolders: *response.Count,
+		IncludesLastItem: response.NextLink == "",
+	}, nil
+}
+
+func (client *Client) listMailFolderHierarchy(
+	ctx context.Context,
+	resource string,
+	input application.MailFolderListInput,
+) (application.MailFolderPage, error) {
+	queue := []string{resource}
+	seen := make(map[string]struct{})
+	folders := make([]graphFolder, 0, 64)
+	requests := 0
+	for len(queue) != 0 {
+		if requests >= maximumGraphFolderRequests {
 			return application.MailFolderPage{}, errors.New(
-				"graph returned an invalid mail folder identity",
+				"graph mail folder hierarchy exceeded the request bound",
+			)
+		}
+		current := queue[0]
+		queue = queue[1:]
+		children, err := client.graphFolderCollection(
+			ctx,
+			current,
+			maximumGraphFolders-len(folders),
+			&requests,
+		)
+		if err != nil {
+			return application.MailFolderPage{}, err
+		}
+		for _, child := range children {
+			if !validGraphID(child.ID) {
+				return application.MailFolderPage{}, errors.New(
+					"graph returned an invalid mail folder identity",
+				)
+			}
+			if _, exists := seen[child.ID]; exists {
+				return application.MailFolderPage{}, errors.New(
+					"graph returned a duplicate mail folder identity",
+				)
+			}
+			seen[child.ID] = struct{}{}
+			folders = append(folders, child)
+			if child.ChildFolderCount > 0 {
+				queue = append(
+					queue,
+					"me/mailFolders/"+escaped(child.ID)+"/childFolders",
+				)
+			}
+		}
+	}
+	total := len(folders)
+	start := min(input.Offset, total)
+	end := min(start+input.Limit, total)
+	summaries, err := graphFolderSummaries(folders[start:end])
+	if err != nil {
+		return application.MailFolderPage{}, err
+	}
+	return application.MailFolderPage{
+		Folders: summaries, TotalFolders: total,
+		IncludesLastItem: end == total,
+	}, nil
+}
+
+func (client *Client) graphFolderCollection(
+	ctx context.Context,
+	resource string,
+	maximum int,
+	requests *int,
+) ([]graphFolder, error) {
+	if maximum < 1 {
+		return nil, errors.New(
+			"graph mail folder hierarchy exceeds the configured bound",
+		)
+	}
+	query := graphFolderQuery(min(graphFolderPageSize, maximum))
+	seenLinks := make(map[string]struct{})
+	folders := make([]graphFolder, 0, min(graphFolderPageSize, maximum))
+	expected := -1
+	for {
+		if *requests >= maximumGraphFolderRequests {
+			return nil, errors.New(
+				"graph mail folder hierarchy exceeded the request bound",
+			)
+		}
+		(*requests)++
+		var response graphFolderPage
+		if _, err := client.api.DoJSON(
+			ctx, http.MethodGet, resource, query, nil, &response, false, nil,
+			http.StatusOK,
+		); err != nil {
+			return nil, err
+		}
+		if response.Count != nil {
+			if *response.Count < 0 || *response.Count > maximum ||
+				expected >= 0 && *response.Count != expected {
+				return nil, errors.New(
+					"graph mail folder count changed during pagination",
+				)
+			}
+			expected = *response.Count
+		}
+		if expected < 0 ||
+			len(response.Value) > graphFolderPageSize ||
+			len(folders)+len(response.Value) > maximum {
+			return nil, errors.New(
+				"graph returned an invalid folder collection page",
+			)
+		}
+		folders = append(folders, response.Value...)
+		if response.NextLink == "" {
+			if len(folders) != expected {
+				return nil, errors.New(
+					"graph folder collection ended before its reported count",
+				)
+			}
+			return folders, nil
+		}
+		if len(response.Value) == 0 || len(folders) >= expected {
+			return nil, errors.New(
+				"graph folder pagination made no progress",
+			)
+		}
+		if _, exists := seenLinks[response.NextLink]; exists {
+			return nil, errors.New(
+				"graph repeated a folder continuation URL",
+			)
+		}
+		seenLinks[response.NextLink] = struct{}{}
+		nextResource, nextQuery, err := client.folderContinuation(response.NextLink)
+		if err != nil {
+			return nil, err
+		}
+		resource, query = nextResource, nextQuery
+	}
+}
+
+func graphFolderQuery(limit int) url.Values {
+	return url.Values{
+		"$select": {
+			"id,displayName,parentFolderId,childFolderCount,totalItemCount,unreadItemCount",
+		},
+		"$top":   {strconv.Itoa(limit)},
+		"$count": {"true"},
+	}
+}
+
+func graphFolderSummaries(
+	folders []graphFolder,
+) ([]application.MailFolderSummary, error) {
+	summaries := make([]application.MailFolderSummary, 0, len(folders))
+	for _, folder := range folders {
+		if !validGraphID(folder.ID) ||
+			folder.ChildFolderCount < 0 ||
+			folder.TotalItemCount < 0 ||
+			folder.UnreadItemCount < 0 {
+			return nil, errors.New(
+				"graph returned invalid mail folder metadata",
 			)
 		}
 		id, err := encodeFolderID(folder.ID)
 		if err != nil {
-			return application.MailFolderPage{}, err
+			return nil, err
 		}
 		parentID := ""
 		if validGraphID(folder.ParentFolderID) {
 			parentID, err = encodeFolderID(folder.ParentFolderID)
 			if err != nil {
-				return application.MailFolderPage{}, err
+				return nil, err
 			}
 		}
-		page.Folders = append(page.Folders, application.MailFolderSummary{
+		summaries = append(summaries, application.MailFolderSummary{
 			ID: id, ParentID: parentID, DisplayName: folder.DisplayName,
 			Class: "folder", ChildFolderCount: folder.ChildFolderCount,
 			TotalItemCount:  folder.TotalItemCount,
 			UnreadItemCount: folder.UnreadItemCount,
 		})
 	}
-	return page, nil
+	return summaries, nil
 }
 
 func (client *Client) messageCollection(

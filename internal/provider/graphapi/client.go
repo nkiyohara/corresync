@@ -30,6 +30,7 @@ type Options struct {
 // Client owns one authorized account-scoped Graph transport.
 type Client struct {
 	api      *restapi.Client
+	apiBase  *url.URL
 	address  string
 	mail     bool
 	calendar bool
@@ -54,8 +55,13 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	apiBase, err := url.Parse(options.APIBase)
+	if err != nil {
+		_ = api.Close()
+		return nil, errors.New("graph API base is malformed")
+	}
 	client := &Client{
-		api: api, address: options.Address,
+		api: api, apiBase: apiBase, address: options.Address,
 		mail: options.Mail, calendar: options.Calendar,
 	}
 	var identity struct {
@@ -248,6 +254,44 @@ func validGraphID(value string) bool {
 func validETag(value string) bool {
 	return value != "" && len(value) <= 1024 &&
 		!strings.ContainsAny(value, "\r\n\x00")
+}
+
+func (client *Client) folderContinuation(
+	value string,
+) (string, url.Values, error) {
+	if client == nil || client.apiBase == nil ||
+		value == "" || len(value) > 16<<10 ||
+		strings.ContainsAny(value, "\r\n\x00") {
+		return "", nil, errors.New("graph continuation URL is malformed")
+	}
+	target, err := url.Parse(value)
+	if err != nil ||
+		target.Scheme != client.apiBase.Scheme ||
+		target.Host != client.apiBase.Host ||
+		target.User != nil ||
+		target.Fragment != "" {
+		return "", nil, errors.New(
+			"graph continuation URL escaped the configured origin",
+		)
+	}
+	basePath := strings.TrimSuffix(client.apiBase.EscapedPath(), "/") + "/"
+	if !strings.HasPrefix(target.EscapedPath(), basePath) {
+		return "", nil, errors.New(
+			"graph continuation URL escaped the configured base path",
+		)
+	}
+	resource := strings.TrimPrefix(target.EscapedPath(), basePath)
+	if resource != "me/mailFolders" &&
+		!strings.HasPrefix(resource, "me/mailFolders/") {
+		return "", nil, errors.New(
+			"graph folder continuation escaped the mail-folder collection",
+		)
+	}
+	query, err := url.ParseQuery(target.RawQuery)
+	if err != nil {
+		return "", nil, errors.New("graph continuation query is malformed")
+	}
+	return resource, query, nil
 }
 
 func escaped(value string) string {
