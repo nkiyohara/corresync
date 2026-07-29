@@ -46,6 +46,9 @@ All notable user-facing changes are recorded here. The project follows
 - Preserve short bounded Google Web result snapshots in cross-account mail
   search instead of misclassifying their honest non-terminal marker as a
   provider failure.
+- Fail closed when Gmail or Google Calendar exposes neither recognized semantic
+  rows nor a structural empty-state marker, and collect every UTC date in a
+  bounded multi-day Google Web agenda window with deterministic deduplication.
 - Save successful SMTP submissions to the discovered IMAP Sent mailbox and
   return its resolvable message identity; fail before SMTP when no Sent mailbox
   exists, and report an unknown partial outcome if post-submit append fails.

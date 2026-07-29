@@ -100,7 +100,10 @@ The normalized contract includes bounded subject/body, absolute start/end,
 time zone, location, all-day state, reminder, supported recurrence creation,
 replacement and removal, and required/optional attendees. Capability and
 degradation records state when a provider cannot preserve a field. Google Web
-exposes only its bounded read-only visible snapshot; Google API discovers
+exposes only bounded read-only visible snapshots, rejects unrecognized DOM as
+selector drift instead of reporting an empty mailbox/calendar, and visits each
+UTC date in a multi-day agenda window; it still cannot prove remote DOM
+completeness. Google API discovers
 selectable calendars and provisions a unique Google Meet link only when the
 authenticated calendar advertises that conference solution. Graph discovers
 selectable calendars and reports Teams meeting support. Outlook Web can

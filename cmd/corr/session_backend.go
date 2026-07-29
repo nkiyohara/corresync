@@ -2285,6 +2285,11 @@ func (backend *sessionBackend) googleWebAccount(
 				Lossy:   true,
 			},
 			domain.Degradation{
+				Feature: "calendar.pagination",
+				Reason:  "the Google Web route collects one bounded semantic DOM snapshot per UTC date and cannot prove remote agenda completeness",
+				Lossy:   true,
+			},
+			domain.Degradation{
 				Feature: "calendar.writes",
 				Reason:  "browser-owned Google sessions are read-only; writes require an explicitly consented Google API route",
 			},

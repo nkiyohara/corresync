@@ -10,15 +10,18 @@ import (
 )
 
 type fakeDriver struct {
-	origins        []string
-	identityTarget string
-	identity       string
-	mailTarget     string
-	bodyTarget     string
-	calendarTarget string
-	mailRows       []browser.GoogleMailRow
-	body           string
-	calendarRows   []browser.GoogleCalendarRow
+	origins         []string
+	identityTarget  string
+	identity        string
+	mailTarget      string
+	bodyTarget      string
+	calendarTarget  string
+	calendarTargets []string
+	mailState       string
+	calendarState   string
+	mailRows        []browser.GoogleMailRow
+	body            string
+	calendarRows    []browser.GoogleCalendarRow
 }
 
 func (driver *fakeDriver) GoogleIdentity(
@@ -43,9 +46,19 @@ func (driver *fakeDriver) WaitForGoogleWeb(
 func (driver *fakeDriver) GoogleMailRows(
 	_ context.Context,
 	target string,
-) ([]browser.GoogleMailRow, error) {
+) (browser.GoogleMailSnapshot, error) {
 	driver.mailTarget = target
-	return append([]browser.GoogleMailRow(nil), driver.mailRows...), nil
+	state := driver.mailState
+	if state == "" {
+		state = "empty"
+		if len(driver.mailRows) != 0 {
+			state = "rows"
+		}
+	}
+	return browser.GoogleMailSnapshot{
+		State: state,
+		Rows:  append([]browser.GoogleMailRow(nil), driver.mailRows...),
+	}, nil
 }
 
 func (driver *fakeDriver) GoogleMailBody(
@@ -59,9 +72,20 @@ func (driver *fakeDriver) GoogleMailBody(
 func (driver *fakeDriver) GoogleCalendarRows(
 	_ context.Context,
 	target string,
-) ([]browser.GoogleCalendarRow, error) {
+) (browser.GoogleCalendarSnapshot, error) {
 	driver.calendarTarget = target
-	return append([]browser.GoogleCalendarRow(nil), driver.calendarRows...), nil
+	driver.calendarTargets = append(driver.calendarTargets, target)
+	state := driver.calendarState
+	if state == "" {
+		state = "empty"
+		if len(driver.calendarRows) != 0 {
+			state = "rows"
+		}
+	}
+	return browser.GoogleCalendarSnapshot{
+		State: state,
+		Rows:  append([]browser.GoogleCalendarRow(nil), driver.calendarRows...),
+	}, nil
 }
 
 func TestBrowserOwnedGoogleReadsStayOnClosedSemanticDriver(t *testing.T) {
@@ -124,8 +148,48 @@ func TestBrowserOwnedGoogleReadsStayOnClosedSemanticDriver(t *testing.T) {
 	)
 	if err != nil || len(calendar.Events) != 1 ||
 		calendar.Events[0].Subject != "Synthetic event" ||
-		!strings.Contains(driver.calendarTarget, "/agenda/2026/8/1") {
+		!strings.Contains(driver.calendarTarget, "/agenda/2026/8/1") ||
+		len(driver.calendarTargets) != 1 {
 		t.Fatalf("calendar = %#v error = %v", calendar, err)
+	}
+}
+
+func TestGoogleWebCalendarVisitsEveryUTCDateAndDeduplicatesRows(t *testing.T) {
+	t.Parallel()
+	driver := &fakeDriver{
+		calendarRows: []browser.GoogleCalendarRow{{
+			ID: "event-1", Text: "Multi-day event",
+			Start: "2026-08-01T20:00:00Z",
+			End:   "2026-08-03T08:00:00Z",
+		}},
+	}
+	client, err := New(t.Context(), Options{
+		Calendar: true, Driver: driver,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := client.ListCalendarEvents(
+		t.Context(),
+		application.CalendarListInput{
+			Calendar: application.CalendarFolder{
+				Kind: application.CalendarFolderDistinguished,
+				ID:   "calendar",
+			},
+			Start: "2026-08-01T12:00:00Z",
+			End:   "2026-08-03T12:00:00Z",
+		},
+	)
+	if err != nil || len(page.Events) != 1 ||
+		len(driver.calendarTargets) != 3 ||
+		!strings.Contains(driver.calendarTargets[0], "/agenda/2026/8/1") ||
+		!strings.Contains(driver.calendarTargets[2], "/agenda/2026/8/3") {
+		t.Fatalf(
+			"multi-day page = %#v targets=%#v error=%v",
+			page,
+			driver.calendarTargets,
+			err,
+		)
 	}
 }
 

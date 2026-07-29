@@ -102,10 +102,11 @@ func (client *Client) mailRows(
 		)
 	}
 	target := client.mailOrigin.String() + "/mail/u/0/#" + fragment
-	rows, err := client.driver.GoogleMailRows(ctx, target)
+	snapshot, err := client.driver.GoogleMailRows(ctx, target)
 	if err != nil {
 		return application.MailPage{}, err
 	}
+	rows := snapshot.Rows
 	start := min(offset, len(rows))
 	end := min(start+limit, len(rows))
 	page := application.MailPage{

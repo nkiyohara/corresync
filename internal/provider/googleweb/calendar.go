@@ -6,13 +6,17 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/browser"
 )
 
 type calendarReference struct {
 	EventID string `json:"eventId"`
+	Start   string `json:"start"`
+	End     string `json:"end"`
 }
 
 func (client *Client) ListCalendarFolders(
@@ -62,19 +66,52 @@ func (client *Client) ListCalendarEvents(
 			)
 		}
 	}
-	start, _ := time.Parse(time.RFC3339, input.Start)
-	end, _ := time.Parse(time.RFC3339, input.End)
-	target := fmt.Sprintf(
-		"%s/calendar/u/0/r/agenda/%d/%d/%d",
-		client.calendarOrigin.String(),
-		start.Year(),
-		int(start.Month()),
-		start.Day(),
-	)
-	rows, err := client.driver.GoogleCalendarRows(ctx, target)
-	if err != nil {
-		return application.CalendarPage{}, err
+	start, startErr := time.Parse(time.RFC3339, input.Start)
+	end, endErr := time.Parse(time.RFC3339, input.End)
+	if startErr != nil || endErr != nil || !start.Before(end) ||
+		end.Sub(start) > application.MaxCalendarWindow {
+		return application.CalendarPage{}, errors.New(
+			"google Web calendar window is invalid",
+		)
 	}
+	firstDay := dateUTC(start)
+	lastDay := dateUTC(end.Add(-time.Nanosecond))
+	uniqueRows := make(map[string]browser.GoogleCalendarRow)
+	for day := firstDay; !day.After(lastDay); day = day.AddDate(0, 0, 1) {
+		target := fmt.Sprintf(
+			"%s/calendar/u/0/r/agenda/%d/%d/%d",
+			client.calendarOrigin.String(),
+			day.Year(),
+			int(day.Month()),
+			day.Day(),
+		)
+		snapshot, err := client.driver.GoogleCalendarRows(ctx, target)
+		if err != nil {
+			return application.CalendarPage{}, err
+		}
+		for _, row := range snapshot.Rows {
+			key := row.ID + "\x00" + row.Start + "\x00" + row.End
+			uniqueRows[key] = row
+			if len(uniqueRows) > 2500 {
+				return application.CalendarPage{}, errors.New(
+					"google Web calendar window exceeds the configured limit",
+				)
+			}
+		}
+	}
+	rows := make([]browser.GoogleCalendarRow, 0, len(uniqueRows))
+	for _, row := range uniqueRows {
+		rows = append(rows, row)
+	}
+	sort.Slice(rows, func(left, right int) bool {
+		if rows[left].Start != rows[right].Start {
+			return rows[left].Start < rows[right].Start
+		}
+		if rows[left].End != rows[right].End {
+			return rows[left].End < rows[right].End
+		}
+		return rows[left].ID < rows[right].ID
+	})
 	page := application.CalendarPage{
 		Events: make([]application.CalendarEvent, 0, len(rows)),
 		Start:  input.Start, End: input.End,
@@ -92,13 +129,18 @@ func (client *Client) ListCalendarEvents(
 		}
 		id, err := encodeReference(
 			"ggwe1_",
-			calendarReference{EventID: row.ID},
+			calendarReference{
+				EventID: row.ID,
+				Start:   row.Start,
+				End:     row.End,
+			},
 		)
 		if err != nil {
 			return application.CalendarPage{}, err
 		}
 		change := sha256.Sum256([]byte(
-			row.ID + "\x00" + row.Text + "\x00" + row.Start + "\x00" + row.End,
+			row.ID + "\x00" + row.Text + "\x00" + row.Start + "\x00" +
+				row.End + "\x00" + row.Location,
 		))
 		page.Events = append(page.Events, application.CalendarEvent{
 			ID: id, ChangeKey: hex.EncodeToString(change[:]),
@@ -113,6 +155,20 @@ func (client *Client) ListCalendarEvents(
 		})
 	}
 	return page, nil
+}
+
+func dateUTC(value time.Time) time.Time {
+	value = value.UTC()
+	return time.Date(
+		value.Year(),
+		value.Month(),
+		value.Day(),
+		0,
+		0,
+		0,
+		0,
+		time.UTC,
+	)
 }
 
 func (client *Client) CreateCalendarEvent(

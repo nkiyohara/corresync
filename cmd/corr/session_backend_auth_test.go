@@ -69,8 +69,8 @@ func (*googleWebBrowserStub) GoogleIdentity(
 func (*googleWebBrowserStub) GoogleMailRows(
 	context.Context,
 	string,
-) ([]browser.GoogleMailRow, error) {
-	return nil, nil
+) (browser.GoogleMailSnapshot, error) {
+	return browser.GoogleMailSnapshot{State: "empty"}, nil
 }
 
 func (*googleWebBrowserStub) GoogleMailBody(
@@ -83,8 +83,8 @@ func (*googleWebBrowserStub) GoogleMailBody(
 func (*googleWebBrowserStub) GoogleCalendarRows(
 	context.Context,
 	string,
-) ([]browser.GoogleCalendarRow, error) {
-	return nil, nil
+) (browser.GoogleCalendarSnapshot, error) {
+	return browser.GoogleCalendarSnapshot{State: "empty"}, nil
 }
 
 func TestProjectionAccountsExposeOnlyContentFreePerServiceStatus(t *testing.T) {

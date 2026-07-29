@@ -93,9 +93,10 @@ never reads cookies, browser storage, or authorization tokens.
 After confirming the configured identity on both surfaces, a bounded semantic
 DOM driver returns visible mail and calendar metadata. It treats the snapshot
 as read-only and incomplete: pagination beyond the rendered set is not
-invented, unsupported details are degradations, and all draft/send/organization
-and calendar mutation operations fail as unavailable without touching the
-browser.
+invented, an unrecognized DOM fails instead of becoming a false empty result,
+multi-day agenda reads visit each UTC date and deduplicate exact occurrences,
+unsupported details are degradations, and all draft/send/organization and
+calendar mutation operations fail as unavailable without touching the browser.
 
 ## Microsoft Graph
 

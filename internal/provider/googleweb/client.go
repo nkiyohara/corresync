@@ -25,9 +25,9 @@ const (
 type Driver interface {
 	WaitForGoogleWeb(context.Context, []string) error
 	GoogleIdentity(context.Context, string) (string, error)
-	GoogleMailRows(context.Context, string) ([]browser.GoogleMailRow, error)
+	GoogleMailRows(context.Context, string) (browser.GoogleMailSnapshot, error)
 	GoogleMailBody(context.Context, string) (string, error)
-	GoogleCalendarRows(context.Context, string) ([]browser.GoogleCalendarRow, error)
+	GoogleCalendarRows(context.Context, string) (browser.GoogleCalendarSnapshot, error)
 }
 
 // Options identifies one isolated, visible Google browser profile.

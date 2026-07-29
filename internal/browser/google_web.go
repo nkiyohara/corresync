@@ -23,6 +23,13 @@ type GoogleMailRow struct {
 	HasAttachments bool   `json:"hasAttachments"`
 }
 
+// GoogleMailSnapshot distinguishes a recognized empty Gmail view from an
+// unknown DOM shape. An empty row slice alone is never sufficient evidence.
+type GoogleMailSnapshot struct {
+	State string          `json:"state"`
+	Rows  []GoogleMailRow `json:"rows"`
+}
+
 // GoogleCalendarRow is a bounded semantic projection from visible Calendar
 // event nodes that expose machine-readable timestamps.
 type GoogleCalendarRow struct {
@@ -31,6 +38,13 @@ type GoogleCalendarRow struct {
 	Start    string `json:"start"`
 	End      string `json:"end"`
 	Location string `json:"location"`
+}
+
+// GoogleCalendarSnapshot distinguishes a recognized empty agenda structure
+// from selector drift.
+type GoogleCalendarSnapshot struct {
+	State string              `json:"state"`
+	Rows  []GoogleCalendarRow `json:"rows"`
 }
 
 // WaitForGoogleWeb navigates to and confirms every configured Google service.
@@ -166,27 +180,48 @@ func (browser *Browser) GoogleIdentity(
 func (browser *Browser) GoogleMailRows(
 	ctx context.Context,
 	target string,
-) ([]GoogleMailRow, error) {
+) (GoogleMailSnapshot, error) {
 	if err := browser.validateGoogleTarget(target); err != nil {
-		return nil, err
+		return GoogleMailSnapshot{}, err
 	}
 	browser.interactionMu.Lock()
 	defer browser.interactionMu.Unlock()
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
-	var rows []GoogleMailRow
+	var snapshot GoogleMailSnapshot
 	if err := chromedp.Run(
 		operationContext,
 		chromedp.Navigate(target),
 		chromedp.WaitReady("[role='main']", chromedp.ByQuery),
-		chromedp.Evaluate(googleMailRowsScript, &rows),
+		chromedp.Evaluate(googleMailRowsScript, &snapshot),
 	); err != nil {
-		return nil, err
+		return GoogleMailSnapshot{}, err
 	}
-	if len(rows) > 500 {
-		return nil, errors.New("google Web mail page exceeds the configured limit")
+	if err := validateGoogleMailSnapshot(snapshot); err != nil {
+		return GoogleMailSnapshot{}, err
 	}
-	return rows, nil
+	return snapshot, nil
+}
+
+func validateGoogleMailSnapshot(snapshot GoogleMailSnapshot) error {
+	if len(snapshot.Rows) > 500 {
+		return errors.New("google Web mail page exceeds the configured limit")
+	}
+	switch snapshot.State {
+	case "rows":
+		if len(snapshot.Rows) == 0 {
+			return errors.New("google Web mail row marker omitted rows")
+		}
+	case "empty":
+		if len(snapshot.Rows) != 0 {
+			return errors.New("google Web mail empty marker included rows")
+		}
+	default:
+		return errors.New(
+			"google Web mail DOM exposed neither semantic rows nor a recognized empty state",
+		)
+	}
+	return nil
 }
 
 // GoogleMailBody reads bounded visible message text after navigating to one
@@ -222,27 +257,48 @@ func (browser *Browser) GoogleMailBody(
 func (browser *Browser) GoogleCalendarRows(
 	ctx context.Context,
 	target string,
-) ([]GoogleCalendarRow, error) {
+) (GoogleCalendarSnapshot, error) {
 	if err := browser.validateGoogleTarget(target); err != nil {
-		return nil, err
+		return GoogleCalendarSnapshot{}, err
 	}
 	browser.interactionMu.Lock()
 	defer browser.interactionMu.Unlock()
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
-	var rows []GoogleCalendarRow
+	var snapshot GoogleCalendarSnapshot
 	if err := chromedp.Run(
 		operationContext,
 		chromedp.Navigate(target),
 		chromedp.WaitReady("[role='main']", chromedp.ByQuery),
-		chromedp.Evaluate(googleCalendarRowsScript, &rows),
+		chromedp.Evaluate(googleCalendarRowsScript, &snapshot),
 	); err != nil {
-		return nil, err
+		return GoogleCalendarSnapshot{}, err
 	}
-	if len(rows) > 2500 {
-		return nil, errors.New("google Web calendar page exceeds the configured limit")
+	if err := validateGoogleCalendarSnapshot(snapshot); err != nil {
+		return GoogleCalendarSnapshot{}, err
 	}
-	return rows, nil
+	return snapshot, nil
+}
+
+func validateGoogleCalendarSnapshot(snapshot GoogleCalendarSnapshot) error {
+	if len(snapshot.Rows) > 2500 {
+		return errors.New("google Web calendar page exceeds the configured limit")
+	}
+	switch snapshot.State {
+	case "rows":
+		if len(snapshot.Rows) == 0 {
+			return errors.New("google Web calendar row marker omitted rows")
+		}
+	case "empty":
+		if len(snapshot.Rows) != 0 {
+			return errors.New("google Web calendar empty marker included rows")
+		}
+	default:
+		return errors.New(
+			"google Web calendar DOM exposed neither semantic rows nor a recognized empty agenda",
+		)
+	}
+	return nil
 }
 
 func (browser *Browser) validateGoogleTarget(raw string) error {
@@ -298,7 +354,11 @@ const googleMailRowsScript = `(() => {
       hasAttachments: !!node.querySelector("[data-tooltip*='ttach'], [title*='ttach']")
     });
   }
-  return result;
+  if (result.length) return {state: "rows", rows: result};
+  if (nodes.length) return {state: "invalid", rows: []};
+  const main = document.querySelector("[role='main']");
+  const empty = main && main.querySelector(".TC, [data-empty-state='true']");
+  return {state: empty ? "empty" : "unknown", rows: []};
 })()`
 
 const googleMailBodyScript = `(() => {
@@ -338,5 +398,9 @@ const googleCalendarRowsScript = `(() => {
       location: clean(node.getAttribute("data-location")).slice(0, 512)
     });
   }
-  return result;
+  if (result.length) return {state: "rows", rows: result};
+  if (nodes.length) return {state: "invalid", rows: []};
+  const main = document.querySelector("[role='main']");
+  const agenda = main && main.querySelector("[data-datekey], [data-date-key], [data-date]");
+  return {state: agenda ? "empty" : "unknown", rows: []};
 })()`

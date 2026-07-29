@@ -32,6 +32,48 @@ func TestBrowserOwnedModeCannotExposeAuthorization(t *testing.T) {
 	}
 }
 
+func TestGoogleWebSnapshotsDistinguishEmptyViewsFromSelectorDrift(t *testing.T) {
+	t.Parallel()
+
+	if err := validateGoogleMailSnapshot(
+		GoogleMailSnapshot{State: "empty"},
+	); err != nil {
+		t.Fatalf("recognized empty mail snapshot: %v", err)
+	}
+	if err := validateGoogleMailSnapshot(
+		GoogleMailSnapshot{
+			State: "rows",
+			Rows:  []GoogleMailRow{{ID: "thread-1"}},
+		},
+	); err != nil {
+		t.Fatalf("recognized mail rows: %v", err)
+	}
+	if err := validateGoogleMailSnapshot(
+		GoogleMailSnapshot{State: "unknown"},
+	); err == nil {
+		t.Fatal("unknown Gmail DOM was reported as an empty mailbox")
+	}
+
+	if err := validateGoogleCalendarSnapshot(
+		GoogleCalendarSnapshot{State: "empty"},
+	); err != nil {
+		t.Fatalf("recognized empty calendar snapshot: %v", err)
+	}
+	if err := validateGoogleCalendarSnapshot(
+		GoogleCalendarSnapshot{
+			State: "rows",
+			Rows:  []GoogleCalendarRow{{ID: "event-1"}},
+		},
+	); err != nil {
+		t.Fatalf("recognized calendar rows: %v", err)
+	}
+	if err := validateGoogleCalendarSnapshot(
+		GoogleCalendarSnapshot{State: "unknown"},
+	); err == nil {
+		t.Fatal("unknown Calendar DOM was reported as an empty agenda")
+	}
+}
+
 func TestValidateOptions(t *testing.T) {
 	t.Parallel()
 
