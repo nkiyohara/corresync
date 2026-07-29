@@ -200,7 +200,7 @@ func TestClientReadsConditionallyUpdatesAndSubmitsSyntheticStandardsMail(t *test
 		secret[index] = 'x'
 	}
 	observed := client.ObservedCapabilities()
-	if !observed.Move || observed.UIDPlus {
+	if !observed.Move || observed.UIDPlus || !observed.Sent {
 		t.Fatalf("synthetic IMAP capabilities = %#v", observed)
 	}
 
@@ -262,8 +262,27 @@ func TestClientReadsConditionallyUpdatesAndSubmitsSyntheticStandardsMail(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(sent.ID, "smtp1_") {
+	if !strings.HasPrefix(sent.ID, "ima1_") || sent.ChangeKey == "" {
 		t.Fatalf("send result = %#v", sent)
+	}
+	sentPage, err := client.ListMessages(
+		t.Context(),
+		application.MailListInput{
+			Folder: application.MailFolder{
+				Kind: application.MailFolderDistinguished,
+				ID:   "sentitems",
+			},
+			Limit: 25,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sentPage.Messages) != 1 ||
+		sentPage.Messages[0].ID != sent.ID ||
+		sentPage.Messages[0].Subject != "Synthetic submission" ||
+		!sentPage.Messages[0].IsRead {
+		t.Fatalf("IMAP Sent page = %#v", sentPage)
 	}
 	fixture.out.mu.Lock()
 	defer fixture.out.mu.Unlock()
@@ -309,6 +328,24 @@ func TestClientOwnsCredentialAndRejectsTLSVerificationBypass(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "cannot be disabled") {
 		t.Fatalf("unsafe TLS error = %v", err)
+	}
+}
+
+func TestSendFailsBeforeSMTPWhenSentMailboxWasNotDiscovered(t *testing.T) {
+	t.Parallel()
+
+	client := &Client{sender: "reader@example.invalid"}
+	_, err := client.SendMail(
+		t.Context(),
+		application.MailSendInput{
+			To:      []string{"recipient@example.invalid"},
+			Subject: "Must not send",
+			Body:    "The IMAP account has no Sent mailbox.",
+		},
+	)
+	if err == nil ||
+		!strings.Contains(err.Error(), "SMTP submission was not attempted") {
+		t.Fatalf("SendMail() error = %v", err)
 	}
 }
 

@@ -33,58 +33,20 @@ func (client *Client) CreateMailDraft(
 	if err != nil {
 		return application.MailDraft{}, err
 	}
-	var result application.MailDraft
-	err = client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		drafts, err := client.resolveMailbox(connection, application.MailFolder{
+	id, changeKey, err := client.appendMessage(
+		ctx,
+		application.MailFolder{
 			Kind: application.MailFolderDistinguished, ID: "drafts",
-		})
-		if err != nil {
-			return err
-		}
-		if err := connection.Append(
-			drafts,
-			[]string{imap.DraftFlag, imap.SeenFlag},
-			time.Now(),
-			bytes.NewReader(raw),
-		); err != nil {
-			return fmt.Errorf("%w: append IMAP draft: %w", application.ErrWriteOutcomeUnknown, err)
-		}
-		status, err := connection.Select(drafts, true)
-		if err != nil {
-			return err
-		}
-		criteria := imap.NewSearchCriteria()
-		criteria.Header = textproto.MIMEHeader{"Message-Id": []string{messageID}}
-		uids, err := connection.UidSearch(criteria)
-		if err != nil {
-			return err
-		}
-		if len(uids) != 1 {
-			return fmt.Errorf(
-				"%w: appended IMAP draft could not be identified uniquely",
-				application.ErrWriteOutcomeUnknown,
-			)
-		}
-		messages, err := fetchUIDs(connection, uids, metadataItems)
-		if err != nil {
-			return err
-		}
-		if len(messages) != 1 {
-			return fmt.Errorf(
-				"%w: appended IMAP draft metadata was omitted",
-				application.ErrWriteOutcomeUnknown,
-			)
-		}
-		id, err := encodeMessageID(messageReference{
-			Mailbox: drafts, UIDValidity: status.UidValidity, UID: uids[0],
-		})
-		if err != nil {
-			return err
-		}
-		result = application.MailDraft{ID: id, ChangeKey: snapshot(status, messages[0])}
-		return nil
-	})
-	return result, err
+		},
+		[]string{imap.DraftFlag, imap.SeenFlag},
+		raw,
+		messageID,
+		"draft",
+	)
+	if err != nil {
+		return application.MailDraft{}, err
+	}
+	return application.MailDraft{ID: id, ChangeKey: changeKey}, nil
 }
 
 func (client *Client) SendMail(
@@ -105,6 +67,11 @@ func (client *Client) SendMail(
 	raw, messageID, err := client.buildMessage(composition)
 	if err != nil {
 		return application.MailSendResult{}, err
+	}
+	if !client.observed.Sent {
+		return application.MailSendResult{}, errors.New(
+			"IMAP Sent mailbox is unavailable; SMTP submission was not attempted",
+		)
 	}
 	recipients := append(append(
 		append([]string(nil), composition.To...),
@@ -135,9 +102,94 @@ func (client *Client) SendMail(
 	if err != nil {
 		return application.MailSendResult{}, err
 	}
-	return application.MailSendResult{
-		ID: "smtp1_" + base64.RawURLEncoding.EncodeToString([]byte(messageID)),
-	}, nil
+	id, changeKey, err := client.appendMessage(
+		ctx,
+		application.MailFolder{
+			Kind: application.MailFolderDistinguished, ID: "sentitems",
+		},
+		[]string{imap.SeenFlag},
+		raw,
+		messageID,
+		"sent message",
+	)
+	if err != nil {
+		return application.MailSendResult{}, errors.Join(
+			application.ErrWriteOutcomeUnknown,
+			fmt.Errorf(
+				"SMTP accepted the message but its IMAP Sent copy was not confirmed: %w",
+				err,
+			),
+		)
+	}
+	return application.MailSendResult{ID: id, ChangeKey: changeKey}, nil
+}
+
+func (client *Client) appendMessage(
+	ctx context.Context,
+	folder application.MailFolder,
+	flags []string,
+	raw []byte,
+	messageID string,
+	kind string,
+) (id, changeKey string, returnErr error) {
+	returnErr = client.withIMAP(ctx, func(connection *imapclient.Client) error {
+		mailbox, err := client.resolveMailbox(connection, folder)
+		if err != nil {
+			return err
+		}
+		if err := connection.Append(
+			mailbox,
+			flags,
+			time.Now(),
+			bytes.NewReader(raw),
+		); err != nil {
+			return fmt.Errorf(
+				"%w: append IMAP %s: %w",
+				application.ErrWriteOutcomeUnknown,
+				kind,
+				err,
+			)
+		}
+		status, err := connection.Select(mailbox, true)
+		if err != nil {
+			return err
+		}
+		criteria := imap.NewSearchCriteria()
+		criteria.Header = textproto.MIMEHeader{
+			"Message-Id": []string{messageID},
+		}
+		uids, err := connection.UidSearch(criteria)
+		if err != nil {
+			return err
+		}
+		if len(uids) != 1 {
+			return fmt.Errorf(
+				"%w: appended IMAP %s could not be identified uniquely",
+				application.ErrWriteOutcomeUnknown,
+				kind,
+			)
+		}
+		messages, err := fetchUIDs(connection, uids, metadataItems)
+		if err != nil {
+			return err
+		}
+		if len(messages) != 1 {
+			return fmt.Errorf(
+				"%w: appended IMAP %s metadata was omitted",
+				application.ErrWriteOutcomeUnknown,
+				kind,
+			)
+		}
+		id, err = encodeMessageID(messageReference{
+			Mailbox: mailbox, UIDValidity: status.UidValidity, UID: uids[0],
+		})
+		if err != nil {
+			return err
+		}
+		changeKey = snapshot(status, messages[0])
+		return nil
+	})
+	return id, changeKey, returnErr
 }
 
 func (client *Client) MoveMail(
@@ -158,19 +210,70 @@ func (client *Client) MoveMail(
 		if err != nil {
 			return err
 		}
-		if !supported {
-			return errors.New(
-				"IMAP MOVE is unavailable; unsafe copy-and-expunge fallback is disabled",
-			)
-		}
 		destination, err := client.resolveMailbox(connection, input.Destination)
 		if err != nil {
 			return err
 		}
 		set := new(imap.SeqSet)
 		set.AddNum(reference.UID)
-		if err := connection.UidMove(set, destination); err != nil {
-			return fmt.Errorf("%w: execute IMAP MOVE: %w", application.ErrWriteOutcomeUnknown, err)
+		if supported {
+			if err := connection.UidMove(set, destination); err != nil {
+				return fmt.Errorf(
+					"%w: execute IMAP MOVE: %w",
+					application.ErrWriteOutcomeUnknown,
+					err,
+				)
+			}
+		} else {
+			uidPlus, err := connection.Support("UIDPLUS")
+			if err != nil {
+				return err
+			}
+			if !uidPlus {
+				return errors.New(
+					"IMAP MOVE and UIDPLUS are unavailable; safe move fallback is disabled",
+				)
+			}
+			if err := connection.UidCopy(set, destination); err != nil {
+				return fmt.Errorf(
+					"%w: execute IMAP UID COPY move fallback: %w",
+					application.ErrWriteOutcomeUnknown,
+					err,
+				)
+			}
+			if err := connection.UidStore(
+				set,
+				imap.FormatFlagsOp(imap.AddFlags, true),
+				[]interface{}{imap.DeletedFlag},
+				nil,
+			); err != nil {
+				return fmt.Errorf(
+					"%w: mark IMAP move source deleted: %w",
+					application.ErrWriteOutcomeUnknown,
+					err,
+				)
+			}
+			status, err := connection.Execute(&imap.Command{
+				Name: "UID",
+				Arguments: []interface{}{
+					imap.RawString("EXPUNGE"),
+					set,
+				},
+			}, nil)
+			if err != nil {
+				return fmt.Errorf(
+					"%w: execute IMAP UID EXPUNGE move fallback: %w",
+					application.ErrWriteOutcomeUnknown,
+					err,
+				)
+			}
+			if err := status.Err(); err != nil {
+				return fmt.Errorf(
+					"%w: execute IMAP UID EXPUNGE move fallback: %w",
+					application.ErrWriteOutcomeUnknown,
+					err,
+				)
+			}
 		}
 		result = application.MailMoveResult{}
 		return nil

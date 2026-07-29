@@ -33,6 +33,14 @@ All notable user-facing changes are recorded here. The project follows
 - Add recurrence replacement and removal to the shared CLI/MCP calendar update
   contract and implement it for Outlook Web, Google Calendar, Microsoft Graph,
   and CalDAV.
+- Preserve short bounded Google Web result snapshots in cross-account mail
+  search instead of misclassifying their honest non-terminal marker as a
+  provider failure.
+- Save successful SMTP submissions to the discovered IMAP Sent mailbox and
+  return its resolvable message identity; fail before SMTP when no Sent mailbox
+  exists, and report an unknown partial outcome if post-submit append fails.
+- Add a targeted IMAP move fallback using UID COPY, deleted marking, and UID
+  EXPUNGE only when UIDPLUS makes it safe for the selected message.
 - Fail closed on Graph permanent mail deletion because its permanent-delete
   action exposes no atomic ETag precondition; expose the limitation as a typed
   account degradation.

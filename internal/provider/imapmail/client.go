@@ -75,6 +75,7 @@ type Client struct {
 type ObservedCapabilities struct {
 	Move    bool
 	UIDPlus bool
+	Sent    bool
 }
 
 // New validates both TLS transports and authenticates without reading mailbox
@@ -119,6 +120,14 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		client.observed = ObservedCapabilities{
 			Move: capabilities["MOVE"], UIDPlus: capabilities["UIDPLUS"],
 		}
+		_, sentErr := client.resolveMailbox(
+			connection,
+			application.MailFolder{
+				Kind: application.MailFolderDistinguished,
+				ID:   "sentitems",
+			},
+		)
+		client.observed.Sent = sentErr == nil
 		return nil
 	}); err != nil {
 		_ = client.Close()

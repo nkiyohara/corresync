@@ -186,6 +186,15 @@ func (service *ProjectionService) searchProjectionAccount(
 			status.Exhausted = true
 			break
 		}
+		if account.MailProvider == domain.ProviderGoogleWeb &&
+			len(page.Messages) < limit {
+			// Google Web deliberately exposes only one bounded visible DOM
+			// snapshot. A short page exhausts that available snapshot even
+			// though the account degradation continues to disclose that it is
+			// not proof of the remote mailbox's terminal page.
+			status.Exhausted = true
+			break
+		}
 		if len(page.Messages) == 0 {
 			status.FetchedItems = len(messages)
 			return mailProjectionSource{status: failProjectionStatus(

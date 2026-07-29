@@ -1799,16 +1799,22 @@ func (backend *sessionBackend) imapAccount(
 		},
 	}
 	observed := client.ObservedCapabilities()
-	if !observed.Move {
+	if !observed.Move && !observed.UIDPlus {
 		result.degradations = append(result.degradations, domain.Degradation{
 			Feature: "mail.move",
-			Reason:  "the authenticated IMAP server does not advertise MOVE",
+			Reason:  "the authenticated IMAP server advertises neither MOVE nor UIDPLUS; safe targeted move is unavailable",
 		})
 	}
 	if !observed.UIDPlus {
 		result.degradations = append(result.degradations, domain.Degradation{
 			Feature: "mail.delete",
 			Reason:  "the authenticated IMAP server does not advertise UIDPLUS; safe UID EXPUNGE is unavailable",
+		})
+	}
+	if !observed.Sent {
+		result.degradations = append(result.degradations, domain.Degradation{
+			Feature: "mail.send",
+			Reason:  "the authenticated IMAP account exposes no Sent mailbox; SMTP submission fails closed before sending",
 		})
 	}
 	return result, nil

@@ -73,7 +73,10 @@ Provider differences remain visible:
   server supports them; a missing Submission capability degrades draft/send
   while mail reads remain available, and a read-only account reports writes
   unavailable;
-- IMAP/SMTP behavior depends on advertised server capabilities;
+- IMAP/SMTP saves accepted submissions to the discovered Sent mailbox and
+  returns the appended message identity. It fails before SMTP when no Sent
+  mailbox exists. Message move uses native MOVE or a targeted UIDPLUS
+  copy/delete/UID-EXPUNGE fallback; permanent delete requires UIDPLUS;
 - Outlook Web supports explicit shared/delegated mailbox routing only when the
   signed-in user already has that permission.
 

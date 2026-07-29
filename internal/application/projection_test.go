@@ -18,6 +18,7 @@ type projectionReaderStub struct {
 	accounts      []ProjectionAccount
 	mail          map[domain.AccountID][]MailSummary
 	mailErrors    map[domain.AccountID]error
+	mailSnapshots map[domain.AccountID]bool
 	calendars     map[domain.AccountID][]CalendarEvent
 	calendarError map[domain.AccountID]error
 	mailCalls     []MailSearchInput
@@ -44,7 +45,8 @@ func (reader *projectionReaderStub) SearchMail(
 	return MailPage{
 		Messages:         append([]MailSummary(nil), messages[start:end]...),
 		TotalItemsInView: len(messages),
-		IncludesLastItem: end == len(messages),
+		IncludesLastItem: end == len(messages) &&
+			!reader.mailSnapshots[input.Account],
 	}, nil
 }
 
@@ -258,6 +260,68 @@ func TestAgendaProjectionNormalizesDisplayAndRetainsOriginalSemantics(t *testing
 		page.Events[2].DisplayEnd != "2026-07-30" ||
 		!page.Events[2].Event.IsAllDay {
 		t.Fatalf("all-day event date semantics changed: %+v", page.Events[2])
+	}
+}
+
+func TestMailProjectionKeepsShortGoogleWebSnapshot(t *testing.T) {
+	t.Parallel()
+
+	reader := &projectionReaderStub{
+		accounts: []ProjectionAccount{
+			projectionAccount(
+				projectionAlpha,
+				"google",
+				domain.ProviderGoogleWeb,
+				"",
+				true,
+				domain.Degradation{
+					Feature: "mail.pagination",
+					Reason:  "synthetic bounded DOM snapshot",
+					Lossy:   true,
+				},
+			),
+		},
+		mail: map[domain.AccountID][]MailSummary{
+			projectionAlpha: {
+				projectionMail(
+					projectionAlpha,
+					domain.ProviderGoogleWeb,
+					"visible-1",
+					"2026-07-28T10:00:00Z",
+				),
+				projectionMail(
+					projectionAlpha,
+					domain.ProviderGoogleWeb,
+					"visible-2",
+					"2026-07-28T09:00:00Z",
+				),
+			},
+		},
+		mailSnapshots: map[domain.AccountID]bool{projectionAlpha: true},
+	}
+	service, err := NewProjectionService(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.SearchAllMail(
+		t.Context(),
+		MailProjectionInput{
+			Folder: MailFolder{
+				Kind: MailFolderDistinguished,
+				ID:   "inbox",
+			},
+			Query: "synthetic", Limit: 25, TimeZone: "UTC",
+		},
+		domain.Caller{Surface: "mcp", Instance: "session-1"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !page.Complete || page.HasMore || len(page.Failures) != 0 ||
+		len(page.Messages) != 2 ||
+		!page.Accounts[0].Complete ||
+		!page.Accounts[0].Exhausted {
+		t.Fatalf("Google Web snapshot projection = %#v", page)
 	}
 }
 
