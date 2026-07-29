@@ -74,6 +74,10 @@ Generic clients can use:
 Stdio is the only transport. There is no HTTP, SSE, remote MCP endpoint, or
 hosted relay.
 
+Tool/resource names, schemas, annotations, deprecations, and negotiated
+compatibility follow the
+[public and local versioning policy](adr/0020-public-and-local-versioning.md).
+
 ## Agent Skill and plugins
 
 The repository ships a portable Agent Skill at

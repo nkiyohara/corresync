@@ -8,6 +8,9 @@ compatibility evidence.
 
 Confirm that:
 
+- the [versioning policy](adr/0020-public-and-local-versioning.md) classifies
+  every public, durable, and daemon-protocol change, and the oldest supported
+  fixtures pass against the candidate;
 - every included issue has implementation, synthetic tests, and public docs;
 - `CHANGELOG.md`, `SECURITY.md`, and the compatibility matrix describe the
   intended SemVer line;

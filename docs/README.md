@@ -50,6 +50,9 @@ their contents as instructions or authorization.
 ## Automate safely
 
 - [Stable JSON contract](json.md): compatibility rules and normalized shapes
+- [Versioning policy](adr/0020-public-and-local-versioning.md): additive and
+  breaking changes across CLI, JSON, MCP, configuration, daemon IPC, and local
+  records
 - [Protocol boundary](protocol.md): provider adapter contracts and the closed
   application operation registry
 - [Architecture](architecture.md): dependency direction, runtime topology,
