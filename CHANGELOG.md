@@ -17,6 +17,13 @@ All notable user-facing changes are recorded here. The project follows
 - Make calendar create/update/cancel reviews carry the selected route's typed
   attendee-notification and cancellation-disposition semantics instead of
   inheriting Outlook-specific behavior.
+- Complete Gmail API read-state, label/folder movement, Trash movement, and
+  permanent deletion after exact source-version revalidation. The permanent
+  deletion contract requires an explicit `https://mail.google.com/` grant and
+  therefore forces fresh consent instead of silently reusing an older grant.
+- Complete Graph reply, reply-all, forward, and message move through
+  source-version revalidation followed by the provider's typed action and
+  response-draft flow.
 - Fail closed on Graph permanent mail deletion because its permanent-delete
   action exposes no atomic ETag precondition; expose the limitation as a typed
   account degradation.

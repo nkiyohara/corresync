@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"net/mail"
 	"net/textproto"
+	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -262,27 +264,236 @@ func (client *Client) SetMailReadState(
 	ctx context.Context,
 	input application.MailReadStateInput,
 ) (application.MailReadStateResult, error) {
-	return application.MailReadStateResult{}, errors.New(
-		"gmail does not expose an atomic historyId precondition for message label updates",
+	reference, err := decodeMessageID(input.MessageID)
+	if err != nil {
+		return application.MailReadStateResult{}, err
+	}
+	message, err := client.requireMessage(
+		ctx, reference.ID, input.ChangeKey, "metadata",
 	)
+	if err != nil {
+		return application.MailReadStateResult{}, err
+	}
+	unread := slices.Contains(message.LabelIDs, "UNREAD")
+	wantUnread := input.State == application.MailReadStateUnread
+	if unread == wantUnread {
+		return application.MailReadStateResult{
+			ID: input.MessageID, ChangeKey: input.ChangeKey, State: input.State,
+		}, nil
+	}
+	request := map[string]any{}
+	if wantUnread {
+		request["addLabelIds"] = []string{"UNREAD"}
+	} else {
+		request["removeLabelIds"] = []string{"UNREAD"}
+	}
+	updated, err := client.modifyMessage(ctx, reference.ID, request)
+	if err != nil {
+		return application.MailReadStateResult{}, err
+	}
+	if slices.Contains(updated.LabelIDs, "UNREAD") != wantUnread {
+		return application.MailReadStateResult{}, fmt.Errorf(
+			"%w: Gmail read-state response did not contain the requested state",
+			application.ErrWriteOutcomeUnknown,
+		)
+	}
+	return application.MailReadStateResult{
+		ID: input.MessageID, ChangeKey: encodeHistoryID(updated.HistoryID),
+		State: input.State,
+	}, nil
 }
 
 func (client *Client) MoveMail(
 	ctx context.Context,
 	input application.MailMoveInput,
 ) (application.MailMoveResult, error) {
-	return application.MailMoveResult{}, errors.New(
-		"gmail does not expose an atomic historyId precondition for message moves",
+	reference, err := decodeMessageID(input.MessageID)
+	if err != nil {
+		return application.MailMoveResult{}, err
+	}
+	message, err := client.requireMessage(
+		ctx, reference.ID, input.ChangeKey, "metadata",
 	)
+	if err != nil {
+		return application.MailMoveResult{}, err
+	}
+	resource := "gmail/v1/users/me/messages/" + escaped(reference.ID)
+	var updated gmailMessage
+	if input.Destination.Kind == application.MailFolderDistinguished &&
+		strings.EqualFold(input.Destination.ID, "deleteditems") {
+		_, err = client.api.DoJSON(
+			ctx, http.MethodPost, resource+"/trash", nil,
+			map[string]any{}, &updated, true, nil, http.StatusOK,
+		)
+	} else {
+		add, remove, resolveErr := client.gmailMoveLabels(
+			ctx, input.Destination, message.LabelIDs,
+		)
+		if resolveErr != nil {
+			return application.MailMoveResult{}, resolveErr
+		}
+		if slices.Contains(message.LabelIDs, "TRASH") {
+			if _, err = client.api.DoJSON(
+				ctx, http.MethodPost, resource+"/untrash", nil,
+				map[string]any{}, &message, true, nil, http.StatusOK,
+			); err != nil {
+				return application.MailMoveResult{}, err
+			}
+			if err := validateModifiedGmailMessage(reference.ID, message); err != nil {
+				return application.MailMoveResult{}, err
+			}
+		}
+		if len(add) == 0 && len(remove) == 0 {
+			updated = message
+		} else {
+			updated, err = client.modifyMessage(ctx, reference.ID, map[string]any{
+				"addLabelIds": add, "removeLabelIds": remove,
+			})
+		}
+	}
+	if err != nil {
+		return application.MailMoveResult{}, err
+	}
+	if err := validateModifiedGmailMessage(reference.ID, updated); err != nil {
+		return application.MailMoveResult{}, err
+	}
+	return application.MailMoveResult{
+		ID: input.MessageID, ChangeKey: encodeHistoryID(updated.HistoryID),
+	}, nil
 }
 
-func (*Client) DeleteMail(
-	context.Context,
-	application.MailDeleteInput,
+func (client *Client) DeleteMail(
+	ctx context.Context,
+	input application.MailDeleteInput,
 ) error {
-	return errors.New(
-		"permanent Gmail deletion requires a broader mail.google.com grant; move to Trash instead",
+	reference, err := decodeMessageID(input.MessageID)
+	if err != nil {
+		return err
+	}
+	if _, err := client.requireMessage(
+		ctx, reference.ID, input.ChangeKey, "metadata",
+	); err != nil {
+		return err
+	}
+	_, err = client.api.DoJSON(
+		ctx, http.MethodDelete,
+		"gmail/v1/users/me/messages/"+escaped(reference.ID),
+		nil, nil, nil, true, nil, http.StatusNoContent,
 	)
+	return err
+}
+
+func (client *Client) modifyMessage(
+	ctx context.Context,
+	id string,
+	request map[string]any,
+) (gmailMessage, error) {
+	var response gmailMessage
+	if _, err := client.api.DoJSON(
+		ctx, http.MethodPost,
+		"gmail/v1/users/me/messages/"+escaped(id)+"/modify",
+		nil, request, &response, true, nil, http.StatusOK,
+	); err != nil {
+		return gmailMessage{}, err
+	}
+	if err := validateModifiedGmailMessage(id, response); err != nil {
+		return gmailMessage{}, err
+	}
+	return response, nil
+}
+
+func validateModifiedGmailMessage(id string, message gmailMessage) error {
+	if message.ID != id || !validGoogleID(message.ID) ||
+		!validGoogleID(message.HistoryID) {
+		return fmt.Errorf(
+			"%w: Gmail write response omitted message identity",
+			application.ErrWriteOutcomeUnknown,
+		)
+	}
+	return nil
+}
+
+func (client *Client) gmailMoveLabels(
+	ctx context.Context,
+	destination application.MailFolder,
+	current []string,
+) (add, remove []string, err error) {
+	if destination.Kind == application.MailFolderDistinguished {
+		switch strings.ToLower(destination.ID) {
+		case "inbox":
+			add = []string{"INBOX"}
+			remove = presentLabels(current, "SPAM")
+		case "archive":
+			remove = presentLabels(current, "INBOX", "SPAM")
+		case "deleteditems":
+			return nil, nil, errors.New("gmail Trash must use the trash action")
+		case "drafts", "sentitems":
+			return nil, nil, fmt.Errorf(
+				"gmail does not permit moving a message into %s",
+				destination.ID,
+			)
+		default:
+			return nil, nil, fmt.Errorf(
+				"unsupported Gmail move destination %q",
+				destination.ID,
+			)
+		}
+		return compactLabelChanges(add, remove, current)
+	}
+	var reference struct {
+		ID string `json:"id"`
+	}
+	if err := decodeReference(destination.ID, "ggl1_", &reference); err != nil ||
+		!validGoogleID(reference.ID) {
+		return nil, nil, errors.New("folder ID is not a Google label identifier")
+	}
+	values := url.Values{"fields": {"id,type"}}
+	var label gmailLabel
+	if _, err := client.api.DoJSON(
+		ctx, http.MethodGet, "gmail/v1/users/me/labels/"+escaped(reference.ID),
+		values, nil, &label, false, nil, http.StatusOK,
+	); err != nil {
+		return nil, nil, err
+	}
+	if label.ID != reference.ID || label.Type != "user" {
+		return nil, nil, errors.New(
+			"gmail move destination is not a writable user label",
+		)
+	}
+	add = []string{reference.ID}
+	remove = presentLabels(current, "INBOX", "SPAM")
+	return compactLabelChanges(add, remove, current)
+}
+
+func compactLabelChanges(
+	add, remove, current []string,
+) ([]string, []string, error) {
+	currentSet := make(map[string]struct{}, len(current))
+	for _, label := range current {
+		currentSet[label] = struct{}{}
+	}
+	add = slices.DeleteFunc(add, func(label string) bool {
+		_, exists := currentSet[label]
+		return exists
+	})
+	remove = slices.DeleteFunc(remove, func(label string) bool {
+		_, exists := currentSet[label]
+		return !exists
+	})
+	if len(add) > 100 || len(remove) > 100 {
+		return nil, nil, errors.New("gmail label update exceeds the limit")
+	}
+	return add, remove, nil
+}
+
+func presentLabels(current []string, labels ...string) []string {
+	result := make([]string, 0, len(labels))
+	for _, label := range labels {
+		if slices.Contains(current, label) {
+			result = append(result, label)
+		}
+	}
+	return result
 }
 
 func buildGmailMessage(

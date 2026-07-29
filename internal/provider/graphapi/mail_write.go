@@ -14,10 +14,20 @@ func (client *Client) CreateMailDraft(
 	ctx context.Context,
 	input application.MailDraftInput,
 ) (application.MailDraft, error) {
-	request, err := graphComposition(input)
-	if err != nil {
-		return application.MailDraft{}, err
+	if input.EffectiveComposeMode() != application.MailComposeNew {
+		response, err := client.createResponseDraft(ctx, input)
+		if err != nil {
+			return application.MailDraft{}, err
+		}
+		id, err := encodeMessageID(response.ID)
+		if err != nil {
+			return application.MailDraft{}, err
+		}
+		return application.MailDraft{
+			ID: id, ChangeKey: encodeETag(response.ODataETag),
+		}, nil
 	}
+	request := graphComposition(input)
 	var response graphMessage
 	if _, err := client.api.DoJSON(
 		ctx,
@@ -51,10 +61,29 @@ func (client *Client) SendMail(
 	ctx context.Context,
 	input application.MailSendInput,
 ) (application.MailSendResult, error) {
-	request, err := graphComposition(application.MailDraftInput(input))
-	if err != nil {
-		return application.MailSendResult{}, err
+	draftInput := application.MailDraftInput(input)
+	if input.ComposeMode != "" &&
+		input.ComposeMode != application.MailComposeNew {
+		draft, err := client.createResponseDraft(ctx, draftInput)
+		if err != nil {
+			return application.MailSendResult{}, err
+		}
+		if _, err := client.api.DoJSON(
+			ctx,
+			http.MethodPost,
+			"me/messages/"+escaped(draft.ID)+"/send",
+			nil,
+			nil,
+			nil,
+			true,
+			nil,
+			http.StatusAccepted,
+		); err != nil {
+			return application.MailSendResult{}, err
+		}
+		return application.MailSendResult{}, nil
 	}
+	request := graphComposition(draftInput)
 	if _, err := client.api.DoJSON(
 		ctx,
 		http.MethodPost,
@@ -71,12 +100,7 @@ func (client *Client) SendMail(
 	return application.MailSendResult{}, nil
 }
 
-func graphComposition(input application.MailDraftInput) (map[string]any, error) {
-	if input.EffectiveComposeMode() != application.MailComposeNew {
-		return nil, errors.New(
-			"graph reply and forward actions do not expose an atomic source-message precondition",
-		)
-	}
+func graphComposition(input application.MailDraftInput) map[string]any {
 	contentType := "text"
 	if input.EffectiveBodyFormat() == application.MailBodyHTML {
 		contentType = "html"
@@ -107,7 +131,64 @@ func graphComposition(input application.MailDraftInput) (map[string]any, error) 
 		}
 		message["attachments"] = attachments
 	}
-	return message, nil
+	return message
+}
+
+func (client *Client) createResponseDraft(
+	ctx context.Context,
+	input application.MailDraftInput,
+) (graphMessage, error) {
+	reference, _, err := client.exactMessage(
+		ctx, input.ReferenceMessageID, input.ReferenceChangeKey,
+	)
+	if err != nil {
+		return graphMessage{}, err
+	}
+	action := ""
+	switch input.EffectiveComposeMode() {
+	case application.MailComposeNew:
+		return graphMessage{}, errors.New(
+			"new graph composition does not use a response action",
+		)
+	case application.MailComposeReply:
+		action = "createReply"
+	case application.MailComposeReplyAll:
+		action = "createReplyAll"
+	case application.MailComposeForward:
+		action = "createForward"
+	default:
+		return graphMessage{}, errors.New("unsupported graph response mode")
+	}
+	message := graphComposition(input)
+	if input.EffectiveComposeMode() != application.MailComposeForward {
+		delete(message, "toRecipients")
+		delete(message, "ccRecipients")
+		delete(message, "bccRecipients")
+	}
+	if input.Subject == "" {
+		delete(message, "subject")
+	}
+	var response graphMessage
+	if _, err := client.api.DoJSON(
+		ctx,
+		http.MethodPost,
+		"me/messages/"+escaped(reference.ID)+"/"+action,
+		nil,
+		map[string]any{"message": message},
+		&response,
+		true,
+		nil,
+		http.StatusCreated,
+	); err != nil {
+		return graphMessage{}, err
+	}
+	if !validGraphID(response.ID) || !validETag(response.ODataETag) {
+		return graphMessage{}, fmt.Errorf(
+			"%w: graph response draft omitted message identity",
+			application.ErrWriteOutcomeUnknown,
+		)
+	}
+	return response, nil
 }
 
 func graphRecipients(addresses []string) []map[string]any {
@@ -184,13 +265,47 @@ func (client *Client) SetMailReadState(
 	}, nil
 }
 
-func (*Client) MoveMail(
-	context.Context,
-	application.MailMoveInput,
+func (client *Client) MoveMail(
+	ctx context.Context,
+	input application.MailMoveInput,
 ) (application.MailMoveResult, error) {
-	return application.MailMoveResult{}, errors.New(
-		"graph message move actions do not expose an atomic ETag precondition",
+	reference, _, err := client.exactMessage(
+		ctx, input.MessageID, input.ChangeKey,
 	)
+	if err != nil {
+		return application.MailMoveResult{}, err
+	}
+	destination, err := client.graphFolder(input.Destination)
+	if err != nil {
+		return application.MailMoveResult{}, err
+	}
+	var moved graphMessage
+	if _, err := client.api.DoJSON(
+		ctx,
+		http.MethodPost,
+		"me/messages/"+escaped(reference.ID)+"/move",
+		nil,
+		map[string]string{"destinationId": destination},
+		&moved,
+		true,
+		nil,
+		http.StatusCreated,
+	); err != nil {
+		return application.MailMoveResult{}, err
+	}
+	if !validGraphID(moved.ID) || !validETag(moved.ODataETag) {
+		return application.MailMoveResult{}, fmt.Errorf(
+			"%w: graph move response omitted message identity",
+			application.ErrWriteOutcomeUnknown,
+		)
+	}
+	id, err := encodeMessageID(moved.ID)
+	if err != nil {
+		return application.MailMoveResult{}, err
+	}
+	return application.MailMoveResult{
+		ID: id, ChangeKey: encodeETag(moved.ODataETag),
+	}, nil
 }
 
 func (*Client) DeleteMail(

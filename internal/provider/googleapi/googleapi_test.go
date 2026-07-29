@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -22,6 +23,9 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 
 	var draftRaw string
 	var sendRaw string
+	var modifiedReadState bool
+	var movedToArchive bool
+	var permanentlyDeleted bool
 	server := httptest.NewTLSServer(http.HandlerFunc(func(
 		writer http.ResponseWriter,
 		request *http.Request,
@@ -80,6 +84,31 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 			writeGoogleJSON(t, writer, map[string]string{
 				"id": "m3", "historyId": "103",
 			})
+		case "POST /gmail/v1/users/me/messages/m1/modify":
+			var mutation struct {
+				Add    []string `json:"addLabelIds"`
+				Remove []string `json:"removeLabelIds"`
+			}
+			if err := json.NewDecoder(request.Body).Decode(&mutation); err != nil {
+				t.Fatal(err)
+			}
+			message := googleTestMessage(false)
+			switch {
+			case slices.Equal(mutation.Remove, []string{"UNREAD"}):
+				modifiedReadState = true
+				message.HistoryID = "104"
+				message.LabelIDs = []string{"INBOX"}
+			case slices.Equal(mutation.Remove, []string{"INBOX"}):
+				movedToArchive = true
+				message.HistoryID = "105"
+				message.LabelIDs = nil
+			default:
+				t.Errorf("unexpected Gmail mutation = %#v", mutation)
+			}
+			writeGoogleJSON(t, writer, message)
+		case "DELETE /gmail/v1/users/me/messages/m1":
+			permanentlyDeleted = true
+			writer.WriteHeader(http.StatusNoContent)
 		case "GET /calendar/v3/calendars/primary/events":
 			if request.URL.Query().Get("showDeleted") != "false" ||
 				request.URL.Query().Get("maxResults") != "2500" {
@@ -212,15 +241,37 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 		!strings.Contains(sendRaw, "Bcc: hidden@example.test") {
 		t.Fatalf("sent = %#v raw = %q", sent, sendRaw)
 	}
-	if _, err := client.SetMailReadState(
-		t.Context(), application.MailReadStateInput{},
-	); err == nil || !strings.Contains(err.Error(), "atomic") {
-		t.Fatalf("read-state degradation = %v", err)
+	readState, err := client.SetMailReadState(
+		t.Context(), application.MailReadStateInput{
+			MessageID: page.Messages[0].ID,
+			ChangeKey: page.Messages[0].ChangeKey,
+			State:     application.MailReadStateRead,
+		},
+	)
+	if err != nil || readState.ChangeKey == page.Messages[0].ChangeKey ||
+		!modifiedReadState {
+		t.Fatalf("read-state = %#v error = %v", readState, err)
 	}
-	if _, err := client.MoveMail(
-		t.Context(), application.MailMoveInput{},
-	); err == nil || !strings.Contains(err.Error(), "atomic") {
-		t.Fatalf("move degradation = %v", err)
+	moved, err := client.MoveMail(
+		t.Context(), application.MailMoveInput{
+			MessageID: page.Messages[0].ID,
+			ChangeKey: page.Messages[0].ChangeKey,
+			Destination: application.MailFolder{
+				Kind: application.MailFolderDistinguished, ID: "archive",
+			},
+		},
+	)
+	if err != nil || moved.ChangeKey == page.Messages[0].ChangeKey ||
+		!movedToArchive {
+		t.Fatalf("move = %#v error = %v", moved, err)
+	}
+	if err := client.DeleteMail(
+		t.Context(), application.MailDeleteInput{
+			MessageID: page.Messages[0].ID,
+			ChangeKey: page.Messages[0].ChangeKey,
+		},
+	); err != nil || !permanentlyDeleted {
+		t.Fatalf("delete error = %v called = %t", err, permanentlyDeleted)
 	}
 
 	calendars, err := client.ListCalendarFolders(

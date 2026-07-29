@@ -60,11 +60,15 @@ Provider differences remain visible:
 - Google Web is a bounded visible-browser snapshot: metadata reads are
   available, pagination beyond the visible snapshot is explicitly incomplete,
   and every mail/calendar write is unavailable;
-- Gmail uses Gmail query syntax, has no atomic history precondition for move or
-  label changes, and least-privilege scopes exclude permanent delete;
-- Graph query syntax differs from Outlook AQS, reply/forward and move expose no
-  atomic source ETag precondition, its permanent-delete action exposes no
-  atomic ETag precondition, and send may return no sent-item identity;
+- Gmail uses Gmail query syntax and has no atomic history precondition for
+  label changes, moves, or permanent deletion. Corresync revalidates the exact
+  reviewed message immediately before each write; full Gmail support requires
+  the explicitly displayed `https://mail.google.com/` OAuth grant;
+- Graph query syntax differs from Outlook AQS. Reply/forward and move
+  revalidate the exact reviewed source before invoking actions that expose no
+  atomic source ETag precondition. Stable Graph does not provide the
+  permanently destructive operation required by Corresync's delete contract,
+  and successful asynchronous sends may return no sent-item identity;
 - JMAP exposes incremental state and strong state preconditions where the
   server supports them; a missing Submission capability degrades draft/send
   while mail reads remain available, and a read-only account reports writes

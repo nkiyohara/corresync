@@ -43,7 +43,7 @@ func TestOAuthConsentNoticeCombinesSharedRouteScopesBeforeLogin(t *testing.T) {
 	}
 	output := stderr.String()
 	if strings.Count(output, "google-api:") != 1 ||
-		!strings.Contains(output, "gmail.modify") ||
+		!strings.Contains(output, "mail.google.com") ||
 		!strings.Contains(output, "calendar.events") ||
 		!strings.Contains(output, "only when no matching valid local grant") {
 		t.Fatalf("consent notice = %q", output)

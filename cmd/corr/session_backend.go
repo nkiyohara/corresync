@@ -1933,10 +1933,6 @@ func (backend *sessionBackend) googleAPIAccount(
 				Reason:  "Gmail exposes no atomic historyId precondition for moves",
 			},
 			domain.Degradation{
-				Feature: "mail.delete",
-				Reason:  "the least-privilege Gmail scope excludes permanent deletion",
-			},
-			domain.Degradation{
 				Feature: "mail.push_history",
 				Reason:  "the Google API route does not register push watches or expose history cursors",
 			},
@@ -2051,11 +2047,11 @@ func (backend *sessionBackend) graphAPIAccount(
 			},
 			domain.Degradation{
 				Feature: "mail.reply_forward",
-				Reason:  "Graph reply and forward actions expose no atomic source ETag precondition",
+				Reason:  "Graph response-draft actions expose no atomic source ETag precondition; Corresync revalidates immediately before creating the draft",
 			},
 			domain.Degradation{
 				Feature: "mail.move",
-				Reason:  "Graph message move exposes no atomic source ETag precondition",
+				Reason:  "Graph message move exposes no atomic source ETag precondition; Corresync revalidates immediately before the action",
 			},
 			domain.Degradation{
 				Feature: "mail.delete",

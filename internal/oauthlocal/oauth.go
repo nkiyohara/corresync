@@ -64,7 +64,7 @@ func ProviderFor(
 		if mailEnabled {
 			result.Scopes = append(
 				result.Scopes,
-				"https://www.googleapis.com/auth/gmail.modify",
+				"https://mail.google.com/",
 			)
 		}
 		if calendarEnabled {

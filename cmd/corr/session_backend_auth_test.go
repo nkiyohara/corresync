@@ -458,7 +458,7 @@ func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
 	}
 	if manager.calls != 1 || factoryCalls != 1 || manager.route != route ||
 		manager.provider.ID != domain.ProviderGoogleAPI ||
-		!slices.Contains(manager.provider.Scopes, "https://www.googleapis.com/auth/gmail.modify") ||
+		!slices.Contains(manager.provider.Scopes, "https://mail.google.com/") ||
 		!slices.Contains(manager.provider.Scopes, "https://www.googleapis.com/auth/calendar.events") {
 		t.Fatalf(
 			"explicit Google OAuth = calls %d factory %d route %#v provider %#v",

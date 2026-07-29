@@ -16,6 +16,9 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 	t.Parallel()
 
 	var sentBody []byte
+	var replyDraftBody []byte
+	var forwardBody []byte
+	var responseDraftSent bool
 	server := httptest.NewTLSServer(http.HandlerFunc(func(
 		writer http.ResponseWriter,
 		request *http.Request,
@@ -81,12 +84,26 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 		case "POST /me/sendMail":
 			sentBody = readGraphBody(t, request)
 			writer.WriteHeader(http.StatusAccepted)
+		case "POST /me/messages/m1/createReply":
+			replyDraftBody = readGraphBody(t, request)
+			message := graphTestMessage(false, `W/"reply"`)
+			message.ID = "reply1"
+			writeGraphJSONStatus(t, writer, message, http.StatusCreated)
+		case "POST /me/messages/m1/createForward":
+			forwardBody = readGraphBody(t, request)
+			message := graphTestMessage(false, `W/"forward"`)
+			message.ID = "forward1"
+			writeGraphJSONStatus(t, writer, message, http.StatusCreated)
+		case "POST /me/messages/forward1/send":
+			responseDraftSent = true
+			writer.WriteHeader(http.StatusAccepted)
 		case "PATCH /me/messages/m1":
 			requireGraphCondition(t, request, `W/"m1"`)
 			writeGraphJSON(t, writer, graphTestMessage(false, `W/"m3"`))
-		case "DELETE /me/messages/m1":
-			requireGraphCondition(t, request, `W/"m1"`)
-			writer.WriteHeader(http.StatusNoContent)
+		case "POST /me/messages/m1/move":
+			moved := graphTestMessage(false, `W/"m4"`)
+			moved.ID = "moved1"
+			writeGraphJSONStatus(t, writer, moved, http.StatusCreated)
 		case "GET /me/calendarView":
 			if request.Header.Get("Prefer") != `outlook.timezone="UTC"` ||
 				request.URL.Query().Get("$top") != "1000" {
@@ -202,6 +219,43 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 	if !strings.Contains(string(sentBody), `"saveToSentItems":true`) {
 		t.Fatalf("send request = %s", sentBody)
 	}
+	replyDraft, err := client.CreateMailDraft(
+		t.Context(),
+		application.MailDraftInput{
+			ComposeMode:        application.MailComposeReply,
+			ReferenceMessageID: messages.Messages[0].ID,
+			ReferenceChangeKey: messages.Messages[0].ChangeKey,
+			Body:               "reply body",
+		},
+	)
+	if err != nil || replyDraft.ID == "" || replyDraft.ChangeKey == "" ||
+		!strings.Contains(string(replyDraftBody), `"content":"reply body"`) ||
+		strings.Contains(string(replyDraftBody), `"toRecipients"`) {
+		t.Fatalf(
+			"reply draft = %#v error = %v request = %s",
+			replyDraft,
+			err,
+			replyDraftBody,
+		)
+	}
+	if _, err := client.SendMail(
+		t.Context(),
+		application.MailSendInput{
+			To:                 []string{"forward@example.test"},
+			ComposeMode:        application.MailComposeForward,
+			ReferenceMessageID: messages.Messages[0].ID,
+			ReferenceChangeKey: messages.Messages[0].ChangeKey,
+			Body:               "forward body",
+		},
+	); err != nil || !responseDraftSent ||
+		!strings.Contains(string(forwardBody), `"forward@example.test"`) {
+		t.Fatalf(
+			"forward error = %v sent = %t request = %s",
+			err,
+			responseDraftSent,
+			forwardBody,
+		)
+	}
 	read, err := client.SetMailReadState(
 		t.Context(),
 		application.MailReadStateInput{
@@ -213,11 +267,20 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 	if err != nil || read.ChangeKey == messages.Messages[0].ChangeKey {
 		t.Fatalf("read state = %#v error = %v", read, err)
 	}
-	if _, err := client.MoveMail(
+	moved, err := client.MoveMail(
 		t.Context(),
-		application.MailMoveInput{},
-	); err == nil || !strings.Contains(err.Error(), "atomic") {
-		t.Fatalf("move degradation = %v", err)
+		application.MailMoveInput{
+			MessageID: messages.Messages[0].ID,
+			ChangeKey: messages.Messages[0].ChangeKey,
+			Destination: application.MailFolder{
+				Kind: application.MailFolderDistinguished,
+				ID:   "archive",
+			},
+		},
+	)
+	if err != nil || moved.ID == messages.Messages[0].ID ||
+		moved.ChangeKey == messages.Messages[0].ChangeKey {
+		t.Fatalf("move = %#v error = %v", moved, err)
 	}
 	if err := client.DeleteMail(
 		t.Context(),
