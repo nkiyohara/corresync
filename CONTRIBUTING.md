@@ -11,8 +11,8 @@ and non-negotiable security boundaries. Accepted design decisions live in
 
 ## Before writing code
 
-1. Check the [feature matrix](docs/features.md) and
-   [roadmap](https://github.com/nkiyohara/corresync/issues/20).
+1. Check the [feature matrix](docs/features.md) and the current
+   [roadmap milestones](https://github.com/nkiyohara/corresync/milestones).
 2. Open or find an issue that states the user outcome and safety boundary.
 3. Add or update an ADR when changing an accepted architectural decision.
 4. Decide how the behavior will be proven with synthetic data before using a
@@ -55,16 +55,18 @@ mise exec -- task verify
 
 Go 1.26 is the minimum supported compiler. The checked-in toolchain follows the
 latest pinned Go 1.26 patch instead of downloading an undeclared compiler.
-Setup also installs repository-managed prek hooks. From then on, changed
-Go, HTML, CSS, YAML, JSON, and TOML files are formatted automatically before a
-commit completes; safe whitespace and merge-conflict checks cover every text
+Setup also installs repository-managed prek hooks. From then on, changed Go,
+shell, HTML, CSS, YAML, JSON, and TOML files are formatted automatically before
+a commit completes; safe whitespace and merge-conflict checks cover every text
 file. Run `mise exec -- task format` to apply the same formatters explicitly or
 `mise exec -- task hooks:run` to check the complete tree.
 
 `task verify` checks:
 
-- Go and structured-file formatting plus Markdown lint;
-- vet, golangci-lint, unit tests, and the race detector;
+- Go, shell, and structured-file formatting plus Markdown lint;
+- static Pages metadata, structured data, links, assets, and sitemap;
+- vet, golangci-lint, ShellCheck, deterministic installer tests, and the race
+  detector;
 - repository-history and working-tree secret scans;
 - reachable vulnerabilities and linked dependency licenses;
 - the binary and GoReleaser configuration;

@@ -99,6 +99,20 @@ func (view updateView) writeAction(report updateActionReport) error {
 			view.strong("corr "+strings.TrimPrefix(report.CurrentVersion, "v")+" is up to date"),
 		)
 		return err
+	case string(updatecheck.InstallStatusRepaired):
+		_, err := view.printf(
+			"\n%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n\n%s\n",
+			view.success(),
+			view.strong("corr command installed"),
+			"Version",
+			strings.TrimPrefix(report.CurrentVersion, "v"),
+			"Verified",
+			"Sigstore identity · SHA-256 · version · platform",
+			"Command",
+			report.CanonicalPath,
+			view.muted("Your existing corresync compatibility command was left unchanged."),
+		)
+		return err
 	case "action_required":
 		_, err := view.printf(
 			"\n%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n\n%s\n",

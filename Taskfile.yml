@@ -18,15 +18,17 @@ tasks:
       - mise exec -- prek install --prepare-hooks
 
   format:
-    desc: Format Go and structured project files
+    desc: Format Go, shell, and structured project files
     cmds:
       - gofmt -w $(rg --files -g '*.go' -g '!vendor/**')
+      - shfmt -w -i 2 -ci site/install.sh tools/test-install.sh
       - dprint fmt
 
   format:check:
-    desc: Verify Go and structured project file formatting
+    desc: Verify Go, shell, and structured project file formatting
     cmds:
       - test -z "$(gofmt -l $(rg --files -g '*.go' -g '!vendor/**'))"
+      - shfmt -d -i 2 -ci site/install.sh tools/test-install.sh
       - dprint check
 
   hooks:install:
@@ -44,20 +46,27 @@ tasks:
     cmds:
       - markdownlint-cli2 "**/*.md" "#.git" "#.release" "#vendor"
 
+  site:
+    desc: Verify Pages metadata, structured data, links, assets, and sitemap
+    cmds:
+      - go run ./tools/siteverify
+
   vet:
     desc: Run the Go static analyzer
     cmds:
       - go vet ./...
 
   lint:
-    desc: Run the configured Go linters
+    desc: Run the configured Go and shell linters
     cmds:
       - golangci-lint run
+      - shellcheck site/install.sh tools/test-install.sh
 
   test:
     desc: Run deterministic unit and contract tests
     cmds:
       - go test -shuffle=on -coverprofile=coverage.out ./...
+      - ./tools/test-install.sh
 
   race:
     desc: Run tests with the race detector
@@ -111,6 +120,7 @@ tasks:
     cmds:
       - task: format:check
       - task: docs
+      - task: site
       - task: vet
       - task: lint
       - task: test

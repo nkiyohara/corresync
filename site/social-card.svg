@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"
+  role="img" aria-labelledby="card-title card-desc">
+  <title id="card-title">Corresync</title>
+  <desc id="card-desc">
+    Corresync mark beside the words: one local MCP for your email and
+    calendars. Provider-neutral, preview before commit.
+  </desc>
+  <rect width="1200" height="630" fill="#13233b"/>
+  <g opacity="0.12" fill="none" stroke-width="64"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M880 210 1030 80 1180 210" stroke="#f2ede2"/>
+    <path d="M950 430 1090 560 1230 430" stroke="#e0574a"/>
+  </g>
+  <circle cx="1030" cy="320" r="22" fill="#3f7ad6" opacity="0.4"/>
+  <g transform="translate(84 72) scale(0.5)">
+    <rect width="256" height="256" rx="58" fill="#1c2f4d"/>
+    <path d="M56 112 116 52 176 112" fill="none" stroke="#f2ede2"
+      stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M80 144 140 204 200 144" fill="none" stroke="#e0574a"
+      stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="128" cy="128" r="18" fill="#3f7ad6"/>
+  </g>
+  <g font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="236" y="156" font-size="52" letter-spacing="7" fill="#f2ede2">corresync</text>
+    <text x="84" y="330" font-size="76" font-weight="700" fill="#f2ede2">One local MCP for</text>
+    <text x="84" y="420" font-size="76" font-weight="700"
+      fill="#f2ede2">your email &amp; calendars.</text>
+    <text x="84" y="496" font-size="36"
+      fill="#e0574a">Provider-neutral · preview before commit</text>
+    <text x="84" y="562" font-size="28" fill="#8fa0b8">nkiyohara.github.io/corresync</text>
+  </g>
+</svg>

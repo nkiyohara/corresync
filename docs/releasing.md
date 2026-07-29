@@ -123,7 +123,10 @@ Keep these controls enabled:
 - `github-pages` deployment limited to the default branch.
 
 The Pages site deploys at its canonical Corresync URL. It intentionally creates
-no redirect from the former Pages path.
+no redirect from the former Pages path. Its user-facing HTML, one-line Linux
+installer, social preview, internal links, structured metadata, canonical URLs,
+robots policy, and sitemap are one reviewed artifact. Run
+`go run ./tools/siteverify` before deployment.
 
 ## Failed or withdrawn release
 

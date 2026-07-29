@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync features — what you can do, in plain language</title>
+    <meta
+      name="description"
+      content="What you can do with Corresync across mail, calendars, AI agents, and scripts—in plain language, with every limit stated explicitly."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Corresync features — what you can do, in plain language">
+    <meta
+      property="og:description"
+      content="What you can do with Corresync across mail, calendars, AI agents, and scripts—in plain language, with every limit stated explicitly."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nkiyohara.github.io/corresync/features.html">
+    <meta property="og:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Corresync features — what you can do, in plain language">
+    <meta
+      name="twitter:description"
+      content="What you can do with Corresync across mail, calendars, AI agents, and scripts—in plain language, with every limit stated explicitly."
+    >
+    <meta name="twitter:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
+    <link rel="canonical" href="https://nkiyohara.github.io/corresync/features.html">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+    <script src="copy.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="airmail" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync home">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./">Home</a>
+        <a href="getting-started.html">Getting started</a>
+        <a href="providers.html">Providers</a>
+        <a href="features.html" aria-current="page">Features</a>
+        <a href="safety.html">Safety</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>Features in plain language</p>
+        <h1 id="page-title">Everything you can do—<em>and exactly where the edges are.</em></h1>
+        <p class="lede">
+          The CLI, your scripts, and MCP agents all call one typed application core, so every
+          capability below works the same way everywhere. What each account can actually do depends
+          on its provider route—<a href="providers.html">check yours first</a>—and any missing
+          capability is reported explicitly instead of being hidden or emulated.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="getting-started.html">Set it up in four steps</a>
+          <a class="button secondary" href="#evidence">How these claims are backed</a>
+        </div>
+      </section>
+
+      <section aria-labelledby="mailcal-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Across your accounts</p>
+          <h2 id="mailcal-title">Mail and calendars, without merging your identities.</h2>
+          <p>
+            Reads span every account you connect while keeping each result's account, provider, and
+            time-zone provenance. Writes are deliberately different: each one targets exactly one
+            account and consequential effects are previewed first.
+          </p>
+        </div>
+        <div class="capability-grid">
+          <article aria-labelledby="cap-mail">
+            <h3 id="cap-mail">Mail</h3>
+            <p>
+              Metadata comes first: lists and searches never include bodies or attachments, which
+              are separate, explicit, bounded reads.
+            </p>
+            <ul>
+              <li>Search one account or all of them, with explicit partial-failure reporting</li>
+              <li>List folders and messages; read a body or one attachment on request</li>
+              <li>Save drafts that can never send themselves</li>
+              <li>Send, reply, reply-all, and forward—text or HTML, bounded file attachments</li>
+              <li>Move messages, set read state, and permanently delete, each with a review</li>
+            </ul>
+            <p>
+              Every write is attempted exactly once. An unknown remote outcome is reported for
+              reconciliation, never retried automatically.
+            </p>
+          </article>
+          <article aria-labelledby="cap-calendar">
+            <h3 id="cap-calendar">Calendar and agenda</h3>
+            <p>
+              One agenda projection across every account, with original calendars, time zones, and
+              provider provenance attached to each event.
+            </p>
+            <ul>
+              <li>Discover selectable calendars per account</li>
+              <li>List bounded windows or one cross-account agenda</li>
+              <li>Create, update, and cancel events with preview → commit</li>
+              <li>Supported recurrence creation, replacement, and removal</li>
+              <li>
+                Required and optional attendees, with the route's notification behavior named in the
+                review
+              </li>
+              <li>
+                Meeting links only where native: Teams on Microsoft routes, Google Meet when the
+                calendar advertises it
+              </li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="tinted-section" id="agents" aria-labelledby="agents-page-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Agents and automation</p>
+          <h2 id="agents-page-title">The same core for AI agents and your scripts.</h2>
+          <p>
+            Nothing here is a second implementation. MCP tools and <code>--json</code> output call
+            the identical use cases and pass the identical policy checks as the interactive CLI.
+          </p>
+        </div>
+        <div class="capability-grid">
+          <article aria-labelledby="cap-agents">
+            <h3 id="cap-agents">For AI agents, over local stdio</h3>
+            <p>
+              Corresync exposes 40 narrow, typed tools and two read-only monitor resources. There is
+              no HTTP, SSE, remote endpoint, or hosted relay.
+            </p>
+            <ul>
+              <li>Metadata-first tools with per-account provenance in every result</li>
+              <li>Preview and commit are separate tools for every consequential write</li>
+              <li>Account add, rename, and remove are preview → commit pairs too</li>
+              <li>
+                Signing in, enabling monitoring, approving a runner or remote egress, purging
+                queues, imports, and updates stay CLI-only human actions
+              </li>
+              <li>Tool annotations inform client UX but never replace server-side policy</li>
+            </ul>
+            <p>
+              <a href="getting-started.html#connect">Connect your client</a> — Codex, Claude Code,
+              GitHub Copilot CLI, Gemini CLI, Qwen Code, Qoder, Kimi Code CLI, or any stdio MCP
+              client.
+            </p>
+          </article>
+          <article id="scripting" aria-labelledby="cap-scripting">
+            <h3 id="cap-scripting">For scripts, with stable JSON</h3>
+            <p>
+              Add <code>--json</code> to a command and it emits exactly one unstyled JSON value on
+              stdout—same isolation, bounds, and preview rules as everywhere else.
+            </p>
+            <div class="cmd" data-copy data-copy-label="JSON search example">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="cap-scripting"
+              ><code>corr mail search --all-accounts \
+    --query 'subject:"quarterly plan"' --json</code></pre>
+            </div>
+            <p>
+              Deep reference: the exact machine contract is documented in
+              <a href="https://github.com/nkiyohara/corresync/blob/main/docs/json.md"
+              >json.md on GitHub</a>.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section aria-labelledby="local-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>On your machine, on your terms</p>
+          <h2 id="local-title">Local capabilities you switch on deliberately.</h2>
+        </div>
+        <div class="capability-grid">
+          <article aria-labelledby="cap-import">
+            <h3 id="cap-import">Read-only import staging</h3>
+            <p>
+              Inspect one explicitly approved local source—recognized archives and exports, a
+              Maildir tree, or a Thunderbird profile—into bounded account-local staging.
+            </p>
+            <ul>
+              <li>Nothing is scanned until you re-run with the explicit read approval</li>
+              <li>Never authenticates, uploads, sends, or mutates the source</li>
+              <li>Purge removes only Corresync-owned staging, never your files</li>
+            </ul>
+          </article>
+          <article aria-labelledby="cap-monitoring">
+            <h3 id="cap-monitoring">Opt-in monitoring</h3>
+            <p>
+              Monitoring starts <strong>off</strong> for every account and advances one consent
+              boundary at a time: off → local notification → durable queue → one approved
+              runner.
+            </p>
+            <ul>
+              <li>Quiet hours, debounce, hourly limits, deduplication, and a circuit breaker</li>
+              <li>
+                Desktop notifications use local tools on Linux and macOS; on Windows they are
+                unavailable (no registered AppUserModelID), while queue and runner modes work
+              </li>
+              <li>
+                The runner is one absolute executable, invoked without a shell, fed bounded JSON;
+                remote egress is a separate explicit approval
+              </li>
+            </ul>
+          </article>
+          <article aria-labelledby="cap-feedback">
+            <h3 id="cap-feedback">Privacy-preserving feedback</h3>
+            <p>
+              <code>corr feedback</code> builds a redacted, allowlisted report locally—build,
+              platform, install method, config validity, aggregate capabilities, and optionally a
+              sanitized error class.
+            </p>
+            <ul>
+              <li>
+                Addresses, credentials, content, queries, and private paths are excluded by
+                construction
+              </li>
+              <li>Generation makes no network request</li>
+              <li>
+                Copying, saving, or opening a prefilled GitHub page each require an explicit flag;
+                nothing is ever submitted automatically
+              </li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="tinted-section" id="faq" aria-labelledby="faq-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Common questions</p>
+          <h2 id="faq-title">Answers before you install anything.</h2>
+        </div>
+        <div class="faq-grid">
+          <article aria-labelledby="faq-provider">
+            <h3 id="faq-provider">Will it work with my accounts?</h3>
+            <p>
+              Corresync speaks Outlook Web, Google Web (read-only), Google API, Microsoft Graph,
+              JMAP, IMAP/SMTP, and CalDAV, and you pick mail and calendar routes independently per
+              account. What a route can do—and any degradation your specific account reports—is
+              always explicit. <a href="providers.html">Compare the routes</a>.
+            </p>
+          </article>
+          <article aria-labelledby="faq-cost">
+            <h3 id="faq-cost">Does it cost anything?</h3>
+            <p>
+              No. Corresync is open source under the Apache-2.0 license. You bring the accounts you
+              already have; the Google API and Microsoft Graph routes additionally need a public
+              OAuth client registration you are authorized to use.
+            </p>
+          </article>
+          <article aria-labelledby="faq-data">
+            <h3 id="faq-data">Where does my mail live?</h3>
+            <p>
+              With your provider, as before. Corresync runs entirely on your machine—there is no
+              hosted relay and no cloud copy. Local state such as cursors, staging, queues, and
+              pending previews stays in local, account-isolated storage.
+            </p>
+          </article>
+          <article aria-labelledby="faq-agent-send">
+            <h3 id="faq-agent-send">Can an AI agent send something without me?</h3>
+            <p>
+              A consequential write first returns a review of the exact effect. Committing requires
+              that exact reviewed payload; approval is short-lived, single-use, and bound to the
+              caller, account, target, and content.
+              <a href="safety.html">Read the safety model</a>.
+            </p>
+          </article>
+          <article aria-labelledby="faq-phone-home">
+            <h3 id="faq-phone-home">Does Corresync phone home?</h3>
+            <p>
+              There is no telemetry pipeline and no automatic crash upload. An interactive CLI may
+              quietly check for a newer public release—sending only the Corresync version string,
+              cached for 24 hours, disabled for MCP, pipes, and JSON output—and you can turn that
+              off in configuration.
+            </p>
+          </article>
+          <article aria-labelledby="faq-unknown">
+            <h3 id="faq-unknown">What if a send fails halfway?</h3>
+            <p>
+              Every write is attempted once. If the provider may have changed remote state but
+              confirmation failed, Corresync stops and reports reconciliation instead of risking a
+              duplicate through an automatic retry.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="honest-edges" id="limits" aria-labelledby="limits-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>Honest limits</p>
+          <h2 id="limits-title">What Corresync deliberately does not do.</h2>
+          <p class="fine-print">
+            Per-account differences—like a JMAP server without submission or an IMAP server
+            without UIDPLUS—surface as typed capabilities and degradations, never as silent
+            fallback to another route.
+          </p>
+        </div>
+        <ul>
+          <li>
+            <strong>Google Web is read-only.</strong> Supported Google writes require explicitly
+            choosing the Google API route.
+          </li>
+          <li>
+            <strong>No shared OAuth client or token relay.</strong> Google API and Microsoft Graph
+            use a public client you register and are authorized to use.
+          </li>
+          <li>
+            <strong>No Teams chat, channels, calls, recordings, or meeting lifecycle
+              management.</strong> Only a provider-native join link on one calendar event.
+          </li>
+          <li>
+            <strong>No mailbox-rule or delegate-permission management</strong>, generic provider
+            property access, or arbitrary provider actions.
+          </li>
+          <li>
+            <strong>No unattended login, tenant-wide access, or TLS interception.</strong>
+            Sign-in stays visible and provider-owned.
+          </li>
+          <li>
+            <strong>No Windows desktop notifications yet</strong>—queue and approved runner modes
+            remain available.
+          </li>
+        </ul>
+      </section>
+
+      <section class="evidence-explainer" id="evidence" aria-labelledby="evidence-page-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>Claims follow evidence</p>
+          <h2 id="evidence-page-title">How compatibility is stated—and what it is not.</h2>
+        </div>
+        <div>
+          <p>
+            Every v0.8 provider route ships with deterministic synthetic provider-contract and
+            application coverage. That is a strong statement about the implementation—and a
+            deliberately limited one: each route remains <strong>live-unobserved</strong> until a
+            separately authorized, content-free observation is recorded against the exact Corresync
+            commit, provider route, and platform.
+          </p>
+          <p>
+            A missing observation is never reported as a pass, and default tests and CI never
+            activate a live mailbox or calendar. Check the current evidence before connecting an
+            account you consider sensitive.
+          </p>
+          <p class="deep-refs">
+            <strong>Deep technical references on GitHub:</strong>
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/compatibility.md"
+            >the full compatibility evidence matrix</a> ·
+            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/features.md"
+            >the exact per-action feature matrix and typed degradations</a>
+          </p>
+        </div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="features-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>Try it on your own accounts</p>
+        <h2 id="features-cta-title">Four clear steps from install to a cross-account answer.</h2>
+        <p>Install with one command, sign in visibly, and connect the agent you already use.</p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">Follow getting started</a>
+          <a class="button secondary" href="providers.html">Choose your provider route</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <p>
+        Independent local-first mail and calendar tooling. Not affiliated with or endorsed by
+        Google, Microsoft, or any provider or agent vendor named here.
+      </p>
+      <nav aria-label="Footer">
+        <a href="getting-started.html">Getting started</a>
+        <a href="providers.html">Providers</a>
+        <a href="features.html">Features</a>
+        <a href="safety.html">Safety</a>
+        <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security policy</a>
+        <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

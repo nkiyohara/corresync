@@ -134,6 +134,42 @@ func TestUpdateDirectInstallProducesStableJSON(t *testing.T) {
 	}
 }
 
+func TestUpdateRepairsMissingPrimaryCommand(t *testing.T) {
+	var stdout bytes.Buffer
+	app := updateTestRuntime(t, &stdout, updatecheck.Result{})
+	app.installMethod = func() updatecheck.InstallMethod { return updatecheck.InstallDirect }
+	app.installUpdate = func(
+		_ context.Context,
+		progress func(updatecheck.InstallProgress),
+	) (updatecheck.InstallResult, error) {
+		if progress != nil {
+			t.Fatal("JSON repair enabled progress output")
+		}
+		return updatecheck.InstallResult{
+			Status:         updatecheck.InstallStatusRepaired,
+			CurrentVersion: "0.8.0",
+			LatestVersion:  "v0.8.0",
+			ReleaseURL:     "https://github.com/nkiyohara/corresync/releases/tag/v0.8.0",
+			Archive:        "corresync_0.8.0_linux_amd64.tar.gz",
+			CanonicalPath:  "/synthetic/corr",
+		}, nil
+	}
+	if err := (&updateApplyCommand{JSON: true}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	var report updateActionReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != "repaired" || report.Updated ||
+		report.CurrentVersion != "0.8.0" ||
+		report.CanonicalPath != "/synthetic/corr" ||
+		len(report.Verification) != 4 ||
+		report.BackupPath != "" {
+		t.Fatalf("unexpected direct repair JSON: %s", stdout.String())
+	}
+}
+
 func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 	result := updatecheck.Result{
 		Status: updatecheck.StatusAvailable, CurrentVersion: "0.3.2",

@@ -79,6 +79,12 @@ func TestInstallerVerifiesAndReplacesDirectRelease(t *testing.T) {
 	if got, err := os.ReadFile(target); err != nil || !bytes.Equal(got, candidate) { // #nosec G304 -- test-controlled path.
 		t.Fatalf("updated target = %q, %v", got, err)
 	}
+	if result.CanonicalPath != filepath.Join(filepath.Dir(target), "corr") {
+		t.Fatalf("canonical path = %q", result.CanonicalPath)
+	}
+	if got, err := os.ReadFile(result.CanonicalPath); err != nil || !bytes.Equal(got, candidate) {
+		t.Fatalf("installed corr command = %q, %v", got, err)
+	}
 	if got, err := os.ReadFile(result.BackupPath); err != nil || !bytes.Equal(got, oldBinary) {
 		t.Fatalf("rollback copy = %q, %v", got, err)
 	}
@@ -270,8 +276,135 @@ func TestInstallerAcceptsCorresyncReleaseArtifacts(t *testing.T) {
 	}
 }
 
+func TestInstallerMigratesDirectCorresyncCommandToCorr(t *testing.T) {
+	directory := secureTempDir(t)
+	target := filepath.Join(directory, "corresync")
+	oldBinary := []byte("#!/bin/sh\nprintf old\n")
+	if err := os.WriteFile(target, oldBinary, 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
+		t.Fatal(err)
+	}
+	candidate := syntheticCandidate()
+	release := newSyntheticCorresyncUpdateRelease(t, candidate)
+	defer release.server.Close()
+
+	result, err := (Installer{
+		CurrentVersion: "1.0.0",
+		Executable:     target,
+		Endpoint:       release.server.URL + "/latest",
+		Client:         release.server.Client(),
+		GOOS:           "linux",
+		GOARCH:         "amd64",
+		VerifyProvenance: func(
+			context.Context,
+			string, string, string, string,
+		) error {
+			return nil
+		},
+	}).Install(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonicalPath := filepath.Join(directory, "corr")
+	if result.Status != InstallStatusUpdated ||
+		result.CanonicalPath != canonicalPath ||
+		result.PreviousVersion != "1.0.0" ||
+		result.CurrentVersion != "1.1.0" {
+		t.Fatalf("Install() = %+v", result)
+	}
+	for _, path := range []string{target, canonicalPath} {
+		if got, readErr := os.ReadFile(path); readErr != nil || !bytes.Equal(got, candidate) { // #nosec G304 -- test-controlled executable paths.
+			t.Fatalf("%s = %q, %v", path, got, readErr)
+		}
+	}
+	if got, readErr := os.ReadFile(result.BackupPath); readErr != nil ||
+		!bytes.Equal(got, oldBinary) {
+		t.Fatalf("rollback copy = %q, %v", got, readErr)
+	}
+}
+
+func TestInstallerRepairsCurrentDirectCorresyncCommand(t *testing.T) {
+	directory := secureTempDir(t)
+	target := filepath.Join(directory, "corresync")
+	candidate := syntheticCandidate()
+	if err := os.WriteFile(target, candidate, 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
+		t.Fatal(err)
+	}
+	stalePaths := []string{
+		target + ".backup-1.1.0",
+		filepath.Join(directory, ".corresync.new"),
+	}
+	for _, path := range stalePaths {
+		if err := os.WriteFile(path, []byte("leave unchanged"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	release := newSyntheticCorresyncUpdateRelease(t, candidate)
+	defer release.server.Close()
+
+	result, err := (Installer{
+		CurrentVersion: "1.1.0",
+		Executable:     target,
+		Endpoint:       release.server.URL + "/latest",
+		Client:         release.server.Client(),
+		GOOS:           "linux",
+		GOARCH:         "amd64",
+		VerifyProvenance: func(
+			context.Context,
+			string, string, string, string,
+		) error {
+			return nil
+		},
+	}).Install(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	canonicalPath := filepath.Join(directory, "corr")
+	if result.Status != InstallStatusRepaired ||
+		result.CanonicalPath != canonicalPath ||
+		result.CurrentVersion != "1.1.0" ||
+		result.PreviousVersion != "" ||
+		result.BackupPath != "" {
+		t.Fatalf("Install() = %+v", result)
+	}
+	if got, readErr := os.ReadFile(canonicalPath); readErr != nil || // #nosec G304 -- test-controlled executable path.
+		!bytes.Equal(got, candidate) {
+		t.Fatalf("repaired corr command = %q, %v", got, readErr)
+	}
+	if got, readErr := os.ReadFile(target); readErr != nil || !bytes.Equal(got, candidate) { // #nosec G304 -- test-controlled executable path.
+		t.Fatalf("compatibility command changed = %q, %v", got, readErr)
+	}
+	for _, path := range stalePaths {
+		if got, readErr := os.ReadFile(path); readErr != nil || // #nosec G304 -- test-controlled executable paths.
+			!bytes.Equal(got, []byte("leave unchanged")) {
+			t.Fatalf("unrelated legacy file %s changed = %q, %v", path, got, readErr)
+		}
+	}
+}
+
+func TestInstallerRequiresExistingCorrToOwnFutureUpdates(t *testing.T) {
+	directory := secureTempDir(t)
+	target := filepath.Join(directory, "corresync")
+	if err := os.WriteFile(target, syntheticCandidate(), 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
+		t.Fatal(err)
+	}
+	canonicalPath := filepath.Join(directory, "corr")
+	if err := os.WriteFile(canonicalPath, syntheticCandidate(), 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
+		t.Fatal(err)
+	}
+	_, err := (Installer{
+		CurrentVersion: "1.1.0",
+		Executable:     target,
+		GOOS:           "linux",
+		GOARCH:         "amd64",
+	}).Install(t.Context())
+	if err == nil || !strings.Contains(err.Error(), "run") ||
+		!strings.Contains(err.Error(), "corr update") {
+		t.Fatalf("Install() error = %v", err)
+	}
+}
+
 func TestInstallerDoesNotDownloadWhenCurrent(t *testing.T) {
-	target := filepath.Join(secureTempDir(t), "owa")
+	target := filepath.Join(secureTempDir(t), "corr")
 	if err := os.WriteFile(target, []byte("#!/bin/sh\n"), 0o755); err != nil { // #nosec G306 -- synthetic executable fixture.
 		t.Fatal(err)
 	}

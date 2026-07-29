@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-  <strong>All your mail and calendars. One local command.</strong><br>
-  A provider-neutral CLI and MCP server for people, scripts, and AI agents.
+  <strong>All your mail and calendars. One local MCP server and CLI.</strong><br>
+  Provider-neutral, local-first tooling for AI agents, scripts, and you.
 </p>
 
 <p align="center">
@@ -25,11 +25,11 @@
 
 <p align="center">
   <a href="https://nkiyohara.github.io/corresync/">Website</a> ·
-  <a href="docs/install.md">Install</a> ·
-  <a href="docs/configuration.md">Configure</a> ·
-  <a href="docs/mcp.md">Connect an agent</a> ·
-  <a href="docs/features.md">Feature matrix</a> ·
-  <a href="docs/README.md">All docs</a>
+  <a href="https://nkiyohara.github.io/corresync/getting-started.html">Getting started</a> ·
+  <a href="https://nkiyohara.github.io/corresync/providers.html">Providers</a> ·
+  <a href="https://nkiyohara.github.io/corresync/features.html">Features</a> ·
+  <a href="https://nkiyohara.github.io/corresync/safety.html">Safety</a> ·
+  <a href="docs/README.md">Technical docs</a>
 </p>
 <!-- markdownlint-enable MD013 MD033 -->
 
@@ -102,18 +102,35 @@ coverage. The v0.8 provider and platform implementations remain
 the exact commit. See [compatibility evidence](docs/compatibility.md) before
 connecting a sensitive account.
 
-## Five minutes to a first read
+## From install to a first read
+
+Prefer a guided page? Follow
+[getting started on the website](https://nkiyohara.github.io/corresync/getting-started.html).
 
 ### 1. Install
 
-```console
-# macOS or Linux
-brew install nkiyohara/corresync/corresync
+Each block below is complete for its platform: it installs `corr` and then
+verifies the installed version.
 
-# Windows
+#### Linux
+
+```console
+curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh
+corr --version
+```
+
+#### macOS (Homebrew — also works on Linux)
+
+```console
+brew install nkiyohara/corresync/corresync
+corr --version
+```
+
+#### Windows (Scoop)
+
+```console
 scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
 scoop install corresync/corresync
-
 corr --version
 ```
 
