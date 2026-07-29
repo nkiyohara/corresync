@@ -23,7 +23,9 @@ Use a clean checkout of the exact candidate commit:
 mise install
 mise exec -- task verify
 mise exec -- task release:check
-mise exec -- task release:snapshot
+GORELEASER_CURRENT_TAG=v0.8.0 \
+GORELEASER_PREVIOUS_TAG=v0.7.0 \
+  mise exec -- task release:snapshot
 ```
 
 Live mailbox tests remain separate and opt-in. Do not add them to `task verify`
@@ -33,6 +35,11 @@ or CI to obtain a release signal.
 
 Inspect `dist/artifacts.json`, `dist/checksums.txt`, every archive/package, and
 both SBOM formats. A snapshot never signs or publishes.
+
+The two tag overrides make an untagged candidate use the exact intended SemVer
+line. Change both values for later releases. Without them, GoReleaser derives a
+snapshot version from the most recent local tag, which tests packaging but does
+not prove the intended candidate version.
 
 The expected release inventory is:
 
