@@ -539,11 +539,6 @@ func eventID(
 }
 
 func prune(state *persistedState, retainAfter time.Time) {
-	for key, seen := range state.Seen {
-		if seen.LastSeenAt.Before(retainAfter) {
-			delete(state.Seen, key)
-		}
-	}
 	retained := state.Events[:0]
 	for _, event := range state.Events {
 		var completedAt *time.Time
@@ -558,6 +553,13 @@ func prune(state *persistedState, retainAfter time.Time) {
 		}
 	}
 	state.Events = retained
+	protected := protectedSeenKeys(state.Events)
+	for key, seen := range state.Seen {
+		if _, queued := protected[key]; !queued &&
+			seen.LastSeenAt.Before(retainAfter) {
+			delete(state.Seen, key)
+		}
+	}
 	pruneDispatches(state, retainAfter)
 }
 
@@ -596,10 +598,7 @@ func makeSeenCapacity(state *persistedState) bool {
 	if len(state.Seen) < maximumSeenObjects {
 		return true
 	}
-	protected := make(map[string]struct{}, len(state.Events))
-	for _, event := range state.Events {
-		protected[sourceKey(event.Provider, event.SourceObjectID)] = struct{}{}
-	}
+	protected := protectedSeenKeys(state.Events)
 	oldestKey := ""
 	var oldest time.Time
 	for key, seen := range state.Seen {
@@ -618,6 +617,14 @@ func makeSeenCapacity(state *persistedState) bool {
 	}
 	delete(state.Seen, oldestKey)
 	return true
+}
+
+func protectedSeenKeys(events []application.MonitorEvent) map[string]struct{} {
+	protected := make(map[string]struct{}, len(events))
+	for _, event := range events {
+		protected[sourceKey(event.Provider, event.SourceObjectID)] = struct{}{}
+	}
+	return protected
 }
 
 func pruneDispatches(state *persistedState, retainAfter time.Time) {

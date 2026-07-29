@@ -209,15 +209,17 @@ notification deferrals and failures leave delivery-bound events pending in the
 outbox instead of rewinding first-seen state. The engine attempts pending
 delivery before a new scan commit, so saturation cannot put the drain behind
 the failing write. Only matching objects occupy deduplication state; its oldest
-identity not protecting a queued event yields capacity, and purge clears both
-queue and dedup state. A cursor older than the bounded 1000-item recovery window
-is re-baselined at the newest inspected window while all inspected items still
-pass through deduplication and delivery. Because older uninspected items are not
-emitted, this is an explicit degraded result: the poll returns an overflow error
-and persists its count and time in monitor status. Reaching the actual mailbox
-end after a cursor was deleted is a complete re-baseline and does not report
-overflow. Terminal delivery records expire by completion time, and capacity
-pressure evicts the oldest terminal record before refusing new pending data.
+identity not protecting a queued event yields capacity, retention also
+preserves queued identities, and purge clears both queue and dedup state.
+Recovery pagination advances by actual returned item count. If recovery reaches
+neither the cursor nor a provider-attested mailbox end—because it exhausts the
+bounded 1000-item window or receives an empty non-terminal page—the inspected
+window is committed but the poll returns an explicit overflow error and
+persists its count and time in monitor status. Reaching the actual mailbox end
+after a cursor was deleted is a complete re-baseline and does not report
+overflow; an attested empty mailbox preserves the prior cursor. Terminal
+delivery records expire by completion time, and capacity pressure evicts the
+oldest terminal record before refusing new pending data.
 Notification processes are time-bound and receive metadata through native
 argument boundaries. Linux and macOS have local adapters; Windows rejects
 `notify` until a registered Corresync AppUserModelID exists. Agent mode

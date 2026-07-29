@@ -66,10 +66,12 @@ All notable user-facing changes are recorded here. The project follows
   notification utilities, persist notification events in a delivery-bound
   outbox, advance provider cursors monotonically across deferrals and failures,
   drain pending deliveries before new scan commits, expire terminal events
-  without evicting pending data, bound matched-only deduplication with safe
-  oldest-first eviction, distinguish mailbox-end rebaseline from true bounded
-  recovery overflow, preserve ACKs that race delivery completion, and reject
-  Windows `notify` setup until Corresync has a registered AppUserModelID.
+  without evicting pending data or their dedup identities, bound matched-only
+  deduplication with safe oldest-first eviction, paginate recovery by returned
+  item count, distinguish provider-attested mailbox end from incomplete bounded
+  recovery, preserve valid cursors across empty listings and ACKs that race
+  delivery completion, and reject Windows `notify` setup until Corresync has a
+  registered AppUserModelID.
 - Add `corr feedback`, an allowlisted deterministic report with an optional
   bounded generalized last-error record. Generation is local; copy/save/open
   actions occur only after full display, and GitHub is never submitted

@@ -205,9 +205,10 @@ Deferred notifications remain pending while the provider cursor advances
 monotonically, so a busy inbox cannot pin cursor recovery at an old message.
 Existing pending deliveries are drained before each new scan commit. Only
 matching objects occupy the bounded deduplication window; pressure evicts the
-oldest identity not protecting a queued event. Recovery beyond the bounded
-1000-message window is recorded and returned as an explicit degraded result
-rather than silently claiming complete delivery.
+oldest identity not protecting a queued event, and retention never removes an
+identity while its event remains queued. Recovery that reaches neither the
+saved cursor nor a provider-attested mailbox end is recorded and returned as
+an explicit degraded result rather than silently claiming complete delivery.
 Windows currently rejects `notify` setup because Corresync does not install a
 registered AppUserModelID; `queue` and `agent` remain available.
 

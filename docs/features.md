@@ -160,13 +160,15 @@ Terminal deliveries expire by completion time under retention; if the 10,000
 event bound is reached, the oldest terminal record yields capacity while
 pending data is never evicted. Only matching messages occupy the bounded
 deduplication window; the oldest identity not protecting a queued event yields
-capacity, and an explicit purge clears both queue and dedup state. If more than
-1000 messages separate the saved cursor from the inbox head, the inspected
-window is committed for continued operation, but status increments
-`recoveryOverflows`, records the time, and the poll returns an explicit
-overflow error because older uninspected messages were not emitted. A missing
-cursor in a completely inspected shorter or empty mailbox is a normal
-re-baseline, not an overflow.
+capacity, retention preserves identities for queued events, and an explicit
+purge clears both queue and dedup state. Recovery advances by actual returned
+item count. If it reaches neither the saved cursor nor a provider-attested
+mailbox end within the 1000-message bound, the inspected window is committed
+for continued operation, but status increments `recoveryOverflows`, records the
+time, and the poll returns an explicit overflow error because uninspected
+messages were not emitted. A missing cursor in a completely inspected shorter
+mailbox is a normal rebaseline; an attested empty mailbox preserves the prior
+cursor. Neither is an overflow.
 Runner and notification completion preserve an acknowledgement that races with
 delivery without redelivering the event. Desktop notification adapters are
 local and time-bound: Linux uses `notify-send`, macOS uses `osascript`, and

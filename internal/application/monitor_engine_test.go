@@ -518,6 +518,108 @@ func TestMonitorCursorRebaselinesAfterBoundedRecoveryWindow(t *testing.T) {
 	}
 }
 
+func TestMonitorCursorRecoveryUsesReturnedShortPageLength(t *testing.T) {
+	t.Parallel()
+	messages := make([]MailSummary, 0, 8)
+	for index := range 8 {
+		messages = append(messages, MailSummary{
+			ID: fmt.Sprintf("message-%d", index),
+			From: MailAddress{
+				Address: "sender@example.invalid",
+			},
+			Provenance: domain.Provenance{Provider: domain.ProviderJMAP},
+		})
+	}
+	reader := &shortPageMailReader{
+		fakeMailReader: &fakeMailReader{},
+		messages:       messages,
+		pageSize:       3,
+	}
+	store := &memoryMonitorStore{status: MonitorQueueStatus{
+		Initialized: true,
+		Cursor:      monitorCursor(domain.ProviderJMAP, "message-7"),
+	}}
+	engine, err := NewMonitorEngine(store, &memoryAudit{}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine.now = func() time.Time {
+		return time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	}
+	if err := engine.Poll(
+		t.Context(),
+		testMonitorPolicy(domain.MonitorQueue),
+		monitorMailService(t, reader),
+	); err != nil {
+		t.Fatalf("Poll() error = %v", err)
+	}
+	if !slices.Equal(reader.offsets, []int{0, 3, 6, 0, 3, 6}) ||
+		len(store.lastScan.Detections) != 7 ||
+		store.lastScan.RecoveryOverflow {
+		t.Fatalf(
+			"offsets=%v detections=%d overflow=%t",
+			reader.offsets,
+			len(store.lastScan.Detections),
+			store.lastScan.RecoveryOverflow,
+		)
+	}
+}
+
+func TestMonitorCursorRecoveryReportsTruncatedShortPageWalk(t *testing.T) {
+	t.Parallel()
+	messages := make([]MailSummary, 0, 4000)
+	for index := range 4000 {
+		messages = append(messages, MailSummary{
+			ID: fmt.Sprintf("message-%d", index),
+			From: MailAddress{
+				Address: "sender@example.invalid",
+			},
+			Provenance: domain.Provenance{Provider: domain.ProviderJMAP},
+		})
+	}
+	reader := &shortPageMailReader{
+		fakeMailReader: &fakeMailReader{},
+		messages:       messages,
+		pageSize:       30,
+	}
+	store := &memoryMonitorStore{status: MonitorQueueStatus{
+		Initialized: true,
+		Cursor:      monitorCursor(domain.ProviderJMAP, "older-than-window"),
+	}}
+	engine, err := NewMonitorEngine(store, &memoryAudit{}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine.now = func() time.Time {
+		return time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	}
+	err = engine.Poll(
+		t.Context(),
+		testMonitorPolicy(domain.MonitorQueue),
+		monitorMailService(t, reader),
+	)
+	if !errors.Is(err, ErrMonitorRecoveryOverflow) ||
+		len(store.lastScan.Detections) != monitorRecoveryLimit ||
+		!store.lastScan.RecoveryOverflow ||
+		store.status.RecoveryOverflows != 1 {
+		t.Fatalf(
+			"Poll() error=%v detections=%d status=%+v",
+			err,
+			len(store.lastScan.Detections),
+			store.status,
+		)
+	}
+	wantOffsets := make([]int, 0, 68)
+	for range 2 {
+		for offset := 0; offset < monitorRecoveryLimit; offset += 30 {
+			wantOffsets = append(wantOffsets, offset)
+		}
+	}
+	if !slices.Equal(reader.offsets, wantOffsets) {
+		t.Fatalf("short-page recovery offsets = %v, want %v", reader.offsets, wantOffsets)
+	}
+}
+
 func TestMonitorCursorRebaselineAtMailboxEndIsNotAnOverflow(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
@@ -540,9 +642,10 @@ func TestMonitorCursorRebaselineAtMailboxEndIsNotAnOverflow(t *testing.T) {
 				IncludesLastItem: true,
 			}
 			reader := &fakeMailReader{pages: []MailPage{page, page}}
+			originalCursor := monitorCursor(domain.ProviderJMAP, "deleted")
 			store := &memoryMonitorStore{status: MonitorQueueStatus{
 				Initialized: true,
-				Cursor:      monitorCursor(domain.ProviderJMAP, "deleted"),
+				Cursor:      originalCursor,
 			}}
 			engine, err := NewMonitorEngine(store, &memoryAudit{}, nil, nil)
 			if err != nil {
@@ -558,17 +661,56 @@ func TestMonitorCursorRebaselineAtMailboxEndIsNotAnOverflow(t *testing.T) {
 			); err != nil {
 				t.Fatalf("Poll() error = %v", err)
 			}
+			wantCursor := originalCursor
+			if len(test.messages) > 0 {
+				wantCursor = monitorCursor(domain.ProviderJMAP, test.messages[0].ID)
+			}
 			if store.lastScan.RecoveryOverflow ||
 				store.status.RecoveryOverflows != 0 ||
 				len(store.lastScan.Detections) != len(test.messages) ||
-				store.status.Cursor == monitorCursor(domain.ProviderJMAP, "deleted") {
+				store.status.Cursor != wantCursor {
 				t.Fatalf(
-					"rebaseline status=%+v scan=%+v",
+					"mailbox-end status=%+v scan=%+v, want cursor %q",
 					store.status,
 					store.lastScan,
+					wantCursor,
 				)
 			}
 		})
+	}
+}
+
+func TestMonitorEmptyNonTerminalPagePreservesCursorAndReportsOverflow(t *testing.T) {
+	t.Parallel()
+	page := MailPage{IncludesLastItem: false}
+	reader := &fakeMailReader{pages: []MailPage{page, page}}
+	cursor := monitorCursor(domain.ProviderJMAP, "current")
+	store := &memoryMonitorStore{status: MonitorQueueStatus{
+		Initialized: true,
+		Cursor:      cursor,
+	}}
+	engine, err := NewMonitorEngine(store, &memoryAudit{}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine.now = func() time.Time {
+		return time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	}
+	err = engine.Poll(
+		t.Context(),
+		testMonitorPolicy(domain.MonitorQueue),
+		monitorMailService(t, reader),
+	)
+	if !errors.Is(err, ErrMonitorRecoveryOverflow) ||
+		store.status.Cursor != cursor ||
+		!store.lastScan.RecoveryOverflow ||
+		len(store.lastScan.Detections) != 0 {
+		t.Fatalf(
+			"Poll() error=%v status=%+v scan=%+v",
+			err,
+			store.status,
+			store.lastScan,
+		)
 	}
 }
 
@@ -838,6 +980,28 @@ func monitorMailService(t *testing.T, reader MailPort) *MailService {
 		t.Fatal(err)
 	}
 	return service
+}
+
+type shortPageMailReader struct {
+	*fakeMailReader
+	messages []MailSummary
+	pageSize int
+	offsets  []int
+}
+
+func (reader *shortPageMailReader) ListMessages(
+	_ context.Context,
+	input MailListInput,
+) (MailPage, error) {
+	reader.offsets = append(reader.offsets, input.Offset)
+	start := min(input.Offset, len(reader.messages))
+	size := min(reader.pageSize, input.Limit)
+	end := min(start+size, len(reader.messages))
+	return MailPage{
+		Messages:         append([]MailSummary(nil), reader.messages[start:end]...),
+		TotalItemsInView: len(reader.messages),
+		IncludesLastItem: end == len(reader.messages),
+	}, nil
 }
 
 func testMonitorPolicy(mode domain.MonitorMode) MonitorPolicy {

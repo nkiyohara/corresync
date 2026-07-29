@@ -498,6 +498,61 @@ func TestDeduplicationTracksOnlyMatchesAndEvictsOldestUnqueuedEntry(t *testing.T
 	}
 }
 
+func TestRetentionKeepsDeduplicationForQueuedEvents(t *testing.T) {
+	t.Parallel()
+	store := NewAt(t.TempDir())
+	start := time.Date(2026, 7, 28, 12, 0, 0, 0, time.UTC)
+	if _, err := store.CommitScan(
+		t.Context(),
+		testScan(testAccountA, start, true, "baseline", nil),
+	); err != nil {
+		t.Fatal(err)
+	}
+	detection := testDetection(testAccountA, "pending", true)
+	if _, err := store.CommitScan(
+		t.Context(),
+		testScan(
+			testAccountA,
+			start.Add(time.Minute),
+			false,
+			"first",
+			[]application.MonitorDetection{detection},
+		),
+	); err != nil {
+		t.Fatal(err)
+	}
+	repeated := testScan(
+		testAccountA,
+		start.Add(2*time.Hour),
+		false,
+		"repeated",
+		[]application.MonitorDetection{detection},
+	)
+	repeated.RetainAfter = start.Add(time.Hour)
+	result, err := store.CommitScan(t.Context(), repeated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Duplicates != 1 || len(result.Events) != 0 {
+		t.Fatalf("repeated result = %+v, want one duplicate and no new event", result)
+	}
+	state, _, err := store.load(testAccountA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := sourceKey(detection.Provider, detection.SourceObjectID)
+	if len(state.Events) != 1 || len(state.Seen) != 1 {
+		t.Fatalf(
+			"retained queue state has %d events and %d seen records",
+			len(state.Events),
+			len(state.Seen),
+		)
+	}
+	if seen, exists := state.Seen[key]; !exists || seen.Count != 2 {
+		t.Fatalf("protected deduplication record = %+v, exists=%t", seen, exists)
+	}
+}
+
 func TestMarkDispatchPreservesConcurrentAcknowledgement(t *testing.T) {
 	t.Parallel()
 	store := NewAt(t.TempDir())

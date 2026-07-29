@@ -20,8 +20,8 @@ const (
 )
 
 var ErrMonitorRecoveryOverflow = errors.New(
-	"monitor cursor recovery exceeded 1000 inbox messages; " +
-		"the inspected window was committed and older uninspected messages were not emitted",
+	"monitor cursor recovery ended before the saved cursor or mailbox end; " +
+		"the inspected bounded window was committed and uninspected messages were not emitted",
 )
 
 // MonitorEngine performs one bounded poll. Scheduling and authenticated
@@ -272,23 +272,26 @@ func (engine *MonitorEngine) readMailboxWindow(
 	newCursor := state.Cursor
 	recovered := !state.Initialized
 	reachedEnd := false
-	for offset := 0; offset < monitorRecoveryLimit; offset += monitorPageSize {
+	for offset := 0; offset < monitorRecoveryLimit; {
+		limit := min(monitorPageSize, monitorRecoveryLimit-offset)
 		page, err := mail.List(ctx, MailListInput{
 			Account: policy.Account,
 			Folder:  MailFolder{Kind: MailFolderDistinguished, ID: "inbox"},
-			Offset:  offset, Limit: monitorPageSize, TimeZone: "UTC",
+			Offset:  offset, Limit: limit, TimeZone: "UTC",
 		}, caller)
 		if err != nil {
 			return nil, "", false, err
 		}
-		if offset == 0 {
-			newCursor = ""
-			if len(page.Messages) > 0 {
-				newCursor = monitorCursor(
-					page.Messages[0].Provenance.Provider,
-					page.Messages[0].ID,
-				)
-			}
+		if len(page.Messages) > limit {
+			return nil, "", false, errors.New(
+				"mail provider returned an oversized monitor page",
+			)
+		}
+		if offset == 0 && len(page.Messages) > 0 {
+			newCursor = monitorCursor(
+				page.Messages[0].Provenance.Provider,
+				page.Messages[0].ID,
+			)
 		}
 		for _, message := range page.Messages {
 			messageCursor := monitorCursor(message.Provenance.Provider, message.ID)
@@ -301,18 +304,21 @@ func (engine *MonitorEngine) readMailboxWindow(
 		if recovered {
 			break
 		}
-		if page.IncludesLastItem || len(page.Messages) == 0 {
+		if page.IncludesLastItem {
 			reachedEnd = true
 			break
 		}
+		if len(page.Messages) == 0 {
+			break
+		}
+		offset += len(page.Messages)
 	}
-	// Only exhausting the complete bounded window without reaching the end is
-	// an overflow. A deleted cursor in a short or empty mailbox is a complete
-	// inspection and therefore a normal re-baseline.
+	// A provider must either return the saved cursor or explicitly attest to
+	// mailbox end. Exhausting the bounded window and an empty non-terminal
+	// page are both degraded recovery; neither may silently claim completeness.
 	recoveryOverflow := state.Initialized &&
 		!recovered &&
-		!reachedEnd &&
-		len(messages) >= monitorRecoveryLimit
+		!reachedEnd
 	if newCursor == "" {
 		empty := sha256.Sum256([]byte("empty:" + string(policy.Account)))
 		newCursor = hex.EncodeToString(empty[:])

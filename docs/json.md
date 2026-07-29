@@ -138,12 +138,14 @@ deterministic `evt_` IDs, a `delivery` value (`queue`, `notification`, or
 private untrusted data. Acknowledgement returns the same event with state
 `acknowledged` and is idempotent.
 
-When cursor recovery exceeds 1000 inbox messages, the inspected bounded window
-is committed so monitoring can continue, but the poll fails explicitly and
-status records `recoveryOverflows` plus `lastRecoveryOverflowAt`. Older
-uninspected messages are not claimed as emitted. A deleted cursor in a shorter
-or empty mailbox does not count as overflow when the provider reports the end
-of the mailbox. Event purge also clears the private deduplication window.
+When cursor recovery reaches neither the saved cursor nor a provider-attested
+mailbox end, the inspected bounded window is committed so monitoring can
+continue, but the poll fails explicitly and status records `recoveryOverflows`
+plus `lastRecoveryOverflowAt`. Uninspected messages are not claimed as emitted.
+A deleted cursor in a shorter mailbox does not count as overflow when the
+provider reports mailbox end. An attested empty mailbox preserves the prior
+cursor. Event purge clears the private deduplication window; ordinary retention
+preserves identities referenced by queued events.
 
 ## Imports
 

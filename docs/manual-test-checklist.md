@@ -397,8 +397,10 @@ pending, then confirm a later poll drains them once delivery is allowed.
 With a synthetic adapter only, place the prior cursor beyond the 1000-message
 recovery window and confirm the poll returns an explicit overflow, monitor
 status increments the durable overflow counter/time, and the inspected window
-still becomes the new bounded baseline. Do not perform this load test against a
-live mailbox.
+still becomes the new bounded baseline. Also return short non-terminal pages
+and confirm offsets advance by the returned item count; an empty non-terminal
+page must return the same degraded result without replacing the prior cursor.
+Do not perform these load tests against a live mailbox.
 
 Queue mode requires a separate step. Test acknowledgement twice and confirm
 idempotence. Agent mode requires a disposable absolute runner, direct execution
