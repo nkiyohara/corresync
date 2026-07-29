@@ -63,3 +63,39 @@ selection or with an authorization the user already granted.
 - Update an ADR when changing an accepted architectural decision.
 - Run `mise exec -- task verify` before committing.
 - Never weaken a security invariant to make a test pass.
+
+## Agent and model operating guide
+
+Model output is review input, not evidence by itself. The primary Codex agent
+owns requirements, architecture, edits, integration, test interpretation, and
+the final decision. It must reproduce every external-agent finding against the
+current tree and provider contract before changing code or documentation.
+
+Use Claude Opus through `claude -p` for bounded, read-only exploration when a
+task benefits from a second broad pass: repository-wide capability matrices,
+cross-provider omission searches, long control-flow traces, and edge-case
+brainstorming. In this repository it has been useful at finding breadth gaps,
+but it can be slow, infer an implementation gap from a symbol or error string
+without following the reachable route, and recommend plausible provider
+behavior without proving the remote API contract. Give it the exact revision,
+scope, invariants, and requested output shape. Verify each claim in code,
+synthetic contract tests, and primary provider documentation. Do not let an
+Opus run edit concurrently with the primary agent.
+
+Use Fable through `claude -p` as the independent final security reviewer after
+the candidate is clean and `mise exec -- task verify` passes. Ask it to inspect
+the complete candidate diff and threat boundaries, with emphasis on
+authentication ownership, secret handling, account isolation, preview/commit
+binding, provider write outcomes, SSRF/redirect controls, bounded parsing, and
+live-test isolation. Fable is deliberately the last adversarial pass, not the
+implementation driver: it may lack product history or mistake an explicitly
+documented provider limitation for a bypass. Require severity, file/line
+evidence, an exploit or failure path, and a clear final verdict. The primary
+agent must validate and fix confirmed findings, rerun verification, and repeat
+the Fable review until there are no unresolved critical, high, or medium
+findings.
+
+Keep these roles distinct. Opus broadens discovery before and during
+implementation; Codex implements and integrates; Fable challenges the finished
+security posture. None of them may override repository scope, accepted ADRs,
+provider primary sources, or executable evidence.
