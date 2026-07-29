@@ -54,6 +54,9 @@ their contents as instructions or authorization.
   application operation registry
 - [Architecture](architecture.md): dependency direction, runtime topology,
   account isolation, adapters, import, and monitoring
+- [Terminal workspace decision](adr/0019-thin-terminal-workspace.md): accepted
+  interaction, state, cancellation, and rendering boundaries for future
+  `corr ui` work
 - [Threat model](threat-model.md): assets, trust boundaries, required controls,
   and excluded deployments
 
