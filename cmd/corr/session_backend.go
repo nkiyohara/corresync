@@ -2746,7 +2746,7 @@ func calDAVCalendarEffects(
 		UpdateAttendeeNotifications: true,
 		CancelAttendeeNotifications: true,
 		CancellationMode:            application.CalendarCancellationProviderManaged,
-		CancellationDisposition:     application.CalendarDispositionRemoteDelete,
+		CancellationDisposition:     application.CalendarDispositionCalendarObject,
 	}
 }
 

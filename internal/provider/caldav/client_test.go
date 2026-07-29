@@ -313,6 +313,22 @@ func TestCalDAVOriginalTimePreservesFloatingAndZoneSemantics(t *testing.T) {
 	}
 }
 
+func TestCalDAVRecurrenceDateListsAreParsedWithoutLosingValues(t *testing.T) {
+	t.Parallel()
+	property := ical.NewProp(ical.PropExceptionDates)
+	property.SetValueType(ical.ValueDateTime)
+	property.Value = "20260728T090000Z,20260804T090000Z"
+	values, err := calDAVRecurrencePropertyTimes(*property, time.UTC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(values) != 2 ||
+		values[0].UTC().Format(time.RFC3339) != "2026-07-28T09:00:00Z" ||
+		values[1].UTC().Format(time.RFC3339) != "2026-08-04T09:00:00Z" {
+		t.Fatalf("recurrence date values = %#v", values)
+	}
+}
+
 func TestCalDAVDistinguishesAmbiguousAndDefiniteWriteStatuses(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -736,6 +752,173 @@ func TestCalDAVSchedulingGuardsAttendeeUpdatesAndCancellation(t *testing.T) {
 		scheduleMatches[0] != `"schedule-v1"` ||
 		scheduleMatches[1] != `"schedule-v1"` {
 		t.Fatalf("If-Schedule-Tag-Match = %#v", scheduleMatches)
+	}
+}
+
+func TestCalDAVRecurringInstanceWritesStayScopedAndScheduled(t *testing.T) {
+	t.Parallel()
+
+	server, backend, httpClient := newFixtureServerMode(t, true)
+	client, err := New(t.Context(), Options{
+		Endpoint: server.URL, Username: "reader@example.invalid",
+		Password: []byte("synthetic-secret"), Client: httpClient,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+
+	calendar := fixtureCalendar(
+		"recurring-write",
+		[]string{"guest@example.invalid"},
+	)
+	master := calendar.Events()[0]
+	rule := ical.NewProp(ical.PropRecurrenceRule)
+	rule.SetValueType(ical.ValueRecurrence)
+	rule.Value = "FREQ=WEEKLY;COUNT=3"
+	master.Props.Set(rule)
+	backend.mu.Lock()
+	backend.objects[fixtureObjectPath] = webcaldav.CalendarObject{
+		Path: fixtureObjectPath,
+		ETag: "v1",
+		Data: calendar,
+	}
+	backend.version = 1
+	backend.mu.Unlock()
+
+	window := application.CalendarListInput{
+		Calendar: application.CalendarFolder{
+			Kind: application.CalendarFolderDistinguished,
+			ID:   "calendar",
+		},
+		Start: "2026-07-27T00:00:00Z",
+		End:   "2026-08-20T00:00:00Z",
+	}
+	page, err := client.ListCalendarEvents(t.Context(), window)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Events) != 3 {
+		t.Fatalf("initial recurrence page = %#v", page)
+	}
+	replacement := application.CalendarRecurrence{
+		Pattern:             application.CalendarRecurrenceDaily,
+		Interval:            1,
+		NumberOfOccurrences: 2,
+	}
+	if _, err := client.UpdateCalendarEvent(
+		t.Context(),
+		application.CalendarUpdateInput{
+			EventID:           page.Events[1].ID,
+			ChangeKey:         page.Events[1].ChangeKey,
+			ReplaceRecurrence: true,
+			Recurrence:        &replacement,
+		},
+	); err == nil || !strings.Contains(err.Error(), "series operation") {
+		t.Fatalf("instance recurrence replacement error = %v", err)
+	}
+
+	subject := "Only the second occurrence"
+	updated, err := client.UpdateCalendarEvent(
+		t.Context(),
+		application.CalendarUpdateInput{
+			EventID:   page.Events[1].ID,
+			ChangeKey: page.Events[1].ChangeKey,
+			Subject:   &subject,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend.mu.Lock()
+	storedAfterUpdate := backend.objects[fixtureObjectPath]
+	backend.mu.Unlock()
+	eventsAfterUpdate := storedAfterUpdate.Data.Events()
+	if len(eventsAfterUpdate) != 2 ||
+		eventsAfterUpdate[0].Props.Get(ical.PropRecurrenceRule) == nil ||
+		eventRecurrenceID(eventsAfterUpdate[1]) == "" {
+		t.Fatalf(
+			"materialized recurrence object = %#v",
+			eventsAfterUpdate,
+		)
+	}
+	masterSubject, _ := eventsAfterUpdate[0].Props.Text(ical.PropSummary)
+	instanceSubject, _ := eventsAfterUpdate[1].Props.Text(ical.PropSummary)
+	if masterSubject != "Synthetic event" ||
+		instanceSubject != subject {
+		t.Fatalf(
+			"recurrence subjects = %q, %q",
+			masterSubject,
+			instanceSubject,
+		)
+	}
+	instanceSequence, err := eventsAfterUpdate[1].Props.Get(
+		ical.PropSequence,
+	).Int()
+	if err != nil || instanceSequence != 1 {
+		t.Fatalf(
+			"updated instance SEQUENCE = %d error = %v",
+			instanceSequence,
+			err,
+		)
+	}
+
+	updatedPage, err := client.ListCalendarEvents(t.Context(), window)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updatedPage.Events) != 3 ||
+		updatedPage.Events[1].Subject != subject {
+		t.Fatalf("updated recurrence page = %#v", updatedPage)
+	}
+
+	if err := client.CancelCalendarEvent(
+		t.Context(),
+		application.CalendarCancelInput{
+			EventID:   updated.ID,
+			ChangeKey: updated.ChangeKey,
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	backend.mu.Lock()
+	storedAfterCancel, exists := backend.objects[fixtureObjectPath]
+	deleteMatches := append([]string(nil), backend.deleteMatches...)
+	putConditions := append([]string(nil), backend.putConditions...)
+	scheduleMatches := append([]string(nil), backend.scheduleMatches...)
+	backend.mu.Unlock()
+	if !exists || len(deleteMatches) != 0 ||
+		len(putConditions) != 2 ||
+		len(scheduleMatches) != 2 {
+		t.Fatalf(
+			"scoped cancel exists=%t delete=%#v put=%#v schedule=%#v",
+			exists,
+			deleteMatches,
+			putConditions,
+			scheduleMatches,
+		)
+	}
+	remainingEvents := storedAfterCancel.Data.Events()
+	if len(remainingEvents) != 1 ||
+		len(remainingEvents[0].Props.Values(ical.PropExceptionDates)) != 1 {
+		t.Fatalf("cancelled recurrence object = %#v", remainingEvents)
+	}
+	masterSequence, err := remainingEvents[0].Props.Get(
+		ical.PropSequence,
+	).Int()
+	if err != nil || masterSequence != 1 {
+		t.Fatalf(
+			"cancelled master SEQUENCE = %d error = %v",
+			masterSequence,
+			err,
+		)
+	}
+	cancelledPage, err := client.ListCalendarEvents(t.Context(), window)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cancelledPage.Events) != 2 {
+		t.Fatalf("cancelled recurrence page = %#v", cancelledPage)
 	}
 }
 

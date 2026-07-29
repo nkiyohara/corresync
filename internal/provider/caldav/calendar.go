@@ -89,20 +89,6 @@ func (client *Client) ListCalendarEvents(
 	return page, nil
 }
 
-func (client *Client) eventView(
-	calendarPath, objectPath, etag string,
-	event ical.Event,
-) (application.CalendarEvent, error) {
-	return client.eventViewAt(
-		calendarPath,
-		objectPath,
-		etag,
-		event,
-		time.Time{},
-		eventRecurrenceID(event),
-	)
-}
-
 func (client *Client) eventViewAt(
 	calendarPath, objectPath, etag string,
 	event ical.Event,
@@ -207,6 +193,13 @@ func (client *Client) calendarObjectViews(
 		seen := make(map[string]struct{}, len(events))
 		for index, event := range events {
 			recurrenceID := eventRecurrenceID(event)
+			if recurrenceID != "" {
+				normalized, err := recurrenceInstant(event)
+				if err != nil {
+					return nil, err
+				}
+				recurrenceID = normalized
+			}
 			if recurrenceID == "" && len(events) > 1 {
 				start, err := event.DateTimeStart(time.UTC)
 				if err != nil {
@@ -286,7 +279,6 @@ func (client *Client) calendarObjectViews(
 		if exception, exists := exceptions[key]; exists {
 			event = exception
 			delete(exceptions, key)
-			recurrenceID = eventRecurrenceID(exception)
 		} else {
 			override = occurrence
 		}
@@ -315,11 +307,17 @@ func (client *Client) calendarObjectViews(
 		if !instanceStart.Before(windowEnd) || !instanceEnd.After(windowStart) {
 			continue
 		}
-		view, err := client.eventView(
+		recurrenceID, err := recurrenceInstant(exception)
+		if err != nil {
+			return nil, err
+		}
+		view, err := client.eventViewAt(
 			calendarPath,
 			objectPath,
 			etag,
 			exception,
+			time.Time{},
+			recurrenceID,
 		)
 		if err != nil {
 			return nil, err
@@ -363,18 +361,28 @@ func expandCalDAVRecurrence(
 	set.DTStart(start)
 	set.RRule(rule)
 	for _, property := range event.Props.Values(ical.PropExceptionDates) {
-		value, err := property.DateTime(start.Location())
+		values, err := calDAVRecurrencePropertyTimes(
+			property,
+			start.Location(),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("parse CalDAV EXDATE: %w", err)
 		}
-		set.ExDate(value)
+		for _, value := range values {
+			set.ExDate(value)
+		}
 	}
 	for _, property := range event.Props.Values(ical.PropRecurrenceDates) {
-		value, err := property.DateTime(start.Location())
+		values, err := calDAVRecurrencePropertyTimes(
+			property,
+			start.Location(),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("parse CalDAV RDATE: %w", err)
 		}
-		set.RDate(value)
+		for _, value := range values {
+			set.RDate(value)
+		}
 	}
 	occurrences := set.Between(windowStart.Add(-duration), windowEnd, true)
 	filtered := occurrences[:0]
@@ -391,6 +399,30 @@ func expandCalDAVRecurrence(
 		}
 	}
 	return filtered, nil
+}
+
+func calDAVRecurrencePropertyTimes(
+	property ical.Prop,
+	location *time.Location,
+) ([]time.Time, error) {
+	rawValues := strings.Split(property.Value, ",")
+	if len(rawValues) == 0 {
+		return nil, errors.New("recurrence date property is empty")
+	}
+	result := make([]time.Time, 0, len(rawValues))
+	for _, raw := range rawValues {
+		if raw == "" {
+			return nil, errors.New("recurrence date property is malformed")
+		}
+		value := property
+		value.Value = raw
+		parsed, err := value.DateTime(location)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, parsed)
+	}
+	return result, nil
 }
 
 func eventUID(event ical.Event) string {
@@ -618,7 +650,27 @@ func (client *Client) UpdateCalendarEvent(
 	if err != nil {
 		return application.CalendarUpdateResult{}, err
 	}
-	requiresScheduling := len(event.Props.Values(ical.PropAttendee)) != 0 ||
+	if reference.RecurrenceID != "" && input.ReplaceRecurrence {
+		return application.CalendarUpdateResult{}, errors.New(
+			"CalDAV recurrence replacement requires an explicit series operation",
+		)
+	}
+	if reference.RecurrenceID != "" &&
+		event.Props.Get(ical.PropRecurrenceID) == nil &&
+		event.Props.Get(ical.PropRecurrenceRule) != nil {
+		event, err = materializeCalDAVOccurrence(
+			object.Data,
+			event,
+			reference.RecurrenceID,
+		)
+		if err != nil {
+			return application.CalendarUpdateResult{}, err
+		}
+	}
+	requiresScheduling := calDAVObjectHasAttendees(
+		object.Data,
+		reference.UID,
+	) ||
 		input.ReplaceAttendees &&
 			len(input.RequiredAttendees)+len(input.OptionalAttendees) != 0
 	if requiresScheduling && !client.scheduling {
@@ -702,7 +754,12 @@ func (client *Client) UpdateCalendarEvent(
 			event.Props.Set(property)
 		}
 	}
-	if requiresScheduling {
+	if requiresScheduling &&
+		client.organizesCalDAVObject(
+			object.Data,
+			reference.UID,
+			event,
+		) {
 		if err := incrementEventSequence(&event); err != nil {
 			return application.CalendarUpdateResult{}, err
 		}
@@ -734,11 +791,18 @@ func (client *Client) CancelCalendarEvent(
 	ctx context.Context,
 	input application.CalendarCancelInput,
 ) error {
-	reference, _, event, err := client.exactEvent(ctx, input.EventID, input.ChangeKey)
+	reference, object, event, err := client.exactEvent(
+		ctx,
+		input.EventID,
+		input.ChangeKey,
+	)
 	if err != nil {
 		return err
 	}
-	attendeeEvent := len(event.Props.Values(ical.PropAttendee)) != 0
+	attendeeEvent := calDAVObjectHasAttendees(
+		object.Data,
+		reference.UID,
+	)
 	if attendeeEvent && !client.scheduling {
 		return errors.New(
 			"CalDAV attendee cancellation requires discovered RFC 6638 scheduling; event was not deleted",
@@ -755,6 +819,41 @@ func (client *Client) CancelCalendarEvent(
 			return err
 		}
 		headers.Set("If-Schedule-Tag-Match", strconv.Quote(scheduleTag))
+	}
+	if reference.RecurrenceID != "" {
+		changed, deleteResource, err := cancelCalDAVOccurrence(
+			object.Data,
+			reference,
+			event,
+		)
+		if err != nil {
+			return err
+		}
+		if !deleteResource {
+			if attendeeEvent &&
+				client.organizesCalDAVObject(
+					object.Data,
+					reference.UID,
+					changed,
+				) {
+				if err := incrementEventSequence(&changed); err != nil {
+					return err
+				}
+			}
+			changed.Props.SetDateTime(
+				ical.PropLastModified,
+				time.Now().UTC(),
+			)
+			_, err = client.conditionalRequestWithHeaders(
+				ctx,
+				http.MethodPut,
+				reference.Calendar,
+				reference.Path,
+				headers,
+				object.Data,
+			)
+			return err
+		}
 	}
 	_, err = client.conditionalRequestWithHeaders(
 		ctx,
@@ -812,13 +911,47 @@ func (client *Client) exactEvent(
 	events := object.Data.Events()
 	if reference.RecurrenceID != "" {
 		for _, candidate := range events {
-			if eventUID(candidate) == reference.UID &&
-				eventRecurrenceID(candidate) == reference.RecurrenceID {
+			if eventUID(candidate) != reference.UID {
+				continue
+			}
+			identity, err := calDAVOccurrenceIdentity(
+				candidate,
+				len(events) > 1,
+			)
+			if err != nil {
+				return eventReference{}, nil, ical.Event{}, err
+			}
+			if identity == reference.RecurrenceID {
+				return reference, object, candidate, nil
+			}
+		}
+		for _, candidate := range events {
+			if eventUID(candidate) != reference.UID ||
+				candidate.Props.Get(ical.PropRecurrenceRule) == nil {
+				continue
+			}
+			occurrence, err := time.Parse(
+				time.RFC3339Nano,
+				reference.RecurrenceID,
+			)
+			if err != nil {
+				return eventReference{}, nil, ical.Event{}, errors.New(
+					"CalDAV recurrence instance identity is malformed",
+				)
+			}
+			contains, err := calDAVRecurrenceContains(
+				candidate,
+				occurrence,
+			)
+			if err != nil {
+				return eventReference{}, nil, ical.Event{}, err
+			}
+			if contains {
 				return reference, object, candidate, nil
 			}
 		}
 		return eventReference{}, nil, ical.Event{}, errors.New(
-			"CalDAV recurrence instance is not materialized for a safe write",
+			"CalDAV recurrence instance is not part of the current series",
 		)
 	}
 	if len(events) != 1 {
@@ -831,6 +964,312 @@ func (client *Client) exactEvent(
 		return eventReference{}, nil, ical.Event{}, errors.New("CalDAV event UID changed")
 	}
 	return reference, object, events[0], nil
+}
+
+func calDAVOccurrenceIdentity(
+	event ical.Event,
+	synthesize bool,
+) (string, error) {
+	if event.Props.Get(ical.PropRecurrenceID) != nil {
+		return recurrenceInstant(event)
+	}
+	if !synthesize || event.Props.Get(ical.PropRecurrenceRule) != nil {
+		return "", nil
+	}
+	start, err := event.DateTimeStart(time.UTC)
+	if err != nil {
+		return "", errors.New(
+			"CalDAV expanded recurrence instance has a malformed start",
+		)
+	}
+	return start.UTC().Format(time.RFC3339Nano), nil
+}
+
+func calDAVRecurrenceContains(
+	master ical.Event,
+	occurrence time.Time,
+) (bool, error) {
+	start, err := master.DateTimeStart(time.UTC)
+	if err != nil {
+		return false, err
+	}
+	end, err := master.DateTimeEnd(time.UTC)
+	if err != nil {
+		return false, err
+	}
+	duration := end.Sub(start)
+	if duration <= 0 {
+		return false, errors.New("CalDAV recurring event has an invalid duration")
+	}
+	values, err := expandCalDAVRecurrence(
+		master,
+		occurrence,
+		occurrence.Add(duration),
+	)
+	if err != nil {
+		return false, err
+	}
+	for _, value := range values {
+		if value.Equal(occurrence) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func materializeCalDAVOccurrence(
+	calendar *ical.Calendar,
+	master ical.Event,
+	recurrenceID string,
+) (ical.Event, error) {
+	occurrence, err := time.Parse(time.RFC3339Nano, recurrenceID)
+	if err != nil {
+		return ical.Event{}, errors.New(
+			"CalDAV recurrence instance identity is malformed",
+		)
+	}
+	start, err := master.DateTimeStart(time.UTC)
+	if err != nil {
+		return ical.Event{}, err
+	}
+	end, err := master.DateTimeEnd(time.UTC)
+	if err != nil {
+		return ical.Event{}, err
+	}
+	component := cloneICalComponent(master.Component)
+	event := ical.Event{Component: component}
+	event.Props.Del(ical.PropRecurrenceRule)
+	event.Props.Del(ical.PropRecurrenceDates)
+	event.Props.Del(ical.PropExceptionDates)
+	startProperty := master.Props.Get(ical.PropDateTimeStart)
+	instanceStart, err := calDAVInstanceProperty(
+		ical.PropDateTimeStart,
+		startProperty,
+		occurrence,
+	)
+	if err != nil {
+		return ical.Event{}, err
+	}
+	event.Props.Set(instanceStart)
+	recurrenceProperty, err := calDAVInstanceProperty(
+		ical.PropRecurrenceID,
+		startProperty,
+		occurrence,
+	)
+	if err != nil {
+		return ical.Event{}, err
+	}
+	event.Props.Set(recurrenceProperty)
+	if endProperty := master.Props.Get(ical.PropDateTimeEnd); endProperty != nil {
+		instanceEnd, err := calDAVInstanceProperty(
+			ical.PropDateTimeEnd,
+			endProperty,
+			occurrence.Add(end.Sub(start)),
+		)
+		if err != nil {
+			return ical.Event{}, err
+		}
+		event.Props.Set(instanceEnd)
+	}
+	calendar.Children = append(calendar.Children, component)
+	return event, nil
+}
+
+func cancelCalDAVOccurrence(
+	calendar *ical.Calendar,
+	reference eventReference,
+	target ical.Event,
+) (ical.Event, bool, error) {
+	occurrence, err := time.Parse(
+		time.RFC3339Nano,
+		reference.RecurrenceID,
+	)
+	if err != nil {
+		return ical.Event{}, false, errors.New(
+			"CalDAV recurrence instance identity is malformed",
+		)
+	}
+	events := calendar.Events()
+	var master *ical.Event
+	for index := range events {
+		if eventUID(events[index]) == reference.UID &&
+			events[index].Props.Get(ical.PropRecurrenceRule) != nil {
+			master = &events[index]
+			break
+		}
+	}
+	if master != nil {
+		for _, property := range master.Props.Values(
+			ical.PropExceptionDates,
+		) {
+			values, parseErr := calDAVRecurrencePropertyTimes(
+				property,
+				time.UTC,
+			)
+			if parseErr != nil {
+				return ical.Event{}, false, errors.New(
+					"CalDAV EXDATE is malformed",
+				)
+			}
+			for _, value := range values {
+				if value.Equal(occurrence) {
+					return ical.Event{}, false, errors.New(
+						"CalDAV recurrence instance is already excluded",
+					)
+				}
+			}
+		}
+		exception, err := calDAVInstanceProperty(
+			ical.PropExceptionDates,
+			master.Props.Get(ical.PropDateTimeStart),
+			occurrence,
+		)
+		if err != nil {
+			return ical.Event{}, false, err
+		}
+		master.Props.Add(exception)
+	}
+
+	children := calendar.Children[:0]
+	for _, child := range calendar.Children {
+		if child == nil ||
+			child.Name != ical.CompEvent ||
+			master != nil && child == master.Component {
+			children = append(children, child)
+			continue
+		}
+		candidate := ical.Event{Component: child}
+		if eventUID(candidate) != reference.UID {
+			children = append(children, child)
+			continue
+		}
+		identity, identityErr := calDAVOccurrenceIdentity(
+			candidate,
+			len(events) > 1,
+		)
+		if identityErr != nil {
+			return ical.Event{}, false, identityErr
+		}
+		if identity != reference.RecurrenceID {
+			children = append(children, child)
+		}
+	}
+	calendar.Children = children
+	if master != nil {
+		return *master, false, nil
+	}
+	remaining := calendar.Events()
+	if len(remaining) == 0 {
+		return target, true, nil
+	}
+	return remaining[0], false, nil
+}
+
+func calDAVInstanceProperty(
+	name string,
+	template *ical.Prop,
+	instant time.Time,
+) (*ical.Prop, error) {
+	if template == nil {
+		return nil, errors.New(
+			"CalDAV recurrence master has no start property",
+		)
+	}
+	property := ical.NewProp(name)
+	for parameter, values := range template.Params {
+		property.Params[parameter] = append([]string(nil), values...)
+	}
+	value := instant
+	if zone := template.Params.Get(ical.ParamTimezoneID); zone != "" {
+		location, err := time.LoadLocation(zone)
+		if err != nil {
+			return nil, errors.New("CalDAV recurrence time zone is invalid")
+		}
+		value = instant.In(location)
+	}
+	valueType := template.ValueType()
+	// Only the two RFC 5545 DTSTART value types can identify an occurrence.
+	//nolint:exhaustive // every other iCalendar value type is rejected below.
+	switch valueType {
+	case ical.ValueDate:
+		property.SetValueType(ical.ValueDate)
+		property.Value = value.Format("20060102")
+	case ical.ValueDateTime:
+		property.SetValueType(ical.ValueDateTime)
+		if template.Params.Get(ical.ParamTimezoneID) != "" ||
+			!strings.HasSuffix(strings.ToUpper(template.Value), "Z") {
+			property.Value = value.Format("20060102T150405")
+		} else {
+			property.Value = instant.UTC().Format("20060102T150405Z")
+		}
+	default:
+		return nil, errors.New(
+			"CalDAV recurrence master start has an unsupported value type",
+		)
+	}
+	return property, nil
+}
+
+func cloneICalComponent(source *ical.Component) *ical.Component {
+	clone := ical.NewComponent(source.Name)
+	for name, properties := range source.Props {
+		copies := make([]ical.Prop, 0, len(properties))
+		for _, property := range properties {
+			copy := property
+			copy.Params = make(ical.Params, len(property.Params))
+			for parameter, values := range property.Params {
+				copy.Params[parameter] = append([]string(nil), values...)
+			}
+			copies = append(copies, copy)
+		}
+		clone.Props[name] = copies
+	}
+	for _, child := range source.Children {
+		clone.Children = append(
+			clone.Children,
+			cloneICalComponent(child),
+		)
+	}
+	return clone
+}
+
+func calDAVObjectHasAttendees(
+	calendar *ical.Calendar,
+	uid string,
+) bool {
+	for _, event := range calendar.Events() {
+		if eventUID(event) == uid &&
+			len(event.Props.Values(ical.PropAttendee)) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func (client *Client) organizesCalDAVObject(
+	calendar *ical.Calendar,
+	uid string,
+	fallback ical.Event,
+) bool {
+	organizer := calendarAddress(fallback.Props.Get(ical.PropOrganizer))
+	if organizer.address == "" {
+		for _, event := range calendar.Events() {
+			if eventUID(event) != uid {
+				continue
+			}
+			organizer = calendarAddress(
+				event.Props.Get(ical.PropOrganizer),
+			)
+			if organizer.address != "" {
+				break
+			}
+		}
+	}
+	return organizer.address != "" &&
+		strings.EqualFold(
+			organizer.address,
+			client.calendarIdentity(),
+		)
 }
 
 func calendarAddressProp(name, address, role, commonName string) *ical.Prop {
