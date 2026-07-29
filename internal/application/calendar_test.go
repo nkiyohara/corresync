@@ -232,3 +232,23 @@ func TestNewCalendarServiceRequiresDependencies(t *testing.T) {
 		t.Fatal("NewCalendarService() unexpectedly accepted inconsistent effects")
 	}
 }
+
+func TestCalendarEffectsAcceptTruthfulCalDAVObjectMutations(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []string{
+		CalendarCancellationNoScheduling,
+		CalendarCancellationProviderManaged,
+	} {
+		effects := CalendarEffects{
+			CancellationMode:        mode,
+			CancellationDisposition: CalendarDispositionCalendarObject,
+		}
+		if mode == CalendarCancellationProviderManaged {
+			effects.CancelAttendeeNotifications = true
+		}
+		if err := effects.validate(); err != nil {
+			t.Fatalf("CalDAV effects for %q: %v", mode, err)
+		}
+	}
+}

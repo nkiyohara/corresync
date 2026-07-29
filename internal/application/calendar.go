@@ -104,7 +104,7 @@ const (
 	CalendarCancellationProviderManaged = "provider_managed"
 	CalendarCancellationNoScheduling    = "no_scheduling"
 	CalendarDispositionRemoteDelete     = "remote_delete"
-	CalendarDispositionCalendarObject   = "delete_calendar_object"
+	CalendarDispositionCalendarObject   = "update_or_delete_calendar_object"
 	CalendarDispositionDeletedItems     = "move_to_deleted_items"
 )
 
@@ -114,6 +114,8 @@ func (effects CalendarEffects) validate() error {
 		effects.CancellationDisposition == CalendarDispositionDeletedItems:
 	case effects.CancellationMode == CalendarCancellationProviderManaged &&
 		effects.CancellationDisposition == CalendarDispositionRemoteDelete:
+	case effects.CancellationMode == CalendarCancellationProviderManaged &&
+		effects.CancellationDisposition == CalendarDispositionCalendarObject:
 	case effects.CancellationMode == CalendarCancellationNoScheduling &&
 		effects.CancellationDisposition == CalendarDispositionCalendarObject:
 	default:
