@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +17,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/credential"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
+	"github.com/nkiyohara/corresync/internal/policy"
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
 	"github.com/nkiyohara/corresync/internal/provider/googleapi"
 	"github.com/nkiyohara/corresync/internal/provider/googleweb"
@@ -29,6 +32,31 @@ type oauthManagerStub struct {
 	provider oauthlocal.Provider
 	client   *http.Client
 	err      error
+}
+
+type routedOAuthCall struct {
+	route    config.OAuthRoute
+	provider oauthlocal.Provider
+}
+
+type routedOAuthManagerStub struct {
+	clients map[string]*http.Client
+	calls   []routedOAuthCall
+}
+
+func (stub *routedOAuthManagerStub) Client(
+	_ context.Context,
+	route config.OAuthRoute,
+	provider oauthlocal.Provider,
+) (*http.Client, error) {
+	client, exists := stub.clients[route.APIBase]
+	if !exists {
+		return nil, errors.New("synthetic OAuth route is not registered")
+	}
+	stub.calls = append(stub.calls, routedOAuthCall{
+		route: route, provider: provider,
+	})
+	return client, nil
 }
 
 type googleWebBrowserStub struct {
@@ -665,5 +693,434 @@ func TestMergeSessionAccountsPreservesServiceSpecificCapabilities(t *testing.T) 
 		!merged.capabilities.Folders || !merged.capabilities.AttachmentReads ||
 		!merged.captured.Equal(time.Unix(2, 0)) {
 		t.Fatalf("mergeSessionAccounts() = %#v", merged)
+	}
+}
+
+func TestSessionBackendKeepsHybridProvidersAndAccountsIsolated(t *testing.T) {
+	t.Parallel()
+
+	const (
+		alphaID domain.AccountID = "acc_00000000000000000000000000000001"
+		betaID  domain.AccountID = "acc_00000000000000000000000000000002"
+	)
+	googleAlpha := newSessionGoogleServer(
+		t,
+		"alpha@example.test",
+		"google-alpha",
+		"unused-google-alpha-event",
+	)
+	defer googleAlpha.Close()
+	graphAlpha := newSessionGraphServer(
+		t,
+		"alpha@example.test",
+		"unused-graph-alpha-message",
+		"graph-alpha",
+	)
+	defer graphAlpha.Close()
+	graphBeta := newSessionGraphServer(
+		t,
+		"beta@example.test",
+		"graph-beta",
+		"unused-graph-beta-event",
+	)
+	defer graphBeta.Close()
+	googleBeta := newSessionGoogleServer(
+		t,
+		"beta@example.test",
+		"unused-google-beta-message",
+		"google-beta",
+	)
+	defer googleBeta.Close()
+
+	googleAlphaRoute := sessionOAuthRoute(googleAlpha.URL, "google-alpha")
+	graphAlphaRoute := sessionOAuthRoute(graphAlpha.URL, "graph-alpha")
+	graphBetaRoute := sessionOAuthRoute(graphBeta.URL, "graph-beta")
+	googleBetaRoute := sessionOAuthRoute(googleBeta.URL, "google-beta")
+	configuration := config.Default()
+	configuration.DefaultAccount = "alpha"
+	configuration.Accounts = map[string]config.Account{
+		"alpha": {
+			ID: alphaID, Address: "alpha@example.test",
+			Mail: &config.MailRoute{
+				Provider:  domain.ProviderGoogleAPI,
+				GoogleAPI: &googleAlphaRoute,
+			},
+			Calendar: &config.CalendarRoute{
+				Provider:       domain.ProviderMicrosoftGraph,
+				MicrosoftGraph: &graphAlphaRoute,
+			},
+		},
+		"beta": {
+			ID: betaID, Address: "beta@example.test",
+			Mail: &config.MailRoute{
+				Provider:       domain.ProviderMicrosoftGraph,
+				MicrosoftGraph: &graphBetaRoute,
+			},
+			Calendar: &config.CalendarRoute{
+				Provider:  domain.ProviderGoogleAPI,
+				GoogleAPI: &googleBetaRoute,
+			},
+		},
+	}
+	manager := &routedOAuthManagerStub{clients: map[string]*http.Client{
+		googleAlpha.URL: googleAlpha.Client(),
+		graphAlpha.URL:  graphAlpha.Client(),
+		graphBeta.URL:   graphBeta.Client(),
+		googleBeta.URL:  googleBeta.Client(),
+	}}
+	lifecycle, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	backend := &sessionBackend{
+		configuration: configuration,
+		guard: daemonMCPGuard(
+			t,
+			policy.DefaultRules(),
+			&daemonMCPAudit{},
+		),
+		oauth:          manager,
+		newGoogle:      googleapi.New,
+		newGraph:       graphapi.New,
+		accounts:       make(map[domain.AccountID]sessionAccount),
+		previews:       make(map[string]sessionPreview),
+		lifecycle:      lifecycle,
+		cancel:         cancel,
+		monitorStarted: make(map[domain.AccountID]bool),
+		monitorCancel:  make(map[domain.AccountID]context.CancelFunc),
+		monitorDone:    make(map[domain.AccountID]chan struct{}),
+	}
+	caller := domain.Caller{Surface: "cli", Instance: "hybrid-provider-test"}
+	for _, accountID := range []domain.AccountID{alphaID, betaID} {
+		result, err := backend.Login(t.Context(), accountID, caller)
+		if err != nil || !result.Authenticated || result.Account != accountID {
+			t.Fatalf("Login(%s) = %+v, %v", accountID, result, err)
+		}
+	}
+	requireHybridOAuthScopes(t, manager.calls)
+
+	assertSessionMailProvider(
+		t,
+		backend,
+		caller,
+		alphaID,
+		domain.ProviderGoogleAPI,
+		"google-alpha",
+	)
+	assertSessionCalendarProvider(
+		t,
+		backend,
+		caller,
+		alphaID,
+		domain.ProviderMicrosoftGraph,
+		"graph-alpha",
+	)
+	assertSessionMailProvider(
+		t,
+		backend,
+		caller,
+		betaID,
+		domain.ProviderMicrosoftGraph,
+		"graph-beta",
+	)
+	assertSessionCalendarProvider(
+		t,
+		backend,
+		caller,
+		betaID,
+		domain.ProviderGoogleAPI,
+		"google-beta",
+	)
+
+	status, err := backend.SessionStatus(t.Context(), caller)
+	if err != nil || len(status.Accounts) != 2 {
+		t.Fatalf("SessionStatus() = %+v, %v", status, err)
+	}
+	for _, account := range status.Accounts {
+		if !account.Authenticated || account.Capabilities == nil ||
+			!account.Capabilities.Mail || !account.Capabilities.Calendar {
+			t.Fatalf("hybrid account status = %+v", account)
+		}
+	}
+
+	if _, err := backend.Logout(t.Context(), alphaID, caller); err != nil {
+		t.Fatalf("Logout(alpha) error = %v", err)
+	}
+	if _, err := backend.ListMail(
+		t.Context(),
+		sessionMailInput(alphaID),
+		caller,
+	); err == nil || !strings.Contains(err.Error(), "corr auth login") {
+		t.Fatalf("logged-out alpha mail error = %v", err)
+	}
+	assertSessionMailProvider(
+		t,
+		backend,
+		caller,
+		betaID,
+		domain.ProviderMicrosoftGraph,
+		"graph-beta",
+	)
+	if _, err := backend.Logout(t.Context(), betaID, caller); err != nil {
+		t.Fatalf("Logout(beta) error = %v", err)
+	}
+}
+
+func sessionOAuthRoute(base, key string) config.OAuthRoute {
+	return config.OAuthRoute{
+		APIBase:     base,
+		ClientID:    "synthetic-public-client-" + key,
+		RedirectURI: "http://127.0.0.1:53682/oauth/callback",
+		Authorization: config.CredentialRef{
+			Backend: config.CredentialOSKeyring,
+			Key:     key,
+			Consent: true,
+		},
+	}
+}
+
+func requireHybridOAuthScopes(t *testing.T, calls []routedOAuthCall) {
+	t.Helper()
+	if len(calls) != 4 {
+		t.Fatalf("OAuth calls = %+v", calls)
+	}
+	for _, call := range calls {
+		hasMail := slices.Contains(
+			call.provider.Scopes,
+			"https://mail.google.com/",
+		) || slices.Contains(call.provider.Scopes, "Mail.ReadWrite")
+		hasCalendar := slices.Contains(
+			call.provider.Scopes,
+			"https://www.googleapis.com/auth/calendar.events",
+		) || slices.Contains(call.provider.Scopes, "Calendars.ReadWrite")
+		if hasMail == hasCalendar {
+			t.Fatalf(
+				"hybrid service grant was not least-privilege: %+v",
+				call,
+			)
+		}
+	}
+}
+
+func sessionMailInput(account domain.AccountID) application.MailListInput {
+	return application.MailListInput{
+		Account: account,
+		Folder: application.MailFolder{
+			Kind: application.MailFolderDistinguished,
+			ID:   "inbox",
+		},
+		Limit: 10,
+	}
+}
+
+func assertSessionMailProvider(
+	t *testing.T,
+	backend *sessionBackend,
+	caller domain.Caller,
+	account domain.AccountID,
+	provider domain.ProviderID,
+	subject string,
+) {
+	t.Helper()
+	page, err := backend.ListMail(
+		t.Context(),
+		sessionMailInput(account),
+		caller,
+	)
+	if err != nil || len(page.Messages) != 1 ||
+		page.Messages[0].Subject != subject ||
+		page.Messages[0].Provenance.AccountID != account ||
+		page.Messages[0].Provenance.Provider != provider {
+		t.Fatalf(
+			"ListMail(%s) = %+v, %v",
+			account,
+			page,
+			err,
+		)
+	}
+}
+
+func assertSessionCalendarProvider(
+	t *testing.T,
+	backend *sessionBackend,
+	caller domain.Caller,
+	account domain.AccountID,
+	provider domain.ProviderID,
+	subject string,
+) {
+	t.Helper()
+	page, err := backend.ListCalendar(
+		t.Context(),
+		application.CalendarListInput{
+			Account: account,
+			Calendar: application.CalendarFolder{
+				Kind: application.CalendarFolderDistinguished,
+				ID:   "calendar",
+			},
+			Start: "2026-08-01T00:00:00Z",
+			End:   "2026-08-02T00:00:00Z",
+		},
+		caller,
+	)
+	if err != nil || len(page.Events) != 1 ||
+		page.Events[0].Subject != subject ||
+		page.Events[0].Provenance.AccountID != account ||
+		page.Events[0].Provenance.Provider != provider {
+		t.Fatalf(
+			"ListCalendar(%s) = %+v, %v",
+			account,
+			page,
+			err,
+		)
+	}
+}
+
+func newSessionGoogleServer(
+	t *testing.T,
+	address, mailSubject, calendarSubject string,
+) *httptest.Server {
+	t.Helper()
+	return httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/gmail/v1/users/me/profile":
+			writeSessionJSON(t, writer, map[string]string{
+				"emailAddress": address,
+			})
+		case "/gmail/v1/users/me/messages":
+			writeSessionJSON(t, writer, map[string]any{
+				"messages":           []map[string]string{{"id": "google-message"}},
+				"resultSizeEstimate": 1,
+			})
+		case "/gmail/v1/users/me/messages/google-message":
+			writeSessionJSON(t, writer, map[string]any{
+				"id":           "google-message",
+				"historyId":    "101",
+				"internalDate": "1785578400000",
+				"labelIds":     []string{"INBOX"},
+				"payload": map[string]any{
+					"headers": []map[string]string{
+						{"name": "Subject", "value": mailSubject},
+						{
+							"name":  "From",
+							"value": "Sender <sender@example.test>",
+						},
+					},
+				},
+			})
+		case "/calendar/v3/users/me/calendarList/primary":
+			writeSessionJSON(t, writer, map[string]any{
+				"id":         address,
+				"accessRole": "owner",
+				"conferenceProperties": map[string]any{
+					"allowedConferenceSolutionTypes": []string{"hangoutsMeet"},
+				},
+			})
+		case "/calendar/v3/calendars/primary/events":
+			writeSessionJSON(t, writer, map[string]any{
+				"items": []map[string]any{{
+					"id":      "google-event",
+					"etag":    `"google-event-etag"`,
+					"status":  "confirmed",
+					"summary": calendarSubject,
+					"start": map[string]string{
+						"dateTime": "2026-08-01T10:00:00Z",
+						"timeZone": "UTC",
+					},
+					"end": map[string]string{
+						"dateTime": "2026-08-01T11:00:00Z",
+						"timeZone": "UTC",
+					},
+					"organizer": map[string]any{
+						"email": address,
+						"self":  true,
+					},
+				}},
+			})
+		default:
+			http.Error(
+				writer,
+				"unexpected synthetic Google request",
+				http.StatusNotFound,
+			)
+		}
+	}))
+}
+
+func newSessionGraphServer(
+	t *testing.T,
+	address, mailSubject, calendarSubject string,
+) *httptest.Server {
+	t.Helper()
+	return httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/me":
+			writeSessionJSON(t, writer, map[string]string{
+				"id": "graph-user", "mail": address,
+			})
+		case "/me/mailFolders/inbox":
+			writeSessionJSON(t, writer, map[string]string{"id": "graph-inbox"})
+		case "/me/mailFolders/inbox/messages":
+			writeSessionJSON(t, writer, map[string]any{
+				"@odata.count": 1,
+				"value": []map[string]any{{
+					"@odata.etag":      `W/"graph-message-etag"`,
+					"id":               "graph-message",
+					"subject":          mailSubject,
+					"receivedDateTime": "2026-08-01T10:00:00Z",
+					"importance":       "normal",
+					"from": map[string]any{
+						"emailAddress": map[string]string{
+							"name": "Sender", "address": "sender@example.test",
+						},
+					},
+				}},
+			})
+		case "/me/calendar":
+			writeSessionJSON(t, writer, map[string]any{
+				"id": "graph-calendar", "canEdit": true,
+			})
+		case "/me/calendarView":
+			writeSessionJSON(t, writer, map[string]any{
+				"value": []map[string]any{{
+					"@odata.etag": `W/"graph-event-etag"`,
+					"id":          "graph-event",
+					"subject":     calendarSubject,
+					"start": map[string]string{
+						"dateTime": "2026-08-01T10:00:00",
+						"timeZone": "UTC",
+					},
+					"end": map[string]string{
+						"dateTime": "2026-08-01T11:00:00",
+						"timeZone": "UTC",
+					},
+					"organizer": map[string]any{
+						"emailAddress": map[string]string{
+							"name": "Reader", "address": address,
+						},
+					},
+					"isOrganizer": true,
+					"showAs":      "busy",
+				}},
+			})
+		default:
+			http.Error(
+				writer,
+				"unexpected synthetic Graph request",
+				http.StatusNotFound,
+			)
+		}
+	}))
+}
+
+func writeSessionJSON(t *testing.T, writer http.ResponseWriter, value any) {
+	t.Helper()
+	if err := json.NewEncoder(writer).Encode(value); err != nil {
+		t.Error(err)
 	}
 }

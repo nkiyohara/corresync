@@ -13,6 +13,9 @@ All notable user-facing changes are recorded here. The project follows
 - Add idempotent account-targeted logout that drains in-flight operations,
   cancels account-local monitors and previews, closes only that account's
   provider sessions, and preserves every other account and the daemon.
+- Keep independently authorized mail and calendar providers isolated within
+  each account and across accounts, including hybrid Google/Graph routes with
+  service-minimal OAuth scopes and provider-qualified result provenance.
 - Offer Microsoft Graph as a credential-free discovery candidate for known
   Microsoft domains and Microsoft-hosted MX records, while requiring explicit
   selection before any OAuth authorization begins.
