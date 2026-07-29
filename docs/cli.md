@@ -157,6 +157,12 @@ that visible. Lists return metadata only. Body and attachment operations are
 explicit sensitive reads and may require a second call with `--approve`,
 depending on policy.
 
+Outlook Web accepts mail list pages of up to 25 items; request later pages with
+`--offset`. Its mail time-zone value is an Exchange/Windows identifier such as
+`GMT Standard Time`, not an IANA identifier such as `Europe/London`. Omit
+`--time-zone` to use the UTC default. Unsupported values and provider-side
+search failures return an actionable error instead of an opaque HTTP 500.
+
 Attachment output is bounded and never overwrites an existing path.
 
 ## Cross-account reads
