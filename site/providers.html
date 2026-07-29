@@ -153,39 +153,13 @@
       <section class="tinted-section" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google routes</p>
-          <h2 id="google-title">Read through a visible browser—or choose the API for writes.</h2>
+          <h2 id="google-title">Connect Gmail and Google Calendar through Google API.</h2>
           <p>
-            The Web and API routes are intentionally separate. Corresync never turns a read-only
-            managed-browser route into OAuth behind your back.
+            Google access is always an explicit choice. Personal accounts need an OAuth app you
+            control; work or school accounts may also need administrator approval.
           </p>
         </div>
         <div class="route-grid two">
-          <article class="route-card">
-            <header>
-              <span class="route-icon" aria-hidden="true">GW</span>
-              <div>
-                <p class="chip">Browser-owned · read-only</p>
-                <h3>Google Web</h3>
-              </div>
-            </header>
-            <dl>
-              <div>
-                <dt>Mail</dt>
-                <dd>Bounded Gmail metadata snapshots</dd>
-              </div>
-              <div>
-                <dt>Calendar</dt>
-                <dd>Bounded Google Calendar snapshots</dd>
-              </div>
-              <div>
-                <dt>Sign-in</dt>
-                <dd>Dedicated visible browser profile; no OAuth client</dd>
-              </div>
-            </dl>
-            <p class="route-foot">
-              Visible snapshot bounds and selector drift are reported as degradations, never hidden.
-            </p>
-          </article>
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">GA</span>
@@ -210,6 +184,33 @@
             </dl>
             <p class="route-foot">
               The exact service-minimal scopes are shown before the provider page opens.
+            </p>
+          </article>
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">✓</span>
+              <div>
+                <p class="chip">Before you connect</p>
+                <h3>What you’ll need</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>Personal Gmail</dt>
+                <dd>A Google desktop OAuth client you are authorized to use</dd>
+              </div>
+              <div>
+                <dt>Work or school</dt>
+                <dd>Your administrator may need to approve access</dd>
+              </div>
+              <div>
+                <dt>Browser login</dt>
+                <dd>Google Web sign-in is not currently supported</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              If your organization blocks a route, Corresync shows the problem instead of switching
+              behind your back.
             </p>
           </article>
         </div>
@@ -281,9 +282,9 @@
           <p class="eyebrow light"><span aria-hidden="true"></span>One account, two routes</p>
           <h2 id="mix-title">Mail and calendar do not have to come from the same protocol.</h2>
           <p>
-            Pair IMAP/SMTP with CalDAV, use a Google route for both services, or configure a
-            mail-only or calendar-only account. Stable account identity keeps profiles, credentials,
-            cursors, previews, and audit context isolated.
+            Pair IMAP/SMTP with CalDAV, use Google API for both services, or configure a mail-only
+            or calendar-only account. Stable account identity keeps profiles, credentials, cursors,
+            previews, and audit context isolated.
           </p>
         </div>
         <figure class="terminal">
@@ -318,8 +319,8 @@
         </div>
         <ul>
           <li>Provider limitations are returned as typed capabilities or degradations.</li>
-          <li>Google Web writes never fall through to Google API.</li>
-          <li>Graph and managed Google authorization never start from automatic discovery.</li>
+          <li>Google Web sign-in is not currently supported.</li>
+          <li>Graph and Google authorization never start from automatic discovery.</li>
           <li>
             Meeting links are requested only from the selected calendar route when it reports
             support.

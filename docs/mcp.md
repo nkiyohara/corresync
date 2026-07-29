@@ -196,7 +196,6 @@ egress, or purge a queue.
 Tools route through the account's selected service:
 
 - Outlook Web: visible browser-owned session;
-- Google Web: visible browser-owned, bounded read-only Gmail/Calendar snapshot;
 - Google API or Graph: explicit OAuth grant in OS keyring;
 - JMAP and IMAP/SMTP: explicit standards credential backend;
 - CalDAV: explicit calendar credential backend.
@@ -205,9 +204,10 @@ No tool silently changes providers or initiates administrator consent.
 `account_discover` is read-only and credential-free; its candidates are hints,
 not permission to configure or authenticate.
 
-Capability checks remain provider-specific. In particular, Google Web exposes
-bounded reads only; its mail and calendar writes are unavailable rather than
-silently routed to Google API.
+Capability checks remain provider-specific. Automated Google Web sign-in is
+unavailable because Google rejects software-controlled browsers. No MCP tool
+can enable it, disguise browser automation, initiate Google OAuth, or silently
+route a blocked Google account through another provider.
 
 Cross-account tools fan out through isolated services and report partial
 failures without dropping successful results. All write tools still require one

@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-07-28
+- Amended: 2026-07-29
 
 ## Context
 
@@ -73,22 +73,18 @@ Microsoft-hosted MX evidence may advertise Graph as a separate discovery
 candidate, but that candidate is always labelled as requiring explicit OAuth
 selection; merely discovering it never opens a browser or reads a grant.
 
-Google consumer domains and Google-hosted Workspace MX evidence produce two
-separate candidates. Automatic mode may select the first-party `google-web`
-route because it opens only Google-owned Gmail and Calendar applications in an
-isolated, browser-owned profile and requests no third-party OAuth consent. The
-web adapter has a closed, read-only semantic DOM surface: its process cannot
-read browser cookies, browser storage, passwords, bearer tokens, or arbitrary
-page state, and it reports bounded visible-snapshot limitations explicitly.
+The former automatic `google-web` decision is superseded by
+[ADR 0018](0018-disable-automated-google-web-sign-in.md). Google consumer
+domains and Google-hosted Workspace MX evidence now produce only a
+`google-api` provider candidate, and that candidate always requires explicit
+selection. Discovery never starts its authorization.
 
-The separate `google-api` route is used only after explicit selection or when an
-existing configured route names it. Before an authorization browser opens, the
-CLI displays the exact mail and calendar scopes. Submitting consent or an
-admin-review request always requires an explicit human action. A blocked API
-grant never falls through to another grant, and disabled Gmail, Calendar, or
-browser access fails clearly rather than attempting to bypass organization
-policy. Consumer-versus-managed inference remains evidence, not proof, and both
-routes remain manually overridable.
+Before an authorization browser opens, the CLI displays the exact mail and
+calendar scopes. Submitting consent or an admin-review request always requires
+an explicit human action. A blocked API grant never falls through to another
+grant, and disabled Gmail, Calendar, or standards access fails clearly rather
+than attempting to bypass organization policy. Consumer-versus-managed
+inference remains evidence, not proof.
 
 ### Password-bearing providers use an external credential facility
 
@@ -137,8 +133,8 @@ centrally held OAuth client secret; Google API and Graph use an explicitly
 selected bring-your-own public-client registration as detailed in
 [ADR 0015](0015-per-service-provider-routes.md).
 
-The Google web route trades API completeness for consent safety: it can expose
-only provider-owned UI projections that pass the closed adapter contract, and
-it never pretends that a virtualized DOM snapshot is a complete remote page.
-Users who need API writes or complete pagination must explicitly select and
-authorize `google-api`.
+Google Web no longer trades API completeness for consent safety because its
+software-controlled browser cannot reliably reach the authenticated provider
+surface. Users must explicitly select and authorize `google-api` or configure
+a standards route that their account and administrator permit. Corresync does
+not disguise automation or fall back around a blocked route.

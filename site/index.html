@@ -101,9 +101,9 @@
             agenda, and approve every send before it happens.
           </p>
           <p class="hero-providers">
-            <strong>Will it work with my accounts?</strong> Outlook Web · Google API · Google Web
-            (read-only) · Microsoft Graph · JMAP · IMAP/SMTP · CalDAV. Capabilities are explicit
-            per account — <a href="providers.html">compare the routes</a>.
+            <strong>Will it work with my accounts?</strong> Outlook Web · Google API · Microsoft
+            Graph · JMAP · IMAP/SMTP · CalDAV. Capabilities and administrator requirements are
+            explicit per account — <a href="providers.html">compare the routes</a>.
           </p>
           <div class="actions">
             <a class="button primary" href="getting-started.html">Get set up in four steps</a>
@@ -387,10 +387,10 @@ payload is approved.</span></code></pre>
         <div class="route-family-grid">
           <article class="route-family">
             <p class="chip">Browser-owned</p>
-            <h3>Outlook Web and Google Web</h3>
+            <h3>Outlook Web</h3>
             <p>
-              Keep interactive sign-in in a dedicated visible browser. Google Web is a bounded
-              read-only option; Outlook Web supports typed mail and calendar operations.
+              Keep interactive Outlook sign-in in a dedicated visible browser while supporting typed
+              mail and calendar operations.
             </p>
           </article>
           <article class="route-family accent-card">
@@ -469,8 +469,8 @@ payload is approved.</span></code></pre>
         </div>
         <ul>
           <li>
-            <strong>Google Web is read-only.</strong> Use Google API explicitly for supported
-            writes.
+            <strong>Gmail currently uses Google API.</strong> Google Web sign-in is not supported,
+            and work or school accounts may need administrator approval.
           </li>
           <li>
             <strong>OAuth routes are bring-your-own public clients.</strong> Corresync does not ship

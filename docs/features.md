@@ -9,7 +9,6 @@ not available through a raw protocol escape hatch.
 | Provider ID | Mail | Calendar | Authentication | v0.8 evidence |
 | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
-| `google-web` | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Visible browser-owned Google session | Implemented; synthetic DOM/integration contracts; live-unobserved |
 | `google-api` | Gmail | Selectable Google calendars, observed Google Meet link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `jmap` | Mail | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
@@ -33,6 +32,11 @@ otherwise it directs the human to explicit selection. `corr account add` require
 explicit provider selection whenever discovery is ambiguous. Microsoft domain
 or hosted-MX evidence offers both Outlook Web and Microsoft Graph, but Graph is
 always marked as an explicit OAuth choice and is never selected as a fallback.
+Google evidence advertises only the explicit `google-api` route. Automated
+`google-web` sign-in is unavailable because Google rejects sign-in from
+software-controlled browsers; Corresync does not disguise automation or
+silently fall back around that protection. Workspace policy may also require
+administrator approval or block API and standards routes.
 
 ## Mail
 
@@ -59,9 +63,6 @@ reported and never automatically retried.
 
 Provider differences remain visible:
 
-- Google Web is a bounded visible-browser snapshot: metadata reads are
-  available, pagination beyond the visible snapshot is explicitly incomplete,
-  and every mail/calendar write is unavailable;
 - Gmail uses Gmail query syntax and has no atomic history precondition for
   label changes, moves, or permanent deletion. Corresync revalidates the exact
   reviewed message immediately before each reviewed operation; a multi-stage
@@ -102,13 +103,9 @@ Provider differences remain visible:
 The normalized contract includes bounded subject/body, absolute start/end,
 time zone, location, all-day state, reminder, supported recurrence creation,
 replacement and removal, and required/optional attendees. Capability and
-degradation records state when a provider cannot preserve a field. Google Web
-exposes only bounded read-only visible snapshots, rejects unrecognized DOM as
-selector drift instead of reporting an empty mailbox/calendar, and visits each
-UTC date in a multi-day agenda window; it still cannot prove remote DOM
-completeness. Google API discovers
-selectable calendars and provisions a unique Google Meet link only when the
-authenticated calendar advertises that conference solution. Graph discovers
+degradation records state when a provider cannot preserve a field. Google API
+discovers selectable calendars and provisions a unique Google Meet link only
+when the authenticated calendar advertises that conference solution. Graph discovers
 selectable calendars and reports Teams meeting support. Outlook Web can
 provision a Teams join link as a creation property. `--online-meeting` selects
 the configured provider's native service; the transitional `--teams-meeting`

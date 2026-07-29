@@ -26,7 +26,6 @@ import (
 	"github.com/nkiyohara/corresync/internal/paths"
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
 	"github.com/nkiyohara/corresync/internal/provider/googleapi"
-	"github.com/nkiyohara/corresync/internal/provider/googleweb"
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
@@ -151,7 +150,6 @@ type sessionBackend struct {
 	newIMAP       func(context.Context, imapmail.Options) (*imapmail.Client, error)
 	newCalDAV     func(context.Context, caldavprovider.Options) (*caldavprovider.Client, error)
 	newGoogle     func(context.Context, googleapi.Options) (*googleapi.Client, error)
-	newGoogleWeb  func(context.Context, googleweb.Options) (*googleweb.Client, error)
 	newGraph      func(context.Context, graphapi.Options) (*graphapi.Client, error)
 	monitorStore  *eventqueue.Store
 	monitor       *application.MonitorService
@@ -236,7 +234,6 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		newIMAP:          imapmail.New,
 		newCalDAV:        caldavprovider.New,
 		newGoogle:        googleapi.New,
-		newGoogleWeb:     googleweb.New,
 		newGraph:         graphapi.New,
 		monitorStore:     eventqueue.New(),
 		accounts:         make(map[domain.AccountID]sessionAccount),
@@ -738,9 +735,7 @@ func (backend *sessionBackend) terminalInteraction(
 		return nil, fmt.Errorf("account %q is not configured", input.Account)
 	}
 	if hasGoogleWebRoute(configured) {
-		return nil, errors.New(
-			"terminal login cannot complete a Google Web route; use visible `corr auth login`",
-		)
+		return nil, errGoogleWebSignInUnavailable
 	}
 	profileDirectory, err := paths.ProfileDir(input.Account)
 	if err != nil {
@@ -1730,6 +1725,9 @@ func (backend *sessionBackend) activateAccount(
 	}
 	backend.mu.Unlock()
 
+	if hasGoogleWebRoute(configured) {
+		return sessionAccount{}, errGoogleWebSignInUnavailable
+	}
 	var services sessionAccount
 	if hasOutlookRoute(configured) {
 		var handle browserHandle
@@ -1746,13 +1744,6 @@ func (backend *sessionBackend) activateAccount(
 		web, err := backend.outlookAccount(configured, handle, captured)
 		if err != nil {
 			return sessionAccount{}, errors.Join(err, handle.Close())
-		}
-		services = mergeSessionAccounts(services, web)
-	}
-	if hasGoogleWebRoute(configured) {
-		web, err := backend.googleWebAccount(ctx, configured)
-		if err != nil {
-			return sessionAccount{}, errors.Join(err, closeSessionAccount(services))
 		}
 		services = mergeSessionAccounts(services, web)
 	}
@@ -2380,170 +2371,6 @@ func (backend *sessionBackend) graphAPIAccount(
 	return result, nil
 }
 
-func (backend *sessionBackend) googleWebAccount(
-	ctx context.Context,
-	configured config.Account,
-) (sessionAccount, error) {
-	mailEnabled := configured.Mail != nil &&
-		configured.Mail.Provider == domain.ProviderGoogleWeb
-	calendarEnabled := configured.Calendar != nil &&
-		configured.Calendar.Provider == domain.ProviderGoogleWeb
-	if !mailEnabled && !calendarEnabled {
-		return sessionAccount{}, errors.New("account has no Google Web route")
-	}
-	mailOrigin := ""
-	if mailEnabled {
-		if configured.Mail.GoogleWeb == nil {
-			return sessionAccount{}, errors.New("google Web mail route settings are missing")
-		}
-		mailOrigin = configured.Mail.GoogleWeb.Origin
-	}
-	calendarOrigin := ""
-	if calendarEnabled {
-		if configured.Calendar.GoogleWeb == nil {
-			return sessionAccount{}, errors.New(
-				"google Web calendar route settings are missing",
-			)
-		}
-		calendarOrigin = configured.Calendar.GoogleWeb.Origin
-	}
-	primaryOrigin := mailOrigin
-	startURL := strings.TrimSuffix(mailOrigin, "/") + "/mail/u/0/#inbox"
-	additionalOrigins := make([]string, 0, 1)
-	if !mailEnabled {
-		primaryOrigin = calendarOrigin
-		startURL = strings.TrimSuffix(calendarOrigin, "/") + "/calendar/u/0/r/agenda"
-	} else if calendarEnabled && calendarOrigin != mailOrigin {
-		additionalOrigins = append(additionalOrigins, calendarOrigin)
-	}
-	profileDirectory, err := paths.ProviderProfileDir(
-		configured.ID,
-		domain.ProviderGoogleWeb,
-	)
-	if err != nil {
-		return sessionAccount{}, err
-	}
-	_, _ = fmt.Fprintln(
-		backend.app.stderr,
-		"Opening an isolated Google browser profile; complete sign-in for each configured service.",
-	)
-	handle, err := backend.app.launch(context.WithoutCancel(ctx), browser.Options{
-		Origin:            primaryOrigin,
-		AdditionalOrigins: additionalOrigins,
-		StartURL:          startURL,
-		ProfileDir:        profileDirectory,
-		Executable:        backend.configuration.Browser.Executable,
-		BrowserOwnedOnly:  true,
-	})
-	if err != nil {
-		return sessionAccount{}, err
-	}
-	driver, supported := handle.(googleWebBrowserHandle)
-	if !supported {
-		return sessionAccount{}, errors.Join(
-			errors.New("configured browser launcher does not support Google Web"),
-			handle.Close(),
-		)
-	}
-	loginContext, cancel := context.WithTimeout(
-		ctx,
-		time.Duration(backend.configuration.Browser.LoginTimeout),
-	)
-	defer cancel()
-	factory := backend.newGoogleWeb
-	if factory == nil {
-		factory = googleweb.New
-	}
-	client, err := factory(loginContext, googleweb.Options{
-		ExpectedAddress: configured.Address,
-		MailOrigin:      mailOrigin, CalendarOrigin: calendarOrigin,
-		Mail: mailEnabled, Calendar: calendarEnabled, Driver: driver,
-	})
-	if err != nil {
-		return sessionAccount{}, errors.Join(err, handle.Close())
-	}
-	result := sessionAccount{
-		closers:  []sessionCloser{handle},
-		captured: time.Now().UTC(),
-		capabilities: domain.Capabilities{
-			Mail: mailEnabled, Calendar: calendarEnabled, Folders: mailEnabled,
-		},
-	}
-	if mailEnabled {
-		result.mail, err = application.NewMailService(
-			backend.guard,
-			client,
-			application.MailOptions{
-				MaxRecipients: backend.configuration.Policy.MaxRecipients,
-				Provenance: domain.Provenance{
-					AccountID: configured.ID,
-					Provider:  domain.ProviderGoogleWeb,
-					MailboxID: "browser-owned-gmail",
-				},
-			},
-		)
-		if err != nil {
-			return sessionAccount{}, errors.Join(err, handle.Close())
-		}
-		result.degradations = append(
-			result.degradations,
-			domain.Degradation{
-				Feature: "mail.pagination",
-				Reason:  "the Gmail browser route returns a bounded visible DOM snapshot and never claims it is the final remote page",
-				Lossy:   true,
-			},
-			domain.Degradation{
-				Feature: "mail.attachments",
-				Reason:  "the closed Google Web adapter does not retrieve attachments",
-			},
-			domain.Degradation{
-				Feature: "mail.writes",
-				Reason:  "browser-owned Google sessions are read-only; writes require an explicitly consented Google API route",
-			},
-		)
-	}
-	if calendarEnabled {
-		result.calendar, err = application.NewCalendarService(
-			backend.guard,
-			client,
-			application.CalendarOptions{
-				MaxAttendees: backend.configuration.Policy.MaxAttendees,
-				Effects:      providerCalendarEffects(domain.ProviderGoogleWeb),
-				Provenance: domain.Provenance{
-					AccountID:  configured.ID,
-					Provider:   domain.ProviderGoogleWeb,
-					CalendarID: "browser-owned-primary",
-				},
-			},
-		)
-		if err != nil {
-			return sessionAccount{}, errors.Join(err, handle.Close())
-		}
-		result.degradations = append(
-			result.degradations,
-			domain.Degradation{
-				Feature: "calendar.discovery",
-				Reason:  "the Google Web route exposes only the primary visible calendar",
-				Lossy:   true,
-			},
-			domain.Degradation{
-				Feature: "calendar.pagination",
-				Reason:  "the Google Web route collects one bounded semantic DOM snapshot per UTC date and cannot prove remote agenda completeness",
-				Lossy:   true,
-			},
-			domain.Degradation{
-				Feature: "calendar.writes",
-				Reason:  "browser-owned Google sessions are read-only; writes require an explicitly consented Google API route",
-			},
-			domain.Degradation{
-				Feature: "calendar.online_meeting_create",
-				Reason:  "the closed Google Web adapter does not provision online meetings",
-			},
-		)
-	}
-	return result, nil
-}
-
 func (backend *sessionBackend) nonOutlookAccount(
 	ctx context.Context,
 	configured config.Account,
@@ -2711,7 +2538,7 @@ func hasGoogleWebRoute(account config.Account) bool {
 }
 
 func hasBrowserRoute(account config.Account) bool {
-	return hasOutlookRoute(account) || hasGoogleWebRoute(account)
+	return hasOutlookRoute(account)
 }
 
 func providerCalendarEffects(provider domain.ProviderID) application.CalendarEffects {

@@ -65,9 +65,9 @@
         <p class="lede">
           Install <code>corr</code>, sign in to an account you control, register the local MCP
           server with your agent, and ask something that spans every inbox and calendar you
-          connected. Sign-in stays browser-owned or consent-gated through your OS keyring, agents
-          never receive Corresync-managed credentials, and the MCP connection is local stdio—no
-          hosted relay.
+          connected. Outlook Web sign-in stays browser-owned; API and standards grants stay behind
+          your OS keyring. Agents never receive Corresync-managed credentials, and the MCP
+          connection is local stdio—no hosted relay.
         </p>
         <div class="actions">
           <a class="button primary" href="#step-install">Start at step 1</a>
@@ -165,16 +165,16 @@ scoop install corresync/corresync</code></pre>
           <div class="duo">
             <div>
               <p>
-                For Outlook Web or Google Web, <code>corr setup</code> can select a first-party
-                browser route when the evidence is strong enough. Discovery and account addition
-                never open that browser. The next <code>auth login</code> command starts sign-in for
-                exactly the alias you name.
+                For Outlook Web, <code>corr setup</code> can select the first-party browser route
+                when the evidence is strong enough. Discovery and account addition never open that
+                browser. The next <code>auth login</code> command starts sign-in for exactly the
+                alias you name.
               </p>
               <p>
-                <strong>Need another route?</strong> Inspect discovery yourself. Google API and
-                Microsoft Graph need a public OAuth client you are authorized to use, with grants
-                kept in the OS keyring. Google Web is a deliberate read-only route. JMAP, IMAP/SMTP,
-                and CalDAV use a keyring entry or an explicitly approved credential helper.
+                <strong>Using Gmail?</strong> Gmail currently connects through Google API. You’ll
+                need a desktop OAuth client you are authorized to use; a Workspace administrator may
+                need to approve it. Other providers can use JMAP, IMAP/SMTP, or CalDAV when
+                available.
               </p>
               <p class="step-links">
                 <a href="providers.html">Compare provider routes</a> ·
@@ -187,7 +187,7 @@ scoop install corresync/corresync</code></pre>
             </div>
             <div class="stack">
               <div class="install-block">
-                <p class="os-label" id="gs-signin-default">First-party route · guided setup</p>
+                <p class="os-label" id="gs-signin-default">Outlook Web · guided setup</p>
                 <div class="cmd" data-copy data-copy-label="account and sign-in commands">
                   <pre
                     tabindex="0"
@@ -199,15 +199,25 @@ corr doctor --account personal</code></pre>
                 </div>
               </div>
               <div class="install-block">
-                <p class="os-label" id="gs-signin-discover">Any route · inspect and select</p>
-                <div class="cmd" data-copy data-copy-label="discovery commands">
+                <p class="os-label" id="gs-signin-discover">Gmail · explicit Google API</p>
+                <div class="cmd" data-copy data-copy-label="Google API account commands">
                   <pre
                     tabindex="0"
                     role="region"
                     aria-labelledby="gs-signin-discover"
-                  ><code>corr account discover reader@example.invalid
-corr account add reader@example.invalid --help</code></pre>
+                  ><code>corr account add you@gmail.com --alias personal \
+  --mail-provider google-api \
+  --calendar-provider google-api \
+  --oauth-client-id YOUR_DESKTOP_CLIENT_ID \
+  --oauth-redirect-uri http://127.0.0.1:0/callback \
+  --authorization-key personal-google \
+  --approve-oauth
+corr auth login --account personal</code></pre>
                 </div>
+                <p class="block-note">
+                  Enable the Gmail and Calendar APIs for that client first. A managed Workspace
+                  account may require administrator approval.
+                </p>
               </div>
             </div>
           </div>

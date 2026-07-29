@@ -122,15 +122,14 @@ func TestDiscoverKnownGoogleDoesNotAuthenticate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(observation.Candidates) != 2 {
+	if len(observation.Candidates) != 1 {
 		t.Fatalf("candidates = %#v", observation.Candidates)
 	}
-	for _, candidate := range observation.Candidates {
-		if candidate.Provider == domain.ProviderGoogleAPI &&
-			(!candidate.RequiresExplicitSelection ||
-				candidate.Authentication != application.DiscoveryExplicitOAuth) {
-			t.Fatalf("Google API candidate could trigger implicit consent: %#v", candidate)
-		}
+	candidate := observation.Candidates[0]
+	if candidate.Provider != domain.ProviderGoogleAPI ||
+		!candidate.RequiresExplicitSelection ||
+		candidate.Authentication != application.DiscoveryExplicitOAuth {
+		t.Fatalf("Google candidate could trigger implicit consent: %#v", candidate)
 	}
 }
 

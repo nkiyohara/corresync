@@ -16,7 +16,7 @@ public transports and one authenticated local session owner.
                   ▼
        config-scoped session owner
        ├── Outlook Web browser adapter
-       ├── Google Web browser adapter
+       ├── legacy Google Web parser (runtime sign-in disabled)
        ├── Google API OAuth adapter
        ├── Microsoft Graph OAuth adapter
        ├── JMAP adapter
@@ -91,7 +91,6 @@ handle, which cannot be rebound from another account.
 The session owner creates all authenticated provider clients:
 
 - Outlook Web: dedicated browser profile and in-memory captured session;
-- Google Web: dedicated visible browser profile and bounded semantic reads;
 - Google/Graph: interactive OAuth browser plus grant in OS keyring;
 - JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference.
 
@@ -99,6 +98,11 @@ No application transport accepts a password. OAuth client secrets, unattended
 grants, TLS interception, and raw authorization injection are unrepresentable.
 The daemon closes secret-owning clients on logout and clears owned mutable
 secret bytes.
+
+The legacy `google-web` configuration shape remains readable for safe
+inspection/removal, but selection and session activation fail before a browser
+launch. Corresync does not disguise software automation to bypass provider
+sign-in controls.
 
 ## Local IPC
 

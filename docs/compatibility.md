@@ -13,7 +13,7 @@ authorized live observations.
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
 | Outlook Web mail/calendar | Synthetic typed wire contracts | Historical Microsoft 365 notes, not commit-bound | Deterministic only; live-unobserved |
-| Google Web read-only mail/calendar | Synthetic semantic-DOM and application integration contracts; opt-in live harness compiles | Not run | Deterministic only |
+| Legacy Google Web adapter | Synthetic semantic-DOM contracts retained; runtime sign-in disabled before browser launch | Live sign-in rejected by Google on 2026-07-29 | Unsupported |
 | Google API mail/calendar/Google Meet field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
@@ -43,9 +43,10 @@ evidence.
 - `microsoft-owa`: mail and calendar are implemented; historical live notes
   exist, but v0.8 remains live-unobserved because those notes are not tied to
   its exact commit.
-- `google-web`: bounded read-only Gmail and Calendar snapshots are implemented
-  through an isolated visible browser session, but have no recorded live
-  observation.
+- `google-web`: the legacy parser and synthetic adapter contracts remain for
+  safe handling of v0.8.0-v0.8.1 configuration, but runtime sign-in is
+  unsupported and stops before browser launch. Google rejected the observed
+  software-controlled browser sign-in; Corresync does not disguise automation.
 - `google-api`: Gmail, selectable Google calendars, and Google Meet creation
   after observed calendar capability are implemented with a BYO public OAuth
   client, but have no recorded live observation.
@@ -118,26 +119,10 @@ session established in step 4 and never initiates authentication or OAuth. It
 does not prove mutation compatibility. Monitoring, remote egress, permanent
 deletion, and calendar invitations require separate explicit authorization.
 
-The managed Google Web adapter also has a separate opt-in, read-only harness.
-It requires a visible browser profile and authenticates only inside that
-browser:
-
-```console
-read -r -p "Authorized Google address: " CORRESYNC_LIVE_GOOGLE_ADDRESS
-export CORRESYNC_LIVE_GOOGLE_ADDRESS
-CORRESYNC_LIVE_CONFIRM=google-web-read-only \
-CORRESYNC_LIVE_GOOGLE_PROFILE_DIR="$(mktemp -d)" \
-mise exec -- go test -tags=live \
-  -run TestLiveGoogleWebVisibleRead ./internal/provider/googleweb
-unset CORRESYNC_LIVE_GOOGLE_ADDRESS
-```
-
-Set `CORRESYNC_LIVE_BROWSER_EXECUTABLE` only when browser auto-detection is not
-appropriate. Use a dedicated profile directory and remove it only through a
-reviewed local cleanup after the test. The harness accepts no password, token,
-cookie, or storage export; it verifies the visible signed-in identity and
-performs bounded mail/calendar reads only. It is excluded from default tests
-and CI.
+The former managed Google Web live harness is no longer an accepted observation
+path. Do not use automation-hiding flags or browser fingerprint spoofing to
+make the provider accept it. Record Google compatibility only through an
+explicitly authorized API client or an administrator-approved standards route.
 
 See the [manual test checklist](manual-test-checklist.md) for provider and
 platform recording templates.

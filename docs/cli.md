@@ -69,14 +69,6 @@ corr account add reader@example.invalid \
   --authorization-key personal-google \
   --approve-oauth
 
-# Managed Gmail and Calendar through a visible read-only browser
-corr account add reader@example.invalid \
-  --alias managed \
-  --mail-provider google-web \
-  --calendar-provider google-web \
-  --origin https://mail.google.com \
-  --calendar-origin https://calendar.google.com
-
 # IMAP/SMTP mail plus CalDAV calendar
 corr account add reader@example.invalid \
   --alias standards \
@@ -129,8 +121,9 @@ open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
 closes the entire local session owner.
 `--terminal` is an optional Outlook-Web-only browser relay and requires an
-interactive TTY. Google Web uses a visible browser-owned session and provides
-bounded read-only Gmail/Calendar snapshots. `auth status` is content-free.
+interactive TTY. Automated Google Web sign-in is unavailable because Google
+rejects software-controlled browsers; use explicit Google API OAuth or an
+administrator-approved standards route. `auth status` is content-free.
 
 `doctor` validates local config, browser prerequisites, IPC, daemon state, and
 update policy. `--online` validates only an already authenticated session; it

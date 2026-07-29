@@ -199,10 +199,11 @@ corr account add reader@example.invalid --help
 
 Discovery is credential-free. Review its candidates and choose one explicitly.
 Google API and Microsoft Graph require a registered public OAuth client and an
-OS-keyring authorization handle. Managed accounts can explicitly choose the
-read-only `google-web` route and authenticate in a visible browser without an
-OAuth client. JMAP, IMAP/SMTP, and CalDAV use an OS-keyring entry or an
-explicitly approved credential helper. See
+OS-keyring authorization handle. Automated Google Web sign-in is unavailable
+because Google rejects software-controlled browsers, and Corresync does not
+disguise automation. Workspace administrators may require approval or block
+API and standards routes. JMAP, IMAP/SMTP, and CalDAV use an OS-keyring entry
+or an explicitly approved credential helper. See
 [configuration.md](configuration.md) and
 [authentication.md](authentication.md).
 

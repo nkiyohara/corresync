@@ -5,6 +5,24 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.2 - 2026-07-29
+
+### Google sign-in safety and onboarding
+
+- Stop offering the `google-web` route after live sign-in was rejected by
+  Google's software-controlled-browser protection. Corresync does not disguise
+  browser automation or attempt to bypass that control.
+- Keep Google discovery credential-free and advertise only the explicit
+  `google-api` candidate. Guided setup now explains that a public OAuth client
+  is required and that Workspace administrator policy may approve or block API
+  and standards routes.
+- Reject new `google-web` selection and fail legacy v0.8.0-v0.8.1 Google Web
+  accounts before any browser is launched, while keeping those configurations
+  loadable for safe inspection and removal.
+- Align README, the multipage website, authentication, configuration, CLI,
+  protocol, threat-model, and compatibility guidance with the supported Google
+  routes.
+
 ## 0.8.1 - 2026-07-29
 
 ### Installation and user documentation

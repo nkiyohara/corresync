@@ -36,11 +36,10 @@ gateway or tenant administration service.
 - Never accept or persist passwords, cookies, canaries, bearer tokens, OAuth
   authorization codes, access tokens, refresh tokens, or client secrets in
   config, CLI, MCP, audit, feedback, or logs.
-- Browser routes use visible interactive sign-in. OAuth routes use
+- The Outlook Web route uses visible interactive sign-in. OAuth routes use
   Authorization Code with PKCE for an explicitly selected public client.
-- The Google Web route reads only bounded semantic page state after exact-origin
-  and identity validation; it never extracts cookies, browser storage, or
-  authorization tokens and exposes no write operation.
+- Legacy Google Web selection and activation fail before browser launch.
+  Automation signals are never hidden to bypass provider sign-in controls.
 - Standards credentials remain behind an OS-keyring entry or an explicitly
   approved helper reference.
 - Account-add approval displays the exact external backend/key handles and
