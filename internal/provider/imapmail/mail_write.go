@@ -456,14 +456,24 @@ func (client *Client) compose(
 	case application.MailComposeNew:
 		return result, nil
 	case application.MailComposeReply:
-		result.To = uniqueIMAPAddresses(envelope.ReplyTo, envelope.From, client.sender)
+		result.To, err = derivedIMAPAddresses(
+			imapReplyTarget(envelope),
+			nil,
+			client.sender,
+		)
 	case application.MailComposeReplyAll:
-		result.To = uniqueIMAPAddresses(
-			append(append([]*imap.Address{}, envelope.ReplyTo...), envelope.From...),
+		result.To, err = derivedIMAPAddresses(
+			imapReplyTarget(envelope),
 			envelope.To,
 			client.sender,
 		)
-		result.CC = uniqueIMAPAddresses(envelope.Cc, nil, client.sender)
+		if err == nil {
+			result.CC, err = derivedIMAPAddresses(
+				envelope.Cc,
+				nil,
+				client.sender,
+			)
+		}
 	case application.MailComposeForward:
 		if parsed.Text != "" {
 			if result.Body != "" {
@@ -473,6 +483,25 @@ func (client *Client) compose(
 		}
 	default:
 		return mailComposition{}, errors.New("unsupported IMAP compose mode")
+	}
+	if err != nil {
+		return mailComposition{}, err
+	}
+	if input.EffectiveComposeMode() == application.MailComposeReply ||
+		input.EffectiveComposeMode() == application.MailComposeReplyAll {
+		count := len(result.To) + len(result.CC)
+		if count == 0 {
+			return mailComposition{}, errors.New(
+				"IMAP reference message has no valid reply recipient",
+			)
+		}
+		if count > application.MaxMailRecipients {
+			return mailComposition{}, fmt.Errorf(
+				"IMAP reply has %d recipients; maximum is %d",
+				count,
+				application.MaxMailRecipients,
+			)
+		}
 	}
 	if result.Subject == "" {
 		prefix := "Re: "
@@ -494,16 +523,33 @@ func (client *Client) compose(
 	return result, nil
 }
 
-func uniqueIMAPAddresses(
+func imapReplyTarget(envelope *imap.Envelope) []*imap.Address {
+	if len(envelope.ReplyTo) != 0 {
+		return envelope.ReplyTo
+	}
+	return envelope.From
+}
+
+func derivedIMAPAddresses(
 	primary, secondary []*imap.Address,
 	exclude string,
-) []string {
+) ([]string, error) {
 	seen := make(map[string]struct{}, len(primary)+len(secondary))
 	result := make([]string, 0, len(primary)+len(secondary))
 	for _, address := range append(append([]*imap.Address{}, primary...), secondary...) {
+		if address == nil {
+			return nil, errors.New(
+				"IMAP reference envelope contains a malformed recipient address",
+			)
+		}
 		value := address.Address()
 		key := strings.ToLower(value)
-		if !bareAddress(value) || strings.EqualFold(value, exclude) {
+		if !bareAddress(value) {
+			return nil, errors.New(
+				"IMAP reference envelope contains a malformed recipient address",
+			)
+		}
+		if strings.EqualFold(value, exclude) {
 			continue
 		}
 		if _, exists := seen[key]; exists {
@@ -512,7 +558,7 @@ func uniqueIMAPAddresses(
 		seen[key] = struct{}{}
 		result = append(result, value)
 	}
-	return result
+	return result, nil
 }
 
 func (client *Client) buildMessage(

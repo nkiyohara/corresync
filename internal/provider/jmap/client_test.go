@@ -20,6 +20,7 @@ type syntheticJMAP struct {
 	state    string
 	ifState  string
 	requests []string
+	created  [][]emailAddress
 	submit   bool
 	readOnly bool
 }
@@ -118,6 +119,17 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 			"ids": []string{"message-1"}, "total": 1, "limit": 25,
 		}
 	case "Email/get":
+		properties, _ := arguments["properties"].([]any)
+		hasReplyTo := false
+		for _, property := range properties {
+			if property == "replyTo" {
+				hasReplyTo = true
+				break
+			}
+		}
+		if !hasReplyTo {
+			fixture.t.Error("Email/get did not request replyTo")
+		}
 		result = map[string]any{
 			"accountId": "account-1", "state": state, "notFound": []string{},
 			"list": []map[string]any{{
@@ -127,6 +139,7 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 				"receivedAt": "2026-07-28T12:00:00Z",
 				"messageId":  []string{"message@example.invalid"},
 				"from":       []map[string]string{{"name": "Sender", "email": "sender@example.invalid"}},
+				"replyTo":    []map[string]string{{"name": "Replies", "email": "replies@example.invalid"}},
 				"to":         []map[string]string{{"email": "reader@example.invalid"}},
 				"subject":    "Synthetic message", "hasAttachment": true,
 				"textBody":   []map[string]any{{"partId": "text", "type": "text/plain"}},
@@ -148,6 +161,22 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 				"updated": map[string]any{"message-1": nil},
 			}
 		} else {
+			create, _ := arguments["create"].(map[string]any)
+			draft, _ := create["draft"].(map[string]any)
+			rawTo, _ := draft["to"].([]any)
+			createdTo := make([]emailAddress, 0, len(rawTo))
+			for _, rawAddress := range rawTo {
+				address, _ := rawAddress.(map[string]any)
+				name, _ := address["name"].(string)
+				emailValue, _ := address["email"].(string)
+				createdTo = append(
+					createdTo,
+					emailAddress{Name: name, Email: emailValue},
+				)
+			}
+			fixture.mu.Lock()
+			fixture.created = append(fixture.created, createdTo)
+			fixture.mu.Unlock()
 			result = map[string]any{
 				"accountId": "account-1", "oldState": state, "newState": "state-2",
 				"created": map[string]any{
@@ -287,6 +316,26 @@ func TestClientReadsAndConditionallyUpdatesSyntheticJMAP(t *testing.T) {
 	if sent.ID != "draft-1" || sent.ChangeKey != "state-2" {
 		t.Fatalf("sent = %#v", sent)
 	}
+	reply, err := client.CreateMailDraft(t.Context(), application.MailDraftInput{
+		ComposeMode:        application.MailComposeReply,
+		ReferenceMessageID: "message-1",
+		ReferenceChangeKey: "state-2",
+		Body:               "Reply body",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply.ID != "draft-1" {
+		t.Fatalf("reply = %#v", reply)
+	}
+	fixture.mu.Lock()
+	created := append([][]emailAddress(nil), fixture.created...)
+	fixture.mu.Unlock()
+	if len(created) != 3 ||
+		len(created[2]) != 1 ||
+		created[2][0].Email != "replies@example.invalid" {
+		t.Fatalf("created recipients = %#v", created)
+	}
 	if observed := client.ObservedCapabilities(); !observed.Submission ||
 		observed.ReadOnly {
 		t.Fatalf("observed capabilities = %#v", observed)
@@ -354,6 +403,33 @@ func TestClientRejectsCrossOriginSessionEndpointsBeforeCredentialReuse(
 			"credential was sent to unapproved origin %d times",
 			attackerRequests.Load(),
 		)
+	}
+}
+
+func TestJMAPReplyTargetRejectsMalformedProviderAddress(t *testing.T) {
+	t.Parallel()
+	source := email{
+		From: []emailAddress{{Email: "sender@example.invalid"}},
+		ReplyTo: []emailAddress{{
+			Email: "malformed address",
+		}},
+	}
+	if _, err := uniqueDerivedAddresses(
+		jmapReplyTarget(source),
+		"reader@example.invalid",
+	); err == nil {
+		t.Fatal("malformed replyTo was accepted")
+	}
+	source.ReplyTo = nil
+	got, err := uniqueDerivedAddresses(
+		jmapReplyTarget(source),
+		"reader@example.invalid",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Email != "sender@example.invalid" {
+		t.Fatalf("fallback reply target = %#v", got)
 	}
 }
 

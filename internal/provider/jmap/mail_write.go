@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -350,13 +351,21 @@ func (client *Client) composition(
 	case application.MailComposeNew:
 		return result, nil
 	case application.MailComposeReply:
-		result.To = uniqueAddresses(source.From, client.username)
-	case application.MailComposeReplyAll:
-		result.To = uniqueAddresses(
-			append(append([]emailAddress{}, source.From...), source.To...),
+		result.To, err = uniqueDerivedAddresses(
+			jmapReplyTarget(source),
 			client.username,
 		)
-		result.CC = uniqueAddresses(source.CC, client.username)
+	case application.MailComposeReplyAll:
+		result.To, err = uniqueDerivedAddresses(
+			append(
+				append([]emailAddress{}, jmapReplyTarget(source)...),
+				source.To...,
+			),
+			client.username,
+		)
+		if err == nil {
+			result.CC, err = uniqueDerivedAddresses(source.CC, client.username)
+		}
 	case application.MailComposeForward:
 		sourceText, bodyErr := boundedBodyText(source)
 		if bodyErr != nil {
@@ -371,6 +380,25 @@ func (client *Client) composition(
 	default:
 		return composition{}, fmt.Errorf("unsupported JMAP compose mode %q", mode)
 	}
+	if err != nil {
+		return composition{}, err
+	}
+	if mode == application.MailComposeReply ||
+		mode == application.MailComposeReplyAll {
+		count := len(result.To) + len(result.CC)
+		if count == 0 {
+			return composition{}, errors.New(
+				"JMAP reference email has no valid reply recipient",
+			)
+		}
+		if count > application.MaxMailRecipients {
+			return composition{}, fmt.Errorf(
+				"JMAP reply has %d recipients; maximum is %d",
+				count,
+				application.MaxMailRecipients,
+			)
+		}
+	}
 	if len(result.Body) > application.MaxMailDraftBodyBytes {
 		return composition{}, fmt.Errorf(
 			"composed JMAP body exceeds %d bytes",
@@ -378,6 +406,13 @@ func (client *Client) composition(
 		)
 	}
 	return result, nil
+}
+
+func jmapReplyTarget(source email) []emailAddress {
+	if len(source.ReplyTo) != 0 {
+		return source.ReplyTo
+	}
+	return source.From
 }
 
 func (client *Client) requireEmailState(
@@ -449,12 +484,23 @@ func addresses(values []string) []emailAddress {
 	return result
 }
 
-func uniqueAddresses(values []emailAddress, exclude string) []emailAddress {
+func uniqueDerivedAddresses(
+	values []emailAddress,
+	exclude string,
+) ([]emailAddress, error) {
 	seen := make(map[string]struct{}, len(values))
 	result := make([]emailAddress, 0, len(values))
 	for _, value := range values {
+		parsed, err := mail.ParseAddress(value.Email)
+		if err != nil ||
+			parsed.Address != value.Email ||
+			strings.ContainsAny(value.Email, "\r\n\x00") {
+			return nil, errors.New(
+				"JMAP reference email contains a malformed recipient address",
+			)
+		}
 		key := strings.ToLower(value.Email)
-		if key == "" || strings.EqualFold(value.Email, exclude) {
+		if strings.EqualFold(value.Email, exclude) {
 			continue
 		}
 		if _, exists := seen[key]; exists {
@@ -463,5 +509,5 @@ func uniqueAddresses(values []emailAddress, exclude string) []emailAddress {
 		seen[key] = struct{}{}
 		result = append(result, value)
 	}
-	return result
+	return result, nil
 }

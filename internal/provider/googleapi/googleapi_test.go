@@ -21,7 +21,7 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 ) {
 	t.Parallel()
 
-	var draftRaw string
+	var draftRaws []string
 	var sendRaw string
 	var modifiedReadState bool
 	var movedToArchive bool
@@ -77,7 +77,7 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 				}},
 			})
 		case "POST /gmail/v1/users/me/drafts":
-			draftRaw = googleTestRaw(t, request)
+			draftRaws = append(draftRaws, googleTestRaw(t, request))
 			writeGoogleJSON(t, writer, map[string]any{
 				"id": "d1",
 				"message": map[string]string{
@@ -261,8 +261,41 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 	if err != nil {
 		t.Fatal(err)
 	}
-	if draft.ID == "" || !strings.Contains(draftRaw, "Bcc: hidden@example.test") {
-		t.Fatalf("draft = %#v raw = %q", draft, draftRaw)
+	if draft.ID == "" || len(draftRaws) != 1 ||
+		!strings.Contains(draftRaws[0], "Bcc: hidden@example.test") {
+		t.Fatalf("draft = %#v raw = %q", draft, draftRaws)
+	}
+	_, err = client.CreateMailDraft(
+		t.Context(),
+		application.MailDraftInput{
+			ComposeMode:        application.MailComposeReply,
+			ReferenceMessageID: page.Messages[0].ID,
+			ReferenceChangeKey: page.Messages[0].ChangeKey,
+			Body:               "Reply body",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.CreateMailDraft(
+		t.Context(),
+		application.MailDraftInput{
+			ComposeMode:        application.MailComposeReplyAll,
+			ReferenceMessageID: page.Messages[0].ID,
+			ReferenceChangeKey: page.Messages[0].ChangeKey,
+			Body:               "Reply-all body",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(draftRaws) != 3 ||
+		!strings.Contains(draftRaws[1], "To: replies@example.test") ||
+		strings.Contains(draftRaws[1], "sender@example.test") ||
+		!strings.Contains(draftRaws[2], "To: replies@example.test") ||
+		strings.Contains(draftRaws[2], "sender@example.test") ||
+		!strings.Contains(draftRaws[2], "Cc: observer@example.test") {
+		t.Fatalf("reply drafts = %#v", draftRaws[1:])
 	}
 	sent, err := client.SendMail(
 		t.Context(),
@@ -654,6 +687,9 @@ func googleTestMessage(full bool) gmailMessage {
 			Headers: []gmailHeader{
 				{Name: "Subject", Value: "Synthetic"},
 				{Name: "From", Value: "Sender <sender@example.test>"},
+				{Name: "Reply-To", Value: "Replies <replies@example.test>"},
+				{Name: "To", Value: "reader@example.test"},
+				{Name: "Cc", Value: "observer@example.test"},
 				{Name: "Message-ID", Value: "<source@example.test>"},
 			},
 		},
@@ -674,6 +710,28 @@ func googleTestMessage(full bool) gmailMessage {
 		}
 	}
 	return message
+}
+
+func TestGmailReplyTargetFallsBackOnlyWhenReplyToIsAbsent(t *testing.T) {
+	t.Parallel()
+	headers := []gmailHeader{
+		{Name: "From", Value: "sender@example.test"},
+		{Name: "Reply-To", Value: "replies@example.test"},
+	}
+	if got := gmailReplyTarget(headers); got != "replies@example.test" {
+		t.Fatalf("reply target = %q", got)
+	}
+	headers[1].Value = "malformed address"
+	if _, err := gmailAddresses(
+		gmailReplyTarget(headers),
+		"reader@example.test",
+	); err == nil {
+		t.Fatal("malformed Reply-To was accepted")
+	}
+	headers = headers[:1]
+	if got := gmailReplyTarget(headers); got != "sender@example.test" {
+		t.Fatalf("fallback reply target = %q", got)
+	}
 }
 
 func googleTestEvent(etag string) googleEvent {

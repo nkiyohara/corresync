@@ -158,14 +158,12 @@ func (client *Client) composition(
 		return result, nil
 	case application.MailComposeReply:
 		result.To, err = gmailAddresses(
-			headerValue(message.Payload.Headers, "Reply-To")+","+
-				headerValue(message.Payload.Headers, "From"),
+			gmailReplyTarget(message.Payload.Headers),
 			client.address,
 		)
 	case application.MailComposeReplyAll:
 		result.To, err = gmailAddresses(
-			headerValue(message.Payload.Headers, "Reply-To")+","+
-				headerValue(message.Payload.Headers, "From")+","+
+			gmailReplyTarget(message.Payload.Headers)+","+
 				headerValue(message.Payload.Headers, "To"),
 			client.address,
 		)
@@ -199,6 +197,22 @@ func (client *Client) composition(
 	if err != nil {
 		return gmailComposition{}, err
 	}
+	if mode == application.MailComposeReply ||
+		mode == application.MailComposeReplyAll {
+		count := len(result.To) + len(result.CC)
+		if count == 0 {
+			return gmailComposition{}, errors.New(
+				"gmail reference message has no valid reply recipient",
+			)
+		}
+		if count > application.MaxMailRecipients {
+			return gmailComposition{}, fmt.Errorf(
+				"gmail reply has %d recipients; maximum is %d",
+				count,
+				application.MaxMailRecipients,
+			)
+		}
+	}
 	if result.Subject == "" {
 		source := headerValue(message.Payload.Headers, "Subject")
 		prefix := "Re: "
@@ -215,6 +229,13 @@ func (client *Client) composition(
 		return gmailComposition{}, errors.New("composed Gmail body exceeds the limit")
 	}
 	return result, nil
+}
+
+func gmailReplyTarget(headers []gmailHeader) string {
+	if value := headerValue(headers, "Reply-To"); strings.TrimSpace(value) != "" {
+		return value
+	}
+	return headerValue(headers, "From")
 }
 
 func gmailAddresses(raw, exclude string) ([]string, error) {

@@ -515,3 +515,54 @@ func TestInheritedReplyHeadersDropMalformedInputAndAllowForward(t *testing.T) {
 		t.Fatalf("forward inherited headers = %q, %q", inReplyTo, references)
 	}
 }
+
+func TestIMAPReplyTargetPrefersReplyToWithoutMixingFrom(t *testing.T) {
+	t.Parallel()
+	replyTo := &imap.Address{
+		PersonalName: "Replies",
+		MailboxName:  "replies",
+		HostName:     "example.invalid",
+	}
+	from := &imap.Address{
+		PersonalName: "Sender",
+		MailboxName:  "sender",
+		HostName:     "example.invalid",
+	}
+	envelope := &imap.Envelope{
+		ReplyTo: []*imap.Address{replyTo},
+		From:    []*imap.Address{from},
+	}
+	got, err := derivedIMAPAddresses(
+		imapReplyTarget(envelope),
+		nil,
+		"reader@example.invalid",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != "replies@example.invalid" {
+		t.Fatalf("reply recipients = %#v", got)
+	}
+
+	envelope.ReplyTo = nil
+	got, err = derivedIMAPAddresses(
+		imapReplyTarget(envelope),
+		nil,
+		"reader@example.invalid",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0] != "sender@example.invalid" {
+		t.Fatalf("fallback reply recipients = %#v", got)
+	}
+
+	envelope.ReplyTo = []*imap.Address{{MailboxName: "malformed"}}
+	if _, err := derivedIMAPAddresses(
+		imapReplyTarget(envelope),
+		nil,
+		"reader@example.invalid",
+	); err == nil {
+		t.Fatal("malformed Reply-To was accepted")
+	}
+}

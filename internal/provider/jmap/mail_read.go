@@ -69,6 +69,7 @@ type email struct {
 	References    []string                   `json:"references"`
 	Sender        []emailAddress             `json:"sender"`
 	From          []emailAddress             `json:"from"`
+	ReplyTo       []emailAddress             `json:"replyTo"`
 	To            []emailAddress             `json:"to"`
 	CC            []emailAddress             `json:"cc"`
 	BCC           []emailAddress             `json:"bcc"`
@@ -338,7 +339,7 @@ func (client *Client) getEmails(
 	properties := []string{
 		"id", "blobId", "threadId", "mailboxIds", "keywords", "size",
 		"receivedAt", "messageId", "inReplyTo", "references", "sender",
-		"from", "to", "cc", "bcc", "subject", "hasAttachment", "preview",
+		"from", "replyTo", "to", "cc", "bcc", "subject", "hasAttachment", "preview",
 	}
 	arguments := map[string]any{
 		"accountId":  client.accountID,
