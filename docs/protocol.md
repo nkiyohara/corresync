@@ -62,9 +62,11 @@ Only reads may retry; `Retry-After` is bounded. OWA actions retain their
 synthetic `__type` metadata and are normalized behind typed contracts.
 
 The registry includes only the actions required for implemented folder, mail,
-attachment, calendar, and reviewed write operations. Shared/delegated mailbox
-headers are added only for an explicitly configured route and never broaden
-the signed-in user's existing permissions.
+attachment, calendar, and reviewed write operations. The typed `FindFolder`
+action also performs a bounded deep scan below the distinguished calendar,
+filters exact calendar folder classes, and reports effective read/write rights.
+Shared/delegated mailbox headers are added only for an explicitly configured
+route and never broaden the signed-in user's existing permissions.
 
 OWA can provision a Teams join URL as a provider-native calendar-event creation
 property. Teams chat, channels, calls, recordings, and meeting lifecycle

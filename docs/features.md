@@ -8,7 +8,7 @@ not available through a raw protocol escape hatch.
 <!-- markdownlint-disable MD013 -->
 | Provider ID | Mail | Calendar | Authentication | Evidence on this branch |
 | --- | --- | --- | --- | --- |
-| `microsoft-owa` | Mail | Calendar | Visible browser-owned Outlook Web session | Implemented; synthetic contracts on current branch, historical live notes are not commit-bound |
+| `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | Visible browser-owned Outlook Web session | Implemented; synthetic contracts on current branch, historical live notes are not commit-bound |
 | `google-web` | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Visible browser-owned Google session | Implemented; synthetic DOM and integration contracts only |
 | `google-api` | Gmail | Selectable Google calendars, observed Google Meet link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |
 | `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter and integration contracts only |

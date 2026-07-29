@@ -49,6 +49,9 @@ All notable user-facing changes are recorded here. The project follows
 - Fail closed when Gmail or Google Calendar exposes neither recognized semantic
   rows nor a structural empty-state marker, and collect every UTC date in a
   bounded multi-day Google Web agenda window with deterministic deduplication.
+- Discover bounded Outlook Web calendar hierarchies through the existing typed
+  `FindFolder` action, filter exact calendar folder classes, expose observed
+  effective rights, and keep the distinguished calendar as the stable default.
 - Save successful SMTP submissions to the discovered IMAP Sent mailbox and
   return its resolvable message identity; fail before SMTP when no Sent mailbox
   exists, and report an unknown partial outcome if post-submit append fails.

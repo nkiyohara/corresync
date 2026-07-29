@@ -1,0 +1,83 @@
+{
+  "Body": {
+    "ResponseMessages": {
+      "Items": [
+        {
+          "ResponseClass": "Success",
+          "ResponseCode": "NoError",
+          "RootFolder": {
+            "Folders": [
+              {
+                "__type": "CalendarFolder:#Exchange",
+                "FolderId": {"Id": "default-calendar", "ChangeKey": "default-change"},
+                "ParentFolderId": {"Id": "calendar-root"},
+                "DisplayName": "Calendar",
+                "FolderClass": "IPF.Appointment",
+                "DistinguishedFolderId": "calendar",
+                "ChildFolderCount": 0,
+                "TotalCount": 1,
+                "UnreadCount": 0,
+                "EffectiveRights": {
+                  "CreateContents": true,
+                  "Modify": true,
+                  "Read": true
+                }
+              },
+              {
+                "__type": "CalendarFolder:#Exchange",
+                "FolderId": {"Id": "team-calendar", "ChangeKey": "team-change"},
+                "ParentFolderId": {"Id": "calendar-root"},
+                "DisplayName": "Team calendar",
+                "FolderClass": "IPF.Appointment",
+                "DistinguishedFolderId": "",
+                "ChildFolderCount": 0,
+                "TotalCount": 4,
+                "UnreadCount": 0,
+                "EffectiveRights": {
+                  "CreateContents": true,
+                  "Modify": true,
+                  "Read": true
+                }
+              },
+              {
+                "__type": "CalendarFolder:#Exchange",
+                "FolderId": {"Id": "birthdays-calendar", "ChangeKey": "birthdays-change"},
+                "ParentFolderId": {"Id": "calendar-root"},
+                "DisplayName": "Birthdays",
+                "FolderClass": "IPF.Appointment",
+                "DistinguishedFolderId": "",
+                "ChildFolderCount": 0,
+                "TotalCount": 2,
+                "UnreadCount": 0,
+                "EffectiveRights": {
+                  "CreateContents": false,
+                  "Modify": false,
+                  "Read": true
+                }
+              },
+              {
+                "__type": "Folder:#Exchange",
+                "FolderId": {"Id": "non-calendar", "ChangeKey": "non-calendar-change"},
+                "ParentFolderId": {"Id": "calendar-root"},
+                "DisplayName": "Not a calendar",
+                "FolderClass": "IPF.Note",
+                "DistinguishedFolderId": "",
+                "ChildFolderCount": 0,
+                "TotalCount": 0,
+                "UnreadCount": 0,
+                "EffectiveRights": {
+                  "CreateContents": true,
+                  "Modify": true,
+                  "Read": true
+                }
+              }
+            ],
+            "TotalItemsInView": 4,
+            "IncludesLastItemInRange": true,
+            "IndexedPagingOffset": 4
+          }
+        }
+      ]
+    }
+  }
+}

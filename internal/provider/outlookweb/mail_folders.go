@@ -55,6 +55,11 @@ type findFolderItem struct {
 	ChildFolderCount int    `json:"ChildFolderCount"`
 	TotalCount       int    `json:"TotalCount"`
 	UnreadCount      int    `json:"UnreadCount"`
+	EffectiveRights  struct {
+		CreateContents bool `json:"CreateContents"`
+		Modify         bool `json:"Modify"`
+		Read           bool `json:"Read"`
+	} `json:"EffectiveRights"`
 }
 
 // ListMailFolders implements bounded folder discovery using OWA FindFolder.
@@ -65,33 +70,16 @@ func (client *Client) ListMailFolders(
 	if err := input.Validate(); err != nil {
 		return application.MailFolderPage{}, err
 	}
-	payload, err := buildFindFolderEnvelope(input)
+	result, err := client.findFolders(ctx, input)
 	if err != nil {
 		return application.MailFolderPage{}, err
 	}
-	var response responseEnvelope[findFolderResponseBody]
-	if err := client.Call(ctx, FindFolder, payload, &response); err != nil {
-		return application.MailFolderPage{}, err
-	}
-	if len(response.Body.ResponseMessages.Items) != 1 {
-		return application.MailFolderPage{}, errors.New("OWA FindFolder returned an unexpected response count")
-	}
-	message := response.Body.ResponseMessages.Items[0]
-	if err := checkResponse(FindFolder.Name(), message.ResponseClass, message.ResponseCode); err != nil {
-		return application.MailFolderPage{}, err
-	}
-	if message.RootFolder.TotalItemsInView < 0 {
-		return application.MailFolderPage{}, errors.New("OWA FindFolder returned a negative total")
-	}
-	if len(message.RootFolder.Folders) > input.Limit {
-		return application.MailFolderPage{}, fmt.Errorf("OWA FindFolder returned more than %d folders", input.Limit)
-	}
 	page := application.MailFolderPage{
-		Folders:          make([]application.MailFolderSummary, 0, len(message.RootFolder.Folders)),
-		TotalFolders:     message.RootFolder.TotalItemsInView,
-		IncludesLastItem: message.RootFolder.IncludesLastItem,
+		Folders:          make([]application.MailFolderSummary, 0, len(result.Folders)),
+		TotalFolders:     result.TotalItemsInView,
+		IncludesLastItem: result.IncludesLastItem,
 	}
-	for _, folder := range message.RootFolder.Folders {
+	for _, folder := range result.Folders {
 		if err := validateFindFolderItem(folder); err != nil {
 			return application.MailFolderPage{}, fmt.Errorf("invalid folder in OWA response: %w", err)
 		}
@@ -110,6 +98,53 @@ func (client *Client) ListMailFolders(
 	return page, nil
 }
 
+func (client *Client) findFolders(
+	ctx context.Context,
+	input application.MailFolderListInput,
+) (findFolderResult, error) {
+	payload, err := buildFindFolderEnvelope(input)
+	if err != nil {
+		return findFolderResult{}, err
+	}
+	return client.findFoldersWithPayload(ctx, payload, input.Limit)
+}
+
+func (client *Client) findFoldersWithPayload(
+	ctx context.Context,
+	payload findFolderEnvelope,
+	limit int,
+) (findFolderResult, error) {
+	var response responseEnvelope[findFolderResponseBody]
+	if err := client.Call(ctx, FindFolder, payload, &response); err != nil {
+		return findFolderResult{}, err
+	}
+	if len(response.Body.ResponseMessages.Items) != 1 {
+		return findFolderResult{}, errors.New(
+			"OWA FindFolder returned an unexpected response count",
+		)
+	}
+	message := response.Body.ResponseMessages.Items[0]
+	if err := checkResponse(
+		FindFolder.Name(),
+		message.ResponseClass,
+		message.ResponseCode,
+	); err != nil {
+		return findFolderResult{}, err
+	}
+	if message.RootFolder.TotalItemsInView < 0 {
+		return findFolderResult{}, errors.New(
+			"OWA FindFolder returned a negative total",
+		)
+	}
+	if len(message.RootFolder.Folders) > limit {
+		return findFolderResult{}, fmt.Errorf(
+			"OWA FindFolder returned more than %d folders",
+			limit,
+		)
+	}
+	return message.RootFolder, nil
+}
+
 func buildFindFolderEnvelope(input application.MailFolderListInput) (findFolderEnvelope, error) {
 	if err := input.Validate(); err != nil {
 		return findFolderEnvelope{}, err
@@ -120,21 +155,6 @@ func buildFindFolderEnvelope(input application.MailFolderListInput) (findFolderE
 		parentType = "DistinguishedFolderId:#Exchange"
 		parentID = strings.ToLower(parentID)
 	}
-	properties := []string{
-		"folder:DisplayName",
-		"folder:ParentFolderId",
-		"folder:FolderClass",
-		"folder:DistinguishedFolderId",
-		"folder:ChildFolderCount",
-		"folder:TotalCount",
-		"folder:UnreadCount",
-	}
-	additional := make([]propertyURI, 0, len(properties))
-	for _, property := range properties {
-		additional = append(additional, propertyURI{
-			Type: "PropertyUri:#Exchange", FieldURI: property,
-		})
-	}
 	traversal := "Shallow"
 	if input.Traversal == application.MailFolderTraversalDeep {
 		traversal = "Deep"
@@ -143,11 +163,8 @@ func buildFindFolderEnvelope(input application.MailFolderListInput) (findFolderE
 		Type:   "FindFolderJsonRequest:#Exchange",
 		Header: newRequestHeader(input.TimeZone),
 		Body: findFolderRequest{
-			Type: "FindFolderRequest:#Exchange",
-			FolderShape: folderResponseShape{
-				Type: "FolderResponseShape:#Exchange", BaseShape: "IdOnly",
-				AdditionalProperties: additional,
-			},
+			Type:        "FindFolderRequest:#Exchange",
+			FolderShape: newFolderResponseShape(),
 			Paging: indexedPageView{
 				Type: "IndexedPageView:#Exchange", BasePoint: "Beginning",
 				Offset: input.Offset, MaxEntriesReturned: input.Limit,
@@ -157,6 +174,29 @@ func buildFindFolderEnvelope(input application.MailFolderListInput) (findFolderE
 			Traversal:          traversal,
 		},
 	}, nil
+}
+
+func newFolderResponseShape() folderResponseShape {
+	properties := []string{
+		"folder:DisplayName",
+		"folder:ParentFolderId",
+		"folder:FolderClass",
+		"folder:DistinguishedFolderId",
+		"folder:ChildFolderCount",
+		"folder:TotalCount",
+		"folder:UnreadCount",
+		"folder:EffectiveRights",
+	}
+	additional := make([]propertyURI, 0, len(properties))
+	for _, property := range properties {
+		additional = append(additional, propertyURI{
+			Type: "PropertyUri:#Exchange", FieldURI: property,
+		})
+	}
+	return folderResponseShape{
+		Type: "FolderResponseShape:#Exchange", BaseShape: "IdOnly",
+		AdditionalProperties: additional,
+	}
 }
 
 func validateFindFolderItem(folder findFolderItem) error {

@@ -34,7 +34,7 @@
       "MaxEntriesReturned": 100
     },
     "ParentFolderIds": [
-      {"__type": "DistinguishedFolderId:#Exchange", "Id": "msgfolderroot"}
+      {"__type": "DistinguishedFolderId:#Exchange", "Id": "calendar"}
     ],
     "ReturnParentFolder": true,
     "Traversal": "Deep"
