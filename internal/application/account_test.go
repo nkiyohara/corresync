@@ -10,6 +10,7 @@ import (
 
 type accountRepositoryStub struct {
 	catalog     AccountCatalog
+	credentials []AccountCredentialBinding
 	added       AccountRegistration
 	renamedID   domain.AccountID
 	renamed     string
@@ -20,6 +21,12 @@ type accountRepositoryStub struct {
 
 func (stub *accountRepositoryStub) ListAccounts(context.Context) (AccountCatalog, error) {
 	return stub.catalog, stub.err
+}
+
+func (stub *accountRepositoryStub) ListCredentialBindings(
+	context.Context,
+) ([]AccountCredentialBinding, error) {
+	return append([]AccountCredentialBinding(nil), stub.credentials...), stub.err
 }
 
 func (stub *accountRepositoryStub) AddAccount(
@@ -319,5 +326,57 @@ func TestAccountServiceAddsMixedStandardsRoutesWithoutExposingLookupKeys(t *test
 	if repository.added.Mail.IMAPSMTP.Credential.Key != "private-mail-key" ||
 		repository.added.Calendar.CalDAV.Credential.Key != "private-calendar-key" {
 		t.Fatalf("persisted registration lost credential references: %#v", repository.added)
+	}
+}
+
+func TestAccountAddReviewDisclosesAndExclusivelyBindsCredentialHandle(t *testing.T) {
+	t.Parallel()
+	repository := &accountRepositoryStub{
+		catalog: AccountCatalog{Accounts: []AccountView{
+			accountFixture("work", "acc_00000000000000000000000000000001", true),
+		}},
+		credentials: []AccountCredentialBinding{{
+			Account: "acc_00000000000000000000000000000001",
+			Backend: "os-keyring",
+			Key:     "owned-handle",
+		}},
+	}
+	service, err := NewAccountService(
+		repository,
+		&accountPurgerStub{},
+		[]domain.ProviderID{domain.ProviderJMAP},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := AccountAddInput{
+		Alias: "team", Address: "reader@example.invalid",
+		Mail: &AccountMailRouteInput{
+			Provider: domain.ProviderJMAP,
+			JMAP: &AccountJMAPInput{
+				SessionURL: "https://jmap.example.invalid/session",
+				Username:   "reader@example.invalid",
+				Credential: AccountCredentialInput{
+					Backend: "os-keyring",
+					Key:     "owned-handle",
+					Consent: true,
+				},
+			},
+		},
+	}
+	if _, err := service.ReviewAdd(t.Context(), input); err == nil {
+		t.Fatal("ReviewAdd() accepted another account's credential handle")
+	}
+	input.Mail.JMAP.Credential.Key = "team-handle"
+	review, err := service.ReviewAdd(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(review.Credentials) != 1 ||
+		review.Credentials[0].Service != "mail" ||
+		review.Credentials[0].Provider != domain.ProviderJMAP ||
+		review.Credentials[0].Backend != "os-keyring" ||
+		review.Credentials[0].Key != "team-handle" {
+		t.Fatalf("credential approval review = %+v", review.Credentials)
 	}
 }

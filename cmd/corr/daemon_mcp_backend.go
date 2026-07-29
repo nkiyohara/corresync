@@ -8,9 +8,11 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/audit"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/paths"
 )
 
 // daemonMCPBackend forwards the MCP application boundary to the sole local
@@ -22,7 +24,8 @@ type daemonMCPBackend struct {
 	configuration   config.Config
 	accounts        *application.AccountService
 	discovery       *application.AccountDiscoveryService
-	approvals       *approval.Store
+	guard           *application.Guard
+	recorder        *audit.FileRecorder
 	accountMu       sync.RWMutex
 	mutationMu      sync.Mutex
 	accountMutation func(
@@ -51,11 +54,41 @@ func newDaemonMCPBackend(app *runtime) (*daemonMCPBackend, error) {
 		_ = client.Close()
 		return nil, err
 	}
+	auditPath, err := paths.AuditPath()
+	if err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	recorder, err := audit.NewFileRecorder(auditPath, audit.Options{})
+	if err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	rules := configuration.Policy.Rules()
+	rules.PreviewReversibleWrites = true
+	guard, err := application.NewGuard(rules, approvals, recorder)
+	if err != nil {
+		_ = recorder.Close()
+		_ = client.Close()
+		return nil, err
+	}
 	return &daemonMCPBackend{
 		Client: client, app: app,
 		defaultAccount: status.DefaultAccount, configuration: configuration,
-		accounts: accounts, discovery: discoverer, approvals: approvals,
+		accounts: accounts, discovery: discoverer, guard: guard, recorder: recorder,
 	}, nil
+}
+
+func (backend *daemonMCPBackend) Close() error {
+	var clientErr error
+	if backend.Client != nil {
+		clientErr = backend.Client.Close()
+	}
+	var recorderErr error
+	if backend.recorder != nil {
+		recorderErr = backend.recorder.Close()
+	}
+	return errors.Join(clientErr, recorderErr)
 }
 
 func (backend *daemonMCPBackend) DefaultAccount() domain.AccountID {
@@ -122,13 +155,19 @@ func (backend *daemonMCPBackend) PreviewAccountAdd(
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
-	preview, err := backend.approvals.Issue(operation, caller)
+	preparation, err := backend.guard.Prepare(ctx, operation, caller)
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
+	if preparation.Preview == nil {
+		return application.AccountChangeAccess{}, errors.New(
+			"account addition policy did not issue the required preview",
+		)
+	}
 	review.RestartsSessions = true
 	return application.AccountChangeAccess{
-		Status: "approval_required", Review: &review, Preview: &preview,
+		Status: "approval_required", Review: &review,
+		Preview: preparation.Preview,
 	}, nil
 }
 
@@ -137,7 +176,8 @@ func (backend *daemonMCPBackend) CommitAccountAdd(
 	token string,
 	caller domain.Caller,
 ) (application.AccountChangeAccess, error) {
-	operation, err := backend.approvals.ConsumeFor(
+	operation, err := backend.guard.CommitFor(
+		ctx,
 		token,
 		caller,
 		"account.add",
@@ -157,8 +197,12 @@ func (backend *daemonMCPBackend) CommitAccountAdd(
 			return backend.accounts.Add(callContext, input)
 		},
 	)
+	auditErr := backend.guard.RecordExecution(ctx, operation, caller, err)
 	if err != nil {
-		return application.AccountChangeAccess{}, err
+		return application.AccountChangeAccess{}, errors.Join(err, auditErr)
+	}
+	if auditErr != nil {
+		return application.AccountChangeAccess{}, auditErr
 	}
 	return application.AccountChangeAccess{
 		Status: "completed", Account: &account,
@@ -185,13 +229,19 @@ func (backend *daemonMCPBackend) PreviewAccountRename(
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
-	preview, err := backend.approvals.Issue(operation, caller)
+	preparation, err := backend.guard.Prepare(ctx, operation, caller)
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
+	if preparation.Preview == nil {
+		return application.AccountChangeAccess{}, errors.New(
+			"account rename policy did not issue the required preview",
+		)
+	}
 	review.RestartsSessions = true
 	return application.AccountChangeAccess{
-		Status: "approval_required", Review: &review, Preview: &preview,
+		Status: "approval_required", Review: &review,
+		Preview: preparation.Preview,
 	}, nil
 }
 
@@ -200,7 +250,8 @@ func (backend *daemonMCPBackend) CommitAccountRename(
 	token string,
 	caller domain.Caller,
 ) (application.AccountChangeAccess, error) {
-	operation, err := backend.approvals.ConsumeFor(
+	operation, err := backend.guard.CommitFor(
+		ctx,
 		token,
 		caller,
 		"account.rename",
@@ -225,8 +276,12 @@ func (backend *daemonMCPBackend) CommitAccountRename(
 			return backend.accounts.Rename(callContext, input)
 		},
 	)
+	auditErr := backend.guard.RecordExecution(ctx, operation, caller, err)
 	if err != nil {
-		return application.AccountChangeAccess{}, err
+		return application.AccountChangeAccess{}, errors.Join(err, auditErr)
+	}
+	if auditErr != nil {
+		return application.AccountChangeAccess{}, auditErr
 	}
 	return application.AccountChangeAccess{
 		Status: "completed", Account: &account,
@@ -256,13 +311,19 @@ func (backend *daemonMCPBackend) PreviewAccountRemove(
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
-	preview, err := backend.approvals.Issue(operation, caller)
+	preparation, err := backend.guard.Prepare(ctx, operation, caller)
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
+	if preparation.Preview == nil {
+		return application.AccountChangeAccess{}, errors.New(
+			"account removal policy did not issue the required preview",
+		)
+	}
 	review.RestartsSessions = true
 	return application.AccountChangeAccess{
-		Status: "approval_required", Review: &review, Preview: &preview,
+		Status: "approval_required", Review: &review,
+		Preview: preparation.Preview,
 	}, nil
 }
 
@@ -271,7 +332,8 @@ func (backend *daemonMCPBackend) CommitAccountRemove(
 	token string,
 	caller domain.Caller,
 ) (application.AccountChangeAccess, error) {
-	operation, err := backend.approvals.ConsumeFor(
+	operation, err := backend.guard.CommitFor(
+		ctx,
 		token,
 		caller,
 		"account.remove",
@@ -296,8 +358,12 @@ func (backend *daemonMCPBackend) CommitAccountRemove(
 			return backend.accounts.Remove(callContext, input)
 		},
 	)
+	auditErr := backend.guard.RecordExecution(ctx, operation, caller, err)
 	if err != nil {
-		return application.AccountChangeAccess{}, err
+		return application.AccountChangeAccess{}, errors.Join(err, auditErr)
+	}
+	if auditErr != nil {
+		return application.AccountChangeAccess{}, auditErr
 	}
 	return application.AccountChangeAccess{
 		Status: "completed", Account: &account,

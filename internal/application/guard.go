@@ -119,6 +119,36 @@ func (guard *Guard) CommitFor(
 	return operation, nil
 }
 
+// RecordExecution closes the audit lifecycle for an operation that already
+// passed Prepare and, when required, Commit. Adapters use this after the typed
+// application mutation returns so success and failure remain content-free.
+func (guard *Guard) RecordExecution(
+	ctx context.Context,
+	operation domain.Operation,
+	caller domain.Caller,
+	executionErr error,
+) error {
+	if err := caller.Validate(); err != nil {
+		return fmt.Errorf("validate caller: %w", err)
+	}
+	outcome := AuditOutcomeSuccess
+	reason := "executed"
+	if executionErr != nil {
+		outcome = AuditOutcomeFailure
+		reason = "execution_failed"
+	}
+	if err := guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{
+		Phase:     AuditPhaseExecuted,
+		Outcome:   outcome,
+		Reason:    reason,
+		Caller:    caller,
+		Operation: operation.View(),
+	}); err != nil {
+		return fmt.Errorf("record operation execution: %w", err)
+	}
+	return nil
+}
+
 func auditOutcome(verdict policy.Verdict) AuditOutcome {
 	switch verdict {
 	case policy.VerdictAllow:

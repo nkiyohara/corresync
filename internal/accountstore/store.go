@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"sort"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
@@ -39,6 +40,37 @@ func (store Store) ListAccounts(context.Context) (application.AccountCatalog, er
 	return application.AccountCatalog{Accounts: accounts}, nil
 }
 
+// ListCredentialBindings returns private handle ownership for application
+// validation. It is never surfaced by account read views.
+func (store Store) ListCredentialBindings(
+	ctx context.Context,
+) ([]application.AccountCredentialBinding, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	configuration, err := config.Load(store.ConfigPath)
+	if err != nil {
+		return nil, err
+	}
+	aliases := make([]string, 0, len(configuration.Accounts))
+	for alias := range configuration.Accounts {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	var bindings []application.AccountCredentialBinding
+	for _, alias := range aliases {
+		account := configuration.Accounts[alias]
+		for _, reference := range accountCredentialReferences(account) {
+			bindings = append(bindings, application.AccountCredentialBinding{
+				Account: account.ID,
+				Backend: string(reference.Backend),
+				Key:     reference.Key,
+			})
+		}
+	}
+	return bindings, nil
+}
+
 // AddAccount atomically rejects stale alias/ID conflicts before saving.
 func (store Store) AddAccount(
 	ctx context.Context,
@@ -64,15 +96,85 @@ func (store Store) AddAccount(
 		if err != nil {
 			return err
 		}
-		configuration.Accounts[account.Alias] = config.Account{
+		candidate := config.Account{
 			ID: account.ID, Address: account.Address,
 			Mail: mail, Calendar: calendar,
 		}
+		for _, requested := range accountCredentialReferences(candidate) {
+			for alias, existing := range configuration.Accounts {
+				for _, reference := range accountCredentialReferences(existing) {
+					if requested.Backend == reference.Backend &&
+						requested.Key == reference.Key {
+						return fmt.Errorf(
+							"credential handle %q in backend %q already belongs to account %q",
+							requested.Key,
+							requested.Backend,
+							alias,
+						)
+					}
+				}
+			}
+		}
+		configuration.Accounts[account.Alias] = candidate
 		if account.IsDefault {
 			configuration.DefaultAccount = account.Alias
 		}
 		return nil
 	})
+}
+
+func accountCredentialReferences(account config.Account) []config.CredentialRef {
+	references := make([]config.CredentialRef, 0, 2)
+	if account.Mail != nil {
+		switch account.Mail.Provider {
+		case domain.ProviderJMAP:
+			if account.Mail.JMAP != nil {
+				references = append(references, account.Mail.JMAP.Credential)
+			}
+		case domain.ProviderIMAPSMTP:
+			if account.Mail.IMAPSMTP != nil {
+				references = append(references, account.Mail.IMAPSMTP.Credential)
+			}
+		case domain.ProviderGoogleAPI:
+			if account.Mail.GoogleAPI != nil {
+				references = append(references, account.Mail.GoogleAPI.Authorization)
+			}
+		case domain.ProviderMicrosoftGraph:
+			if account.Mail.MicrosoftGraph != nil {
+				references = append(
+					references,
+					account.Mail.MicrosoftGraph.Authorization,
+				)
+			}
+		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
+			domain.ProviderCalDAV, domain.ProviderPOP3:
+		}
+	}
+	if account.Calendar != nil {
+		switch account.Calendar.Provider {
+		case domain.ProviderCalDAV:
+			if account.Calendar.CalDAV != nil {
+				references = append(references, account.Calendar.CalDAV.Credential)
+			}
+		case domain.ProviderGoogleAPI:
+			if account.Calendar.GoogleAPI != nil {
+				references = append(
+					references,
+					account.Calendar.GoogleAPI.Authorization,
+				)
+			}
+		case domain.ProviderMicrosoftGraph:
+			if account.Calendar.MicrosoftGraph != nil {
+				references = append(
+					references,
+					account.Calendar.MicrosoftGraph.Authorization,
+				)
+			}
+		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
+			domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3:
+		}
+	}
+	return references
 }
 
 func mailRouteView(route *config.MailRoute) *application.AccountRouteView {

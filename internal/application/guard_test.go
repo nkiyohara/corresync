@@ -110,6 +110,35 @@ func TestGuardDeniesWriteInReadOnlyMode(t *testing.T) {
 	}
 }
 
+func TestGuardRecordsExecutionOutcome(t *testing.T) {
+	t.Parallel()
+	guard, recorder := newTestGuard(t, policy.DefaultRules())
+	caller := domain.Caller{Surface: "mcp", Instance: "execution-test"}
+	operation := operationWithEffect(t, domain.EffectReversibleWrite)
+	if err := guard.RecordExecution(
+		t.Context(),
+		operation,
+		caller,
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := guard.RecordExecution(
+		t.Context(),
+		operation,
+		caller,
+		errors.New("synthetic failure"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if len(recorder.events) != 2 ||
+		recorder.events[0].Phase != AuditPhaseExecuted ||
+		recorder.events[0].Outcome != AuditOutcomeSuccess ||
+		recorder.events[1].Outcome != AuditOutcomeFailure {
+		t.Fatalf("execution audit = %+v", recorder.events)
+	}
+}
+
 func TestNewGuardRejectsInvalidDependencies(t *testing.T) {
 	t.Parallel()
 

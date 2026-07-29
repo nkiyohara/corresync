@@ -53,6 +53,24 @@ type AccountCredentialInput struct {
 	Consent bool   `json:"consent"`
 }
 
+// AccountCredentialReview discloses the exact external lookup handle bound by
+// an account-add approval. It appears only in the write review, never in
+// AccountView or other account reads.
+type AccountCredentialReview struct {
+	Service  string            `json:"service"`
+	Provider domain.ProviderID `json:"provider"`
+	Backend  string            `json:"backend"`
+	Key      string            `json:"key"`
+}
+
+// AccountCredentialBinding is the private ownership projection used to reject
+// cross-account handle reuse before a route can be approved or persisted.
+type AccountCredentialBinding struct {
+	Account domain.AccountID
+	Backend string
+	Key     string
+}
+
 // AccountOutlookWebInput configures a first-party browser route.
 type AccountOutlookWebInput struct {
 	Origin  string `json:"origin"`
@@ -162,22 +180,23 @@ type AccountRemoveInput struct {
 // AccountChangeReview is the bounded, secret-free account lifecycle summary
 // returned before an MCP configuration mutation.
 type AccountChangeReview struct {
-	Action              string            `json:"action"`
-	Account             domain.AccountID  `json:"account,omitempty"`
-	Alias               string            `json:"alias"`
-	NewAlias            string            `json:"newAlias,omitempty"`
-	Address             string            `json:"address,omitempty"`
-	MailProvider        domain.ProviderID `json:"mailProvider,omitempty"`
-	CalendarProvider    domain.ProviderID `json:"calendarProvider,omitempty"`
-	Mail                *AccountRouteView `json:"mail,omitempty"`
-	Calendar            *AccountRouteView `json:"calendar,omitempty"`
-	MakesDefault        bool              `json:"makesDefault"`
-	ReplacementDefault  string            `json:"replacementDefault,omitempty"`
-	ReplacementAccount  domain.AccountID  `json:"replacementAccount,omitempty"`
-	PurgesLocalState    bool              `json:"purgesLocalState"`
-	MayDeleteOwnedOAuth bool              `json:"mayDeleteOwnedOAuth"`
-	Authentication      string            `json:"authentication,omitempty"`
-	RestartsSessions    bool              `json:"restartsSessions"`
+	Action              string                    `json:"action"`
+	Account             domain.AccountID          `json:"account,omitempty"`
+	Alias               string                    `json:"alias"`
+	NewAlias            string                    `json:"newAlias,omitempty"`
+	Address             string                    `json:"address,omitempty"`
+	MailProvider        domain.ProviderID         `json:"mailProvider,omitempty"`
+	CalendarProvider    domain.ProviderID         `json:"calendarProvider,omitempty"`
+	Mail                *AccountRouteView         `json:"mail,omitempty"`
+	Calendar            *AccountRouteView         `json:"calendar,omitempty"`
+	Credentials         []AccountCredentialReview `json:"credentials,omitempty"`
+	MakesDefault        bool                      `json:"makesDefault"`
+	ReplacementDefault  string                    `json:"replacementDefault,omitempty"`
+	ReplacementAccount  domain.AccountID          `json:"replacementAccount,omitempty"`
+	PurgesLocalState    bool                      `json:"purgesLocalState"`
+	MayDeleteOwnedOAuth bool                      `json:"mayDeleteOwnedOAuth"`
+	Authentication      string                    `json:"authentication,omitempty"`
+	RestartsSessions    bool                      `json:"restartsSessions"`
 }
 
 // AccountChangeAccess is either an approval-bound preview or a completed
@@ -193,6 +212,7 @@ type AccountChangeAccess struct {
 // must perform each mutation atomically against the latest complete config.
 type AccountRepository interface {
 	ListAccounts(context.Context) (AccountCatalog, error)
+	ListCredentialBindings(context.Context) ([]AccountCredentialBinding, error)
 	AddAccount(context.Context, AccountRegistration) error
 	RenameAccount(context.Context, domain.AccountID, string) error
 	RemoveAccount(context.Context, domain.AccountID, domain.AccountID) error
@@ -321,6 +341,7 @@ func (service *AccountService) ReviewAdd(
 	review := AccountChangeReview{
 		Action: "add", Alias: input.Alias, Address: address,
 		Mail: mailRouteView(input.Mail), Calendar: calendarRouteView(input.Calendar),
+		Credentials:    accountCredentialReviews(input),
 		MakesDefault:   input.Default || len(catalog.Accounts) == 0,
 		Authentication: "explicit_cli_required",
 	}
@@ -363,6 +384,26 @@ func (service *AccountService) reviewAdd(
 	if err != nil {
 		return "", AccountCatalog{}, err
 	}
+	bindings, err := service.repository.ListCredentialBindings(ctx)
+	if err != nil {
+		return "", AccountCatalog{}, fmt.Errorf(
+			"list credential ownership: %w",
+			err,
+		)
+	}
+	for _, requested := range accountCredentialReviews(input) {
+		for _, existing := range bindings {
+			if requested.Backend == existing.Backend &&
+				requested.Key == existing.Key {
+				return "", AccountCatalog{}, fmt.Errorf(
+					"credential handle %q in backend %q already belongs to account %q",
+					requested.Key,
+					requested.Backend,
+					existing.Account,
+				)
+			}
+		}
+	}
 	for _, existing := range catalog.Accounts {
 		if existing.Alias == input.Alias {
 			return "", AccountCatalog{}, fmt.Errorf(
@@ -372,6 +413,65 @@ func (service *AccountService) reviewAdd(
 		}
 	}
 	return normalizedAddress, catalog, nil
+}
+
+func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
+	reviews := make([]AccountCredentialReview, 0, 2)
+	if input.Mail != nil {
+		var credential *AccountCredentialInput
+		switch input.Mail.Provider {
+		case domain.ProviderJMAP:
+			if input.Mail.JMAP != nil {
+				credential = &input.Mail.JMAP.Credential
+			}
+		case domain.ProviderIMAPSMTP:
+			if input.Mail.IMAPSMTP != nil {
+				credential = &input.Mail.IMAPSMTP.Credential
+			}
+		case domain.ProviderGoogleAPI:
+			if input.Mail.GoogleAPI != nil {
+				credential = &input.Mail.GoogleAPI.Authorization
+			}
+		case domain.ProviderMicrosoftGraph:
+			if input.Mail.MicrosoftGraph != nil {
+				credential = &input.Mail.MicrosoftGraph.Authorization
+			}
+		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
+			domain.ProviderCalDAV, domain.ProviderPOP3:
+		}
+		if credential != nil {
+			reviews = append(reviews, AccountCredentialReview{
+				Service: "mail", Provider: input.Mail.Provider,
+				Backend: credential.Backend, Key: credential.Key,
+			})
+		}
+	}
+	if input.Calendar != nil {
+		var credential *AccountCredentialInput
+		switch input.Calendar.Provider {
+		case domain.ProviderCalDAV:
+			if input.Calendar.CalDAV != nil {
+				credential = &input.Calendar.CalDAV.Credential
+			}
+		case domain.ProviderGoogleAPI:
+			if input.Calendar.GoogleAPI != nil {
+				credential = &input.Calendar.GoogleAPI.Authorization
+			}
+		case domain.ProviderMicrosoftGraph:
+			if input.Calendar.MicrosoftGraph != nil {
+				credential = &input.Calendar.MicrosoftGraph.Authorization
+			}
+		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
+			domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3:
+		}
+		if credential != nil {
+			reviews = append(reviews, AccountCredentialReview{
+				Service: "calendar", Provider: input.Calendar.Provider,
+				Backend: credential.Backend, Key: credential.Key,
+			})
+		}
+	}
+	return reviews
 }
 
 // Rename preserves the opaque account identity and all account-owned state.

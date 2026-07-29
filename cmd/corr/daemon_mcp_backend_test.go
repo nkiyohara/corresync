@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -14,7 +15,37 @@ import (
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/policy"
 )
+
+type daemonMCPAudit struct {
+	events []application.AuditEvent
+}
+
+func (recorder *daemonMCPAudit) Record(
+	_ context.Context,
+	event application.AuditEvent,
+) error {
+	recorder.events = append(recorder.events, event)
+	return nil
+}
+
+func daemonMCPGuard(
+	t *testing.T,
+	rules policy.Rules,
+	recorder application.AuditRecorder,
+) *application.Guard {
+	t.Helper()
+	approvals, err := approval.NewStore(approval.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard, err := application.NewGuard(rules, approvals, recorder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return guard
+}
 
 func TestDaemonMCPAccountLifecycleUsesCallerBoundPreviewCommit(t *testing.T) {
 	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
@@ -26,14 +57,13 @@ func TestDaemonMCPAccountLifecycleUsesCallerBoundPreviewCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	approvals, err := approval.NewStore(approval.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	recorder := &daemonMCPAudit{}
+	rules := policy.DefaultRules()
+	rules.PreviewReversibleWrites = true
 	backend := &daemonMCPBackend{
 		app: app, configuration: configuration,
 		defaultAccount: configuration.Accounts[configuration.DefaultAccount].ID,
-		accounts:       accounts, approvals: approvals,
+		accounts:       accounts, guard: daemonMCPGuard(t, rules, recorder),
 		accountMutation: func(
 			ctx context.Context,
 			_ domain.Caller,
@@ -129,6 +159,18 @@ func TestDaemonMCPAccountLifecycleUsesCallerBoundPreviewCommit(t *testing.T) {
 	if _, err := accounts.Show(t.Context(), "office"); err == nil {
 		t.Fatal("removed account remained configured")
 	}
+	if len(recorder.events) != 9 {
+		t.Fatalf("account lifecycle audit events = %d, want 9", len(recorder.events))
+	}
+	for index, phase := range []application.AuditPhase{
+		application.AuditPhasePrepared,
+		application.AuditPhaseCommitted,
+		application.AuditPhaseExecuted,
+	} {
+		if recorder.events[index].Phase != phase {
+			t.Fatalf("audit event %d = %+v, want phase %q", index, recorder.events[index], phase)
+		}
+	}
 }
 
 func TestDaemonMCPAccountLifecycleCommitKeepsPreviewedOpaqueIdentity(t *testing.T) {
@@ -142,14 +184,13 @@ func TestDaemonMCPAccountLifecycleCommitKeepsPreviewedOpaqueIdentity(t *testing.
 		t.Fatal(err)
 	}
 	originalDefault := configuration.Accounts[configuration.DefaultAccount].ID
-	approvals, err := approval.NewStore(approval.Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	recorder := &daemonMCPAudit{}
+	rules := policy.DefaultRules()
+	rules.PreviewReversibleWrites = true
 	backend := &daemonMCPBackend{
 		app: app, configuration: configuration,
 		defaultAccount: originalDefault,
-		accounts:       accounts, approvals: approvals,
+		accounts:       accounts, guard: daemonMCPGuard(t, rules, recorder),
 		accountMutation: func(
 			ctx context.Context,
 			_ domain.Caller,
@@ -237,6 +278,52 @@ func TestDaemonMCPAccountLifecycleCommitKeepsPreviewedOpaqueIdentity(t *testing.
 	}
 	if survivor.ID != originalDefault {
 		t.Fatalf("unexpected survivor: %+v", survivor)
+	}
+}
+
+func TestDaemonMCPAccountLifecycleHonorsReadOnlyPolicy(t *testing.T) {
+	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
+	accounts, _, err := app.accountServices()
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := &daemonMCPAudit{}
+	backend := &daemonMCPBackend{
+		app: app, configuration: configuration,
+		defaultAccount: configuration.Accounts[configuration.DefaultAccount].ID,
+		accounts:       accounts,
+		guard: daemonMCPGuard(
+			t,
+			policy.Rules{
+				Mode:                    policy.ModeReadOnly,
+				PreviewReversibleWrites: true,
+			},
+			recorder,
+		),
+	}
+	_, err = backend.PreviewAccountAdd(
+		t.Context(),
+		application.AccountAddInput{
+			Alias: "team", Address: "reader@example.invalid",
+			Mail: &application.AccountMailRouteInput{
+				Provider: domain.ProviderMicrosoftOWA,
+				OutlookWeb: &application.AccountOutlookWebInput{
+					Origin: "https://outlook.example.invalid",
+				},
+			},
+		},
+		domain.Caller{Surface: "mcp", Instance: "read-only-test"},
+	)
+	if !errors.Is(err, application.ErrDenied) {
+		t.Fatalf("PreviewAccountAdd() error = %v, want policy denial", err)
+	}
+	if len(recorder.events) != 1 ||
+		recorder.events[0].Outcome != application.AuditOutcomeDenied {
+		t.Fatalf("read-only audit = %+v", recorder.events)
 	}
 }
 

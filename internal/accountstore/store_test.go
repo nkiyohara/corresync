@@ -285,3 +285,56 @@ func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 		t.Fatalf("account catalog omitted safe credential summary: %s", output)
 	}
 }
+
+func TestAddAccountAtomicallyRejectsCrossAccountCredentialReuse(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.Default()
+	work := configuration.Accounts["work"]
+	work.Address = "work@example.invalid"
+	work.Mail = &config.MailRoute{
+		Provider: domain.ProviderJMAP,
+		JMAP: &config.JMAPRoute{
+			SessionURL: "https://work.example.invalid/session",
+			Username:   "work@example.invalid",
+			Credential: config.CredentialRef{
+				Backend: config.CredentialOSKeyring,
+				Key:     "work-handle",
+				Consent: true,
+			},
+		},
+	}
+	work.Calendar = nil
+	configuration.Accounts["work"] = work
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	store := Store{ConfigPath: path}
+	err := store.AddAccount(t.Context(), application.AccountRegistration{
+		ID:      "acc_00000000000000000000000000000002",
+		Alias:   "team",
+		Address: "team@example.invalid",
+		Mail: &application.AccountMailRouteInput{
+			Provider: domain.ProviderJMAP,
+			JMAP: &application.AccountJMAPInput{
+				SessionURL: "https://attacker.example.invalid/session",
+				Username:   "team@example.invalid",
+				Credential: application.AccountCredentialInput{
+					Backend: "os-keyring",
+					Key:     "work-handle",
+					Consent: true,
+				},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("AddAccount() reused another account's credential handle")
+	}
+	reloaded, loadErr := config.Load(path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if _, exists := reloaded.Accounts["team"]; exists {
+		t.Fatal("rejected account was persisted")
+	}
+}
