@@ -285,20 +285,22 @@ type CalendarCreateInput struct {
 // CalendarUpdateInput is a closed patch. Nil fields are unchanged; an empty
 // provided string clears that field. Start and end must be provided together.
 type CalendarUpdateInput struct {
-	Account           string                 `json:"account,omitempty" jsonschema:"Configured account alias; omit to use default_account"`
-	EventID           string                 `json:"eventId" jsonschema:"Exact event ID returned by calendar_list"`
-	ChangeKey         string                 `json:"changeKey" jsonschema:"Exact change key returned with that event ID"`
-	Subject           *string                `json:"subject,omitempty" jsonschema:"Replacement subject; empty clears it; omit to preserve"`
-	Body              *string                `json:"body,omitempty" jsonschema:"Replacement plain-text body; empty clears it; omit to preserve"`
-	Start             *string                `json:"start,omitempty" jsonschema:"Replacement RFC3339 start; requires end"`
-	End               *string                `json:"end,omitempty" jsonschema:"Replacement RFC3339 end; requires start"`
-	TimeZone          *string                `json:"timeZone,omitempty" jsonschema:"Replacement Exchange/Windows time-zone ID; requires start and end"`
-	Location          *string                `json:"location,omitempty" jsonschema:"Replacement location; empty clears it; omit to preserve"`
-	AllDay            *bool                  `json:"allDay,omitempty" jsonschema:"Replacement all-day status; enabling requires midnight start and end"`
-	Reminder          *CalendarReminderInput `json:"reminder,omitempty" jsonschema:"Replacement reminder; enabled=false disables it"`
-	ReplaceAttendees  bool                   `json:"replaceAttendees,omitempty" jsonschema:"Replace both attendee lists, including clearing them when lists are empty"`
-	RequiredAttendees []string               `json:"requiredAttendees,omitempty" jsonschema:"Replacement required attendee addresses; requires replaceAttendees"`
-	OptionalAttendees []string               `json:"optionalAttendees,omitempty" jsonschema:"Replacement optional attendee addresses; requires replaceAttendees"`
+	Account           string                   `json:"account,omitempty" jsonschema:"Configured account alias; omit to use default_account"`
+	EventID           string                   `json:"eventId" jsonschema:"Exact event ID returned by calendar_list"`
+	ChangeKey         string                   `json:"changeKey" jsonschema:"Exact change key returned with that event ID"`
+	Subject           *string                  `json:"subject,omitempty" jsonschema:"Replacement subject; empty clears it; omit to preserve"`
+	Body              *string                  `json:"body,omitempty" jsonschema:"Replacement plain-text body; empty clears it; omit to preserve"`
+	Start             *string                  `json:"start,omitempty" jsonschema:"Replacement RFC3339 start; requires end"`
+	End               *string                  `json:"end,omitempty" jsonschema:"Replacement RFC3339 end; requires start"`
+	TimeZone          *string                  `json:"timeZone,omitempty" jsonschema:"Replacement Exchange/Windows time-zone ID; requires start and end"`
+	Location          *string                  `json:"location,omitempty" jsonschema:"Replacement location; empty clears it; omit to preserve"`
+	AllDay            *bool                    `json:"allDay,omitempty" jsonschema:"Replacement all-day status; enabling requires midnight start and end"`
+	Reminder          *CalendarReminderInput   `json:"reminder,omitempty" jsonschema:"Replacement reminder; enabled=false disables it"`
+	ReplaceRecurrence bool                     `json:"replaceRecurrence,omitempty" jsonschema:"Replace recurrence, including clearing it when recurrence is omitted; requires replacement start and end"`
+	Recurrence        *CalendarRecurrenceInput `json:"recurrence,omitempty" jsonschema:"Replacement recurrence configuration; requires replaceRecurrence"`
+	ReplaceAttendees  bool                     `json:"replaceAttendees,omitempty" jsonschema:"Replace both attendee lists, including clearing them when lists are empty"`
+	RequiredAttendees []string                 `json:"requiredAttendees,omitempty" jsonschema:"Replacement required attendee addresses; requires replaceAttendees"`
+	OptionalAttendees []string                 `json:"optionalAttendees,omitempty" jsonschema:"Replacement optional attendee addresses; requires replaceAttendees"`
 }
 
 // CalendarCancelInput names one exact event version for cancellation.
@@ -747,7 +749,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "calendar_update",
 		Title:       "Review a calendar event update",
-		Description: "Prepare an exact versioned patch for supported event fields, including all-day status, reminder, and complete attendee-list replacement. This tool never updates the event or notifies attendees; it returns a caller-bound mandatory preview.",
+		Description: "Prepare an exact versioned patch for supported event fields, including all-day status, reminder, recurrence replacement, and complete attendee-list replacement. This tool never updates the event or notifies attendees; it returns a caller-bound mandatory preview.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Review a calendar event update",
 			ReadOnlyHint:    false,
@@ -768,6 +770,8 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			Subject: input.Subject, Body: input.Body, Start: input.Start, End: input.End,
 			TimeZone: input.TimeZone, Location: input.Location, AllDay: input.AllDay,
 			Reminder:          applicationCalendarReminder(input.Reminder),
+			ReplaceRecurrence: input.ReplaceRecurrence,
+			Recurrence:        applicationCalendarRecurrence(input.Recurrence),
 			ReplaceAttendees:  input.ReplaceAttendees,
 			RequiredAttendees: input.RequiredAttendees,
 			OptionalAttendees: input.OptionalAttendees,

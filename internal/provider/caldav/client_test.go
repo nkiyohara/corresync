@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -26,11 +27,12 @@ const (
 )
 
 type fixtureBackend struct {
-	mu            sync.Mutex
-	objects       map[string]webcaldav.CalendarObject
-	version       int
-	putConditions []string
-	deleteMatches []string
+	mu              sync.Mutex
+	objects         map[string]webcaldav.CalendarObject
+	version         int
+	putConditions   []string
+	deleteMatches   []string
+	scheduleMatches []string
 }
 
 func newFixtureBackend() *fixtureBackend {
@@ -200,6 +202,88 @@ func fixtureCalendar(uid string, attendees []string) *ical.Calendar {
 	return calendar
 }
 
+func fixtureRecurringEvent(uid string) ical.Event {
+	event := ical.NewEvent()
+	event.Props.SetText(ical.PropUID, uid)
+	event.Props.SetDateTime(ical.PropDateTimeStamp, time.Now().UTC())
+	event.Props.SetText(ical.PropSummary, "Weekly synthetic event")
+	event.Props.SetDateTime(
+		ical.PropDateTimeStart,
+		time.Date(2026, time.July, 28, 9, 0, 0, 0, time.UTC),
+	)
+	event.Props.SetDateTime(
+		ical.PropDateTimeEnd,
+		time.Date(2026, time.July, 28, 10, 0, 0, 0, time.UTC),
+	)
+	rule := ical.NewProp(ical.PropRecurrenceRule)
+	rule.SetValueType(ical.ValueRecurrence)
+	rule.Value = "FREQ=WEEKLY;COUNT=3"
+	event.Props.Set(rule)
+	return *event
+}
+
+func TestCalDAVListsLocalAndServerExpandedRecurrence(t *testing.T) {
+	t.Parallel()
+
+	client := &Client{username: "reader@example.invalid"}
+	windowStart := time.Date(2026, time.July, 27, 0, 0, 0, 0, time.UTC)
+	windowEnd := time.Date(2026, time.August, 20, 0, 0, 0, 0, time.UTC)
+	master := fixtureRecurringEvent("recurring-event")
+	local, err := client.calendarObjectViews(
+		fixtureCalendarPath,
+		fixtureObjectPath,
+		"v1",
+		[]ical.Event{master},
+		windowStart,
+		windowEnd,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(local) != 3 ||
+		local[0].Start != "2026-07-28T09:00:00Z" ||
+		local[1].Start != "2026-08-04T09:00:00Z" ||
+		local[2].Start != "2026-08-11T09:00:00Z" ||
+		local[0].ID == local[1].ID ||
+		local[1].ID == local[2].ID {
+		t.Fatalf("local recurrence = %#v", local)
+	}
+
+	expanded := make([]ical.Event, 0, len(local))
+	for index, start := range []time.Time{
+		time.Date(2026, time.July, 28, 9, 0, 0, 0, time.UTC),
+		time.Date(2026, time.August, 4, 9, 0, 0, 0, time.UTC),
+		time.Date(2026, time.August, 11, 9, 0, 0, 0, time.UTC),
+	} {
+		event := fixtureRecurringEvent("recurring-event")
+		event.Props.Del(ical.PropRecurrenceRule)
+		event.Props.SetDateTime(ical.PropDateTimeStart, start)
+		event.Props.SetDateTime(ical.PropDateTimeEnd, start.Add(time.Hour))
+		recurrenceID := ical.NewProp(ical.PropRecurrenceID)
+		recurrenceID.SetDateTime(start)
+		event.Props.Set(recurrenceID)
+		event.Props.SetText(ical.PropSummary, fmt.Sprintf("Instance %d", index+1))
+		expanded = append(expanded, event)
+	}
+	serverExpanded, err := client.calendarObjectViews(
+		fixtureCalendarPath,
+		fixtureObjectPath,
+		"v1",
+		expanded,
+		windowStart,
+		windowEnd,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(serverExpanded) != 3 ||
+		serverExpanded[0].Subject != "Instance 1" ||
+		serverExpanded[0].ID == serverExpanded[1].ID ||
+		serverExpanded[1].ID == serverExpanded[2].ID {
+		t.Fatalf("server recurrence = %#v", serverExpanded)
+	}
+}
+
 func TestCalDAVOriginalTimePreservesFloatingAndZoneSemantics(t *testing.T) {
 	t.Parallel()
 
@@ -232,6 +316,13 @@ func TestCalDAVOriginalTimePreservesFloatingAndZoneSemantics(t *testing.T) {
 func newFixtureServer(
 	t *testing.T,
 ) (*httptest.Server, *fixtureBackend, *http.Client) {
+	return newFixtureServerMode(t, false)
+}
+
+func newFixtureServerMode(
+	t *testing.T,
+	scheduling bool,
+) (*httptest.Server, *fixtureBackend, *http.Client) {
 	t.Helper()
 	backend := newFixtureBackend()
 	var encoded bytes.Buffer
@@ -249,6 +340,56 @@ func newFixtureServer(
 		if !ok || username != "reader@example.invalid" || password != "synthetic-secret" {
 			http.Error(writer, "authentication required", http.StatusUnauthorized)
 			return
+		}
+		if scheduling && request.Method == "PROPFIND" &&
+			request.URL.Path == "/user/" {
+			body, err := io.ReadAll(request.Body)
+			if err != nil {
+				t.Error(err)
+				http.Error(writer, "fixture read failed", http.StatusInternalServerError)
+				return
+			}
+			request.Body = io.NopCloser(bytes.NewReader(body))
+			if bytes.Contains(body, []byte("schedule-outbox-URL")) {
+				writer.Header().Set("Content-Type", "application/xml")
+				writer.WriteHeader(http.StatusMultiStatus)
+				_, _ = io.WriteString(
+					writer,
+					`<?xml version="1.0" encoding="utf-8"?>`+
+						`<D:multistatus xmlns:D="DAV:" `+
+						`xmlns:C="urn:ietf:params:xml:ns:caldav">`+
+						`<D:response><D:href>/user/</D:href><D:propstat>`+
+						`<D:prop><C:calendar-user-address-set>`+
+						`<D:href>mailto:reader@example.invalid</D:href>`+
+						`</C:calendar-user-address-set>`+
+						`<C:schedule-outbox-URL><D:href>/user/outbox/</D:href>`+
+						`</C:schedule-outbox-URL></D:prop>`+
+						`<D:status>HTTP/1.1 200 OK</D:status>`+
+						`</D:propstat></D:response></D:multistatus>`,
+				)
+				return
+			}
+		}
+		if scheduling && request.Method == http.MethodHead &&
+			pathWithin(request.URL.Path, fixtureCalendarPath) {
+			backend.mu.Lock()
+			_, exists := backend.objects[request.URL.Path]
+			backend.mu.Unlock()
+			if !exists {
+				http.NotFound(writer, request)
+				return
+			}
+			writer.Header().Set("Schedule-Tag", `"schedule-v1"`)
+			writer.WriteHeader(http.StatusOK)
+			return
+		}
+		if scheduling && request.Header.Get("If-Schedule-Tag-Match") != "" {
+			backend.mu.Lock()
+			backend.scheduleMatches = append(
+				backend.scheduleMatches,
+				request.Header.Get("If-Schedule-Tag-Match"),
+			)
+			backend.mu.Unlock()
 		}
 		if request.Method == http.MethodDelete {
 			backend.mu.Lock()
@@ -329,10 +470,18 @@ func TestClientUsesTLSDiscoveryAndConditionalCalendarWrites(t *testing.T) {
 	}
 
 	subject := "Conditionally updated"
+	start := "2026-07-28T09:00:00Z"
+	end := "2026-07-28T10:00:00Z"
 	updated, err := client.UpdateCalendarEvent(
 		t.Context(),
 		application.CalendarUpdateInput{
 			EventID: event.ID, ChangeKey: event.ChangeKey, Subject: &subject,
+			Start: &start, End: &end, ReplaceRecurrence: true,
+			Recurrence: &application.CalendarRecurrence{
+				Pattern:  application.CalendarRecurrenceWeekly,
+				Interval: 1, DaysOfWeek: []string{"Tuesday"},
+				NumberOfOccurrences: 4,
+			},
 		},
 	)
 	if err != nil {
@@ -340,9 +489,15 @@ func TestClientUsesTLSDiscoveryAndConditionalCalendarWrites(t *testing.T) {
 	}
 	backend.mu.Lock()
 	putConditions := append([]string(nil), backend.putConditions...)
+	stored := backend.objects[fixtureObjectPath]
 	backend.mu.Unlock()
 	if len(putConditions) != 1 || putConditions[0] != `|"v1"` {
 		t.Fatalf("PUT conditions = %#v", putConditions)
+	}
+	recurrence := stored.Data.Events()[0].Props.Get(ical.PropRecurrenceRule)
+	if recurrence == nil ||
+		recurrence.Value != "FREQ=WEEKLY;BYDAY=TU;COUNT=4" {
+		t.Fatalf("stored recurrence = %#v", recurrence)
 	}
 
 	if err := client.CancelCalendarEvent(
@@ -387,7 +542,7 @@ func TestClientUsesTLSDiscoveryAndConditionalCalendarWrites(t *testing.T) {
 		t.Fatalf("create PUT condition = %q", lastCondition)
 	}
 
-	invited, err := client.CreateCalendarEvent(
+	_, err = client.CreateCalendarEvent(
 		t.Context(),
 		application.CalendarCreateInput{
 			Calendar: application.CalendarFolder{
@@ -401,16 +556,8 @@ func TestClientUsesTLSDiscoveryAndConditionalCalendarWrites(t *testing.T) {
 			RequiredAttendees: []string{"guest@example.invalid"},
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := client.CancelCalendarEvent(
-		t.Context(),
-		application.CalendarCancelInput{
-			EventID: invited.ID, ChangeKey: invited.ChangeKey,
-		},
-	); err == nil || !strings.Contains(err.Error(), "scheduling cancellation is unavailable") {
-		t.Fatalf("attendee CancelCalendarEvent() error = %v", err)
+	if err == nil || !strings.Contains(err.Error(), "invitations require") {
+		t.Fatalf("attendee CreateCalendarEvent() error = %v", err)
 	}
 	if _, err := client.CreateCalendarEvent(
 		t.Context(),
@@ -429,6 +576,89 @@ func TestClientUsesTLSDiscoveryAndConditionalCalendarWrites(t *testing.T) {
 	}
 	if string(password) != "synthetic-secret" {
 		t.Fatal("New() modified its caller-owned credential buffer")
+	}
+}
+
+func TestCalDAVSchedulingGuardsAttendeeUpdatesAndCancellation(t *testing.T) {
+	t.Parallel()
+
+	server, backend, httpClient := newFixtureServerMode(t, true)
+	client, err := New(t.Context(), Options{
+		Endpoint: server.URL, Username: "reader@example.invalid",
+		Password: []byte("synthetic-secret"), Client: httpClient,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	if !client.SchedulingAvailable() ||
+		client.calendarIdentity() != "reader@example.invalid" {
+		t.Fatalf(
+			"scheduling = %t identity = %q",
+			client.SchedulingAvailable(),
+			client.calendarIdentity(),
+		)
+	}
+
+	created, err := client.CreateCalendarEvent(
+		t.Context(),
+		application.CalendarCreateInput{
+			Calendar: application.CalendarFolder{
+				Kind: application.CalendarFolderDistinguished,
+				ID:   "calendar",
+			},
+			Subject:           "Invited event",
+			Start:             "2026-07-30T09:00:00Z",
+			End:               "2026-07-30T10:00:00Z",
+			TimeZone:          "UTC",
+			RequiredAttendees: []string{"guest@example.invalid"},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject := "Updated invitation"
+	updated, err := client.UpdateCalendarEvent(
+		t.Context(),
+		application.CalendarUpdateInput{
+			EventID: created.ID, ChangeKey: created.ChangeKey,
+			Subject: &subject,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference, err := decodeEventID(created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend.mu.Lock()
+	stored := backend.objects[reference.Path]
+	backend.mu.Unlock()
+	events := stored.Data.Events()
+	if len(events) != 1 {
+		t.Fatalf("scheduled object events = %d", len(events))
+	}
+	sequence, err := events[0].Props.Get(ical.PropSequence).Int()
+	if err != nil || sequence != 1 {
+		t.Fatalf("scheduled SEQUENCE = %d error = %v", sequence, err)
+	}
+
+	if err := client.CancelCalendarEvent(
+		t.Context(),
+		application.CalendarCancelInput{
+			EventID: created.ID, ChangeKey: updated.ChangeKey,
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	backend.mu.Lock()
+	scheduleMatches := append([]string(nil), backend.scheduleMatches...)
+	backend.mu.Unlock()
+	if len(scheduleMatches) != 2 ||
+		scheduleMatches[0] != `"schedule-v1"` ||
+		scheduleMatches[1] != `"schedule-v1"` {
+		t.Fatalf("If-Schedule-Tag-Match = %#v", scheduleMatches)
 	}
 }
 

@@ -272,7 +272,12 @@ corr calendar update \
   --account work \
   --event-id opaque-event-id \
   --change-key opaque-change-key \
-  --subject 'Revised review'
+  --subject 'Revised review' \
+  --start 2026-07-28T09:00:00Z \
+  --end 2026-07-28T10:00:00Z \
+  --recurrence weekly \
+  --recurrence-day Tuesday \
+  --recurrence-count 4
 
 corr calendar cancel \
   --account work \
@@ -282,9 +287,11 @@ corr calendar cancel \
 
 Repeat the exact reviewed command with `--approve` to commit. Supported fields
 include bounded subject/body, absolute start/end, time zone, location, all-day
-state, reminder, closed recurrence forms, and complete required/optional
-attendee lists. Provider meeting-link creation is accepted only when the
-authenticated calendar route reports a supported capability.
+state, reminder, closed recurrence creation/replacement/removal, and complete
+required/optional attendee lists. Use `--recurrence none` with replacement
+start/end boundaries to remove a series rule. Provider meeting-link creation
+is accepted only when the authenticated calendar route reports a supported
+capability.
 
 ## Read-only import staging
 

@@ -506,6 +506,25 @@ func (client *Client) UpdateCalendarEvent(
 			input.OptionalAttendees,
 		)
 	}
+	if input.ReplaceRecurrence {
+		if input.Recurrence == nil {
+			patch["recurrence"] = nil
+		} else {
+			zone := ""
+			if input.TimeZone != nil {
+				zone = *input.TimeZone
+			}
+			recurrence, err := graphRecurrence(
+				*input.Recurrence,
+				*input.Start,
+				zone,
+			)
+			if err != nil {
+				return application.CalendarUpdateResult{}, err
+			}
+			patch["recurrence"] = recurrence
+		}
+	}
 	var updated graphEvent
 	if _, err := client.api.DoJSON(
 		ctx,

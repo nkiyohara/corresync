@@ -1017,6 +1017,12 @@ func TestCalendarUpdateToolsExposeOnlyClosedVersionedPatch(t *testing.T) {
 			"start": "2026-07-20T09:00:00Z", "end": "2026-07-20T10:00:00Z",
 			"timeZone": "UTC", "allDay": false,
 			"reminder":          map[string]any{"enabled": true, "minutesBeforeStart": 10},
+			"replaceRecurrence": true,
+			"recurrence": map[string]any{
+				"pattern": "weekly", "interval": 1,
+				"daysOfWeek":          []string{"Monday"},
+				"numberOfOccurrences": 4,
+			},
 			"replaceAttendees":  true,
 			"requiredAttendees": []string{"alice@example.invalid"},
 		},
@@ -1029,7 +1035,11 @@ func TestCalendarUpdateToolsExposeOnlyClosedVersionedPatch(t *testing.T) {
 		backend.calendarUpdate.Location == nil || *backend.calendarUpdate.Location != "" ||
 		backend.calendarUpdate.Start == nil || backend.calendarUpdate.End == nil ||
 		backend.calendarUpdate.TimeZone == nil || backend.calendarUpdate.AllDay == nil ||
-		backend.calendarUpdate.Reminder == nil || !backend.calendarUpdate.ReplaceAttendees ||
+		backend.calendarUpdate.Reminder == nil ||
+		!backend.calendarUpdate.ReplaceRecurrence ||
+		backend.calendarUpdate.Recurrence == nil ||
+		backend.calendarUpdate.Recurrence.NumberOfOccurrences != 4 ||
+		!backend.calendarUpdate.ReplaceAttendees ||
 		len(backend.calendarUpdate.RequiredAttendees) != 1 {
 		t.Fatalf("unexpected calendar update input: %+v", backend.calendarUpdate)
 	}

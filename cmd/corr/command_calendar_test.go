@@ -79,9 +79,10 @@ func TestWriteCalendarUpdateReviewShowsClearsAndRemovesControls(t *testing.T) {
 
 	input := application.CalendarUpdateInput{
 		EventID: "event-1", ChangeKey: "change-1",
-		Subject:  stringValuePointer("Updated\x1b[2J subject"),
-		Body:     stringValuePointer("line one\n\x1b[31mline two"),
-		Location: stringValuePointer(""),
+		Subject:           stringValuePointer("Updated\x1b[2J subject"),
+		Body:              stringValuePointer("line one\n\x1b[31mline two"),
+		Location:          stringValuePointer(""),
+		ReplaceRecurrence: true,
 	}
 	var output bytes.Buffer
 	if err := writeCalendarUpdateReview(&output, input.Review(), false); err != nil {
@@ -90,6 +91,7 @@ func TestWriteCalendarUpdateReviewShowsClearsAndRemovesControls(t *testing.T) {
 	if strings.Contains(output.String(), "\x1b") ||
 		!strings.Contains(output.String(), "Updated subject") ||
 		!strings.Contains(output.String(), "Location: (clear)") ||
+		!strings.Contains(output.String(), "Recurrence: none") ||
 		!strings.Contains(output.String(), "line two") {
 		t.Fatalf("unsafe or incomplete update review: %q", output.String())
 	}

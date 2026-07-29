@@ -1849,7 +1849,7 @@ func (backend *sessionBackend) calDAVAccount(
 		client,
 		application.CalendarOptions{
 			MaxAttendees: backend.configuration.Policy.MaxAttendees,
-			Effects:      providerCalendarEffects(domain.ProviderCalDAV),
+			Effects:      calDAVCalendarEffects(client.SchedulingAvailable()),
 			Provenance: domain.Provenance{
 				AccountID: configured.ID, Provider: domain.ProviderCalDAV,
 				CalendarID: "configured-caldav-calendar",
@@ -1859,14 +1859,24 @@ func (backend *sessionBackend) calDAVAccount(
 	if err != nil {
 		return sessionAccount{}, errors.Join(err, client.Close())
 	}
-	return sessionAccount{
+	result := sessionAccount{
 		closers:  []sessionCloser{client},
 		calendar: calendar,
 		captured: time.Now().UTC(),
 		capabilities: domain.Capabilities{
 			Calendar: true,
 		},
-	}, nil
+	}
+	if !client.SchedulingAvailable() {
+		result.degradations = append(
+			result.degradations,
+			domain.Degradation{
+				Feature: "calendar.attendee_scheduling",
+				Reason:  "the authenticated CalDAV principal does not expose RFC 6638 server-managed scheduling; attendee create, update, and cancellation fail closed",
+			},
+		)
+	}
+	return result, nil
 }
 
 func (backend *sessionBackend) googleAPIAccount(
@@ -2463,6 +2473,21 @@ func providerCalendarEffects(provider domain.ProviderID) application.CalendarEff
 		return application.CalendarEffects{}
 	default:
 		return application.CalendarEffects{}
+	}
+}
+
+func calDAVCalendarEffects(
+	scheduling bool,
+) application.CalendarEffects {
+	if !scheduling {
+		return providerCalendarEffects(domain.ProviderCalDAV)
+	}
+	return application.CalendarEffects{
+		CreateAttendeeNotifications: true,
+		UpdateAttendeeNotifications: true,
+		CancelAttendeeNotifications: true,
+		CancellationMode:            application.CalendarCancellationProviderManaged,
+		CancellationDisposition:     application.CalendarDispositionRemoteDelete,
 	}
 }
 

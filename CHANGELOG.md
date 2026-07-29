@@ -24,6 +24,15 @@ All notable user-facing changes are recorded here. The project follows
 - Complete Graph reply, reply-all, forward, and message move through
   source-version revalidation followed by the provider's typed action and
   response-draft flow.
+- Expand CalDAV recurrence safely whether a server returns expanded instances
+  or an unexpanded recurrence master, with unique instance identities and
+  bounded local expansion.
+- Detect RFC 6638 server-managed CalDAV scheduling and protect attendee
+  invitation, update, and cancellation writes with schedule-tag conditions;
+  unsupported servers now fail before silently changing an attendee event.
+- Add recurrence replacement and removal to the shared CLI/MCP calendar update
+  contract and implement it for Outlook Web, Google Calendar, Microsoft Graph,
+  and CalDAV.
 - Fail closed on Graph permanent mail deletion because its permanent-delete
   action exposes no atomic ETag precondition; expose the limitation as a typed
   account degradation.

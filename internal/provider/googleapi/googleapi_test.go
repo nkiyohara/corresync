@@ -26,6 +26,7 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 	var modifiedReadState bool
 	var movedToArchive bool
 	var permanentlyDeleted bool
+	var calendarRecurrenceUpdated bool
 	server := httptest.NewTLSServer(http.HandlerFunc(func(
 		writer http.ResponseWriter,
 		request *http.Request,
@@ -133,6 +134,12 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 					request.URL.RawQuery,
 				)
 			}
+			var patch map[string]json.RawMessage
+			if err := json.NewDecoder(request.Body).Decode(&patch); err != nil {
+				t.Fatal(err)
+			}
+			calendarRecurrenceUpdated =
+				string(patch["recurrence"]) == `["RRULE:FREQ=WEEKLY;BYDAY=MO;COUNT=4"]`
 			writeGoogleJSON(t, writer, googleTestEvent(`"etag3"`))
 		case "DELETE /calendar/v3/calendars/primary/events/e1":
 			if request.Header.Get("If-Match") != `"etag1"` ||
@@ -317,14 +324,23 @@ func TestGoogleAPIContractUsesBoundedReadsAndConditionalCalendarWrites(
 		t.Fatalf("created = %#v error = %v", created, err)
 	}
 	subject := "Updated"
+	start := "2026-08-01T10:00:00Z"
+	end := "2026-08-01T11:00:00Z"
 	updated, err := client.UpdateCalendarEvent(
 		t.Context(),
 		application.CalendarUpdateInput{
 			EventID: calendar.Events[0].ID, ChangeKey: calendar.Events[0].ChangeKey,
-			Subject: &subject,
+			Subject: &subject, Start: &start, End: &end,
+			ReplaceRecurrence: true,
+			Recurrence: &application.CalendarRecurrence{
+				Pattern:  application.CalendarRecurrenceWeekly,
+				Interval: 1, DaysOfWeek: []string{"Monday"},
+				NumberOfOccurrences: 4,
+			},
 		},
 	)
-	if err != nil || updated.ChangeKey == calendar.Events[0].ChangeKey {
+	if err != nil || updated.ChangeKey == calendar.Events[0].ChangeKey ||
+		!calendarRecurrenceUpdated {
 		t.Fatalf("updated = %#v error = %v", updated, err)
 	}
 	if err := client.CancelCalendarEvent(

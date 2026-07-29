@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-07-28
+- Amended: 2026-07-29
 
 ## Context
 
@@ -35,6 +35,15 @@ Web today apply unchanged to every adapter added later: dependencies point
 inward, CLI and MCP call the same typed application use cases, consequential
 writes use the server-enforced preview/commit protocol, live mailbox tests are
 opt-in, and fixtures are synthetic.
+
+Calendar scope includes organizer scheduling semantics, not calendar-object
+storage alone. When an event has attendees, create, material update, attendee
+replacement, and cancellation must use the selected provider's supported
+invitation/update/cancellation path. An adapter must discover scheduling
+capability where the protocol requires it, disclose the exact effects in the
+preview, and fail before changing the event when it cannot guarantee the
+reviewed notification behavior. It must never report a storage-only delete as
+an attendee cancellation.
 
 The following remain permanently out of scope rather than merely
 unimplemented:

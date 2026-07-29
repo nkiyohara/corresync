@@ -155,6 +155,41 @@ func TestCalendarUpdateBuildsReminderAllDayAndAttendeeReplacement(t *testing.T) 
 	}
 }
 
+func TestCalendarUpdateReplacesAndClearsRecurrence(t *testing.T) {
+	t.Parallel()
+
+	input := testCalendarUpdateInput()
+	input.ReplaceRecurrence = true
+	input.Recurrence = &application.CalendarRecurrence{
+		Pattern: application.CalendarRecurrenceWeekly, Interval: 1,
+		DaysOfWeek:          []string{"Monday"},
+		NumberOfOccurrences: 4,
+	}
+	payload, err := buildCalendarUpdateEnvelope(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last := payload.Body.ItemChange.Updates[len(payload.Body.ItemChange.Updates)-1]
+	if last.Type != "SetItemField:#Exchange" ||
+		last.Path.FieldURI != "Recurrence" ||
+		last.Item == nil ||
+		last.Item.Recurrence == nil {
+		t.Fatalf("recurrence set field = %#v", last)
+	}
+
+	input.Recurrence = nil
+	payload, err = buildCalendarUpdateEnvelope(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	last = payload.Body.ItemChange.Updates[len(payload.Body.ItemChange.Updates)-1]
+	if last.Type != "DeleteItemField:#Exchange" ||
+		last.Path.FieldURI != "Recurrence" ||
+		last.Item != nil {
+		t.Fatalf("recurrence delete field = %#v", last)
+	}
+}
+
 func TestCalendarUpdateValidatesBeforeNetwork(t *testing.T) {
 	t.Parallel()
 

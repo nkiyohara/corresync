@@ -474,6 +474,17 @@ func (client *Client) UpdateCalendarEvent(
 	if input.Reminder != nil {
 		patch["reminders"] = googleReminders(*input.Reminder)
 	}
+	if input.ReplaceRecurrence {
+		recurrence := []string{}
+		if input.Recurrence != nil {
+			rule, err := googleRecurrence(*input.Recurrence)
+			if err != nil {
+				return application.CalendarUpdateResult{}, err
+			}
+			recurrence = append(recurrence, "RRULE:"+rule)
+		}
+		patch["recurrence"] = recurrence
+	}
 	headers := http.Header{"If-Match": []string{etag}}
 	query := url.Values{}
 	if input.ReplaceAttendees || len(existing.Attendees) != 0 {

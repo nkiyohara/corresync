@@ -181,6 +181,36 @@ func TestCalendarUpdateSupportsAllDayReminderAndAttendeeReplacement(t *testing.T
 	}
 }
 
+func TestCalendarUpdateSupportsRecurrenceReplacementAndRemoval(t *testing.T) {
+	t.Parallel()
+
+	input := validCalendarUpdateInput()
+	input.ReplaceRecurrence = true
+	input.Recurrence = &CalendarRecurrence{
+		Pattern: CalendarRecurrenceWeekly, Interval: 1,
+		DaysOfWeek:          []string{"Monday"},
+		NumberOfOccurrences: 4,
+	}
+	if err := input.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	review := input.Review()
+	if !review.ReplaceRecurrence || review.Recurrence == input.Recurrence ||
+		review.Recurrence == nil ||
+		review.Recurrence.NumberOfOccurrences != 4 {
+		t.Fatalf("recurrence review = %#v", review)
+	}
+
+	input.Recurrence = nil
+	if err := input.Validate(); err != nil {
+		t.Fatalf("recurrence removal validation = %v", err)
+	}
+	if review := input.Review(); !review.ReplaceRecurrence ||
+		review.Recurrence != nil {
+		t.Fatalf("recurrence removal review = %#v", review)
+	}
+}
+
 func TestCalendarUpdateRejectsUnsafeExtendedPatches(t *testing.T) {
 	t.Parallel()
 
@@ -215,6 +245,21 @@ func TestCalendarUpdateRejectsUnsafeExtendedPatches(t *testing.T) {
 			value := valid
 			value.ReplaceAttendees = true
 			value.RequiredAttendees = []string{"alice@example.invalid", "ALICE@example.invalid"}
+			return value
+		}(),
+		func() CalendarUpdateInput {
+			value := valid
+			value.Recurrence = &CalendarRecurrence{
+				Pattern:  CalendarRecurrenceDaily,
+				Interval: 1, NumberOfOccurrences: 2,
+			}
+			return value
+		}(),
+		func() CalendarUpdateInput {
+			value := valid
+			value.ReplaceRecurrence = true
+			value.Start = nil
+			value.End = nil
 			return value
 		}(),
 	}

@@ -92,21 +92,24 @@ Provider differences remain visible:
 <!-- markdownlint-enable MD013 -->
 
 The normalized contract includes bounded subject/body, absolute start/end,
-time zone, location, all-day state, reminder, supported recurrence, and
-required/optional attendees. Capability and degradation records state when a
-provider cannot preserve a field. Google Web exposes only its bounded read-only
-visible snapshot; Google API discovers selectable calendars but does not
-provision an online meeting. Graph discovers selectable calendars and reports
-Teams meeting support. Outlook Web can provision a Teams join link as a
-creation property. CalDAV discovers VEVENT collections, maps typed events
-through WebDAV/iCalendar, and uses conditional writes.
+time zone, location, all-day state, reminder, supported recurrence creation,
+replacement and removal, and required/optional attendees. Capability and
+degradation records state when a provider cannot preserve a field. Google Web
+exposes only its bounded read-only visible snapshot; Google API discovers
+selectable calendars but does not provision an online meeting. Graph discovers
+selectable calendars and reports Teams meeting support. Outlook Web can
+provision a Teams join link as a creation property. CalDAV discovers VEVENT
+collections, maps typed events through WebDAV/iCalendar, safely consumes
+server-expanded recurrence or performs bounded local expansion, and uses
+conditional writes.
 
 Create/update/cancel reviews also name the selected route's attendee-
 notification and cancellation disposition. Outlook Web, Google API, and Graph
-use their reviewed provider-managed notification behavior. The current CalDAV
-adapter performs calendar-object storage only: it claims no scheduling
-notification and refuses to delete an attendee event as though it had sent a
-cancellation.
+use their reviewed provider-managed notification behavior. CalDAV detects RFC
+6638 server-managed scheduling on the authenticated principal. When available,
+attendee create/update/cancel operations use that route and schedule-tag
+preconditions; when unavailable, attendee writes fail before changing the
+calendar object and the account reports an explicit degradation.
 
 Teams chat, channels, calls, recordings, and meeting lifecycle management are
 outside scope.

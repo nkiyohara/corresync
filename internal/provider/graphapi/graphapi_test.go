@@ -19,6 +19,7 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 	var replyDraftBody []byte
 	var forwardBody []byte
 	var responseDraftSent bool
+	var calendarRecurrenceUpdated bool
 	server := httptest.NewTLSServer(http.HandlerFunc(func(
 		writer http.ResponseWriter,
 		request *http.Request,
@@ -127,6 +128,14 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			writeGraphJSON(t, writer, graphTestEvent(`W/"e1"`))
 		case "PATCH /me/events/e1":
 			requireGraphCondition(t, request, `W/"e1"`)
+			var patch map[string]json.RawMessage
+			if err := json.NewDecoder(request.Body).Decode(&patch); err != nil {
+				t.Fatal(err)
+			}
+			calendarRecurrenceUpdated = strings.Contains(
+				string(patch["recurrence"]),
+				`"type":"weekly"`,
+			)
 			writeGraphJSON(t, writer, graphTestEvent(`W/"e3"`))
 		case "DELETE /me/events/e1":
 			requireGraphCondition(t, request, `W/"e1"`)
@@ -332,15 +341,26 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 		t.Fatalf("created = %#v error = %v", created, err)
 	}
 	subject := "Updated"
+	start := "2026-08-01T10:00:00Z"
+	end := "2026-08-01T11:00:00Z"
 	updated, err := client.UpdateCalendarEvent(
 		t.Context(),
 		application.CalendarUpdateInput{
-			EventID:   calendar.Events[0].ID,
-			ChangeKey: calendar.Events[0].ChangeKey,
-			Subject:   &subject,
+			EventID:           calendar.Events[0].ID,
+			ChangeKey:         calendar.Events[0].ChangeKey,
+			Subject:           &subject,
+			Start:             &start,
+			End:               &end,
+			ReplaceRecurrence: true,
+			Recurrence: &application.CalendarRecurrence{
+				Pattern:  application.CalendarRecurrenceWeekly,
+				Interval: 1, DaysOfWeek: []string{"Monday"},
+				NumberOfOccurrences: 4,
+			},
 		},
 	)
-	if err != nil || updated.ChangeKey == calendar.Events[0].ChangeKey {
+	if err != nil || updated.ChangeKey == calendar.Events[0].ChangeKey ||
+		!calendarRecurrenceUpdated {
 		t.Fatalf("updated = %#v error = %v", updated, err)
 	}
 	if err := client.CancelCalendarEvent(

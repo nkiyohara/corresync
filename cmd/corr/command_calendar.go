@@ -59,26 +59,33 @@ type calendarCreateCommand struct {
 }
 
 type calendarUpdateCommand struct {
-	Account           string   `help:"Configured account alias; defaults to default_account."`
-	EventID           string   `name:"event-id" help:"Exact event ID returned by calendar list (required)."`
-	ChangeKey         string   `name:"change-key" help:"Exact change key returned with the event ID (required)."`
-	Subject           string   `help:"Non-empty replacement subject; use clear-subject to clear."`
-	ClearSubject      bool     `name:"clear-subject" help:"Clear the event subject."`
-	BodyFile          string   `name:"body-file" help:"Replacement plain-text body file, or - for stdin."`
-	ClearBody         bool     `name:"clear-body" help:"Clear the event body."`
-	Start             string   `help:"Replacement RFC3339 start; requires end."`
-	End               string   `help:"Replacement RFC3339 end; requires start."`
-	TimeZone          string   `name:"time-zone" help:"Replacement Exchange/Windows time-zone ID; requires start and end."`
-	Location          string   `help:"Non-empty replacement location; use clear-location to clear."`
-	ClearLocation     bool     `name:"clear-location" help:"Clear the event location."`
-	AllDay            string   `name:"all-day" enum:"unchanged,true,false" default:"unchanged" help:"Set or clear all-day status."`
-	ReminderMinutes   *int     `name:"reminder-minutes" help:"Enable or replace a reminder this many minutes before start."`
-	DisableReminder   bool     `name:"disable-reminder" help:"Disable the event reminder."`
-	ReplaceAttendees  bool     `name:"replace-attendees" help:"Replace both attendee lists, including clearing them when no addresses are supplied."`
-	RequiredAttendees []string `name:"required-attendee" help:"Replacement required attendee address; repeat as needed."`
-	OptionalAttendees []string `name:"optional-attendee" help:"Replacement optional attendee address; repeat as needed."`
-	Approve           bool     `help:"Apply the exact preview generated from these arguments."`
-	JSON              bool     `help:"Write the stable machine-readable schema."`
+	Account              string   `help:"Configured account alias; defaults to default_account."`
+	EventID              string   `name:"event-id" help:"Exact event ID returned by calendar list (required)."`
+	ChangeKey            string   `name:"change-key" help:"Exact change key returned with the event ID (required)."`
+	Subject              string   `help:"Non-empty replacement subject; use clear-subject to clear."`
+	ClearSubject         bool     `name:"clear-subject" help:"Clear the event subject."`
+	BodyFile             string   `name:"body-file" help:"Replacement plain-text body file, or - for stdin."`
+	ClearBody            bool     `name:"clear-body" help:"Clear the event body."`
+	Start                string   `help:"Replacement RFC3339 start; requires end."`
+	End                  string   `help:"Replacement RFC3339 end; requires start."`
+	TimeZone             string   `name:"time-zone" help:"Replacement Exchange/Windows time-zone ID; requires start and end."`
+	Location             string   `help:"Non-empty replacement location; use clear-location to clear."`
+	ClearLocation        bool     `name:"clear-location" help:"Clear the event location."`
+	AllDay               string   `name:"all-day" enum:"unchanged,true,false" default:"unchanged" help:"Set or clear all-day status."`
+	ReminderMinutes      *int     `name:"reminder-minutes" help:"Enable or replace a reminder this many minutes before start."`
+	DisableReminder      bool     `name:"disable-reminder" help:"Disable the event reminder."`
+	Recurrence           string   `enum:"unchanged,none,daily,weekly,monthly,yearly" default:"unchanged" help:"Replace recurrence, clear it with none, or leave it unchanged."`
+	RecurrenceInterval   int      `name:"recurrence-interval" default:"1" help:"Replacement recurrence interval."`
+	RecurrenceDay        []string `name:"recurrence-day" help:"Replacement weekly weekday; repeat as needed."`
+	RecurrenceDayOfMonth int      `name:"recurrence-day-of-month" help:"Replacement monthly or yearly day of month."`
+	RecurrenceMonth      string   `name:"recurrence-month" help:"Replacement yearly month."`
+	RecurrenceEndDate    string   `name:"recurrence-end-date" help:"Replacement inclusive YYYY-MM-DD recurrence end."`
+	RecurrenceCount      int      `name:"recurrence-count" help:"Replacement number of occurrences."`
+	ReplaceAttendees     bool     `name:"replace-attendees" help:"Replace both attendee lists, including clearing them when no addresses are supplied."`
+	RequiredAttendees    []string `name:"required-attendee" help:"Replacement required attendee address; repeat as needed."`
+	OptionalAttendees    []string `name:"optional-attendee" help:"Replacement optional attendee address; repeat as needed."`
+	Approve              bool     `help:"Apply the exact preview generated from these arguments."`
+	JSON                 bool     `help:"Write the stable machine-readable schema."`
 }
 
 type calendarCancelCommand struct {
@@ -336,6 +343,12 @@ func (command *calendarUpdateCommand) Run(app *runtime) (returnErr error) {
 	} else if command.DisableReminder {
 		input.Reminder = &application.CalendarReminder{}
 	}
+	replaceRecurrence, recurrence, err := command.calendarRecurrence()
+	if err != nil {
+		return err
+	}
+	input.ReplaceRecurrence = replaceRecurrence
+	input.Recurrence = recurrence
 	input.ReplaceAttendees = command.ReplaceAttendees
 	input.RequiredAttendees = command.RequiredAttendees
 	input.OptionalAttendees = command.OptionalAttendees
@@ -463,6 +476,45 @@ func (command calendarCreateCommand) calendarRecurrence() (*application.Calendar
 	}, nil
 }
 
+func (command calendarUpdateCommand) calendarRecurrence() (
+	bool,
+	*application.CalendarRecurrence,
+	error,
+) {
+	details := len(command.RecurrenceDay) != 0 ||
+		command.RecurrenceDayOfMonth != 0 ||
+		command.RecurrenceMonth != "" ||
+		command.RecurrenceEndDate != "" ||
+		command.RecurrenceCount != 0
+	switch command.Recurrence {
+	case "", "unchanged":
+		if details {
+			return false, nil, errors.New(
+				"recurrence details require a replacement recurrence",
+			)
+		}
+		return false, nil, nil
+	case "none":
+		if details {
+			return false, nil, errors.New(
+				"recurrence details cannot be used when clearing recurrence",
+			)
+		}
+		return true, nil, nil
+	default:
+		recurrence, err := (calendarCreateCommand{
+			Recurrence:           command.Recurrence,
+			RecurrenceInterval:   command.RecurrenceInterval,
+			RecurrenceDay:        command.RecurrenceDay,
+			RecurrenceDayOfMonth: command.RecurrenceDayOfMonth,
+			RecurrenceMonth:      command.RecurrenceMonth,
+			RecurrenceEndDate:    command.RecurrenceEndDate,
+			RecurrenceCount:      command.RecurrenceCount,
+		}).calendarRecurrence()
+		return true, recurrence, err
+	}
+}
+
 func writeCalendarCreateReview(
 	writer io.Writer,
 	review application.CalendarCreateReview,
@@ -584,6 +636,27 @@ func writeCalendarUpdateReview(
 			value = fmt.Sprintf("%d minutes before start", review.Reminder.MinutesBeforeStart)
 		}
 		if _, err := fmt.Fprintf(writer, "Reminder: %s\n", value); err != nil {
+			return err
+		}
+	}
+	if review.ReplaceRecurrence {
+		value := "none"
+		if review.Recurrence != nil {
+			value = string(review.Recurrence.Pattern)
+			if review.Recurrence.EndDate != "" {
+				value += " through " + review.Recurrence.EndDate
+			} else {
+				value += fmt.Sprintf(
+					" for %d occurrences",
+					review.Recurrence.NumberOfOccurrences,
+				)
+			}
+		}
+		if _, err := fmt.Fprintf(
+			writer,
+			"Recurrence: %s\n",
+			sanitizeCell(value, 256),
+		); err != nil {
 			return err
 		}
 	}

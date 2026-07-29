@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -44,6 +45,9 @@ type Client struct {
 	calendarPath string
 	calendars    []caldav.Calendar
 	username     string
+	calendarUser string
+	scheduling   bool
+	outboxPath   string
 	password     []byte
 	http         *http.Client
 	dav          *caldav.Client
@@ -121,6 +125,7 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		_ = client.Close()
 		return nil, fmt.Errorf("discover CalDAV principal: %w", err)
 	}
+	client.discoverScheduling(ctx, principal)
 	home, err := dav.FindCalendarHomeSet(ctx, principal)
 	if err != nil {
 		_ = client.Close()
@@ -166,6 +171,111 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	client.calendarPath = selected
 	client.calendars = eventCalendars
 	return client, nil
+}
+
+type schedulingMultiStatus struct {
+	Responses []struct {
+		Href      string `xml:"href"`
+		PropStats []struct {
+			Status string `xml:"status"`
+			Prop   struct {
+				UserAddresses struct {
+					Hrefs []string `xml:"href"`
+				} `xml:"calendar-user-address-set"`
+				Outbox struct {
+					Href string `xml:"href"`
+				} `xml:"schedule-outbox-URL"`
+			} `xml:"prop"`
+		} `xml:"propstat"`
+	} `xml:"response"`
+}
+
+func (client *Client) discoverScheduling(ctx context.Context, principal string) {
+	if !validDAVPath(principal) {
+		return
+	}
+	target := *client.endpoint
+	target.Path = principal
+	target.RawPath = ""
+	target.RawQuery = ""
+	target.Fragment = ""
+	const body = `<?xml version="1.0" encoding="utf-8"?>` +
+		`<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">` +
+		`<D:prop><C:calendar-user-address-set/><C:schedule-outbox-URL/>` +
+		`</D:prop></D:propfind>`
+	request, err := http.NewRequestWithContext(
+		ctx,
+		"PROPFIND",
+		target.String(),
+		strings.NewReader(body),
+	)
+	if err != nil {
+		return
+	}
+	request.Header.Set("Content-Type", "application/xml; charset=utf-8")
+	request.Header.Set("Depth", "0")
+	response, err := (*authorizedHTTPClient)(client).Do(request)
+	if err != nil {
+		return
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusMultiStatus {
+		_, _ = io.Copy(io.Discard, response.Body)
+		return
+	}
+	var result schedulingMultiStatus
+	decoder := xml.NewDecoder(response.Body)
+	if err := decoder.Decode(&result); err != nil || len(result.Responses) != 1 {
+		return
+	}
+	for _, propstat := range result.Responses[0].PropStats {
+		if !strings.Contains(propstat.Status, " 200 ") {
+			continue
+		}
+		outbox, ok := client.davPath(propstat.Prop.Outbox.Href)
+		if !ok {
+			continue
+		}
+		address := ""
+		for _, href := range propstat.Prop.UserAddresses.Hrefs {
+			parsed, err := url.Parse(strings.TrimSpace(href))
+			if err != nil || !strings.EqualFold(parsed.Scheme, "mailto") ||
+				!bareCalendarAddress(parsed.Opaque) {
+				continue
+			}
+			address = parsed.Opaque
+			break
+		}
+		if address == "" {
+			continue
+		}
+		client.calendarUser = address
+		client.outboxPath = outbox
+		client.scheduling = true
+		return
+	}
+}
+
+func (client *Client) davPath(raw string) (string, bool) {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return "", false
+	}
+	if parsed.IsAbs() &&
+		(parsed.Scheme != client.endpoint.Scheme ||
+			!strings.EqualFold(parsed.Host, client.endpoint.Host)) {
+		return "", false
+	}
+	if !validDAVPath(parsed.Path) {
+		return "", false
+	}
+	return parsed.Path, true
+}
+
+// SchedulingAvailable reports an authenticated RFC 6638 server-managed
+// scheduling route discovered for this account.
+func (client *Client) SchedulingAvailable() bool {
+	return client != nil && client.scheduling
 }
 
 type authorizedHTTPClient Client
@@ -253,9 +363,10 @@ func supportsEvents(values []string) bool {
 }
 
 type eventReference struct {
-	Calendar string `json:"calendar"`
-	Path     string `json:"path"`
-	UID      string `json:"uid"`
+	Calendar     string `json:"calendar"`
+	Path         string `json:"path"`
+	UID          string `json:"uid"`
+	RecurrenceID string `json:"recurrenceId,omitempty"`
 }
 
 func encodeEventID(reference eventReference) (string, error) {
@@ -340,6 +451,22 @@ func (client *Client) conditionalRequest(
 	method, calendarPath, objectPath, conditionName, conditionValue string,
 	calendar *ical.Calendar,
 ) (string, error) {
+	return client.conditionalRequestWithHeaders(
+		ctx,
+		method,
+		calendarPath,
+		objectPath,
+		http.Header{conditionName: {conditionValue}},
+		calendar,
+	)
+}
+
+func (client *Client) conditionalRequestWithHeaders(
+	ctx context.Context,
+	method, calendarPath, objectPath string,
+	headers http.Header,
+	calendar *ical.Calendar,
+) (string, error) {
 	target, err := client.objectURL(objectPath, calendarPath)
 	if err != nil {
 		return "", err
@@ -362,7 +489,11 @@ func (client *Client) conditionalRequest(
 	if calendar != nil {
 		request.Header.Set("Content-Type", ical.MIMEType)
 	}
-	request.Header.Set(conditionName, conditionValue)
+	for name, values := range headers {
+		for _, value := range values {
+			request.Header.Add(name, value)
+		}
+	}
 	response, err := (*authorizedHTTPClient)(client).Do(request)
 	if err != nil {
 		return "", fmt.Errorf("%w: execute conditional CalDAV write: %w",
@@ -378,6 +509,44 @@ func (client *Client) conditionalRequest(
 		return "", fmt.Errorf("CalDAV write returned HTTP %d", response.StatusCode)
 	}
 	return strongETag(response.Header.Get("ETag")), nil
+}
+
+func (client *Client) scheduleTag(
+	ctx context.Context,
+	calendarPath, objectPath string,
+) (string, error) {
+	target, err := client.objectURL(objectPath, calendarPath)
+	if err != nil {
+		return "", err
+	}
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodHead,
+		target.String(),
+		nil,
+	)
+	if err != nil {
+		return "", err
+	}
+	response, err := (*authorizedHTTPClient)(client).Do(request)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = response.Body.Close() }()
+	_, _ = io.Copy(io.Discard, response.Body)
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf(
+			"CalDAV schedule-tag lookup returned HTTP %d",
+			response.StatusCode,
+		)
+	}
+	tag := strongETag(response.Header.Get("Schedule-Tag"))
+	if tag == "" {
+		return "", errors.New(
+			"CalDAV scheduling resource returned no strong Schedule-Tag",
+		)
+	}
+	return tag, nil
 }
 
 func strongETag(raw string) string {
