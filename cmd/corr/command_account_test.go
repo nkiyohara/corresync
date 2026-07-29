@@ -36,7 +36,7 @@ func newAccountCommandRuntime(
 	state := filepath.Join(t.TempDir(), "state")
 	t.Setenv("CORRESYNC_STATE_DIR", state)
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := config.Save(path, config.Default()); err != nil {
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
 		t.Fatal(err)
 	}
 	var stdout, stderr bytes.Buffer
@@ -53,6 +53,67 @@ func newAccountCommandRuntime(
 		return nil, nil
 	}
 	return app, path, &stdout
+}
+
+func TestSetupCreatesProviderNeutralConfigThenAddsFirstDiscoveredAccount(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{{
+				Provider:       domain.ProviderGoogleWeb,
+				Confidence:     98,
+				Authentication: application.DiscoveryBrowserFirstParty,
+				Endpoints: []application.DiscoveredEndpoint{{
+					Kind: "origin", Value: "https://mail.google.com",
+				}},
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "known_domain", Detail: "gmail.com",
+				}},
+			}},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	var stdout, stderr bytes.Buffer
+	app := newRuntime(
+		t.Context(),
+		path,
+		&stdout,
+		&stderr,
+		buildinfo.Info{Version: "dev", OS: "linux", Arch: "amd64"},
+	)
+	app.accountDiscoverer = discoverer
+	app.launch = func(context.Context, browser.Options) (browserHandle, error) {
+		t.Fatal("setup unexpectedly started authentication")
+		return nil, nil
+	}
+
+	command := setupCommand{Address: "reader@gmail.com", Alias: "personal"}
+	if err := command.Run(app); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.DefaultAccount != "personal" || len(configuration.Accounts) != 1 {
+		t.Fatalf("setup default/account count = %+v", configuration)
+	}
+	account := configuration.Accounts["personal"]
+	if account.Address != command.Address ||
+		account.Mail == nil ||
+		account.Mail.Provider != domain.ProviderGoogleWeb ||
+		account.Calendar == nil ||
+		account.Calendar.Provider != domain.ProviderGoogleWeb {
+		t.Fatalf("setup account = %+v", account)
+	}
+	for _, expected := range []string{
+		"Provider-neutral configuration created",
+		"authentication has not started",
+		"corr auth login --account 'personal'",
+	} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("setup output missing %q: %q", expected, stdout.String())
+		}
+	}
 }
 
 func TestAccountAddCreatesDistinctStableIsolationKeysWithoutAuthentication(t *testing.T) {

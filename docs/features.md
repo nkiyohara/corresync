@@ -27,7 +27,9 @@ not a universal provider-compatibility claim. See
 
 Discovery uses DNS and well-known metadata without credentials. It returns
 ranked evidence, confidence, required authentication, and availability; it
-never authenticates or silently adds an account. `corr account add` requires
+never authenticates or silently adds an account. `corr setup ADDRESS` uses the
+same evidence and may add only a safely auto-selectable first-party route;
+otherwise it directs the human to explicit selection. `corr account add` requires
 explicit provider selection whenever discovery is ambiguous. Microsoft domain
 or hosted-MX evidence offers both Outlook Web and Microsoft Graph, but Graph is
 always marked as an explicit OAuth choice and is never selected as a fallback.

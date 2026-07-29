@@ -77,7 +77,7 @@ func TestAuthStatusReportsContentFreeDaemonState(t *testing.T) {
 
 	root := t.TempDir()
 	configPath := filepath.Join(root, "config.toml")
-	if err := config.Save(configPath, config.Default()); err != nil {
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 		t.Fatal(err)
 	}
 	digest, err := config.Fingerprint(configPath)
@@ -126,7 +126,7 @@ func TestAuthLogoutStopsSessionOwner(t *testing.T) {
 
 	root := t.TempDir()
 	configPath := filepath.Join(root, "config.toml")
-	if err := config.Save(configPath, config.Default()); err != nil {
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 		t.Fatal(err)
 	}
 	digest, err := config.Fingerprint(configPath)
@@ -172,7 +172,7 @@ func TestAuthLogoutClosesOnlySelectedAccount(t *testing.T) {
 
 	root := t.TempDir()
 	configPath := filepath.Join(root, "config.toml")
-	if err := config.Save(configPath, config.Default()); err != nil {
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
 		t.Fatal(err)
 	}
 	digest, err := config.Fingerprint(configPath)

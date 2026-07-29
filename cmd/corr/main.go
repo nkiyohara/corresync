@@ -24,6 +24,7 @@ type cli struct {
 	ConfigPath  string            `name:"config" type:"path" env:"CORRESYNC_CONFIG" help:"Path to config.toml."`
 	VersionFlag kong.VersionFlag  `name:"version" short:"V" help:"Print version information and quit."`
 	Version     versionCommand    `cmd:"" help:"Print version and build information."`
+	Setup       setupCommand      `cmd:"" help:"Discover and add an account without authenticating."`
 	Config      configCommand     `cmd:"" help:"Initialize and inspect configuration."`
 	Account     accountCommand    `cmd:"" help:"Discover and manage isolated accounts."`
 	Doctor      doctorCommand     `cmd:"" help:"Diagnose local setup and opt-in provider compatibility."`

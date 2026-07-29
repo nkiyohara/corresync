@@ -124,6 +124,13 @@ func (command *accountListCommand) Run(app *runtime) error {
 	if _, err := view.printf("%s  %s\n\n", view.info(), view.strong("Accounts")); err != nil {
 		return err
 	}
+	if len(catalog.Accounts) == 0 {
+		_, err := view.printf(
+			"  No accounts configured.\n\n  %s\n",
+			view.command("Next: corr setup <email-address>"),
+		)
+		return err
+	}
 	for _, account := range catalog.Accounts {
 		marker := " "
 		if account.IsDefault {
@@ -318,7 +325,7 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	}
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
 	_, err = view.printf(
-		"%s  %s\n\n  %-14s %s\n  %-14s %d/100\n  %-14s %s\n  %-14s %s\n\n%s  %s\n",
+		"%s  %s\n\n  %-14s %s\n  %-14s %d/100\n  %-14s %s\n  %-14s %s\n\n%s  %s\n   %s\n",
 		view.info(),
 		view.strong("Selected provider route"),
 		"Provider", selected.Provider,
@@ -327,6 +334,7 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		"Endpoint", sanitizeCell(endpoint, 2048),
 		view.success(),
 		view.strong("Account "+sanitizeCell(account.Alias, 64)+" added; authentication has not started"),
+		view.command("Next: corr auth login --account "+shellSingleQuote(account.Alias)),
 	)
 	return err
 }
@@ -996,7 +1004,9 @@ func writeDiscoveryResult(app *runtime, result application.AccountDiscoveryResul
 	}
 	if len(result.Candidates) == 0 {
 		_, err := view.printf(
-			"\n  No candidate was inferred. Manual --provider and --origin remain available.\n",
+			"\n  No candidate was inferred. Manual --provider and endpoint flags remain available.\n"+
+				"  %s\n",
+			view.command("Next: corr account add "+shellSingleQuote(result.Address)+" --help"),
 		)
 		return err
 	}
@@ -1033,5 +1043,10 @@ func writeDiscoveryResult(app *runtime, result application.AccountDiscoveryResul
 			}
 		}
 	}
-	return nil
+	_, err := view.printf(
+		"\n  Discovery changed nothing and opened no sign-in page.\n"+
+			"  %s\n",
+		view.command("Next: corr account add "+shellSingleQuote(result.Address)+" --help"),
+	)
+	return err
 }

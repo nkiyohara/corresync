@@ -154,27 +154,27 @@ scoop install corresync/corresync</code></pre>
           <header>
             <span class="step-badge" aria-hidden="true">2</span>
             <div>
-              <h2 id="signin-title">Sign in to an account you control</h2>
+              <h2 id="signin-title">Choose an account, then sign in</h2>
               <p>
-                The default configuration uses Outlook Web in a dedicated, visible browser profile.
-                Your SSO, MFA, and Conditional Access prompts happen with the provider, exactly as
-                they do every morning.
+                Corresync starts with no provider selected. It uses your address only to gather
+                credential-free evidence, adds the route you choose, and authenticates only after a
+                separate account-specific command.
               </p>
             </div>
           </header>
           <div class="duo">
             <div>
               <p>
-                Corresync never asks for a password, and no secret ever enters
-                <code>config.toml</code>. <code>corr doctor</code> confirms the pieces are healthy
-                before you connect anything else.
+                For Outlook Web or Google Web, <code>corr setup</code> can select a first-party
+                browser route when the evidence is strong enough. Discovery and account addition
+                never open that browser. The next <code>auth login</code> command starts sign-in for
+                exactly the alias you name.
               </p>
               <p>
-                <strong>Different provider?</strong> Discovery gathers credential-free evidence—it
-                never authenticates or adds an account. Google API and Microsoft Graph need a public
-                OAuth client you are authorized to use, with grants kept in the OS keyring. Google
-                Web is a deliberate read-only route. JMAP, IMAP/SMTP, and CalDAV use a keyring entry
-                or an explicitly approved credential helper.
+                <strong>Need another route?</strong> Inspect discovery yourself. Google API and
+                Microsoft Graph need a public OAuth client you are authorized to use, with grants
+                kept in the OS keyring. Google Web is a deliberate read-only route. JMAP, IMAP/SMTP,
+                and CalDAV use a keyring entry or an explicitly approved credential helper.
               </p>
               <p class="step-links">
                 <a href="providers.html">Compare provider routes</a> ·
@@ -187,20 +187,19 @@ scoop install corresync/corresync</code></pre>
             </div>
             <div class="stack">
               <div class="install-block">
-                <p class="os-label" id="gs-signin-default">Default · Outlook Web</p>
-                <div class="cmd" data-copy data-copy-label="sign-in commands">
+                <p class="os-label" id="gs-signin-default">First-party route · guided setup</p>
+                <div class="cmd" data-copy data-copy-label="account and sign-in commands">
                   <pre
                     tabindex="0"
                     role="region"
                     aria-labelledby="gs-signin-default"
-                  ><code>corr config init
-corr config validate
-corr auth login
-corr doctor</code></pre>
+                  ><code>corr setup you@example.com --alias personal
+corr auth login --account personal
+corr doctor --account personal</code></pre>
                 </div>
               </div>
               <div class="install-block">
-                <p class="os-label" id="gs-signin-discover">Another provider · discover first</p>
+                <p class="os-label" id="gs-signin-discover">Any route · inspect and select</p>
                 <div class="cmd" data-copy data-copy-label="discovery commands">
                   <pre
                     tabindex="0"

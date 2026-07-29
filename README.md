@@ -137,21 +137,22 @@ corr --version
 Direct archives, native Linux packages, checksums, Sigstore provenance, and
 current WinGet status are in the [installation guide](docs/install.md).
 
-### 2. Initialize and sign in
+### 2. Add and sign in to your account
 
 ```console
-corr config init
-corr config validate
-corr auth login
-corr mail folders
-corr calendar folders
+corr setup you@example.com --alias personal
+corr auth login --account personal
+corr mail folders --account personal
+corr calendar folders --account personal
 ```
 
-The default configuration is Outlook Web. Login opens a dedicated visible
-browser profile; SSO, MFA, Conditional Access, and organization notices remain
-inside the provider-owned flow.
+`setup` creates a provider-neutral, secret-free local configuration when
+needed, performs credential-free discovery, and adds only an automatically
+selectable first-party route. It never opens a sign-in page. Authentication is
+a separate, account-specific action.
 
-To use another route, discover candidates and inspect the exact add flags:
+If no route can be selected safely—or if you want an API or standards route—
+inspect the evidence and choose the exact provider settings:
 
 ```console
 corr account discover reader@example.invalid
@@ -162,6 +163,9 @@ Account addition does not authenticate. OAuth routes require a public-client
 registration you are authorized to use. Standards routes use a keyring entry
 or explicitly approved helper reference. Passwords and tokens never enter
 `config.toml`. See [account and provider configuration](docs/configuration.md).
+Browser-owned routes open a dedicated visible profile only during the later
+`auth login`; SSO, MFA, Conditional Access, and organization notices remain
+inside the provider-owned flow.
 
 ### 3. Connect an agent
 

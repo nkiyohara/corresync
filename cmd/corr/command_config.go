@@ -37,27 +37,35 @@ func (command *configInitCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Lstat(path); err == nil && !command.Force {
-		return fmt.Errorf("config already exists at %s; use --force to replace it", path)
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("inspect config path: %w", err)
-	}
-	configuration, err := config.NewDefault()
-	if err != nil {
-		return err
-	}
-	if err := config.Save(path, configuration); err != nil {
-		return err
+	configuration := config.Default()
+	if command.Force {
+		if err := config.Save(path, configuration); err != nil {
+			return err
+		}
+	} else {
+		created, err := config.Create(app.context, path, configuration)
+		if err != nil {
+			return err
+		}
+		if !created {
+			return fmt.Errorf("config already exists at %s; use --force to replace it", path)
+		}
 	}
 	if command.JSON {
-		return writeJSON(app.stdout, map[string]any{"created": true, "path": path})
+		return writeJSON(app.stdout, map[string]any{
+			"created":          true,
+			"path":             path,
+			"providerSelected": false,
+		})
 	}
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
 	_, err = view.printf(
-		"%s  %s\n   %s\n",
+		"%s  %s\n   %s\n\n   %s\n   %s\n",
 		view.success(),
-		view.strong("Configuration created"),
+		view.strong("Provider-neutral configuration created"),
 		view.muted(path),
+		"No account or provider was selected.",
+		view.command("Next: corr setup <email-address>"),
 	)
 	return err
 }
@@ -97,6 +105,13 @@ func (command *configShowCommand) Run(app *runtime) error {
 		view.strong("Corresync configuration"),
 		view.muted(path),
 	); err != nil {
+		return err
+	}
+	if len(configuration.Accounts) == 0 {
+		_, err := view.printf(
+			"  No accounts configured.\n\n  %s\n",
+			view.command("Next: corr setup <email-address>"),
+		)
 		return err
 	}
 	if _, err := view.printf(

@@ -308,10 +308,16 @@ func (command *mcpQoderSetupCommand) Run(app *runtime) error {
 }
 
 func resolveMCPSetup(app *runtime, name, executable string) (string, string, []string, error) {
-	if _, _, err := app.loadConfig(); err != nil {
+	configuration, _, err := app.loadConfig()
+	if err != nil {
 		return "", "", nil, fmt.Errorf(
-			"load Corresync configuration before MCP setup (run `corr config init` first): %w",
+			"load Corresync configuration before MCP setup (run `corr setup <email-address>` first): %w",
 			err,
+		)
+	}
+	if len(configuration.Accounts) == 0 {
+		return "", "", nil, errors.New(
+			"configure an account before MCP setup; run `corr setup <email-address>` first",
 		)
 	}
 	name, executable, arguments, err := resolveMCPClientConfig(app, name, executable)

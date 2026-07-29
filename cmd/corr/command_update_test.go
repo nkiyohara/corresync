@@ -186,7 +186,7 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 		t.Fatalf("TTY notice missing: %q", stderr.String())
 	}
 
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Updates.DisableAutomaticChecks = true
 	configPath := filepath.Join(t.TempDir(), "config.toml")
 	if err := config.Save(configPath, configuration); err != nil {

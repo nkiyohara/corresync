@@ -272,8 +272,14 @@ func (app *runtime) requireDaemonStopped() error {
 // openDaemon connects to the config-scoped session owner, starting it when
 // absent. It never receives provider authorization material.
 func (app *runtime) openDaemon(ctx context.Context) (*daemonapi.Client, daemonapi.Status, error) {
-	if _, _, err := app.loadConfigContext(ctx); err != nil {
+	configuration, _, err := app.loadConfigContext(ctx)
+	if err != nil {
 		return nil, daemonapi.Status{}, err
+	}
+	if len(configuration.Accounts) == 0 {
+		return nil, daemonapi.Status{}, errors.New(
+			"no account is configured; run `corr setup <email-address>` first",
+		)
 	}
 	configPath, err := app.resolvedConfigPath()
 	if err != nil {

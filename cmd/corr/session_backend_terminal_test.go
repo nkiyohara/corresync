@@ -57,7 +57,7 @@ func TestSessionBackendTerminalLoginStartsHeadlessAndBindsCaller(t *testing.T) {
 		return fakeBrowser, nil
 	}}
 	backend := &sessionBackend{
-		app: app, configuration: config.Default(), lifecycle: lifecycle, cancel: cancel,
+		app: app, configuration: config.OutlookDefault(), lifecycle: lifecycle, cancel: cancel,
 		accounts: make(map[domain.AccountID]sessionAccount), previews: make(map[string]sessionPreview),
 		terminalSessions: make(map[string]*terminalLoginSession),
 		terminalAccounts: make(map[domain.AccountID]string),
@@ -72,7 +72,7 @@ func TestSessionBackendTerminalLoginStartsHeadlessAndBindsCaller(t *testing.T) {
 	if err != nil || result.Status != "pending" || result.View == nil {
 		t.Fatalf("TerminalLogin(start) = %+v, %v", result, err)
 	}
-	web, _ := config.Default().Accounts["work"].OutlookWeb()
+	web, _ := config.OutlookDefault().Accounts["work"].OutlookWeb()
 	if !launched.Headless || launched.Origin != web.Origin {
 		t.Fatalf("browser options = %+v", launched)
 	}

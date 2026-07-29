@@ -28,15 +28,16 @@ The references here remain the complete technical and evidence contracts.
 ## First run
 
 ```console
-corr config init
-corr config validate
-corr auth login
-corr mail folders
-corr calendar folders
+corr setup you@example.com --alias personal
+corr auth login --account personal
+corr mail folders --account personal
+corr calendar folders --account personal
 ```
 
-The default route is Outlook Web. To inspect another provider without sending
-credentials or starting authentication:
+`setup` begins from no selected provider, performs credential-free discovery,
+and adds only an automatically selectable first-party route. To inspect or
+manually select another route without sending credentials or starting
+authentication:
 
 ```console
 corr account discover reader@example.invalid

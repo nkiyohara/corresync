@@ -17,7 +17,7 @@ import (
 func TestStoreLifecyclePreservesStableID(t *testing.T) {
 	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
 	path := filepath.Join(t.TempDir(), "config.toml")
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestStoreLifecyclePreservesStableID(t *testing.T) {
 func TestRemoveAccountPinsReplacementDefaultByStableID(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.toml")
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	replacement := configuration.Accounts["work"]
 	replacement.ID = "acc_00000000000000000000000000000002"
 	other := replacement
@@ -169,7 +169,7 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 	state := filepath.Join(t.TempDir(), "state")
 	t.Setenv("CORRESYNC_STATE_DIR", state)
 	path := filepath.Join(t.TempDir(), "config.toml")
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	route := func(key string) *config.OAuthRoute {
 		return &config.OAuthRoute{
 			APIBase:     "https://www.googleapis.com",
@@ -225,7 +225,7 @@ func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	configuration.Credentials.Helper = []string{
 		filepath.Join(t.TempDir(), "private-helper-command"),
 		"--private-profile",
@@ -289,7 +289,7 @@ func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 func TestAddAccountAtomicallyRejectsCrossAccountCredentialReuse(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.toml")
-	configuration := config.Default()
+	configuration := config.OutlookDefault()
 	work := configuration.Accounts["work"]
 	work.Address = "work@example.invalid"
 	work.Mail = &config.MailRoute{

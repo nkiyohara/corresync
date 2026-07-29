@@ -8,11 +8,14 @@ private authenticated local connection.
 ## Quick setup
 
 ```console
-corr config init
-corr config validate
-corr auth login
+corr setup you@example.com --alias personal
+corr auth login --account personal
 corr mcp setup codex
 ```
+
+`setup` performs credential-free discovery and route addition but never
+authenticates. MCP registration is refused until at least one account route is
+configured.
 
 Replace `codex` with `claude-code`, `github-copilot`, `gemini-cli`,
 `qwen-code`, or `qoder`. Use `--dry-run` to print the official client command

@@ -127,9 +127,6 @@ corr config path
 corr config validate
 corr account list
 corr doctor --json
-corr daemon start
-corr daemon status --json
-corr daemon stop
 corr completion install
 corr completion install
 ```
@@ -137,8 +134,8 @@ corr completion install
 Pass criteria:
 
 - config contains no password, token, cookie, grant, or client secret;
-- schema/version/account routes validate;
-- daemon status is content-free and reports protocol/version/config digest;
+- schema/version and the provider-neutral zero-account state validate;
+- session-backed commands refuse to start until an account is configured;
 - no TCP listener appears;
 - the second completion install is an exact no-op and no startup line is
   appended;
@@ -200,7 +197,12 @@ place a secret in a flag or config.
 corr account list
 corr account show ALIAS
 corr config validate
+corr daemon start
+corr daemon status --json
+corr daemon stop
 ```
+
+Daemon status is content-free and reports protocol/version/config digest.
 
 ## 6. Authenticate and run bounded doctor
 

@@ -9,6 +9,12 @@ All notable user-facing changes are recorded here. The project follows
 
 ### Installation and user documentation
 
+- Fix the provider-neutral first-run flow: fresh configuration no longer
+  creates a legacy Outlook Web placeholder. `corr setup ADDRESS` now creates
+  an empty secret-free configuration when needed, performs credential-free
+  discovery, adds only a safely auto-selectable route, and directs the user to
+  a separate account-specific login. Existing configurations are never
+  rewritten during upgrade.
 - Add a no-sudo Linux installer at
   `https://nkiyohara.github.io/corresync/install.sh`. It selects the latest
   stable amd64/arm64 archive, requires the exact checksum entry, verifies the

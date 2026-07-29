@@ -60,6 +60,27 @@ type accountPurgerStub struct {
 	err     error
 }
 
+func TestAccountServiceAcceptsEmptyOnboardingCatalog(t *testing.T) {
+	t.Parallel()
+
+	repository := &accountRepositoryStub{}
+	service, err := NewAccountService(
+		repository,
+		&accountPurgerStub{},
+		[]domain.ProviderID{domain.ProviderGoogleWeb},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := service.List(t.Context())
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(catalog.Accounts) != 0 {
+		t.Fatalf("List() = %+v, want empty onboarding catalog", catalog)
+	}
+}
+
 func (stub *accountPurgerStub) PurgeAccountState(
 	_ context.Context,
 	account domain.AccountID,

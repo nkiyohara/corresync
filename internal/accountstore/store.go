@@ -77,6 +77,9 @@ func (store Store) AddAccount(
 	account application.AccountRegistration,
 ) error {
 	return config.Update(ctx, store.ConfigPath, func(configuration *config.Config) error {
+		if configuration.Accounts == nil {
+			configuration.Accounts = make(map[string]config.Account)
+		}
 		if len(configuration.Accounts) >= 32 {
 			return errors.New("at most 32 accounts are supported")
 		}

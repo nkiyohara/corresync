@@ -253,8 +253,13 @@ func parsePage(path string) (page, error) {
 	if meta["twitter:card"][0] != "summary_large_image" {
 		return page{}, fmt.Errorf("%s does not request a large Twitter summary card", path)
 	}
-	if filepath.Base(path) == "index.html" && jsonLDCount != 1 {
-		return page{}, fmt.Errorf("%s contains %d JSON-LD blocks, want 1", path, jsonLDCount)
+	if filepath.Base(path) == "index.html" {
+		if _, err := oneMeta(path, meta, "google-site-verification"); err != nil {
+			return page{}, err
+		}
+		if jsonLDCount != 1 {
+			return page{}, fmt.Errorf("%s contains %d JSON-LD blocks, want 1", path, jsonLDCount)
+		}
 	}
 	return item, nil
 }
