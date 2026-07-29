@@ -158,7 +158,9 @@ shape means data was sent to a provider.
 
 - `auth status --json`: content-free account lifecycle, capability, and
   degradation state.
-- `auth logout --json`: shutdown result.
+- `auth logout --account work --json`: exact account ID and alias with
+  `scope: "account"`; the daemon remains active.
+- `auth logout --json`: whole-owner shutdown result with `scope: "all"`.
 - `daemon status --json`: process/protocol/version/config-digest health; no
   credential.
 - `config validate --json`: validity and local path. The path is private.

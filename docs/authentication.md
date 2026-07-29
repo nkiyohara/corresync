@@ -113,12 +113,16 @@ authenticated/pending/signed-out state, captured time, normalized
 capabilities, and explicit degradations. It returns no address, endpoint,
 cookie, token, page content, or mailbox item.
 
-`corr auth logout` closes all account adapters and browsers owned by the
-config-scoped daemon, clears in-memory sessions, rotates/removes IPC
-credentials, and exits the owner. Provider keyring entries and user-owned
-credential-helper data are external and are not deleted implicitly. Approved
-account removal deletes an unshared OAuth grant only when Corresync owns that
-grant; shared grants and external standards credentials are retained.
+`corr auth logout --account work` closes only that account's adapters, browser,
+pending login, previews, and monitor after its in-flight operations finish.
+Other accounts and the config-scoped daemon remain active. Repeating the command
+is safe. Without `--account`, `corr auth logout` closes every account session,
+rotates/removes IPC credentials, and exits the owner.
+
+Neither form deletes provider keyring entries or user-owned credential-helper
+data. Approved account removal deletes an unshared OAuth grant only when
+Corresync owns that grant; shared grants and external standards credentials are
+retained.
 
 ## Local IPC authentication
 

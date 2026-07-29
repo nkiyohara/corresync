@@ -10,6 +10,9 @@ All notable user-facing changes are recorded here. The project follows
 - Add atomic account discovery/add/rename/remove with stable opaque identities,
   explicit mail/calendar routes, account-local state, and credential-free
   discovery.
+- Add idempotent account-targeted logout that drains in-flight operations,
+  cancels account-local monitors and previews, closes only that account's
+  provider sessions, and preserves every other account and the daemon.
 - Offer Microsoft Graph as a credential-free discovery candidate for known
   Microsoft domains and Microsoft-hosted MX records, while requiring explicit
   selection before any OAuth authorization begins.

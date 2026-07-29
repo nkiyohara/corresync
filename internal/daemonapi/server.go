@@ -186,6 +186,15 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.Login(ctx, input.Account, request.Caller)
+	case MethodLogout:
+		var input LogoutInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Account.ValidateOpaque(); err != nil {
+			return nil, err
+		}
+		return server.backend.Logout(ctx, input.Account, request.Caller)
 	case MethodSessionStatus:
 		var input struct{}
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {

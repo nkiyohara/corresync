@@ -112,6 +112,13 @@ func monitorTestEvent(state string) application.MonitorEvent {
 func (*fakeBackend) Login(_ context.Context, account domain.AccountID, _ domain.Caller) (LoginResult, error) {
 	return LoginResult{Account: account, Authenticated: true, CapturedAt: time.Unix(2, 0)}, nil
 }
+func (*fakeBackend) Logout(
+	_ context.Context,
+	account domain.AccountID,
+	_ domain.Caller,
+) (LogoutResult, error) {
+	return LogoutResult{Account: account, LoggedOut: true}, nil
+}
 func (backend *fakeBackend) TerminalLogin(_ context.Context, input TerminalLoginInput, caller domain.Caller) (TerminalLoginResult, error) {
 	backend.terminalInput, backend.caller = input, caller
 	if input.SessionID == "" {
@@ -423,6 +430,10 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	login, err := client.Login(t.Context(), testAccountID, caller)
 	if err != nil || !login.Authenticated || login.Account != testAccountID {
 		t.Fatalf("Login() = %+v, %v", login, err)
+	}
+	logout, err := client.Logout(t.Context(), testAccountID, caller)
+	if err != nil || !logout.LoggedOut || logout.Account != testAccountID {
+		t.Fatalf("Logout() = %+v, %v", logout, err)
 	}
 	sessions, err := client.SessionStatus(t.Context(), caller)
 	if err != nil ||

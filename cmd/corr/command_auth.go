@@ -10,7 +10,7 @@ import (
 type authCommand struct {
 	Login  loginCommand      `cmd:"" help:"Explicitly authenticate one configured provider route."`
 	Status authStatusCommand `cmd:"" help:"Inspect content-free session state."`
-	Logout authLogoutCommand `cmd:"" help:"Close browsers and clear all in-memory sessions."`
+	Logout authLogoutCommand `cmd:"" help:"Close one account session or all local sessions."`
 }
 
 type authStatusCommand struct {
@@ -130,10 +130,52 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 }
 
 type authLogoutCommand struct {
-	JSON bool `help:"Write machine-readable JSON."`
+	Account string `help:"Close only this configured account alias or ID."`
+	JSON    bool   `help:"Write machine-readable JSON."`
 }
 
 func (command *authLogoutCommand) Run(app *runtime) (returnErr error) {
+	if command.Account != "" {
+		configuration, _, err := app.loadConfig()
+		if err != nil {
+			return err
+		}
+		alias, account, err := configuration.ResolveAccount(command.Account)
+		if err != nil {
+			return err
+		}
+		client, _, err := app.openDaemon(app.context)
+		if err != nil {
+			return err
+		}
+		defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
+		if _, err := client.Logout(app.context, account.ID, app.caller()); err != nil {
+			return fmt.Errorf("clear account session: %w", err)
+		}
+		report := struct {
+			LoggedOut bool   `json:"loggedOut"`
+			Scope     string `json:"scope"`
+			Account   string `json:"account"`
+			Alias     string `json:"alias"`
+		}{
+			LoggedOut: true,
+			Scope:     "account",
+			Account:   string(account.ID),
+			Alias:     alias,
+		}
+		if command.JSON {
+			return writeJSON(app.stdout, report)
+		}
+		view := newConsoleView(app, app.stdout, app.interactiveStdout())
+		_, err = view.printf(
+			"%s  %s\n   %s\n",
+			view.success(),
+			view.strong("Local session cleared for "+sanitizeCell(alias, 64)),
+			view.muted("Other account sessions and the local session owner remain active."),
+		)
+		return err
+	}
+
 	client, status, err := app.openDaemon(app.context)
 	if err != nil {
 		return err

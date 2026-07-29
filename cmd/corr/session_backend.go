@@ -53,6 +53,60 @@ type sessionAccount struct {
 	captured     time.Time
 	capabilities domain.Capabilities
 	degradations []domain.Degradation
+	usage        *accountUsage
+}
+
+type accountUsage struct {
+	mu      sync.Mutex
+	active  int
+	closing bool
+	done    chan struct{}
+}
+
+func newAccountUsage() *accountUsage {
+	return &accountUsage{done: make(chan struct{})}
+}
+
+func (usage *accountUsage) begin() error {
+	if usage == nil {
+		return errors.New("account session usage is unavailable")
+	}
+	usage.mu.Lock()
+	defer usage.mu.Unlock()
+	if usage.closing {
+		return errors.New("account logout is in progress")
+	}
+	usage.active++
+	return nil
+}
+
+func (usage *accountUsage) end() {
+	usage.mu.Lock()
+	defer usage.mu.Unlock()
+	if usage.active > 0 {
+		usage.active--
+	}
+	if usage.closing && usage.active == 0 {
+		select {
+		case <-usage.done:
+		default:
+			close(usage.done)
+		}
+	}
+}
+
+func (usage *accountUsage) closeAfterActive() <-chan struct{} {
+	usage.mu.Lock()
+	defer usage.mu.Unlock()
+	usage.closing = true
+	if usage.active == 0 {
+		select {
+		case <-usage.done:
+		default:
+			close(usage.done)
+		}
+	}
+	return usage.done
 }
 
 func (account sessionAccount) mailService() (*application.MailService, error) {
@@ -117,6 +171,8 @@ type sessionBackend struct {
 	terminalSessions map[string]*terminalLoginSession
 	terminalAccounts map[domain.AccountID]string
 	monitorStarted   map[domain.AccountID]bool
+	monitorCancel    map[domain.AccountID]context.CancelFunc
+	monitorDone      map[domain.AccountID]chan struct{}
 }
 
 func newSessionBackend(app *runtime) (*sessionBackend, error) {
@@ -185,6 +241,8 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		terminalSessions: make(map[string]*terminalLoginSession),
 		terminalAccounts: make(map[domain.AccountID]string),
 		monitorStarted:   make(map[domain.AccountID]bool),
+		monitorCancel:    make(map[domain.AccountID]context.CancelFunc),
+		monitorDone:      make(map[domain.AccountID]chan struct{}),
 	}
 	monitor, err := application.NewMonitorService(backend, backend.monitorStore, recorder)
 	if err != nil {
@@ -424,6 +482,92 @@ func (backend *sessionBackend) SessionStatus(
 	return result, nil
 }
 
+func (backend *sessionBackend) Logout(
+	ctx context.Context,
+	accountID domain.AccountID,
+	caller domain.Caller,
+) (daemonapi.LogoutResult, error) {
+	if err := ctx.Err(); err != nil {
+		return daemonapi.LogoutResult{}, err
+	}
+	if err := caller.Validate(); err != nil {
+		return daemonapi.LogoutResult{}, err
+	}
+	if caller.Surface != "cli" {
+		return daemonapi.LogoutResult{}, errors.New(
+			"logout can only be started by an explicit local CLI command",
+		)
+	}
+	if err := accountID.ValidateOpaque(); err != nil {
+		return daemonapi.LogoutResult{}, err
+	}
+
+	backend.activationMu.Lock()
+	defer backend.activationMu.Unlock()
+
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return daemonapi.LogoutResult{}, errors.New("session backend is closed")
+	}
+	if _, _, exists := backend.configuration.AccountByID(accountID); !exists {
+		backend.mu.Unlock()
+		return daemonapi.LogoutResult{}, fmt.Errorf(
+			"account %q is not configured",
+			accountID,
+		)
+	}
+	account, authenticated := backend.accounts[accountID]
+	var accountDone <-chan struct{}
+	if authenticated {
+		if account.usage == nil {
+			account.usage = newAccountUsage()
+		}
+		accountDone = account.usage.closeAfterActive()
+		delete(backend.accounts, accountID)
+	}
+	var terminal *terminalLoginSession
+	if terminalID, exists := backend.terminalAccounts[accountID]; exists {
+		terminal = backend.terminalSessions[terminalID]
+		delete(backend.terminalSessions, terminalID)
+		delete(backend.terminalAccounts, accountID)
+	}
+	monitorCancel := backend.monitorCancel[accountID]
+	monitorDone := backend.monitorDone[accountID]
+	delete(backend.monitorCancel, accountID)
+	delete(backend.monitorDone, accountID)
+	delete(backend.monitorStarted, accountID)
+	for token, preview := range backend.previews {
+		if preview.account == accountID {
+			delete(backend.previews, token)
+		}
+	}
+	backend.mu.Unlock()
+
+	if monitorCancel != nil {
+		monitorCancel()
+	}
+	var closeErrors []error
+	if terminal != nil {
+		closeErrors = append(closeErrors, terminal.handle.Close())
+	}
+	for _, done := range []<-chan struct{}{monitorDone, accountDone} {
+		if done == nil {
+			continue
+		}
+		<-done
+	}
+	if authenticated {
+		closeErrors = append(closeErrors, closeSessionAccount(account))
+	}
+	if err := errors.Join(closeErrors...); err != nil {
+		return daemonapi.LogoutResult{}, err
+	}
+	return daemonapi.LogoutResult{
+		Account: accountID, LoggedOut: true,
+	}, nil
+}
+
 func (backend *sessionBackend) MonitorStatus(
 	ctx context.Context,
 	account domain.AccountID,
@@ -540,8 +684,10 @@ func (backend *sessionBackend) TerminalLogin(
 			)
 		}
 		account = mergeSessionAccounts(account, standards)
+		account.usage = newAccountUsage()
 		backend.accounts[input.Account] = account
-		backend.startMonitorLocked(input.Account, account)
+		// The monitor belongs to the daemon lifecycle, not this login request.
+		backend.startMonitorLocked(input.Account, account) //nolint:contextcheck
 		_ = backend.dropTerminalInteraction(interaction, false)
 		return authenticatedTerminalResult(input.Account, account.captured), nil
 	}
@@ -711,6 +857,7 @@ func (backend *sessionBackend) ListMail(
 	if err != nil {
 		return application.MailPage{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailPage{}, err
@@ -736,6 +883,7 @@ func (backend *sessionBackend) SearchMail(
 	if err != nil {
 		return application.MailPage{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailPage{}, err
@@ -784,6 +932,7 @@ func (backend *sessionBackend) ListMailFolders(
 	if err != nil {
 		return application.MailFolderPage{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailFolderPage{}, err
@@ -809,6 +958,7 @@ func (backend *sessionBackend) GetMailBody(
 	if err != nil {
 		return application.MailBodyAccess{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailBodyAccess{}, err
@@ -838,6 +988,7 @@ func (backend *sessionBackend) GetMailAttachment(
 	if err != nil {
 		return application.MailAttachmentAccess{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailAttachmentAccess{}, err
@@ -867,6 +1018,7 @@ func (backend *sessionBackend) CreateMailDraft(
 	if err != nil {
 		return application.MailDraftAccess{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailDraftAccess{}, err
@@ -893,7 +1045,11 @@ func (backend *sessionBackend) CommitMailDraft(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.mail == nil {
+	if !exists {
+		return application.MailDraftAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.mail == nil {
 		return application.MailDraftAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.mail.CommitDraft(ctx, token, caller)
@@ -922,6 +1078,7 @@ func (backend *sessionBackend) SendMail(
 	if err != nil {
 		return application.MailSendAccess{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailSendAccess{}, err
@@ -948,7 +1105,11 @@ func (backend *sessionBackend) CommitMailSend(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.mail == nil {
+	if !exists {
+		return application.MailSendAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.mail == nil {
 		return application.MailSendAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.mail.CommitSend(ctx, token, caller)
@@ -977,6 +1138,7 @@ func (backend *sessionBackend) MoveMail(
 	if err != nil {
 		return application.MailMoveAccess{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailMoveAccess{}, err
@@ -1003,7 +1165,11 @@ func (backend *sessionBackend) CommitMailMove(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.mail == nil {
+	if !exists {
+		return application.MailMoveAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.mail == nil {
 		return application.MailMoveAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.mail.CommitMove(ctx, token, caller)
@@ -1032,6 +1198,7 @@ func (backend *sessionBackend) SetMailReadState(
 	if err != nil {
 		return application.MailReadStateAccess{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailReadStateAccess{}, err
@@ -1058,7 +1225,11 @@ func (backend *sessionBackend) CommitMailReadState(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.mail == nil {
+	if !exists {
+		return application.MailReadStateAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.mail == nil {
 		return application.MailReadStateAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.mail.CommitReadState(ctx, token, caller)
@@ -1087,6 +1258,7 @@ func (backend *sessionBackend) DeleteMail(
 	if err != nil {
 		return application.MailDeleteAccess{}, err
 	}
+	defer services.usage.end()
 	mail, err := services.mailService()
 	if err != nil {
 		return application.MailDeleteAccess{}, err
@@ -1113,7 +1285,11 @@ func (backend *sessionBackend) CommitMailDelete(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.mail == nil {
+	if !exists {
+		return application.MailDeleteAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.mail == nil {
 		return application.MailDeleteAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.mail.CommitDelete(ctx, token, caller)
@@ -1139,7 +1315,11 @@ func (backend *sessionBackend) CommitMailBody(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.mail == nil {
+	if !exists {
+		return application.MailBodyAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.mail == nil {
 		return application.MailBodyAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.mail.CommitBody(ctx, token, caller)
@@ -1165,7 +1345,11 @@ func (backend *sessionBackend) CommitMailAttachment(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.mail == nil {
+	if !exists {
+		return application.MailAttachmentAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.mail == nil {
 		return application.MailAttachmentAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.mail.CommitAttachment(ctx, token, caller)
@@ -1204,7 +1388,17 @@ func (backend *sessionBackend) accountForPreview(token string) (sessionAccount, 
 		return sessionAccount{}, false
 	}
 	account, exists := backend.accounts[preview.account]
-	return account, exists
+	if !exists {
+		return sessionAccount{}, false
+	}
+	if account.usage == nil {
+		account.usage = newAccountUsage()
+		backend.accounts[preview.account] = account
+	}
+	if err := account.usage.begin(); err != nil {
+		return sessionAccount{}, false
+	}
+	return account, true
 }
 
 func (backend *sessionBackend) forgetPreview(token string) {
@@ -1231,6 +1425,7 @@ func (backend *sessionBackend) ListCalendar(
 	if err != nil {
 		return application.CalendarPage{}, err
 	}
+	defer services.usage.end()
 	calendar, err := services.calendarService()
 	if err != nil {
 		return application.CalendarPage{}, err
@@ -1256,6 +1451,7 @@ func (backend *sessionBackend) ListCalendarFolders(
 	if err != nil {
 		return application.CalendarFolderPage{}, err
 	}
+	defer services.usage.end()
 	calendar, err := services.calendarService()
 	if err != nil {
 		return application.CalendarFolderPage{}, err
@@ -1304,6 +1500,7 @@ func (backend *sessionBackend) CreateCalendar(
 	if err != nil {
 		return application.CalendarCreateAccess{}, err
 	}
+	defer services.usage.end()
 	calendar, err := services.calendarService()
 	if err != nil {
 		return application.CalendarCreateAccess{}, err
@@ -1330,7 +1527,11 @@ func (backend *sessionBackend) CommitCalendarCreate(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.calendar == nil {
+	if !exists {
+		return application.CalendarCreateAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.calendar == nil {
 		return application.CalendarCreateAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.calendar.CommitCreate(ctx, token, caller)
@@ -1359,6 +1560,7 @@ func (backend *sessionBackend) UpdateCalendar(
 	if err != nil {
 		return application.CalendarUpdateAccess{}, err
 	}
+	defer services.usage.end()
 	calendar, err := services.calendarService()
 	if err != nil {
 		return application.CalendarUpdateAccess{}, err
@@ -1385,7 +1587,11 @@ func (backend *sessionBackend) CommitCalendarUpdate(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.calendar == nil {
+	if !exists {
+		return application.CalendarUpdateAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.calendar == nil {
 		return application.CalendarUpdateAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.calendar.CommitUpdate(ctx, token, caller)
@@ -1414,6 +1620,7 @@ func (backend *sessionBackend) CancelCalendar(
 	if err != nil {
 		return application.CalendarCancelAccess{}, err
 	}
+	defer services.usage.end()
 	calendar, err := services.calendarService()
 	if err != nil {
 		return application.CalendarCancelAccess{}, err
@@ -1440,7 +1647,11 @@ func (backend *sessionBackend) CommitCalendarCancel(
 	defer backend.active.Done()
 
 	account, exists := backend.accountForPreview(token)
-	if !exists || account.calendar == nil {
+	if !exists {
+		return application.CalendarCancelAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.calendar == nil {
 		return application.CalendarCancelAccess{}, errors.New("invalid or expired approval token")
 	}
 	access, err := account.calendar.CommitCancel(ctx, token, caller)
@@ -1462,13 +1673,25 @@ func (backend *sessionBackend) accountServices(
 	backend.mu.Lock()
 	defer backend.mu.Unlock()
 	if account, exists := backend.accounts[accountID]; exists {
+		if account.usage == nil {
+			account.usage = newAccountUsage()
+			backend.accounts[accountID] = account
+		}
+		if err := account.usage.begin(); err != nil {
+			return sessionAccount{}, err
+		}
 		return account, nil
 	}
 	if _, exists := backend.terminalAccounts[accountID]; exists {
-		return sessionAccount{}, errors.New("terminal login is in progress for this account")
+		return sessionAccount{}, errors.New(
+			"terminal login is in progress for this account",
+		)
 	}
 	if _, _, exists := backend.configuration.AccountByID(accountID); !exists {
-		return sessionAccount{}, fmt.Errorf("account %q is not configured", accountID)
+		return sessionAccount{}, fmt.Errorf(
+			"account %q is not configured",
+			accountID,
+		)
 	}
 	return sessionAccount{}, errors.New(
 		"account is not authenticated; run `corr auth login --account <alias>` interactively",
@@ -1533,6 +1756,7 @@ func (backend *sessionBackend) activateAccount(
 		return sessionAccount{}, errors.Join(err, closeSessionAccount(services))
 	}
 	services = mergeSessionAccounts(services, standards)
+	services.usage = newAccountUsage()
 
 	backend.mu.Lock()
 	defer backend.mu.Unlock()
@@ -1543,7 +1767,8 @@ func (backend *sessionBackend) activateAccount(
 		)
 	}
 	backend.accounts[accountID] = services
-	backend.startMonitorLocked(accountID, services)
+	// The monitor belongs to the daemon lifecycle, not this login request.
+	backend.startMonitorLocked(accountID, services) //nolint:contextcheck
 	return services, nil
 }
 
@@ -1559,18 +1784,26 @@ func (backend *sessionBackend) startMonitorLocked(
 		return
 	}
 	backend.monitorStarted[accountID] = true
+	// Logout retains and calls cancel; daemon shutdown cancels the parent.
+	monitorContext, cancel := context.WithCancel(backend.lifecycle) //nolint:gosec
+	done := make(chan struct{})
+	backend.monitorCancel[accountID] = cancel
+	backend.monitorDone[accountID] = done
 	backend.active.Add(1)
-	go backend.monitorLoop(policy, account.mail)
+	go backend.monitorLoop(monitorContext, policy, account.mail, done)
 }
 
 func (backend *sessionBackend) monitorLoop(
+	ctx context.Context,
 	policy application.MonitorPolicy,
 	mail *application.MailService,
+	done chan<- struct{},
 ) {
 	defer backend.active.Done()
+	defer close(done)
 	poll := func() {
-		if err := backend.monitorEngine.Poll(backend.lifecycle, policy, mail); err != nil &&
-			backend.lifecycle.Err() == nil {
+		if err := backend.monitorEngine.Poll(ctx, policy, mail); err != nil &&
+			ctx.Err() == nil {
 			_, _ = fmt.Fprintf(
 				backend.app.stderr,
 				"monitor %s encountered a safe failure and will retry; inspect monitor status and the local audit; if the pending queue is saturated, run `corr events purge --account %s --approve`\n",
@@ -1584,7 +1817,7 @@ func (backend *sessionBackend) monitorLoop(
 	defer ticker.Stop()
 	for {
 		select {
-		case <-backend.lifecycle.Done():
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			poll()

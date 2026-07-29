@@ -76,6 +76,31 @@ func (client *Client) Login(ctx context.Context, account domain.AccountID, calle
 	return result, nil
 }
 
+// Logout closes exactly one account's in-memory provider sessions.
+func (client *Client) Logout(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (LogoutResult, error) {
+	if err := account.ValidateOpaque(); err != nil {
+		return LogoutResult{}, err
+	}
+	var result LogoutResult
+	if err := client.call(
+		ctx,
+		MethodLogout,
+		caller,
+		LogoutInput{Account: account},
+		&result,
+	); err != nil {
+		return LogoutResult{}, err
+	}
+	if result.Account != account || !result.LoggedOut {
+		return LogoutResult{}, errors.New("daemon returned invalid logout state")
+	}
+	return result, nil
+}
+
 // SessionStatus returns content-free in-memory authentication state.
 func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (SessionStatusResult, error) {
 	var result SessionStatusResult

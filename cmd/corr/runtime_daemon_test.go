@@ -442,6 +442,17 @@ func startLifecycleTestDaemon(
 				})
 				response.Result = encoded
 				responseErr = encodeErr
+			case envelope.Method == "logout":
+				var input daemonapi.LogoutInput
+				if decodeErr := json.Unmarshal(envelope.Params, &input); decodeErr != nil {
+					responseErr = decodeErr
+					break
+				}
+				encoded, encodeErr := json.Marshal(daemonapi.LogoutResult{
+					Account: input.Account, LoggedOut: true,
+				})
+				response.Result = encoded
+				responseErr = encodeErr
 			case envelope.Method == "shutdown":
 				response.Result = json.RawMessage(`{"stopping":true}`)
 				shutdown = true

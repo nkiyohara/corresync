@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 18
+	ProtocolVersion   = 19
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -34,6 +34,7 @@ const (
 	MethodStatus               Method = "status"
 	MethodShutdown             Method = "shutdown"
 	MethodLogin                Method = "login"
+	MethodLogout               Method = "logout"
 	MethodSessionStatus        Method = "session.status"
 	MethodTerminalLogin        Method = "login.terminal"
 	MethodMailFolders          Method = "mail.folders.list"
@@ -182,6 +183,18 @@ type LoginResult struct {
 	CapturedAt    time.Time        `json:"capturedAt"`
 }
 
+// LogoutInput selects one configured account whose in-memory session closes.
+type LogoutInput struct {
+	Account domain.AccountID `json:"account"`
+}
+
+// LogoutResult confirms the exact account boundary without exposing session
+// or credential material.
+type LogoutResult struct {
+	Account   domain.AccountID `json:"account"`
+	LoggedOut bool             `json:"loggedOut"`
+}
+
 // SessionStatus is the application-owned, content-free session status schema.
 type SessionStatus = application.SessionStatus
 
@@ -294,6 +307,7 @@ func (action TerminalLoginAction) validate() error {
 type Backend interface {
 	DefaultAccount() domain.AccountID
 	Login(context.Context, domain.AccountID, domain.Caller) (LoginResult, error)
+	Logout(context.Context, domain.AccountID, domain.Caller) (LogoutResult, error)
 	SessionStatus(context.Context, domain.Caller) (SessionStatusResult, error)
 	ListMailFolders(context.Context, application.MailFolderListInput, domain.Caller) (application.MailFolderPage, error)
 	ListMail(context.Context, application.MailListInput, domain.Caller) (application.MailPage, error)
@@ -340,7 +354,7 @@ type MonitoringBackend interface {
 
 func (method Method) valid() bool {
 	switch method {
-	case MethodStatus, MethodShutdown, MethodLogin, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
+	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
 		MethodMailGetAttachment, MethodMailCommitAttachment,
 		MethodMailCreateDraft, MethodMailCommitDraft, MethodMailSend, MethodMailCommitSend,
 		MethodMailMove, MethodMailCommitMove,

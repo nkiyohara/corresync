@@ -69,6 +69,13 @@ func (*adapterTestBackend) Login(_ context.Context, account domain.AccountID, _ 
 		Account: account, Authenticated: true, CapturedAt: time.Unix(2, 0),
 	}, nil
 }
+func (*adapterTestBackend) Logout(
+	_ context.Context,
+	account domain.AccountID,
+	_ domain.Caller,
+) (daemonapi.LogoutResult, error) {
+	return daemonapi.LogoutResult{Account: account, LoggedOut: true}, nil
+}
 func (backend *adapterTestBackend) ListMail(_ context.Context, _ application.MailListInput, _ domain.Caller) (application.MailPage, error) {
 	backend.mailCalls++
 	return application.MailPage{

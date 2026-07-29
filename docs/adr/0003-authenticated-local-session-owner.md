@@ -72,6 +72,8 @@ session status with separate mail and calendar provider identities so a
 mixed-provider account is never collapsed to a misleading primary route.
 Protocol version 18 adds the provider-neutral online-meeting creation field and
 provider-bound review result without reinterpreting the v0.7 Teams-only field.
+Protocol version 19 adds a CLI-only, account-targeted logout method that closes
+one account's in-memory sessions without stopping or exposing the session owner.
 
 Before a client reads the rotating bearer, it authenticates the endpoint
 itself. On Unix it opens the runtime directory without following symlinks,
