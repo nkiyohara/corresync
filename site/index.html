@@ -231,9 +231,13 @@ corr calendar folders</code></pre>
           <span class="step-number" aria-hidden="true">03</span>
           <div>
             <h3>Connect an agent—or keep using the CLI</h3>
-            <pre tabindex="0" role="region" aria-label="Connect Codex and list a cross-account agenda"><code>corr mcp setup codex
-<span class="t-comment"># also: claude-code, github-copilot,</span>
-<span class="t-comment"># gemini-cli, qwen-code, qoder</span>
+            <pre tabindex="0" role="region" aria-label="Connect an MCP client and list a cross-account agenda"><code><span class="t-comment"># choose the client you use</span>
+corr mcp setup codex
+corr mcp setup claude-code
+corr mcp setup github-copilot
+corr mcp setup gemini-cli
+corr mcp setup qwen-code
+corr mcp setup qoder
 
 corr agenda list --all-accounts \
   --start 2026-07-29T00:00:00Z \
