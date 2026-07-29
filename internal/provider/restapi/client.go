@@ -204,6 +204,11 @@ func (client *Client) target(resource string, query url.Values) (*url.URL, error
 		target.Fragment != "" {
 		return nil, errors.New("API resource escaped the configured origin")
 	}
+	for _, segment := range strings.Split(target.Path, "/") {
+		if segment == "." || segment == ".." {
+			return nil, errors.New("API resource path contains a dot segment")
+		}
+	}
 	basePath := strings.TrimSuffix(client.base.EscapedPath(), "/") + "/"
 	if !strings.HasPrefix(target.EscapedPath(), basePath) {
 		return nil, errors.New("API resource escaped the configured base path")

@@ -732,6 +732,19 @@ func TestGraphRejectsDelegatedIdentityMismatch(t *testing.T) {
 	}
 }
 
+func TestGraphRejectsDotSegmentOpaqueIdentifiers(t *testing.T) {
+	t.Parallel()
+	for _, id := range []string{".", ".."} {
+		encoded, err := encodeMessageID(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := decodeMessageID(encoded); err == nil {
+			t.Errorf("decodeMessageID(%q) accepted dot segment %q", encoded, id)
+		}
+	}
+}
+
 func graphTestMessage(body bool, etag string) graphMessage {
 	message := graphMessage{
 		ODataETag: etag, ID: "m1", ChangeKey: "change",

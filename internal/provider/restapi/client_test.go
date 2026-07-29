@@ -200,6 +200,28 @@ func TestClientKeepsExplicitWriteRejectionDefinite(t *testing.T) {
 	}
 }
 
+func TestClientRejectsDecodedDotSegments(t *testing.T) {
+	t.Parallel()
+	client, err := New(Options{
+		BaseURL: "https://api.example.invalid/v1",
+		HTTP:    &http.Client{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, resource := range []string{
+		"me/messages/.",
+		"me/messages/..",
+		"me/messages/%2e",
+		"me/messages/%2E%2E",
+	} {
+		if _, err := client.target(resource, nil); err == nil ||
+			!strings.Contains(err.Error(), "dot segment") {
+			t.Errorf("target(%q) error = %v", resource, err)
+		}
+	}
+}
+
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (function roundTripperFunc) RoundTrip(

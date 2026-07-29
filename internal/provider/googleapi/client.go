@@ -221,7 +221,7 @@ func decodeReference(value, prefix string, target any) error {
 }
 
 func validGoogleID(value string) bool {
-	return value != "" && len(value) <= 4096 &&
+	return value != "" && value != "." && value != ".." && len(value) <= 4096 &&
 		!strings.ContainsAny(value, "\r\n\x00/?#")
 }
 

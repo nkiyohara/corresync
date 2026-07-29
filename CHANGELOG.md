@@ -135,6 +135,9 @@ All notable user-facing changes are recorded here. The project follows
   recovery, preserve valid cursors across empty listings and ACKs that race
   delivery completion, and reject Windows `notify` setup until Corresync has a
   registered AppUserModelID.
+- Reject plain and percent-encoded dot path segments at the shared authorized
+  REST boundary, with provider ID validation as a second guard, so opaque
+  provider identifiers cannot be normalized into a different collection path.
 - Add `corr feedback`, an allowlisted deterministic report with an optional
   bounded generalized last-error record. Generation is local; copy/save/open
   actions occur only after full display, and GitHub is never submitted
