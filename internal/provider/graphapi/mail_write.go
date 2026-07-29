@@ -14,39 +14,15 @@ func (client *Client) CreateMailDraft(
 	ctx context.Context,
 	input application.MailDraftInput,
 ) (application.MailDraft, error) {
-	if input.EffectiveComposeMode() != application.MailComposeNew {
-		response, err := client.createResponseDraft(ctx, input)
-		if err != nil {
-			return application.MailDraft{}, err
-		}
-		id, err := encodeMessageID(response.ID)
-		if err != nil {
-			return application.MailDraft{}, err
-		}
-		return application.MailDraft{
-			ID: id, ChangeKey: encodeETag(response.ODataETag),
-		}, nil
-	}
-	request := graphComposition(input)
 	var response graphMessage
-	if _, err := client.api.DoJSON(
-		ctx,
-		http.MethodPost,
-		"me/messages",
-		nil,
-		request,
-		&response,
-		true,
-		nil,
-		http.StatusCreated,
-	); err != nil {
-		return application.MailDraft{}, err
+	var err error
+	if input.EffectiveComposeMode() != application.MailComposeNew {
+		response, err = client.createResponseDraft(ctx, input)
+	} else {
+		response, err = client.createNewDraft(ctx, input)
 	}
-	if !validGraphID(response.ID) || !validETag(response.ODataETag) {
-		return application.MailDraft{}, fmt.Errorf(
-			"%w: graph draft response omitted message identity",
-			application.ErrWriteOutcomeUnknown,
-		)
+	if err != nil {
+		return application.MailDraft{}, err
 	}
 	id, err := encodeMessageID(response.ID)
 	if err != nil {
@@ -57,6 +33,99 @@ func (client *Client) CreateMailDraft(
 	}, nil
 }
 
+func (client *Client) createNewDraft(
+	ctx context.Context,
+	input application.MailDraftInput,
+) (graphMessage, error) {
+	var response graphMessage
+	if _, err := client.api.DoJSON(
+		ctx,
+		http.MethodPost,
+		"me/messages",
+		nil,
+		graphComposition(input),
+		&response,
+		true,
+		nil,
+		http.StatusCreated,
+	); err != nil {
+		return graphMessage{}, err
+	}
+	if !validGraphID(response.ID) || !validETag(response.ODataETag) {
+		return graphMessage{}, fmt.Errorf(
+			"%w: graph draft response omitted message identity",
+			application.ErrWriteOutcomeUnknown,
+		)
+	}
+	return client.assembleDraft(ctx, response, input.Attachments)
+}
+
+func (client *Client) assembleDraft(
+	ctx context.Context,
+	draft graphMessage,
+	attachments []application.MailFileAttachment,
+) (graphMessage, error) {
+	if len(attachments) == 0 {
+		return draft, nil
+	}
+	for _, attachment := range attachments {
+		contentType := attachment.ContentType
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+		var created graphAttachment
+		if _, err := client.api.DoJSON(
+			ctx,
+			http.MethodPost,
+			"me/messages/"+escaped(draft.ID)+"/attachments",
+			nil,
+			map[string]any{
+				"@odata.type": "#microsoft.graph.fileAttachment",
+				"name":        attachment.Name,
+				"contentType": contentType,
+				"contentBytes": base64.StdEncoding.EncodeToString(
+					attachment.Content,
+				),
+			},
+			&created,
+			true,
+			nil,
+			http.StatusCreated,
+		); err != nil {
+			return graphMessage{}, graphDraftAssemblyError(err)
+		}
+		if created.ODataType != "#microsoft.graph.fileAttachment" ||
+			!validGraphID(created.ID) ||
+			created.Name != attachment.Name ||
+			created.Size != len(attachment.Content) {
+			return graphMessage{}, graphDraftAssemblyError(errors.New(
+				"graph attachment response omitted reviewed identity",
+			))
+		}
+	}
+	updated, err := client.getMessage(ctx, draft.ID, false)
+	if err != nil {
+		return graphMessage{}, graphDraftAssemblyError(err)
+	}
+	if updated.ID != draft.ID || !validETag(updated.ODataETag) {
+		return graphMessage{}, graphDraftAssemblyError(errors.New(
+			"graph assembled draft omitted current identity",
+		))
+	}
+	return updated, nil
+}
+
+func graphDraftAssemblyError(err error) error {
+	if errors.Is(err, application.ErrWriteOutcomeUnknown) {
+		return err
+	}
+	return fmt.Errorf(
+		"%w: graph draft exists but attachment assembly failed: %w",
+		application.ErrWriteOutcomeUnknown,
+		err,
+	)
+}
+
 func (client *Client) SendMail(
 	ctx context.Context,
 	input application.MailSendInput,
@@ -65,6 +134,26 @@ func (client *Client) SendMail(
 	if input.ComposeMode != "" &&
 		input.ComposeMode != application.MailComposeNew {
 		draft, err := client.createResponseDraft(ctx, draftInput)
+		if err != nil {
+			return application.MailSendResult{}, err
+		}
+		if _, err := client.api.DoJSON(
+			ctx,
+			http.MethodPost,
+			"me/messages/"+escaped(draft.ID)+"/send",
+			nil,
+			nil,
+			nil,
+			true,
+			nil,
+			http.StatusAccepted,
+		); err != nil {
+			return application.MailSendResult{}, err
+		}
+		return application.MailSendResult{}, nil
+	}
+	if len(input.Attachments) != 0 {
+		draft, err := client.createNewDraft(ctx, draftInput)
 		if err != nil {
 			return application.MailSendResult{}, err
 		}
@@ -114,22 +203,6 @@ func graphComposition(input application.MailDraftInput) map[string]any {
 		"toRecipients":  graphRecipients(input.To),
 		"ccRecipients":  graphRecipients(input.CC),
 		"bccRecipients": graphRecipients(input.BCC),
-	}
-	if len(input.Attachments) != 0 {
-		attachments := make([]map[string]any, 0, len(input.Attachments))
-		for _, attachment := range input.Attachments {
-			contentType := attachment.ContentType
-			if contentType == "" {
-				contentType = "application/octet-stream"
-			}
-			attachments = append(attachments, map[string]any{
-				"@odata.type":  "#microsoft.graph.fileAttachment",
-				"name":         attachment.Name,
-				"contentType":  contentType,
-				"contentBytes": base64.StdEncoding.EncodeToString(attachment.Content),
-			})
-		}
-		message["attachments"] = attachments
 	}
 	return message
 }
@@ -188,7 +261,7 @@ func (client *Client) createResponseDraft(
 			application.ErrWriteOutcomeUnknown,
 		)
 	}
-	return response, nil
+	return client.assembleDraft(ctx, response, input.Attachments)
 }
 
 func graphRecipients(addresses []string) []map[string]any {

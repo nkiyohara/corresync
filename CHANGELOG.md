@@ -36,6 +36,10 @@ All notable user-facing changes are recorded here. The project follows
 - Complete Graph reply, reply-all, forward, and message move through
   source-version revalidation followed by the provider's typed action and
   response-draft flow.
+- Assemble Graph file attachments through the created draft's attachment
+  collection for new, reply, reply-all, and forward flows, refresh the final
+  draft identity before returning it, and report any partial draft as an
+  outcome requiring reconciliation rather than risking a duplicate send.
 - Traverse Microsoft Graph mail-folder hierarchies through bounded child-folder
   collections and origin-checked provider continuation URLs.
 - Add Microsoft Graph v1.0 permanent message deletion after exact source-version

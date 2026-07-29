@@ -3,9 +3,11 @@ package graphapi
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -16,9 +18,12 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 	t.Parallel()
 
 	var sentBody []byte
+	var newDraftBodies [][]byte
 	var replyDraftBody []byte
 	var forwardBody []byte
 	var responseDraftSent bool
+	var attachmentDraftSent bool
+	var attachedDrafts []string
 	var messagePermanentlyDeleted bool
 	var calendarRecurrenceUpdated bool
 	var calendarRecurrenceRemoved bool
@@ -78,12 +83,44 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 				}},
 			})
 		case "POST /me/messages":
+			newDraftBodies = append(newDraftBodies, readGraphBody(t, request))
+			draftID := "draft1"
+			if len(newDraftBodies) == 2 {
+				draftID = "senddraft1"
+			}
+			message := graphTestMessage(false, `W/"draft-initial"`)
+			message.ID = draftID
 			writeGraphJSONStatus(
 				t,
 				writer,
-				graphTestMessage(false, `W/"m2"`),
+				message,
 				http.StatusCreated,
 			)
+		case "POST /me/messages/draft1/attachments":
+			attachedDrafts = append(attachedDrafts, "draft1")
+			requireGraphAttachment(t, request, "draft.txt")
+			writeGraphJSONStatus(t, writer, graphAttachment{
+				ODataType: "#microsoft.graph.fileAttachment",
+				ID:        "attachment-draft", Name: "draft.txt", Size: 5,
+			}, http.StatusCreated)
+		case "GET /me/messages/draft1":
+			message := graphTestMessage(false, `W/"draft-final"`)
+			message.ID = "draft1"
+			writeGraphJSON(t, writer, message)
+		case "POST /me/messages/senddraft1/attachments":
+			attachedDrafts = append(attachedDrafts, "senddraft1")
+			requireGraphAttachment(t, request, "send.txt")
+			writeGraphJSONStatus(t, writer, graphAttachment{
+				ODataType: "#microsoft.graph.fileAttachment",
+				ID:        "attachment-send", Name: "send.txt", Size: 4,
+			}, http.StatusCreated)
+		case "GET /me/messages/senddraft1":
+			message := graphTestMessage(false, `W/"send-draft-final"`)
+			message.ID = "senddraft1"
+			writeGraphJSON(t, writer, message)
+		case "POST /me/messages/senddraft1/send":
+			attachmentDraftSent = true
+			writer.WriteHeader(http.StatusAccepted)
 		case "POST /me/sendMail":
 			sentBody = readGraphBody(t, request)
 			writer.WriteHeader(http.StatusAccepted)
@@ -92,11 +129,33 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			message := graphTestMessage(false, `W/"reply"`)
 			message.ID = "reply1"
 			writeGraphJSONStatus(t, writer, message, http.StatusCreated)
+		case "POST /me/messages/reply1/attachments":
+			attachedDrafts = append(attachedDrafts, "reply1")
+			requireGraphAttachment(t, request, "reply.txt")
+			writeGraphJSONStatus(t, writer, graphAttachment{
+				ODataType: "#microsoft.graph.fileAttachment",
+				ID:        "attachment-reply", Name: "reply.txt", Size: 5,
+			}, http.StatusCreated)
+		case "GET /me/messages/reply1":
+			message := graphTestMessage(false, `W/"reply-final"`)
+			message.ID = "reply1"
+			writeGraphJSON(t, writer, message)
 		case "POST /me/messages/m1/createForward":
 			forwardBody = readGraphBody(t, request)
 			message := graphTestMessage(false, `W/"forward"`)
 			message.ID = "forward1"
 			writeGraphJSONStatus(t, writer, message, http.StatusCreated)
+		case "POST /me/messages/forward1/attachments":
+			attachedDrafts = append(attachedDrafts, "forward1")
+			requireGraphAttachment(t, request, "forward.txt")
+			writeGraphJSONStatus(t, writer, graphAttachment{
+				ODataType: "#microsoft.graph.fileAttachment",
+				ID:        "attachment-forward", Name: "forward.txt", Size: 7,
+			}, http.StatusCreated)
+		case "GET /me/messages/forward1":
+			message := graphTestMessage(false, `W/"forward-final"`)
+			message.ID = "forward1"
+			writeGraphJSON(t, writer, message)
 		case "POST /me/messages/forward1/send":
 			responseDraftSent = true
 			writer.WriteHeader(http.StatusAccepted)
@@ -219,10 +278,17 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 		t.Context(),
 		application.MailDraftInput{
 			To: []string{"to@example.test"}, Subject: "Draft", Body: "body",
+			Attachments: []application.MailFileAttachment{{
+				Name: "draft.txt", Content: []byte("draft"),
+			}},
 		},
 	)
 	if err != nil || draft.ID == "" || draft.ChangeKey == "" {
 		t.Fatalf("draft = %#v error = %v", draft, err)
+	}
+	if len(newDraftBodies) != 1 ||
+		strings.Contains(string(newDraftBodies[0]), `"attachments"`) {
+		t.Fatalf("new draft embedded attachments inline: %q", newDraftBodies)
 	}
 	if _, err := client.SendMail(
 		t.Context(),
@@ -235,6 +301,25 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 	if !strings.Contains(string(sentBody), `"saveToSentItems":true`) {
 		t.Fatalf("send request = %s", sentBody)
 	}
+	if _, err := client.SendMail(
+		t.Context(),
+		application.MailSendInput{
+			To: []string{"to@example.test"}, Subject: "Sent attachment",
+			Body: "body",
+			Attachments: []application.MailFileAttachment{{
+				Name: "send.txt", Content: []byte("send"),
+			}},
+		},
+	); err != nil || !attachmentDraftSent ||
+		len(newDraftBodies) != 2 ||
+		strings.Contains(string(newDraftBodies[1]), `"attachments"`) {
+		t.Fatalf(
+			"attachment send error = %v sent = %t drafts = %q",
+			err,
+			attachmentDraftSent,
+			newDraftBodies,
+		)
+	}
 	replyDraft, err := client.CreateMailDraft(
 		t.Context(),
 		application.MailDraftInput{
@@ -242,11 +327,15 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			ReferenceMessageID: messages.Messages[0].ID,
 			ReferenceChangeKey: messages.Messages[0].ChangeKey,
 			Body:               "reply body",
+			Attachments: []application.MailFileAttachment{{
+				Name: "reply.txt", Content: []byte("reply"),
+			}},
 		},
 	)
 	if err != nil || replyDraft.ID == "" || replyDraft.ChangeKey == "" ||
 		!strings.Contains(string(replyDraftBody), `"content":"reply body"`) ||
-		strings.Contains(string(replyDraftBody), `"toRecipients"`) {
+		strings.Contains(string(replyDraftBody), `"toRecipients"`) ||
+		strings.Contains(string(replyDraftBody), `"attachments"`) {
 		t.Fatalf(
 			"reply draft = %#v error = %v request = %s",
 			replyDraft,
@@ -262,15 +351,25 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			ReferenceMessageID: messages.Messages[0].ID,
 			ReferenceChangeKey: messages.Messages[0].ChangeKey,
 			Body:               "forward body",
+			Attachments: []application.MailFileAttachment{{
+				Name: "forward.txt", Content: []byte("forward"),
+			}},
 		},
 	); err != nil || !responseDraftSent ||
-		!strings.Contains(string(forwardBody), `"forward@example.test"`) {
+		!strings.Contains(string(forwardBody), `"forward@example.test"`) ||
+		strings.Contains(string(forwardBody), `"attachments"`) {
 		t.Fatalf(
 			"forward error = %v sent = %t request = %s",
 			err,
 			responseDraftSent,
 			forwardBody,
 		)
+	}
+	if !slices.Equal(
+		attachedDrafts,
+		[]string{"draft1", "senddraft1", "reply1", "forward1"},
+	) {
+		t.Fatalf("attachment draft sequence = %#v", attachedDrafts)
 	}
 	read, err := client.SetMailReadState(
 		t.Context(),
@@ -495,6 +594,58 @@ func TestGraphDeepMailFolderTraversalIsBoundedAndFollowsSafePages(t *testing.T) 
 	}
 }
 
+func TestGraphDraftAttachmentFailureReportsPartialOutcome(t *testing.T) {
+	t.Parallel()
+
+	var draftCreated bool
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.Method + " " + request.URL.Path {
+		case "GET /me":
+			writeGraphJSON(t, writer, map[string]string{
+				"id": "user1", "mail": "reader@example.test",
+			})
+		case "GET /me/mailFolders/inbox":
+			writeGraphJSON(t, writer, map[string]string{"id": "inbox1"})
+		case "POST /me/messages":
+			draftCreated = true
+			message := graphTestMessage(false, `W/"draft-initial"`)
+			message.ID = "draft1"
+			writeGraphJSONStatus(t, writer, message, http.StatusCreated)
+		case "POST /me/messages/draft1/attachments":
+			http.Error(writer, `{"error":{"code":"SyntheticFailure"}}`, http.StatusBadRequest)
+		default:
+			http.Error(writer, "unexpected synthetic Graph request", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := New(t.Context(), Options{
+		APIBase: server.URL, Address: "reader@example.test",
+		Mail: true, HTTP: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+
+	_, err = client.CreateMailDraft(
+		t.Context(),
+		application.MailDraftInput{
+			To: []string{"to@example.test"}, Body: "body",
+			Attachments: []application.MailFileAttachment{{
+				Name: "fixture.txt", Content: []byte("fixture"),
+			}},
+		},
+	)
+	if !draftCreated || !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+		t.Fatalf("draft created = %t error = %v", draftCreated, err)
+	}
+}
+
 func TestGraphRejectsDelegatedIdentityMismatch(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(
@@ -562,6 +713,29 @@ func requireGraphCondition(t *testing.T, request *http.Request, want string) {
 	t.Helper()
 	if request.Header.Get("If-Match") != want {
 		t.Errorf("If-Match = %q, want %q", request.Header.Get("If-Match"), want)
+	}
+}
+
+func requireGraphAttachment(
+	t *testing.T,
+	request *http.Request,
+	name string,
+) {
+	t.Helper()
+	var attachment struct {
+		ODataType   string `json:"@odata.type"`
+		Name        string `json:"name"`
+		ContentData string `json:"contentBytes"`
+	}
+	if err := json.NewDecoder(request.Body).Decode(&attachment); err != nil {
+		t.Fatal(err)
+	}
+	content, err := base64.StdEncoding.DecodeString(attachment.ContentData)
+	if err != nil ||
+		attachment.ODataType != "#microsoft.graph.fileAttachment" ||
+		attachment.Name != name ||
+		string(content) != strings.TrimSuffix(name, ".txt") {
+		t.Fatalf("attachment request = %+v content = %q", attachment, content)
 	}
 }
 
