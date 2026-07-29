@@ -95,10 +95,12 @@ discovery.
 All remote endpoints require encrypted transport. IMAP/SMTP support implicit
 TLS or STARTTLS according to the explicit route. IMAP response literals are
 bounded individually and in aggregate from the first greeting, including after
-STARTTLS. The byte filter uses the same pinned go-imap response parser with
-zero-length prior literal probes before treating payload bytes as opaque, so a
-status-text `{N}` cannot desynchronize it from the parser; LF-only control lines
-are rejected. Reply inheritance drops malformed external
+STARTTLS. A forward-only capture gives each complete response to the same pinned
+go-imap parser exactly once before releasing its exact bytes to the client.
+Parser-recognized literal payload reads are bounded separately from control
+syntax, parser CPU work has an internal deadline, status-text `{N}` cannot
+desynchronize framing, and LF-only control lines are rejected. Reply
+inheritance drops malformed external
 Message-ID/References values and forwarding does not depend on them. CalDAV
 and JMAP endpoints must be HTTPS; a JMAP session may advertise
 API/upload/download URLs only on that exact HTTPS origin. Certificate

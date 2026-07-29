@@ -53,17 +53,22 @@ choice to retain or purge the local queue.
 The provider cursor advances monotonically in the same commit that creates
 first-seen outbox events. Quiet hours, debounce, rate limits, cancellation, and
 sink failures leave events pending instead of rolling back the cursor. Pending
-events are filtered by their original delivery kind, so changing mode cannot
-redirect old data to a different sink. A cursor that falls outside the bounded
-1000-item recovery window is re-baselined at the newest inspected window; all
-inspected items still pass through deduplication and normal delivery. This is
-never reported as an ordinary successful scan: the durable status increments a
-recovery-overflow counter, records its time, and the poll returns an explicit
-error that older uninspected messages were not emitted. Terminal notification,
-runner, and acknowledged records expire by their completion time. At the hard
-event bound, the oldest terminal record may yield capacity, but pending events
-are never evicted. State schema v1 entries migrate to local-only `queue`
-delivery rather than guessing an external destination.
+events are drained before a new scan commit and filtered by their original
+delivery kind, so saturation can self-recover and changing mode cannot redirect
+old data to a different sink. Only matched messages consume deduplication state;
+the oldest identity not protecting a queued event yields capacity, and explicit
+purge clears queue and dedup state together. A cursor that falls outside the
+bounded 1000-item recovery window is re-baselined at the newest inspected
+window; all inspected items still pass through deduplication and normal
+delivery. This is never reported as an ordinary successful scan: the durable
+status increments a recovery-overflow counter, records its time, and the poll
+returns an explicit error that older uninspected messages were not emitted.
+Reaching the mailbox end after a cursor disappears is a complete normal
+re-baseline and does not increment overflow. Terminal notification, runner, and
+acknowledged records expire by their completion time. At the hard event bound,
+the oldest terminal record may yield capacity, but pending events are never
+evicted. State schema v1 entries migrate to local-only `queue` delivery rather
+than guessing an external destination.
 
 Events are metadata first: event identifier, account, source object identity,
 sender, subject, received time, and a trust marker. Bodies and attachments are

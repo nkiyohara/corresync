@@ -141,7 +141,9 @@ private untrusted data. Acknowledgement returns the same event with state
 When cursor recovery exceeds 1000 inbox messages, the inspected bounded window
 is committed so monitoring can continue, but the poll fails explicitly and
 status records `recoveryOverflows` plus `lastRecoveryOverflowAt`. Older
-uninspected messages are not claimed as emitted.
+uninspected messages are not claimed as emitted. A deleted cursor in a shorter
+or empty mailbox does not count as overflow when the provider reports the end
+of the mailbox. Event purge also clears the private deduplication window.
 
 ## Imports
 

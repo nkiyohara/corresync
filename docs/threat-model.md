@@ -43,6 +43,8 @@ gateway or tenant administration service.
   authorization tokens and exposes no write operation.
 - Standards credentials remain behind an OS-keyring entry or an explicitly
   approved helper reference.
+- Account-add approval displays the exact external backend/key handles and
+  rejects cross-account handle reuse before both preview and atomic commit.
 - Discovery cannot access credentials, start consent, or probe administrator
   approval.
 - Never automate around MFA, Conditional Access, consent, or provider policy.

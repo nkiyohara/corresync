@@ -51,9 +51,9 @@ The development branch implements seven explicit provider routes:
 
 Only Outlook Web has a recorded live observation. Google Web, Google API,
 Graph, JMAP, IMAP/SMTP, and CalDAV are implemented and deterministically tested
-on `main`, but remain pre-release compatibility claims until their documented
-opt-in live checks are completed. The latest stable v0.7 release remains
-Outlook-Web-only.
+on this development branch, but remain pre-release compatibility claims until
+their documented opt-in live checks are completed. The latest stable v0.7
+release remains Outlook-Web-only.
 
 Corresync never guesses a privileged route, requests a password, or silently
 falls back to Graph. Discovery is credential-free, selection is explicit, and
@@ -117,7 +117,8 @@ client.
 Account lifecycle is also available through MCP preview/commit tools, but
 addition never authenticates or resolves a credential. A local
 `corr auth login --account ALIAS` remains required before the route can be
-used.
+used. An add review displays each exact credential backend/key handle, and a
+handle already owned by another Corresync account cannot be rebound.
 
 ### Read across accounts
 
@@ -202,8 +203,11 @@ after interactive authentication; quiet hours, debounce, hourly rate limits,
 deduplication, retention, loop prevention, and a circuit breaker are enforced.
 Deferred notifications remain pending while the provider cursor advances
 monotonically, so a busy inbox cannot pin cursor recovery at an old message.
-Recovery beyond the bounded 1000-message window is recorded and returned as an
-explicit degraded result rather than silently claiming complete delivery.
+Existing pending deliveries are drained before each new scan commit. Only
+matching objects occupy the bounded deduplication window; pressure evicts the
+oldest identity not protecting a queued event. Recovery beyond the bounded
+1000-message window is recorded and returned as an explicit degraded result
+rather than silently claiming complete delivery.
 Windows currently rejects `notify` setup because Corresync does not install a
 registered AppUserModelID; `queue` and `agent` remain available.
 

@@ -1,8 +1,8 @@
 # Compatibility evidence
 
 Compatibility is an evidence claim, not an inference from a fixture or a
-provider brand. This page distinguishes deterministic coverage on `main` from
-authorized live observations.
+provider brand. This page distinguishes deterministic coverage on the current
+development branch from authorized live observations.
 
 ## Current branch evidence
 

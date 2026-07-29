@@ -84,7 +84,13 @@ or explicitly configured helper returns a secret on demand to the local session
 owner after a prior human consent step. Discovery, MCP, account addition, and
 capability probing cannot trigger that access; only explicit local CLI login
 may activate the configured route. Credential-reference keys remain private
-write input, are omitted from route/review output, and remain bound by the
+write input and are omitted from ordinary account route views. Account-add
+review is the deliberate exception: it displays each exact service, provider,
+backend, and key that approval will bind. A new account cannot reuse a
+backend/key pair already owned by another Corresync account; the application
+checks ownership before preview and the atomic configuration adapter checks it
+again at commit. Mail and calendar routes within the same account may
+intentionally share one handle. The complete input also remains bound by the
 approval operation digest.
 
 OAuth routes use Authorization Code with PKCE as a local public client and store

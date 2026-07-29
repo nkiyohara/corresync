@@ -80,7 +80,11 @@ credentials remain under their keyring/helper owner.
 MCP exposes the same typed lifecycle through caller-bound add, rename, and
 remove preview/commit pairs. A commit drains and restarts the session owner
 around the atomic config mutation; authentication remains an explicit local CLI
-action and account preview never resolves credentials or starts OAuth.
+action and account preview never resolves credentials or starts OAuth. The MCP
+lifecycle uses a stricter reversible-write preview rule while still honoring a
+configured read-only policy, and records content-free prepare, commit, and
+execution audit phases. Add review displays each exact credential backend/key
+handle, which cannot be rebound from another account.
 
 ## Authentication ownership
 
@@ -202,12 +206,17 @@ circuit breaker.
 Queue/cursor/event state is atomically persisted under the account ID with
 owner-only permissions and symlink rejection. Cursors advance monotonically;
 notification deferrals and failures leave delivery-bound events pending in the
-outbox instead of rewinding first-seen state. A cursor older than the bounded
-1000-item recovery window is re-baselined at the newest inspected window while
-all inspected items still pass through deduplication and delivery. Because
-older uninspected items are not emitted, this is an explicit degraded result:
-the poll returns an overflow error and persists its count and time in monitor
-status. Terminal delivery records expire by completion time, and capacity
+outbox instead of rewinding first-seen state. The engine attempts pending
+delivery before a new scan commit, so saturation cannot put the drain behind
+the failing write. Only matching objects occupy deduplication state; its oldest
+identity not protecting a queued event yields capacity, and purge clears both
+queue and dedup state. A cursor older than the bounded 1000-item recovery window
+is re-baselined at the newest inspected window while all inspected items still
+pass through deduplication and delivery. Because older uninspected items are not
+emitted, this is an explicit degraded result: the poll returns an overflow error
+and persists its count and time in monitor status. Reaching the actual mailbox
+end after a cursor was deleted is a complete re-baseline and does not report
+overflow. Terminal delivery records expire by completion time, and capacity
 pressure evicts the oldest terminal record before refusing new pending data.
 Notification processes are time-bound and receive metadata through native
 argument boundaries. Linux and macOS have local adapters; Windows rejects

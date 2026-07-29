@@ -57,7 +57,7 @@ Scope is not capability. At the time of this decision, the current release
 implemented exactly one provider adapter. A provider may be described as
 live-compatible only after synthetic fixture contract tests and a documented
 opt-in live observation; documentation must distinguish that claim from an
-adapter implemented and deterministically tested on `main`.
+adapter implemented and deterministically tested only on a development commit.
 
 ## Consequences
 

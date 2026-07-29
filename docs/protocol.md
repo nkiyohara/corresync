@@ -140,11 +140,14 @@ TLS downgrade are rejected.
 The adapter advertises only behavior supported by server capabilities. MIME is
 parsed and constructed behind bounded typed operations; callers cannot submit
 raw commands or arbitrary headers. Server literal declarations are bounded
-before parser allocation from the first greeting onward. STARTTLS is negotiated
-with a bounded pre-TLS control exchange, then the complete decrypted IMAP
-stream is checked. Reply message IDs and References are normalized as bounded
-angle-bracket identifiers before header construction. SMTP acceptance without
-a returned message identity is represented explicitly.
+before client allocation from the first greeting onward. A forward-only capture
+feeds each response exactly once to the pinned client parser, separately bounds
+parser-recognized literal payload and control bytes, and stops excessive parser
+CPU work internally. STARTTLS is negotiated with a bounded pre-TLS control
+exchange, then the complete decrypted IMAP stream is checked. Reply message IDs
+and References are normalized as bounded angle-bracket identifiers before
+header construction. SMTP acceptance without a returned message identity is
+represented explicitly.
 
 ## CalDAV
 

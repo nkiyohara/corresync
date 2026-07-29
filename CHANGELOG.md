@@ -54,17 +54,22 @@ All notable user-facing changes are recorded here. The project follows
   ambiguity, and require explicit local CLI login after an MCP account addition.
 - Restrict JMAP API/upload/download URLs to the configured session origin,
   require absolute credential-helper executables, drop malformed inherited IMAP
-  reply headers, reject LF-only IMAP control lines, and use the pinned IMAP
-  parser itself to classify and bound literals both individually and per
-  operation across implicit TLS and STARTTLS.
+  reply headers, reject LF-only IMAP control lines, and give each response to
+  the pinned IMAP parser once through a forward-only, CPU-bounded capture that
+  bounds literals individually and per operation across implicit TLS and
+  STARTTLS.
+- Route MCP account add/rename/remove through effect policy and content-free
+  prepare/commit/execution audit; show exact credential handles in add review
+  and reject cross-account handle reuse before preview and atomic persistence.
 - Keep attacker-controlled notification metadata behind native argument
   boundaries, escape Linux notification markup, reject NUL metadata, time-bound
   notification utilities, persist notification events in a delivery-bound
   outbox, advance provider cursors monotonically across deferrals and failures,
-  expire terminal events without evicting pending data, report bounded cursor
-  recovery overflow explicitly, preserve ACKs that race delivery completion,
-  and reject Windows `notify` setup until Corresync has a registered
-  AppUserModelID.
+  drain pending deliveries before new scan commits, expire terminal events
+  without evicting pending data, bound matched-only deduplication with safe
+  oldest-first eviction, distinguish mailbox-end rebaseline from true bounded
+  recovery overflow, preserve ACKs that race delivery completion, and reject
+  Windows `notify` setup until Corresync has a registered AppUserModelID.
 - Add `corr feedback`, an allowlisted deterministic report with an optional
   bounded generalized last-error record. Generation is local; copy/save/open
   actions occur only after full display, and GitHub is never submitted

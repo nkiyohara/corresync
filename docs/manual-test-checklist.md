@@ -306,8 +306,12 @@ Pass criteria:
 - the MCP process receives no provider/session credential;
 - tool results preserve provenance/degradations;
 - content is treated as untrusted data;
-- account add/rename/remove require the matching short-lived MCP preview token,
-  and a commit restarts the session owner without starting authentication;
+- account add/rename/remove honor read-only policy, require the matching
+  short-lived MCP preview token, and record prepare/commit/execution audit
+  phases;
+- account-add review displays each exact credential backend/key handle, rejects
+  cross-account reuse, and commit restarts the session owner without starting
+  authentication;
 - account removal review discloses any unshared Corresync-owned OAuth grant
   deletion and retains external standards credentials;
 - MCP cannot authenticate, configure monitoring/egress, scan imports, purge

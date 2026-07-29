@@ -137,6 +137,13 @@ key = "work-calendar"
 consent = true
 ```
 
+An account-add review shows the exact backend/key handles before approval.
+Corresync rejects a new account that attempts to reuse a handle already owned
+by another configured account; mail and calendar routes belonging to the same
+account may intentionally share one handle. Existing external credential
+records remain owned by their keyring or helper and are never copied into this
+file.
+
 The executable is invoked directly without a shell. It receives one bounded
 JSON line on stdin:
 

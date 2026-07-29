@@ -91,10 +91,13 @@ selection, and no MCP tool can read a secret, resolve a reference, trigger a
 credential prompt, or authenticate. An MCP account-add preview may persist a
 reviewed private handle reference, but its result explicitly requires a later
 `corr auth login` invocation from the local CLI before the reference can be
-used. The approval digest binds the complete input while read/review views omit
-the private lookup key. This is the single narrow exception to "no secrets in
-core": the secret belongs to an external facility that the human already
-trusts, and this project holds a reference to it rather than a copy of it.
+used. The approval digest binds the complete input. Ordinary account reads omit
+the private lookup key; the account-add approval review deliberately displays
+the exact backend/key handle and rejects cross-account reuse so the human can
+see where later login will resolve a secret. This is the single narrow
+exception to "no secrets in core": the secret belongs to an external facility
+that the human already trusts, and this project holds a reference to it rather
+than a copy of it.
 
 ## Consequences
 

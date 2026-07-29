@@ -1,8 +1,9 @@
 # Corresync documentation
 
 Corresync is the product and package name; `corr` is the primary command. These
-guides describe the provider-neutral, multi-account implementation on `main`.
-The release notes for an installed version remain authoritative when its
+guides describe the provider-neutral, multi-account implementation on the
+current development branch. The release notes for an installed version remain
+authoritative when its
 behavior differs.
 
 ## Use Corresync

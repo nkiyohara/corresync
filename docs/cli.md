@@ -355,6 +355,11 @@ corr monitor disable --purge-queue --approve
 corr events purge --account work --approve
 ```
 
+Purge clears both queued events and their private deduplication window. The
+monitor also attempts pending notification/runner delivery before committing a
+new scan, so a saturated pending queue can recover when its configured sink and
+rate policy permit.
+
 ## Privacy-preserving feedback
 
 ```console

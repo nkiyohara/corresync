@@ -129,11 +129,14 @@ stops and restarts the session owner around the atomic config change so no
 authenticated route can retain stale configuration. Addition never
 authenticates or resolves a credential, and its review says
 `explicit_cli_required`; `corr auth login --account ALIAS` remains a separate
-local human action. Private credential-reference keys are omitted from read and
-review views, while the caller-bound operation digest still commits to the
-complete input. Removal previews its Corresync-owned state purge and never
-deletes an external standards credential. Its review discloses deletion of an
-unshared Corresync-owned OAuth grant; shared grants are retained.
+local human action. Account read views omit private credential-reference keys;
+the add review deliberately discloses the exact backend/key handles being bound
+and rejects a handle already owned by another account. The caller-bound
+operation digest commits to the complete input. All three lifecycle operations
+pass through the configured effect policy and content-free prepare, commit, and
+execution audit phases. Removal previews its Corresync-owned state purge and
+never deletes an external standards credential. Its review discloses deletion
+of an unshared Corresync-owned OAuth grant; legacy shared grants are retained.
 
 Authentication, monitor enable/reconfigure, runner/egress consent, queue purge,
 local import reads, updates, and feedback external actions remain CLI-only.

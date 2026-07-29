@@ -6,7 +6,7 @@ not available through a raw protocol escape hatch.
 ## Provider routes
 
 <!-- markdownlint-disable MD013 -->
-| Provider ID | Mail | Calendar | Authentication | Evidence on `main` |
+| Provider ID | Mail | Calendar | Authentication | Evidence on this branch |
 | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Mail | Calendar | Visible browser-owned Outlook Web session | Implemented; synthetic contracts on current branch, historical live notes are not commit-bound |
 | `google-web` | Bounded read-only Gmail snapshot | Bounded read-only Calendar snapshot | Visible browser-owned Google session | Implemented; synthetic DOM and integration contracts only |
@@ -21,10 +21,11 @@ Mail and calendar are selected independently. For example, one account may use
 IMAP/SMTP for mail and CalDAV for calendar. `pop3` is reserved without a route
 builder and cannot be selected.
 
-“Implemented” means the route and synthetic contracts exist on `main`; it is
-not a universal compatibility claim. The latest stable v0.7 release remains
-Outlook-Web-only. See [compatibility evidence](compatibility.md) before using a
-development build with a live account.
+“Implemented” means the route and synthetic contracts exist on this development
+branch; it is not a universal compatibility claim. The latest stable v0.7
+release remains Outlook-Web-only. See
+[compatibility evidence](compatibility.md) before using a development build
+with a live account.
 
 Discovery uses DNS and well-known metadata without credentials. It returns
 ranked evidence, confidence, required authentication, and availability; it
@@ -151,16 +152,21 @@ cursor/event updates, acknowledgement, retention, quiet hours, debounce,
 hourly limits, batching, and a circuit breaker. The provider cursor advances
 monotonically with an atomic outbox commit. Notify-mode events remain pending
 in that outbox through quiet hours, debounce, rate limiting, cancellation, or
-adapter failure and are drained on later polls; the cursor is never rewound.
+adapter failure and are drained before new scan commits and again after a
+successful commit; the cursor is never rewound.
 Each event records whether it belongs to manual queueing, desktop notification,
 or runner delivery so a later policy change cannot redirect old pending data.
 Terminal deliveries expire by completion time under retention; if the 10,000
 event bound is reached, the oldest terminal record yields capacity while
-pending data is never evicted. If more than 1000 messages separate the saved
-cursor from the inbox head, the inspected window is committed for continued
-operation, but status increments `recoveryOverflows`, records the time, and the
-poll returns an explicit overflow error because older uninspected messages were
-not emitted.
+pending data is never evicted. Only matching messages occupy the bounded
+deduplication window; the oldest identity not protecting a queued event yields
+capacity, and an explicit purge clears both queue and dedup state. If more than
+1000 messages separate the saved cursor from the inbox head, the inspected
+window is committed for continued operation, but status increments
+`recoveryOverflows`, records the time, and the poll returns an explicit
+overflow error because older uninspected messages were not emitted. A missing
+cursor in a completely inspected shorter or empty mailbox is a normal
+re-baseline, not an overflow.
 Runner and notification completion preserve an acknowledgement that races with
 delivery without redelivering the event. Desktop notification adapters are
 local and time-bound: Linux uses `notify-send`, macOS uses `osascript`, and
