@@ -646,6 +646,72 @@ func TestGraphDraftAttachmentFailureReportsPartialOutcome(t *testing.T) {
 	}
 }
 
+func TestGraphDraftSendFailureReportsPartialOutcome(t *testing.T) {
+	t.Parallel()
+
+	var draftCalls int
+	var sendCalls int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.Method + " " + request.URL.Path {
+		case "GET /me":
+			writeGraphJSON(t, writer, map[string]string{
+				"id": "user1", "mail": "reader@example.test",
+			})
+		case "GET /me/mailFolders/inbox":
+			writeGraphJSON(t, writer, map[string]string{"id": "inbox1"})
+		case "GET /me/messages/m1":
+			writeGraphJSON(t, writer, graphTestMessage(false, `W/"m1"`))
+		case "POST /me/messages/m1/createReply":
+			draftCalls++
+			message := graphTestMessage(false, `W/"draft1"`)
+			message.ID = "draft1"
+			writeGraphJSONStatus(t, writer, message, http.StatusCreated)
+		case "POST /me/messages/draft1/send":
+			sendCalls++
+			http.Error(
+				writer,
+				`{"error":{"code":"SyntheticRejection"}}`,
+				http.StatusBadRequest,
+			)
+		default:
+			http.Error(writer, "unexpected synthetic Graph request", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := New(t.Context(), Options{
+		APIBase: server.URL, Address: "reader@example.test",
+		Mail: true, HTTP: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	messageID, err := encodeMessageID("m1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.SendMail(t.Context(), application.MailSendInput{
+		ComposeMode:        application.MailComposeReply,
+		ReferenceMessageID: messageID,
+		ReferenceChangeKey: encodeETag(`W/"m1"`),
+		Body:               "synthetic reply",
+	})
+	if !errors.Is(err, application.ErrWriteOutcomeUnknown) ||
+		draftCalls != 1 || sendCalls != 1 {
+		t.Fatalf(
+			"SendMail() error = %v, draft calls = %d, send calls = %d",
+			err,
+			draftCalls,
+			sendCalls,
+		)
+	}
+}
+
 func TestGraphRejectsDelegatedIdentityMismatch(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(

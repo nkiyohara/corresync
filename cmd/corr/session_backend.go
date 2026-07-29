@@ -2187,6 +2187,10 @@ func (backend *sessionBackend) googleAPIAccount(
 				Reason:  "Gmail exposes no atomic historyId precondition for moves",
 			},
 			domain.Degradation{
+				Feature: "mail.delete",
+				Reason:  "Gmail exposes no atomic historyId precondition for permanent deletion; Corresync revalidates immediately before the action",
+			},
+			domain.Degradation{
 				Feature: "mail.push_history",
 				Reason:  "the Google API route does not register push watches or expose history cursors",
 			},

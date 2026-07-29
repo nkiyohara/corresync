@@ -367,6 +367,7 @@ func (client *Client) MoveMail(
 		if resolveErr != nil {
 			return application.MailMoveResult{}, resolveErr
 		}
+		untrashed := false
 		if slices.Contains(message.LabelIDs, "TRASH") {
 			if _, err = client.api.DoJSON(
 				ctx, http.MethodPost, resource+"/untrash", nil,
@@ -374,6 +375,7 @@ func (client *Client) MoveMail(
 			); err != nil {
 				return application.MailMoveResult{}, err
 			}
+			untrashed = true
 			if err := validateModifiedGmailMessage(reference.ID, message); err != nil {
 				return application.MailMoveResult{}, err
 			}
@@ -384,6 +386,13 @@ func (client *Client) MoveMail(
 			updated, err = client.modifyMessage(ctx, reference.ID, map[string]any{
 				"addLabelIds": add, "removeLabelIds": remove,
 			})
+			if err != nil && untrashed {
+				return application.MailMoveResult{}, fmt.Errorf(
+					"%w: Gmail removed the message from Trash but did not confirm the destination label update: %w",
+					application.ErrWriteOutcomeUnknown,
+					err,
+				)
+			}
 		}
 	}
 	if err != nil {

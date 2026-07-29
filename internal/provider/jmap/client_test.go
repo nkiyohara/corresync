@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,6 +25,7 @@ type syntheticJMAP struct {
 	created             [][]emailAddress
 	submit              bool
 	readOnly            bool
+	submissionFailure   bool
 	brokenWriteResponse bool
 	writeStatus         int
 }
@@ -99,6 +101,7 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 	fixture.requests = append(fixture.requests, method)
 	state := fixture.state
 	brokenWriteResponse := fixture.brokenWriteResponse
+	submissionFailure := fixture.submissionFailure
 	writeStatus := fixture.writeStatus
 	fixture.mu.Unlock()
 	var result any
@@ -199,14 +202,27 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 			"notFound": []string{},
 		}
 	case "EmailSubmission/set":
-		result = map[string]any{
-			"accountId": "account-1", "oldState": "submissions-1",
-			"newState": "submissions-2",
-			"created": map[string]any{
-				"send": map[string]any{
-					"id": "submission-1", "emailId": "draft-1",
+		if submissionFailure {
+			result = map[string]any{
+				"accountId": "account-1", "oldState": "submissions-1",
+				"newState": "submissions-1",
+				"notCreated": map[string]any{
+					"send": map[string]any{
+						"type":        "invalidProperties",
+						"description": "synthetic submission rejection",
+					},
 				},
-			},
+			}
+		} else {
+			result = map[string]any{
+				"accountId": "account-1", "oldState": "submissions-1",
+				"newState": "submissions-2",
+				"created": map[string]any{
+					"send": map[string]any{
+						"id": "submission-1", "emailId": "draft-1",
+					},
+				},
+			}
 		}
 	default:
 		fixture.t.Errorf("unexpected method %q", method)
@@ -533,6 +549,43 @@ func TestJMAPDistinguishesAmbiguousAndDefiniteWriteStatuses(t *testing.T) {
 				t.Fatalf("CreateMailDraft() error = %v", err)
 			}
 		})
+	}
+}
+
+func TestJMAPSubmissionFailureReportsRetainedDraft(t *testing.T) {
+	t.Parallel()
+	fixture := newSyntheticJMAP(t)
+	fixture.mu.Lock()
+	fixture.submissionFailure = true
+	fixture.mu.Unlock()
+	client, err := New(t.Context(), Options{
+		SessionURL: fixture.server.URL + "/session",
+		Username:   "reader@example.invalid",
+		Password:   []byte("synthetic-secret"),
+		Client:     fixture.server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+
+	_, err = client.SendMail(t.Context(), application.MailSendInput{
+		To:      []string{"recipient@example.invalid"},
+		Subject: "Synthetic retained draft",
+		Body:    "body",
+	})
+	fixture.mu.Lock()
+	requests := append([]string(nil), fixture.requests...)
+	fixture.mu.Unlock()
+	if !errors.Is(err, application.ErrWriteOutcomeUnknown) ||
+		!slices.Equal(
+			requests,
+			[]string{
+				"Identity/get", "Mailbox/get", "Email/set",
+				"EmailSubmission/set",
+			},
+		) {
+		t.Fatalf("SendMail() error = %v, requests = %#v", err, requests)
 	}
 }
 

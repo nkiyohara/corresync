@@ -148,7 +148,7 @@ func (client *Client) SendMail(
 			nil,
 			http.StatusAccepted,
 		); err != nil {
-			return application.MailSendResult{}, err
+			return application.MailSendResult{}, graphDraftSubmissionError(err)
 		}
 		return application.MailSendResult{}, nil
 	}
@@ -168,7 +168,7 @@ func (client *Client) SendMail(
 			nil,
 			http.StatusAccepted,
 		); err != nil {
-			return application.MailSendResult{}, err
+			return application.MailSendResult{}, graphDraftSubmissionError(err)
 		}
 		return application.MailSendResult{}, nil
 	}
@@ -187,6 +187,14 @@ func (client *Client) SendMail(
 		return application.MailSendResult{}, err
 	}
 	return application.MailSendResult{}, nil
+}
+
+func graphDraftSubmissionError(err error) error {
+	return fmt.Errorf(
+		"%w: graph retained the reviewed draft but submission was not confirmed: %w",
+		application.ErrWriteOutcomeUnknown,
+		err,
+	)
 }
 
 func graphComposition(input application.MailDraftInput) map[string]any {

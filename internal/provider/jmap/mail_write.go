@@ -67,11 +67,11 @@ func (client *Client) SendMail(
 		ReferenceChangeKey: input.ReferenceChangeKey,
 		Attachments:        append([]application.MailFileAttachment(nil), input.Attachments...),
 	}
-	draft, err := client.createDraft(ctx, draftInput)
+	identityID, err := client.defaultIdentity(ctx)
 	if err != nil {
 		return application.MailSendResult{}, err
 	}
-	identityID, err := client.defaultIdentity(ctx)
+	draft, err := client.createDraft(ctx, draftInput)
 	if err != nil {
 		return application.MailSendResult{}, err
 	}
@@ -101,15 +101,14 @@ func (client *Client) SendMail(
 		&response,
 	)
 	if err != nil {
-		return application.MailSendResult{}, fmt.Errorf(
-			"submit JMAP email: %w",
-			err,
-		)
+		return application.MailSendResult{}, jmapDraftSubmissionError(err)
 	}
 	if failure, exists := response.NotCreated["send"]; exists {
-		return application.MailSendResult{}, fmt.Errorf(
-			"JMAP submission failed: %s",
-			sanitizeProviderError(methodError(failure)),
+		return application.MailSendResult{}, jmapDraftSubmissionError(
+			fmt.Errorf(
+				"JMAP submission failed: %s",
+				sanitizeProviderError(methodError(failure)),
+			),
 		)
 	}
 	created, exists := response.Created["send"]
@@ -120,6 +119,14 @@ func (client *Client) SendMail(
 		)
 	}
 	return application.MailSendResult{ID: draft.ID, ChangeKey: draft.ChangeKey}, nil
+}
+
+func jmapDraftSubmissionError(err error) error {
+	return fmt.Errorf(
+		"%w: JMAP retained the reviewed draft but submission was not confirmed: %w",
+		application.ErrWriteOutcomeUnknown,
+		err,
+	)
 }
 
 func (client *Client) MoveMail(

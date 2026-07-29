@@ -597,6 +597,73 @@ func TestGoogleAPIRejectsReadOnlyPrimaryCalendarForWriteRoute(t *testing.T) {
 	}
 }
 
+func TestGmailMoveFromTrashReportsPartialOutcome(t *testing.T) {
+	t.Parallel()
+
+	var untrashCalls int
+	var modifyCalls int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.Method + " " + request.URL.Path {
+		case "GET /gmail/v1/users/me/profile":
+			writeGoogleJSON(t, writer, map[string]string{
+				"emailAddress": "reader@example.test",
+			})
+		case "GET /gmail/v1/users/me/messages/m1":
+			message := googleTestMessage(false)
+			message.LabelIDs = []string{"TRASH"}
+			writeGoogleJSON(t, writer, message)
+		case "POST /gmail/v1/users/me/messages/m1/untrash":
+			untrashCalls++
+			message := googleTestMessage(false)
+			message.HistoryID = "102"
+			message.LabelIDs = nil
+			writeGoogleJSON(t, writer, message)
+		case "POST /gmail/v1/users/me/messages/m1/modify":
+			modifyCalls++
+			http.Error(
+				writer,
+				`{"error":{"code":400,"message":"synthetic rejection"}}`,
+				http.StatusBadRequest,
+			)
+		default:
+			http.Error(writer, "unexpected synthetic Gmail request", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client, err := New(t.Context(), Options{
+		APIBase: server.URL, Address: "reader@example.test",
+		Mail: true, HTTP: server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	messageID, err := encodeMessageID("m1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.MoveMail(t.Context(), application.MailMoveInput{
+		MessageID: messageID, ChangeKey: encodeHistoryID("101"),
+		Destination: application.MailFolder{
+			Kind: application.MailFolderDistinguished, ID: "inbox",
+		},
+	})
+	if !errors.Is(err, application.ErrWriteOutcomeUnknown) ||
+		untrashCalls != 1 || modifyCalls != 1 {
+		t.Fatalf(
+			"MoveMail() error = %v, untrash calls = %d, modify calls = %d",
+			err,
+			untrashCalls,
+			modifyCalls,
+		)
+	}
+}
+
 func TestGmailPaginationTraversesBeyondTheFirstFiveHundredMessages(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(
