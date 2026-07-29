@@ -32,3 +32,19 @@ configuration, and GitHub Actions security. Build the local binary with
 Go 1.26 is the minimum supported compiler and the checked-in toolchain follows
 the latest Go 1.26 patch release. This matches the current Chromium/CDP stack
 instead of silently downloading a newer compiler behind an older CI matrix.
+
+## GitHub metadata
+
+Human-authored issues and pull requests use exactly one category label:
+`bug`, `enhancement`, `documentation`, `security`, `testing`, `release`,
+`roadmap`, or `compatibility`. Add only the `area:` labels needed to identify
+the affected product surface. Automation labels such as `dependencies`, `go`,
+and `github_actions` are reserved for dependency-update pull requests.
+
+Release work belongs to the milestone whose acceptance criteria it delivers.
+Standalone maintenance and dependency updates may omit a milestone. Milestones
+do not carry due dates: a release is ready when its tracked scope, verification,
+documentation, and security review are complete.
+
+Pull requests close or reference their tracking issue. A standalone maintenance
+pull request explains why no issue or release milestone is needed.
