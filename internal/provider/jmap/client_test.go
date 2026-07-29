@@ -3,6 +3,7 @@ package jmap
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,15 +15,17 @@ import (
 )
 
 type syntheticJMAP struct {
-	t        *testing.T
-	server   *httptest.Server
-	mu       sync.Mutex
-	state    string
-	ifState  string
-	requests []string
-	created  [][]emailAddress
-	submit   bool
-	readOnly bool
+	t                   *testing.T
+	server              *httptest.Server
+	mu                  sync.Mutex
+	state               string
+	ifState             string
+	requests            []string
+	created             [][]emailAddress
+	submit              bool
+	readOnly            bool
+	brokenWriteResponse bool
+	writeStatus         int
 }
 
 func newSyntheticJMAP(t *testing.T) *syntheticJMAP {
@@ -95,6 +98,8 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 	fixture.mu.Lock()
 	fixture.requests = append(fixture.requests, method)
 	state := fixture.state
+	brokenWriteResponse := fixture.brokenWriteResponse
+	writeStatus := fixture.writeStatus
 	fixture.mu.Unlock()
 	var result any
 	switch method {
@@ -206,6 +211,14 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 	default:
 		fixture.t.Errorf("unexpected method %q", method)
 		writer.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if brokenWriteResponse && method == "Email/set" {
+		_, _ = writer.Write([]byte(`{`))
+		return
+	}
+	if writeStatus != 0 && method == "Email/set" {
+		writer.WriteHeader(writeStatus)
 		return
 	}
 	fixture.writeJSON(writer, map[string]any{
@@ -430,6 +443,86 @@ func TestJMAPReplyTargetRejectsMalformedProviderAddress(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Email != "sender@example.invalid" {
 		t.Fatalf("fallback reply target = %#v", got)
+	}
+}
+
+func TestJMAPMarksUnverifiableSuccessfulWriteAsAmbiguous(t *testing.T) {
+	t.Parallel()
+	fixture := newSyntheticJMAP(t)
+	fixture.mu.Lock()
+	fixture.brokenWriteResponse = true
+	fixture.mu.Unlock()
+	client, err := New(t.Context(), Options{
+		SessionURL: fixture.server.URL + "/session",
+		Username:   "reader@example.invalid",
+		Password:   []byte("synthetic-secret"),
+		Client:     fixture.server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+
+	_, err = client.CreateMailDraft(
+		t.Context(),
+		application.MailDraftInput{
+			To:      []string{"recipient@example.invalid"},
+			Subject: "Unverifiable draft",
+		},
+	)
+	if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+		t.Fatalf("CreateMailDraft() error = %v", err)
+	}
+}
+
+func TestJMAPDistinguishesAmbiguousAndDefiniteWriteStatuses(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		status      int
+		wantUnknown bool
+	}{
+		{
+			name:        "server failure",
+			status:      http.StatusServiceUnavailable,
+			wantUnknown: true,
+		},
+		{
+			name:   "explicit rejection",
+			status: http.StatusBadRequest,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			fixture := newSyntheticJMAP(t)
+			fixture.mu.Lock()
+			fixture.writeStatus = test.status
+			fixture.mu.Unlock()
+			client, err := New(t.Context(), Options{
+				SessionURL: fixture.server.URL + "/session",
+				Username:   "reader@example.invalid",
+				Password:   []byte("synthetic-secret"),
+				Client:     fixture.server.Client(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = client.Close() })
+
+			_, err = client.CreateMailDraft(
+				t.Context(),
+				application.MailDraftInput{
+					To:      []string{"recipient@example.invalid"},
+					Subject: "Status classification",
+				},
+			)
+			if err == nil ||
+				errors.Is(err, application.ErrWriteOutcomeUnknown) !=
+					test.wantUnknown {
+				t.Fatalf("CreateMailDraft() error = %v", err)
+			}
+		})
 	}
 }
 

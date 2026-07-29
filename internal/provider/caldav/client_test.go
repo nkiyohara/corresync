@@ -313,6 +313,83 @@ func TestCalDAVOriginalTimePreservesFloatingAndZoneSemantics(t *testing.T) {
 	}
 }
 
+func TestCalDAVDistinguishesAmbiguousAndDefiniteWriteStatuses(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		status      int
+		wantUnknown bool
+		oversized   bool
+	}{
+		{
+			name:        "server failure",
+			status:      http.StatusServiceUnavailable,
+			wantUnknown: true,
+		},
+		{
+			name:   "explicit rejection",
+			status: http.StatusBadRequest,
+		},
+		{
+			name:        "oversized success response",
+			status:      http.StatusOK,
+			wantUnknown: true,
+			oversized:   true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			server := httptest.NewTLSServer(http.HandlerFunc(func(
+				writer http.ResponseWriter,
+				_ *http.Request,
+			) {
+				writer.WriteHeader(test.status)
+				if test.oversized {
+					if flusher, ok := writer.(http.Flusher); ok {
+						flusher.Flush()
+					}
+					_, _ = io.WriteString(
+						writer,
+						strings.Repeat(
+							"x",
+							maximumCalDAVResponseBytes+1,
+						),
+					)
+				}
+			}))
+			t.Cleanup(server.Close)
+			endpoint, err := validateHTTPSURL("fixture", server.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			client := &Client{
+				endpoint: endpoint,
+				calendars: []webcaldav.Calendar{{
+					Path: fixtureCalendarPath,
+				}},
+				username: "reader@example.invalid",
+				password: []byte("synthetic-secret"),
+				http:     server.Client(),
+			}
+			_, err = client.conditionalRequest(
+				t.Context(),
+				http.MethodPut,
+				fixtureCalendarPath,
+				fixtureObjectPath,
+				"If-Match",
+				`"v1"`,
+				nil,
+			)
+			if err == nil ||
+				errors.Is(err, application.ErrWriteOutcomeUnknown) !=
+					test.wantUnknown {
+				t.Fatalf("conditionalRequest() error = %v", err)
+			}
+		})
+	}
+}
+
 func newFixtureServer(
 	t *testing.T,
 ) (*httptest.Server, *fixtureBackend, *http.Client) {

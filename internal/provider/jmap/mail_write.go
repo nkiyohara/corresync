@@ -82,7 +82,7 @@ func (client *Client) SendMail(
 		Created    map[string]submission `json:"created"`
 		NotCreated map[string]setError   `json:"notCreated"`
 	}
-	err = client.call(
+	err = client.callWrite(
 		ctx,
 		[]string{mailCapability, submissionCapability},
 		"EmailSubmission/set",
@@ -102,8 +102,7 @@ func (client *Client) SendMail(
 	)
 	if err != nil {
 		return application.MailSendResult{}, fmt.Errorf(
-			"%w: submit JMAP email: %w",
-			application.ErrWriteOutcomeUnknown,
+			"submit JMAP email: %w",
 			err,
 		)
 	}
@@ -189,7 +188,7 @@ func (client *Client) DeleteMail(
 		return err
 	}
 	var response setResponse
-	if err := client.call(ctx, []string{mailCapability}, "Email/set", map[string]any{
+	if err := client.callWrite(ctx, []string{mailCapability}, "Email/set", map[string]any{
 		"accountId": client.accountID,
 		"ifInState": input.ChangeKey,
 		"destroy":   []string{input.MessageID},
@@ -200,7 +199,10 @@ func (client *Client) DeleteMail(
 		return fmt.Errorf("JMAP delete failed: %s", sanitizeProviderError(methodError(failure)))
 	}
 	if len(response.Destroyed) != 1 || response.Destroyed[0] != input.MessageID {
-		return errors.New("JMAP did not confirm email deletion")
+		return fmt.Errorf(
+			"%w: JMAP did not confirm email deletion",
+			application.ErrWriteOutcomeUnknown,
+		)
 	}
 	return nil
 }
@@ -277,7 +279,7 @@ func (client *Client) createDraft(
 		}
 	}
 	var response setResponse
-	if err := client.call(ctx, []string{mailCapability}, "Email/set", map[string]any{
+	if err := client.callWrite(ctx, []string{mailCapability}, "Email/set", map[string]any{
 		"accountId": client.accountID,
 		"create":    map[string]any{"draft": create},
 	}, &response); err != nil {
@@ -291,7 +293,10 @@ func (client *Client) createDraft(
 	}
 	created, exists := response.Created["draft"]
 	if !exists || created.ID == "" || response.NewState == "" {
-		return application.MailDraft{}, errors.New("JMAP did not confirm draft creation")
+		return application.MailDraft{}, fmt.Errorf(
+			"%w: JMAP did not confirm draft creation",
+			application.ErrWriteOutcomeUnknown,
+		)
 	}
 	return application.MailDraft{
 		ID: created.ID, ChangeKey: response.NewState,
@@ -435,7 +440,7 @@ func (client *Client) updateEmail(
 	patch map[string]any,
 ) (string, error) {
 	var response setResponse
-	if err := client.call(ctx, []string{mailCapability}, "Email/set", map[string]any{
+	if err := client.callWrite(ctx, []string{mailCapability}, "Email/set", map[string]any{
 		"accountId": client.accountID,
 		"ifInState": state,
 		"update":    map[string]any{id: patch},
@@ -446,7 +451,10 @@ func (client *Client) updateEmail(
 		return "", fmt.Errorf("JMAP update failed: %s", sanitizeProviderError(methodError(failure)))
 	}
 	if _, exists := response.Updated[id]; !exists || response.NewState == "" {
-		return "", errors.New("JMAP did not confirm email update")
+		return "", fmt.Errorf(
+			"%w: JMAP did not confirm email update",
+			application.ErrWriteOutcomeUnknown,
+		)
 	}
 	return response.NewState, nil
 }

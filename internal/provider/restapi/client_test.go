@@ -100,6 +100,106 @@ func TestClientMarksAmbiguousWriteTransportFailure(t *testing.T) {
 	}
 }
 
+func TestClientMarksUnverifiableSuccessfulWriteResponseAsAmbiguous(
+	t *testing.T,
+) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		body   string
+		status int
+		json   bool
+	}{
+		{
+			name: "malformed JSON", body: `{`,
+			status: http.StatusOK, json: true,
+		},
+		{
+			name:   "oversized response",
+			body:   strings.Repeat("x", maximumResponseBytes+1),
+			status: http.StatusOK,
+		},
+		{name: "unexpected success", status: http.StatusAccepted},
+		{name: "server failure", status: http.StatusServiceUnavailable},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			client, err := New(Options{
+				BaseURL: "https://api.example.invalid/v1",
+				HTTP: &http.Client{Transport: roundTripperFunc(func(
+					*http.Request,
+				) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: test.status,
+						Header:     make(http.Header),
+						Body:       io.NopCloser(strings.NewReader(test.body)),
+					}, nil
+				})},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var response struct {
+				ID string `json:"id"`
+			}
+			var target any
+			if test.json {
+				target = &response
+			}
+			_, err = client.DoJSON(
+				t.Context(),
+				http.MethodPost,
+				"messages",
+				nil,
+				map[string]string{"subject": "synthetic"},
+				target,
+				true,
+				nil,
+				http.StatusOK,
+			)
+			if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+				t.Fatalf("write response error = %v", err)
+			}
+		})
+	}
+}
+
+func TestClientKeepsExplicitWriteRejectionDefinite(t *testing.T) {
+	t.Parallel()
+	client, err := New(Options{
+		BaseURL: "https://api.example.invalid/v1",
+		HTTP: &http.Client{Transport: roundTripperFunc(func(
+			*http.Request,
+		) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusBadRequest,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(
+					`{"error":{"code":"invalid_request"}}`,
+				)),
+			}, nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.DoJSON(
+		t.Context(),
+		http.MethodPost,
+		"messages",
+		nil,
+		map[string]string{"subject": "synthetic"},
+		nil,
+		true,
+		nil,
+		http.StatusOK,
+	)
+	if err == nil || errors.Is(err, application.ErrWriteOutcomeUnknown) {
+		t.Fatalf("explicit write rejection error = %v", err)
+	}
+}
+
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (function roundTripperFunc) RoundTrip(

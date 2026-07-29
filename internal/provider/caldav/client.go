@@ -500,13 +500,32 @@ func (client *Client) conditionalRequestWithHeaders(
 			application.ErrWriteOutcomeUnknown, err)
 	}
 	defer func() { _ = response.Body.Close() }()
-	_, _ = io.Copy(io.Discard, response.Body)
+	if _, err := io.Copy(io.Discard, response.Body); err != nil {
+		return "", fmt.Errorf(
+			"%w: read conditional CalDAV write response: %w",
+			application.ErrWriteOutcomeUnknown,
+			err,
+		)
+	}
 	switch response.StatusCode {
 	case http.StatusCreated, http.StatusNoContent, http.StatusOK:
 	case http.StatusPreconditionFailed:
 		return "", errors.New("CalDAV write precondition failed")
 	default:
-		return "", fmt.Errorf("CalDAV write returned HTTP %d", response.StatusCode)
+		statusErr := fmt.Errorf(
+			"CalDAV write returned HTTP %d",
+			response.StatusCode,
+		)
+		if response.StatusCode >= http.StatusInternalServerError ||
+			response.StatusCode >= http.StatusOK &&
+				response.StatusCode < http.StatusMultipleChoices {
+			return "", fmt.Errorf(
+				"%w: %w",
+				application.ErrWriteOutcomeUnknown,
+				statusErr,
+			)
+		}
+		return "", statusErr
 	}
 	return strongETag(response.Header.Get("ETag")), nil
 }

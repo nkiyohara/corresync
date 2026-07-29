@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nkiyohara/corresync/internal/application"
 )
 
 const (
@@ -235,6 +237,41 @@ func (client *Client) call(
 	arguments any,
 	result any,
 ) error {
+	return client.callWithEffect(
+		ctx,
+		capabilities,
+		method,
+		arguments,
+		result,
+		false,
+	)
+}
+
+func (client *Client) callWrite(
+	ctx context.Context,
+	capabilities []string,
+	method string,
+	arguments any,
+	result any,
+) error {
+	return client.callWithEffect(
+		ctx,
+		capabilities,
+		method,
+		arguments,
+		result,
+		true,
+	)
+}
+
+func (client *Client) callWithEffect(
+	ctx context.Context,
+	capabilities []string,
+	method string,
+	arguments any,
+	result any,
+	write bool,
+) error {
 	document := requestDocument{
 		Using: append([]string{coreCapability}, capabilities...),
 		MethodCalls: []methodCall{
@@ -259,27 +296,61 @@ func (client *Client) call(
 	client.authorize(request)
 	response, err := client.http.Do(request)
 	if err != nil {
+		if write {
+			return fmt.Errorf(
+				"%w: call JMAP %s: %w",
+				application.ErrWriteOutcomeUnknown,
+				method,
+				err,
+			)
+		}
 		return fmt.Errorf("call JMAP %s: %w", method, err)
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
-		return fmt.Errorf("JMAP %s returned HTTP %d", method, response.StatusCode)
+		statusErr := fmt.Errorf(
+			"JMAP %s returned HTTP %d",
+			method,
+			response.StatusCode,
+		)
+		if write &&
+			(response.StatusCode >= http.StatusInternalServerError ||
+				response.StatusCode >= http.StatusOK &&
+					response.StatusCode < http.StatusMultipleChoices) {
+			return fmt.Errorf(
+				"%w: %w",
+				application.ErrWriteOutcomeUnknown,
+				statusErr,
+			)
+		}
+		return statusErr
 	}
 	var decoded responseDocument
 	if err := decodeBoundedJSON(response.Body, maximumResponseBytes, &decoded); err != nil {
-		return fmt.Errorf("decode JMAP %s response: %w", method, err)
+		return unverifiableJMAPResponse(write, method, err)
 	}
 	if len(decoded.MethodResponses) != 1 {
-		return fmt.Errorf("JMAP %s returned %d method responses", method, len(decoded.MethodResponses))
+		return unverifiableJMAPResponse(
+			write,
+			method,
+			fmt.Errorf(
+				"returned %d method responses",
+				len(decoded.MethodResponses),
+			),
+		)
 	}
 	var envelope []json.RawMessage
 	if err := json.Unmarshal(decoded.MethodResponses[0], &envelope); err != nil || len(envelope) != 3 {
-		return fmt.Errorf("JMAP %s returned a malformed method response", method)
+		return unverifiableJMAPResponse(
+			write,
+			method,
+			errors.New("returned a malformed method response"),
+		)
 	}
 	var responseMethod string
 	if err := json.Unmarshal(envelope[0], &responseMethod); err != nil {
-		return fmt.Errorf("decode JMAP %s response name: %w", method, err)
+		return unverifiableJMAPResponse(write, method, err)
 	}
 	if responseMethod == "error" {
 		var methodErr methodError
@@ -289,12 +360,28 @@ func (client *Client) call(
 		return fmt.Errorf("JMAP %s failed: %s", method, sanitizeProviderError(methodErr))
 	}
 	if responseMethod != method {
-		return fmt.Errorf("JMAP %s returned unexpected method %q", method, responseMethod)
+		return unverifiableJMAPResponse(
+			write,
+			method,
+			fmt.Errorf("returned unexpected method %q", responseMethod),
+		)
 	}
 	if err := json.Unmarshal(envelope[1], result); err != nil {
-		return fmt.Errorf("decode JMAP %s result: %w", method, err)
+		return unverifiableJMAPResponse(write, method, err)
 	}
 	return nil
+}
+
+func unverifiableJMAPResponse(write bool, method string, err error) error {
+	if write {
+		return fmt.Errorf(
+			"%w: verify JMAP %s response: %w",
+			application.ErrWriteOutcomeUnknown,
+			method,
+			err,
+		)
+	}
+	return fmt.Errorf("verify JMAP %s response: %w", method, err)
 }
 
 func (client *Client) authorize(request *http.Request) {
@@ -338,20 +425,44 @@ func (client *Client) upload(
 	client.authorize(request)
 	response, err := client.http.Do(request)
 	if err != nil {
-		return blobUpload{}, fmt.Errorf("upload JMAP attachment: %w", err)
+		return blobUpload{}, fmt.Errorf(
+			"%w: upload JMAP attachment: %w",
+			application.ErrWriteOutcomeUnknown,
+			err,
+		)
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusCreated && response.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
-		return blobUpload{}, fmt.Errorf("JMAP upload returned HTTP %d", response.StatusCode)
+		statusErr := fmt.Errorf(
+			"JMAP upload returned HTTP %d",
+			response.StatusCode,
+		)
+		if response.StatusCode >= http.StatusInternalServerError ||
+			response.StatusCode >= http.StatusOK &&
+				response.StatusCode < http.StatusMultipleChoices {
+			return blobUpload{}, fmt.Errorf(
+				"%w: %w",
+				application.ErrWriteOutcomeUnknown,
+				statusErr,
+			)
+		}
+		return blobUpload{}, statusErr
 	}
 	var upload blobUpload
 	if err := decodeBoundedJSON(response.Body, 1<<20, &upload); err != nil {
-		return blobUpload{}, fmt.Errorf("decode JMAP upload: %w", err)
+		return blobUpload{}, fmt.Errorf(
+			"%w: verify JMAP upload response: %w",
+			application.ErrWriteOutcomeUnknown,
+			err,
+		)
 	}
 	if upload.BlobID == "" || upload.AccountID != client.accountID ||
 		upload.Size != len(content) {
-		return blobUpload{}, errors.New("JMAP upload returned inconsistent metadata")
+		return blobUpload{}, fmt.Errorf(
+			"%w: JMAP upload returned inconsistent metadata",
+			application.ErrWriteOutcomeUnknown,
+		)
 	}
 	return upload, nil
 }

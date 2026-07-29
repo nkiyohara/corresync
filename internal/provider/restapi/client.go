@@ -96,6 +96,12 @@ func (client *Client) DoJSON(
 	}
 	if responseBody != nil && len(result.Body) != 0 {
 		if err := json.Unmarshal(result.Body, responseBody); err != nil {
+			if write {
+				return Result{}, fmt.Errorf(
+					"%w: API write returned malformed JSON",
+					application.ErrWriteOutcomeUnknown,
+				)
+			}
 			return Result{}, errors.New("API returned malformed JSON")
 		}
 	}
@@ -147,6 +153,12 @@ func (client *Client) Do(
 		return Result{}, err
 	}
 	if len(content) > maximumResponseBytes {
+		if write {
+			return Result{}, fmt.Errorf(
+				"%w: API write response exceeds the configured limit",
+				application.ErrWriteOutcomeUnknown,
+			)
+		}
 		return Result{}, errors.New("API response exceeds the configured limit")
 	}
 	result := Result{
@@ -163,7 +175,18 @@ func (client *Client) Do(
 		response.StatusCode == http.StatusConflict {
 		return Result{}, ErrPrecondition
 	}
-	return Result{}, apiStatusError(response.StatusCode, content)
+	statusErr := apiStatusError(response.StatusCode, content)
+	if write &&
+		(response.StatusCode >= http.StatusInternalServerError ||
+			response.StatusCode >= http.StatusOK &&
+				response.StatusCode < http.StatusMultipleChoices) {
+		return Result{}, fmt.Errorf(
+			"%w: %w",
+			application.ErrWriteOutcomeUnknown,
+			statusErr,
+		)
+	}
+	return Result{}, statusErr
 }
 
 func (client *Client) target(resource string, query url.Values) (*url.URL, error) {
