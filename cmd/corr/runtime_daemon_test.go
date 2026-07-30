@@ -56,6 +56,62 @@ func TestOpenDaemonRejectsProviderNeutralEmptyConfig(t *testing.T) {
 	}
 }
 
+func TestOpenDaemonForMCPAllowsProviderNeutralEmptyConfig(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	configPath := filepath.Join(root, "config.toml")
+	if err := config.Save(configPath, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	configDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := localipc.ResolveInState(
+		configPath,
+		filepath.Join(root, "state"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app := newRuntime(
+		t.Context(),
+		configPath,
+		&bytes.Buffer{},
+		&bytes.Buffer{},
+		buildinfo.Current(),
+	)
+	app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
+	var daemon lifecycleTestDaemon
+	app.startDaemon = func(ctx context.Context, path string) error {
+		if path != configPath {
+			return fmt.Errorf("daemon config path = %q, want %q", path, configPath)
+		}
+		daemon = startLifecycleTestDaemon(
+			ctx,
+			t,
+			endpoint,
+			daemonapi.ProtocolVersion,
+			app.info.Version,
+			123,
+			configDigest,
+			"",
+		)
+		return nil
+	}
+
+	client, status, err := app.openDaemonForMCP(t.Context())
+	if err != nil {
+		t.Fatalf("openDaemonForMCP() error = %v", err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	t.Cleanup(daemon.stop)
+	if status.DefaultAccount != "" {
+		t.Fatalf("provider-neutral default account = %q, want empty", status.DefaultAccount)
+	}
+}
+
 func TestOpenDaemonReplacesOutdatedOwner(t *testing.T) {
 	t.Parallel()
 
@@ -365,8 +421,13 @@ func startLifecycleTestDaemon(
 	version string,
 	processID int,
 	configDigest string,
+	defaultAccounts ...domain.AccountID,
 ) lifecycleTestDaemon {
 	t.Helper()
+	defaultAccount := domain.AccountID(adapterTestAccountID)
+	if len(defaultAccounts) > 0 {
+		defaultAccount = defaultAccounts[0]
+	}
 
 	listener, err := localipc.Listen(endpoint)
 	if err != nil {
@@ -454,19 +515,23 @@ func startLifecycleTestDaemon(
 					Version:         version,
 					ProcessID:       processID,
 					StartedAt:       time.Unix(1, 0).UTC(),
-					DefaultAccount:  adapterTestAccountID,
+					DefaultAccount:  defaultAccount,
 					ConfigDigest:    configDigest,
 				})
 				response.Result = encoded
 				responseErr = encodeErr
 			case envelope.Method == "session.status":
+				accounts := []daemonapi.SessionStatus{{
+					Account: adapterTestAccountID, Alias: "work",
+					Provider:     domain.ProviderMicrosoftOWA,
+					MailProvider: domain.ProviderMicrosoftOWA,
+					State:        "signed_out",
+				}}
+				if defaultAccount == "" {
+					accounts = []daemonapi.SessionStatus{}
+				}
 				encoded, encodeErr := json.Marshal(daemonapi.SessionStatusResult{
-					Accounts: []daemonapi.SessionStatus{{
-						Account: adapterTestAccountID, Alias: "work",
-						Provider:     domain.ProviderMicrosoftOWA,
-						MailProvider: domain.ProviderMicrosoftOWA,
-						State:        "signed_out",
-					}},
+					Accounts: accounts,
 				})
 				response.Result = encoded
 				responseErr = encodeErr

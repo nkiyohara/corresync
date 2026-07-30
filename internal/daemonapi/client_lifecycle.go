@@ -93,8 +93,10 @@ func (client *Client) status(
 	if result.ProcessID < 1 || result.StartedAt.IsZero() {
 		return Status{}, errors.New("daemon returned invalid process metadata")
 	}
-	if err := result.DefaultAccount.Validate(); err != nil {
-		return Status{}, errors.New("daemon returned an invalid default account")
+	if result.DefaultAccount != "" {
+		if err := result.DefaultAccount.Validate(); err != nil {
+			return Status{}, errors.New("daemon returned an invalid default account")
+		}
 	}
 	if err := validateConfigDigest(result.ConfigDigest); err != nil {
 		return Status{}, errors.New("daemon returned an invalid config digest")

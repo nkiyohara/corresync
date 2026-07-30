@@ -177,11 +177,6 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(configuration.Accounts) == 0 {
-		return nil, errors.New(
-			"no account is configured; run `corr setup <email-address>` first",
-		)
-	}
 	auditPath, err := paths.AuditPath()
 	if err != nil {
 		return nil, err

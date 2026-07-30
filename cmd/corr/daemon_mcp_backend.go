@@ -40,7 +40,7 @@ func newDaemonMCPBackend(app *runtime) (*daemonMCPBackend, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, status, err := app.openDaemon(app.context)
+	client, status, err := app.openDaemonForMCP(app.context)
 	if err != nil {
 		return nil, err
 	}
@@ -105,6 +105,13 @@ func (backend *daemonMCPBackend) refreshAccountSnapshot() error {
 	configuration, _, err := backend.app.loadConfig()
 	if err != nil {
 		return err
+	}
+	if len(configuration.Accounts) == 0 {
+		backend.accountMu.Lock()
+		backend.configuration = configuration
+		backend.defaultAccount = ""
+		backend.accountMu.Unlock()
+		return nil
 	}
 	account, exists := configuration.Accounts[configuration.DefaultAccount]
 	if !exists {

@@ -50,6 +50,12 @@ type fakeBackend struct {
 
 func (backend *fakeBackend) DefaultAccount() domain.AccountID { return testAccountID }
 
+type providerNeutralBackend struct {
+	*fakeBackend
+}
+
+func (*providerNeutralBackend) DefaultAccount() domain.AccountID { return "" }
+
 func (backend *fakeBackend) SessionStatus(
 	context.Context,
 	domain.Caller,
@@ -663,6 +669,65 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	case <-server.Done():
 	default:
 		t.Fatal("server did not publish the authenticated shutdown request")
+	}
+}
+
+func TestProviderNeutralStatusRoundTripOverLocalIPC(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	endpoint, err := localipc.ResolveInState(
+		filepath.Join(root, "config.toml"), filepath.Join(root, "state"),
+	)
+	if err != nil {
+		t.Fatalf("ResolveInState() error = %v", err)
+	}
+	listener, err := localipc.Listen(endpoint)
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	credential, err := localipc.IssueCredential(endpoint)
+	if err != nil {
+		t.Fatalf("IssueCredential() error = %v", err)
+	}
+	backend := &providerNeutralBackend{fakeBackend: &fakeBackend{}}
+	options := ServerOptions{
+		Version: "dev", ProcessID: 123, StartedAt: time.Unix(1, 0),
+		Credential: credential.Value(), ConfigDigest: strings.Repeat("a", 64),
+	}
+	if _, err := NewServer(backend, options); err == nil ||
+		!strings.Contains(err.Error(), "default daemon account is required") {
+		t.Fatalf("NewServer() error = %v, want explicit provider-neutral opt-in", err)
+	}
+	options.AllowNoDefaultAccount = true
+	server, err := NewServer(backend, options)
+	if err != nil {
+		t.Fatalf("NewServer() provider-neutral error = %v", err)
+	}
+	serveDone := make(chan error, 1)
+	go func() { serveDone <- server.Serve(listener) }()
+	t.Cleanup(func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = server.Shutdown(shutdownCtx)
+		_ = listener.Close()
+		_ = credential.Close()
+		<-serveDone
+	})
+
+	client, err := NewClient(endpoint)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	status, err := client.Status(
+		t.Context(),
+		domain.Caller{Surface: "mcp", Instance: "provider-neutral-test"},
+	)
+	if err != nil {
+		t.Fatalf("Status() error = %v", err)
+	}
+	if status.DefaultAccount != "" || status.ProtocolVersion != ProtocolVersion {
+		t.Fatalf("provider-neutral Status() = %+v", status)
 	}
 }
 
