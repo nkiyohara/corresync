@@ -354,9 +354,10 @@
           <p>
             Every v0.8 provider route ships with deterministic synthetic provider-contract and
             application coverage. That is a strong statement about the implementation—and a
-            deliberately limited one: each route remains <strong>live-unobserved</strong> until a
-            separately authorized, content-free observation is recorded against the exact Corresync
-            commit, provider route, and platform.
+            deliberately limited one. Google authorization and bounded reads now have one
+            commit-bound macOS arm64 observation; Google writes and other routes remain <strong
+            >live-unobserved</strong> until a separately authorized, content-free observation is
+            recorded against the exact Corresync commit, provider route, and platform.
           </p>
           <p>
             A missing observation is never reported as a pass, and default tests and CI never

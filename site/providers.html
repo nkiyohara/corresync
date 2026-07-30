@@ -78,11 +78,11 @@
       <section class="evidence-banner" aria-label="Provider evidence status">
         <span class="status-dot" aria-hidden="true"></span>
         <div>
-          <strong>v0.8 evidence level: deterministic.</strong>
+          <strong>v0.8 evidence: deterministic, plus one bounded Google observation.</strong>
           <p>
-            All routes below have synthetic provider-contract and application coverage. They remain
-            live-unobserved until an authorized record is tied to the exact commit, provider route,
-            and platform.
+            All routes below have synthetic provider-contract and application coverage. Google
+            authorization and bounded reads are also live-observed on one exact macOS arm64
+            candidate; other provider and write surfaces remain live-unobserved.
           </p>
         </div>
         <a href="features.html#evidence">How evidence works<span aria-hidden="true"> →</span></a>
@@ -159,7 +159,8 @@
           <p class="eyebrow"><span aria-hidden="true"></span>Google routes</p>
           <h2 id="google-title">Corresync’s guided Google connection is not available yet.</h2>
           <p>
-            The transport is built and tested with synthetic contracts while the project prepares
+            The transport is built and tested with synthetic contracts; authorization and bounded
+            reads are also live-observed on an exact macOS arm64 candidate. The project is preparing
             its official OAuth application for Google verification. For now, use Google’s official
             Workspace MCP servers with your agent.
           </p>
