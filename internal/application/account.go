@@ -100,6 +100,16 @@ type AccountIMAPSMTPInput struct {
 	Credential AccountCredentialInput  `json:"credential"`
 }
 
+// AccountGoogleMailInput configures Gmail's fixed IMAP/SMTP XOAUTH2 route.
+// It contains only public-client metadata and an OS-keyring grant handle.
+type AccountGoogleMailInput struct {
+	Username      string                 `json:"username"`
+	Mailbox       string                 `json:"mailbox,omitempty"`
+	ClientID      string                 `json:"clientId"`
+	RedirectURI   string                 `json:"redirectUri"`
+	Authorization AccountCredentialInput `json:"authorization"`
+}
+
 // AccountCalDAVInput configures authenticated principal discovery for one
 // calendar. CalendarPath may remain empty to select the first VEVENT calendar.
 type AccountCalDAVInput struct {
@@ -129,7 +139,7 @@ type AccountMailRouteInput struct {
 	OutlookWeb     *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
 	JMAP           *AccountJMAPInput       `json:"jmap,omitempty"`
 	IMAPSMTP       *AccountIMAPSMTPInput   `json:"imapSmtp,omitempty"`
-	GoogleAPI      *AccountOAuthInput      `json:"googleApi,omitempty"`
+	Google         *AccountGoogleMailInput `json:"google,omitempty"`
 	GoogleWeb      *AccountWebInput        `json:"googleWeb,omitempty"`
 	MicrosoftGraph *AccountOAuthInput      `json:"microsoftGraph,omitempty"`
 }
@@ -139,7 +149,7 @@ type AccountCalendarRouteInput struct {
 	Provider       domain.ProviderID       `json:"provider"`
 	OutlookWeb     *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
 	CalDAV         *AccountCalDAVInput     `json:"caldav,omitempty"`
-	GoogleAPI      *AccountOAuthInput      `json:"googleApi,omitempty"`
+	Google         *AccountOAuthInput      `json:"google,omitempty"`
 	GoogleWeb      *AccountWebInput        `json:"googleWeb,omitempty"`
 	MicrosoftGraph *AccountOAuthInput      `json:"microsoftGraph,omitempty"`
 }
@@ -374,6 +384,16 @@ func (service *AccountService) reviewAdd(
 		if err := service.validateMailRoute(*input.Mail); err != nil {
 			return "", AccountCatalog{}, fmt.Errorf("mail route: %w", err)
 		}
+		if input.Mail.Provider == domain.ProviderGoogle &&
+			input.Mail.Google != nil &&
+			!strings.EqualFold(
+				input.Mail.Google.Username,
+				normalizedAddress,
+			) {
+			return "", AccountCatalog{}, errors.New(
+				"google mail username must match the account email address",
+			)
+		}
 	}
 	if input.Calendar != nil {
 		if err := service.validateCalendarRoute(*input.Calendar); err != nil {
@@ -428,9 +448,9 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 			if input.Mail.IMAPSMTP != nil {
 				credential = &input.Mail.IMAPSMTP.Credential
 			}
-		case domain.ProviderGoogleAPI:
-			if input.Mail.GoogleAPI != nil {
-				credential = &input.Mail.GoogleAPI.Authorization
+		case domain.ProviderGoogle:
+			if input.Mail.Google != nil {
+				credential = &input.Mail.Google.Authorization
 			}
 		case domain.ProviderMicrosoftGraph:
 			if input.Mail.MicrosoftGraph != nil {
@@ -453,9 +473,9 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 			if input.Calendar.CalDAV != nil {
 				credential = &input.Calendar.CalDAV.Credential
 			}
-		case domain.ProviderGoogleAPI:
-			if input.Calendar.GoogleAPI != nil {
-				credential = &input.Calendar.GoogleAPI.Authorization
+		case domain.ProviderGoogle:
+			if input.Calendar.Google != nil {
+				credential = &input.Calendar.Google.Authorization
 			}
 		case domain.ProviderMicrosoftGraph:
 			if input.Calendar.MicrosoftGraph != nil {
@@ -576,7 +596,7 @@ func accountUsesOAuth(account AccountView) bool {
 			continue
 		}
 		switch route.Provider {
-		case domain.ProviderGoogleAPI, domain.ProviderMicrosoftGraph:
+		case domain.ProviderGoogle, domain.ProviderMicrosoftGraph:
 			return true
 		case
 			domain.ProviderMicrosoftOWA,
@@ -724,7 +744,7 @@ func (service *AccountService) validateMailRoute(route AccountMailRouteInput) er
 	if route.IMAPSMTP != nil {
 		present++
 	}
-	if route.GoogleAPI != nil {
+	if route.Google != nil {
 		present++
 	}
 	if route.GoogleWeb != nil {
@@ -752,11 +772,11 @@ func (service *AccountService) validateMailRoute(route AccountMailRouteInput) er
 			return errors.New("imap-smtp requires IMAP/SMTP settings")
 		}
 		return validateIMAPSMTPInput(*route.IMAPSMTP)
-	case domain.ProviderGoogleAPI:
-		if route.GoogleAPI == nil {
-			return errors.New("google-api requires Google API settings")
+	case domain.ProviderGoogle:
+		if route.Google == nil {
+			return errors.New("google requires Google settings")
 		}
-		return validateOAuthInput(domain.ProviderGoogleAPI, *route.GoogleAPI)
+		return validateGoogleMailInput(*route.Google)
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires Google Web settings")
@@ -797,6 +817,22 @@ func validateIMAPSMTPInput(route AccountIMAPSMTPInput) error {
 	return validateAccountCredential(route.Credential)
 }
 
+func validateGoogleMailInput(route AccountGoogleMailInput) error {
+	if route.Username == "" || len(route.Username) > 320 ||
+		strings.TrimSpace(route.Username) != route.Username ||
+		strings.ContainsAny(route.Username, "\r\n\x00") {
+		return errors.New("google mail username is malformed")
+	}
+	if err := validateOptionalMailbox(route.Mailbox); err != nil {
+		return err
+	}
+	return validateOAuthClientInput(
+		route.ClientID,
+		route.RedirectURI,
+		route.Authorization,
+	)
+}
+
 func validateAccountTLSEndpoint(name string, endpoint AccountTLSEndpointInput) error {
 	if endpoint.Host == "" || len(endpoint.Host) > 253 ||
 		strings.TrimSpace(endpoint.Host) != endpoint.Host ||
@@ -825,7 +861,7 @@ func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteI
 	if route.CalDAV != nil {
 		present++
 	}
-	if route.GoogleAPI != nil {
+	if route.Google != nil {
 		present++
 	}
 	if route.GoogleWeb != nil {
@@ -848,11 +884,11 @@ func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteI
 			return errors.New("caldav requires CalDAV settings")
 		}
 		return validateCalDAVInput(*route.CalDAV)
-	case domain.ProviderGoogleAPI:
-		if route.GoogleAPI == nil {
-			return errors.New("google-api requires Google API settings")
+	case domain.ProviderGoogle:
+		if route.Google == nil {
+			return errors.New("google requires Google settings")
 		}
-		return validateOAuthInput(domain.ProviderGoogleAPI, *route.GoogleAPI)
+		return validateOAuthInput(domain.ProviderGoogle, *route.Google)
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires Google Web settings")
@@ -891,7 +927,7 @@ func validateOAuthInput(
 	}
 	apiBase, _ := url.Parse(route.APIBase)
 	switch provider {
-	case domain.ProviderGoogleAPI:
+	case domain.ProviderGoogle:
 		if apiBase.Host != "www.googleapis.com" || apiBase.RawQuery != "" ||
 			apiBase.EscapedPath() != "" && apiBase.EscapedPath() != "/" {
 			return errors.New("google API base must be https://www.googleapis.com")
@@ -913,22 +949,34 @@ func validateOAuthInput(
 	default:
 		return fmt.Errorf("unknown OAuth API provider %q", provider)
 	}
-	if route.ClientID == "" || len(route.ClientID) > 512 ||
-		strings.TrimSpace(route.ClientID) != route.ClientID ||
-		strings.ContainsAny(route.ClientID, "\r\n\x00") {
+	return validateOAuthClientInput(
+		route.ClientID,
+		route.RedirectURI,
+		route.Authorization,
+	)
+}
+
+func validateOAuthClientInput(
+	clientID string,
+	redirectURI string,
+	authorization AccountCredentialInput,
+) error {
+	if clientID == "" || len(clientID) > 512 ||
+		strings.TrimSpace(clientID) != clientID ||
+		strings.ContainsAny(clientID, "\r\n\x00") {
 		return errors.New("OAuth client ID is malformed")
 	}
-	redirect, err := url.Parse(route.RedirectURI)
+	redirect, err := url.Parse(redirectURI)
 	if err != nil || redirect.Scheme != "http" ||
 		redirect.Hostname() != "127.0.0.1" ||
 		redirect.User != nil || redirect.Fragment != "" ||
 		redirect.RawQuery != "" || redirect.Port() == "" {
 		return errors.New("OAuth redirect URI must use an explicit loopback port")
 	}
-	if route.Authorization.Backend != "os-keyring" {
+	if authorization.Backend != "os-keyring" {
 		return errors.New("OAuth authorization must use the OS keyring")
 	}
-	return validateAccountCredential(route.Authorization)
+	return validateAccountCredential(authorization)
 }
 
 func validateGoogleWebOrigin(raw, host string) error {
@@ -1101,8 +1149,22 @@ func mailRouteView(route *AccountMailRouteInput) *AccountRouteView {
 				Consented: route.IMAPSMTP.Credential.Consent,
 			},
 		}
-	case domain.ProviderGoogleAPI:
-		return oauthRouteView(route.Provider, route.GoogleAPI)
+	case domain.ProviderGoogle:
+		if route.Google == nil {
+			return &AccountRouteView{Provider: route.Provider}
+		}
+		return &AccountRouteView{
+			Provider: route.Provider,
+			Endpoints: []DiscoveredEndpoint{
+				{Kind: "imap", Value: "implicit://imap.gmail.com:993"},
+				{Kind: "smtp", Value: "starttls://smtp.gmail.com:587"},
+			},
+			Identity: route.Google.Username,
+			Credential: &AccountCredentialView{
+				Configured: true, Backend: route.Google.Authorization.Backend,
+				Consented: route.Google.Authorization.Consent,
+			},
+		}
 	case domain.ProviderGoogleWeb:
 		return webRouteView(route.Provider, route.GoogleWeb)
 	case domain.ProviderMicrosoftGraph:
@@ -1147,8 +1209,8 @@ func calendarRouteView(route *AccountCalendarRouteInput) *AccountRouteView {
 				Consented: route.CalDAV.Credential.Consent,
 			},
 		}
-	case domain.ProviderGoogleAPI:
-		return oauthRouteView(route.Provider, route.GoogleAPI)
+	case domain.ProviderGoogle:
+		return oauthRouteView(route.Provider, route.Google)
 	case domain.ProviderGoogleWeb:
 		return webRouteView(route.Provider, route.GoogleWeb)
 	case domain.ProviderMicrosoftGraph:
@@ -1224,9 +1286,9 @@ func cloneMailRoute(route *AccountMailRouteInput) *AccountMailRouteInput {
 		value := *route.IMAPSMTP
 		cloned.IMAPSMTP = &value
 	}
-	if route.GoogleAPI != nil {
-		value := *route.GoogleAPI
-		cloned.GoogleAPI = &value
+	if route.Google != nil {
+		value := *route.Google
+		cloned.Google = &value
 	}
 	if route.GoogleWeb != nil {
 		value := *route.GoogleWeb
@@ -1252,9 +1314,9 @@ func cloneCalendarRoute(route *AccountCalendarRouteInput) *AccountCalendarRouteI
 		value := *route.CalDAV
 		cloned.CalDAV = &value
 	}
-	if route.GoogleAPI != nil {
-		value := *route.GoogleAPI
-		cloned.GoogleAPI = &value
+	if route.Google != nil {
+		value := *route.Google
+		cloned.Google = &value
 	}
 	if route.GoogleWeb != nil {
 		value := *route.GoogleWeb

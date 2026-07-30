@@ -44,6 +44,8 @@ jobs:
           test -s site/features.html
           test -s site/providers.html
           test -s site/safety.html
+          test -s site/privacy.html
+          test -s site/terms.html
           test -s site/styles.css
           test -s site/copy.js
           test -s site/install.sh
@@ -53,7 +55,7 @@ jobs:
           test -s site/social-card.png
           test -s site/robots.txt
           test -s site/sitemap.xml
-          for page in index getting-started features providers safety; do
+          for page in index getting-started features providers safety privacy terms; do
             grep -Fq '<html lang="en">' "site/${page}.html"
             grep -Fq '<link rel="canonical"' "site/${page}.html"
             grep -Fq 'corresync-mark.svg' "site/${page}.html"
@@ -70,6 +72,13 @@ jobs:
           grep -Fq 'https://nkiyohara.github.io/corresync/features.html' site/features.html
           grep -Fq 'https://nkiyohara.github.io/corresync/providers.html' site/providers.html
           grep -Fq 'https://nkiyohara.github.io/corresync/safety.html' site/safety.html
+          grep -Fq 'https://nkiyohara.github.io/corresync/privacy.html' site/privacy.html
+          grep -Fq 'https://nkiyohara.github.io/corresync/terms.html' site/terms.html
+          grep -Fq 'href="privacy.html"' site/index.html
+          grep -Fq 'href="terms.html"' site/index.html
+          grep -Fq 'https://mail.google.com/' site/privacy.html
+          grep -Fq 'Google API Services User Data Policy' site/privacy.html
+          grep -Fq 'Apache License, Version 2.0' site/terms.html
           grep -Fq 'curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh' site/index.html
           grep -Fq 'curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh' site/getting-started.html
           grep -Fq 'corr mcp setup codex' site/index.html
@@ -84,6 +93,8 @@ jobs:
           grep -Fq 'https://nkiyohara.github.io/corresync/features.html' site/sitemap.xml
           grep -Fq 'https://nkiyohara.github.io/corresync/providers.html' site/sitemap.xml
           grep -Fq 'https://nkiyohara.github.io/corresync/safety.html' site/sitemap.xml
+          grep -Fq 'https://nkiyohara.github.io/corresync/privacy.html' site/sitemap.xml
+          grep -Fq 'https://nkiyohara.github.io/corresync/terms.html' site/sitemap.xml
           test -z "$(grep -Rh '<script[^>]* src=' site --include='*.html' | grep -Fv 'src="copy.js" defer' || true)"
           if grep -Eiq 'fetch\\(|XMLHttpRequest|WebSocket|EventSource' site/copy.js; then
             exit 1

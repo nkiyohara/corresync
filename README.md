@@ -29,6 +29,8 @@
   <a href="https://nkiyohara.github.io/corresync/providers.html">Providers</a> ·
   <a href="https://nkiyohara.github.io/corresync/features.html">Features</a> ·
   <a href="https://nkiyohara.github.io/corresync/safety.html">Safety</a> ·
+  <a href="https://nkiyohara.github.io/corresync/privacy.html">Privacy</a> ·
+  <a href="https://nkiyohara.github.io/corresync/terms.html">Terms</a> ·
   <a href="docs/README.md">Technical docs</a>
 </p>
 <!-- markdownlint-enable MD013 MD033 -->
@@ -52,7 +54,7 @@ and CalDAV accounts into one terminal—and one local
 $ corr mail search --all-accounts \
     --query 'subject:"Quarterly plan"' --limit 3
 ● work · microsoft-owa   Ana Ruiz   Plan review
-· personal · google-api Finance    Plan receipt
+· personal · google     Finance    Plan receipt
 
 $ corr agenda list --all-accounts \
     --start 2026-07-29T00:00:00Z \
@@ -84,7 +86,7 @@ can pair IMAP/SMTP mail with a CalDAV calendar.
 | Route | Mail | Calendar | Authentication |
 | --- | --- | --- | --- |
 | Outlook Web | Typed reads and writes | Selectable calendars; provider-supported Teams link | Dedicated visible browser profile |
-| Google API | Gmail reads and writes | Selectable calendars; Google Meet when advertised | Your authorized public OAuth client; OS-keyring grant |
+| Google (not yet available) | Gmail over IMAP/SMTP XOAUTH2 | Selectable calendars; Google Meet when advertised | Built; the official OAuth application is being prepared for verification |
 | Microsoft Graph | Typed reads and writes | Selectable calendars; typed Teams-link creation | Your authorized public OAuth client; OS-keyring grant |
 | JMAP | Typed mail operations | — | OS keyring or approved credential helper |
 | IMAP / SMTP | IMAP read/manage and SMTP draft/send | — | OS keyring or approved credential helper |
@@ -94,10 +96,11 @@ can pair IMAP/SMTP mail with a CalDAV calendar.
 Discovery gathers DNS, well-known, and provider metadata without credentials.
 It never authenticates or adds an account. Microsoft Graph and managed Google
 authorization remain explicit choices and are never automatic fallbacks.
-Automated Google Web sign-in is not supported: Google rejects sign-in from
-software-controlled browsers, and Corresync neither disguises automation nor
-bypasses that account protection. Google Workspace administrators may also
-restrict API and standards access.
+Google discovery does not add an account while Corresync prepares and verifies
+its official Google OAuth application. For now, connect Gmail and Calendar through
+Google's official
+[Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers)
+(Developer Preview).
 
 Every v0.8 route above has synthetic provider-contract and application
 coverage. The v0.8 provider and platform implementations remain
@@ -140,6 +143,23 @@ corr --version
 Direct archives, native Linux packages, checksums, Sigstore provenance, and
 current WinGet status are in the [installation guide](docs/install.md).
 
+### Stay current
+
+Interactive commands make a quiet, cached release check at startup. If an
+update exists, Corresync shows the exact command for your installation:
+`corr update` for the standalone build, or the matching Homebrew, Scoop, or
+WinGet command. Package-managed files are never changed by Corresync.
+
+Standalone users can opt in to verified automatic installation:
+
+```console
+corr config set updates.auto_install true
+```
+
+It never runs during MCP tool calls, configuration changes, daemon work, JSON
+output, pipes, or other non-interactive paths. The current command continues
+normally and the new binary is active on the next `corr` start.
+
 ### 2. Add and sign in to your account
 
 ```console
@@ -162,14 +182,19 @@ corr account discover reader@example.invalid
 corr account add reader@example.invalid --help
 ```
 
+For Gmail and Google Calendar, Corresync's OAuth application is still under
+review. Until guided connection opens, use Google's official
+[Workspace MCP setup](https://developers.google.com/workspace/guides/configure-mcp-servers)
+with your agent. It is currently a Google Developer Preview and has its own
+Google Cloud and OAuth setup requirements.
+
 Account addition does not authenticate. OAuth routes require a public-client
 registration you are authorized to use. Standards routes use a keyring entry
 or explicitly approved helper reference. Passwords and tokens never enter
 `config.toml`. See [account and provider configuration](docs/configuration.md).
 The Outlook Web route opens a dedicated visible profile only during the later
 `auth login`; SSO, MFA, Conditional Access, and organization notices remain
-inside the provider-owned flow. Google uses an explicitly authorized API or a
-standards route permitted by the account administrator.
+inside the provider-owned flow.
 
 ### 3. Connect an agent
 
@@ -214,6 +239,10 @@ provider, target, payload, and effect. Changing any reviewed field invalidates
 it. MCP keeps preview and commit as separate typed tools.
 
 [See the complete safety model](https://nkiyohara.github.io/corresync/safety.html).
+Corresync's public [Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html)
+explains Google data access, local storage, disclosure, retention, and removal;
+the [Terms of Use](https://nkiyohara.github.io/corresync/terms.html) preserve
+the software rights granted by Apache-2.0.
 
 ## More than one inbox
 
@@ -235,12 +264,11 @@ agent.
 
 ## Honest edges
 
-- Automated Google Web login is unavailable because Google rejects
-  software-controlled browsers. Corresync does not disguise automation;
-  supported Google operations require an explicitly authorized API or
-  administrator-approved standards route.
-- Google API and Microsoft Graph require your own authorized public-client
-  registration. Corresync ships no shared OAuth client or token relay.
+- Corresync is preparing its official Google OAuth application for
+  verification. Guided Google connection is not offered yet; use Google's
+  official Workspace MCP in the meantime.
+- Microsoft Graph requires your own authorized public-client registration.
+  Corresync ships no token relay.
 - Windows desktop notification setup is unavailable because Corresync does
   not install an AppUserModelID; queue and approved runner modes remain
   available.
@@ -290,6 +318,9 @@ Read the [architecture](docs/architecture.md),
 | Consume stable machine output | [JSON contract](docs/json.md) |
 | Integrate versioned public/local contracts | [Versioning policy](docs/adr/0020-public-and-local-versioning.md) |
 | Verify compatibility claims | [Evidence matrix](docs/compatibility.md) |
+| Review privacy and Google data handling | [Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html) |
+| Review use and open-source license terms | [Terms of Use](https://nkiyohara.github.io/corresync/terms.html) |
+| Prepare the official Google OAuth review | [Google verification runbook](docs/google-oauth-verification.md) |
 | Review every guide | [Documentation map](docs/README.md) |
 
 Users upgrading from versions before v0.7 can follow the

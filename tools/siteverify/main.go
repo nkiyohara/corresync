@@ -17,8 +17,11 @@ import (
 )
 
 const (
-	siteBaseURL    = "https://nkiyohara.github.io/corresync/"
-	socialImageURL = siteBaseURL + "social-card.png"
+	siteBaseURL              = "https://nkiyohara.github.io/corresync/"
+	socialImageURL           = siteBaseURL + "social-card.png"
+	googleSiteVerification   = "du6yQYCD4HROJoMhBnPxnbcntabW8RFRJbfZrRcVcic"
+	privacyPolicyRelativeURL = "privacy.html"
+	termsOfUseRelativeURL    = "terms.html"
 )
 
 type page struct {
@@ -96,6 +99,12 @@ func verifySite(root string) error {
 	}
 
 	for _, item := range pages {
+		if !containsString(item.links, privacyPolicyRelativeURL) {
+			return fmt.Errorf("%s does not link the public Privacy Policy", item.path)
+		}
+		if !containsString(item.links, termsOfUseRelativeURL) {
+			return fmt.Errorf("%s does not link the public Terms of Use", item.path)
+		}
 		if err := verifyLocalReferences(root, item, pages); err != nil {
 			return err
 		}
@@ -254,14 +263,27 @@ func parsePage(path string) (page, error) {
 		return page{}, fmt.Errorf("%s does not request a large Twitter summary card", path)
 	}
 	if filepath.Base(path) == "index.html" {
-		if _, err := oneMeta(path, meta, "google-site-verification"); err != nil {
+		verification, err := oneMeta(path, meta, "google-site-verification")
+		if err != nil {
 			return page{}, err
+		}
+		if verification != googleSiteVerification {
+			return page{}, fmt.Errorf("%s has an unexpected Google site verification token", path)
 		}
 		if jsonLDCount != 1 {
 			return page{}, fmt.Errorf("%s contains %d JSON-LD blocks, want 1", path, jsonLDCount)
 		}
 	}
 	return item, nil
+}
+
+func containsString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
 }
 
 func verifyLocalReferences(root string, item page, pages map[string]page) error {

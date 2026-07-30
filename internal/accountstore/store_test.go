@@ -182,24 +182,34 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 			},
 		}
 	}
+	graphRoute := func(key string) *config.OAuthRoute {
+		result := route(key)
+		result.APIBase = "https://graph.microsoft.com/v1.0"
+		return result
+	}
 	const targetID domain.AccountID = "acc_00000000000000000000000000000002"
 	configuration.Accounts["target"] = config.Account{
 		ID: targetID, Address: "target@example.test",
 		Mail: &config.MailRoute{
-			Provider:  domain.ProviderGoogleAPI,
-			GoogleAPI: route("target-only"),
+			Provider: domain.ProviderGoogle,
+			Google: &config.GoogleMailRoute{
+				Username:      "target@example.test",
+				ClientID:      route("target-only").ClientID,
+				RedirectURI:   route("target-only").RedirectURI,
+				Authorization: route("target-only").Authorization,
+			},
 		},
 		Calendar: &config.CalendarRoute{
-			Provider:  domain.ProviderGoogleAPI,
-			GoogleAPI: route("shared"),
+			Provider:       domain.ProviderMicrosoftGraph,
+			MicrosoftGraph: graphRoute("shared"),
 		},
 	}
 	configuration.Accounts["other"] = config.Account{
 		ID:      "acc_00000000000000000000000000000003",
 		Address: "other@example.test",
 		Calendar: &config.CalendarRoute{
-			Provider:  domain.ProviderGoogleAPI,
-			GoogleAPI: route("shared"),
+			Provider:       domain.ProviderMicrosoftGraph,
+			MicrosoftGraph: graphRoute("shared"),
 		},
 	}
 	if err := config.Save(path, configuration); err != nil {

@@ -72,30 +72,30 @@ OWA can provision a Teams join URL as a provider-native calendar-event creation
 property. Teams chat, channels, calls, recordings, and meeting lifecycle
 management are not exposed.
 
-## Google API
+## Google
 
 The Google adapter uses an explicitly selected public OAuth client and a grant
-held by the operating-system credential facility. It implements bounded Gmail
-and primary Google Calendar contracts. When the authenticated primary calendar
-advertises `hangoutsMeet`, a reviewed provider-native online-meeting request
-uses a unique conference request ID and returns only that event's Meet link.
+held by the operating-system credential facility. Gmail mail is transported
+only over fixed TLS IMAP and SMTP Submission endpoints with SASL XOAUTH2; it
+does not use Gmail REST, a password, an app password, or a configurable host.
+The short-lived bearer is fetched immediately before each authentication,
+bounded, kept out of logs, and overwritten afterwards.
+After Gmail accepts an SMTP submission, Corresync confirms Gmail's
+automatically stored Sent copy by its unique Message-ID and does not issue a
+duplicate IMAP APPEND.
 
-Gmail search retains provider query syntax. Label/move operations do not claim
-an atomic history precondition, and permanent delete requires the explicit
-full-mailbox scope because Gmail exposes it through that scope only. The
-adapter revalidates the reviewed message immediately before the operation. If
-a Trash-to-label move confirms untrash but not the destination label update,
-the result requires reconciliation. The adapter does not enable push/history
-monitoring or scheduled send.
+Gmail labels project through IMAP mailboxes and are reported as lossy.
+Search uses bounded IMAP text criteria. Move and permanent delete depend on
+observed MOVE/UIDPLUS behavior for general standards routes. The Google route
+disables permanent delete because Gmail's expunge behavior is account
+configurable. Ambiguous mutation or submission outcomes require reconciliation
+under the shared standards-mail contract. The route does not enable
+push/history monitoring or scheduled send.
 
-## Google Web
-
-Runtime Google Web sign-in is disabled before browser launch. Google rejects
-sign-in from software-controlled browsers, and Corresync does not hide
-automation signals or otherwise bypass that protection. The old semantic-DOM
-adapter remains covered by synthetic tests only while v0.8.0-v0.8.1
-configuration can still be parsed for safe inspection and removal. It is not a
-supported provider protocol.
+Google Calendar remains a bounded REST adapter sharing the same OAuth grant.
+When the authenticated primary calendar advertises `hangoutsMeet`, a reviewed
+provider-native online-meeting request uses a unique conference request ID and
+returns only that event's Meet link.
 
 ## Microsoft Graph
 
@@ -158,6 +158,10 @@ header construction. SMTP acceptance without a returned message identity is
 represented explicitly. Errors after a mutating IMAP command or an accepted
 SMTP submission are partial outcomes requiring reconciliation; Corresync does
 not repeat the operation automatically.
+
+The `google` route reuses this adapter only with provider-pinned Gmail
+endpoints and XOAUTH2. Generic `imap-smtp` routes continue to use an explicitly
+approved external credential and cannot inherit a Google OAuth grant.
 
 ## CalDAV
 

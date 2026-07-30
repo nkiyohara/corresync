@@ -218,7 +218,7 @@ func TestGoogleWebWritesFailClearlyWithoutUsingTheDriver(t *testing.T) {
 	if _, err := client.SendMail(
 		t.Context(),
 		application.MailSendInput{},
-	); err == nil || !strings.Contains(err.Error(), "google-api") {
+	); err == nil || !strings.Contains(err.Error(), "google") {
 		t.Fatalf("SendMail() error = %v", err)
 	}
 }

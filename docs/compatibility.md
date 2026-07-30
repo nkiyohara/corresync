@@ -9,12 +9,12 @@ authorized live observations.
 <!-- markdownlint-disable MD013 -->
 | Boundary | Deterministic evidence | Recorded live evidence | v0.8 status |
 | --- | --- | --- | --- |
-| CLI, stable JSON, configuration schema v3 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
+| CLI, stable JSON, configuration schema v4 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
 | Outlook Web mail/calendar | Synthetic typed wire contracts | Historical Microsoft 365 notes, not commit-bound | Deterministic only; live-unobserved |
 | Legacy Google Web adapter | Synthetic semantic-DOM contracts retained; runtime sign-in disabled before browser launch | Live sign-in rejected by Google on 2026-07-29 | Unsupported |
-| Google API mail/calendar/Google Meet field | Synthetic REST and application integration contracts | Not run | Deterministic only |
+| Google Gmail XOAUTH2 mail and Calendar API/Google Meet field | Synthetic TLS protocol, REST, OAuth, and application integration contracts | Not run | Deterministic only |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
 | IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
@@ -47,9 +47,9 @@ evidence.
   safe handling of v0.8.0-v0.8.1 configuration, but runtime sign-in is
   unsupported and stops before browser launch. Google rejected the observed
   software-controlled browser sign-in; Corresync does not disguise automation.
-- `google-api`: Gmail, selectable Google calendars, and Google Meet creation
-  after observed calendar capability are implemented with a BYO public OAuth
-  client, but have no recorded live observation.
+- `google`: Gmail IMAP/SMTP XOAUTH2, selectable Google calendars, and Google
+  Meet creation after observed calendar capability are implemented with one
+  BYO desktop public OAuth client, but have no recorded live observation.
 - `microsoft-graph`: mail, selectable calendars, and typed Teams-link creation are
   implemented with a BYO public OAuth client, but have no recorded live
   observation.
@@ -121,8 +121,8 @@ deletion, and calendar invitations require separate explicit authorization.
 
 The former managed Google Web live harness is no longer an accepted observation
 path. Do not use automation-hiding flags or browser fingerprint spoofing to
-make the provider accept it. Record Google compatibility only through an
-explicitly authorized API client or an administrator-approved standards route.
+make the provider accept it. Record Google compatibility only through the
+explicitly authorized `google` route.
 
 See the [manual test checklist](manual-test-checklist.md) for provider and
 platform recording templates.

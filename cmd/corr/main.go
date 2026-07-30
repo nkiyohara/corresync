@@ -132,8 +132,8 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		configPath = os.Getenv("OWA_CONFIG")
 	}
 	app := newRuntime(executionContext, configPath, stdout, stderr, info)
-	if shouldOfferAutomaticUpdateNotice(arguments) {
-		app.maybeNotifyUpdate(executionContext)
+	if shouldHandleAutomaticUpdate(arguments) {
+		app.maybeHandleAutomaticUpdate(executionContext)
 	}
 	if err := parsed.Run(app); err != nil {
 		if rootCommand(arguments) != "feedback" {

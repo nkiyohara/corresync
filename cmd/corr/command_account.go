@@ -42,9 +42,9 @@ type accountAddCommand struct {
 	MailProvider              string `help:"Explicit mail provider override; use none for calendar-only."`
 	CalendarProvider          string `help:"Explicit calendar provider override; use none for mail-only."`
 	Origin                    string `help:"Outlook Web HTTPS origin override."`
-	Mailbox                   string `help:"Optional Outlook mailbox identity."`
+	Mailbox                   string `help:"Optional routed or sender mailbox identity."`
 	SessionURL                string `help:"JMAP HTTPS session resource."`
-	APIBase                   string `help:"Google or Microsoft API HTTPS base override."`
+	APIBase                   string `help:"Google Calendar or Microsoft Graph API HTTPS base override."`
 	OAuthClientID             string `name:"oauth-client-id" help:"BYO OAuth public-client ID."`
 	OAuthRedirectURI          string `name:"oauth-redirect-uri" help:"Registered http://127.0.0.1 loopback redirect URI."`
 	AuthorizationKey          string `help:"OS-keyring handle for the OAuth grant."`
@@ -54,7 +54,7 @@ type accountAddCommand struct {
 	CalendarOAuthRedirectURI  string `name:"calendar-oauth-redirect-uri" help:"Calendar loopback redirect; defaults to --oauth-redirect-uri."`
 	CalendarAuthorizationKey  string `name:"calendar-authorization-key" help:"Calendar OAuth grant key; defaults to --authorization-key."`
 	ApproveCalendarOAuth      bool   `name:"approve-calendar-oauth" help:"Confirm a distinct calendar OAuth authorization."`
-	Username                  string `help:"Standards mail login identity; defaults to the address."`
+	Username                  string `help:"Mail login identity; defaults to the address and must match it for Google."`
 	CredentialBackend         string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
 	CredentialKey             string `help:"External standards credential lookup key."`
 	ApproveCredential         bool   `help:"Record explicit consent to use that external credential."`
@@ -66,7 +66,6 @@ type accountAddCommand struct {
 	SMTPTLS                   string `name:"smtp-tls" default:"starttls" enum:"implicit,starttls" help:"SMTP TLS mode."`
 	CalDAVEndpoint            string `name:"caldav-endpoint" help:"CalDAV HTTPS discovery endpoint."`
 	CalendarPath              string `help:"Optional absolute CalDAV calendar path."`
-	CalendarOrigin            string `name:"calendar-origin" help:"Google Calendar Web HTTPS origin override."`
 	CalendarUsername          string `help:"CalDAV login identity; defaults to --username or the address."`
 	CalendarCredentialBackend string `help:"External CalDAV credential backend; defaults to --credential-backend."`
 	CalendarCredentialKey     string `help:"External CalDAV credential key; defaults to --credential-key."`
@@ -93,11 +92,12 @@ type accountAddResult struct {
 	Account  application.AccountView       `json:"account"`
 }
 
-var errGoogleWebSignInUnavailable = errors.New(
-	`google-web sign-in is unavailable because Google rejects sign-in from ` +
-		`software-controlled browsers; use an explicitly authorized google-api ` +
-		`route, or a standards route approved by the account administrator`,
+var errUnsupportedLegacyGoogleRoute = errors.New(
+	"this account uses an unsupported legacy Google route; remove it and " +
+		"add it again with provider google",
 )
+
+const googleWorkspaceMCPGuide = "https://developers.google.com/workspace/guides/configure-mcp-servers"
 
 func (command *accountDiscoverCommand) Run(app *runtime) error {
 	_, discoverer, err := app.accountServices()
@@ -271,7 +271,7 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		}
 	case domain.ProviderCalDAV:
 		endpointOverride = command.CalDAVEndpoint
-	case domain.ProviderGoogleAPI:
+	case domain.ProviderGoogle:
 		endpointOverride = command.APIBase
 		if mailProvider == "none" && command.CalendarAPIBase != "" {
 			endpointOverride = command.CalendarAPIBase
@@ -467,9 +467,9 @@ func (command accountAddCommand) routes(
 		), selected, discovery)
 	case domain.ProviderCalDAV:
 		return command.finishRoutes(nil, nil, "", selected, discovery)
-	case domain.ProviderGoogleAPI:
+	case domain.ProviderGoogle:
 		oauth, err := command.oauthRoute(
-			domain.ProviderGoogleAPI,
+			domain.ProviderGoogle,
 			selected,
 			"https://www.googleapis.com",
 			command.Provider == "none",
@@ -477,18 +477,28 @@ func (command accountAddCommand) routes(
 		if err != nil {
 			return nil, nil, "", err
 		}
+		username := command.Username
+		if username == "" {
+			username = address
+		}
 		return command.finishRoutes(
 			&application.AccountMailRouteInput{
-				Provider: domain.ProviderGoogleAPI, GoogleAPI: oauth,
+				Provider: domain.ProviderGoogle,
+				Google: &application.AccountGoogleMailInput{
+					Username: username, Mailbox: command.Mailbox,
+					ClientID: oauth.ClientID, RedirectURI: oauth.RedirectURI,
+					Authorization: oauth.Authorization,
+				},
 			},
 			&application.AccountCalendarRouteInput{
-				Provider: domain.ProviderGoogleAPI,
-				GoogleAPI: &application.AccountOAuthInput{
+				Provider: domain.ProviderGoogle,
+				Google: &application.AccountOAuthInput{
 					APIBase: oauth.APIBase, ClientID: oauth.ClientID,
 					RedirectURI: oauth.RedirectURI, Authorization: oauth.Authorization,
 				},
 			},
-			oauth.APIBase,
+			"IMAP imap.gmail.com:993 · SMTP smtp.gmail.com:587 · Calendar "+
+				oauth.APIBase,
 			selected,
 			discovery,
 		)
@@ -518,33 +528,9 @@ func (command accountAddCommand) routes(
 			discovery,
 		)
 	case domain.ProviderGoogleWeb:
-		mailOrigin := command.Origin
-		if mailOrigin == "" {
-			mailOrigin = candidateHTTPSEndpoint(selected, "origin")
-		}
-		if mailOrigin == "" {
-			mailOrigin = "https://mail.google.com"
-		}
-		calendarOrigin := command.CalendarOrigin
-		if calendarOrigin == "" {
-			calendarOrigin = "https://calendar.google.com"
-		}
-		return command.finishRoutes(
-			&application.AccountMailRouteInput{
-				Provider: domain.ProviderGoogleWeb,
-				GoogleWeb: &application.AccountWebInput{
-					Origin: mailOrigin,
-				},
-			},
-			&application.AccountCalendarRouteInput{
-				Provider: domain.ProviderGoogleWeb,
-				GoogleWeb: &application.AccountWebInput{
-					Origin: calendarOrigin,
-				},
-			},
-			mailOrigin+" · Google Calendar "+calendarOrigin,
-			selected,
-			discovery,
+		return nil, nil, "", fmt.Errorf(
+			"provider %q is not available in this build",
+			selected.Provider,
 		)
 	case domain.ProviderPOP3:
 		return nil, nil, "", fmt.Errorf(
@@ -641,7 +627,12 @@ func (command accountAddCommand) finishRoutes(
 		}
 		return mail, calendar, endpoint, nil
 	case domain.ProviderCalDAV:
-	case domain.ProviderGoogleAPI, domain.ProviderMicrosoftGraph:
+	case domain.ProviderGoogleWeb:
+		return nil, nil, "", fmt.Errorf(
+			"calendar provider %q is not available in this build",
+			provider,
+		)
+	case domain.ProviderGoogle, domain.ProviderMicrosoftGraph:
 		if calendar == nil ||
 			calendar.Provider != domain.ProviderID(provider) ||
 			command.hasDistinctCalendarOAuth() {
@@ -662,8 +653,8 @@ func (command accountAddCommand) finishRoutes(
 			calendar = &application.AccountCalendarRouteInput{
 				Provider: domain.ProviderID(provider),
 			}
-			if provider == string(domain.ProviderGoogleAPI) {
-				calendar.GoogleAPI = oauth
+			if provider == string(domain.ProviderGoogle) {
+				calendar.Google = oauth
 			} else {
 				calendar.MicrosoftGraph = oauth
 			}
@@ -671,25 +662,6 @@ func (command accountAddCommand) finishRoutes(
 				endpoint = oauth.APIBase
 			} else {
 				endpoint += " · " + provider + " " + oauth.APIBase
-			}
-		}
-		return mail, calendar, endpoint, nil
-	case domain.ProviderGoogleWeb:
-		if calendar == nil || calendar.Provider != domain.ProviderGoogleWeb {
-			origin := command.CalendarOrigin
-			if origin == "" {
-				origin = "https://calendar.google.com"
-			}
-			calendar = &application.AccountCalendarRouteInput{
-				Provider: domain.ProviderGoogleWeb,
-				GoogleWeb: &application.AccountWebInput{
-					Origin: origin,
-				},
-			}
-			if endpoint == "" {
-				endpoint = origin
-			} else {
-				endpoint += " · google-web " + origin
 			}
 		}
 		return mail, calendar, endpoint, nil
@@ -856,7 +828,10 @@ func selectAccountCandidate(
 			return application.ProviderCandidate{}, err
 		}
 		if provider == domain.ProviderGoogleWeb {
-			return application.ProviderCandidate{}, errGoogleWebSignInUnavailable
+			return application.ProviderCandidate{}, fmt.Errorf(
+				"provider %q is not available in this build",
+				provider,
+			)
 		}
 		for _, candidate := range result.Candidates {
 			if candidate.Provider == provider {
@@ -873,7 +848,7 @@ func selectAccountCandidate(
 			provider != domain.ProviderJMAP &&
 			provider != domain.ProviderIMAPSMTP &&
 			provider != domain.ProviderCalDAV &&
-			provider != domain.ProviderGoogleAPI &&
+			provider != domain.ProviderGoogle &&
 			provider != domain.ProviderMicrosoftGraph {
 			return application.ProviderCandidate{}, fmt.Errorf(
 				"provider %q is not available in this build",
@@ -899,7 +874,7 @@ func selectAccountCandidate(
 		}
 		if standardsKind, isStandards := standards[provider]; isStandards {
 			authentication, kind = application.DiscoveryExternalCredential, standardsKind
-		} else if provider == domain.ProviderGoogleAPI ||
+		} else if provider == domain.ProviderGoogle ||
 			provider == domain.ProviderMicrosoftGraph {
 			authentication, kind = application.DiscoveryExplicitOAuth, "api"
 		}
@@ -922,14 +897,14 @@ func selectAccountCandidate(
 		}
 	}
 	for _, candidate := range result.Candidates {
-		if candidate.Provider == domain.ProviderGoogleAPI && candidate.Available {
+		if candidate.Provider == domain.ProviderGoogle && candidate.Available {
 			return application.ProviderCandidate{}, errors.New(
-				"google account discovered, but no route can be selected " +
-					"automatically; configure google-api explicitly with your " +
-					"OAuth public-client settings (managed Workspace accounts " +
-					"may require administrator approval). Automated google-web " +
-					"sign-in is unavailable because Google rejects " +
-					"software-controlled browsers",
+				"google account discovered, but Corresync's Google OAuth " +
+					"application is being prepared for verification, so " +
+					"guided Google connection is not available yet. For now, connect your " +
+					"agent directly to Google's official Workspace MCP servers " +
+					"(Developer Preview; follow Google's setup guide): " +
+					googleWorkspaceMCPGuide,
 			)
 		}
 	}

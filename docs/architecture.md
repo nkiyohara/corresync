@@ -16,8 +16,7 @@ public transports and one authenticated local session owner.
                   ▼
        config-scoped session owner
        ├── Outlook Web browser adapter
-       ├── legacy Google Web parser (runtime sign-in disabled)
-       ├── Google API OAuth adapter
+       ├── Google Gmail XOAUTH2 + Calendar API adapters
        ├── Microsoft Graph OAuth adapter
        ├── JMAP adapter
        ├── IMAP/SMTP adapter
@@ -91,18 +90,15 @@ handle, which cannot be rebound from another account.
 The session owner creates all authenticated provider clients:
 
 - Outlook Web: dedicated browser profile and in-memory captured session;
-- Google/Graph: interactive OAuth browser plus grant in OS keyring;
+- Google: interactive OAuth browser, OS-keyring grant, Gmail XOAUTH2, and
+  Calendar API;
+- Graph: interactive OAuth browser plus grant in OS keyring;
 - JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference.
 
 No application transport accepts a password. OAuth client secrets, unattended
 grants, TLS interception, and raw authorization injection are unrepresentable.
 The daemon closes secret-owning clients on logout and clears owned mutable
 secret bytes.
-
-The legacy `google-web` configuration shape remains readable for safe
-inspection/removal, but selection and session activation fail before a browser
-launch. Corresync does not disguise software automation to bypass provider
-sign-in controls.
 
 ## Local IPC
 
@@ -260,11 +256,14 @@ acknowledgement transitions.
 ## Updates and distribution
 
 Automatic update discovery reads only public latest-release metadata, is
-cached, and is absent from machine transports and feedback. Explicit direct
-updates verify a finite GitHub Actions Sigstore identity allowlist, signed
+cached, and is absent from machine transports and feedback. Direct updates,
+whether invoked explicitly or through the default-off `updates.auto_install`
+consent, verify a finite GitHub Actions Sigstore identity allowlist, signed
 checksums, version, OS, architecture, and artifact inventory before
-rollback-capable replacement. Package-managed binaries remain owned by their
-package manager.
+rollback-capable replacement. Automatic installation runs only before eligible
+interactive CLI commands, never during MCP, configuration management, daemon,
+machine-readable, piped, or non-interactive execution. Package-managed binaries
+remain owned by their package manager.
 
 The v0.6 legacy names survive only in narrow migration/update inputs. Canonical
 runtime, config, state, IPC, package, plugin, and documentation names are

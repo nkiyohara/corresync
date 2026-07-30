@@ -1,5 +1,8 @@
 # ADR 0015: Per-service provider routes and authorization handles
 
+The Google transport and provider ID are amended by
+[ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md).
+
 - Status: accepted
 - Date: 2026-07-28
 

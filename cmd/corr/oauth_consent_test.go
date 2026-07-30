@@ -24,10 +24,15 @@ func TestOAuthConsentNoticeCombinesSharedRouteScopesBeforeLogin(t *testing.T) {
 	}
 	account := config.Account{
 		Mail: &config.MailRoute{
-			Provider: domain.ProviderGoogleAPI, GoogleAPI: &route,
+			Provider: domain.ProviderGoogle,
+			Google: &config.GoogleMailRoute{
+				Username: "reader@example.test",
+				ClientID: route.ClientID, RedirectURI: route.RedirectURI,
+				Authorization: route.Authorization,
+			},
 		},
 		Calendar: &config.CalendarRoute{
-			Provider: domain.ProviderGoogleAPI, GoogleAPI: &route,
+			Provider: domain.ProviderGoogle, Google: &route,
 		},
 	}
 	var stderr bytes.Buffer
@@ -42,10 +47,12 @@ func TestOAuthConsentNoticeCombinesSharedRouteScopesBeforeLogin(t *testing.T) {
 		t.Fatal(err)
 	}
 	output := stderr.String()
-	if strings.Count(output, "google-api:") != 1 ||
+	if strings.Count(output, "google:") != 1 ||
 		!strings.Contains(output, "mail.google.com") ||
 		!strings.Contains(output, "calendar.events") ||
-		!strings.Contains(output, "only when no matching valid local grant") {
+		!strings.Contains(output, "only when no matching valid local grant") ||
+		!strings.Contains(output, privacyPolicyURL) ||
+		!strings.Contains(output, termsOfUseURL) {
 		t.Fatalf("consent notice = %q", output)
 	}
 }

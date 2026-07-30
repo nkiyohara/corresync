@@ -42,15 +42,15 @@ type Provider struct {
 	AuthParams map[string]string
 }
 
-// ProviderFor returns the accepted endpoint and scope set for one explicit API
-// route. It never performs discovery or authorization.
+// ProviderFor returns the accepted endpoint and scope set for one explicit
+// OAuth route. It never performs discovery or authorization.
 func ProviderFor(
 	provider domain.ProviderID,
 	mailEnabled, calendarEnabled bool,
 ) (Provider, error) {
 	var result Provider
 	switch provider {
-	case domain.ProviderGoogleAPI:
+	case domain.ProviderGoogle:
 		// #nosec G101 -- these are public OAuth endpoint URLs, not credentials.
 		result = Provider{
 			ID:       provider,
@@ -164,13 +164,43 @@ type storedGrant struct {
 	Token       oauth2.Token      `json:"token"`
 }
 
-// Client loads an existing valid grant or starts explicit PKCE authorization.
-// Callers must invoke it only from the local CLI login boundary.
-func (manager *Manager) Client(
+// Authorization is one account-scoped, refreshable grant projection. The
+// refresh token remains encapsulated in the manager-owned token source.
+type Authorization interface {
+	HTTPClient() *http.Client
+	AccessToken(context.Context) ([]byte, error)
+}
+
+type authorization struct {
+	http   *http.Client
+	source oauth2.TokenSource
+}
+
+func (authorization *authorization) HTTPClient() *http.Client {
+	return authorization.http
+}
+
+func (authorization *authorization) AccessToken(ctx context.Context) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	token, err := authorization.source.Token()
+	if err != nil {
+		return nil, err
+	}
+	if token.AccessToken == "" || len(token.AccessToken) > maximumGrantBytes {
+		return nil, errors.New("OAuth access token is empty or too large")
+	}
+	return []byte(token.AccessToken), nil
+}
+
+// Authorize loads an existing valid grant or starts explicit PKCE
+// authorization. Callers must invoke it only from the local CLI login boundary.
+func (manager *Manager) Authorize(
 	ctx context.Context,
-	route config.OAuthRoute,
+	route config.OAuthClient,
 	provider Provider,
-) (*http.Client, error) {
+) (Authorization, error) {
 	if route.Authorization.Backend != config.CredentialOSKeyring ||
 		!route.Authorization.Consent {
 		return nil, errors.New("OAuth authorization handle is not explicitly consented")
@@ -199,11 +229,27 @@ func (manager *Manager) Client(
 		source: source, manager: manager, route: route,
 		provider: persistedProvider, current: grant.Token,
 	}
-	return oauth2.NewClient(baseContext, oauth2.ReuseTokenSource(&grant.Token, persisting)), nil
+	reused := oauth2.ReuseTokenSource(&grant.Token, persisting)
+	return &authorization{
+		http: oauth2.NewClient(baseContext, reused), source: reused,
+	}, nil
+}
+
+// Client is the compatibility projection used by HTTP API adapters.
+func (manager *Manager) Client(
+	ctx context.Context,
+	route config.OAuthRoute,
+	provider Provider,
+) (*http.Client, error) {
+	authorization, err := manager.Authorize(ctx, route.Client(), provider)
+	if err != nil {
+		return nil, err
+	}
+	return authorization.HTTPClient(), nil
 }
 
 func (manager *Manager) load(
-	route config.OAuthRoute,
+	route config.OAuthClient,
 	provider Provider,
 ) (storedGrant, error) {
 	raw, err := manager.get(keyringService, route.Authorization.Key)
@@ -223,8 +269,11 @@ func (manager *Manager) load(
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return storedGrant{}, errors.New("stored OAuth grant has trailing content")
 	}
+	providerMatches := grant.Provider == provider.ID ||
+		provider.ID == domain.ProviderGoogle &&
+			grant.Provider == domain.ProviderID("google-api")
 	if grant.Version != 1 ||
-		grant.Provider != provider.ID ||
+		!providerMatches ||
 		grant.ClientID != route.ClientID ||
 		grant.RedirectURI != route.RedirectURI ||
 		grant.Token.AccessToken == "" ||
@@ -257,7 +306,7 @@ func hasScopes(granted, required []string) bool {
 	return true
 }
 
-func oauthConfig(route config.OAuthRoute, provider Provider) oauth2.Config {
+func oauthConfig(route config.OAuthClient, provider Provider) oauth2.Config {
 	return oauth2.Config{
 		ClientID: route.ClientID, RedirectURL: route.RedirectURI,
 		Scopes: append([]string(nil), provider.Scopes...),
@@ -272,7 +321,7 @@ type persistingTokenSource struct {
 	mu       sync.Mutex
 	source   oauth2.TokenSource
 	manager  *Manager
-	route    config.OAuthRoute
+	route    config.OAuthClient
 	provider Provider
 	current  oauth2.Token
 }
@@ -296,7 +345,7 @@ func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func (manager *Manager) save(
-	route config.OAuthRoute,
+	route config.OAuthClient,
 	provider Provider,
 	token oauth2.Token,
 ) error {

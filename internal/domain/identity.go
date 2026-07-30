@@ -61,7 +61,7 @@ type ProviderID string
 const (
 	ProviderMicrosoftOWA   ProviderID = "microsoft-owa"
 	ProviderMicrosoftGraph ProviderID = "microsoft-graph"
-	ProviderGoogleAPI      ProviderID = "google-api"
+	ProviderGoogle         ProviderID = "google"
 	ProviderGoogleWeb      ProviderID = "google-web"
 	ProviderJMAP           ProviderID = "jmap"
 	ProviderIMAPSMTP       ProviderID = "imap-smtp"

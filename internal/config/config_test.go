@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -62,6 +63,21 @@ func TestDefaultRoundTripIsProviderNeutral(t *testing.T) {
 	}
 	if loaded.DefaultAccount != "" || len(loaded.Accounts) != 0 {
 		t.Fatalf("round trip selected a provider route: %+v", loaded)
+	}
+	if loaded.Updates.AutoInstall {
+		t.Fatal("fresh configuration enabled automatic installation")
+	}
+}
+
+func TestAutomaticInstallRequiresAutomaticChecks(t *testing.T) {
+	t.Parallel()
+
+	configuration := OutlookDefault()
+	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Updates.AutoInstall = true
+	if err := configuration.Validate(); err == nil ||
+		!strings.Contains(err.Error(), "updates.auto_install") {
+		t.Fatalf("contradictory update settings error = %v", err)
 	}
 }
 
@@ -186,12 +202,12 @@ func TestSaveTOMLPreservesValidatedComments(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	encoded := []byte("# retained\nversion = 3\n")
+	encoded := []byte("# retained\nversion = 4\n")
 	defaultConfig, err := toml.Marshal(OutlookDefault())
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded = append(encoded, bytes.TrimPrefix(defaultConfig, []byte("version = 3\n"))...)
+	encoded = append(encoded, bytes.TrimPrefix(defaultConfig, []byte("version = 4\n"))...)
 	if err := SaveTOML(path, encoded); err != nil {
 		t.Fatalf("SaveTOML() error = %v", err)
 	}
@@ -449,6 +465,125 @@ login_timeout = "5m"
 	}
 }
 
+func TestLoadMigratesV3GoogleAPIToGmailXOAUTH2(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	v3 := []byte(`
+version = 3
+default_account = "personal"
+
+[accounts.personal]
+id = "acc_00000000000000000000000000000003"
+address = "reader@gmail.com"
+
+[accounts.personal.mail]
+provider = "google-api"
+
+[accounts.personal.mail.google_api]
+api_base = "https://www.googleapis.com"
+client_id = "synthetic-google-public-client"
+redirect_uri = "http://127.0.0.1:43123/oauth/callback"
+
+[accounts.personal.mail.google_api.authorization]
+backend = "os-keyring"
+key = "google-personal-oauth"
+consent = true
+
+[accounts.personal.calendar]
+provider = "google-api"
+
+[accounts.personal.calendar.google_api]
+api_base = "https://www.googleapis.com"
+client_id = "synthetic-google-public-client"
+redirect_uri = "http://127.0.0.1:43123/oauth/callback"
+
+[accounts.personal.calendar.google_api.authorization]
+backend = "os-keyring"
+key = "google-personal-oauth"
+consent = true
+
+[policy]
+mode = "guarded"
+max_recipients = 20
+max_attendees = 50
+
+[browser]
+login_timeout = "5m"
+
+[updates]
+disable_automatic_checks = true
+`)
+	if err := os.WriteFile(path, v3, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["personal"]
+	if configuration.Version != CurrentVersion ||
+		configuration.DefaultAccount != "personal" ||
+		account.ID != "acc_00000000000000000000000000000003" ||
+		account.MailProvider() != domain.ProviderGoogle ||
+		account.CalendarProvider() != domain.ProviderGoogle ||
+		account.Mail.Google == nil ||
+		account.Mail.Google.Username != "reader@gmail.com" ||
+		account.Mail.Google.Mailbox != "" ||
+		account.Mail.Google.ClientID != "synthetic-google-public-client" ||
+		account.Mail.Google.Authorization.Key != "google-personal-oauth" ||
+		account.Calendar.Google == nil ||
+		account.Calendar.Google.APIBase != "https://www.googleapis.com" ||
+		account.Mail.Google.Client() != account.Calendar.Google.Client() ||
+		!configuration.Updates.DisableAutomaticChecks {
+		t.Fatalf("migrated v3 Google config = %+v", configuration)
+	}
+	raw, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(raw, v3) {
+		t.Fatal("read-only Load modified the v3 source")
+	}
+}
+
+func TestMigrateV3RejectsUnknownFields(t *testing.T) {
+	t.Parallel()
+	_, err := MigrateV3([]byte(`
+version = 3
+unexpected = "must-not-be-accepted"
+`))
+	if err == nil {
+		t.Fatalf("MigrateV3() error = %v", err)
+	}
+}
+
+func TestLegacyMigrationsCannotPreauthorizeAutomaticInstallation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		version int
+		migrate func([]byte) (Config, error)
+	}{
+		{"v1", 1, MigrateV1},
+		{"v2", 2, MigrateV2},
+		{"v3", 3, MigrateV3},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := test.migrate([]byte(fmt.Sprintf(`
+version = %d
+
+[updates]
+auto_install = true
+`, test.version)))
+			if err == nil || !strings.Contains(err.Error(), "strict mode") {
+				t.Fatalf("legacy auto-install consent error = %v", err)
+			}
+		})
+	}
+}
+
 func TestMixedStandardsRoutesAreStrictAndSecretFree(t *testing.T) {
 	t.Parallel()
 	configuration := OutlookDefault()
@@ -509,15 +644,16 @@ func TestMixedStandardsRoutesAreStrictAndSecretFree(t *testing.T) {
 	}
 }
 
-func TestOAuthRouteRequiresLoopbackPKCEAndOSKeyring(t *testing.T) {
+func TestGoogleMailOAuthRouteRequiresLoopbackAndOSKeyring(t *testing.T) {
 	t.Parallel()
 	configuration := OutlookDefault()
 	configuration.Accounts["work"] = Account{
-		ID: defaultAccountID,
+		ID:      defaultAccountID,
+		Address: "reader@example.test",
 		Mail: &MailRoute{
-			Provider: domain.ProviderGoogleAPI,
-			GoogleAPI: &OAuthRoute{
-				APIBase:     "https://www.googleapis.com",
+			Provider: domain.ProviderGoogle,
+			Google: &GoogleMailRoute{
+				Username:    "reader@example.test",
 				ClientID:    "synthetic-public-client",
 				RedirectURI: "http://127.0.0.1:43123/callback",
 				Authorization: CredentialRef{
@@ -530,25 +666,25 @@ func TestOAuthRouteRequiresLoopbackPKCEAndOSKeyring(t *testing.T) {
 		t.Fatalf("valid public-client route rejected: %v", err)
 	}
 	account := configuration.Accounts["work"]
-	oauth := *account.Mail.GoogleAPI
-	oauth.APIBase = "https://api.attacker.invalid"
-	account.Mail.GoogleAPI = &oauth
+	account.Mail.Google.Username = "other@example.test"
 	configuration.Accounts["work"] = account
 	if err := configuration.Validate(); err == nil {
-		t.Fatal("credential-exfiltrating OAuth API base was accepted")
+		t.Fatal("Google username different from the account address was accepted")
 	}
+	account.Mail.Google.Username = account.Address
+	configuration.Accounts["work"] = account
 
-	oauth.APIBase = "https://www.googleapis.com"
+	oauth := *account.Mail.Google
 	oauth.RedirectURI = "http://127.0.0.1:43123/callback?leak=true"
-	account.Mail.GoogleAPI = &oauth
+	account.Mail.Google = &oauth
 	configuration.Accounts["work"] = account
 	if err := configuration.Validate(); err == nil {
 		t.Fatal("OAuth redirect query was accepted")
 	}
 
 	oauth.RedirectURI = "http://127.0.0.1:43123/callback"
-	account.Mail.GoogleAPI = &oauth
-	account.Mail.GoogleAPI.Authorization.Backend = CredentialHelper
+	account.Mail.Google = &oauth
+	account.Mail.Google.Authorization.Backend = CredentialHelper
 	configuration.Accounts["work"] = account
 	if err := configuration.Validate(); err == nil {
 		t.Fatal("OAuth helper-backed grant was accepted")

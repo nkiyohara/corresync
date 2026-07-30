@@ -9,9 +9,14 @@ import (
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
 )
 
+const (
+	privacyPolicyURL = "https://nkiyohara.github.io/corresync/privacy.html"
+	termsOfUseURL    = "https://nkiyohara.github.io/corresync/terms.html"
+)
+
 type oauthConsentRoute struct {
 	provider domain.ProviderID
-	route    config.OAuthRoute
+	route    config.OAuthClient
 	mail     bool
 	calendar bool
 }
@@ -20,7 +25,7 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 	routes := make([]oauthConsentRoute, 0, 2)
 	add := func(
 		provider domain.ProviderID,
-		route *config.OAuthRoute,
+		route *config.OAuthClient,
 		mail, calendar bool,
 	) {
 		if route == nil {
@@ -29,7 +34,7 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 		for index := range routes {
 			existing := &routes[index]
 			if existing.provider == provider &&
-				oauthRoutesEqual(existing.route, *route) {
+				oauthClientsEqual(existing.route, *route) {
 				existing.mail = existing.mail || mail
 				existing.calendar = existing.calendar || calendar
 				return
@@ -42,10 +47,16 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 	}
 	if account.Mail != nil {
 		switch account.Mail.Provider {
-		case domain.ProviderGoogleAPI:
-			add(account.Mail.Provider, account.Mail.GoogleAPI, true, false)
+		case domain.ProviderGoogle:
+			if account.Mail.Google != nil {
+				client := account.Mail.Google.Client()
+				add(account.Mail.Provider, &client, true, false)
+			}
 		case domain.ProviderMicrosoftGraph:
-			add(account.Mail.Provider, account.Mail.MicrosoftGraph, true, false)
+			if account.Mail.MicrosoftGraph != nil {
+				client := account.Mail.MicrosoftGraph.Client()
+				add(account.Mail.Provider, &client, true, false)
+			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
 			domain.ProviderJMAP, domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV, domain.ProviderPOP3:
@@ -53,10 +64,16 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 	}
 	if account.Calendar != nil {
 		switch account.Calendar.Provider {
-		case domain.ProviderGoogleAPI:
-			add(account.Calendar.Provider, account.Calendar.GoogleAPI, false, true)
+		case domain.ProviderGoogle:
+			if account.Calendar.Google != nil {
+				client := account.Calendar.Google.Client()
+				add(account.Calendar.Provider, &client, false, true)
+			}
 		case domain.ProviderMicrosoftGraph:
-			add(account.Calendar.Provider, account.Calendar.MicrosoftGraph, false, true)
+			if account.Calendar.MicrosoftGraph != nil {
+				client := account.Calendar.MicrosoftGraph.Client()
+				add(account.Calendar.Provider, &client, false, true)
+			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
 			domain.ProviderJMAP, domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV, domain.ProviderPOP3:
@@ -106,7 +123,9 @@ func writeOAuthConsentNotice(app *runtime, account config.Account) error {
 	}
 	_, err = fmt.Fprintln(
 		app.stderr,
-		"   A provider page opens only when no matching valid local grant is stored.",
+		"   A provider page opens only when no matching valid local grant is stored.\n"+
+			"   Privacy: "+privacyPolicyURL+"\n"+
+			"   Terms: "+termsOfUseURL,
 	)
 	return err
 }

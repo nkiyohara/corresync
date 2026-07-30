@@ -150,46 +150,83 @@ func (app *runtime) updateReportWith(
 	return report, err
 }
 
-func (app *runtime) maybeNotifyUpdate(parent context.Context) {
-	if app.interactiveOutput == nil ||
-		!app.interactiveOutput() ||
-		!app.automaticUpdateChecksEnabled(parent, nil) {
+type automaticUpdateSettings struct {
+	checksEnabled bool
+	autoInstall   bool
+}
+
+func (app *runtime) maybeHandleAutomaticUpdate(parent context.Context) {
+	if app.interactiveOutput == nil || !app.interactiveOutput() ||
+		app.interactiveStdout == nil || !app.interactiveStdout() {
 		return
 	}
-	ctx, cancel := context.WithTimeout(parent, 750*time.Millisecond)
+	settings := app.automaticUpdateSettings(parent, nil)
+	if !settings.checksEnabled {
+		return
+	}
+	checkTimeout := 750 * time.Millisecond
+	if settings.autoInstall {
+		checkTimeout = 5 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(parent, checkTimeout)
 	defer cancel()
 	report, err := app.updateReport(ctx)
 	if err != nil || report.Status != updatecheck.StatusAvailable {
 		return
 	}
 	view := newUpdateView(app, app.stderr, true)
-	_ = view.writeNotice(report.CurrentVersion, report.LatestVersion)
+	if !settings.autoInstall || report.InstallMethod != updatecheck.InstallDirect {
+		_ = view.writeNotice(report.CurrentVersion, report.LatestVersion, report.Upgrade)
+		return
+	}
+	_ = view.writeAutomaticInstallStart(report.CurrentVersion, report.LatestVersion)
+	installContext, cancelInstall := context.WithTimeout(parent, 2*time.Minute)
+	defer cancelInstall()
+	result, err := app.installUpdate(installContext, nil)
+	if err != nil {
+		_ = view.writeAutomaticInstallFailure(report.CurrentVersion)
+		return
+	}
+	_ = view.writeAutomaticInstallResult(result)
 }
 
 func (app *runtime) automaticUpdateChecksEnabled(
 	ctx context.Context,
 	configuration *config.Config,
 ) bool {
+	return app.automaticUpdateSettings(ctx, configuration).checksEnabled
+}
+
+func (app *runtime) automaticUpdateSettings(
+	ctx context.Context,
+	configuration *config.Config,
+) automaticUpdateSettings {
 	if value, exists := app.lookupEnv("CORRESYNC_NO_UPDATE_CHECK"); exists &&
 		disablesUpdateCheck(value) {
-		return false
+		return automaticUpdateSettings{}
 	}
 	// Keep the v0.6 environment override as a migration-only compatibility
 	// input. It is intentionally not advertised by Corresync.
 	if value, exists := app.lookupEnv("OWA_NO_UPDATE_CHECK"); exists && disablesUpdateCheck(value) {
-		return false
+		return automaticUpdateSettings{}
 	}
 	if configuration != nil {
-		return !configuration.Updates.DisableAutomaticChecks
+		return automaticUpdateSettings{
+			checksEnabled: !configuration.Updates.DisableAutomaticChecks,
+			autoInstall:   configuration.Updates.AutoInstall,
+		}
 	}
 	loaded, _, err := app.loadConfigContext(ctx)
 	if err == nil {
-		return !loaded.Updates.DisableAutomaticChecks
+		return automaticUpdateSettings{
+			checksEnabled: !loaded.Updates.DisableAutomaticChecks,
+			autoInstall:   loaded.Updates.AutoInstall,
+		}
 	}
 	if errors.Is(err, os.ErrNotExist) {
-		return true
+		return automaticUpdateSettings{checksEnabled: true}
 	}
-	return false
+	return automaticUpdateSettings{}
 }
 
 func disablesUpdateCheck(value string) bool {
@@ -201,7 +238,7 @@ func disablesUpdateCheck(value string) bool {
 	}
 }
 
-func shouldOfferAutomaticUpdateNotice(arguments []string) bool {
+func shouldHandleAutomaticUpdate(arguments []string) bool {
 	for _, argument := range arguments {
 		if argument == "--json" || strings.HasPrefix(argument, "--json=") {
 			return false
@@ -209,7 +246,7 @@ func shouldOfferAutomaticUpdateNotice(arguments []string) bool {
 	}
 	command := rootCommand(arguments)
 	switch command {
-	case "", "completion", "daemon", "doctor", "feedback", "mcp", "update":
+	case "", "completion", "config", "daemon", "doctor", "feedback", "mcp", "update":
 		return false
 	default:
 		return !completionEnvironmentActive()

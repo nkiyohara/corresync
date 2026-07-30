@@ -103,7 +103,8 @@ treats cancellation as destructive, and never retries either submission.
 ## Multi-provider amendment
 
 On 2026-07-28 the project expanded the stable application boundary with
-independent Google API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters.
+independent Google Gmail-XOAUTH2/Calendar-API, Microsoft Graph, JMAP,
+IMAP/SMTP, and CalDAV adapters.
 This does not reverse the independent-implementation decision:
 
 - each adapter was written against its published protocol documentation and

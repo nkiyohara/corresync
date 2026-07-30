@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -56,13 +55,13 @@ func newAccountCommandRuntime(
 	return app, path, &stdout
 }
 
-func TestSetupCreatesProviderNeutralConfigThenRequiresExplicitGoogleRoute(
+func TestSetupCreatesProviderNeutralConfigThenDirectsGoogleToOfficialMCP(
 	t *testing.T,
 ) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{{
-				Provider:                  domain.ProviderGoogleAPI,
+				Provider:                  domain.ProviderGoogle,
 				Confidence:                98,
 				Authentication:            application.DiscoveryExplicitOAuth,
 				RequiresExplicitSelection: true,
@@ -94,9 +93,11 @@ func TestSetupCreatesProviderNeutralConfigThenRequiresExplicitGoogleRoute(
 	}
 	for _, expected := range []string{
 		"google account discovered",
-		"google-api",
-		"Workspace accounts may require administrator approval",
-		"software-controlled browsers",
+		"Google OAuth application is being prepared for verification",
+		"guided Google connection is not available yet",
+		"Google's official Workspace MCP servers",
+		"Developer Preview",
+		googleWorkspaceMCPGuide,
 	} {
 		if !strings.Contains(err.Error(), expected) {
 			t.Fatalf("setup error missing %q: %v", expected, err)
@@ -223,7 +224,7 @@ func TestSelectAccountCandidateDoesNotAutoSelectExplicitConsent(t *testing.T) {
 	result := application.AccountDiscoveryResult{
 		Domain: "gmail.com",
 		Candidates: []application.ProviderCandidate{{
-			Provider: domain.ProviderGoogleAPI, Confidence: 98,
+			Provider: domain.ProviderGoogle, Confidence: 98,
 			Authentication:            application.DiscoveryExplicitOAuth,
 			RequiresExplicitSelection: true,
 			Available:                 true,
@@ -239,7 +240,7 @@ func TestAccountAddRejectsGoogleWebEvenWhenDiscovered(t *testing.T) {
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{
 				{
-					Provider:                  domain.ProviderGoogleAPI,
+					Provider:                  domain.ProviderGoogle,
 					Confidence:                98,
 					Authentication:            application.DiscoveryExplicitOAuth,
 					RequiresExplicitSelection: true,
@@ -267,7 +268,10 @@ func TestAccountAddRejectsGoogleWebEvenWhenDiscovered(t *testing.T) {
 		Alias:    "google-web",
 		Provider: string(domain.ProviderGoogleWeb),
 	}).Run(app)
-	if !errors.Is(err, errGoogleWebSignInUnavailable) {
+	if err == nil || !strings.Contains(
+		err.Error(),
+		`provider "google-web" is not available in this build`,
+	) {
 		t.Fatalf("google-web error = %v", err)
 	}
 	configuration, err := config.Load(path)
@@ -305,11 +309,10 @@ func TestAccountAddRejectsGoogleWebOnOneServiceOfMixedRoute(t *testing.T) {
 		Provider:         string(domain.ProviderMicrosoftOWA),
 		Origin:           "https://outlook.cloud.microsoft",
 		CalendarProvider: string(domain.ProviderGoogleWeb),
-		CalendarOrigin:   "https://calendar.google.com",
 	}).Run(app)
 	if err == nil || !strings.Contains(
 		err.Error(),
-		`provider "google-web" is not available in this build`,
+		`calendar provider "google-web" is not available in this build`,
 	) {
 		t.Fatalf("mixed google-web error = %v", err)
 	}
@@ -419,7 +422,7 @@ func TestAccountAddPersistsExplicitGooglePublicClientWithoutAuthorizing(t *testi
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{{
-				Provider:                  domain.ProviderGoogleAPI,
+				Provider:                  domain.ProviderGoogle,
 				Confidence:                98,
 				Authentication:            application.DiscoveryExplicitOAuth,
 				RequiresExplicitSelection: true,
@@ -432,7 +435,7 @@ func TestAccountAddPersistsExplicitGooglePublicClientWithoutAuthorizing(t *testi
 	app, path, stdout := newAccountCommandRuntime(t, discoverer)
 	command := accountAddCommand{
 		Address: "reader@gmail.com", Alias: "google",
-		Provider:         string(domain.ProviderGoogleAPI),
+		Provider:         string(domain.ProviderGoogle),
 		OAuthClientID:    "synthetic-public-client.apps.googleusercontent.com",
 		OAuthRedirectURI: "http://127.0.0.1:53682/oauth/callback",
 		AuthorizationKey: "google-reader",
@@ -446,12 +449,13 @@ func TestAccountAddPersistsExplicitGooglePublicClientWithoutAuthorizing(t *testi
 		t.Fatal(err)
 	}
 	account := configuration.Accounts["google"]
-	if account.Mail == nil || account.Mail.GoogleAPI == nil ||
-		account.Calendar == nil || account.Calendar.GoogleAPI == nil ||
-		account.Mail.GoogleAPI.ClientID != command.OAuthClientID ||
-		account.Mail.GoogleAPI.Authorization.Key != command.AuthorizationKey ||
-		account.Mail.GoogleAPI.Authorization.Backend != config.CredentialOSKeyring {
-		t.Fatalf("Google API account = %#v", account)
+	if account.Mail == nil || account.Mail.Google == nil ||
+		account.Calendar == nil || account.Calendar.Google == nil ||
+		account.Mail.Google.ClientID != command.OAuthClientID ||
+		account.Mail.Google.Username != command.Address ||
+		account.Mail.Google.Authorization.Key != command.AuthorizationKey ||
+		account.Mail.Google.Authorization.Backend != config.CredentialOSKeyring {
+		t.Fatalf("Google account = %#v", account)
 	}
 	if !strings.Contains(stdout.String(), "authentication has not started") {
 		t.Fatalf("account output = %q", stdout.String())
@@ -508,7 +512,7 @@ func TestAccountAddPersistsCalendarOnlyGoogleRoute(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{{
-				Provider:                  domain.ProviderGoogleAPI,
+				Provider:                  domain.ProviderGoogle,
 				Confidence:                90,
 				Authentication:            application.DiscoveryExplicitOAuth,
 				RequiresExplicitSelection: true,
@@ -523,7 +527,7 @@ func TestAccountAddPersistsCalendarOnlyGoogleRoute(t *testing.T) {
 	command := accountAddCommand{
 		Address: "calendar@example.test", Alias: "calendar-only",
 		MailProvider:             "none",
-		CalendarProvider:         string(domain.ProviderGoogleAPI),
+		CalendarProvider:         string(domain.ProviderGoogle),
 		CalendarOAuthClientID:    "synthetic-calendar-client",
 		CalendarOAuthRedirectURI: "http://127.0.0.1:0/oauth/callback",
 		CalendarAuthorizationKey: "calendar-only-google",
@@ -539,9 +543,9 @@ func TestAccountAddPersistsCalendarOnlyGoogleRoute(t *testing.T) {
 	account := configuration.Accounts["calendar-only"]
 	if account.Mail != nil ||
 		account.Calendar == nil ||
-		account.Calendar.GoogleAPI == nil ||
-		account.Calendar.GoogleAPI.ClientID != command.CalendarOAuthClientID ||
-		account.Calendar.GoogleAPI.Authorization.Key !=
+		account.Calendar.Google == nil ||
+		account.Calendar.Google.ClientID != command.CalendarOAuthClientID ||
+		account.Calendar.Google.Authorization.Key !=
 			command.CalendarAuthorizationKey {
 		t.Fatalf("calendar-only Google account = %#v", account)
 	}

@@ -225,6 +225,35 @@ func TestAccountServiceFailsClosed(t *testing.T) {
 	}
 }
 
+func TestAccountServiceBindsGoogleMailUsernameToAccountAddress(t *testing.T) {
+	t.Parallel()
+	service, err := NewAccountService(
+		&accountRepositoryStub{},
+		&accountPurgerStub{},
+		[]domain.ProviderID{domain.ProviderGoogle},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.ReviewAdd(t.Context(), AccountAddInput{
+		Alias: "personal", Address: "reader@gmail.com",
+		Mail: &AccountMailRouteInput{
+			Provider: domain.ProviderGoogle,
+			Google: &AccountGoogleMailInput{
+				Username:    "other@gmail.com",
+				ClientID:    "synthetic.apps.googleusercontent.com",
+				RedirectURI: "http://127.0.0.1:0",
+				Authorization: AccountCredentialInput{
+					Backend: "os-keyring", Key: "google-personal", Consent: true,
+				},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("ReviewAdd() accepted a Google username for another account")
+	}
+}
+
 func TestAccountLifecycleReviewsNeverMutateRepositoryOrState(t *testing.T) {
 	t.Parallel()
 	work := accountFixture("work", "acc_00000000000000000000000000000001", true)

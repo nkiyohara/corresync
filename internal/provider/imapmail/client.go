@@ -35,6 +35,7 @@ const (
 
 	maximumRawMessageBytes  = 8 << 20
 	maximumIMAPLiteralBytes = maximumRawMessageBytes
+	maximumAccessTokenBytes = 64 << 10
 	networkTimeout          = 30 * time.Second
 )
 
@@ -45,29 +46,48 @@ type Endpoint struct {
 	Mode string
 }
 
-// Options identifies one explicitly configured standards mail route. Password
-// is copied into mutable client-owned storage and zeroed by Close.
+// AccessTokenSource returns one short-lived bearer credential owned by the
+// authenticated local session. The caller owns and must erase the returned
+// bytes.
+type AccessTokenSource interface {
+	AccessToken(context.Context) ([]byte, error)
+}
+
+// Options identifies one explicitly configured standards mail route. Exactly
+// one authentication mechanism is required. Password is copied into mutable
+// client-owned storage and zeroed by Close; OAuth2 tokens are requested only
+// immediately before a TLS-protected protocol authentication exchange.
 type Options struct {
-	IMAP      Endpoint
-	SMTP      Endpoint
-	Username  string
-	Sender    string
-	Password  []byte
-	TLSConfig *tls.Config
+	IMAP     Endpoint
+	SMTP     Endpoint
+	Username string
+	Sender   string
+	Password []byte
+	OAuth2   AccessTokenSource
+	// SMTPStoresSent means the submission service itself places an accepted
+	// message in the account's Sent mailbox. The adapter confirms that copy
+	// instead of issuing a duplicate IMAP APPEND.
+	SMTPStoresSent         bool
+	DisablePermanentDelete bool
+	TLSConfig              *tls.Config
 }
 
 // Client opens a fresh authenticated transport for each operation so accounts,
 // concurrent calls, rate state, and protocol state cannot bleed together.
 type Client struct {
-	imap       Endpoint
-	smtp       Endpoint
-	username   string
-	sender     string
-	password   []byte
-	tlsConfig  *tls.Config
-	observed   ObservedCapabilities
-	passwordMu sync.RWMutex
-	close      sync.Once
+	imap                   Endpoint
+	smtp                   Endpoint
+	username               string
+	sender                 string
+	password               []byte
+	oauth2                 AccessTokenSource
+	smtpStoresSent         bool
+	disablePermanentDelete bool
+	tlsConfig              *tls.Config
+	observed               ObservedCapabilities
+	authMu                 sync.RWMutex
+	closed                 bool
+	close                  sync.Once
 }
 
 // ObservedCapabilities are server-advertised IMAP features confirmed after
@@ -92,8 +112,15 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		strings.ContainsAny(options.Username, "\r\n\x00") {
 		return nil, errors.New("standards mail username is malformed")
 	}
-	if len(options.Password) == 0 || len(options.Password) > 64<<10 {
-		return nil, errors.New("standards mail credential is empty or too large")
+	passwordConfigured := len(options.Password) > 0
+	oauthConfigured := options.OAuth2 != nil
+	if passwordConfigured == oauthConfigured {
+		return nil, errors.New(
+			"standards mail requires exactly one password or OAuth2 token source",
+		)
+	}
+	if len(options.Password) > maximumAccessTokenBytes {
+		return nil, errors.New("standards mail credential is too large")
 	}
 	sender := options.Sender
 	if sender == "" {
@@ -109,8 +136,11 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	client := &Client{
 		imap: options.IMAP, smtp: options.SMTP,
 		username: options.Username, sender: sender,
-		password:  append([]byte(nil), options.Password...),
-		tlsConfig: tlsConfig,
+		password:               append([]byte(nil), options.Password...),
+		oauth2:                 options.OAuth2,
+		smtpStoresSent:         options.SMTPStoresSent,
+		disablePermanentDelete: options.DisablePermanentDelete,
+		tlsConfig:              tlsConfig,
 	}
 	if err := client.withIMAP(ctx, func(connection *imapclient.Client) error {
 		capabilities, err := connection.Capability()
@@ -156,9 +186,9 @@ func (client *Client) withIMAP(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	client.passwordMu.RLock()
-	defer client.passwordMu.RUnlock()
-	if len(client.password) == 0 {
+	client.authMu.RLock()
+	defer client.authMu.RUnlock()
+	if client.closed {
 		return errors.New("standards mail client is closed")
 	}
 	address := net.JoinHostPort(client.imap.Host, strconv.Itoa(int(client.imap.Port)))
@@ -179,7 +209,7 @@ func (client *Client) withIMAP(
 	}
 	connection.Timeout = networkTimeout
 	connection.ErrorLog = log.New(io.Discard, "", 0)
-	if err := connection.Login(client.username, string(client.password)); err != nil {
+	if err := client.authenticateIMAP(ctx, connection); err != nil {
 		_ = connection.Terminate()
 		return err
 	}
@@ -198,9 +228,9 @@ func (client *Client) withSMTP(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	client.passwordMu.RLock()
-	defer client.passwordMu.RUnlock()
-	if len(client.password) == 0 {
+	client.authMu.RLock()
+	defer client.authMu.RUnlock()
+	if client.closed {
 		return errors.New("standards mail client is closed")
 	}
 	address := net.JoinHostPort(client.smtp.Host, strconv.Itoa(int(client.smtp.Port)))
@@ -220,9 +250,7 @@ func (client *Client) withSMTP(
 	}
 	connection.CommandTimeout = networkTimeout
 	connection.SubmissionTimeout = networkTimeout
-	if err := connection.Auth(
-		sasl.NewPlainClient("", client.username, string(client.password)),
-	); err != nil {
+	if err := client.authenticateSMTP(ctx, connection); err != nil {
 		_ = connection.Close()
 		return err
 	}
@@ -237,18 +265,72 @@ func (client *Client) endpointTLS(serverName string) *tls.Config {
 	return copy
 }
 
+func (client *Client) authenticateIMAP(
+	ctx context.Context,
+	connection *imapclient.Client,
+) error {
+	if client.oauth2 == nil {
+		return connection.Login(client.username, string(client.password))
+	}
+	token, err := client.accessToken(ctx)
+	if err != nil {
+		return err
+	}
+	defer erase(token)
+	auth := newXOAuth2Client(client.username, token)
+	defer func() { _ = auth.Close() }()
+	return connection.Authenticate(auth)
+}
+
+func (client *Client) authenticateSMTP(
+	ctx context.Context,
+	connection *smtp.Client,
+) error {
+	if client.oauth2 == nil {
+		return connection.Auth(
+			sasl.NewPlainClient("", client.username, string(client.password)),
+		)
+	}
+	token, err := client.accessToken(ctx)
+	if err != nil {
+		return err
+	}
+	defer erase(token)
+	auth := newXOAuth2Client(client.username, token)
+	defer func() { _ = auth.Close() }()
+	return connection.Auth(auth)
+}
+
+func (client *Client) accessToken(ctx context.Context) ([]byte, error) {
+	token, err := client.oauth2.AccessToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("obtain OAuth2 access token: %w", err)
+	}
+	if len(token) == 0 || len(token) > maximumAccessTokenBytes {
+		erase(token)
+		return nil, errors.New("OAuth2 access token is empty or too large")
+	}
+	return token, nil
+}
+
+func erase(value []byte) {
+	for index := range value {
+		value[index] = 0
+	}
+}
+
 // Close overwrites the credential bytes owned by the adapter.
 func (client *Client) Close() error {
 	if client == nil {
 		return nil
 	}
 	client.close.Do(func() {
-		client.passwordMu.Lock()
-		defer client.passwordMu.Unlock()
-		for index := range client.password {
-			client.password[index] = 0
-		}
+		client.authMu.Lock()
+		defer client.authMu.Unlock()
+		erase(client.password)
 		client.password = nil
+		client.oauth2 = nil
+		client.closed = true
 	})
 	return nil
 }

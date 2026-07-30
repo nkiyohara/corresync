@@ -51,7 +51,7 @@ func TestFeedbackPrintsCompleteReportBeforeOfferingActions(t *testing.T) {
 			t.Fatalf("feedback output retained config value %q:\n%s", sensitive, output)
 		}
 	}
-	if shouldOfferAutomaticUpdateNotice([]string{"feedback"}) {
+	if shouldHandleAutomaticUpdate([]string{"feedback"}) {
 		t.Fatal("feedback would perform an automatic network update check")
 	}
 }

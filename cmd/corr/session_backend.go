@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -38,11 +37,11 @@ type sessionCloser interface {
 }
 
 type oauthClientManager interface {
-	Client(
+	Authorize(
 		context.Context,
-		config.OAuthRoute,
+		config.OAuthClient,
 		oauthlocal.Provider,
-	) (*http.Client, error)
+	) (oauthlocal.Authorization, error)
 }
 
 type sessionAccount struct {
@@ -735,7 +734,7 @@ func (backend *sessionBackend) terminalInteraction(
 		return nil, fmt.Errorf("account %q is not configured", input.Account)
 	}
 	if hasGoogleWebRoute(configured) {
-		return nil, errGoogleWebSignInUnavailable
+		return nil, errUnsupportedLegacyGoogleRoute
 	}
 	profileDirectory, err := paths.ProfileDir(input.Account)
 	if err != nil {
@@ -1726,7 +1725,7 @@ func (backend *sessionBackend) activateAccount(
 	backend.mu.Unlock()
 
 	if hasGoogleWebRoute(configured) {
-		return sessionAccount{}, errGoogleWebSignInUnavailable
+		return sessionAccount{}, errUnsupportedLegacyGoogleRoute
 	}
 	var services sessionAccount
 	if hasOutlookRoute(configured) {
@@ -2119,14 +2118,17 @@ func (backend *sessionBackend) calDAVAccount(
 	return result, nil
 }
 
-func (backend *sessionBackend) googleAPIAccount(
+func (backend *sessionBackend) googleAccount(
 	ctx context.Context,
 	configured config.Account,
-	route config.OAuthRoute,
-	mailEnabled, calendarEnabled bool,
+	clientRoute config.OAuthClient,
+	mailRoute *config.GoogleMailRoute,
+	calendarRoute *config.OAuthRoute,
 ) (sessionAccount, error) {
+	mailEnabled := mailRoute != nil
+	calendarEnabled := calendarRoute != nil
 	provider, err := oauthlocal.ProviderFor(
-		domain.ProviderGoogleAPI,
+		domain.ProviderGoogle,
 		mailEnabled,
 		calendarEnabled,
 	)
@@ -2140,25 +2142,11 @@ func (backend *sessionBackend) googleAPIAccount(
 			return sessionAccount{}, err
 		}
 	}
-	authorizedHTTP, err := manager.Client(ctx, route, provider)
-	if err != nil {
-		return sessionAccount{}, err
-	}
-	factory := backend.newGoogle
-	if factory == nil {
-		factory = googleapi.New
-	}
-	client, err := factory(ctx, googleapi.Options{
-		APIBase: route.APIBase,
-		Address: configured.Address,
-		Mail:    mailEnabled, Calendar: calendarEnabled,
-		HTTP: authorizedHTTP,
-	})
+	authorization, err := manager.Authorize(ctx, clientRoute, provider)
 	if err != nil {
 		return sessionAccount{}, err
 	}
 	result := sessionAccount{
-		closers:  []sessionCloser{client},
 		captured: time.Now().UTC(),
 		capabilities: domain.Capabilities{
 			Mail: mailEnabled, Calendar: calendarEnabled,
@@ -2167,48 +2155,31 @@ func (backend *sessionBackend) googleAPIAccount(
 		},
 	}
 	if mailEnabled {
-		result.degradations = append(
-			result.degradations,
-			domain.Degradation{
-				Feature: "mail.search",
-				Reason:  "Gmail search syntax differs from Outlook AQS",
-				Lossy:   true,
+		factory := backend.newIMAP
+		if factory == nil {
+			factory = imapmail.New
+		}
+		sender := mailRoute.Mailbox
+		if sender == "" {
+			sender = configured.Address
+		}
+		client, clientErr := factory(ctx, imapmail.Options{
+			IMAP: imapmail.Endpoint{
+				Host: "imap.gmail.com", Port: 993, Mode: imapmail.TLSImplicit,
 			},
-			domain.Degradation{
-				Feature: "mail.state",
-				Reason:  "Gmail exposes no atomic historyId precondition for label updates",
+			SMTP: imapmail.Endpoint{
+				Host: "smtp.gmail.com", Port: 587, Mode: imapmail.TLSStartTLS,
 			},
-			domain.Degradation{
-				Feature: "mail.move",
-				Reason:  "Gmail exposes no atomic historyId precondition for moves",
-			},
-			domain.Degradation{
-				Feature: "mail.delete",
-				Reason:  "Gmail exposes no atomic historyId precondition for permanent deletion; Corresync revalidates immediately before the action",
-			},
-			domain.Degradation{
-				Feature: "mail.push_history",
-				Reason:  "the Google API route does not register push watches or expose history cursors",
-			},
-			domain.Degradation{
-				Feature: "mail.scheduled_send",
-				Reason:  "the Gmail API does not expose scheduled sending",
-			},
-		)
-	}
-	if calendarEnabled && client.MeetAvailable() {
-		result.capabilities.OnlineMeeting = "google-meet"
-	}
-	if calendarEnabled && !client.MeetAvailable() {
-		result.degradations = append(
-			result.degradations,
-			domain.Degradation{
-				Feature: "calendar.online_meeting_create",
-				Reason:  "the authenticated Google calendar does not advertise hangoutsMeet as an allowed conference solution",
-			},
-		)
-	}
-	if mailEnabled {
+			Username:               mailRoute.Username,
+			Sender:                 sender,
+			OAuth2:                 authorization,
+			SMTPStoresSent:         true,
+			DisablePermanentDelete: true,
+		})
+		if clientErr != nil {
+			return sessionAccount{}, clientErr
+		}
+		result.closers = append(result.closers, client)
 		result.mail, err = application.NewMailService(
 			backend.guard,
 			client,
@@ -2216,22 +2187,82 @@ func (backend *sessionBackend) googleAPIAccount(
 				MaxRecipients: backend.configuration.Policy.MaxRecipients,
 				Provenance: domain.Provenance{
 					AccountID: configured.ID,
-					Provider:  domain.ProviderGoogleAPI,
-					MailboxID: "gmail-me",
+					Provider:  domain.ProviderGoogle,
+					MailboxID: "gmail-imap",
 				},
 			},
 		)
 		if err != nil {
-			return sessionAccount{}, errors.Join(err, client.Close())
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(result))
 		}
+		observed := client.ObservedCapabilities()
+		if !observed.Move && !observed.UIDPlus {
+			result.degradations = append(result.degradations, domain.Degradation{
+				Feature: "mail.move",
+				Reason:  "Gmail IMAP advertises neither MOVE nor UIDPLUS; safe targeted move is unavailable",
+			})
+		}
+		if !observed.Sent {
+			result.degradations = append(result.degradations, domain.Degradation{
+				Feature: "mail.send",
+				Reason:  "Gmail IMAP exposes no Sent mailbox; SMTP submission fails closed before sending",
+			})
+		}
+		result.degradations = append(
+			result.degradations,
+			domain.Degradation{
+				Feature: "mail.delete",
+				Reason:  "Gmail IMAP expunge behavior is account-configurable, so Corresync cannot guarantee permanent deletion",
+			},
+			domain.Degradation{
+				Feature: "mail.labels",
+				Reason:  "Gmail labels are projected through IMAP mailboxes and may appear in more than one folder",
+				Lossy:   true,
+			},
+			domain.Degradation{
+				Feature: "mail.push_history",
+				Reason:  "the Gmail IMAP route does not register push watches or expose durable history cursors",
+			},
+			domain.Degradation{
+				Feature: "mail.scheduled_send",
+				Reason:  "Gmail SMTP submission does not expose scheduled sending",
+			},
+		)
 	}
 	if calendarEnabled {
+		factory := backend.newGoogle
+		if factory == nil {
+			factory = googleapi.New
+		}
+		client, clientErr := factory(ctx, googleapi.Options{
+			APIBase: calendarRoute.APIBase,
+			Address: configured.Address,
+			HTTP:    authorization.HTTPClient(),
+		})
+		if clientErr != nil {
+			return sessionAccount{}, errors.Join(
+				clientErr,
+				closeSessionAccount(result),
+			)
+		}
+		result.closers = append(result.closers, client)
+		if client.MeetAvailable() {
+			result.capabilities.OnlineMeeting = "google-meet"
+		} else {
+			result.degradations = append(
+				result.degradations,
+				domain.Degradation{
+					Feature: "calendar.online_meeting_create",
+					Reason:  "the authenticated Google calendar does not advertise hangoutsMeet as an allowed conference solution",
+				},
+			)
+		}
 		result.calendar, err = application.NewCalendarService(
 			backend.guard,
 			client,
 			application.CalendarOptions{
 				MaxAttendees: backend.configuration.Policy.MaxAttendees,
-				Effects:      providerCalendarEffects(domain.ProviderGoogleAPI),
+				Effects:      providerCalendarEffects(domain.ProviderGoogle),
 				OnlineMeetingProvider: func() string {
 					if client.MeetAvailable() {
 						return "google-meet"
@@ -2240,13 +2271,16 @@ func (backend *sessionBackend) googleAPIAccount(
 				}(),
 				Provenance: domain.Provenance{
 					AccountID:  configured.ID,
-					Provider:   domain.ProviderGoogleAPI,
+					Provider:   domain.ProviderGoogle,
 					CalendarID: "primary",
 				},
 			},
 		)
 		if err != nil {
-			return sessionAccount{}, errors.Join(err, client.Close())
+			return sessionAccount{}, errors.Join(
+				err,
+				closeSessionAccount(result),
+			)
 		}
 	}
 	return result, nil
@@ -2273,10 +2307,11 @@ func (backend *sessionBackend) graphAPIAccount(
 			return sessionAccount{}, err
 		}
 	}
-	authorizedHTTP, err := manager.Client(ctx, route, provider)
+	authorization, err := manager.Authorize(ctx, route.Client(), provider)
 	if err != nil {
 		return sessionAccount{}, err
 	}
+	authorizedHTTP := authorization.HTTPClient()
 	factory := backend.newGraph
 	if factory == nil {
 		factory = graphapi.New
@@ -2376,28 +2411,63 @@ func (backend *sessionBackend) nonOutlookAccount(
 	configured config.Account,
 ) (sessionAccount, error) {
 	var combined sessionAccount
-	sharedGoogle := configured.Mail != nil &&
-		configured.Mail.Provider == domain.ProviderGoogleAPI &&
-		configured.Mail.GoogleAPI != nil &&
-		configured.Calendar != nil &&
-		configured.Calendar.Provider == domain.ProviderGoogleAPI &&
-		configured.Calendar.GoogleAPI != nil &&
-		oauthRoutesEqual(
-			*configured.Mail.GoogleAPI,
-			*configured.Calendar.GoogleAPI,
-		)
-	if sharedGoogle {
-		google, err := backend.googleAPIAccount(
-			ctx,
-			configured,
-			*configured.Mail.GoogleAPI,
-			true,
-			true,
-		)
-		if err != nil {
-			return sessionAccount{}, err
+	var googleMail *config.GoogleMailRoute
+	if configured.Mail != nil &&
+		configured.Mail.Provider == domain.ProviderGoogle {
+		googleMail = configured.Mail.Google
+	}
+	var googleCalendar *config.OAuthRoute
+	if configured.Calendar != nil &&
+		configured.Calendar.Provider == domain.ProviderGoogle {
+		googleCalendar = configured.Calendar.Google
+	}
+	if googleMail != nil || googleCalendar != nil {
+		sharedGoogle := googleMail != nil &&
+			googleCalendar != nil &&
+			oauthClientsEqual(googleMail.Client(), googleCalendar.Client())
+		if sharedGoogle {
+			google, err := backend.googleAccount(
+				ctx,
+				configured,
+				googleMail.Client(),
+				googleMail,
+				googleCalendar,
+			)
+			if err != nil {
+				return sessionAccount{}, err
+			}
+			combined = mergeSessionAccounts(combined, google)
+		} else {
+			if googleMail != nil {
+				google, err := backend.googleAccount(
+					ctx,
+					configured,
+					googleMail.Client(),
+					googleMail,
+					nil,
+				)
+				if err != nil {
+					return sessionAccount{}, err
+				}
+				combined = mergeSessionAccounts(combined, google)
+			}
+			if googleCalendar != nil {
+				google, err := backend.googleAccount(
+					ctx,
+					configured,
+					googleCalendar.Client(),
+					nil,
+					googleCalendar,
+				)
+				if err != nil {
+					return sessionAccount{}, errors.Join(
+						err,
+						closeSessionAccount(combined),
+					)
+				}
+				combined = mergeSessionAccounts(combined, google)
+			}
 		}
-		combined = mergeSessionAccounts(combined, google)
 	}
 	sharedGraph := configured.Mail != nil &&
 		configured.Mail.Provider == domain.ProviderMicrosoftGraph &&
@@ -2434,13 +2504,9 @@ func (backend *sessionBackend) nonOutlookAccount(
 			mail, err = backend.jmapAccount(ctx, configured)
 		case domain.ProviderIMAPSMTP:
 			mail, err = backend.imapAccount(ctx, configured)
-		case domain.ProviderGoogleAPI:
-			if configured.Mail.GoogleAPI == nil {
-				err = errors.New("google API mail route settings are missing")
-			} else if !sharedGoogle {
-				mail, err = backend.googleAPIAccount(
-					ctx, configured, *configured.Mail.GoogleAPI, true, false,
-				)
+		case domain.ProviderGoogle:
+			if configured.Mail.Google == nil {
+				err = errors.New("google mail route settings are missing")
 			}
 		case domain.ProviderMicrosoftGraph:
 			if configured.Mail.MicrosoftGraph == nil {
@@ -2475,13 +2541,9 @@ func (backend *sessionBackend) nonOutlookAccount(
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb:
 		case domain.ProviderCalDAV:
 			calendar, err = backend.calDAVAccount(ctx, configured)
-		case domain.ProviderGoogleAPI:
-			if configured.Calendar.GoogleAPI == nil {
-				err = errors.New("google API calendar route settings are missing")
-			} else if !sharedGoogle {
-				calendar, err = backend.googleAPIAccount(
-					ctx, configured, *configured.Calendar.GoogleAPI, false, true,
-				)
+		case domain.ProviderGoogle:
+			if configured.Calendar.Google == nil {
+				err = errors.New("google calendar route settings are missing")
 			}
 		case domain.ProviderMicrosoftGraph:
 			if configured.Calendar.MicrosoftGraph == nil {
@@ -2518,7 +2580,11 @@ func (backend *sessionBackend) nonOutlookAccount(
 
 func oauthRoutesEqual(left, right config.OAuthRoute) bool {
 	return left.APIBase == right.APIBase &&
-		left.ClientID == right.ClientID &&
+		oauthClientsEqual(left.Client(), right.Client())
+}
+
+func oauthClientsEqual(left, right config.OAuthClient) bool {
+	return left.ClientID == right.ClientID &&
 		left.RedirectURI == right.RedirectURI &&
 		left.Authorization == right.Authorization
 }
@@ -2551,7 +2617,7 @@ func providerCalendarEffects(provider domain.ProviderID) application.CalendarEff
 			CancellationMode:            application.CalendarCancellationModeAll,
 			CancellationDisposition:     application.CalendarDispositionDeletedItems,
 		}
-	case domain.ProviderGoogleAPI, domain.ProviderMicrosoftGraph:
+	case domain.ProviderGoogle, domain.ProviderMicrosoftGraph:
 		return application.CalendarEffects{
 			CreateAttendeeNotifications: true,
 			UpdateAttendeeNotifications: true,

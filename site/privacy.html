@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync Privacy Policy — local-first Google data handling</title>
+    <meta
+      name="description"
+      content="How Corresync accesses, uses, stores, shares, and deletes Google mail, calendar, OAuth, website, update, and optional local monitoring data."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta
+      property="og:title"
+      content="Corresync Privacy Policy — local-first Google data handling"
+    >
+    <meta
+      property="og:description"
+      content="How Corresync accesses, uses, stores, shares, and deletes Google mail, calendar, OAuth, website, update, and optional local monitoring data."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://nkiyohara.github.io/corresync/privacy.html">
+    <meta property="og:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta
+      name="twitter:title"
+      content="Corresync Privacy Policy — local-first Google data handling"
+    >
+    <meta
+      name="twitter:description"
+      content="How Corresync accesses, uses, stores, shares, and deletes Google mail, calendar, OAuth, website, update, and optional local monitoring data."
+    >
+    <meta name="twitter:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+    >
+    <link rel="canonical" href="https://nkiyohara.github.io/corresync/privacy.html">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="airmail" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync home">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="./">Home</a>
+        <a href="getting-started.html">Getting started</a>
+        <a href="providers.html">Providers</a>
+        <a href="features.html">Features</a>
+        <a href="safety.html">Safety</a>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="page-hero legal-page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>Privacy Policy</p>
+        <h1 id="page-title">Your correspondence stays <em>under your control.</em></h1>
+        <p class="lede">
+          Corresync is a local-first open-source application. It connects your device directly to
+          providers you authorize; the Corresync project does not operate a hosted mailbox,
+          calendar, token relay, analytics service, or remote MCP server.
+        </p>
+        <p class="legal-date">
+          Effective and last updated: <time datetime="2026-07-30">30 July 2026</time>
+        </p>
+        <nav class="legal-toc" aria-label="Privacy Policy sections">
+          <a href="#scope">Scope</a>
+          <a href="#google-data">Google data</a>
+          <a href="#other-data">Other routes</a>
+          <a href="#storage">Local storage</a>
+          <a href="#sharing">Sharing</a>
+          <a href="#choices">Your choices</a>
+          <a href="#contact">Contact</a>
+        </nav>
+      </section>
+
+      <section class="legal-shell" aria-label="Privacy Policy">
+        <div class="legal-summary" role="note" aria-labelledby="summary-title">
+          <div>
+            <p class="eyebrow"><span aria-hidden="true"></span>At a glance</p>
+            <h2 id="summary-title">No Corresync cloud holds your mailbox.</h2>
+          </div>
+          <ul>
+            <li>Google authorization happens in your normal system browser.</li>
+            <li>OAuth grants stay in your operating system keyring.</li>
+            <li>Mail and calendar requests go from your device to Google over TLS.</li>
+            <li>No advertising, sale of data, analytics, or general-purpose model training.</li>
+          </ul>
+        </div>
+
+        <article class="legal-copy">
+          <section id="scope" aria-labelledby="scope-title">
+            <p class="legal-kicker">01 · Scope and identity</p>
+            <h2 id="scope-title">What this policy covers</h2>
+            <p>
+              This Privacy Policy explains how Naoki Kiyohara, maintainer of the Corresync
+              open-source project, and project contributors (“Corresync”, “we”, or “the
+              project”) handle information in the official Corresync application, its Google OAuth
+              application, and this website. It does not govern independent forks, third-party
+              builds, your email or calendar provider, operating system, package manager, MCP
+              client, AI provider, or optional runner; those parties apply their own terms and
+              privacy policies.
+            </p>
+            <p>
+              Corresync has no user-account database. You install and run it on a device you
+              control. Provider account data is processed locally at your direction to provide the
+              mail and calendar features you invoke.
+            </p>
+          </section>
+
+          <section id="google-data" aria-labelledby="google-title">
+            <p class="legal-kicker">02 · Google user data</p>
+            <h2 id="google-title">Exactly what Corresync requests and why</h2>
+            <p>
+              Corresync requests Google access only for services you enable. The consent screen
+              shows the applicable permissions before Google issues a grant.
+            </p>
+            <p>
+              Guided connection through the project’s official Google OAuth application is not
+              generally available while that application is prepared and verified. The practices
+              below apply both to that official application when available and to the same local
+              Google route when you explicitly configure a public client you are authorized to use.
+            </p>
+            <div
+              class="legal-table-wrap"
+              tabindex="0"
+              role="region"
+              aria-label="Google OAuth data and use"
+            >
+              <table class="legal-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Google scope</th>
+                    <th scope="col">Data accessed</th>
+                    <th scope="col">Purpose and actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>https://mail.google.com/</code></td>
+                    <td>
+                      Gmail folders and labels; message identifiers, headers, participants,
+                      subjects, timestamps, bodies, attachments, state, drafts, and sent mail.
+                    </td>
+                    <td>
+                      Search, list, read, download an attachment you request, draft, send, mark read
+                      or unread, and move or organize mail. Gmail IMAP/SMTP XOAUTH2 requires this
+                      broad scope. Corresync’s Google route does not expose permanent message
+                      deletion even though the scope itself is capable of broader mailbox access.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>https://www.googleapis.com/auth/calendar.calendarlist.readonly</code>
+                    </td>
+                    <td>
+                      The names, identifiers, access roles, and metadata of calendars in your
+                      calendar list.
+                    </td>
+                    <td>Show and select the calendars already available to your Google account.</td>
+                  </tr>
+                  <tr>
+                    <td><code>https://www.googleapis.com/auth/calendar.events</code></td>
+                    <td>
+                      Event identifiers, titles, descriptions, locations, times, attendees,
+                      recurrence, reminders, status, and conferencing properties.
+                    </td>
+                    <td>
+                      List, read, create, update, and cancel events you select, including requesting
+                      a Google Meet link as a property of an event when Google supports it.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              Corresync uses this data only to provide the user-facing mail, calendar, monitoring,
+              and automation features that you explicitly invoke or configure. It does not access
+              Google Contacts, Drive, advertising profiles, passwords, browser cookies, or
+              undocumented Google APIs.
+            </p>
+          </section>
+
+          <section id="other-data" aria-labelledby="other-data-title">
+            <p class="legal-kicker">03 · Other providers and local imports</p>
+            <h2 id="other-data-title">The same local boundary across routes</h2>
+            <p>
+              For an Outlook Web, Microsoft Graph, JMAP, IMAP/SMTP, or CalDAV route you select,
+              Corresync can process the equivalent account address, mail folders, message metadata
+              and content, attachments, calendar lists, event data, capabilities, and write outcomes
+              needed for the operations you invoke. This data travels between your device and the
+              selected provider; the Corresync project does not receive it.
+            </p>
+            <p>
+              Microsoft Graph grants stay in the OS keyring. Standards-provider passwords or tokens
+              remain behind an OS-keyring reference or a credential helper that you explicitly
+              approve; helper output is used transiently and is not copied into configuration.
+              Outlook Web sign-in and site data remain in a dedicated local browser profile.
+            </p>
+            <p>
+              If you explicitly approve a read-only local import scan, Corresync can inspect the one
+              archive, Maildir tree, or supported export you selected and create a bounded,
+              account-local staging record. It does not upload, authenticate, send, change, or
+              delete the source.
+            </p>
+          </section>
+
+          <section id="processing" aria-labelledby="processing-title">
+            <p class="legal-kicker">04 · How processing works</p>
+            <h2 id="processing-title">Direct connections, explicit actions</h2>
+            <p>
+              The official Google route opens Google’s authorization page in your system browser
+              using OAuth 2.0 with PKCE and a loopback redirect. Corresync then connects directly
+              from your device to Google’s fixed Gmail IMAP, Gmail SMTP, and Calendar API
+              endpoints over TLS. The project does not receive your password, OAuth grant, email,
+              attachment, or calendar content.
+            </p>
+            <p>
+              CLI and MCP requests enter the same typed application operations. Reads are
+              metadata-first where possible. A consequential write—such as sending mail or
+              inviting attendees—presents an exact preview and requires a separate, short-lived
+              approval bound to the selected account and payload. Corresync does not silently fall
+              back to another provider route.
+            </p>
+          </section>
+
+          <section id="storage" aria-labelledby="storage-title">
+            <p class="legal-kicker">05 · Local storage and retention</p>
+            <h2 id="storage-title">What remains on your device</h2>
+            <ul>
+              <li>
+                <strong>OAuth grant:</strong> access and refresh tokens are stored under an opaque
+                account-specific handle in your operating system keyring, not in Corresync
+                configuration.
+              </li>
+              <li>
+                <strong>Browser-owned session:</strong> a web route can retain cookies, session
+                material, and provider site data inside a dedicated, account-local browser profile.
+                Those values are not copied into Corresync configuration, audit, feedback, or MCP
+                output.
+              </li>
+              <li>
+                <strong>Standards credential:</strong> a JMAP, IMAP/SMTP, or CalDAV password or
+                token remains in your OS keyring or approved helper. Configuration retains only the
+                external reference.
+              </li>
+              <li>
+                <strong>Configuration:</strong> your account address, local alias, enabled routes,
+                public OAuth client identifier, loopback redirect, and keyring handle.
+              </li>
+              <li>
+                <strong>Content-free audit:</strong> bounded operation type, outcome, time, caller,
+                opaque account and target/provider identifiers, and policy context. Audit records
+                exclude addresses, recipients, subjects, bodies, attachment names, event text,
+                queries, credential references, tokens, and approval values.
+              </li>
+              <li>
+                <strong>Optional monitoring:</strong> only after you enable durable queueing,
+                account/event identifiers and selected fields such as sender, subject, received
+                time, importance, and attachment presence may be stored locally. Message bodies and
+                attachments are not placed in that queue.
+              </li>
+              <li>
+                <strong>Optional import staging:</strong> after explicit read approval, a bounded
+                account-local record can retain metadata and content from the one local source you
+                selected until you purge it or remove the account.
+              </li>
+              <li>
+                <strong>Transient data:</strong> requested mail and calendar values may exist in
+                process memory and local stdio while an operation runs. Corresync does not maintain
+                a general persistent copy of your Gmail mailbox or Google Calendar.
+              </li>
+            </ul>
+            <p>
+              Local records remain until you remove the account, purge the applicable queue or
+              staging area, or delete the protected Corresync data yourself. Content-free security
+              audit records remain until you delete the local audit file. Provider data remains at
+              Google according to your Google settings and actions.
+            </p>
+          </section>
+
+          <section id="sharing" aria-labelledby="sharing-title">
+            <p class="legal-kicker">06 · Disclosure and transfers</p>
+            <h2 id="sharing-title">Who can receive data</h2>
+            <p>
+              The Corresync project does not collect or share your Google user data because it has
+              no service that receives it. On your device, data may be disclosed only as needed to:
+            </p>
+            <ul>
+              <li>
+                Google or another provider you select, to authenticate and perform the provider
+                operation you requested;
+              </li>
+              <li>
+                your chosen local CLI output or MCP client when you ask it to retrieve or act on
+                data;
+              </li>
+              <li>
+                an AI service selected and configured by you if that MCP client sends tool results
+                to a remote model, under that service’s own privacy terms; or
+              </li>
+              <li>
+                an optional no-shell monitor runner and destination that you separately enable, with
+                a separate opt-in for remote egress.
+              </li>
+            </ul>
+            <p>
+              Corresync does not sell Google user data, use it for advertising, provide it to data
+              brokers, use it for credit or lending decisions, conduct surveillance, or use it to
+              train general-purpose AI or machine-learning models. Project maintainers do not read
+              it. Do not send live mailbox, calendar, token, or account data in public issues or
+              support reports.
+            </p>
+          </section>
+
+          <section id="limited-use" aria-labelledby="limited-use-title">
+            <p class="legal-kicker">07 · Google Limited Use</p>
+            <h2 id="limited-use-title">A purpose-bound commitment</h2>
+            <p>
+              Corresync’s use and transfer of information received from Google APIs adheres to the
+              <a href="https://developers.google.com/terms/api-services-user-data-policy"
+              >Google API Services User Data Policy</a>, including its Limited Use requirements.
+              Access is limited to providing or improving the prominent user-facing features
+              described in this Policy. Corresync does not permit human reading of Google user data
+              except with the user’s affirmative agreement for a specific item, when necessary for
+              security investigation, to comply with applicable law, or when data has been
+              aggregated and anonymized for internal operation; the official local-first project
+              does not ordinarily receive such data at all.
+            </p>
+          </section>
+
+          <section id="website" aria-labelledby="website-title">
+            <p class="legal-kicker">08 · Website, updates, and feedback</p>
+            <h2 id="website-title">No project analytics or telemetry</h2>
+            <p>
+              This static website sets no Corresync cookies and loads no analytics, advertising, or
+              third-party scripts. It is delivered by GitHub Pages, so GitHub may process ordinary
+              request and security logs under
+              <a
+                href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+              >GitHub’s privacy statement</a>.
+            </p>
+            <p>
+              Eligible interactive CLI starts may ask GitHub’s public Releases API whether a newer
+              stable Corresync release exists. The request contains the current Corresync version in
+              its user agent, not your account address, mailbox data, or a persistent device
+              identifier. The result is cached locally. Package-manager update paths are handled by
+              their respective providers. If a standalone user explicitly enables automatic
+              installation, Corresync also downloads the public release artifact, checksums, and
+              provenance needed to verify and replace that executable; this never runs during an MCP
+              tool call.
+            </p>
+            <p>
+              <code>corr feedback</code> creates an allowlisted, redacted report locally and never
+              submits it automatically. You decide whether to copy, save, or open a prefilled GitHub
+              page after reviewing every field.
+            </p>
+            <p>
+              If you choose to submit a GitHub issue or private advisory, the project receives the
+              GitHub identity and report content you provide and uses them to answer the question,
+              maintain the project, or investigate the concern. Public issues are public; private
+              advisories remain restricted to authorized repository participants. GitHub stores
+              these records under its own privacy terms, and the project retains them only as
+              reasonably needed for support, security, legal, and project-history purposes. Never
+              include live Google user data or credentials.
+            </p>
+          </section>
+
+          <section id="security" aria-labelledby="security-title">
+            <p class="legal-kicker">09 · Security</p>
+            <h2 id="security-title">Controls and unavoidable risk</h2>
+            <p>
+              Corresync uses provider-pinned TLS endpoints for Google, a normal system browser for
+              authorization, PKCE and state validation, OS-keyring grant storage, account-isolated
+              sessions, authenticated local IPC, MCP over stdio, bounded parsing, and
+              preview-before-commit controls. No method of local storage or transmission is
+              completely secure. Protect your device, keyring, MCP configuration, selected model,
+              and backups, and install only releases whose provenance you trust.
+            </p>
+            <p>
+              Report a suspected vulnerability through
+              <a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+              >GitHub private vulnerability reporting</a>; never put secrets or private account data
+              in a public report.
+            </p>
+          </section>
+
+          <section id="choices" aria-labelledby="choices-title">
+            <p class="legal-kicker">10 · Your choices and deletion</p>
+            <h2 id="choices-title">Disconnect and remove access at any time</h2>
+            <ol>
+              <li>
+                Run <code>corr account remove ALIAS --approve</code> to remove that account’s
+                Corresync configuration and account-local profile, import, cursor, and queue state.
+                An unshared OAuth grant owned by Corresync is also removed from the OS keyring. This
+                does not delete mail or calendar data held by Google.
+              </li>
+              <li>
+                Visit your
+                <a href="https://myaccount.google.com/connections">Google Account connections</a>,
+                select Corresync, and remove its access to revoke the provider-side authorization.
+              </li>
+              <li>
+                Use <code>corr events purge --account ALIAS --approve</code> for a retained local
+                monitor queue, and delete any local audit or explicitly created import staging
+                records you no longer want.
+              </li>
+              <li>
+                Uninstall Corresync and delete its local configuration/data directories if you want
+                to remove the application completely. Your provider retains its own data until you
+                change or delete it there.
+              </li>
+            </ol>
+            <p>
+              <code>corr auth logout</code> closes local sessions but intentionally preserves
+              keyring grants for later sign-in. Use account removal and Google revocation when you
+              want the authorization deleted.
+            </p>
+            <p>
+              Depending on where you live, applicable law may provide rights to access, correct,
+              delete, restrict, object to, or obtain a copy of personal information. Corresync does
+              not operate an account database or hold the provider data processed only on your
+              device, so use the local and provider controls above for that data. Contact the
+              project about information you deliberately submitted through a project channel.
+            </p>
+          </section>
+
+          <section id="children" aria-labelledby="children-title">
+            <p class="legal-kicker">11 · Children</p>
+            <h2 id="children-title">Not directed to children</h2>
+            <p>
+              Corresync is a technical mail and calendar tool and is not directed to children under
+              13. The project does not knowingly operate a service that collects personal
+              information from children.
+            </p>
+          </section>
+
+          <section id="changes" aria-labelledby="changes-title">
+            <p class="legal-kicker">12 · Changes</p>
+            <h2 id="changes-title">Material changes remain visible</h2>
+            <p>
+              We may update this Policy as Corresync changes. The effective date appears at the top,
+              and material changes are published on this page and in project release notes. If a
+              change would use Google user data for a new purpose, Corresync will provide notice and
+              obtain consent before that new use. Earlier versions remain available in the public
+              source history.
+            </p>
+          </section>
+
+          <section id="contact" aria-labelledby="contact-title">
+            <p class="legal-kicker">13 · Contact</p>
+            <h2 id="contact-title">Questions and concerns</h2>
+            <p>
+              For a policy question that contains no private data, open a
+              <a href="https://github.com/nkiyohara/corresync/issues/new?template=policy.yml"
+              >Corresync GitHub issue</a>. For a security or privacy concern that requires private
+              details, use
+              <a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+              >private vulnerability reporting</a>. The project is maintained by Naoki Kiyohara and
+              contributors. Because the project does not host user accounts or mailbox data,
+              maintainers cannot retrieve or delete data stored only on your device or at Google.
+            </p>
+          </section>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <p>
+        Independent local-first mail and calendar tooling. Not affiliated with or endorsed by
+        Google, Microsoft, or any provider or agent vendor named here.
+      </p>
+      <nav aria-label="Footer">
+        <a href="getting-started.html">Getting started</a>
+        <a href="providers.html">Providers</a>
+        <a href="features.html">Features</a>
+        <a href="safety.html">Safety</a>
+        <a href="privacy.html" aria-current="page">Privacy</a>
+        <a href="terms.html">Terms</a>
+        <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
+        <a href="https://github.com/nkiyohara/corresync/security/advisories/new">Security</a>
+        <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
+        <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

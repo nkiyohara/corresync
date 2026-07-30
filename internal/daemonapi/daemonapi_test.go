@@ -376,7 +376,7 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 		{Accounts: []SessionStatus{{
 			Account: testAccountID, Alias: "work",
 			Provider:     domain.ProviderMicrosoftOWA,
-			MailProvider: domain.ProviderGoogleAPI,
+			MailProvider: domain.ProviderGoogle,
 			State:        "signed_out",
 		}}},
 	}

@@ -126,9 +126,19 @@ func TestDiscoverKnownGoogleDoesNotAuthenticate(t *testing.T) {
 		t.Fatalf("candidates = %#v", observation.Candidates)
 	}
 	candidate := observation.Candidates[0]
-	if candidate.Provider != domain.ProviderGoogleAPI ||
+	if candidate.Provider != domain.ProviderGoogle ||
 		!candidate.RequiresExplicitSelection ||
-		candidate.Authentication != application.DiscoveryExplicitOAuth {
+		candidate.Authentication != application.DiscoveryExplicitOAuth ||
+		len(candidate.Endpoints) != 3 ||
+		candidate.Endpoints[0] != (application.DiscoveredEndpoint{
+			Kind: "imap", Value: "imap.gmail.com:993",
+		}) ||
+		candidate.Endpoints[1] != (application.DiscoveredEndpoint{
+			Kind: "smtp", Value: "smtp.gmail.com:587",
+		}) ||
+		candidate.Endpoints[2] != (application.DiscoveredEndpoint{
+			Kind: "api", Value: "https://www.googleapis.com",
+		}) {
 		t.Fatalf("Google candidate could trigger implicit consent: %#v", candidate)
 	}
 }

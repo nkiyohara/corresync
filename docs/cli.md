@@ -59,13 +59,13 @@ corr account add reader@example.invalid \
   --mail-provider microsoft-owa \
   --origin https://outlook.cloud.microsoft
 
-# Gmail and Google Calendar with an authorized public client
+# Gmail over IMAP/SMTP XOAUTH2 and Google Calendar with one public client
 corr account add reader@example.invalid \
   --alias personal \
-  --mail-provider google-api \
-  --calendar-provider google-api \
+  --mail-provider google \
+  --calendar-provider google \
   --oauth-client-id synthetic-public-client \
-  --oauth-redirect-uri http://127.0.0.1:8765/callback \
+  --oauth-redirect-uri http://127.0.0.1:0 \
   --authorization-key personal-google \
   --approve-oauth
 
@@ -121,9 +121,9 @@ open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
 closes the entire local session owner.
 `--terminal` is an optional Outlook-Web-only browser relay and requires an
-interactive TTY. Automated Google Web sign-in is unavailable because Google
-rejects software-controlled browsers; use explicit Google API OAuth or an
-administrator-approved standards route. `auth status` is content-free.
+interactive TTY. The `google` route opens the normal system browser for OAuth,
+then uses Gmail IMAP/SMTP XOAUTH2 and Google Calendar API access; it never
+automates Google sign-in. `auth status` is content-free.
 
 `doctor` validates local config, browser prerequisites, IPC, daemon state, and
 update policy. `--online` validates only an already authenticated session; it
@@ -455,6 +455,20 @@ corr update --json
 Package-managed installations print their owner command. Direct installs
 verify Sigstore identity, checksum, version, OS, and architecture before a
 rollback-capable replacement. No ambiguous update is retried.
+
+Eligible interactive CLI starts perform a bounded, 24-hour-cached check and
+show a short installation-specific notice. Direct installs may opt in to the
+same verified replacement path:
+
+```console
+corr config set updates.auto_install true
+```
+
+The update becomes active on the next process start. Package-managed binaries
+continue to receive only their exact owner command. MCP, configuration
+management, daemon, completion, feedback, JSON, pipes, and non-interactive paths
+never attempt an update, so an MCP tool call cannot be interrupted by
+installation.
 
 ## Exit behavior
 

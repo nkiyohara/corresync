@@ -20,10 +20,13 @@ The [project website](https://nkiyohara.github.io/corresync/) gives a
 user-focused introduction. Its dedicated
 [getting-started](https://nkiyohara.github.io/corresync/getting-started.html),
 [features](https://nkiyohara.github.io/corresync/features.html),
-[providers](https://nkiyohara.github.io/corresync/providers.html), and
-[safety](https://nkiyohara.github.io/corresync/safety.html) pages keep normal
-install, MCP setup, provider choice, and safety journeys on readable web pages.
-The references here remain the complete technical and evidence contracts.
+[providers](https://nkiyohara.github.io/corresync/providers.html),
+[safety](https://nkiyohara.github.io/corresync/safety.html),
+[privacy](https://nkiyohara.github.io/corresync/privacy.html), and
+[terms](https://nkiyohara.github.io/corresync/terms.html) pages keep normal
+install, MCP setup, provider choice, safety, data handling, and use terms on
+readable web pages. The references here remain the complete technical and
+evidence contracts.
 
 ## First run
 
@@ -78,6 +81,13 @@ preview/commit checks regardless of interface.
 - [Architecture decision records](adr/): accepted decisions and consequences
 - [Prior art](prior-art.md): independent-implementation record
 - [Security policy](../SECURITY.md): supported versions and private reporting
+- [Google OAuth verification](google-oauth-verification.md): production
+  branding, scope justifications, restricted-data architecture, evidence, and
+  submission gate
+- [Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html): public
+  data-access, storage, sharing, retention, and deletion disclosures
+- [Terms of Use](https://nkiyohara.github.io/corresync/terms.html): official
+  project-service terms without narrowing the Apache-2.0 software license
 
 Accepted ADRs are historical records. Current guides may add operational
 detail, but changing an accepted decision requires a new or amended ADR.

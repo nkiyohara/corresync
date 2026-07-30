@@ -44,22 +44,20 @@ Piped input is rejected. CAPTCHA, passkeys, security keys, client
 certificates, native dialogs, and graphical custom login may require the
 visible browser. Do not use the relay to bypass organization policy.
 
-## Google Web
+## Google
 
-Automated `google-web` sign-in is unavailable. Google rejects sign-in from
-software-controlled browsers; hiding automation signals would be an
-unsupported attempt to bypass an account-protection control. Corresync does not
-do that. New discovery does not offer this route, explicit selection is
-rejected, and a v0.8.0 or v0.8.1 configuration that still names it fails before
-any browser is launched.
+Choose `google` explicitly with a desktop public OAuth client you are
+authorized to use. Corresync opens the normal system browser for Google
+authorization; it never automates the sign-in page. Gmail then uses only
+XOAUTH2 over `imap.gmail.com:993` and `smtp.gmail.com:587`. Google Calendar and
+Google Meet use the Calendar API with the same grant. No Gmail password, app
+password, cookie, or Gmail REST transport is accepted.
 
-Choose `google-api` explicitly with a public OAuth client you are authorized to
-use, or choose a standards route that the account and its administrator permit.
-Google Workspace administrators can restrict third-party OAuth, Gmail API,
-Calendar API, IMAP, and other client access. A rejected or unapproved route
-fails clearly and never falls through to another provider.
+Google Workspace administrators can restrict third-party OAuth, IMAP, and
+Calendar API access. A rejected or unapproved route fails clearly and never
+falls through to a password or another provider.
 
-## Google API and Microsoft Graph
+## Google and Microsoft Graph OAuth
 
 These routes require an explicitly configured public OAuth client and a
 registered loopback redirect:
@@ -72,13 +70,19 @@ Login first prints the exact service-derived scopes. It then opens the provider
 authorization page in a browser when a matching valid grant is absent, binds
 the redirect to an unpredictable state value, and accepts only the configured
 loopback path and actual bound port. Configured port `0` requests an available
-ephemeral port. Corresync never accepts a client secret, device-code unattended
-flow, password grant, or broad tenant credential.
+ephemeral port. The same in-product notice links the public
+[Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html) and
+[Terms of Use](https://nkiyohara.github.io/corresync/terms.html) before any
+provider page can open. Corresync never accepts a client secret, device-code
+unattended flow, password grant, or broad tenant credential.
 
 The resulting grant is stored by the operating-system keyring under the
 configured local reference. The TOML contains only that reference and the
 explicit consent bit. Scopes are selected from the configured mail/calendar
-services; choosing Graph or Google is never an automatic fallback.
+services; choosing Graph or Google is never an automatic fallback. Google mail
+requests the provider-documented `https://mail.google.com/` scope required by
+XOAUTH2 and fetches a fresh short-lived access token immediately before each
+encrypted IMAP or SMTP authentication.
 
 Use only an application registration and account you are authorized to use.
 

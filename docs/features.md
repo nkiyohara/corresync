@@ -9,7 +9,7 @@ not available through a raw protocol escape hatch.
 | Provider ID | Mail | Calendar | Authentication | v0.8 evidence |
 | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
-| `google-api` | Gmail | Selectable Google calendars, observed Google Meet link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
+| `google` | Gmail over IMAP/SMTP XOAUTH2 | Selectable Google calendars, observed Google Meet link | Normal browser OAuth with a BYO desktop public client; grant in OS keyring | Implemented; synthetic protocol/API integration contracts; live-unobserved |
 | `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `jmap` | Mail | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
 | `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts; live-unobserved |
@@ -32,11 +32,10 @@ otherwise it directs the human to explicit selection. `corr account add` require
 explicit provider selection whenever discovery is ambiguous. Microsoft domain
 or hosted-MX evidence offers both Outlook Web and Microsoft Graph, but Graph is
 always marked as an explicit OAuth choice and is never selected as a fallback.
-Google evidence advertises only the explicit `google-api` route. Automated
-`google-web` sign-in is unavailable because Google rejects sign-in from
-software-controlled browsers; Corresync does not disguise automation or
-silently fall back around that protection. Workspace policy may also require
-administrator approval or block API and standards routes.
+Google evidence advertises only the explicit `google` route with fixed Gmail
+IMAP/SMTP endpoints and the Calendar API base. Workspace policy may require
+administrator approval or block OAuth, IMAP, or Calendar API access; Corresync
+does not silently fall back to another route.
 
 ## Mail
 
@@ -63,11 +62,13 @@ reported and never automatically retried.
 
 Provider differences remain visible:
 
-- Gmail uses Gmail query syntax and has no atomic history precondition for
-  label changes, moves, or permanent deletion. Corresync revalidates the exact
-  reviewed message immediately before each reviewed operation; a multi-stage
-  move reports any confirmed partial change. Full Gmail support requires the
-  explicitly displayed `https://mail.google.com/` OAuth grant;
+- Gmail uses bounded IMAP text search. Labels are projected as IMAP mailboxes,
+  so one message may appear in more than one folder. Move and permanent delete
+  require the server-advertised MOVE/UIDPLUS features used by the standards
+  adapter, and any confirmed partial mutation requires reconciliation. Gmail
+  does not expose push history or scheduled send through this route. The
+  provider-documented `https://mail.google.com/` XOAUTH2 scope is displayed
+  before authorization;
 - Graph query syntax differs from Outlook AQS. Reply/forward and move
   revalidate the exact reviewed source before invoking actions that expose no
   atomic source ETag precondition. Permanent deletion uses Graph's explicit
@@ -103,7 +104,7 @@ Provider differences remain visible:
 The normalized contract includes bounded subject/body, absolute start/end,
 time zone, location, all-day state, reminder, supported recurrence creation,
 replacement and removal, and required/optional attendees. Capability and
-degradation records state when a provider cannot preserve a field. Google API
+degradation records state when a provider cannot preserve a field. Google Calendar
 discovers selectable calendars and provisions a unique Google Meet link only
 when the authenticated calendar advertises that conference solution. Graph discovers
 selectable calendars and reports Teams meeting support. Outlook Web can
@@ -117,7 +118,7 @@ conditional writes. A recurring-instance update materializes a
 and removes a matching exception without deleting the series.
 
 Create/update/cancel reviews also name the selected route's attendee-
-notification and cancellation disposition. Outlook Web, Google API, and Graph
+notification and cancellation disposition. Outlook Web, Google Calendar, and Graph
 use their reviewed provider-managed notification behavior. CalDAV detects RFC
 6638 server-managed scheduling on the authenticated principal. When available,
 attendee create/update/cancel operations use that route and schedule-tag

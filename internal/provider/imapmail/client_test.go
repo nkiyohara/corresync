@@ -2,6 +2,7 @@ package imapmail
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -27,9 +28,10 @@ import (
 )
 
 type syntheticSMTPBackend struct {
-	mu         sync.Mutex
-	messages   [][]byte
-	recipients [][]string
+	mu          sync.Mutex
+	messages    [][]byte
+	recipients  [][]string
+	afterAccept func([]byte) error
 }
 
 func (backend *syntheticSMTPBackend) NewSession(*smtp.Conn) (smtp.Session, error) {
@@ -43,17 +45,30 @@ type syntheticSMTPSession struct {
 }
 
 func (*syntheticSMTPSession) AuthMechanisms() []string {
-	return []string{sasl.Plain}
+	return []string{sasl.Plain, xoauth2Mechanism}
 }
 
-func (session *syntheticSMTPSession) Auth(string) (sasl.Server, error) {
-	return sasl.NewPlainServer(func(_, username, password string) error {
-		if username != "username" || password != "password" {
-			return errors.New("invalid synthetic credentials")
-		}
-		session.authorized = true
-		return nil
-	}), nil
+func (session *syntheticSMTPSession) Auth(mechanism string) (sasl.Server, error) {
+	switch mechanism {
+	case sasl.Plain:
+		return sasl.NewPlainServer(func(_, username, password string) error {
+			if username != "username" || password != "password" {
+				return errors.New("invalid synthetic credentials")
+			}
+			session.authorized = true
+			return nil
+		}), nil
+	case xoauth2Mechanism:
+		return &syntheticXOAuth2Server{authenticate: func(username, token string) error {
+			if username != "username" || token != "synthetic-access-token" {
+				return errors.New("invalid synthetic OAuth2 credentials")
+			}
+			session.authorized = true
+			return nil
+		}}, nil
+	default:
+		return nil, errors.New("unsupported synthetic authentication mechanism")
+	}
 }
 
 func (session *syntheticSMTPSession) Mail(
@@ -94,7 +109,11 @@ func (session *syntheticSMTPSession) Data(reader io.Reader) error {
 		session.backend.recipients,
 		append([]string(nil), session.recipients...),
 	)
+	afterAccept := session.backend.afterAccept
 	session.backend.mu.Unlock()
+	if afterAccept != nil {
+		return afterAccept(message)
+	}
 	return nil
 }
 
@@ -102,10 +121,11 @@ func (*syntheticSMTPSession) Reset()        {}
 func (*syntheticSMTPSession) Logout() error { return nil }
 
 type standardsFixture struct {
-	imap Endpoint
-	smtp Endpoint
-	tls  *tls.Config
-	out  *syntheticSMTPBackend
+	imap      Endpoint
+	smtp      Endpoint
+	tls       *tls.Config
+	out       *syntheticSMTPBackend
+	storeSent func([]byte) error
 }
 
 func newStandardsFixture(t *testing.T) standardsFixture {
@@ -131,6 +151,27 @@ func newStandardsFixture(t *testing.T) standardsFixture {
 		t.Fatal(err)
 	}
 	imapService := imapserver.New(imapBackend)
+	imapService.EnableAuth(
+		xoauth2Mechanism,
+		func(connection imapserver.Conn) sasl.Server {
+			return &syntheticXOAuth2Server{authenticate: func(username, token string) error {
+				if username != "username" || token != "synthetic-access-token" {
+					return errors.New("invalid synthetic OAuth2 credentials")
+				}
+				user, err := imapBackend.Login(
+					connection.Info(),
+					"username",
+					"password",
+				)
+				if err != nil {
+					return err
+				}
+				connection.Context().State = imap.AuthenticatedState
+				connection.Context().User = user
+				return nil
+			}}
+		},
+	)
 	imapService.TLSConfig = serverTLS
 	imapService.ErrorLog = log.New(io.Discard, "", 0)
 	go func() { _ = imapService.Serve(imapListener) }()
@@ -157,6 +198,180 @@ func newStandardsFixture(t *testing.T) standardsFixture {
 		smtp: Endpoint{Host: smtpHost, Port: smtpPort, Mode: TLSImplicit},
 		tls:  clientTLS,
 		out:  smtpBackend,
+		storeSent: func(message []byte) error {
+			mailbox, mailboxErr := user.GetMailbox("Sent")
+			if mailboxErr != nil {
+				return mailboxErr
+			}
+			return mailbox.CreateMessage(
+				[]string{imap.SeenFlag},
+				time.Now(),
+				bytes.NewReader(message),
+			)
+		},
+	}
+}
+
+type syntheticXOAuth2Server struct {
+	authenticate func(username, token string) error
+	complete     bool
+}
+
+func TestXOAuth2ClientBoundsChallengesAndErasesOwnedCredentials(t *testing.T) {
+	token := []byte("synthetic-secret")
+	client := newXOAuth2Client("reader@example.invalid", token)
+	mechanism, initial, err := client.Start()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mechanism != xoauth2Mechanism ||
+		string(initial) != "user=reader@example.invalid\x01auth=Bearer synthetic-secret\x01\x01" {
+		t.Fatalf("XOAUTH2 initial response = %q %q", mechanism, initial)
+	}
+	if _, err := client.Next(make([]byte, maximumAccessTokenBytes+1)); err == nil ||
+		!strings.Contains(err.Error(), "too large") {
+		t.Fatalf("oversized XOAUTH2 challenge error = %v", err)
+	}
+	if err := client.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(initial, make([]byte, len(initial))) {
+		t.Fatalf("XOAUTH2 initial response was not erased: %q", initial)
+	}
+	if string(token) != "synthetic-secret" {
+		t.Fatalf("XOAUTH2 constructor modified caller token: %q", token)
+	}
+}
+
+func (server *syntheticXOAuth2Server) Next(
+	response []byte,
+) ([]byte, bool, error) {
+	if server.complete {
+		return nil, false, errors.New("synthetic XOAUTH2 exchange already completed")
+	}
+	server.complete = true
+	const userPrefix = "user="
+	// #nosec G101 -- this is the fixed XOAUTH2 field label, not a credential.
+	const bearerMarker = "\x01auth=Bearer "
+	const suffix = "\x01\x01"
+	value := string(response)
+	marker := strings.Index(value, bearerMarker)
+	if !strings.HasPrefix(value, userPrefix) ||
+		marker <= len(userPrefix) ||
+		!strings.HasSuffix(value, suffix) {
+		return nil, false, errors.New("malformed synthetic XOAUTH2 response")
+	}
+	username := value[len(userPrefix):marker]
+	token := value[marker+len(bearerMarker) : len(value)-len(suffix)]
+	if server.authenticate == nil {
+		return nil, false, errors.New("synthetic XOAUTH2 authenticator is missing")
+	}
+	if err := server.authenticate(username, token); err != nil {
+		return nil, false, err
+	}
+	return nil, true, nil
+}
+
+type syntheticAccessTokenSource struct {
+	mu     sync.Mutex
+	issued [][]byte
+}
+
+func (source *syntheticAccessTokenSource) AccessToken(
+	ctx context.Context,
+) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	source.mu.Lock()
+	defer source.mu.Unlock()
+	token := []byte("synthetic-access-token")
+	source.issued = append(source.issued, token)
+	return token, nil
+}
+
+func TestClientAuthenticatesIMAPAndSMTPWithFreshXOAUTH2Tokens(t *testing.T) {
+	fixture := newStandardsFixture(t)
+	source := new(syntheticAccessTokenSource)
+	client, err := New(t.Context(), Options{
+		IMAP: fixture.imap, SMTP: fixture.smtp,
+		Username: "username", Sender: "reader@example.invalid",
+		OAuth2: source, TLSConfig: fixture.tls,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	if _, err := client.ListMessages(t.Context(), application.MailListInput{
+		Folder: application.MailFolder{
+			Kind: application.MailFolderDistinguished, ID: "inbox",
+		},
+		Limit: 1,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	source.mu.Lock()
+	defer source.mu.Unlock()
+	if len(source.issued) != 3 {
+		t.Fatalf("OAuth2 token requests = %d, want IMAP + SMTP + IMAP", len(source.issued))
+	}
+	for index, token := range source.issued {
+		if !bytes.Equal(token, make([]byte, len(token))) {
+			t.Fatalf("issued OAuth2 token %d was not erased", index)
+		}
+	}
+}
+
+func TestClientConfirmsSMTPStoredSentCopyWithoutAppendingDuplicate(t *testing.T) {
+	fixture := newStandardsFixture(t)
+	fixture.out.mu.Lock()
+	fixture.out.afterAccept = fixture.storeSent
+	fixture.out.mu.Unlock()
+	client, err := New(t.Context(), Options{
+		IMAP: fixture.imap, SMTP: fixture.smtp,
+		Username: "username", Sender: "reader@example.invalid",
+		OAuth2:         new(syntheticAccessTokenSource),
+		SMTPStoresSent: true,
+		TLSConfig:      fixture.tls,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	sent, err := client.SendMail(t.Context(), application.MailSendInput{
+		Account: "acc_00000000000000000000000000000001",
+		To:      []string{"recipient@example.invalid"},
+		Subject: "Server-stored submission",
+		Body:    "The SMTP server owns the Sent copy.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := client.ListMessages(t.Context(), application.MailListInput{
+		Folder: application.MailFolder{
+			Kind: application.MailFolderDistinguished,
+			ID:   "sentitems",
+		},
+		Limit: 25,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Messages) != 1 ||
+		page.Messages[0].ID != sent.ID ||
+		page.Messages[0].Subject != "Server-stored submission" {
+		t.Fatalf("server-stored Sent page = %#v, result = %#v", page, sent)
+	}
+}
+
+func TestClientDisablesPermanentDeleteBeforeParsingOrNetwork(t *testing.T) {
+	client := &Client{disablePermanentDelete: true}
+	err := client.DeleteMail(t.Context(), application.MailDeleteInput{
+		MessageID: "not-an-imap-identifier",
+		ChangeKey: "not-an-imap-snapshot",
+	})
+	if err == nil || !strings.Contains(err.Error(), "permanent deletion is unavailable") {
+		t.Fatalf("disabled permanent delete error = %v", err)
 	}
 }
 

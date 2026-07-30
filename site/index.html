@@ -101,9 +101,9 @@
             agenda, and approve every send before it happens.
           </p>
           <p class="hero-providers">
-            <strong>Will it work with my accounts?</strong> Outlook Web · Google API · Microsoft
-            Graph · JMAP · IMAP/SMTP · CalDAV. Capabilities and administrator requirements are
-            explicit per account — <a href="providers.html">compare the routes</a>.
+            <strong>Will it work with my accounts?</strong> Outlook Web · Google · Microsoft Graph
+            · JMAP · IMAP/SMTP · CalDAV. Capabilities and administrator requirements are explicit
+            per account — <a href="providers.html">compare the routes</a>.
           </p>
           <div class="actions">
             <a class="button primary" href="getting-started.html">Get set up in four steps</a>
@@ -166,10 +166,8 @@ scoop install corresync/corresync</code></pre>
             Replace the example address and alias. Setup performs credential-free discovery and
             never opens a sign-in page. Then <a href="getting-started.html#connect"
             >connect Codex, Claude Code, Copilot, Gemini CLI, or another MCP client</a>. Prefer to
-            read before you run? Review <a href="install.sh">install.sh</a> first. Deep reference:
-            checksum and Sigstore provenance verification in the
-            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/install.md"
-            >install guide on GitHub</a>.
+            read before you run? Review <a href="install.sh">install.sh</a> first, or see every
+            platform option in <a href="getting-started.html#step-install">getting started</a>.
           </p>
         </div>
       </section>
@@ -189,6 +187,22 @@ scoop install corresync/corresync</code></pre>
           <strong>Preview, then commit</strong>
           <span>Sends and destructive writes return an exact server-enforced review first. Approval
             is single-use.</span>
+        </div>
+      </section>
+
+      <section class="policy-callout" aria-labelledby="policy-callout-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>Your data, explained</p>
+          <h2 id="policy-callout-title">Google access is direct, local, and purpose-bound.</h2>
+          <p>
+            Corresync requests Gmail and Calendar access only for the account features you enable.
+            Mail, events, and OAuth grants do not pass through a Corresync-operated server: grants
+            stay in your OS keyring, and provider requests leave directly from your device.
+          </p>
+        </div>
+        <div class="actions">
+          <a class="button primary" href="privacy.html">Read the Privacy Policy</a>
+          <a class="button secondary" href="terms.html">Read the Terms of Use</a>
         </div>
       </section>
 
@@ -267,7 +281,7 @@ corr auth login --account personal</code></pre>
             ><code><span class="t-prompt">$</span> corr mail search --all-accounts \
     --query 'subject:"quarterly plan"'
 <span class="t-unread">●</span> <span class="t-dim">work · microsoft-owa</span>  Ana Ruiz  Plan review
-<span class="t-read">·</span> <span class="t-dim">personal · google-api</span> Finance  Plan receipt</code></pre>
+<span class="t-read">·</span> <span class="t-dim">personal · google</span> Finance      Plan receipt</code></pre>
             <p class="outcome-note">
               A failed account surfaces as an explicit partial result—never silently hidden.
             </p>
@@ -395,10 +409,11 @@ payload is approved.</span></code></pre>
           </article>
           <article class="route-family accent-card">
             <p class="chip">Explicit OAuth</p>
-            <h3>Google API and Microsoft Graph</h3>
+            <h3>Google and Microsoft Graph</h3>
             <p>
-              Bring a public-client registration you are authorized to use. Corresync shows
-              service-minimal scopes and keeps grants in the OS keyring—never in configuration.
+              Microsoft Graph accepts a public client you are authorized to use. Corresync is
+              preparing its official OAuth application for Google verification; use Google’s
+              official Workspace MCP for now.
             </p>
           </article>
           <article class="route-family">
@@ -469,12 +484,13 @@ payload is approved.</span></code></pre>
         </div>
         <ul>
           <li>
-            <strong>Gmail currently uses Google API.</strong> Google Web sign-in is not supported,
-            and work or school accounts may need administrator approval.
+            <strong>Guided Google connection is not available yet.</strong> Corresync is preparing
+            its official OAuth application for verification; use Google’s official Workspace MCP
+            servers in the meantime.
           </li>
           <li>
-            <strong>OAuth routes are bring-your-own public clients.</strong> Corresync does not ship
-            a shared client or relay.
+            <strong>Microsoft Graph is bring-your-own OAuth.</strong> Corresync does not operate a
+            token relay.
           </li>
           <li>
             <strong>Windows desktop notifications are unavailable.</strong> Queue and approved
@@ -516,8 +532,10 @@ payload is approved.</span></code></pre>
         <a href="providers.html">Providers</a>
         <a href="features.html">Features</a>
         <a href="safety.html">Safety</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
         <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security policy</a>
+        <a href="https://github.com/nkiyohara/corresync/security/advisories/new">Security</a>
         <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
         <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
       </nav>

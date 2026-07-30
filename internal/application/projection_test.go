@@ -74,7 +74,7 @@ func TestMailProjectionHasStablePaginationProvenanceAndPartialFailure(t *testing
 			projectionAccount(
 				projectionZeta,
 				"zeta",
-				domain.ProviderGoogleAPI,
+				domain.ProviderGoogle,
 				"",
 				true,
 				domain.Degradation{
@@ -110,13 +110,13 @@ func TestMailProjectionHasStablePaginationProvenanceAndPartialFailure(t *testing
 			projectionZeta: {
 				projectionMail(
 					projectionZeta,
-					domain.ProviderGoogleAPI,
+					domain.ProviderGoogle,
 					"zeta-1",
 					"2026-07-28T11:00:00Z",
 				),
 				projectionMail(
 					projectionZeta,
-					domain.ProviderGoogleAPI,
+					domain.ProviderGoogle,
 					"zeta-2",
 					"2026-07-28T09:00:00Z",
 				),

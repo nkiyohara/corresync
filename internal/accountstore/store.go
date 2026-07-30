@@ -138,9 +138,9 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 			if account.Mail.IMAPSMTP != nil {
 				references = append(references, account.Mail.IMAPSMTP.Credential)
 			}
-		case domain.ProviderGoogleAPI:
-			if account.Mail.GoogleAPI != nil {
-				references = append(references, account.Mail.GoogleAPI.Authorization)
+		case domain.ProviderGoogle:
+			if account.Mail.Google != nil {
+				references = append(references, account.Mail.Google.Authorization)
 			}
 		case domain.ProviderMicrosoftGraph:
 			if account.Mail.MicrosoftGraph != nil {
@@ -159,11 +159,11 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 			if account.Calendar.CalDAV != nil {
 				references = append(references, account.Calendar.CalDAV.Credential)
 			}
-		case domain.ProviderGoogleAPI:
-			if account.Calendar.GoogleAPI != nil {
+		case domain.ProviderGoogle:
+			if account.Calendar.Google != nil {
 				references = append(
 					references,
-					account.Calendar.GoogleAPI.Authorization,
+					account.Calendar.Google.Authorization,
 				)
 			}
 		case domain.ProviderMicrosoftGraph:
@@ -236,8 +236,8 @@ func mailRouteView(route *config.MailRoute) *application.AccountRouteView {
 				Consented:  route.IMAPSMTP.Credential.Consent,
 			},
 		}
-	case domain.ProviderGoogleAPI:
-		return oauthRouteView(route.Provider, route.GoogleAPI)
+	case domain.ProviderGoogle:
+		return googleMailRouteView(route.Provider, route.Google)
 	case domain.ProviderGoogleWeb:
 		return webRouteView(route.Provider, route.GoogleWeb)
 	case domain.ProviderMicrosoftGraph:
@@ -284,8 +284,8 @@ func calendarRouteView(route *config.CalendarRoute) *application.AccountRouteVie
 				Consented:  route.CalDAV.Credential.Consent,
 			},
 		}
-	case domain.ProviderGoogleAPI:
-		return oauthRouteView(route.Provider, route.GoogleAPI)
+	case domain.ProviderGoogle:
+		return oauthRouteView(route.Provider, route.Google)
 	case domain.ProviderGoogleWeb:
 		return webRouteView(route.Provider, route.GoogleWeb)
 	case domain.ProviderMicrosoftGraph:
@@ -317,6 +317,28 @@ func oauthRouteView(
 		Endpoints: []application.DiscoveredEndpoint{
 			{Kind: "api", Value: route.APIBase},
 		},
+		Credential: &application.AccountCredentialView{
+			Configured: true,
+			Backend:    string(route.Authorization.Backend),
+			Consented:  route.Authorization.Consent,
+		},
+	}
+}
+
+func googleMailRouteView(
+	provider domain.ProviderID,
+	route *config.GoogleMailRoute,
+) *application.AccountRouteView {
+	if route == nil {
+		return &application.AccountRouteView{Provider: provider}
+	}
+	return &application.AccountRouteView{
+		Provider: provider,
+		Endpoints: []application.DiscoveredEndpoint{
+			{Kind: "imap", Value: "implicit://imap.gmail.com:993"},
+			{Kind: "smtp", Value: "starttls://smtp.gmail.com:587"},
+		},
+		Identity: route.Username,
 		Credential: &application.AccountCredentialView{
 			Configured: true,
 			Backend:    string(route.Authorization.Backend),
@@ -415,12 +437,26 @@ func mailRouteConfig(
 				},
 			},
 		}, nil
-	case domain.ProviderGoogleAPI:
-		oauth, err := oauthRouteConfig(route.GoogleAPI)
-		if err != nil {
-			return nil, err
+	case domain.ProviderGoogle:
+		if route.Google == nil {
+			return nil, errors.New("google mail settings are missing")
 		}
-		return &config.MailRoute{Provider: route.Provider, GoogleAPI: oauth}, nil
+		return &config.MailRoute{
+			Provider: route.Provider,
+			Google: &config.GoogleMailRoute{
+				Username:    route.Google.Username,
+				Mailbox:     route.Google.Mailbox,
+				ClientID:    route.Google.ClientID,
+				RedirectURI: route.Google.RedirectURI,
+				Authorization: config.CredentialRef{
+					Backend: config.CredentialBackend(
+						route.Google.Authorization.Backend,
+					),
+					Key:     route.Google.Authorization.Key,
+					Consent: route.Google.Authorization.Consent,
+				},
+			},
+		}, nil
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return nil, errors.New("google Web mail settings are missing")
@@ -479,12 +515,12 @@ func calendarRouteConfig(
 				},
 			},
 		}, nil
-	case domain.ProviderGoogleAPI:
-		oauth, err := oauthRouteConfig(route.GoogleAPI)
+	case domain.ProviderGoogle:
+		oauth, err := oauthRouteConfig(route.Google)
 		if err != nil {
 			return nil, err
 		}
-		return &config.CalendarRoute{Provider: route.Provider, GoogleAPI: oauth}, nil
+		return &config.CalendarRoute{Provider: route.Provider, Google: oauth}, nil
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return nil, errors.New("google Web calendar settings are missing")
@@ -651,18 +687,16 @@ func (store Store) PurgeAccountState(
 func accountOAuthAuthorizationKeys(account config.Account) []string {
 	keys := make([]string, 0, 2)
 	if account.Mail != nil {
-		for _, route := range []*config.OAuthRoute{
-			account.Mail.GoogleAPI,
-			account.Mail.MicrosoftGraph,
-		} {
-			if route != nil {
-				keys = append(keys, route.Authorization.Key)
-			}
+		if account.Mail.Google != nil {
+			keys = append(keys, account.Mail.Google.Authorization.Key)
+		}
+		if account.Mail.MicrosoftGraph != nil {
+			keys = append(keys, account.Mail.MicrosoftGraph.Authorization.Key)
 		}
 	}
 	if account.Calendar != nil {
 		for _, route := range []*config.OAuthRoute{
-			account.Calendar.GoogleAPI,
+			account.Calendar.Google,
 			account.Calendar.MicrosoftGraph,
 		} {
 			if route != nil {
