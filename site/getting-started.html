@@ -141,12 +141,29 @@ scoop install corresync/corresync</code></pre>
               ><code>corr --version</code></pre>
             </div>
           </div>
+          <div class="install-block verify-block">
+            <p class="os-label" id="gs-updates">Optional · keep standalone installs current</p>
+            <div class="cmd" data-copy data-copy-label="enable verified automatic updates">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="gs-updates"
+              ><code>corr config set updates.auto_install true</code></pre>
+            </div>
+            <p class="block-note">
+              Interactive starts already check quietly and show the right update command. This
+              opt-in automatically installs only signed, verified standalone releases; Homebrew,
+              Scoop, and WinGet stay under their package manager. Updates never run during MCP tool
+              calls, configuration changes, or machine-readable output, and become active on the
+              next
+              <code>corr</code> start.
+            </p>
+          </div>
           <p class="step-foot">
             macOS binaries are not yet notarized and Windows binaries are not yet
             Authenticode-signed—verify downloads instead of overriding Gatekeeper or SmartScreen.
-            Deep reference: direct archives, checksums, and Sigstore provenance verification in the
-            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/install.md"
-            >install guide on GitHub</a>.
+            Direct archives, packages, checksums, and signed provenance are available on the
+            <a href="https://github.com/nkiyohara/corresync/releases">release page</a>.
           </p>
         </li>
 
@@ -171,18 +188,13 @@ scoop install corresync/corresync</code></pre>
                 alias you name.
               </p>
               <p>
-                <strong>Using Gmail?</strong> Gmail currently connects through Google API. You’ll
-                need a desktop OAuth client you are authorized to use; a Workspace administrator may
-                need to approve it. Other providers can use JMAP, IMAP/SMTP, or CalDAV when
-                available.
+                <strong>Using Gmail?</strong> Corresync is still preparing its official Google OAuth
+                application for verification, so guided Google connection is not available yet. For
+                now, connect your agent directly to Google’s official Workspace MCP servers.
               </p>
               <p class="step-links">
                 <a href="providers.html">Compare provider routes</a> ·
-                <a href="safety.html">how sign-in ownership works</a>. Deep references on GitHub:
-                <a href="https://github.com/nkiyohara/corresync/blob/main/docs/configuration.md"
-                >configuration</a> ·
-                <a href="https://github.com/nkiyohara/corresync/blob/main/docs/authentication.md"
-                >authentication</a>
+                <a href="safety.html">see how sign-in ownership works</a>
               </p>
             </div>
             <div class="stack">
@@ -199,24 +211,12 @@ corr doctor --account personal</code></pre>
                 </div>
               </div>
               <div class="install-block">
-                <p class="os-label" id="gs-signin-discover">Gmail · explicit Google API</p>
-                <div class="cmd" data-copy data-copy-label="Google API account commands">
-                  <pre
-                    tabindex="0"
-                    role="region"
-                    aria-labelledby="gs-signin-discover"
-                  ><code>corr account add you@gmail.com --alias personal \
-  --mail-provider google-api \
-  --calendar-provider google-api \
-  --oauth-client-id YOUR_DESKTOP_CLIENT_ID \
-  --oauth-redirect-uri http://127.0.0.1:0/callback \
-  --authorization-key personal-google \
-  --approve-oauth
-corr auth login --account personal</code></pre>
-                </div>
+                <p class="os-label" id="gs-signin-discover">Gmail · temporary connection path</p>
                 <p class="block-note">
-                  Enable the Gmail and Calendar APIs for that client first. A managed Workspace
-                  account may require administrator approval.
+                  Use Google’s official
+                  <a href="https://developers.google.com/workspace/guides/configure-mcp-servers"
+                  >Workspace MCP setup guide</a>. The service is currently a Google Developer
+                  Preview and has its own Google Cloud and OAuth setup requirements.
                 </p>
               </div>
             </div>
@@ -328,9 +328,7 @@ corr auth login --account personal</code></pre>
           <p class="step-foot">
             Every client reaches the same 40 narrow tools and two read-only monitor resources—see
             <a href="features.html#agents">what agents can and cannot do</a>. Codex and Claude Code
-            users can also install the bundled plugin and Agent Skill; deep reference: the
-            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/mcp.md"
-            >MCP guide on GitHub</a>.
+            users can also install the bundled plugin and Agent Skill.
           </p>
         </li>
 
@@ -467,8 +465,10 @@ corr auth login --account personal</code></pre>
         <a href="providers.html">Providers</a>
         <a href="features.html">Features</a>
         <a href="safety.html">Safety</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
         <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security policy</a>
+        <a href="https://github.com/nkiyohara/corresync/security/advisories/new">Security</a>
         <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
         <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
       </nav>

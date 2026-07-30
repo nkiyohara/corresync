@@ -14,6 +14,10 @@ Confirm that:
 - every included issue has implementation, synthetic tests, and public docs;
 - `CHANGELOG.md`, `SECURITY.md`, and the compatibility matrix describe the
   intended SemVer line;
+- the public homepage, Privacy Policy, Terms of Use, and any provider consent
+  notice still match the shipped data flows and requested OAuth scopes;
+- release archives and packages contain the project license and generated
+  third-party license materials, and license/SBOM checks pass;
 - provider capabilities and degradations match CLI, MCP, and stable JSON;
 - all accepted architecture changes have an ADR;
 - the working tree contains no credentials, personal data, generated live
@@ -128,7 +132,8 @@ Keep these controls enabled:
 The Pages site deploys at its canonical Corresync URL. It intentionally creates
 no redirect from the former Pages path. Its user-facing HTML, one-line Linux
 installer, social preview, internal links, structured metadata, canonical URLs,
-robots policy, and sitemap are one reviewed artifact. Run
+Privacy Policy, Terms of Use, robots policy, and sitemap are one reviewed
+artifact. Run
 `go run ./tools/siteverify` before deployment.
 
 ## Failed or withdrawn release

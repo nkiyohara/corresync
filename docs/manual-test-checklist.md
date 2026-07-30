@@ -149,6 +149,7 @@ directory.
 ```console
 corr update check
 corr update check --json
+corr config set updates.auto_install true
 corr feedback
 corr feedback --last-error
 ```
@@ -156,7 +157,12 @@ corr feedback --last-error
 The update JSON is one unstyled object. A repeated bounded public check may use
 the local cache. A package-managed binary prints its owner-specific update
 action and is not replaced. A direct update verifies provenance/checksum before
-replacement and retains rollback.
+replacement and retains rollback. Test automatic installation only with a
+disposable direct binary and a newer synthetic release fixture: it must
+use the same verification path, keep the current command running, and activate
+the replacement on the next start. With the option enabled, MCP, configuration
+management, daemon, JSON, piped, and non-interactive paths must make no update
+attempt.
 
 Feedback must print a deterministic allowlisted report with no network
 request. Review it manually for private values. If testing an external action,
@@ -231,10 +237,9 @@ Pass criteria:
 The Outlook-Web-only `--terminal` relay is optional, requires a real TTY, and
 must reject piped input. Do not record entered or rendered identity values.
 
-Do not attempt a Google Web live observation. Google rejects sign-in from
-software-controlled browsers, and browser fingerprint spoofing or automation
-hiding is outside the product and test scope. Test Google only through an
-explicitly authorized API client or an administrator-approved standards route.
+Record Google observations only through the current explicit `google` route:
+system-browser OAuth, Gmail IMAP/SMTP XOAUTH2, and the Calendar API. Workspace
+policy may require administrator approval or disable one of those services.
 
 ## 7. Read-only CLI
 

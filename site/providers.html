@@ -150,13 +150,14 @@
         </div>
       </section>
 
-      <section class="tinted-section" aria-labelledby="google-title">
+      <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google routes</p>
-          <h2 id="google-title">Connect Gmail and Google Calendar through Google API.</h2>
+          <h2 id="google-title">Corresync’s guided Google connection is not available yet.</h2>
           <p>
-            Google access is always an explicit choice. Personal accounts need an OAuth app you
-            control; work or school accounts may also need administrator approval.
+            The transport is built and tested with synthetic contracts while the project prepares
+            its official OAuth application for Google verification. For now, use Google’s official
+            Workspace MCP servers with your agent.
           </p>
         </div>
         <div class="route-grid two">
@@ -164,14 +165,17 @@
             <header>
               <span class="route-icon" aria-hidden="true">GA</span>
               <div>
-                <p class="chip">Explicit OAuth</p>
-                <h3>Google API</h3>
+                <p class="chip">Preparing verification</p>
+                <h3>Corresync Google route</h3>
               </div>
             </header>
             <dl>
               <div>
                 <dt>Mail</dt>
-                <dd>Gmail reads, composition, labels, Trash, and reviewed permanent deletion</dd>
+                <dd>
+                  Gmail IMAP folders, search, composition, and organization; permanent delete
+                  remains disabled
+                </dd>
               </div>
               <div>
                 <dt>Calendar</dt>
@@ -183,34 +187,36 @@
               </div>
             </dl>
             <p class="route-foot">
-              The exact service-minimal scopes are shown before the provider page opens.
+              When approval opens, the normal browser will own OAuth. Gmail uses encrypted IMAP/SMTP
+              XOAUTH2; Calendar and Meet use the Calendar API.
             </p>
           </article>
           <article class="route-card">
             <header>
               <span class="route-icon" aria-hidden="true">✓</span>
               <div>
-                <p class="chip">Before you connect</p>
-                <h3>What you’ll need</h3>
+                <p class="chip">Available now</p>
+                <h3>Google Workspace MCP</h3>
               </div>
             </header>
             <dl>
               <div>
-                <dt>Personal Gmail</dt>
-                <dd>A Google desktop OAuth client you are authorized to use</dd>
+                <dt>Provider</dt>
+                <dd>Remote MCP servers operated by Google</dd>
               </div>
               <div>
-                <dt>Work or school</dt>
-                <dd>Your administrator may need to approve access</dd>
+                <dt>Status</dt>
+                <dd>Google Developer Preview</dd>
               </div>
               <div>
-                <dt>Browser login</dt>
-                <dd>Google Web sign-in is not currently supported</dd>
+                <dt>Setup</dt>
+                <dd>Google Cloud and OAuth configuration are required</dd>
               </div>
             </dl>
             <p class="route-foot">
-              If your organization blocks a route, Corresync shows the problem instead of switching
-              behind your back.
+              Follow Google’s official
+              <a href="https://developers.google.com/workspace/guides/configure-mcp-servers"
+              >Workspace MCP setup guide</a>.
             </p>
           </article>
         </div>
@@ -282,8 +288,8 @@
           <p class="eyebrow light"><span aria-hidden="true"></span>One account, two routes</p>
           <h2 id="mix-title">Mail and calendar do not have to come from the same protocol.</h2>
           <p>
-            Pair IMAP/SMTP with CalDAV, use Google API for both services, or configure a mail-only
-            or calendar-only account. Stable account identity keeps profiles, credentials, cursors,
+            Pair IMAP/SMTP with CalDAV, use the unified Google route, or configure a mail-only or
+            calendar-only account. Stable account identity keeps profiles, credentials, cursors,
             previews, and audit context isolated.
           </p>
         </div>
@@ -310,16 +316,13 @@
           <p class="eyebrow"><span aria-hidden="true"></span>No hidden fallback</p>
           <h2 id="provider-limits-title">A missing capability stays missing.</h2>
           <p class="fine-print">
-            The plain-language tour of what you can do is on the
-            <a href="features.html">features page</a>. Deep reference: the exact per-action matrix
-            and typed degradations in
-            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/features.md"
-            >features.md on GitHub</a>.
+            See the <a href="features.html">plain-language feature tour</a> for the actions agents
+            can take and how partial provider support is shown.
           </p>
         </div>
         <ul>
           <li>Provider limitations are returned as typed capabilities or degradations.</li>
-          <li>Google Web sign-in is not currently supported.</li>
+          <li>Google connects only through normal-browser OAuth and the current Google route.</li>
           <li>Graph and Google authorization never start from automatic discovery.</li>
           <li>
             Meeting links are requested only from the selected calendar route when it reports
@@ -356,8 +359,10 @@
         <a href="providers.html">Providers</a>
         <a href="features.html">Features</a>
         <a href="safety.html">Safety</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
         <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security policy</a>
+        <a href="https://github.com/nkiyohara/corresync/security/advisories/new">Security</a>
         <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
         <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
       </nav>

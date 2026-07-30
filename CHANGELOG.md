@@ -5,6 +5,48 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Privacy, terms, and Google verification
+
+- Publish same-domain Privacy Policy and Terms of Use pages with complete
+  Google scope, access, use, local storage, disclosure, retention, deletion,
+  Limited Use, open-source license, and third-party-service boundaries.
+- Link both policies from the public homepage, every site footer, README, and
+  sitemap; validate their canonical metadata and internal references as part of
+  the Pages artifact.
+- Add a project-specific Google OAuth production and restricted-scope
+  verification runbook with exact Cloud project state, canonical URLs, scope
+  justifications, local-only architecture, synthetic demo, and submission gate.
+- Replace the obsolete Google Web description in the security policy with the
+  system-browser OAuth, OS-keyring, Gmail IMAP/SMTP XOAUTH2, and Calendar API
+  design.
+- Mark the local OAuth completion response as non-cacheable and add a
+  deny-by-default content policy, no-referrer policy, anti-framing policy, and
+  MIME-sniffing protection.
+
+### Automatic updates
+
+- Check for a cached stable release at eligible interactive CLI startup, show
+  the exact standalone or package-manager action, and add the default-off
+  `updates.auto_install = true` option for verified direct self-updates.
+- Never invoke Homebrew, Scoop, WinGet, or a system package manager, and keep
+  all automatic checking and installation out of MCP, configuration management,
+  daemon, completion, feedback, JSON, piped, and non-interactive execution.
+
+### Google connection
+
+- Replace the Gmail REST mail route with one `google` route that opens the
+  normal system browser for OAuth and then uses Gmail IMAP/SMTP XOAUTH2 at
+  provider-pinned TLS endpoints. Passwords, app passwords, automated Google
+  Web sign-in, configurable Gmail hosts, and silent fallback are not supported.
+- Keep Google Calendar and Google Meet on the Calendar API, sharing the same
+  account-scoped public-client grant as Gmail when both services are enabled.
+- Migrate schema-v3 `google-api` accounts to schema v4 in memory while
+  preserving stable identity, policy, public-client metadata, authorization
+  handle, and reusable matching grants.
+- Add synthetic XOAUTH2/TLS, OAuth projection, migration, account-isolation,
+  fixed-endpoint, and Calendar-only REST contracts, plus updated CLI,
+  documentation, and website onboarding.
+
 ## 0.8.2 - 2026-07-29
 
 ### Google sign-in safety and onboarding

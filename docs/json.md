@@ -38,8 +38,8 @@ Provider-backed results include or inherit provenance:
 ```json
 {
   "accountId": "acc_0123456789abcdef0123456789abcdef",
-  "provider": "google-api",
-  "mailboxId": "gmail-me",
+  "provider": "google",
+  "mailboxId": "gmail-imap",
   "sourceObjectId": "opaque-provider-id"
 }
 ```

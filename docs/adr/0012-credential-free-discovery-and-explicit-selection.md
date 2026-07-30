@@ -1,5 +1,9 @@
 # ADR 0012: Credential-free discovery and explicit provider selection
 
+The Google candidate described here is amended by
+[ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md): it now advertises the
+`google` route with fixed Gmail IMAP/SMTP endpoints and the Calendar API base.
+
 - Status: accepted
 - Date: 2026-07-28
 - Amended: 2026-07-29

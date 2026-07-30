@@ -46,14 +46,15 @@ and unshared Corresync-owned OAuth grant state. External standards credentials
 remain in their keyring/helper. Removing the default account requires
 `--new-default`.
 
-## Schema v3
+## Schema v4
 
-Schema v3 separates mail and calendar routes. A freshly initialized
-provider-neutral configuration contains no account and has an empty
-`default_account`. The first account added becomes the default:
+Schema v4 separates mail and calendar routes and gives Google one current
+provider ID with Gmail's fixed OAuth-backed IMAP/SMTP transport. A freshly
+initialized provider-neutral configuration contains no account and has an
+empty `default_account`. The first account added becomes the default:
 
 ```toml
-version = 3
+version = 4
 default_account = ""
 
 [policy]
@@ -68,12 +69,13 @@ login_timeout = "5m0s"
 
 [updates]
 disable_automatic_checks = false
+auto_install = false
 ```
 
 A configured Outlook Web account then looks like:
 
 ```toml
-version = 3
+version = 4
 default_account = "work"
 
 [accounts.work]
@@ -104,6 +106,7 @@ login_timeout = "5m0s"
 
 [updates]
 disable_automatic_checks = false
+auto_install = false
 ```
 
 Unknown fields, mismatched tagged-union payloads, unsupported providers,
@@ -121,19 +124,22 @@ Each account may have mail, calendar, or both. Supported route payloads are:
 | Service | Provider | Nested table |
 | --- | --- | --- |
 | mail | `microsoft-owa` | `mail.outlook_web` |
-| mail | `google-api` | `mail.google_api` |
+| mail | `google` | `mail.google` |
 | mail | `microsoft-graph` | `mail.microsoft_graph` |
 | mail | `jmap` | `mail.jmap` |
 | mail | `imap-smtp` | `mail.imap_smtp` |
 | calendar | `microsoft-owa` | `calendar.outlook_web` |
-| calendar | `google-api` | `calendar.google_api` |
+| calendar | `google` | `calendar.google` |
 | calendar | `microsoft-graph` | `calendar.microsoft_graph` |
 | calendar | `caldav` | `calendar.caldav` |
 <!-- markdownlint-enable MD013 -->
 
-The payload must match the provider exactly. Google or Graph mail and calendar
-routes may share one identical OAuth route. An IMAP/SMTP mail route can be
-paired with a CalDAV calendar route.
+The payload must match the provider exactly. New Google mail-and-calendar
+setup shares one OAuth public client and grant: mail has fixed Gmail IMAP/SMTP
+endpoints while calendar pins the Google Calendar API base. A migrated
+schema-v3 account with deliberately distinct Google clients remains separate.
+Graph mail and calendar may share one identical API route. An independent
+IMAP/SMTP mail route can be paired with a CalDAV calendar route.
 
 Use `corr account add` for these combinations; it validates endpoint
 discovery, explicit provider selection, required consent bits, and route
@@ -189,19 +195,20 @@ configuration—not suitable for support reports.
 Corresync never stores a password, cookie, OAuth access/refresh token,
 authorization header, or browser canary in TOML.
 
-## OAuth routes
+## Google OAuth route
 
-Google API and Microsoft Graph are explicit BYO public-client integrations:
+Google is an explicit BYO desktop public-client integration:
 
 ```console
 corr account add reader@example.invalid \
   --alias personal \
-  --mail-provider google-api \
-  --calendar-provider google-api \
+  --mail-provider google \
+  --calendar-provider google \
   --oauth-client-id synthetic-public-client \
-  --oauth-redirect-uri http://127.0.0.1:8765/callback \
+  --oauth-redirect-uri http://127.0.0.1:0 \
   --authorization-key personal-google \
   --approve-oauth
+corr auth login --account personal
 ```
 
 The redirect must be an allowed loopback `http://127.0.0.1` URI. Port `0`
@@ -209,27 +216,20 @@ selects an available ephemeral port for public-client registrations that permit
 native-app loopback ports; otherwise configure an explicitly registered port.
 Before a provider page can open, `corr auth login` prints the exact service-
 derived scope set. The flow validates state and grants belong to the OS keyring.
-There is no client-secret field and no automatic Graph or Google selection. Use
-only a client registration you are authorized to operate.
+There is no client-secret field and no automatic Google selection. Use only a
+client registration you are authorized to operate.
 
-Mail and calendar routes can also use distinct OAuth providers and grants.
-Prefix the calendar settings with `calendar-`, for example
+The normal system browser owns Google sign-in. Mail then authenticates with a
+fresh access token over fixed `imap.gmail.com:993` implicit TLS and
+`smtp.gmail.com:587` STARTTLS endpoints. Calendar uses the pinned Google
+Calendar API. Passwords, app passwords, cookies, custom Gmail hosts, and Gmail
+REST are not accepted by the Google route.
+
+Microsoft Graph and hybrid accounts can use distinct OAuth providers and
+grants. Prefix calendar settings with `calendar-`, for example
 `--calendar-oauth-client-id` and `--calendar-authorization-key`. A
 calendar-only account uses `--mail-provider none`; `--calendar-provider none`
 creates a mail-only account.
-
-## Legacy Google Web configuration
-
-Schema v3 can still parse `mail.google_web` and `calendar.google_web` only so
-v0.8.0 and v0.8.1 accounts can be inspected and removed safely. New
-`google-web` selection is rejected, and login fails before launching a browser.
-Google rejects sign-in from software-controlled browsers; Corresync does not
-disguise automation or bypass that protection.
-
-Replace the account with an explicitly authorized `google-api` route or with
-IMAP/SMTP and CalDAV routes that the provider and account administrator permit.
-Workspace policy can require OAuth app approval or disable either API or
-standards access; Corresync never silently falls back around those controls.
 
 ## Outlook Web routing
 
@@ -275,6 +275,22 @@ external sends retain mandatory review.
 checks without disabling `corr update` or `corr update check`.
 `CORRESYNC_NO_UPDATE_CHECK=1` provides a process override.
 
+Interactive CLI starts check the cached stable-release status and show one
+short, installation-specific command when an update is available. Opt in to
+verified automatic installation for a standalone/direct binary with:
+
+```console
+corr config set updates.auto_install true
+```
+
+or set `updates.auto_install = true` in TOML. Corresync never runs Homebrew,
+Scoop, WinGet, or a system package manager: managed installations still show
+their exact owner command. Automatic installation is default-off and never
+runs on MCP, daemon, completion, feedback, JSON, piped, or non-interactive
+paths. Configuration commands are also excluded so consent can always be
+revoked before another update attempt. `disable_automatic_checks` and
+`auto_install` cannot both be true.
+
 ## Config lifecycle
 
 `corr config edit` uses `VISUAL`, `EDITOR`, or the platform default, then saves
@@ -292,6 +308,6 @@ corr daemon stop
 
 then retry so the new owner starts with the new policy.
 
-Schema v1 and v2 files are read into schema v3 in memory during migration.
-Automatic migration preserves the original rollback copy and never migrates
-IPC credentials.
+Older schema files are migrated without changing stable account identity or
+moving credentials into configuration. See the
+[migration guide](migration-v0.7.md) for version-specific details.

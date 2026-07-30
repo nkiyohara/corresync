@@ -38,8 +38,9 @@ gateway or tenant administration service.
   config, CLI, MCP, audit, feedback, or logs.
 - The Outlook Web route uses visible interactive sign-in. OAuth routes use
   Authorization Code with PKCE for an explicitly selected public client.
-- Legacy Google Web selection and activation fail before browser launch.
-  Automation signals are never hidden to bypass provider sign-in controls.
+- The Google route pins Gmail TLS endpoints, uses a fresh short-lived token for
+  each IMAP/SMTP XOAUTH2 exchange, and cannot represent a password, app
+  password, alternate mail host, or Gmail REST transport.
 - Standards credentials remain behind an OS-keyring entry or an explicitly
   approved helper reference.
 - Account-add approval displays the exact external backend/key handles and
@@ -134,6 +135,11 @@ gateway or tenant administration service.
 - Keep automatic update checks bounded, unauthenticated, cached, and free of
   account or machine identifiers. Disable them in MCP, daemon, completion,
   feedback, pipes, and JSON output.
+- Keep automatic installation default-off and direct-install-only. Reuse the
+  complete verified self-update path, never invoke a package manager, never run
+  on an MCP, configuration-management, or machine-output path, and let
+  verification failure leave both the executable and requested provider
+  operation unchanged.
 
 ## Explicitly unsupported
 

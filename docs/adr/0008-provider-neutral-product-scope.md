@@ -88,8 +88,10 @@ monitoring.
 
 ## Implementation amendment
 
-Google API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV adapters are
-implemented behind the shared application boundary. The former read-only
+Google Gmail-XOAUTH2/Calendar-API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV
+adapters are implemented behind the shared application boundary. The current
+Google transport is defined by
+[ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md). The former read-only
 Google Web route is disabled before browser launch by
 [ADR 0018](0018-disable-automated-google-web-sign-in.md); its legacy schema and
 synthetic fixtures are not a runtime capability. Remaining route evidence is

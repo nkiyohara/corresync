@@ -1,5 +1,9 @@
 # ADR 0018: Disable automated Google Web sign-in
 
+Google's supported route was subsequently simplified by
+[ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md): Gmail now uses
+IMAP/SMTP XOAUTH2 under provider ID `google`, while Calendar remains API-backed.
+
 - Status: accepted
 - Date: 2026-07-29
 

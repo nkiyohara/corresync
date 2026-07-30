@@ -47,7 +47,7 @@ body:
       label: Provider route
       options:
         - microsoft-owa
-        - google-api
+        - google
         - microsoft-graph
         - jmap
         - imap-smtp

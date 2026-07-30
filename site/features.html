@@ -174,9 +174,7 @@
     --query 'subject:"quarterly plan"' --json</code></pre>
             </div>
             <p>
-              Deep reference: the exact machine contract is documented in
-              <a href="https://github.com/nkiyohara/corresync/blob/main/docs/json.md"
-              >json.md on GitHub</a>.
+              The same account isolation, bounds, and preview rules apply to every JSON response.
             </p>
           </article>
         </div>
@@ -250,9 +248,9 @@
           <article aria-labelledby="faq-provider">
             <h3 id="faq-provider">Will it work with my accounts?</h3>
             <p>
-              Corresync speaks Outlook Web, Google API, Microsoft Graph, JMAP, IMAP/SMTP, and
-              CalDAV, and you pick mail and calendar routes independently per account. What a route
-              can do—and any degradation your specific account reports—is always explicit. <a
+              Corresync speaks Outlook Web, Google, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV,
+              and you pick mail and calendar routes independently per account. What a route can
+              do—and any degradation your specific account reports—is always explicit. <a
                 href="providers.html"
               >Compare the routes</a>.
             </p>
@@ -261,8 +259,9 @@
             <h3 id="faq-cost">Does it cost anything?</h3>
             <p>
               No. Corresync is open source under the Apache-2.0 license. You bring the accounts you
-              already have; the Google API and Microsoft Graph routes additionally need a public
-              OAuth client registration you are authorized to use.
+              already have. Microsoft Graph additionally needs a public OAuth client registration
+              you are authorized to use; Corresync is preparing its official OAuth application
+              before guided Google connection can open.
             </p>
           </article>
           <article aria-labelledby="faq-data">
@@ -288,7 +287,8 @@
               There is no telemetry pipeline and no automatic crash upload. An interactive CLI may
               quietly check for a newer public release—sending only the Corresync version string,
               cached for 24 hours, disabled for MCP, pipes, and JSON output—and you can turn that
-              off in configuration.
+              off in configuration. Standalone installs can separately opt in to verified automatic
+              updates; package-managed installs always receive only their owner command.
             </p>
           </article>
           <article aria-labelledby="faq-unknown">
@@ -314,12 +314,13 @@
         </div>
         <ul>
           <li>
-            <strong>Gmail currently uses Google API.</strong> Google Web sign-in is not supported,
-            and managed accounts may need administrator approval.
+            <strong>Guided Google connection is not available yet.</strong> Corresync is preparing
+            its official OAuth application for verification; use Google’s official Workspace MCP
+            servers in the meantime.
           </li>
           <li>
-            <strong>No shared OAuth client or token relay.</strong> Google API and Microsoft Graph
-            use a public client you register and are authorized to use.
+            <strong>No token relay.</strong> Microsoft Graph uses a public client you register and
+            are authorized to use.
           </li>
           <li>
             <strong>No Teams chat, channels, calls, recordings, or meeting lifecycle
@@ -359,11 +360,7 @@
             account you consider sensitive.
           </p>
           <p class="deep-refs">
-            <strong>Deep technical references on GitHub:</strong>
-            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/compatibility.md"
-            >the full compatibility evidence matrix</a> ·
-            <a href="https://github.com/nkiyohara/corresync/blob/main/docs/features.md"
-            >the exact per-action feature matrix and typed degradations</a>
+            <a href="safety.html">See the safety boundaries behind every provider route</a>.
           </p>
         </div>
       </section>
@@ -393,8 +390,10 @@
         <a href="providers.html">Providers</a>
         <a href="features.html">Features</a>
         <a href="safety.html">Safety</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="terms.html">Terms</a>
         <a href="https://github.com/nkiyohara/corresync">GitHub source</a>
-        <a href="https://github.com/nkiyohara/corresync/blob/main/SECURITY.md">Security policy</a>
+        <a href="https://github.com/nkiyohara/corresync/security/advisories/new">Security</a>
         <a href="https://github.com/nkiyohara/corresync/releases">Releases</a>
         <a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
       </nav>

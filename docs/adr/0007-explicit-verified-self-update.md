@@ -1,8 +1,8 @@
-# ADR 0007: Explicit verified self-update
+# ADR 0007: Verified self-update with explicit automatic opt-in
 
 - Status: accepted
 - Date: 2026-07-24
-- Amended: 2026-07-28
+- Amended: 2026-07-30
 
 ## Context
 
@@ -14,21 +14,35 @@ carefully but is easy to perform incompletely. The original `owa update` name al
 reasonably suggests a user-initiated update rather than a command group that
 only contains `owa update check`.
 
-Background replacement remains inappropriate. A normal Outlook command must
-not gain local filesystem write authority merely because a public endpoint
-reports a newer version. Package-manager files must remain owned by their
-package manager, and machine-readable or MCP output must never receive terminal
-decoration or update progress.
+Implicit replacement remains inappropriate. A normal provider command must not
+gain local filesystem write authority merely because a public endpoint reports
+a newer version. An explicit local opt-in can grant that authority to a direct
+installation, but package-manager files must remain owned by their package
+manager. Machine-readable and MCP paths must never receive terminal decoration,
+update progress, or an update attempt.
 
 ## Decision
 
-Keep startup update discovery read-only and add an explicit `corr update`
-action. It performs one fresh stable-release check. Homebrew, WinGet, Scoop,
-deb, RPM, and APK installations are never modified; the command displays and
-returns the exact package-manager action instead.
+Keep startup update discovery read-only by default and retain the explicit
+`corr update` action. It performs one fresh stable-release check. Homebrew,
+WinGet, Scoop, deb, RPM, and APK installations are never modified; startup
+notices and the explicit command display the exact package-manager action
+instead.
 
-For a direct installation, `corr update` may replace only the running regular
-file, never a symlink. It:
+`updates.auto_install = true` is a separate, default-off consent for a direct
+installation to apply an available verified stable release before an eligible
+interactive CLI command. The check remains cached and bounded. Automatic
+installation is excluded entirely from MCP, daemon, completion, feedback,
+configuration management, machine-readable, piped, and non-interactive paths;
+it cannot run between MCP tool calls or while one is in flight. Excluding
+configuration management ensures that a command which revokes automatic-update
+consent cannot itself trigger an update first. A failed automatic attempt
+leaves the requested command available and prints only a short manual retry
+instruction. The already-running process continues on its loaded image, so the
+replacement takes effect on the next `corr` start.
+
+For a direct installation, either the explicit command or the opted-in startup
+path may replace only the running regular file, never a symlink. It:
 
 1. accepts only the exact stable GitHub release and matching OS/architecture
    archive from a bounded HTTPS asset allowlist;
@@ -62,9 +76,10 @@ documented compatibility window ends.
 
 ## Consequences
 
-Direct users get the short, memorable path `corr update` without giving
-background checks write authority. Managed users can use the same entry point
-to discover the owner-specific command without risking mixed ownership.
+Direct users get the short, memorable path `corr update` and can separately
+consent to verified startup installation. Default checks retain no write
+authority. Managed users receive their owner-specific command without risking
+mixed ownership, even if automatic installation is enabled in configuration.
 
 The release binary and dependency review surface grow because provenance
 verification is now self-contained instead of requiring an external `cosign`

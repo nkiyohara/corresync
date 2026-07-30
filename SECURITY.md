@@ -54,12 +54,15 @@ controls. It does not bypass authentication, tenant policy, MFA, Conditional
 Access, disabled services, mailbox permissions, or administrator consent.
 
 The Outlook Web route does not require a third-party Microsoft Graph
-application. The read-only Google Web route keeps sign-in and session material
-inside a visible provider-owned browser. Google API and Microsoft Graph routes
-require an explicitly selected public OAuth client. JMAP, IMAP/SMTP, and
-CalDAV routes use only an OS-keyring entry or approved helper reference. None
-of these models is an authorization bypass: the provider must already permit
-the requested operation.
+application. The Google route uses an explicitly selected desktop public OAuth
+client: the normal system browser owns authorization, the grant stays in the OS
+keyring, Gmail uses fixed IMAP/SMTP XOAUTH2 endpoints, and Calendar uses the
+Google Calendar API. Automated Google Web sign-in, passwords, app passwords,
+cookies, custom Gmail hosts, and silent fallback are not supported. Microsoft
+Graph also requires an explicitly selected public OAuth client. JMAP,
+IMAP/SMTP, and CalDAV routes use only an OS-keyring entry or approved helper
+reference. None of these models is an authorization bypass: the provider must
+already permit the requested operation.
 
 Expected controls include:
 
@@ -82,6 +85,9 @@ Expected controls include:
 Read the complete [threat model](docs/threat-model.md),
 [authentication design](docs/authentication.md), and
 [release verification guide](docs/install.md#verify-checksums-and-provenance).
+Google user-data access, local retention, disclosure, and revocation are
+documented in the public
+[Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html).
 
 ## Out of scope for security claims
 

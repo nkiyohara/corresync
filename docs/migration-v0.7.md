@@ -1,8 +1,9 @@
 # Migrate from the v0.6 Outlook bridge
 
 Corresync 0.7 coordinated the product/repository/package rename. Corresync 0.8
-makes `corr` the primary interactive command and upgrades configuration to
-schema v3 with explicit mail/calendar provider routes.
+makes `corr` the primary interactive command. Current builds load configuration
+as schema v4 with explicit mail/calendar provider routes and the unified
+`google` route.
 
 Old names in this guide are migration inputs only. They are not current command
 or directory aliases.
@@ -155,7 +156,8 @@ The migration:
 
 1. reads the old config only when no canonical Corresync config exists;
 2. preserves every stable opaque account ID;
-3. converts schema v1/v2 accounts to schema v3 mail/calendar routes;
+3. converts schema v1/v2 accounts to schema v4 mail/calendar routes and
+   converts schema-v3 `google-api` accounts to the current `google` route;
 4. leaves the original config byte-for-byte unchanged;
 5. stops the old authenticated session owner before browser-state changes;
 6. copies only rollback-safe state such as content-free audit/update metadata;
