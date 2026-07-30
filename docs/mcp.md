@@ -17,6 +17,13 @@ corr mcp setup codex
 authenticates. MCP registration is refused until at least one account route is
 configured.
 
+`corr mcp serve` itself can start against a freshly initialized, account-free
+configuration so MCP clients and registries can inspect the complete catalog
+without selecting a provider. In that provider-neutral state, account catalogs
+are empty and account-bound calls return setup guidance; no provider adapter is
+selected, contacted, or authenticated. The client registration commands above
+continue to require a configured account.
+
 Replace `codex` with `claude-code`, `github-copilot`, `gemini-cli`,
 `qwen-code`, or `qoder`. Use `--dry-run` to print the official client command
 without changing client configuration.

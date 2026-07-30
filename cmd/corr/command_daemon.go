@@ -83,6 +83,7 @@ func (*daemonServeCommand) Run(app *runtime) (returnErr error) {
 	server, err := daemonapi.NewServer(backend, daemonapi.ServerOptions{
 		Version: app.info.Version, ProcessID: app.processID,
 		StartedAt: time.Now(), Credential: credential.Value(), ConfigDigest: configDigest,
+		AllowNoDefaultAccount: len(backend.configuration.Accounts) == 0,
 	})
 	if err != nil {
 		return err

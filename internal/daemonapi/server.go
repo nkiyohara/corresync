@@ -24,11 +24,12 @@ const maxConcurrentCalls = 32
 
 // ServerOptions identifies the process serving one API namespace.
 type ServerOptions struct {
-	Version      string
-	ProcessID    int
-	StartedAt    time.Time
-	Credential   string
-	ConfigDigest string
+	Version               string
+	ProcessID             int
+	StartedAt             time.Time
+	Credential            string
+	ConfigDigest          string
+	AllowNoDefaultAccount bool
 }
 
 // Server hosts the daemon API over a caller-provided local-only listener.
@@ -59,15 +60,21 @@ func NewServer(backend Backend, options ServerOptions) (*Server, error) {
 	if err := localipc.ValidateCredential(options.Credential); err != nil {
 		return nil, err
 	}
-	if err := backend.DefaultAccount().Validate(); err != nil {
-		return nil, fmt.Errorf("validate default daemon account: %w", err)
+	defaultAccount := backend.DefaultAccount()
+	if defaultAccount == "" && !options.AllowNoDefaultAccount {
+		return nil, errors.New("default daemon account is required")
+	}
+	if defaultAccount != "" {
+		if err := defaultAccount.Validate(); err != nil {
+			return nil, fmt.Errorf("validate default daemon account: %w", err)
+		}
 	}
 	server := &Server{
 		backend: backend,
 		status: Status{
 			ProtocolVersion: ProtocolVersion, Version: options.Version,
 			ProcessID: options.ProcessID, StartedAt: options.StartedAt.UTC(),
-			DefaultAccount: backend.DefaultAccount(),
+			DefaultAccount: defaultAccount,
 			ConfigDigest:   options.ConfigDigest,
 		},
 		token: options.Credential,

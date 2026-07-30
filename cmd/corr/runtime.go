@@ -264,11 +264,27 @@ func (app *runtime) requireDaemonStopped() error {
 // openDaemon connects to the config-scoped session owner, starting it when
 // absent. It never receives provider authorization material.
 func (app *runtime) openDaemon(ctx context.Context) (*daemonapi.Client, daemonapi.Status, error) {
+	return app.openDaemonWithOptions(ctx, false)
+}
+
+// openDaemonForMCP permits the provider-neutral onboarding state so MCP
+// clients and registries can inspect the complete catalog before an account is
+// configured. Ordinary CLI operations continue to require an account.
+func (app *runtime) openDaemonForMCP(
+	ctx context.Context,
+) (*daemonapi.Client, daemonapi.Status, error) {
+	return app.openDaemonWithOptions(ctx, true)
+}
+
+func (app *runtime) openDaemonWithOptions(
+	ctx context.Context,
+	allowNoAccounts bool,
+) (*daemonapi.Client, daemonapi.Status, error) {
 	configuration, _, err := app.loadConfigContext(ctx)
 	if err != nil {
 		return nil, daemonapi.Status{}, err
 	}
-	if len(configuration.Accounts) == 0 {
+	if len(configuration.Accounts) == 0 && !allowNoAccounts {
 		return nil, daemonapi.Status{}, errors.New(
 			"no account is configured; run `corr setup <email-address>` first",
 		)
