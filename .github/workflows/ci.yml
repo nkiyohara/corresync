@@ -53,8 +53,8 @@ jobs:
 
       - name: Verify standalone installer
         run: |
-          mise exec -- shfmt -d -i 2 -ci site/install.sh tools/test-install.sh
-          mise exec -- shellcheck site/install.sh tools/test-install.sh
+          mise exec -- shfmt -d -i 2 -ci mcpb/server/launch.sh site/install.sh tools/test-install.sh
+          mise exec -- shellcheck mcpb/server/launch.sh site/install.sh tools/test-install.sh
           ./tools/test-install.sh
 
       - name: Verify static site
@@ -189,5 +189,6 @@ jobs:
         run: |
           goreleaser check
           goreleaser release --snapshot --clean
+          go run ./tools/mcpbpack --dist dist
           go run ./tools/catalogrender --dist dist
           go run ./tools/releaseverify --dist dist

@@ -21,14 +21,14 @@ tasks:
     desc: Format Go, shell, and structured project files
     cmds:
       - gofmt -w $(rg --files -g '*.go' -g '!vendor/**')
-      - shfmt -w -i 2 -ci site/install.sh tools/test-install.sh
+      - shfmt -w -i 2 -ci mcpb/server/launch.sh site/install.sh tools/test-install.sh
       - dprint fmt
 
   format:check:
     desc: Verify Go, shell, and structured project file formatting
     cmds:
       - test -z "$(gofmt -l $(rg --files -g '*.go' -g '!vendor/**'))"
-      - shfmt -d -i 2 -ci site/install.sh tools/test-install.sh
+      - shfmt -d -i 2 -ci mcpb/server/launch.sh site/install.sh tools/test-install.sh
       - dprint check
 
   hooks:install:
@@ -60,7 +60,7 @@ tasks:
     desc: Run the configured Go and shell linters
     cmds:
       - golangci-lint run
-      - shellcheck site/install.sh tools/test-install.sh
+      - shellcheck mcpb/server/launch.sh site/install.sh tools/test-install.sh
 
   test:
     desc: Run deterministic unit and contract tests
@@ -106,6 +106,7 @@ tasks:
     desc: Build all release archives and SBOMs without publishing
     cmds:
       - goreleaser release --snapshot --clean
+      - go run ./tools/mcpbpack --dist dist
       - go run ./tools/catalogrender --dist dist
       - go run ./tools/releaseverify --dist dist
 

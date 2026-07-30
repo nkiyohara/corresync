@@ -52,7 +52,8 @@ The expected release inventory is:
 
 - six OS/architecture archives and one tagged source archive;
 - six native Linux packages;
-- SPDX JSON and CycloneDX JSON SBOMs for every archive and package;
+- one platform-universal MCPB containing the six verified primary binaries;
+- SPDX JSON and CycloneDX JSON SBOMs for every archive, package, and MCPB;
 - one SHA-256 checksum manifest;
 - license and third-party license material;
 - README, changelog, security policy, installation/MCP guides, and migration
@@ -67,9 +68,10 @@ version metadata, and flags as `corr`. There is no separate compatibility
 manual or completion.
 
 The verifier rejects missing/extra inventory, unsafe archive paths, wrong
-binary names, asset names GitHub could rewrite, mismatched versions,
-non-reproducible metadata, missing licenses, incomplete SBOMs, and stale
-documentation/package payloads.
+binary names, MCPB path or launcher drift, a bundled binary that differs from
+its verified release input, asset names GitHub could rewrite, mismatched
+versions, non-reproducible metadata, missing licenses, incomplete SBOMs, and
+stale documentation/package payloads.
 
 ## Publish a version
 
@@ -86,8 +88,9 @@ documentation/package payloads.
 
 The workflow rejects a tag that is not reachable from `main`. GoReleaser creates
 a draft, injects the version/commit/source date, builds with `CGO_ENABLED=0` and
-`-trimpath`, then verifies archives, packages, catalogs, licenses, checksums,
-and SBOMs before publication.
+`-trimpath`, then the MCPB packer creates one deterministic local bundle from
+those exact primary binaries. The release gate verifies archives, packages,
+the MCPB, catalogs, licenses, checksums, and SBOMs before publication.
 
 Only the verified checksum manifest is signed. The GitHub Actions OIDC identity
 is bound to the exact repository, release workflow, and tag. Any pre-publish
