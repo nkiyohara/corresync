@@ -79,8 +79,9 @@ Expected controls include:
   execution, content release, and remote egress;
 - allowlisted local feedback that prints before any copy/save/browser action
   and never submits automatically;
-- signed checksum provenance, per-artifact SBOMs, secret scanning, dependency
-  checks, and pinned workflow actions.
+- Developer ID-signed and Apple-notarized macOS binaries, signed checksum
+  provenance, per-artifact SBOMs, secret scanning, dependency checks, and
+  pinned workflow actions.
 
 Read the complete [threat model](docs/threat-model.md),
 [authentication design](docs/authentication.md), and

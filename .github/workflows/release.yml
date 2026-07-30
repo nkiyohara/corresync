@@ -14,8 +14,8 @@ permissions: {}
 jobs:
   build-release:
     name: Verify and build draft release
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
+    runs-on: macos-15
+    timeout-minutes: 45
     permissions:
       contents: write # Create the verified draft and upload its assets.
     steps:
@@ -43,10 +43,105 @@ jobs:
           go test -shuffle=on ./...
           goreleaser check
 
+      - name: Prepare isolated Apple signing credentials
+        env:
+          MACOS_NOTARY_APPLE_ID: ${{ secrets.MACOS_NOTARY_APPLE_ID }}
+          MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
+          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
+          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
+          MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+        run: |
+          certificate_path="$RUNNER_TEMP/corresync-developer-id.p12"
+          keychain_path="$RUNNER_TEMP/corresync-release.keychain-db"
+          keychain_password="$(openssl rand -hex 32)"
+          echo "::add-mask::$keychain_password"
+
+          printf '%s' "$MACOS_SIGN_P12" | base64 --decode -o "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -k "$keychain_path" \
+            -P "$MACOS_SIGN_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          security find-identity -v -p codesigning "$keychain_path" |
+            grep -F "Developer ID Application: Naoki Kiyohara ($MACOS_TEAM_ID)"
+
+          xcrun notarytool store-credentials "corresync-release" \
+            --apple-id "$MACOS_NOTARY_APPLE_ID" \
+            --team-id "$MACOS_TEAM_ID" \
+            --password "$MACOS_NOTARY_PASSWORD" \
+            --keychain "$keychain_path"
+          rm -f "$certificate_path"
+          echo "CORRESYNC_KEYCHAIN_PATH=$keychain_path" >>"$GITHUB_ENV"
+
       - name: Build SBOM-bearing draft release
         run: goreleaser release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign and notarize every Darwin binary
+        env:
+          MACOS_SIGN_IDENTITY: >-
+            Developer ID Application: Naoki Kiyohara (${{ secrets.MACOS_TEAM_ID }})
+          MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+        run: |
+          notary_root="$RUNNER_TEMP/corresync-notary"
+          notary_zip="$RUNNER_TEMP/corresync-notary.zip"
+          mkdir -p "$notary_root"
+
+          binary_count="$(
+            jq '[.[] | select(.type == "Binary" and .goos == "darwin")] | length' \
+              dist/artifacts.json
+          )"
+          test "$binary_count" -eq 4
+          jq -r '
+            .[]
+            | select(.type == "Binary" and .goos == "darwin")
+            | [.path, .goarch, .name]
+            | @tsv
+          ' dist/artifacts.json |
+            while IFS=$'\t' read -r binary architecture name; do
+              test -f "$binary"
+              mkdir -p "$notary_root/$architecture"
+              codesign \
+                --force \
+                --options runtime \
+                --timestamp \
+                --keychain "$CORRESYNC_KEYCHAIN_PATH" \
+                --sign "$MACOS_SIGN_IDENTITY" \
+                "$binary"
+              codesign --verify --strict --verbose=2 "$binary"
+              codesign --display --verbose=4 "$binary" 2>&1 |
+                grep -F "TeamIdentifier=$MACOS_TEAM_ID"
+              install -m 0755 "$binary" "$notary_root/$architecture/$name"
+            done
+
+          ditto -c -k --keepParent "$notary_root" "$notary_zip"
+          notary_result="$(
+            xcrun notarytool submit "$notary_zip" \
+              --keychain-profile "corresync-release" \
+              --keychain "$CORRESYNC_KEYCHAIN_PATH" \
+              --wait \
+              --timeout 20m \
+              --output-format json
+          )"
+          printf '%s\n' "$notary_result" |
+            jq -e '.status == "Accepted"'
+          printf 'Apple notarization accepted: %s\n' \
+            "$(printf '%s\n' "$notary_result" | jq -r '.id')"
+
+      - name: Repack signed Darwin archives and refresh their SBOMs
+        run: >-
+          go run ./tools/macosrelease
+          --dist dist
 
       - name: Build the platform-universal MCP Bundle
         run: go run ./tools/mcpbpack --dist dist
@@ -57,9 +152,12 @@ jobs:
       - name: Verify every release output
         run: go run ./tools/releaseverify --dist dist
 
-      - name: Attach the verified MCP Bundle
+      - name: Replace signed macOS assets and attach the verified MCP Bundle
         run: >-
           gh release upload "$GITHUB_REF_NAME"
+          dist/corresync_*_darwin_*.tar.gz
+          dist/corresync_*_darwin_*.tar.gz.spdx.json
+          dist/corresync_*_darwin_*.tar.gz.cdx.json
           dist/*.mcpb
           dist/*.mcpb.spdx.json
           dist/*.mcpb.cdx.json
@@ -86,6 +184,12 @@ jobs:
           path: dist/checksums.txt
           if-no-files-found: error
           retention-days: 1
+
+      - name: Remove the isolated Apple signing keychain
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/corresync-developer-id.p12"
+          security delete-keychain "$CORRESYNC_KEYCHAIN_PATH" || true
 
   sign-release:
     name: Sign and publish verified release
