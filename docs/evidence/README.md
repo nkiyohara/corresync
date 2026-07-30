@@ -6,9 +6,10 @@ an earlier build does not promote a current implementation to “observed.”
 
 ## v0.8 marker
 
-The v0.8 provider routes, native platform IPC implementations, and MCP clients
-are **live-unobserved**. No live observation record is committed for the v0.8
-code.
+The Google authorization and bounded read path has one commit-bound
+[macOS arm64 live observation](google-macos-arm64-2026-07-30.md). Google writes,
+all other provider routes, native-platform IPC implementations, and MCP clients
+remain **live-unobserved**.
 
 Published distribution evidence remains bound to its exact tag and workflow;
 it does not promote provider or native-platform rows to live-observed.

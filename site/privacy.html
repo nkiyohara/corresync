@@ -368,6 +368,12 @@
                 public OAuth client identifier, loopback redirect, and keyring handle.
               </li>
               <li>
+                <strong>Google Desktop client credential:</strong> when Google requires this value
+                at token exchange, it is supplied only through the local Corresync process
+                environment. It is not stored in configuration, the OAuth grant, audit, feedback,
+                MCP output, or browser URLs.
+              </li>
+              <li>
                 <strong>Content-free audit:</strong> bounded operation type, outcome, time, caller,
                 opaque account and target/provider identifiers, and policy context. Audit records
                 exclude addresses, recipients, subjects, bodies, attachment names, event text,

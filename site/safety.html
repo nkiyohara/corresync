@@ -262,8 +262,9 @@
             <p class="chip">Public-client OAuth</p>
             <h3>Google and Graph</h3>
             <p>
-              Explicit selection, PKCE, registered loopback redirect, service-minimal scopes, no
-              client secret, and OS-keyring grant storage.
+              Explicit selection, PKCE, registered loopback redirect, service-minimal scopes, and
+              OS-keyring grant storage. A required Google Desktop client credential stays only in
+              the local process environment; Graph remains secret-free.
             </p>
           </article>
           <article>
@@ -351,9 +352,10 @@
         </div>
         <div>
           <p>
-            v0.8 routes are implemented against synthetic provider contracts. They remain <strong
-            >live-unobserved</strong> until an authorized, content-free observation names the exact
-            Corresync commit, provider route, platform, and outcome.
+            v0.8 routes are implemented against synthetic provider contracts. Google authorization
+            and bounded reads also have one commit-bound macOS arm64 observation. Other provider and
+            write surfaces remain <strong>live-unobserved</strong> until an authorized, content-free
+            observation names the exact Corresync commit, provider route, platform, and outcome.
           </p>
           <p>
             A missing observation is never reported as a pass. Default tests and CI never activate a

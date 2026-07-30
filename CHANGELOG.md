@@ -68,6 +68,12 @@ All notable user-facing changes are recorded here. The project follows
 
 ### Google connection
 
+- Complete the observed Google Desktop token exchange with a bounded
+  process-environment client credential while keeping it out of configuration,
+  CLI/MCP input, browser URLs, stored grants, logs, and public artifacts.
+- Start Google authorization in English for stable verification evidence,
+  ignore Gmail `\Noselect` hierarchy containers during folder discovery, and
+  accept path-escaped Calendar IDs such as subscribed holiday calendars.
 - Replace the Gmail REST mail route with one `google` route that opens the
   normal system browser for OAuth and then uses Gmail IMAP/SMTP XOAUTH2 at
   provider-pinned TLS endpoints. Passwords, app passwords, automated Google

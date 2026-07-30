@@ -2,6 +2,8 @@
 
 The Google transport and provider ID are amended by
 [ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md).
+Google's generated Desktop client credential is further amended by
+[ADR 0022](0022-google-desktop-client-credential.md).
 
 - Status: accepted
 - Date: 2026-07-28
@@ -101,7 +103,9 @@ the resulting grant only in the operating-system credential facility. A client
 ID and redirect URI are identifiers, not authorization material, and may be
 configured. Corresync does not ship or request a centrally held client secret.
 If a provider requires a client secret for the selected flow, that route is
-unsupported.
+unsupported unless a later provider-specific decision defines a bounded local
+delivery mechanism. ADR 0022 defines that exception for a Google-generated
+Desktop client credential; it does not change the Microsoft Graph rule.
 
 The initial Google API distribution model is bring-your-own public client
 registration. Selecting it is explicit and shows scopes before opening a

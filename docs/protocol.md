@@ -78,6 +78,10 @@ The Google adapter uses an explicitly selected public OAuth client and a grant
 held by the operating-system credential facility. Gmail mail is transported
 only over fixed TLS IMAP and SMTP Submission endpoints with SASL XOAUTH2; it
 does not use Gmail REST, a password, an app password, or a configurable host.
+When Google's generated Desktop client requires its client credential for token
+exchange, the local session owner receives it only through
+`CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET`; it is absent from configuration,
+browser URLs, MCP, logs, and the stored grant.
 The short-lived bearer is fetched immediately before each authentication,
 bounded, kept out of logs, and overwritten afterwards.
 After Gmail accepts an SMTP submission, Corresync confirms Gmail's

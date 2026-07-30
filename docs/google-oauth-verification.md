@@ -13,11 +13,13 @@ assessment; the Google verification team makes those decisions.
 | Google Cloud project name | `Corresync` |
 | Google Cloud project ID | `strong-surfer-504009-i0` |
 | Cloud project | Created |
-| OAuth consent / Google Auth Platform branding | Not configured |
-| Gmail API | Not enabled |
-| Google Calendar API | Not enabled |
-| Desktop OAuth client | Not created |
-| Data access scopes | Not registered |
+| Google Auth Platform branding | Configured; External / Testing |
+| Gmail API | Enabled |
+| Google Calendar API | Enabled |
+| Desktop OAuth client | Created as `Corresync desktop` |
+| Data access scopes | Registered exactly as listed below |
+| Authorized domain and public URLs | Configured and live on `corresync.org` |
+| Synthetic test account | Authorized and live-observed |
 | Google verification submission | Not submitted |
 
 Do not describe the Google route as generally available until the production
@@ -109,19 +111,27 @@ domain during review can trigger another brand review.
 ## Create the desktop public client
 
 Create an OAuth client with application type **Desktop app** and a clear name
-such as `Corresync desktop`. A desktop public client has no safely keepable
-client secret. Corresync accepts and persists only:
+such as `Corresync desktop`. A native application cannot keep an embedded
+client credential confidential, but Google's generated Desktop client may
+still require that value at the token endpoint. Corresync persists only:
 
 - the public client ID;
 - `http://127.0.0.1:0` as the native loopback redirect model;
 - an opaque OS-keyring authorization handle; and
 - the user's explicit OAuth consent bit.
 
+Supply the generated value only in the local session owner's
+`CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` process environment. Corresync bounds
+it, excludes it from the browser authorization URL and stored grant, and sends
+it only to Google's fixed TLS token endpoint. Never put it in configuration,
+CLI or MCP input, source, release metadata, CI, issues, logs, support output, or
+the verification recording.
+
 The runtime opens Google's authorization endpoint in the normal system browser,
 uses Authorization Code with PKCE and unpredictable state, binds a listener to
 a random loopback port, and exchanges the code directly with Google's token
 endpoint. It does not use an embedded browser, device-code flow, password,
-application password, browser cookie, or client-secret field.
+application password, browser cookie, or client-secret configuration field.
 
 Google's desktop-app documentation recommends a system browser and random
 loopback port on macOS, Linux, and Windows. Confirm the generated Desktop client
@@ -130,8 +140,8 @@ internet callback for the local desktop path.
 
 The client ID is public by design, but publishing it changes who can present
 the Corresync OAuth identity. Record how the official binary receives it, and
-keep a kill/rotation plan. Do not put a client secret in source, release
-metadata, configuration, CI, issues, or logs.
+keep a kill/rotation plan. Rotate or disable an obsolete generated credential
+after a replacement has completed an end-to-end token exchange.
 
 ## Register the exact data-access scopes
 
@@ -233,7 +243,8 @@ and synthetic mail/calendar content. Keep the consent screen and browser
 address bar visible. Show:
 
 1. the installed Corresync version and the public homepage;
-2. account configuration for Google mail and calendar without a client secret;
+2. account configuration for Google mail and calendar with no credential value
+   visible in configuration, commands, or output;
 3. `corr auth login --account TEST_ALIAS`;
 4. the exact three scopes printed before browser launch;
 5. the Google account chooser and consent screen identifying `Corresync`;
@@ -270,8 +281,9 @@ Do not submit until every item is true:
       and authorized domain are complete.
 - [ ] Gmail API and Google Calendar API are enabled; no unrelated API is enabled
       for this integration.
-- [ ] One Desktop app public client exists; no client secret is distributed or
-      persisted.
+- [ ] One Desktop app client exists; its generated client credential is injected
+      only into the local process, excluded from the recording and public
+      artifacts, and not persisted by Corresync.
 - [ ] The three scopes above—and no others—are registered.
 - [ ] Scope justifications match the current code and Privacy Policy.
 - [ ] The local-only restricted-data architecture is answered accurately.

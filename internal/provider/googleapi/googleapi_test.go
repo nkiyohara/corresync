@@ -235,6 +235,24 @@ func TestGoogleCalendarRouteBindsTheConfiguredIdentity(t *testing.T) {
 	}
 }
 
+func TestValidGoogleIDAcceptsEscapedCalendarIdentifiers(t *testing.T) {
+	t.Parallel()
+	for _, value := range []string{
+		"reader@example.test",
+		"en.uk#holiday@group.v.calendar.google.com",
+		"team/calendar?view=demo",
+	} {
+		if !validGoogleID(value) {
+			t.Fatalf("validGoogleID(%q) = false", value)
+		}
+	}
+	for _, value := range []string{"", ".", "..", "line\nbreak", "nul\x00byte"} {
+		if validGoogleID(value) {
+			t.Fatalf("validGoogleID(%q) = true", value)
+		}
+	}
+}
+
 func TestGoogleCalendarRejectsReadOnlyPrimaryCalendar(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewTLSServer(http.HandlerFunc(func(

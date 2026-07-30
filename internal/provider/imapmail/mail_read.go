@@ -171,6 +171,9 @@ func (client *Client) ListMailFolders(
 		})
 		selected := make([]*imap.MailboxInfo, 0, len(infos))
 		for _, info := range infos {
+			if !mailboxSelectable(info) {
+				continue
+			}
 			if parent == "" ||
 				input.Traversal == application.MailFolderTraversalDeep &&
 					isMailboxChild(info.Name, parent, info.Delimiter) ||
@@ -421,11 +424,16 @@ func parentFolderID(name string) string {
 func childCount(name, delimiter string, infos []*imap.MailboxInfo) int {
 	count := 0
 	for _, info := range infos {
-		if isDirectMailboxChild(info.Name, name, delimiter) {
+		if mailboxSelectable(info) &&
+			isDirectMailboxChild(info.Name, name, delimiter) {
 			count++
 		}
 	}
 	return count
+}
+
+func mailboxSelectable(info *imap.MailboxInfo) bool {
+	return info != nil && !hasFlag(info.Attributes, imap.NoSelectAttr)
 }
 
 func mailboxRole(info *imap.MailboxInfo) string {

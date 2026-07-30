@@ -238,8 +238,11 @@ Discovery is credential-free. Review its candidates and choose one explicitly.
 Google and Microsoft Graph require a registered public OAuth client and an
 OS-keyring authorization handle. Google mail then uses Gmail IMAP/SMTP XOAUTH2;
 Calendar and Meet use the Calendar API. Workspace administrators may require
-approval or block OAuth, IMAP, or Calendar API access. JMAP, IMAP/SMTP, and
-CalDAV use an OS-keyring entry or an explicitly approved credential helper. See
+approval or block OAuth, IMAP, or Calendar API access. A generated Google
+Desktop client may also require its client credential in the local
+`CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` process environment; never put it in
+configuration or command arguments. JMAP, IMAP/SMTP, and CalDAV use an
+OS-keyring entry or an explicitly approved credential helper. See
 [configuration.md](configuration.md) and
 [authentication.md](authentication.md).
 
