@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	privacyPolicyURL = "https://nkiyohara.github.io/corresync/privacy.html"
-	termsOfUseURL    = "https://nkiyohara.github.io/corresync/terms.html"
+	privacyPolicyURL = "https://corresync.org/privacy.html"
+	termsOfUseURL    = "https://corresync.org/terms.html"
 )
 
 type oauthConsentRoute struct {

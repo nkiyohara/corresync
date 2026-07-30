@@ -5,7 +5,7 @@
   "author": {
     "name": "Corresync contributors"
   },
-  "homepage": "https://nkiyohara.github.io/corresync/",
+  "homepage": "https://corresync.org/",
   "repository": "https://github.com/nkiyohara/corresync",
   "license": "Apache-2.0",
   "keywords": ["email", "calendar", "gmail", "outlook", "mcp", "local-first"]

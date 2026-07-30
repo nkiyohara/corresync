@@ -49,7 +49,13 @@ jobs:
           test -s site/styles.css
           test -s site/copy.js
           test -s site/install.sh
+          test -s site/favicon.ico
           test -s site/favicon.svg
+          test -s site/favicon-32x32.png
+          test -s site/apple-touch-icon.png
+          test -s site/icon-192.png
+          test -s site/icon-512.png
+          test -s site/site.webmanifest
           test -s site/corresync-mark.svg
           test -s site/social-card.svg
           test -s site/social-card.png
@@ -59,7 +65,11 @@ jobs:
             grep -Fq '<html lang="en">' "site/${page}.html"
             grep -Fq '<link rel="canonical"' "site/${page}.html"
             grep -Fq 'corresync-mark.svg' "site/${page}.html"
-            grep -Fq 'https://nkiyohara.github.io/corresync/social-card.png' "site/${page}.html"
+            grep -Fq '<link rel="icon" href="favicon.ico" sizes="any">' "site/${page}.html"
+            grep -Fq '<link rel="icon" href="favicon.svg" type="image/svg+xml">' "site/${page}.html"
+            grep -Fq '<link rel="apple-touch-icon"' "site/${page}.html"
+            grep -Fq '<link rel="manifest" href="site.webmanifest">' "site/${page}.html"
+            grep -Fq 'https://corresync.org/social-card.png' "site/${page}.html"
             if grep -Eiq 'http-equiv=.*refresh|window\.location|location\.(href|replace)' "site/${page}.html"; then
               exit 1
             fi
@@ -67,20 +77,20 @@ jobs:
               exit 1
             fi
           done
-          grep -Fq 'https://nkiyohara.github.io/corresync/' site/index.html
-          grep -Fq 'https://nkiyohara.github.io/corresync/getting-started.html' site/getting-started.html
-          grep -Fq 'https://nkiyohara.github.io/corresync/features.html' site/features.html
-          grep -Fq 'https://nkiyohara.github.io/corresync/providers.html' site/providers.html
-          grep -Fq 'https://nkiyohara.github.io/corresync/safety.html' site/safety.html
-          grep -Fq 'https://nkiyohara.github.io/corresync/privacy.html' site/privacy.html
-          grep -Fq 'https://nkiyohara.github.io/corresync/terms.html' site/terms.html
+          grep -Fq 'https://corresync.org/' site/index.html
+          grep -Fq 'https://corresync.org/getting-started.html' site/getting-started.html
+          grep -Fq 'https://corresync.org/features.html' site/features.html
+          grep -Fq 'https://corresync.org/providers.html' site/providers.html
+          grep -Fq 'https://corresync.org/safety.html' site/safety.html
+          grep -Fq 'https://corresync.org/privacy.html' site/privacy.html
+          grep -Fq 'https://corresync.org/terms.html' site/terms.html
           grep -Fq 'href="privacy.html"' site/index.html
           grep -Fq 'href="terms.html"' site/index.html
           grep -Fq 'https://mail.google.com/' site/privacy.html
           grep -Fq 'Google API Services User Data Policy' site/privacy.html
           grep -Fq 'Apache License, Version 2.0' site/terms.html
-          grep -Fq 'curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh' site/index.html
-          grep -Fq 'curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh' site/getting-started.html
+          grep -Fq 'curl -LsSf https://corresync.org/install.sh | sh' site/index.html
+          grep -Fq 'curl -LsSf https://corresync.org/install.sh | sh' site/getting-started.html
           grep -Fq 'corr mcp setup codex' site/index.html
           grep -Fq 'corr mcp setup claude-code' site/getting-started.html
           grep -Fq 'corr mcp setup github-copilot' site/getting-started.html
@@ -88,13 +98,13 @@ jobs:
           grep -Fq 'corr mcp setup qwen-code' site/getting-started.html
           grep -Fq 'corr mcp setup qoder' site/getting-started.html
           grep -Fq 'corr mcp config kimi-code' site/getting-started.html
-          grep -Fq 'https://nkiyohara.github.io/corresync/' site/sitemap.xml
-          grep -Fq 'https://nkiyohara.github.io/corresync/getting-started.html' site/sitemap.xml
-          grep -Fq 'https://nkiyohara.github.io/corresync/features.html' site/sitemap.xml
-          grep -Fq 'https://nkiyohara.github.io/corresync/providers.html' site/sitemap.xml
-          grep -Fq 'https://nkiyohara.github.io/corresync/safety.html' site/sitemap.xml
-          grep -Fq 'https://nkiyohara.github.io/corresync/privacy.html' site/sitemap.xml
-          grep -Fq 'https://nkiyohara.github.io/corresync/terms.html' site/sitemap.xml
+          grep -Fq 'https://corresync.org/' site/sitemap.xml
+          grep -Fq 'https://corresync.org/getting-started.html' site/sitemap.xml
+          grep -Fq 'https://corresync.org/features.html' site/sitemap.xml
+          grep -Fq 'https://corresync.org/providers.html' site/sitemap.xml
+          grep -Fq 'https://corresync.org/safety.html' site/sitemap.xml
+          grep -Fq 'https://corresync.org/privacy.html' site/sitemap.xml
+          grep -Fq 'https://corresync.org/terms.html' site/sitemap.xml
           test -z "$(grep -Rh '<script[^>]* src=' site --include='*.html' | grep -Fv 'src="copy.js" defer' || true)"
           if grep -Eiq 'fetch\\(|XMLHttpRequest|WebSocket|EventSource' site/copy.js; then
             exit 1

@@ -6,7 +6,7 @@
     "name": "Corresync contributors",
     "url": "https://github.com/nkiyohara/corresync"
   },
-  "homepage": "https://nkiyohara.github.io/corresync/",
+  "homepage": "https://corresync.org/",
   "repository": "https://github.com/nkiyohara/corresync",
   "license": "Apache-2.0",
   "keywords": ["email", "calendar", "gmail", "outlook", "mcp", "local-first"],
@@ -23,7 +23,7 @@
       "Reviewed writes",
       "Local monitoring"
     ],
-    "websiteURL": "https://nkiyohara.github.io/corresync/",
+    "websiteURL": "https://corresync.org/",
     "brandColor": "#3F7AD6",
     "composerIcon": "./assets/icon.svg",
     "logo": "./assets/icon.svg",

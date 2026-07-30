@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://nkiyohara.github.io/corresync/sitemap.xml
+Sitemap: https://corresync.org/sitemap.xml

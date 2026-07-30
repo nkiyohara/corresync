@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	siteBaseURL              = "https://nkiyohara.github.io/corresync/"
+	siteBaseURL              = "https://corresync.org/"
 	socialImageURL           = siteBaseURL + "social-card.png"
 	googleSiteVerification   = "du6yQYCD4HROJoMhBnPxnbcntabW8RFRJbfZrRcVcic"
 	privacyPolicyRelativeURL = "privacy.html"
@@ -38,6 +38,19 @@ type sitemap struct {
 	URLs []struct {
 		Location string `xml:"loc"`
 	} `xml:"url"`
+}
+
+type webManifest struct {
+	Name      string `json:"name"`
+	ShortName string `json:"short_name"`
+	StartURL  string `json:"start_url"`
+	Scope     string `json:"scope"`
+	Display   string `json:"display"`
+	Icons     []struct {
+		Source string `json:"src"`
+		Sizes  string `json:"sizes"`
+		Type   string `json:"type"`
+	} `json:"icons"`
 }
 
 func main() {
@@ -119,6 +132,9 @@ func verifySite(root string) error {
 	if !strings.Contains(string(robots), "Sitemap: "+siteBaseURL+"sitemap.xml") {
 		return errors.New("robots.txt does not name the canonical sitemap")
 	}
+	if err := verifyWebManifest(root); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -168,7 +184,7 @@ func parsePage(path string) (page, error) {
 						return fmt.Errorf("%s contains more than one canonical link", path)
 					}
 					item.canonical = attributes["href"]
-				case "stylesheet", "icon":
+				case "stylesheet", "icon", "apple-touch-icon", "manifest":
 					item.assets = append(item.assets, attributes["href"])
 				}
 			case "a":
@@ -262,6 +278,17 @@ func parsePage(path string) (page, error) {
 	if meta["twitter:card"][0] != "summary_large_image" {
 		return page{}, fmt.Errorf("%s does not request a large Twitter summary card", path)
 	}
+	for _, requiredAsset := range []string{
+		"favicon.ico",
+		"favicon.svg",
+		"favicon-32x32.png",
+		"apple-touch-icon.png",
+		"site.webmanifest",
+	} {
+		if !containsString(item.assets, requiredAsset) {
+			return page{}, fmt.Errorf("%s does not reference %s", path, requiredAsset)
+		}
+	}
 	if filepath.Base(path) == "index.html" {
 		verification, err := oneMeta(path, meta, "google-site-verification")
 		if err != nil {
@@ -329,6 +356,50 @@ func verifyLocalReferences(root string, item page, pages map[string]page) error 
 		}
 		if !strings.HasPrefix(targetPath, filepath.Clean(root)+string(filepath.Separator)) {
 			return fmt.Errorf("%s reference escapes the site root: %q", item.path, rawReference)
+		}
+	}
+	return nil
+}
+
+func verifyWebManifest(root string) error {
+	path := filepath.Join(root, "site.webmanifest")
+	data, err := os.ReadFile(path) // #nosec G304 -- repository-owned site root.
+	if err != nil {
+		return fmt.Errorf("read site.webmanifest: %w", err)
+	}
+	var manifest webManifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return fmt.Errorf("parse site.webmanifest: %w", err)
+	}
+	if manifest.Name != "Corresync" ||
+		manifest.ShortName != "Corresync" ||
+		manifest.StartURL != "./" ||
+		manifest.Scope != "./" ||
+		manifest.Display != "standalone" {
+		return errors.New("site.webmanifest has unexpected application metadata")
+	}
+	expectedIcons := map[string]string{
+		"icon-192.png": "192x192",
+		"icon-512.png": "512x512",
+	}
+	if len(manifest.Icons) != len(expectedIcons) {
+		return fmt.Errorf(
+			"site.webmanifest has %d icons, want %d",
+			len(manifest.Icons),
+			len(expectedIcons),
+		)
+	}
+	for _, icon := range manifest.Icons {
+		expectedSize, ok := expectedIcons[icon.Source]
+		if !ok || icon.Sizes != expectedSize || icon.Type != "image/png" {
+			return fmt.Errorf("site.webmanifest contains unexpected icon %#v", icon)
+		}
+		info, err := os.Stat(filepath.Join(root, icon.Source))
+		if err != nil {
+			return fmt.Errorf("site.webmanifest icon %q: %w", icon.Source, err)
+		}
+		if info.IsDir() || info.Size() == 0 {
+			return fmt.Errorf("site.webmanifest icon %q is empty", icon.Source)
 		}
 	}
 	return nil
