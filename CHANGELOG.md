@@ -5,8 +5,15 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
-### Privacy, terms, and Google verification
+### Privacy, terms, provider disclosure, and Google verification
 
+- Make `https://corresync.org/` the canonical site origin across Pages,
+  install commands, package metadata, OAuth disclosures, social metadata, and
+  the sitemap.
+- Expand the Privacy Policy and Terms beyond Google to disclose the actual
+  Outlook Web, Microsoft Graph, JMAP, IMAP/SMTP, CalDAV, local-import, client,
+  and monitoring boundaries; publish complete favicon, Apple touch icon, and
+  web-app manifest assets from the current Corresync mark.
 - Publish same-domain Privacy Policy and Terms of Use pages with complete
   Google scope, access, use, local storage, disclosure, retention, deletion,
   Limited Use, open-source license, and third-party-service boundaries.
@@ -76,7 +83,7 @@ All notable user-facing changes are recorded here. The project follows
   a separate account-specific login. Existing configurations are never
   rewritten during upgrade.
 - Add a no-sudo Linux installer at
-  `https://nkiyohara.github.io/corresync/install.sh`. It selects the latest
+  `https://corresync.org/install.sh`. It selects the latest
   stable amd64/arm64 archive, requires the exact checksum entry, verifies the
   release workflow identity when `cosign` is available, validates candidate
   version/OS/architecture, and atomically installs `corr` plus the finite-window

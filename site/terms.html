@@ -6,7 +6,7 @@
     <title>Corresync Terms of Use — open-source software and project services</title>
     <meta
       name="description"
-      content="Terms for Corresync’s official website, release distribution, and OAuth application, without adding conditions to the Apache-2.0 software license."
+      content="Terms for Corresync’s website, releases, provider integrations, and project-operated OAuth identity without adding conditions to the Apache-2.0 software license."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,11 +16,11 @@
     >
     <meta
       property="og:description"
-      content="Terms for Corresync’s official website, release distribution, and OAuth application, without adding conditions to the Apache-2.0 software license."
+      content="Terms for Corresync’s website, releases, provider integrations, and project-operated OAuth identity without adding conditions to the Apache-2.0 software license."
     >
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://nkiyohara.github.io/corresync/terms.html">
-    <meta property="og:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta property="og:url" content="https://corresync.org/terms.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta
@@ -34,15 +34,19 @@
     >
     <meta
       name="twitter:description"
-      content="Terms for Corresync’s official website, release distribution, and OAuth application, without adding conditions to the Apache-2.0 software license."
+      content="Terms for Corresync’s website, releases, provider integrations, and project-operated OAuth identity without adding conditions to the Apache-2.0 software license."
     >
-    <meta name="twitter:image" content="https://nkiyohara.github.io/corresync/social-card.png">
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
       content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
     >
-    <link rel="canonical" href="https://nkiyohara.github.io/corresync/terms.html">
+    <link rel="canonical" href="https://corresync.org/terms.html">
+    <link rel="icon" href="favicon.ico" sizes="any">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="site.webmanifest">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -69,8 +73,10 @@
         <h1 id="page-title">Clear terms, without taking away <em>open-source rights.</em></h1>
         <p class="lede">
           These Terms cover the official Corresync website, release distribution channels, and
-          project-operated OAuth application. Your copy of the software remains governed by Apache
-          License 2.0; these Terms do not add a condition to the rights that license grants.
+          project-operated OAuth identity. They also explain your responsibilities when the software
+          connects to Google, Microsoft, Outlook Web, JMAP, IMAP/SMTP, CalDAV, a local import, or a
+          user-selected client. Your copy of the software remains governed by Apache License 2.0;
+          these Terms do not add a condition to the rights that license grants.
         </p>
         <p class="legal-date">
           Effective and last updated: <time datetime="2026-07-30">30 July 2026</time>
@@ -106,10 +112,11 @@
             <p>
               These Terms of Use (“Terms”) are an agreement between you and Naoki Kiyohara,
               maintainer of the Corresync open-source project (“Corresync”, “we”, or “the
-              project”). They apply when you use the official Corresync website, project-operated
-              Google OAuth identity, or official release distribution infrastructure (“Project
-              Services”). By using Project Services, you agree to these Terms. If you do not
-              agree, do not use those Project Services.
+              project”). They apply when you use the official Corresync website, official release
+              distribution infrastructure, or a project-operated OAuth identity (currently the
+              Corresync Google OAuth application). Together, these are “Project Services”. By
+              using Project Services, you agree to these Terms. If you do not agree, do not use
+              those Project Services.
             </p>
             <p>
               These Terms do not govern your rights to possess, run, study, reproduce, modify, or
@@ -173,6 +180,10 @@
                 client, selected model, runner, and backups.
               </li>
               <li>
+                Review the privacy and data-handling terms of any MCP client, AI service, monitor
+                destination, credential helper, or provider that you configure to receive data.
+              </li>
+              <li>
                 Install trusted builds, keep supported versions current, and verify release
                 provenance where appropriate.
               </li>
@@ -213,18 +224,20 @@
             <p class="legal-kicker">06 · Providers and third parties</p>
             <h2 id="providers-title">Other services keep their own rules</h2>
             <p>
-              Corresync connects directly to services you select, including Google, Microsoft, and
-              standards-based providers. Your use of those services is governed by their own terms,
-              privacy policies, acceptable-use rules, quotas, administrator policies, and fees.
-              Google account access is also subject to the
+              Corresync connects directly to the routes you select: Google, Outlook Web, Microsoft
+              Graph, JMAP, IMAP/SMTP, CalDAV, and approved local imports. Your use of a provider or
+              endpoint is governed by its own terms, privacy policy, acceptable-use rules, quotas,
+              administrator policies, and fees. Google account access is also subject to the
               <a href="https://developers.google.com/terms">Google APIs Terms of Service</a> and
               applicable Google product policies.
             </p>
             <p>
-              Corresync does not control and is not responsible for a provider’s availability,
-              data, security, policy decisions, authentication flow, API changes, delivery outcome,
-              or account action. Links to third-party resources are provided for context, not
-              endorsement.
+              Outlook Web uses Microsoft’s live website; Microsoft Graph uses delegated API
+              permissions from a public client you authorize; standards routes use the TLS endpoints
+              and credential references you choose. Corresync does not control and is not
+              responsible for a provider’s availability, data, security, policy decisions,
+              authentication flow, API or website changes, delivery outcome, or account action.
+              Links to third-party resources are provided for context, not endorsement.
             </p>
           </section>
 
@@ -232,10 +245,11 @@
             <p class="legal-kicker">07 · Privacy</p>
             <h2 id="privacy-title">Local-first data handling</h2>
             <p>
-              The <a href="privacy.html">Corresync Privacy Policy</a> explains what the official
-              application accesses, why Google scopes are requested, what is stored locally, when
-              data can reach a user-selected client or model, and how to disconnect and delete
-              authorization. It is incorporated into these Terms by reference.
+              The <a href="privacy.html">Corresync Privacy Policy</a> explains what every supported
+              provider route and local import can access, why Google and Microsoft scopes are
+              requested, what browser, credential, content, audit, queue, and staging data can
+              remain locally, when data can reach a user-selected client or model, and how to
+              disconnect and delete authorization. It is incorporated into these Terms by reference.
             </p>
           </section>
 

@@ -87,7 +87,7 @@ Read the complete [threat model](docs/threat-model.md),
 [release verification guide](docs/install.md#verify-checksums-and-provenance).
 Google user-data access, local retention, disclosure, and revocation are
 documented in the public
-[Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html).
+[Privacy Policy](https://corresync.org/privacy.html).
 
 ## Out of scope for security claims
 

@@ -32,10 +32,10 @@ Use these exact, non-redirecting HTTPS URLs in the Google Auth Platform:
 | Google field | Canonical value |
 | --- | --- |
 | Application name | `Corresync` |
-| Homepage | `https://nkiyohara.github.io/corresync/` |
-| Privacy Policy | `https://nkiyohara.github.io/corresync/privacy.html` |
-| Terms of Service | `https://nkiyohara.github.io/corresync/terms.html` |
-| Authorized domain | `nkiyohara.github.io` |
+| Homepage | `https://corresync.org/` |
+| Privacy Policy | `https://corresync.org/privacy.html` |
+| Terms of Service | `https://corresync.org/terms.html` |
+| Authorized domain | `corresync.org` |
 
 The homepage identifies Corresync, describes the mail/calendar and MCP
 functionality, explains direct local Google data handling, and visibly links
@@ -58,10 +58,10 @@ Before entering these URLs:
    ```
 
 4. In Search Console, verify the URL-prefix property
-   `https://nkiyohara.github.io/corresync/` using the Google account that is
+   `https://corresync.org/` using the Google account that is
    also an Owner of the Cloud project. Keep the tag published:
    Search Console periodically rechecks it.
-5. Confirm that Google Auth Platform accepts `nkiyohara.github.io` as the
+5. Confirm that Google Auth Platform accepts `corresync.org` as the
    authorized domain and recognizes the project owner's Search Console
    verification. If it does not, stop and move all three canonical URLs to one
    custom domain controlled through DNS rather than submitting inconsistent
@@ -95,7 +95,7 @@ In Google Auth Platform:
 3. Use the Corresync project mark only; do not use a Google, Gmail, Calendar,
    or Meet trademark as the application icon.
 4. Enter the exact homepage, Privacy Policy, and Terms URLs above.
-5. Add `nkiyohara.github.io` as the only authorized domain used by these
+5. Add `corresync.org` as the only authorized domain used by these
    fields.
 6. Choose the **External** audience for a public open-source desktop client.
 7. Add a monitored developer contact email.
@@ -251,9 +251,9 @@ specific form flow, follow the current reviewer instructions.
 
 Use these feature-documentation links in the submission where the form permits:
 
-- `https://nkiyohara.github.io/corresync/providers.html#google`
-- `https://nkiyohara.github.io/corresync/safety.html`
-- `https://nkiyohara.github.io/corresync/privacy.html#google-data`
+- `https://corresync.org/providers.html#google`
+- `https://corresync.org/safety.html`
+- `https://corresync.org/privacy.html#google-data`
 
 ## Pre-submission gate
 

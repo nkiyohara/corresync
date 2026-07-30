@@ -16,14 +16,14 @@ installed binary, its matching release notes remain authoritative.
 | Compare exact provider actions and limits | [Feature matrix](features.md) |
 | Check what is synthetic versus live-observed | [Compatibility evidence](compatibility.md) |
 
-The [project website](https://nkiyohara.github.io/corresync/) gives a
+The [project website](https://corresync.org/) gives a
 user-focused introduction. Its dedicated
-[getting-started](https://nkiyohara.github.io/corresync/getting-started.html),
-[features](https://nkiyohara.github.io/corresync/features.html),
-[providers](https://nkiyohara.github.io/corresync/providers.html),
-[safety](https://nkiyohara.github.io/corresync/safety.html),
-[privacy](https://nkiyohara.github.io/corresync/privacy.html), and
-[terms](https://nkiyohara.github.io/corresync/terms.html) pages keep normal
+[getting-started](https://corresync.org/getting-started.html),
+[features](https://corresync.org/features.html),
+[providers](https://corresync.org/providers.html),
+[safety](https://corresync.org/safety.html),
+[privacy](https://corresync.org/privacy.html), and
+[terms](https://corresync.org/terms.html) pages keep normal
 install, MCP setup, provider choice, safety, data handling, and use terms on
 readable web pages. The references here remain the complete technical and
 evidence contracts.
@@ -84,9 +84,9 @@ preview/commit checks regardless of interface.
 - [Google OAuth verification](google-oauth-verification.md): production
   branding, scope justifications, restricted-data architecture, evidence, and
   submission gate
-- [Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html): public
+- [Privacy Policy](https://corresync.org/privacy.html): public
   data-access, storage, sharing, retention, and deletion disclosures
-- [Terms of Use](https://nkiyohara.github.io/corresync/terms.html): official
+- [Terms of Use](https://corresync.org/terms.html): official
   project-service terms without narrowing the Apache-2.0 software license
 
 Accepted ADRs are historical records. Current guides may add operational

@@ -39,7 +39,7 @@ canonical target names are:
 | Product | `Corresync` |
 | MCP display name | `Corresync — Mail & Calendar` |
 | Source repository | `nkiyohara/corresync` |
-| GitHub Pages | `https://nkiyohara.github.io/corresync/` |
+| GitHub Pages | `https://corresync.org/` |
 | Go module | `github.com/nkiyohara/corresync` |
 | Primary CLI | `corresync` |
 | MCP connection name | `corresync` |

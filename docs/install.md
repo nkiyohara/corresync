@@ -10,7 +10,7 @@ finite v0.8–v0.9 command-transition window also contain the identical
 ### Linux: one command, no sudo
 
 ```console
-curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh
+curl -LsSf https://corresync.org/install.sh | sh
 ```
 
 The standalone installer supports Linux amd64 and arm64. It:
@@ -37,7 +37,7 @@ connect a provider, start a daemon, or register an MCP client.
 Review the exact script before running it:
 
 ```console
-curl -LsSf https://nkiyohara.github.io/corresync/install.sh | less
+curl -LsSf https://corresync.org/install.sh | less
 ```
 
 The Pages script is a mutable bootstrap delivered over HTTPS. For a
@@ -51,7 +51,7 @@ unchanged:
 CORRESYNC_VERSION=v0.8.0 \
   CORRESYNC_NO_PATH_UPDATE=1 \
   CORRESYNC_INSTALL_DIR="$HOME/bin" \
-  sh -c 'curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh'
+  sh -c 'curl -LsSf https://corresync.org/install.sh | sh'
 ```
 
 ### macOS

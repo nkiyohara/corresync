@@ -2,7 +2,7 @@
 
 # Install the latest stable Corresync release on Linux without sudo.
 # Review this script before running it:
-#   https://nkiyohara.github.io/corresync/install.sh
+#   https://corresync.org/install.sh
 #
 # Optional environment variables:
 #   CORRESYNC_VERSION=v0.8.0

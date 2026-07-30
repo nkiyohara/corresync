@@ -122,7 +122,7 @@ direct in-place update, the old updater replaced only its own executable path.
 On Linux, install both verified command entries with:
 
 ```console
-curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh
+curl -LsSf https://corresync.org/install.sh | sh
 ```
 
 Updated direct installers can also repair the missing primary name without
@@ -212,8 +212,9 @@ Update a local remote explicitly:
 git remote set-url origin https://github.com/nkiyohara/corresync.git
 ```
 
-Pages is `https://nkiyohara.github.io/corresync/`. There is deliberately no
-Pages redirect; update bookmarks.
+Pages is `https://corresync.org/`. The former GitHub Pages project URL
+redirects to this canonical origin, but bookmarks and published links should
+still use the custom domain directly.
 
 ## Rollback
 

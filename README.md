@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD013 MD033 -->
 <p align="center">
-  <a href="https://nkiyohara.github.io/corresync/">
+  <a href="https://corresync.org/">
     <img src="site/corresync-mark.svg" width="144" height="144" alt="Corresync: two correspondence flows around one local core">
   </a>
 </p>
@@ -24,13 +24,13 @@
 </p>
 
 <p align="center">
-  <a href="https://nkiyohara.github.io/corresync/">Website</a> ·
-  <a href="https://nkiyohara.github.io/corresync/getting-started.html">Getting started</a> ·
-  <a href="https://nkiyohara.github.io/corresync/providers.html">Providers</a> ·
-  <a href="https://nkiyohara.github.io/corresync/features.html">Features</a> ·
-  <a href="https://nkiyohara.github.io/corresync/safety.html">Safety</a> ·
-  <a href="https://nkiyohara.github.io/corresync/privacy.html">Privacy</a> ·
-  <a href="https://nkiyohara.github.io/corresync/terms.html">Terms</a> ·
+  <a href="https://corresync.org/">Website</a> ·
+  <a href="https://corresync.org/getting-started.html">Getting started</a> ·
+  <a href="https://corresync.org/providers.html">Providers</a> ·
+  <a href="https://corresync.org/features.html">Features</a> ·
+  <a href="https://corresync.org/safety.html">Safety</a> ·
+  <a href="https://corresync.org/privacy.html">Privacy</a> ·
+  <a href="https://corresync.org/terms.html">Terms</a> ·
   <a href="docs/README.md">Technical docs</a>
 </p>
 <!-- markdownlint-enable MD013 MD033 -->
@@ -111,7 +111,7 @@ connecting a sensitive account.
 ## From install to a first read
 
 Prefer a guided page? Follow
-[getting started on the website](https://nkiyohara.github.io/corresync/getting-started.html).
+[getting started on the website](https://corresync.org/getting-started.html).
 
 ### 1. Install
 
@@ -121,7 +121,7 @@ verifies the installed version.
 #### Linux
 
 ```console
-curl -LsSf https://nkiyohara.github.io/corresync/install.sh | sh
+curl -LsSf https://corresync.org/install.sh | sh
 corr --version
 ```
 
@@ -238,10 +238,10 @@ Approval is short-lived, single-use, and bound to the caller, account,
 provider, target, payload, and effect. Changing any reviewed field invalidates
 it. MCP keeps preview and commit as separate typed tools.
 
-[See the complete safety model](https://nkiyohara.github.io/corresync/safety.html).
-Corresync's public [Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html)
+[See the complete safety model](https://corresync.org/safety.html).
+Corresync's public [Privacy Policy](https://corresync.org/privacy.html)
 explains Google data access, local storage, disclosure, retention, and removal;
-the [Terms of Use](https://nkiyohara.github.io/corresync/terms.html) preserve
+the [Terms of Use](https://corresync.org/terms.html) preserve
 the software rights granted by Apache-2.0.
 
 ## More than one inbox
@@ -318,8 +318,8 @@ Read the [architecture](docs/architecture.md),
 | Consume stable machine output | [JSON contract](docs/json.md) |
 | Integrate versioned public/local contracts | [Versioning policy](docs/adr/0020-public-and-local-versioning.md) |
 | Verify compatibility claims | [Evidence matrix](docs/compatibility.md) |
-| Review privacy and Google data handling | [Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html) |
-| Review use and open-source license terms | [Terms of Use](https://nkiyohara.github.io/corresync/terms.html) |
+| Review privacy and Google data handling | [Privacy Policy](https://corresync.org/privacy.html) |
+| Review use and open-source license terms | [Terms of Use](https://corresync.org/terms.html) |
 | Prepare the official Google OAuth review | [Google verification runbook](docs/google-oauth-verification.md) |
 | Review every guide | [Documentation map](docs/README.md) |
 

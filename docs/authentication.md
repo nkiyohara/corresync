@@ -71,8 +71,8 @@ authorization page in a browser when a matching valid grant is absent, binds
 the redirect to an unpredictable state value, and accepts only the configured
 loopback path and actual bound port. Configured port `0` requests an available
 ephemeral port. The same in-product notice links the public
-[Privacy Policy](https://nkiyohara.github.io/corresync/privacy.html) and
-[Terms of Use](https://nkiyohara.github.io/corresync/terms.html) before any
+[Privacy Policy](https://corresync.org/privacy.html) and
+[Terms of Use](https://corresync.org/terms.html) before any
 provider page can open. Corresync never accepts a client secret, device-code
 unattended flow, password grant, or broad tenant credential.
 
