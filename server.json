@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.nkiyohara/corresync",
+  "title": "Corresync",
+  "description": "Local-first MCP for provider-neutral mail and calendars with isolated accounts and guarded writes.",
+  "version": "0.8.3",
+  "repository": {
+    "url": "https://github.com/nkiyohara/corresync",
+    "source": "github"
+  },
+  "websiteUrl": "https://corresync.org/",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/nkiyohara/corresync/releases/download/v0.8.3/corresync_0.8.3.mcpb",
+      "fileSha256": "ac233b091fce5cfae45a481920f4329e406f9e22abc069fe8f74cae7aeb7daff",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
