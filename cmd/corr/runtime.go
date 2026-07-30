@@ -203,7 +203,7 @@ func (app *runtime) accountServices() (
 			domain.ProviderJMAP,
 			domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV,
-			domain.ProviderGoogleAPI,
+			domain.ProviderGoogle,
 			domain.ProviderMicrosoftGraph,
 		},
 	)
@@ -217,7 +217,7 @@ func (app *runtime) accountServices() (
 			domain.ProviderJMAP,
 			domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV,
-			domain.ProviderGoogleAPI,
+			domain.ProviderGoogle,
 			domain.ProviderMicrosoftGraph,
 		},
 	)

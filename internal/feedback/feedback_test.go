@@ -155,7 +155,7 @@ func TestGenerateIsDeterministicAndAllowlisted(t *testing.T) {
 		Config:        ConfigStatus{Status: "ok", SchemaVersion: 3},
 		Providers: []Provider{
 			{ID: "microsoft-graph", Capabilities: []string{"mail", "calendar"}},
-			{ID: "google-api", Capabilities: []string{"calendar"}},
+			{ID: "google", Capabilities: []string{"calendar"}},
 		},
 		LastError: LastErrorStatus{
 			Status:  "ok",
@@ -179,7 +179,7 @@ func TestGenerateIsDeterministicAndAllowlisted(t *testing.T) {
 		`"generation": "local-only"`,
 		`"automatic_upload": false`,
 		`"mail_or_calendar_content_included": false`,
-		`"id": "google-api"`,
+		`"id": "google"`,
 		`"id": "microsoft-graph"`,
 	} {
 		if !bytes.Contains(first, []byte(want)) {

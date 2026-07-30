@@ -314,7 +314,7 @@ func allowedInstallMethod(method string) bool {
 
 func allowedProvider(provider string) bool {
 	switch provider {
-	case "caldav", "google-api", "google-web", "imap-smtp", "jmap", "microsoft-graph",
+	case "caldav", "google", "google-web", "imap-smtp", "jmap", "microsoft-graph",
 		"microsoft-owa":
 		return true
 	default:

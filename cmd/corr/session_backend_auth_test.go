@@ -21,19 +21,21 @@ import (
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
 	"github.com/nkiyohara/corresync/internal/provider/googleapi"
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
+	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
 )
 
 type oauthManagerStub struct {
 	calls    int
-	route    config.OAuthRoute
+	route    config.OAuthClient
 	provider oauthlocal.Provider
 	client   *http.Client
+	token    []byte
 	err      error
 }
 
 type routedOAuthCall struct {
-	route    config.OAuthRoute
+	route    config.OAuthClient
 	provider oauthlocal.Provider
 }
 
@@ -42,19 +44,45 @@ type routedOAuthManagerStub struct {
 	calls   []routedOAuthCall
 }
 
-func (stub *routedOAuthManagerStub) Client(
+type oauthAuthorizationStub struct {
+	client *http.Client
+	token  []byte
+	err    error
+}
+
+func (authorization *oauthAuthorizationStub) HTTPClient() *http.Client {
+	return authorization.client
+}
+
+func (authorization *oauthAuthorizationStub) AccessToken(
+	ctx context.Context,
+) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if authorization.err != nil {
+		return nil, authorization.err
+	}
+	token := authorization.token
+	if len(token) == 0 {
+		token = []byte("synthetic-access-token")
+	}
+	return append([]byte(nil), token...), nil
+}
+
+func (stub *routedOAuthManagerStub) Authorize(
 	_ context.Context,
-	route config.OAuthRoute,
+	route config.OAuthClient,
 	provider oauthlocal.Provider,
-) (*http.Client, error) {
-	client, exists := stub.clients[route.APIBase]
+) (oauthlocal.Authorization, error) {
+	client, exists := stub.clients[route.Authorization.Key]
 	if !exists {
 		return nil, errors.New("synthetic OAuth route is not registered")
 	}
 	stub.calls = append(stub.calls, routedOAuthCall{
 		route: route, provider: provider,
 	})
-	return client, nil
+	return &oauthAuthorizationStub{client: client}, nil
 }
 
 func TestProjectionAccountsExposeOnlyContentFreePerServiceStatus(t *testing.T) {
@@ -110,15 +138,21 @@ func TestProjectionAccountsExposeOnlyContentFreePerServiceStatus(t *testing.T) {
 	}
 }
 
-func (stub *oauthManagerStub) Client(
+func (stub *oauthManagerStub) Authorize(
 	_ context.Context,
-	route config.OAuthRoute,
+	route config.OAuthClient,
 	provider oauthlocal.Provider,
-) (*http.Client, error) {
+) (oauthlocal.Authorization, error) {
 	stub.calls++
 	stub.route = route
 	stub.provider = provider
-	return stub.client, stub.err
+	if stub.err != nil {
+		return nil, stub.err
+	}
+	return &oauthAuthorizationStub{
+		client: stub.client,
+		token:  stub.token,
+	}, nil
 }
 
 func TestSessionBackendOnlyResolvesJMAPCredentialForExplicitCLILogin(t *testing.T) {
@@ -363,10 +397,15 @@ func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
 	configuration.Accounts["work"] = config.Account{
 		ID: accountID, Address: "reader@example.test",
 		Mail: &config.MailRoute{
-			Provider: domain.ProviderGoogleAPI, GoogleAPI: &route,
+			Provider: domain.ProviderGoogle,
+			Google: &config.GoogleMailRoute{
+				Username: "reader@example.test",
+				ClientID: route.ClientID, RedirectURI: route.RedirectURI,
+				Authorization: route.Authorization,
+			},
 		},
 		Calendar: &config.CalendarRoute{
-			Provider: domain.ProviderGoogleAPI, GoogleAPI: &route,
+			Provider: domain.ProviderGoogle, Google: &route,
 		},
 	}
 	manager := &oauthManagerStub{client: http.DefaultClient}
@@ -374,18 +413,29 @@ func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
 	factoryCalls := 0
 	backend := &sessionBackend{
 		configuration: configuration,
-		oauth:         manager,
-		accounts:      make(map[domain.AccountID]sessionAccount),
-		previews:      make(map[string]sessionPreview),
-		newGoogle: func(
+		guard: daemonMCPGuard(
+			t,
+			policy.DefaultRules(),
+			&daemonMCPAudit{},
+		),
+		oauth:    manager,
+		accounts: make(map[domain.AccountID]sessionAccount),
+		previews: make(map[string]sessionPreview),
+		newIMAP: func(
 			_ context.Context,
-			options googleapi.Options,
-		) (*googleapi.Client, error) {
+			options imapmail.Options,
+		) (*imapmail.Client, error) {
 			factoryCalls++
-			if !options.Mail || !options.Calendar ||
-				options.Address != "reader@example.test" ||
-				options.APIBase != route.APIBase {
-				t.Fatalf("Google options = %#v", options)
+			if options.IMAP.Host != "imap.gmail.com" ||
+				options.IMAP.Port != 993 ||
+				options.SMTP.Host != "smtp.gmail.com" ||
+				options.SMTP.Port != 587 ||
+				options.Username != "reader@example.test" ||
+				options.OAuth2 == nil ||
+				!options.SMTPStoresSent ||
+				!options.DisablePermanentDelete ||
+				len(options.Password) != 0 {
+				t.Fatalf("Google IMAP options = %#v", options)
 			}
 			return nil, factoryError
 		},
@@ -426,8 +476,8 @@ func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
 	) {
 		t.Fatalf("CLI Login() error = %v", err)
 	}
-	if manager.calls != 1 || factoryCalls != 1 || manager.route != route ||
-		manager.provider.ID != domain.ProviderGoogleAPI ||
+	if manager.calls != 1 || factoryCalls != 1 || manager.route != route.Client() ||
+		manager.provider.ID != domain.ProviderGoogle ||
 		!slices.Contains(manager.provider.Scopes, "https://mail.google.com/") ||
 		!slices.Contains(manager.provider.Scopes, "https://www.googleapis.com/auth/calendar.events") {
 		t.Fatalf(
@@ -437,6 +487,107 @@ func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
 			manager.route,
 			manager.provider,
 		)
+	}
+}
+
+func TestSessionBackendPreservesDistinctMigratedGoogleGrants(t *testing.T) {
+	t.Parallel()
+
+	const accountID domain.AccountID = "acc_00000000000000000000000000000001"
+	mailClient := config.OAuthClient{
+		ClientID:    "synthetic-mail.apps.googleusercontent.com",
+		RedirectURI: "http://127.0.0.1:53682/oauth/callback",
+		Authorization: config.CredentialRef{
+			Backend: config.CredentialOSKeyring,
+			Key:     "google-mail",
+			Consent: true,
+		},
+	}
+	calendarRoute := config.OAuthRoute{
+		APIBase:     "https://www.googleapis.com",
+		ClientID:    "synthetic-calendar.apps.googleusercontent.com",
+		RedirectURI: "http://127.0.0.1:53683/oauth/callback",
+		Authorization: config.CredentialRef{
+			Backend: config.CredentialOSKeyring,
+			Key:     "google-calendar",
+			Consent: true,
+		},
+	}
+	configuration := config.OutlookDefault()
+	configuration.Accounts["work"] = config.Account{
+		ID: accountID, Address: "reader@example.test",
+		Mail: &config.MailRoute{
+			Provider: domain.ProviderGoogle,
+			Google: &config.GoogleMailRoute{
+				Username:      "reader@example.test",
+				ClientID:      mailClient.ClientID,
+				RedirectURI:   mailClient.RedirectURI,
+				Authorization: mailClient.Authorization,
+			},
+		},
+		Calendar: &config.CalendarRoute{
+			Provider: domain.ProviderGoogle, Google: &calendarRoute,
+		},
+	}
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("distinct migrated Google grants are invalid: %v", err)
+	}
+	manager := &routedOAuthManagerStub{clients: map[string]*http.Client{
+		"google-mail":     http.DefaultClient,
+		"google-calendar": http.DefaultClient,
+	}}
+	factoryError := errors.New("synthetic Google Calendar factory stop")
+	backend := &sessionBackend{
+		configuration: configuration,
+		guard: daemonMCPGuard(
+			t,
+			policy.DefaultRules(),
+			&daemonMCPAudit{},
+		),
+		oauth:    manager,
+		accounts: make(map[domain.AccountID]sessionAccount),
+		previews: make(map[string]sessionPreview),
+		newIMAP: func(
+			context.Context,
+			imapmail.Options,
+		) (*imapmail.Client, error) {
+			return nil, nil
+		},
+		newGoogle: func(
+			context.Context,
+			googleapi.Options,
+		) (*googleapi.Client, error) {
+			return nil, factoryError
+		},
+	}
+	_, err := backend.Login(
+		t.Context(),
+		accountID,
+		domain.Caller{Surface: "cli", Instance: "synthetic-process"},
+	)
+	if !errors.Is(err, factoryError) {
+		t.Fatalf("Login() error = %v", err)
+	}
+	if len(manager.calls) != 2 ||
+		manager.calls[0].route != mailClient ||
+		manager.calls[1].route != calendarRoute.Client() ||
+		!slices.Contains(
+			manager.calls[0].provider.Scopes,
+			"https://mail.google.com/",
+		) ||
+		slices.Contains(
+			manager.calls[0].provider.Scopes,
+			"https://www.googleapis.com/auth/calendar.events",
+		) ||
+		slices.Contains(
+			manager.calls[1].provider.Scopes,
+			"https://mail.google.com/",
+		) ||
+		!slices.Contains(
+			manager.calls[1].provider.Scopes,
+			"https://www.googleapis.com/auth/calendar.events",
+		) {
+		t.Fatalf("distinct Google OAuth calls = %+v", manager.calls)
 	}
 }
 
@@ -605,7 +756,7 @@ func TestSessionBackendRejectsGoogleWebBeforeOpeningBrowser(
 				t.Context(),
 				accountID,
 				cliCaller,
-			); !errors.Is(err, errGoogleWebSignInUnavailable) {
+			); !errors.Is(err, errUnsupportedLegacyGoogleRoute) {
 				t.Fatalf("CLI Login() error = %v", err)
 			}
 			if launchCalls != 0 {
@@ -653,15 +804,15 @@ func TestSessionBackendKeepsHybridProvidersAndAccountsIsolated(t *testing.T) {
 	googleAlpha := newSessionGoogleServer(
 		t,
 		"alpha@example.test",
+		"unused-google-alpha-message",
 		"google-alpha",
-		"unused-google-alpha-event",
 	)
 	defer googleAlpha.Close()
 	graphAlpha := newSessionGraphServer(
 		t,
 		"alpha@example.test",
-		"unused-graph-alpha-message",
 		"graph-alpha",
+		"unused-graph-alpha-event",
 	)
 	defer graphAlpha.Close()
 	graphBeta := newSessionGraphServer(
@@ -689,12 +840,12 @@ func TestSessionBackendKeepsHybridProvidersAndAccountsIsolated(t *testing.T) {
 		"alpha": {
 			ID: alphaID, Address: "alpha@example.test",
 			Mail: &config.MailRoute{
-				Provider:  domain.ProviderGoogleAPI,
-				GoogleAPI: &googleAlphaRoute,
-			},
-			Calendar: &config.CalendarRoute{
 				Provider:       domain.ProviderMicrosoftGraph,
 				MicrosoftGraph: &graphAlphaRoute,
+			},
+			Calendar: &config.CalendarRoute{
+				Provider: domain.ProviderGoogle,
+				Google:   &googleAlphaRoute,
 			},
 		},
 		"beta": {
@@ -704,16 +855,16 @@ func TestSessionBackendKeepsHybridProvidersAndAccountsIsolated(t *testing.T) {
 				MicrosoftGraph: &graphBetaRoute,
 			},
 			Calendar: &config.CalendarRoute{
-				Provider:  domain.ProviderGoogleAPI,
-				GoogleAPI: &googleBetaRoute,
+				Provider: domain.ProviderGoogle,
+				Google:   &googleBetaRoute,
 			},
 		},
 	}
 	manager := &routedOAuthManagerStub{clients: map[string]*http.Client{
-		googleAlpha.URL: googleAlpha.Client(),
-		graphAlpha.URL:  graphAlpha.Client(),
-		graphBeta.URL:   graphBeta.Client(),
-		googleBeta.URL:  googleBeta.Client(),
+		"google-alpha": googleAlpha.Client(),
+		"graph-alpha":  graphAlpha.Client(),
+		"graph-beta":   graphBeta.Client(),
+		"google-beta":  googleBeta.Client(),
 	}}
 	lifecycle, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -749,16 +900,16 @@ func TestSessionBackendKeepsHybridProvidersAndAccountsIsolated(t *testing.T) {
 		backend,
 		caller,
 		alphaID,
-		domain.ProviderGoogleAPI,
-		"google-alpha",
+		domain.ProviderMicrosoftGraph,
+		"graph-alpha",
 	)
 	assertSessionCalendarProvider(
 		t,
 		backend,
 		caller,
 		alphaID,
-		domain.ProviderMicrosoftGraph,
-		"graph-alpha",
+		domain.ProviderGoogle,
+		"google-alpha",
 	)
 	assertSessionMailProvider(
 		t,
@@ -773,7 +924,7 @@ func TestSessionBackendKeepsHybridProvidersAndAccountsIsolated(t *testing.T) {
 		backend,
 		caller,
 		betaID,
-		domain.ProviderGoogleAPI,
+		domain.ProviderGoogle,
 		"google-beta",
 	)
 

@@ -172,7 +172,7 @@ func (client *Client) GetMailAttachment(
 	application.MailAttachmentInput,
 ) (application.MailAttachment, error) {
 	return application.MailAttachment{}, errors.New(
-		"google Web attachment retrieval is unavailable; select google-api when permitted",
+		"google Web attachment retrieval is unavailable; select google when permitted",
 	)
 }
 
@@ -237,7 +237,7 @@ func (client *Client) mailFragment(folder application.MailFolder) (string, error
 
 func googleWebWriteUnavailable() error {
 	return errors.New(
-		"google Web writes are unavailable; use the explicitly consented google-api route when organization policy permits",
+		"google Web writes are unavailable; use the explicitly consented google route when organization policy permits",
 	)
 }
 

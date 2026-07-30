@@ -26,7 +26,7 @@ func TestAccountDiscoveryNormalizesSortsAndMarksAvailability(t *testing.T) {
 	t.Parallel()
 	stub := &discoveryStub{candidates: []ProviderCandidate{
 		{
-			Provider: domain.ProviderGoogleAPI, Confidence: 95,
+			Provider: domain.ProviderGoogle, Confidence: 95,
 			Authentication:            DiscoveryExplicitOAuth,
 			RequiresExplicitSelection: true,
 			Evidence:                  []DiscoveryEvidence{{Source: "known_domain", Detail: "gmail.com"}},
@@ -55,7 +55,7 @@ func TestAccountDiscoveryNormalizesSortsAndMarksAvailability(t *testing.T) {
 		t.Fatalf("normalized discovery = %#v, adapter address = %q", result, stub.address)
 	}
 	if len(result.Candidates) != 2 ||
-		result.Candidates[0].Provider != domain.ProviderGoogleAPI ||
+		result.Candidates[0].Provider != domain.ProviderGoogle ||
 		result.Candidates[0].Available ||
 		result.Candidates[1].Provider != domain.ProviderMicrosoftOWA ||
 		!result.Candidates[1].Available {
@@ -76,7 +76,7 @@ func TestAccountDiscoveryRejectsMalformedOrAdapterData(t *testing.T) {
 	}
 
 	stub := &discoveryStub{candidates: []ProviderCandidate{{
-		Provider: domain.ProviderGoogleAPI, Confidence: 101,
+		Provider: domain.ProviderGoogle, Confidence: 101,
 		Authentication: DiscoveryExplicitOAuth,
 		Evidence:       []DiscoveryEvidence{{Source: "test", Detail: "synthetic"}},
 	}}}

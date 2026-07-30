@@ -81,13 +81,47 @@ type CalDAVRoute struct {
 	Credential   CredentialRef `json:"credential" toml:"credential"`
 }
 
-// OAuthRoute identifies a local public client and an OS-keyring grant. It can
+// OAuthClient identifies a local public client and an OS-keyring grant. It can
 // never represent a client secret, authorization code, or bearer token.
+type OAuthClient struct {
+	ClientID      string        `json:"clientId" toml:"client_id"`
+	RedirectURI   string        `json:"redirectUri" toml:"redirect_uri"`
+	Authorization CredentialRef `json:"authorization" toml:"authorization"`
+}
+
+// GoogleMailRoute binds Gmail's fixed IMAP/SMTP endpoints to one explicit
+// desktop OAuth public client. The endpoints are product policy, not mutable
+// configuration, so a Google grant cannot be redirected to another host.
+type GoogleMailRoute struct {
+	Username      string        `json:"username" toml:"username"`
+	Mailbox       string        `json:"mailbox,omitempty" toml:"mailbox,omitempty"`
+	ClientID      string        `json:"clientId" toml:"client_id"`
+	RedirectURI   string        `json:"redirectUri" toml:"redirect_uri"`
+	Authorization CredentialRef `json:"authorization" toml:"authorization"`
+}
+
+// Client returns the secret-free public-client authorization.
+func (route GoogleMailRoute) Client() OAuthClient {
+	return OAuthClient{
+		ClientID: route.ClientID, RedirectURI: route.RedirectURI,
+		Authorization: route.Authorization,
+	}
+}
+
+// OAuthRoute adds one pinned HTTPS API base to a public-client authorization.
 type OAuthRoute struct {
 	APIBase       string        `json:"apiBase" toml:"api_base"`
 	ClientID      string        `json:"clientId" toml:"client_id"`
 	RedirectURI   string        `json:"redirectUri" toml:"redirect_uri"`
 	Authorization CredentialRef `json:"authorization" toml:"authorization"`
+}
+
+// Client returns the secret-free public-client portion of an API route.
+func (route OAuthRoute) Client() OAuthClient {
+	return OAuthClient{
+		ClientID: route.ClientID, RedirectURI: route.RedirectURI,
+		Authorization: route.Authorization,
+	}
 }
 
 // WebRoute identifies a provider-owned interactive browser origin.
@@ -102,7 +136,7 @@ type MailRoute struct {
 	OutlookWeb     *OutlookWebRoute  `json:"outlookWeb,omitempty" toml:"outlook_web,omitempty"`
 	JMAP           *JMAPRoute        `json:"jmap,omitempty" toml:"jmap,omitempty"`
 	IMAPSMTP       *IMAPSMTPRoute    `json:"imapSmtp,omitempty" toml:"imap_smtp,omitempty"`
-	GoogleAPI      *OAuthRoute       `json:"googleApi,omitempty" toml:"google_api,omitempty"`
+	Google         *GoogleMailRoute  `json:"google,omitempty" toml:"google,omitempty"`
 	GoogleWeb      *WebRoute         `json:"googleWeb,omitempty" toml:"google_web,omitempty"`
 	MicrosoftGraph *OAuthRoute       `json:"microsoftGraph,omitempty" toml:"microsoft_graph,omitempty"`
 }
@@ -112,7 +146,7 @@ type CalendarRoute struct {
 	Provider       domain.ProviderID `json:"provider" toml:"provider"`
 	OutlookWeb     *OutlookWebRoute  `json:"outlookWeb,omitempty" toml:"outlook_web,omitempty"`
 	CalDAV         *CalDAVRoute      `json:"caldav,omitempty" toml:"caldav,omitempty"`
-	GoogleAPI      *OAuthRoute       `json:"googleApi,omitempty" toml:"google_api,omitempty"`
+	Google         *OAuthRoute       `json:"google,omitempty" toml:"google,omitempty"`
 	GoogleWeb      *WebRoute         `json:"googleWeb,omitempty" toml:"google_web,omitempty"`
 	MicrosoftGraph *OAuthRoute       `json:"microsoftGraph,omitempty" toml:"microsoft_graph,omitempty"`
 }
@@ -131,6 +165,23 @@ func (account Account) validate() error {
 			return fmt.Errorf("calendar: %w", err)
 		}
 	}
+	googleMail := account.Mail != nil &&
+		account.Mail.Provider == domain.ProviderGoogle &&
+		account.Mail.Google != nil
+	googleCalendar := account.Calendar != nil &&
+		account.Calendar.Provider == domain.ProviderGoogle &&
+		account.Calendar.Google != nil
+	if googleMail || googleCalendar {
+		if account.Address == "" {
+			return errors.New("google routes require the account email address")
+		}
+		if googleMail &&
+			!strings.EqualFold(account.Mail.Google.Username, account.Address) {
+			return errors.New(
+				"google mail username must match the account email address",
+			)
+		}
+	}
 	if account.Monitor != nil {
 		if err := account.Monitor.validate(); err != nil {
 			return fmt.Errorf("monitor: %w", err)
@@ -147,7 +198,7 @@ func (route MailRoute) validate() error {
 		return err
 	}
 	present := countNonNil(
-		route.OutlookWeb, route.JMAP, route.IMAPSMTP, route.GoogleAPI,
+		route.OutlookWeb, route.JMAP, route.IMAPSMTP, route.Google,
 		route.GoogleWeb, route.MicrosoftGraph,
 	)
 	if present != 1 {
@@ -169,11 +220,11 @@ func (route MailRoute) validate() error {
 			return errors.New("imap-smtp requires imap_smtp settings")
 		}
 		return route.IMAPSMTP.validate()
-	case domain.ProviderGoogleAPI:
-		if route.GoogleAPI == nil {
-			return errors.New("google-api requires google_api settings")
+	case domain.ProviderGoogle:
+		if route.Google == nil {
+			return errors.New("google requires google settings")
 		}
-		return route.GoogleAPI.validateFor(domain.ProviderGoogleAPI)
+		return route.Google.validate()
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires google_web settings")
@@ -196,7 +247,7 @@ func (route CalendarRoute) validate() error {
 		return err
 	}
 	present := countNonNil(
-		route.OutlookWeb, route.CalDAV, route.GoogleAPI, route.GoogleWeb,
+		route.OutlookWeb, route.CalDAV, route.Google, route.GoogleWeb,
 		route.MicrosoftGraph,
 	)
 	if present != 1 {
@@ -213,11 +264,11 @@ func (route CalendarRoute) validate() error {
 			return errors.New("caldav requires caldav settings")
 		}
 		return route.CalDAV.validate()
-	case domain.ProviderGoogleAPI:
-		if route.GoogleAPI == nil {
-			return errors.New("google-api requires google_api settings")
+	case domain.ProviderGoogle:
+		if route.Google == nil {
+			return errors.New("google requires google settings")
 		}
-		return route.GoogleAPI.validateFor(domain.ProviderGoogleAPI)
+		return route.Google.validateFor(domain.ProviderGoogle)
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires google_web settings")
@@ -252,6 +303,8 @@ func isNilPointer(value any) bool {
 	case *JMAPRoute:
 		return typed == nil
 	case *IMAPSMTPRoute:
+		return typed == nil
+	case *GoogleMailRoute:
 		return typed == nil
 	case *OAuthRoute:
 		return typed == nil
@@ -313,10 +366,7 @@ func (route CalDAVRoute) validate() error {
 	return route.Credential.validate(false)
 }
 
-func (route OAuthRoute) validate() error {
-	if err := validateHTTPSURL("API base", route.APIBase, true); err != nil {
-		return err
-	}
+func (route OAuthClient) validate() error {
 	if err := validateBoundedText("OAuth client ID", route.ClientID, 512, false); err != nil {
 		return err
 	}
@@ -336,13 +386,30 @@ func (route OAuthRoute) validate() error {
 	return route.Authorization.validate(true)
 }
 
+func (route GoogleMailRoute) validate() error {
+	if err := validateUsername(route.Username); err != nil {
+		return err
+	}
+	if err := validateMailbox(route.Mailbox); err != nil {
+		return err
+	}
+	return route.Client().validate()
+}
+
+func (route OAuthRoute) validate() error {
+	if err := validateHTTPSURL("API base", route.APIBase, true); err != nil {
+		return err
+	}
+	return route.Client().validate()
+}
+
 func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
 	if err := route.validate(); err != nil {
 		return err
 	}
 	parsed, _ := url.Parse(route.APIBase)
 	switch provider {
-	case domain.ProviderGoogleAPI:
+	case domain.ProviderGoogle:
 		if parsed.Host != "www.googleapis.com" || parsed.RawQuery != "" ||
 			parsed.EscapedPath() != "" && parsed.EscapedPath() != "/" {
 			return errors.New("google API base must be https://www.googleapis.com")

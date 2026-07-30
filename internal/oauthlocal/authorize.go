@@ -29,7 +29,7 @@ type callbackResult struct {
 
 func (manager *Manager) authorize(
 	ctx context.Context,
-	route config.OAuthRoute,
+	route config.OAuthClient,
 	provider Provider,
 ) (storedGrant, error) {
 	redirect, err := url.Parse(route.RedirectURI)
@@ -102,6 +102,12 @@ func (manager *Manager) authorize(
 			}
 			writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 			writer.Header().Set("Cache-Control", "no-store")
+			writer.Header().Set(
+				"Content-Security-Policy",
+				"default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+			)
+			writer.Header().Set("Referrer-Policy", "no-referrer")
+			writer.Header().Set("X-Content-Type-Options", "nosniff")
 			_, _ = io.WriteString(
 				writer,
 				"<!doctype html><title>Corresync authorization complete</title>"+

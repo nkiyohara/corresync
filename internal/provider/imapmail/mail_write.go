@@ -102,16 +102,26 @@ func (client *Client) SendMail(
 	if err != nil {
 		return application.MailSendResult{}, err
 	}
-	id, changeKey, err := client.appendMessage(
-		ctx,
-		application.MailFolder{
-			Kind: application.MailFolderDistinguished, ID: "sentitems",
-		},
-		[]string{imap.SeenFlag},
-		raw,
-		messageID,
-		"sent message",
-	)
+	sentFolder := application.MailFolder{
+		Kind: application.MailFolderDistinguished, ID: "sentitems",
+	}
+	var id, changeKey string
+	if client.smtpStoresSent {
+		id, changeKey, err = client.findMessage(
+			ctx,
+			sentFolder,
+			messageID,
+		)
+	} else {
+		id, changeKey, err = client.appendMessage(
+			ctx,
+			sentFolder,
+			[]string{imap.SeenFlag},
+			raw,
+			messageID,
+			"sent message",
+		)
+	}
 	if err != nil {
 		return application.MailSendResult{}, errors.Join(
 			application.ErrWriteOutcomeUnknown,
@@ -122,6 +132,22 @@ func (client *Client) SendMail(
 		)
 	}
 	return application.MailSendResult{ID: id, ChangeKey: changeKey}, nil
+}
+
+func (client *Client) findMessage(
+	ctx context.Context,
+	folder application.MailFolder,
+	messageID string,
+) (id, changeKey string, returnErr error) {
+	returnErr = client.withIMAP(ctx, func(connection *imapclient.Client) error {
+		mailbox, err := client.resolveMailbox(connection, folder)
+		if err != nil {
+			return err
+		}
+		id, changeKey, err = identifyMessage(connection, mailbox, messageID)
+		return err
+	})
+	return id, changeKey, returnErr
 }
 
 func (client *Client) appendMessage(
@@ -148,56 +174,49 @@ func (client *Client) appendMessage(
 				err,
 			)
 		}
-		status, err := connection.Select(mailbox, true)
+		id, changeKey, err = identifyMessage(connection, mailbox, messageID)
 		if err != nil {
-			return imapCommittedWriteError(
-				"confirm appended IMAP "+kind,
-				err,
-			)
+			return imapCommittedWriteError("confirm appended IMAP "+kind, err)
 		}
-		criteria := imap.NewSearchCriteria()
-		criteria.Header = textproto.MIMEHeader{
-			"Message-Id": []string{messageID},
-		}
-		uids, err := connection.UidSearch(criteria)
-		if err != nil {
-			return imapCommittedWriteError(
-				"identify appended IMAP "+kind,
-				err,
-			)
-		}
-		if len(uids) != 1 {
-			return imapCommittedWriteError(
-				"identify appended IMAP "+kind,
-				errors.New("message could not be identified uniquely"),
-			)
-		}
-		messages, err := fetchUIDs(connection, uids, metadataItems)
-		if err != nil {
-			return imapCommittedWriteError(
-				"read appended IMAP "+kind,
-				err,
-			)
-		}
-		if len(messages) != 1 {
-			return imapCommittedWriteError(
-				"read appended IMAP "+kind,
-				errors.New("message metadata was omitted"),
-			)
-		}
-		id, err = encodeMessageID(messageReference{
-			Mailbox: mailbox, UIDValidity: status.UidValidity, UID: uids[0],
-		})
-		if err != nil {
-			return imapCommittedWriteError(
-				"encode appended IMAP "+kind+" identity",
-				err,
-			)
-		}
-		changeKey = snapshot(status, messages[0])
 		return nil
 	})
 	return id, changeKey, returnErr
+}
+
+func identifyMessage(
+	connection *imapclient.Client,
+	mailbox string,
+	messageID string,
+) (string, string, error) {
+	status, err := connection.Select(mailbox, true)
+	if err != nil {
+		return "", "", err
+	}
+	criteria := imap.NewSearchCriteria()
+	criteria.Header = textproto.MIMEHeader{
+		"Message-Id": []string{messageID},
+	}
+	uids, err := connection.UidSearch(criteria)
+	if err != nil {
+		return "", "", err
+	}
+	if len(uids) != 1 {
+		return "", "", errors.New("message could not be identified uniquely")
+	}
+	messages, err := fetchUIDs(connection, uids, metadataItems)
+	if err != nil {
+		return "", "", err
+	}
+	if len(messages) != 1 {
+		return "", "", errors.New("message metadata was omitted")
+	}
+	id, err := encodeMessageID(messageReference{
+		Mailbox: mailbox, UIDValidity: status.UidValidity, UID: uids[0],
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return id, snapshot(status, messages[0]), nil
 }
 
 func imapCommittedWriteError(action string, err error) error {
@@ -358,6 +377,11 @@ func (client *Client) DeleteMail(
 	ctx context.Context,
 	input application.MailDeleteInput,
 ) error {
+	if client.disablePermanentDelete {
+		return errors.New(
+			"permanent deletion is unavailable for this mail route",
+		)
+	}
 	reference, err := decodeMessageID(input.MessageID)
 	if err != nil {
 		return err

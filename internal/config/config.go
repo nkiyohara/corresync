@@ -15,7 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CurrentVersion = 3
+const CurrentVersion = 4
 
 const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
@@ -106,11 +106,13 @@ type Browser struct {
 	LoginTimeout Duration `json:"loginTimeout" toml:"login_timeout"`
 }
 
-// Updates controls only opportunistic public release checks. Explicit
-// `corr update` and `corr update check` remain available when automatic
-// checks are disabled.
+// Updates controls opportunistic public release checks and the explicit
+// opt-in that lets direct installations apply a verified update at CLI
+// startup. Explicit `corr update` and `corr update check` remain available
+// when automatic checks are disabled.
 type Updates struct {
 	DisableAutomaticChecks bool `json:"disableAutomaticChecks" toml:"disable_automatic_checks"`
+	AutoInstall            bool `json:"autoInstall" toml:"auto_install"`
 }
 
 // Duration encodes a human-readable Go duration such as "5m" in TOML.
@@ -258,6 +260,11 @@ func (configuration Config) Validate() error {
 	}
 	if strings.ContainsAny(configuration.Browser.Executable, "\r\n\x00") {
 		return errors.New("browser executable contains a forbidden character")
+	}
+	if configuration.Updates.DisableAutomaticChecks && configuration.Updates.AutoInstall {
+		return errors.New(
+			"updates.auto_install cannot be true when updates.disable_automatic_checks is true",
+		)
 	}
 	if err := configuration.Credentials.validate(); err != nil {
 		return err

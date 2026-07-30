@@ -269,13 +269,7 @@ func addKnownDomainCandidates(collector *candidateCollector, domainName string) 
 			},
 		})
 	case "gmail.com", "googlemail.com":
-		collector.add(candidateInput{
-			provider: domain.ProviderGoogleAPI, confidence: 98,
-			authentication: application.DiscoveryExplicitOAuth, explicit: true,
-			evidence: application.DiscoveryEvidence{
-				Source: "known_domain", Detail: domainName,
-			},
-		})
+		addGoogleCandidate(collector, 98, "known_domain", domainName)
 	}
 }
 
@@ -306,14 +300,35 @@ func addMXCandidates(collector *candidateCollector, records []*net.MX) {
 				},
 			})
 		case host == "aspmx.l.google.com" || strings.HasSuffix(host, ".google.com"):
-			collector.add(candidateInput{
-				provider: domain.ProviderGoogleAPI, confidence: 55,
-				authentication: application.DiscoveryExplicitOAuth, explicit: true,
-				evidence: application.DiscoveryEvidence{
-					Source: "mx", Detail: "google-hosted mail exchange",
-				},
-			})
+			addGoogleCandidate(
+				collector,
+				55,
+				"mx",
+				"google-hosted mail exchange",
+			)
 		}
+	}
+}
+
+func addGoogleCandidate(
+	collector *candidateCollector,
+	confidence int,
+	source string,
+	detail string,
+) {
+	for _, endpoint := range []application.DiscoveredEndpoint{
+		{Kind: "imap", Value: "imap.gmail.com:993"},
+		{Kind: "smtp", Value: "smtp.gmail.com:587"},
+		{Kind: "api", Value: "https://www.googleapis.com"},
+	} {
+		collector.add(candidateInput{
+			provider: domain.ProviderGoogle, confidence: confidence,
+			authentication: application.DiscoveryExplicitOAuth, explicit: true,
+			endpoint: endpoint,
+			evidence: application.DiscoveryEvidence{
+				Source: source, Detail: detail,
+			},
+		})
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 
 const legacyVersion = 1
 const routeLegacyVersion = 2
+const googleAPILegacyVersion = 3
 
 type legacyConfig struct {
 	Version        int                      `toml:"version"`
@@ -23,7 +24,13 @@ type legacyConfig struct {
 	Accounts       map[string]legacyAccount `toml:"accounts"`
 	Policy         Policy                   `toml:"policy"`
 	Browser        Browser                  `toml:"browser"`
-	Updates        Updates                  `toml:"updates"`
+	Updates        legacyUpdates            `toml:"updates"`
+}
+
+// legacyUpdates deliberately excludes automatic installation. No schema that
+// predates that consent may manufacture it during migration.
+type legacyUpdates struct {
+	DisableAutomaticChecks bool `toml:"disable_automatic_checks"`
 }
 
 type legacyAccount struct {
@@ -37,7 +44,7 @@ type routeLegacyConfig struct {
 	Accounts       map[string]routeLegacyAccount `toml:"accounts"`
 	Policy         Policy                        `toml:"policy"`
 	Browser        Browser                       `toml:"browser"`
-	Updates        Updates                       `toml:"updates"`
+	Updates        legacyUpdates                 `toml:"updates"`
 }
 
 type routeLegacyAccount struct {
@@ -48,7 +55,145 @@ type routeLegacyAccount struct {
 	Mailbox  string            `toml:"mailbox,omitempty"`
 }
 
-// MigrateV1 converts an exact legacy config snapshot to v3. Account IDs are
+type googleAPILegacyConfig struct {
+	Version        int                               `toml:"version"`
+	DefaultAccount string                            `toml:"default_account"`
+	Accounts       map[string]googleAPILegacyAccount `toml:"accounts"`
+	Policy         Policy                            `toml:"policy"`
+	Browser        Browser                           `toml:"browser"`
+	Credentials    Credentials                       `toml:"credentials,omitempty"`
+	Updates        legacyUpdates                     `toml:"updates"`
+}
+
+type googleAPILegacyAccount struct {
+	ID       domain.AccountID              `toml:"id"`
+	Address  string                        `toml:"address,omitempty"`
+	Mail     *googleAPILegacyMailRoute     `toml:"mail,omitempty"`
+	Calendar *googleAPILegacyCalendarRoute `toml:"calendar,omitempty"`
+	Monitor  *Monitor                      `toml:"monitor,omitempty"`
+}
+
+type googleAPILegacyMailRoute struct {
+	Provider       domain.ProviderID `toml:"provider"`
+	OutlookWeb     *OutlookWebRoute  `toml:"outlook_web,omitempty"`
+	JMAP           *JMAPRoute        `toml:"jmap,omitempty"`
+	IMAPSMTP       *IMAPSMTPRoute    `toml:"imap_smtp,omitempty"`
+	GoogleAPI      *OAuthRoute       `toml:"google_api,omitempty"`
+	GoogleWeb      *WebRoute         `toml:"google_web,omitempty"`
+	MicrosoftGraph *OAuthRoute       `toml:"microsoft_graph,omitempty"`
+}
+
+type googleAPILegacyCalendarRoute struct {
+	Provider       domain.ProviderID `toml:"provider"`
+	OutlookWeb     *OutlookWebRoute  `toml:"outlook_web,omitempty"`
+	CalDAV         *CalDAVRoute      `toml:"caldav,omitempty"`
+	GoogleAPI      *OAuthRoute       `toml:"google_api,omitempty"`
+	GoogleWeb      *WebRoute         `toml:"google_web,omitempty"`
+	MicrosoftGraph *OAuthRoute       `toml:"microsoft_graph,omitempty"`
+}
+
+// MigrateV3 replaces the Google Gmail REST route with Gmail's fixed
+// IMAP/SMTP XOAUTH2 route while preserving account IDs, public-client
+// settings, authorization handles, calendar API routing, and local policy.
+func MigrateV3(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var legacy googleAPILegacyConfig
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&legacy); err != nil {
+		return Config{}, fmt.Errorf("decode v3 config: %w", err)
+	}
+	if legacy.Version != googleAPILegacyVersion {
+		return Config{}, fmt.Errorf(
+			"google API legacy config version must be %d",
+			googleAPILegacyVersion,
+		)
+	}
+	configuration := Config{
+		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
+		Accounts: make(map[string]Account, len(legacy.Accounts)),
+		Policy:   legacy.Policy, Browser: legacy.Browser,
+		Credentials: legacy.Credentials,
+		Updates: Updates{
+			DisableAutomaticChecks: legacy.Updates.DisableAutomaticChecks,
+		},
+	}
+	for alias, source := range legacy.Accounts {
+		account := Account{
+			ID: source.ID, Address: source.Address, Monitor: source.Monitor,
+		}
+		if source.Mail != nil {
+			mail, err := migrateV3Mail(source.Address, *source.Mail)
+			if err != nil {
+				return Config{}, fmt.Errorf("migrate account %q mail: %w", alias, err)
+			}
+			account.Mail = mail
+		}
+		if source.Calendar != nil {
+			calendar, err := migrateV3Calendar(*source.Calendar)
+			if err != nil {
+				return Config{}, fmt.Errorf("migrate account %q calendar: %w", alias, err)
+			}
+			account.Calendar = calendar
+		}
+		configuration.Accounts[alias] = account
+	}
+	if err := configuration.Validate(); err != nil {
+		return Config{}, fmt.Errorf("validate migrated v3 config: %w", err)
+	}
+	return configuration, nil
+}
+
+func migrateV3Mail(
+	address string,
+	route googleAPILegacyMailRoute,
+) (*MailRoute, error) {
+	if route.Provider != domain.ProviderID("google-api") {
+		return &MailRoute{
+			Provider: route.Provider, OutlookWeb: route.OutlookWeb,
+			JMAP: route.JMAP, IMAPSMTP: route.IMAPSMTP,
+			GoogleWeb: route.GoogleWeb, MicrosoftGraph: route.MicrosoftGraph,
+		}, nil
+	}
+	if route.GoogleAPI == nil {
+		return nil, errors.New("google-api settings are missing")
+	}
+	if address == "" {
+		return nil, errors.New("google mail migration requires the account address")
+	}
+	return &MailRoute{
+		Provider: domain.ProviderGoogle,
+		Google: &GoogleMailRoute{
+			Username:      address,
+			ClientID:      route.GoogleAPI.ClientID,
+			RedirectURI:   route.GoogleAPI.RedirectURI,
+			Authorization: route.GoogleAPI.Authorization,
+		},
+	}, nil
+}
+
+func migrateV3Calendar(
+	route googleAPILegacyCalendarRoute,
+) (*CalendarRoute, error) {
+	if route.Provider != domain.ProviderID("google-api") {
+		return &CalendarRoute{
+			Provider: route.Provider, OutlookWeb: route.OutlookWeb,
+			CalDAV: route.CalDAV, GoogleWeb: route.GoogleWeb,
+			MicrosoftGraph: route.MicrosoftGraph,
+		}, nil
+	}
+	if route.GoogleAPI == nil {
+		return nil, errors.New("google-api settings are missing")
+	}
+	return &CalendarRoute{
+		Provider: domain.ProviderGoogle,
+		Google:   route.GoogleAPI,
+	}, nil
+}
+
+// MigrateV1 converts an exact legacy config snapshot to the current schema. Account IDs are
 // generated once and must be persisted by the caller before use.
 func MigrateV1(data []byte) (Config, error) {
 	if len(data) > maximumConfigBytes {
@@ -79,7 +224,9 @@ func MigrateV1(data []byte) (Config, error) {
 		Accounts:       make(map[string]Account, len(legacy.Accounts)),
 		Policy:         legacy.Policy,
 		Browser:        legacy.Browser,
-		Updates:        legacy.Updates,
+		Updates: Updates{
+			DisableAutomaticChecks: legacy.Updates.DisableAutomaticChecks,
+		},
 	}
 	for _, alias := range aliases {
 		accountID, err := domain.NewAccountID()
@@ -121,7 +268,10 @@ func MigrateV2(data []byte) (Config, error) {
 	configuration := Config{
 		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
 		Accounts: make(map[string]Account, len(legacy.Accounts)),
-		Policy:   legacy.Policy, Browser: legacy.Browser, Updates: legacy.Updates,
+		Policy:   legacy.Policy, Browser: legacy.Browser,
+		Updates: Updates{
+			DisableAutomaticChecks: legacy.Updates.DisableAutomaticChecks,
+		},
 	}
 	for alias, account := range legacy.Accounts {
 		if account.Provider != domain.ProviderMicrosoftOWA {
@@ -168,7 +318,8 @@ func migratedOutlookAccount(
 }
 
 // EnsureDefaultPath performs the one-way, rollback-safe default migration.
-// The legacy file remains byte-for-byte unchanged; the returned file is v3.
+// The legacy file remains byte-for-byte unchanged; the returned file uses the
+// current schema.
 func EnsureDefaultPath() (path string, migrated bool, err error) {
 	path, err = DefaultPath()
 	if err != nil {

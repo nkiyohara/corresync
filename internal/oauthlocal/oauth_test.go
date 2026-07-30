@@ -68,7 +68,7 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 
 	redirectURI := "http://127.0.0.1:0/oauth/callback"
 	provider := Provider{
-		ID:      domain.ProviderGoogleAPI,
+		ID:      domain.ProviderGoogle,
 		AuthURL: apiServer.URL + "/authorize", TokenURL: apiServer.URL + "/token",
 		Scopes: []string{"mail.read", "calendar.write"},
 		AuthParams: map[string]string{
@@ -133,6 +133,21 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 			if response.StatusCode != http.StatusOK {
 				return errorsNewStatus(response.StatusCode)
 			}
+			for name, expected := range map[string]string{
+				"Cache-Control":           "no-store",
+				"Content-Security-Policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+				"Referrer-Policy":         "no-referrer",
+				"X-Content-Type-Options":  "nosniff",
+			} {
+				if response.Header.Get(name) != expected {
+					t.Fatalf(
+						"authorization callback %s = %q, want %q",
+						name,
+						response.Header.Get(name),
+						expected,
+					)
+				}
+			}
 			return nil
 		},
 	})
@@ -148,10 +163,18 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 			Consent: true,
 		},
 	}
-	client, err := manager.Client(t.Context(), route, provider)
+	authorization, err := manager.Authorize(t.Context(), route.Client(), provider)
 	if err != nil {
 		t.Fatal(err)
 	}
+	accessToken, err := authorization.AccessToken(t.Context())
+	if err != nil || string(accessToken) != "synthetic-access" {
+		t.Fatalf("AccessToken() = %q, %v", accessToken, err)
+	}
+	for index := range accessToken {
+		accessToken[index] = 0
+	}
+	client := authorization.HTTPClient()
 	request, err := http.NewRequestWithContext(
 		t.Context(),
 		http.MethodGet,
@@ -181,6 +204,12 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 		strings.Contains(stored, "synthetic-code") {
 		t.Fatalf("stored grant contains transient authorization data: %s", stored)
 	}
+	grant["provider"] = "google-api"
+	legacyStored, err := json.Marshal(grant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored = string(legacyStored)
 
 	second, err := manager.Client(t.Context(), route, provider)
 	if err != nil || second == nil {

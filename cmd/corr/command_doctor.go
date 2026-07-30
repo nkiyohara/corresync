@@ -70,7 +70,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 
 	switch {
 	case hasGoogleWebRoute(configured):
-		report.add("browser", "fail", errGoogleWebSignInUnavailable.Error())
+		report.add("account", "fail", errUnsupportedLegacyGoogleRoute.Error())
 	case hasBrowserRoute(configured):
 		executable, err := browser.ResolveExecutable(configuration.Browser.Executable)
 		if err != nil {
