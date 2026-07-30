@@ -341,6 +341,8 @@ func getConfigValue(configuration config.Config, key string) (any, error) {
 		return time.Duration(configuration.Browser.LoginTimeout).String(), nil
 	case "updates.disable_automatic_checks":
 		return configuration.Updates.DisableAutomaticChecks, nil
+	case "updates.auto_install":
+		return configuration.Updates.AutoInstall, nil
 	}
 	if alias, field, ok := accountConfigKey(key); ok {
 		account, exists := configuration.Accounts[alias]
@@ -417,6 +419,12 @@ func setConfigValue(configuration *config.Config, key, value string) error {
 			return fmt.Errorf("parse %s as boolean: %w", key, err)
 		}
 		configuration.Updates.DisableAutomaticChecks = parsed
+	case "updates.auto_install":
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("parse %s as boolean: %w", key, err)
+		}
+		configuration.Updates.AutoInstall = parsed
 	default:
 		alias, field, ok := accountConfigKey(key)
 		if !ok {

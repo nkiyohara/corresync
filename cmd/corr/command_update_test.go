@@ -180,11 +180,34 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 	var stderr bytes.Buffer
 	app.stderr = &stderr
 	app.interactiveOutput = func() bool { return true }
-	app.maybeNotifyUpdate(t.Context())
+	app.interactiveStdout = func() bool { return true }
+	app.installMethod = func() updatecheck.InstallMethod { return updatecheck.InstallDirect }
+	app.installUpdate = func(
+		context.Context,
+		func(updatecheck.InstallProgress),
+	) (updatecheck.InstallResult, error) {
+		t.Fatal("default update check attempted automatic installation")
+		return updatecheck.InstallResult{}, nil
+	}
+	app.maybeHandleAutomaticUpdate(t.Context())
 	if !strings.Contains(stderr.String(), "Update available") ||
 		!strings.Contains(stderr.String(), "Run corr update") {
 		t.Fatalf("TTY notice missing: %q", stderr.String())
 	}
+
+	stderr.Reset()
+	app.interactiveOutput = func() bool { return false }
+	app.maybeHandleAutomaticUpdate(t.Context())
+	if stderr.Len() != 0 {
+		t.Fatalf("non-TTY emitted notice: %q", stderr.String())
+	}
+	app.interactiveOutput = func() bool { return true }
+	app.interactiveStdout = func() bool { return false }
+	app.maybeHandleAutomaticUpdate(t.Context())
+	if stderr.Len() != 0 {
+		t.Fatalf("piped stdout emitted notice: %q", stderr.String())
+	}
+	app.interactiveStdout = func() bool { return true }
 
 	configuration := config.OutlookDefault()
 	configuration.Updates.DisableAutomaticChecks = true
@@ -194,7 +217,7 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 	}
 	app.configPath = configPath
 	stderr.Reset()
-	app.maybeNotifyUpdate(t.Context())
+	app.maybeHandleAutomaticUpdate(t.Context())
 	if stderr.Len() != 0 {
 		t.Fatalf("config opt-out emitted notice: %q", stderr.String())
 	}
@@ -209,28 +232,145 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 		}
 		return "", false
 	}
-	app.maybeNotifyUpdate(t.Context())
+	app.maybeHandleAutomaticUpdate(t.Context())
 	if stderr.Len() != 0 {
 		t.Fatalf("environment opt-out emitted notice: %q", stderr.String())
 	}
 }
 
-func TestMachineSurfacesNeverOfferAutomaticNotice(t *testing.T) {
+func TestAutomaticUpdateInstallsOnlyAnOptedInDirectBinary(t *testing.T) {
+	result := updatecheck.Result{
+		Status: updatecheck.StatusAvailable, CurrentVersion: "0.8.1",
+		LatestVersion: "v0.8.2", UpdateAvailable: true,
+	}
+	var stdout, stderr bytes.Buffer
+	app := updateTestRuntime(t, &stdout, result)
+	app.stderr = &stderr
+	app.interactiveOutput = func() bool { return true }
+	app.interactiveStdout = func() bool { return true }
+	app.installMethod = func() updatecheck.InstallMethod { return updatecheck.InstallDirect }
+	configuration := config.OutlookDefault()
+	configuration.Updates.AutoInstall = true
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+	app.configPath = configPath
+	installCalls := 0
+	app.installUpdate = func(
+		_ context.Context,
+		progress func(updatecheck.InstallProgress),
+	) (updatecheck.InstallResult, error) {
+		installCalls++
+		if progress != nil {
+			t.Fatal("automatic install exposed progress output")
+		}
+		return updatecheck.InstallResult{
+			Status:          updatecheck.InstallStatusUpdated,
+			PreviousVersion: "0.8.1",
+			CurrentVersion:  "0.8.2",
+			LatestVersion:   "v0.8.2",
+			BackupPath:      "/synthetic/corr.backup-0.8.1",
+		}, nil
+	}
+
+	app.maybeHandleAutomaticUpdate(t.Context())
+
+	if installCalls != 1 ||
+		!strings.Contains(stderr.String(), "installing verified standalone update") ||
+		!strings.Contains(stderr.String(), "Corresync 0.8.2 installed") ||
+		!strings.Contains(stderr.String(), "active on the next corr start") {
+		t.Fatalf("automatic direct update = calls %d, output %q", installCalls, stderr.String())
+	}
+}
+
+func TestAutomaticUpdateNeverRunsAPackageManager(t *testing.T) {
+	result := updatecheck.Result{
+		Status: updatecheck.StatusAvailable, CurrentVersion: "0.8.1",
+		LatestVersion: "v0.8.2", UpdateAvailable: true,
+	}
+	var stdout, stderr bytes.Buffer
+	app := updateTestRuntime(t, &stdout, result)
+	app.stderr = &stderr
+	app.interactiveOutput = func() bool { return true }
+	app.interactiveStdout = func() bool { return true }
+	configuration := config.OutlookDefault()
+	configuration.Updates.AutoInstall = true
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+	app.configPath = configPath
+	app.installMethod = func() updatecheck.InstallMethod { return updatecheck.InstallHomebrew }
+	app.installUpdate = func(
+		context.Context,
+		func(updatecheck.InstallProgress),
+	) (updatecheck.InstallResult, error) {
+		t.Fatal("automatic update attempted to modify a package-managed installation")
+		return updatecheck.InstallResult{}, nil
+	}
+
+	app.maybeHandleAutomaticUpdate(t.Context())
+
+	if !strings.Contains(stderr.String(), "Update available") ||
+		!strings.Contains(stderr.String(), "brew upgrade nkiyohara/corresync/corresync") ||
+		strings.Contains(stderr.String(), "installing verified standalone update") {
+		t.Fatalf("managed automatic update output = %q", stderr.String())
+	}
+}
+
+func TestAutomaticUpdateFailureDoesNotBlockTheRequestedCommand(t *testing.T) {
+	result := updatecheck.Result{
+		Status: updatecheck.StatusAvailable, CurrentVersion: "0.8.1",
+		LatestVersion: "v0.8.2", UpdateAvailable: true,
+	}
+	var stdout, stderr bytes.Buffer
+	app := updateTestRuntime(t, &stdout, result)
+	app.stderr = &stderr
+	app.interactiveOutput = func() bool { return true }
+	app.interactiveStdout = func() bool { return true }
+	app.installMethod = func() updatecheck.InstallMethod { return updatecheck.InstallDirect }
+	configuration := config.OutlookDefault()
+	configuration.Updates.AutoInstall = true
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+	app.configPath = configPath
+	app.installUpdate = func(
+		context.Context,
+		func(updatecheck.InstallProgress),
+	) (updatecheck.InstallResult, error) {
+		return updatecheck.InstallResult{}, context.DeadlineExceeded
+	}
+
+	app.maybeHandleAutomaticUpdate(t.Context())
+
+	if !strings.Contains(stderr.String(), "Automatic update failed") ||
+		!strings.Contains(stderr.String(), "continuing with 0.8.1") ||
+		!strings.Contains(stderr.String(), "corr update") {
+		t.Fatalf("automatic update failure output = %q", stderr.String())
+	}
+}
+
+func TestMachineSurfacesNeverHandleAutomaticUpdates(t *testing.T) {
 	tests := [][]string{
 		{"mcp", "serve"},
+		{"--config", "/synthetic/config.toml", "mcp", "serve"},
 		{"mcp", "config", "codex"},
 		{"completion", "bash"},
 		{"version", "--json"},
 		{"doctor", "--json"},
 		{"update", "check"},
+		{"config", "set", "updates.auto_install", "false"},
 		{"daemon", "run"},
 	}
 	for _, arguments := range tests {
-		if shouldOfferAutomaticUpdateNotice(arguments) {
-			t.Errorf("shouldOfferAutomaticUpdateNotice(%q) = true", arguments)
+		if shouldHandleAutomaticUpdate(arguments) {
+			t.Errorf("shouldHandleAutomaticUpdate(%q) = true", arguments)
 		}
 	}
-	if !shouldOfferAutomaticUpdateNotice([]string{"mail", "list"}) {
+	if !shouldHandleAutomaticUpdate([]string{"mail", "list"}) {
 		t.Fatal("human-facing mail command did not allow a quiet notice")
 	}
 }

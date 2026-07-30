@@ -57,6 +57,30 @@ func TestConfigGetAndSetTypedValues(t *testing.T) {
 	}
 }
 
+func TestConfigGetAndSetAutomaticInstall(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	if err := (&configSetCommand{
+		Key: "updates.auto_install", Value: "true", JSON: true,
+	}).Run(app); err != nil {
+		t.Fatalf("config set auto-install: %v", err)
+	}
+	loaded, err := config.Load(path)
+	if err != nil || !loaded.Updates.AutoInstall {
+		t.Fatalf("saved auto-install config = %+v, %v", loaded.Updates, err)
+	}
+	value, err := getConfigValue(loaded, "updates.auto_install")
+	if err != nil || value != true {
+		t.Fatalf("get updates.auto_install = %v, %v", value, err)
+	}
+}
+
 func TestConfigSetSupportsDottedAccountAliases(t *testing.T) {
 	t.Parallel()
 

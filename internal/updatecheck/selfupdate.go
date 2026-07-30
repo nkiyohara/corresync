@@ -34,7 +34,7 @@ const (
 	currentRepository       = "nkiyohara/corresync"
 )
 
-// InstallStatus describes the result of an explicit direct self-update.
+// InstallStatus describes the result of a consented direct self-update.
 type InstallStatus string
 
 const (
@@ -43,8 +43,8 @@ const (
 	InstallStatusUpdated  InstallStatus = "updated"
 )
 
-// InstallResult contains no Outlook or machine identity. BackupPath is
-// included because installation is an explicit local filesystem operation.
+// InstallResult contains no provider or machine identity. BackupPath is
+// included because installation is a consented local filesystem operation.
 type InstallResult struct {
 	Status          InstallStatus `json:"status"`
 	PreviousVersion string        `json:"previousVersion,omitempty"`
@@ -75,7 +75,7 @@ type InstallProgress struct {
 	Detail string
 }
 
-// Installer performs an explicit self-update of one direct installation.
+// Installer performs a consented self-update of one direct installation.
 // Network, platform, and verification seams are injectable for deterministic
 // synthetic tests.
 type Installer struct {

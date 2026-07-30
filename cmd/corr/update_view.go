@@ -16,14 +16,64 @@ func newUpdateView(app *runtime, writer io.Writer, interactive bool) updateView 
 	return updateView{consoleView: newConsoleView(app, writer, interactive)}
 }
 
-func (view updateView) writeNotice(current, latest string) error {
+func (view updateView) writeNotice(current, latest, command string) error {
 	_, err := view.printf(
 		"\n%s  %s\n   Run %s\n",
 		view.accent(),
 		view.strong("Update available")+"  "+view.muted(versionPair(current, latest)),
-		view.command("corr update"),
+		view.command(command),
 	)
 	return err
+}
+
+func (view updateView) writeAutomaticInstallStart(current, latest string) error {
+	_, err := view.printf(
+		"\n%s  %s\n",
+		view.accent(),
+		view.strong("Update available")+"  "+
+			view.muted(versionPair(current, latest))+" · installing verified standalone update…",
+	)
+	return err
+}
+
+func (view updateView) writeAutomaticInstallFailure(current string) error {
+	_, err := view.printf(
+		"%s  %s\n",
+		view.warning(),
+		"Automatic update failed; continuing with "+
+			strings.TrimPrefix(current, "v")+". Run "+view.command("corr update")+" to retry.",
+	)
+	return err
+}
+
+func (view updateView) writeAutomaticInstallResult(result updatecheck.InstallResult) error {
+	switch result.Status {
+	case updatecheck.InstallStatusUpdated:
+		_, err := view.printf(
+			"%s  %s\n",
+			view.success(),
+			view.strong("Corresync "+strings.TrimPrefix(result.CurrentVersion, "v")+
+				" installed")+" · active on the next corr start",
+		)
+		return err
+	case updatecheck.InstallStatusRepaired:
+		_, err := view.printf(
+			"%s  %s\n",
+			view.success(),
+			view.strong("corr "+strings.TrimPrefix(result.CurrentVersion, "v")+
+				" installed")+" · active on the next corr start",
+		)
+		return err
+	case updatecheck.InstallStatusCurrent:
+		_, err := view.printf(
+			"%s  %s\n",
+			view.success(),
+			view.strong("corr "+strings.TrimPrefix(result.CurrentVersion, "v")+" is already current"),
+		)
+		return err
+	default:
+		return fmt.Errorf("unknown automatic update status %q", result.Status)
+	}
 }
 
 func (view updateView) writeProgress(progress updatecheck.InstallProgress) {
