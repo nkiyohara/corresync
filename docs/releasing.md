@@ -88,14 +88,31 @@ stale documentation/package payloads.
 
 The workflow rejects a tag that is not reachable from `main`. GoReleaser creates
 a draft, injects the version/commit/source date, builds with `CGO_ENABLED=0` and
-`-trimpath`, then the MCPB packer creates one deterministic local bundle from
-those exact primary binaries. The release gate verifies archives, packages,
-the MCPB, catalogs, licenses, checksums, and SBOMs before publication.
+`-trimpath`, then an isolated macOS keychain Developer ID-signs all four Darwin
+executables with hardened runtime and secure timestamp. Apple notarization must
+accept those exact binaries before the Darwin archives are repacked. The MCPB,
+Darwin SBOMs, catalogs, and checksum inventory are then rebuilt from the signed
+inputs. The release gate verifies archives, packages, the MCPB, catalogs,
+licenses, checksums, and SBOMs before publication.
 
 Only the verified checksum manifest is signed. The GitHub Actions OIDC identity
 is bound to the exact repository, release workflow, and tag. Any pre-publish
 failure leaves at most a draft; it does not expose an unverified release as
 latest.
+
+Apple release credentials are repository-scoped Actions Secrets restored from
+the maintainer's private password manager:
+
+- `MACOS_SIGN_P12`, the base64-encoded encrypted Developer ID PKCS#12 bundle;
+- `MACOS_SIGN_PASSWORD`, the PKCS#12 password;
+- `MACOS_NOTARY_APPLE_ID`, `MACOS_NOTARY_PASSWORD`, and `MACOS_TEAM_ID`, used
+  only to create an ephemeral keychain profile for `notarytool`.
+
+Do not place these values in repository variables, workflow artifacts, release
+assets, logs, caches, or local environment files. The release job imports them
+only after source verification and deletes its temporary keychain even on
+failure. Rotate notarization credentials independently where possible; verify a
+replacement release path before revoking the prior Developer ID certificate.
 
 ## Package catalogs
 
@@ -118,9 +135,10 @@ checks are scoped to the same author/version. A catalog failure does not mutate
 the published release; repair the credential/upstream condition and rerun only
 the failed job.
 
-Homebrew builds the verified tagged source. Until native binaries are signed
-and notarized, do not publish a Cask or instructions that weaken Gatekeeper or
-SmartScreen.
+Homebrew builds the verified tagged source. Do not publish a Cask unless it
+installs the exact signed and notarized release archive and passes a
+quarantine-path Gatekeeper test. Never add instructions that weaken Gatekeeper
+or SmartScreen.
 
 ## Repository controls
 
