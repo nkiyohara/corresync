@@ -189,10 +189,24 @@ cosign verify-blob \
 The identity must match the repository, release workflow, and selected tag
 exactly. Do not accept a wildcard identity.
 
-macOS binaries are not yet notarized and Windows binaries are not yet
-Authenticode-signed. Do not disable Gatekeeper, SmartScreen, or organization
-policy to run them. If platform signing is required, build from the verified
-tag or wait for a signed distribution.
+The macOS binaries in v0.8.4 and later are signed with the Corresync
+maintainer's Apple Developer ID, hardened runtime, and secure timestamp, and
+Apple notarization must be accepted before the release can publish. Check an
+extracted binary without changing Gatekeeper:
+
+```console
+codesign --verify --strict --verbose=2 corr
+codesign --display --verbose=4 corr 2>&1 |
+  grep -E 'Authority=Developer ID|TeamIdentifier=N2D7Q889MA'
+```
+
+Apple issues an online notarization ticket for each standalone command-line
+binary; standalone executables cannot carry a stapled ticket. The signed
+Darwin binaries in the direct archives and MCPB are byte-identical to the
+notarized release inputs.
+
+Windows binaries are not yet Authenticode-signed. Do not disable Gatekeeper,
+SmartScreen, or organization policy to run a release.
 
 ## First run
 

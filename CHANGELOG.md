@@ -5,6 +5,22 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.4 - 2026-07-30
+
+### macOS release trust
+
+- Sign both amd64 and arm64 macOS release binaries with the project's Apple
+  Developer ID, hardened runtime, and secure timestamp, then require Apple
+  notarization to be accepted before publication.
+- Rebuild the macOS archives, platform-universal MCPB, SBOMs, package catalogs,
+  and checksum inventory from the exact signed binaries so no unsigned Darwin
+  executable can survive the release gate.
+- Isolate Apple credentials in an ephemeral release keychain, keep them out of
+  artifacts and logs, and retain GitHub Actions Sigstore provenance as a
+  separate verification layer.
+
+## 0.8.3 - 2026-07-30
+
 ### MCP Bundle distribution
 
 - Publish one platform-universal `.mcpb` for local stdio installation on

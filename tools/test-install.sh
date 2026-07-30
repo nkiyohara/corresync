@@ -2,6 +2,11 @@
 
 set -eu
 
+if [ "$(uname -s)" != "Linux" ]; then
+  printf 'standalone installer tests skipped: Linux-only installer\n'
+  exit 0
+fi
+
 repository_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 installer="${repository_root}/site/install.sh"
 test_root=$(mktemp -d "${TMPDIR:-/tmp}/corresync-install-test.XXXXXX")
