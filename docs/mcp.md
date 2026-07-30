@@ -24,6 +24,14 @@ are empty and account-bound calls return setup guidance; no provider adapter is
 selected, contacted, or authenticated. The client registration commands above
 continue to require a configured account.
 
+Claude Desktop can instead install `corresync_VERSION.mcpb` from the matching
+GitHub release. The platform-universal bundle contains the verified macOS,
+Linux, and Windows amd64/arm64 binaries and starts only the matching
+`corr mcp serve` locally. It does not replace the CLI's explicit account setup
+and authentication, and it adds no HTTP endpoint, hosted relay, or credential
+configuration. Verify its checksum and Sigstore provenance using
+[install.md](install.md) before installation.
+
 Replace `codex` with `claude-code`, `github-copilot`, `gemini-cli`,
 `qwen-code`, or `qoder`. Use `--dry-run` to print the official client command
 without changing client configuration.

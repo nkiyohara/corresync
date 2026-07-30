@@ -5,6 +5,17 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### MCP Bundle distribution
+
+- Publish one platform-universal `.mcpb` for local stdio installation on
+  macOS, Linux, and Windows across amd64 and arm64.
+- Package the exact verified release binaries, project and third-party
+  licenses, Privacy Policy metadata, and local launchers without adding a
+  hosted relay, remote MCP endpoint, credential field, or Docker image.
+- Add deterministic bundle construction, manifest and binary identity checks,
+  per-bundle SPDX/CycloneDX SBOMs, and signed-checksum coverage to the release
+  gate.
+
 ### Privacy, terms, provider disclosure, and Google verification
 
 - Make `https://corresync.org/` the canonical site origin across Pages,

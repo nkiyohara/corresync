@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -100,10 +101,12 @@ func canonicalize(path, format string, when time.Time) error {
 			return err
 		}
 		metadata["timestamp"] = timestamp
+		canonicalizeCycloneDXRootReference(document, metadata)
 		document["serialNumber"] = ""
 	default:
 		return fmt.Errorf("unsupported SBOM format %q", format)
 	}
+	canonicalizeArrayOrder(document)
 
 	canonical, err := json.Marshal(document)
 	if err != nil {
@@ -126,6 +129,43 @@ func canonicalize(path, format string, when time.Time) error {
 	return nil
 }
 
+func canonicalizeCycloneDXRootReference(document, metadata map[string]any) {
+	component, ok := metadata["component"].(map[string]any)
+	if !ok {
+		return
+	}
+	oldReference, ok := component["bom-ref"].(string)
+	if !ok || oldReference == "" {
+		return
+	}
+	name, _ := component["name"].(string)
+	version, _ := component["version"].(string)
+	componentType, _ := component["type"].(string)
+	digest := sha256.Sum256([]byte(name + "\x00" + version + "\x00" + componentType))
+	replaceStringValue(document, oldReference, deterministicUUID(digest))
+}
+
+func replaceStringValue(value any, oldValue, newValue string) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if text, ok := child.(string); ok && text == oldValue {
+				typed[key] = newValue
+				continue
+			}
+			replaceStringValue(child, oldValue, newValue)
+		}
+	case []any:
+		for index, child := range typed {
+			if text, ok := child.(string); ok && text == oldValue {
+				typed[index] = newValue
+				continue
+			}
+			replaceStringValue(child, oldValue, newValue)
+		}
+	}
+}
+
 func normalizeGeneratedPaths(value any) {
 	switch typed := value.(type) {
 	case map[string]any:
@@ -144,6 +184,27 @@ func normalizeGeneratedPaths(value any) {
 			}
 			normalizeGeneratedPaths(child)
 		}
+	}
+}
+
+func canonicalizeArrayOrder(value any) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, child := range typed {
+			canonicalizeArrayOrder(child)
+		}
+	case []any:
+		for _, child := range typed {
+			canonicalizeArrayOrder(child)
+		}
+		sort.SliceStable(typed, func(left, right int) bool {
+			leftJSON, leftErr := json.Marshal(typed[left])
+			rightJSON, rightErr := json.Marshal(typed[right])
+			if leftErr != nil || rightErr != nil {
+				return false
+			}
+			return bytes.Compare(leftJSON, rightJSON) < 0
+		})
 	}
 }
 

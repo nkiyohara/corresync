@@ -15,27 +15,60 @@ import (
 	"os"
 	pathpkg "path"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 )
 
 const (
-	expectedArchives = 6
-	expectedBinaries = 12
-	expectedPackages = 6
-	expectedSBOMs    = 26
-	expectedSources  = 1
-	licensePrefix    = "third_party_licenses/"
-	minimumLicenses  = 24
+	expectedArchives   = 6
+	expectedBinaries   = 12
+	expectedMCPBundles = 1
+	expectedPackages   = 6
+	expectedSBOMs      = 28
+	expectedSources    = 1
+	licensePrefix      = "third_party_licenses/"
+	minimumLicenses    = 24
+)
+
+var mcpbNamePattern = regexp.MustCompile(
+	`^corresync_([0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?)\.mcpb$`,
 )
 
 type artifact struct {
 	Name   string         `json:"name"`
+	Path   string         `json:"path"`
 	Type   string         `json:"type"`
 	GOOS   string         `json:"goos"`
 	GOARCH string         `json:"goarch"`
 	Extra  map[string]any `json:"extra"`
+}
+
+type mcpbManifest struct {
+	ManifestVersion string   `json:"manifest_version"`
+	Name            string   `json:"name"`
+	Version         string   `json:"version"`
+	ToolsGenerated  bool     `json:"tools_generated"`
+	PrivacyPolicies []string `json:"privacy_policies"`
+	Server          struct {
+		Type       string `json:"type"`
+		EntryPoint string `json:"entry_point"`
+		MCPConfig  struct {
+			Command           string            `json:"command"`
+			Args              []string          `json:"args"`
+			Env               map[string]string `json:"env"`
+			PlatformOverrides map[string]struct {
+				Command string            `json:"command"`
+				Args    []string          `json:"args"`
+				Env     map[string]string `json:"env"`
+			} `json:"platform_overrides"`
+		} `json:"mcp_config"`
+	} `json:"server"`
+	Compatibility struct {
+		Platforms []string `json:"platforms"`
+	} `json:"compatibility"`
 }
 
 type scoopManifest struct {
@@ -55,8 +88,9 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf(
-		"release verification passed: %d archives, %d packages, %d SBOMs\n",
+		"release verification passed: %d archives, %d MCP bundles, %d packages, %d SBOMs\n",
 		expectedArchives,
+		expectedMCPBundles,
 		expectedPackages,
 		expectedSBOMs,
 	)
@@ -131,7 +165,11 @@ func verifyChecksums(dist string) (map[string]string, error) {
 		}
 		hashes[name] = want
 	}
-	expectedChecksums := expectedArchives + expectedPackages + expectedSBOMs + expectedSources
+	expectedChecksums := expectedArchives +
+		expectedMCPBundles +
+		expectedPackages +
+		expectedSBOMs +
+		expectedSources
 	if len(hashes) != expectedChecksums {
 		return nil, fmt.Errorf("checksum count is %d, want %d", len(hashes), expectedChecksums)
 	}
@@ -154,6 +192,10 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 	binaries := make(map[string]map[string]int)
 	packageFormats := make(map[string]int)
 	sbomFormats := make(map[string]int)
+	bundleBinaries, err := expectedMCPBBinaries(dist, artifacts)
+	if err != nil {
+		return err
+	}
 	for _, item := range artifacts {
 		counts[item.Type]++
 		switch item.Type {
@@ -172,6 +214,19 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 				return fmt.Errorf("archive %q is absent from checksums", item.Name)
 			}
 			if err := verifyArchive(filepath.Join(dist, item.Name), item.GOOS); err != nil {
+				return err
+			}
+		case "MCP Bundle":
+			if filepath.Base(item.Name) != item.Name {
+				return fmt.Errorf("MCP bundle name %q is not a basename", item.Name)
+			}
+			if hashes[item.Name] == "" {
+				return fmt.Errorf("MCP bundle %q is absent from checksums", item.Name)
+			}
+			if err := verifyMCPBundle(
+				filepath.Join(dist, item.Name),
+				bundleBinaries,
+			); err != nil {
 				return err
 			}
 		case "Linux Package":
@@ -207,6 +262,7 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 		"Binary":        expectedBinaries,
 		"Checksum":      1,
 		"Linux Package": expectedPackages,
+		"MCP Bundle":    expectedMCPBundles,
 		"Metadata":      1,
 		"SBOM":          expectedSBOMs,
 		"Source":        expectedSources,
@@ -257,6 +313,83 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 		)
 	}
 	return nil
+}
+
+func expectedMCPBBinaries(dist string, artifacts []artifact) (map[string]string, error) {
+	expected := make(map[string]bool)
+	for _, goos := range []string{"darwin", "linux", "windows"} {
+		for _, goarch := range []string{"amd64", "arm64"} {
+			expected[goos+"/"+goarch] = false
+		}
+	}
+	hashes := make(map[string]string, len(expected))
+	for _, item := range artifacts {
+		id, _ := item.Extra["ID"].(string)
+		if item.Type != "Binary" || id != "corr" {
+			continue
+		}
+		target := item.GOOS + "/" + item.GOARCH
+		if _, wanted := expected[target]; !wanted {
+			continue
+		}
+		if expected[target] {
+			return nil, fmt.Errorf("duplicate primary binary for MCPB target %s", target)
+		}
+		path, err := releaseArtifactPath(dist, item.Path)
+		if err != nil {
+			return nil, fmt.Errorf("resolve MCPB target %s: %w", target, err)
+		}
+		hash, err := hashFile(path)
+		if err != nil {
+			return nil, err
+		}
+		hashes["server/"+target+"/corr"] = hash
+		if item.GOOS == "windows" {
+			delete(hashes, "server/"+target+"/corr")
+			hashes["server/"+target+"/corr.exe"] = hash
+		}
+		expected[target] = true
+	}
+	var missing []string
+	for target, found := range expected {
+		if !found {
+			missing = append(missing, target)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return nil, fmt.Errorf("MCPB source binaries are missing targets %q", missing)
+	}
+	return hashes, nil
+}
+
+func releaseArtifactPath(dist, path string) (string, error) {
+	if path == "" {
+		return "", errors.New("artifact path is empty")
+	}
+	absoluteDist, err := filepath.Abs(dist)
+	if err != nil {
+		return "", err
+	}
+	absolutePath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	relative, err := filepath.Rel(absoluteDist, absolutePath)
+	if err != nil {
+		return "", err
+	}
+	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("artifact path %q escapes the dist directory", path)
+	}
+	info, err := os.Lstat(absolutePath)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", fmt.Errorf("artifact %q is not a regular file", filepath.Base(path))
+	}
+	return absolutePath, nil
 }
 
 func packageMissingFiles(extra map[string]any) []string {
@@ -438,6 +571,240 @@ func verifyArchive(path, goos string) error {
 	}
 	want = append(want, "corr", "corresync")
 	return verifyTarGzip(path, want)
+}
+
+func verifyMCPBundle(bundlePath string, binaryHashes map[string]string) error {
+	name := filepath.Base(bundlePath)
+	match := mcpbNamePattern.FindStringSubmatch(name)
+	if len(match) != 2 {
+		return fmt.Errorf("MCP bundle name %q does not contain one SemVer version", name)
+	}
+	archive, err := zip.OpenReader(bundlePath)
+	if err != nil {
+		return fmt.Errorf("open MCP bundle %q: %w", name, err)
+	}
+	defer func() { _ = archive.Close() }()
+
+	requiredModes := map[string]os.FileMode{
+		"LICENSE":           0o644,
+		"README.md":         0o644,
+		"SECURITY.md":       0o644,
+		"icon.png":          0o644,
+		"manifest.json":     0o644,
+		"server/launch.cmd": 0o644,
+		"server/launch.sh":  0o755,
+	}
+	for binary := range binaryHashes {
+		requiredModes[binary] = 0o755
+	}
+	found := make(map[string]bool, len(requiredModes))
+	seen := make(map[string]bool, len(archive.File))
+	var manifestData []byte
+	licenseFiles := 0
+	for _, file := range archive.File {
+		if err := validateMCPBEntry(file); err != nil {
+			return fmt.Errorf("MCP bundle %q: %w", name, err)
+		}
+		if seen[file.Name] {
+			return fmt.Errorf("MCP bundle %q has duplicate entry %q", name, file.Name)
+		}
+		seen[file.Name] = true
+		if strings.HasPrefix(file.Name, licensePrefix) {
+			licenseFiles++
+			if file.Mode().Perm() != 0o644 {
+				return fmt.Errorf(
+					"MCP bundle %q license %q has mode %#o, want 0644",
+					name,
+					file.Name,
+					file.Mode().Perm(),
+				)
+			}
+			continue
+		}
+		wantMode, expected := requiredModes[file.Name]
+		if !expected {
+			return fmt.Errorf("MCP bundle %q contains unexpected entry %q", name, file.Name)
+		}
+		if file.Mode().Perm() != wantMode {
+			return fmt.Errorf(
+				"MCP bundle %q entry %q has mode %#o, want %#o",
+				name,
+				file.Name,
+				file.Mode().Perm(),
+				wantMode,
+			)
+		}
+		found[file.Name] = true
+		if wantHash := binaryHashes[file.Name]; wantHash != "" {
+			gotHash, err := hashZipEntry(file)
+			if err != nil {
+				return fmt.Errorf("hash MCP bundle binary %q: %w", file.Name, err)
+			}
+			if gotHash != wantHash {
+				return fmt.Errorf(
+					"MCP bundle binary %q differs from the verified release binary",
+					file.Name,
+				)
+			}
+		}
+		if file.Name == "manifest.json" {
+			manifestData, err = readZipEntry(file)
+			if err != nil {
+				return fmt.Errorf("read MCPB manifest: %w", err)
+			}
+		}
+	}
+	var missing []string
+	for entry := range requiredModes {
+		if !found[entry] {
+			missing = append(missing, entry)
+		}
+	}
+	if len(missing) > 0 {
+		sort.Strings(missing)
+		return fmt.Errorf("MCP bundle %q is missing %q", name, missing)
+	}
+	if licenseFiles < minimumLicenses {
+		return fmt.Errorf(
+			"MCP bundle %q contains %d third-party license files, want at least %d",
+			name,
+			licenseFiles,
+			minimumLicenses,
+		)
+	}
+	if err := verifyMCPBManifest(manifestData, match[1]); err != nil {
+		return fmt.Errorf("MCP bundle %q: %w", name, err)
+	}
+	return nil
+}
+
+func validateMCPBEntry(file *zip.File) error {
+	name := file.Name
+	clean := pathpkg.Clean(name)
+	if name == "" ||
+		clean != name ||
+		pathpkg.IsAbs(clean) ||
+		clean == ".." ||
+		strings.HasPrefix(clean, "../") ||
+		strings.Contains(name, `\`) {
+		return fmt.Errorf("unsafe entry path %q", name)
+	}
+	if file.FileInfo().IsDir() {
+		return fmt.Errorf("unexpected directory entry %q", name)
+	}
+	if file.Mode()&os.ModeSymlink != 0 || !file.Mode().IsRegular() {
+		return fmt.Errorf("entry %q is not a regular file", name)
+	}
+	return nil
+}
+
+func hashZipEntry(file *zip.File) (string, error) {
+	const maximumBinaryBytes = 256 * 1024 * 1024
+
+	if file.UncompressedSize64 > maximumBinaryBytes {
+		return "", fmt.Errorf("entry %q exceeds %d bytes", file.Name, maximumBinaryBytes)
+	}
+	reader, err := file.Open()
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = reader.Close() }()
+	hash := sha256.New()
+	// #nosec G110 -- the declared and streamed size are both bounded above.
+	written, err := io.Copy(hash, io.LimitReader(reader, maximumBinaryBytes+1))
+	if err != nil {
+		return "", err
+	}
+	if written != int64(file.UncompressedSize64) { // #nosec G115 -- bounded above.
+		return "", fmt.Errorf(
+			"entry %q size is %d, want %d",
+			file.Name,
+			written,
+			file.UncompressedSize64,
+		)
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func readZipEntry(file *zip.File) ([]byte, error) {
+	const maximum = 256 * 1024
+
+	if file.UncompressedSize64 > maximum {
+		return nil, fmt.Errorf("entry %q exceeds %d bytes", file.Name, maximum)
+	}
+	reader, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = reader.Close() }()
+	data, err := io.ReadAll(io.LimitReader(reader, maximum+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maximum {
+		return nil, fmt.Errorf("entry %q exceeds %d bytes", file.Name, maximum)
+	}
+	return data, nil
+}
+
+func verifyMCPBManifest(data []byte, version string) error {
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("decode manifest object: %w", err)
+	}
+	if _, exists := raw["user_config"]; exists {
+		return errors.New("manifest must not collect credentials or configuration")
+	}
+	var document mcpbManifest
+	if err := json.Unmarshal(data, &document); err != nil {
+		return fmt.Errorf("decode manifest fields: %w", err)
+	}
+	if document.ManifestVersion != "0.4" ||
+		document.Name != "corresync" ||
+		document.Version != version {
+		return errors.New("manifest identity does not match the release")
+	}
+	if !document.ToolsGenerated {
+		return errors.New("manifest must discover the live tool catalog")
+	}
+	if !equalStringLists(
+		document.PrivacyPolicies,
+		[]string{"https://corresync.org/privacy.html"},
+	) {
+		return errors.New("manifest does not bind the Corresync Privacy Policy")
+	}
+	if document.Server.Type != "binary" ||
+		document.Server.EntryPoint != "server/launch.sh" ||
+		document.Server.MCPConfig.Command != "${__dirname}/server/launch.sh" ||
+		len(document.Server.MCPConfig.Args) != 0 ||
+		len(document.Server.MCPConfig.Env) != 0 {
+		return errors.New("manifest does not use the reviewed local stdio launcher")
+	}
+	windows, exists := document.Server.MCPConfig.PlatformOverrides["win32"]
+	wantWindowsArgs := []string{
+		"/d",
+		"/s",
+		"/c",
+		`"${__dirname}/server/launch.cmd"`,
+	}
+	if !exists ||
+		len(document.Server.MCPConfig.PlatformOverrides) != 1 ||
+		windows.Command != "cmd.exe" ||
+		!equalStringLists(windows.Args, wantWindowsArgs) ||
+		len(windows.Env) != 0 {
+		return errors.New("manifest does not use the reviewed Windows launcher")
+	}
+	if !equalStringLists(
+		document.Compatibility.Platforms,
+		[]string{"darwin", "linux", "win32"},
+	) {
+		return errors.New("manifest platform inventory is incomplete")
+	}
+	return nil
+}
+
+func equalStringLists(left, right []string) bool {
+	return slices.Equal(left, right)
 }
 
 func verifyZip(path string, want []string) error {

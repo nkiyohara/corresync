@@ -37,9 +37,11 @@ func TestCanonicalizeSPDXIsStable(t *testing.T) {
 
 	first := canonicalizeFixture(t, "spdx-json", `{
 		"name":"corresync","documentNamespace":"https://random/one",
-		"creationInfo":{"created":"2026-01-01T00:00:00Z"},"packages":[]}`)
+		"creationInfo":{"created":"2026-01-01T00:00:00Z"},
+		"packages":[{"name":"zeta"},{"name":"alpha"}]}`)
 	second := canonicalizeFixture(t, "spdx-json", `{
-		"packages":[],"creationInfo":{"created":"2027-01-01T00:00:00Z"},
+		"packages":[{"name":"alpha"},{"name":"zeta"}],
+		"creationInfo":{"created":"2027-01-01T00:00:00Z"},
 		"documentNamespace":"https://random/two","name":"corresync"}`)
 	if first != second {
 		t.Fatalf("canonical SPDX differs:\n%s\n%s", first, second)
@@ -55,11 +57,21 @@ func TestCanonicalizeCycloneDXIsStable(t *testing.T) {
 
 	first := canonicalizeFixture(t, "cyclonedx-json", `{
 		"bomFormat":"CycloneDX","serialNumber":"urn:uuid:random-one",
-		"metadata":{"timestamp":"2026-01-01T00:00:00Z"},
-		"components":[{"name":"/tmp/syft-archive-contents-1234/corresync"}]}`)
+		"metadata":{
+			"timestamp":"2026-01-01T00:00:00Z",
+			"component":{"bom-ref":"random-root-one","name":"corresync","type":"file","version":"1.2.3"}},
+		"components":[
+			{"name":"zeta"},
+			{"name":"/tmp/syft-archive-contents-1234/corresync"}],
+		"dependencies":[{"ref":"random-root-one","dependsOn":[]}]}`)
 	second := canonicalizeFixture(t, "cyclonedx-json", `{
-		"components":[{"name":"/tmp/syft-archive-contents-9876/corresync"}],
-		"metadata":{"timestamp":"2027-01-01T00:00:00Z"},
+		"components":[
+			{"name":"/tmp/syft-archive-contents-9876/corresync"},
+			{"name":"zeta"}],
+		"dependencies":[{"ref":"random-root-two","dependsOn":[]}],
+		"metadata":{
+			"timestamp":"2027-01-01T00:00:00Z",
+			"component":{"bom-ref":"random-root-two","name":"corresync","type":"file","version":"1.2.3"}},
 		"serialNumber":"urn:uuid:random-two","bomFormat":"CycloneDX"}`)
 	if first != second {
 		t.Fatalf("canonical CycloneDX differs:\n%s\n%s", first, second)

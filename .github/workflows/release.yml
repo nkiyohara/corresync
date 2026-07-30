@@ -48,11 +48,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build the platform-universal MCP Bundle
+        run: go run ./tools/mcpbpack --dist dist
+
       - name: Render package-catalog manifests
         run: go run ./tools/catalogrender --dist dist
 
       - name: Verify every release output
         run: go run ./tools/releaseverify --dist dist
+
+      - name: Attach the verified MCP Bundle
+        run: >-
+          gh release upload "$GITHUB_REF_NAME"
+          dist/*.mcpb
+          dist/*.mcpb.spdx.json
+          dist/*.mcpb.cdx.json
+          dist/checksums.txt
+          --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Preserve verified package-catalog manifests
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

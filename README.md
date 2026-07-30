@@ -143,6 +143,13 @@ corr --version
 Direct archives, native Linux packages, checksums, Sigstore provenance, and
 current WinGet status are in the [installation guide](docs/install.md).
 
+Claude Desktop users can also install the platform-universal `.mcpb` from the
+[latest release](https://github.com/nkiyohara/corresync/releases/latest).
+The bundle runs the same verified `corr mcp serve` binary locally over stdio;
+it does not deploy Corresync or relay mailbox data. Install the CLI first for
+the explicit account setup and sign-in steps below, then open or drag the
+`.mcpb` into Claude Desktop.
+
 ### Stay current
 
 Interactive commands make a quiet, cached release check at startup. If an

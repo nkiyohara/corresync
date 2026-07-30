@@ -74,15 +74,38 @@ corr --version
 <!-- markdownlint-disable MD013 -->
 | Operating system | Architectures | Artifacts |
 | --- | --- | --- |
-| macOS | amd64, arm64 | `.tar.gz` |
-| Linux | amd64, arm64 | `.tar.gz`, `.deb`, `.rpm`, `.apk` |
-| Windows | amd64, arm64 | `.zip` |
+| macOS | amd64, arm64 | `.tar.gz`, platform-universal `.mcpb` |
+| Linux | amd64, arm64 | `.tar.gz`, `.deb`, `.rpm`, `.apk`, platform-universal `.mcpb` |
+| Windows | amd64, arm64 | `.zip`, platform-universal `.mcpb` |
 <!-- markdownlint-enable MD013 -->
 
 Every archive includes the license, security policy, changelog, essential
 guides, `corr(1)`, Bash/Zsh/Fish completion, plugin metadata, the Agent Skill,
-and required third-party licenses. Each archive and Linux package has SPDX JSON
-and CycloneDX JSON SBOMs.
+and required third-party licenses. The MCPB contains the exact same six primary
+release binaries, chooses only the current OS/architecture from a fixed local
+launcher, and includes the project and third-party licenses. Each archive,
+Linux package, and MCPB has SPDX JSON and CycloneDX JSON SBOMs.
+
+## Claude Desktop MCP Bundle
+
+Install the CLI with one of the methods above, then configure and authenticate
+the exact accounts you control:
+
+```console
+corr setup you@example.com --alias personal
+corr auth login --account personal
+```
+
+Download `corresync_VERSION.mcpb` from the
+[matching GitHub release](https://github.com/nkiyohara/corresync/releases),
+verify it through `checksums.txt` and the Sigstore procedure below, then open
+the file or drag it into Claude Desktop. The installation UI shows the bundle
+identity before installing it for the current user.
+
+MCPB changes distribution, not the trust boundary. Claude Desktop starts the
+bundled `corr mcp serve` on the user's device over stdio. The bundle defines no
+credential fields, HTTP transport, remote endpoint, hosted relay, or Docker
+runtime. Account setup and authentication remain separate explicit CLI actions.
 
 ## Package managers
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -63,5 +64,56 @@ func TestArchiveInventoryAcceptsChangelogAndRejectsExtras(t *testing.T) {
 	}
 	if err := requireReleaseFiles("synthetic.zip", append(got, "unexpected.txt"), want); err == nil {
 		t.Fatal("requireReleaseFiles() accepted an unexpected file")
+	}
+}
+
+func TestMCPBManifestRequiresLocalLaunchersAndNoUserConfig(t *testing.T) {
+	t.Parallel()
+
+	document := `{
+  "manifest_version": "0.4",
+  "name": "corresync",
+  "version": "1.2.3",
+  "tools_generated": true,
+  "privacy_policies": ["https://corresync.org/privacy.html"],
+  "server": {
+    "type": "binary",
+    "entry_point": "server/launch.sh",
+    "mcp_config": {
+      "command": "${__dirname}/server/launch.sh",
+      "args": [],
+      "env": {},
+      "platform_overrides": {
+        "win32": {
+          "command": "cmd.exe",
+          "args": ["/d", "/s", "/c", "\"${__dirname}/server/launch.cmd\""]
+        }
+      }
+    }
+  },
+  "compatibility": {"platforms": ["darwin", "linux", "win32"]}
+}`
+	if err := verifyMCPBManifest([]byte(document), "1.2.3"); err != nil {
+		t.Fatalf("verifyMCPBManifest() error = %v", err)
+	}
+
+	withConfig := strings.Replace(
+		document,
+		`"tools_generated": true,`,
+		`"tools_generated": true, "user_config": {},`,
+		1,
+	)
+	if err := verifyMCPBManifest([]byte(withConfig), "1.2.3"); err == nil {
+		t.Fatal("verifyMCPBManifest() accepted user configuration")
+	}
+
+	remote := strings.Replace(
+		document,
+		`"${__dirname}/server/launch.sh"`,
+		fmt.Sprintf("%q", "https://example.invalid/mcp"),
+		1,
+	)
+	if err := verifyMCPBManifest([]byte(remote), "1.2.3"); err == nil {
+		t.Fatal("verifyMCPBManifest() accepted a remote launcher")
 	}
 }

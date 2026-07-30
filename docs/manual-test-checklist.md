@@ -86,8 +86,9 @@ cosign verify-blob \
 ```
 
 Confirm the inventory matches [release engineering](releasing.md): archives,
-Linux packages, source archive, per-artifact SPDX/CycloneDX SBOMs, checksum
-manifest, and signature bundle. Stop on any missing, extra, or mismatched file.
+Linux packages, the platform-universal MCPB, source archive, per-artifact
+SPDX/CycloneDX SBOMs, checksum manifest, and signature bundle. Stop on any
+missing, extra, or mismatched file.
 
 ## 2. Launch the native artifact
 
