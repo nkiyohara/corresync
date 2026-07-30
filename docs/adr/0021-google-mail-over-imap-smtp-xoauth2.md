@@ -1,5 +1,8 @@
 # ADR 0021: Google mail over IMAP/SMTP XOAUTH2
 
+The generated Google Desktop client credential required during token exchange
+is amended by [ADR 0022](0022-google-desktop-client-credential.md).
+
 - Status: accepted
 - Date: 2026-07-30
 

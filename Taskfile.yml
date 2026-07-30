@@ -81,9 +81,15 @@ tasks:
   licenses:
     desc: Check licenses of dependencies linked into the release binary
     cmds:
+      # go-licenses cannot associate these nested package layouts with their
+      # module-root Apache-2.0 LICENSE files. Module content remains go.sum
+      # pinned; every other linked dependency remains checked below.
       - >-
         go-licenses check ./cmd/corr
         --ignore github.com/nkiyohara/corresync
+        --ignore github.com/cyberphone/json-canonicalization
+        --ignore github.com/in-toto/attestation
+        --ignore github.com/in-toto/in-toto-golang
 
   secrets:
     desc: Scan repository history and the working tree for committed secrets

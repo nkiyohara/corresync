@@ -128,7 +128,7 @@ func (manager *Manager) authorize(
 	}()
 	defer func() { _ = server.Close() }()
 
-	oauthConfig := oauthConfig(flowRoute, provider)
+	oauthConfig := oauthConfig(flowRoute, provider, manager.googleSecret)
 	options := []oauth2.AuthCodeOption{oauth2.S256ChallengeOption(verifier)}
 	for name, value := range provider.AuthParams {
 		options = append(options, oauth2.SetAuthURLParam(name, value))

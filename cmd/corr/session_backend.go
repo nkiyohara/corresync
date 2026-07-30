@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -203,6 +204,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		return nil, err
 	}
 	oauth, err := oauthlocal.New(oauthlocal.Options{
+		GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
 		BeforeOpen: func(provider oauthlocal.Provider) {
 			_, _ = fmt.Fprintf(
 				app.stderr,
@@ -2132,7 +2134,9 @@ func (backend *sessionBackend) googleAccount(
 	}
 	manager := backend.oauth
 	if manager == nil {
-		manager, err = oauthlocal.New(oauthlocal.Options{})
+		manager, err = oauthlocal.New(oauthlocal.Options{
+			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
+		})
 		if err != nil {
 			return sessionAccount{}, err
 		}
@@ -2297,7 +2301,9 @@ func (backend *sessionBackend) graphAPIAccount(
 	}
 	manager := backend.oauth
 	if manager == nil {
-		manager, err = oauthlocal.New(oauthlocal.Options{})
+		manager, err = oauthlocal.New(oauthlocal.Options{
+			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
+		})
 		if err != nil {
 			return sessionAccount{}, err
 		}

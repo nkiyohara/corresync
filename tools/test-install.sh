@@ -4,7 +4,9 @@ set -eu
 
 repository_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 installer="${repository_root}/site/install.sh"
-test_root=$(mktemp -d "${TMPDIR:-/tmp}/corresync-install-test.XXXXXX")
+test_root=$(CDPATH='' cd -- \
+  "$(mktemp -d "${TMPDIR:-/tmp}/corresync-install-test.XXXXXX")" &&
+  pwd -P)
 
 cleanup() {
   cleanup_status=$?
@@ -99,6 +101,40 @@ case "${url##*/}" in
 esac
 EOF
 chmod 0755 "$fake_bin/curl"
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  cat >"$fake_bin/uname" <<'EOF'
+#!/bin/sh
+case "${1:-}" in
+  -s) printf 'Linux\n' ;;
+  -m) printf 'x86_64\n' ;;
+  *) printf 'Linux\n' ;;
+esac
+EOF
+  cat >"$fake_bin/sha256sum" <<'EOF'
+#!/bin/sh
+exec /usr/bin/shasum -a 256 "$@"
+EOF
+  cat >"$fake_bin/timeout" <<'EOF'
+#!/bin/sh
+shift
+exec "$@"
+EOF
+  cat >"$fake_bin/stat" <<'EOF'
+#!/bin/sh
+[ "${1:-}" = "-c" ] || exit 2
+case "${2:-}" in
+  %u) exec /usr/bin/stat -f '%u' "$3" ;;
+  %a) exec /usr/bin/stat -f '%Lp' "$3" ;;
+  *) exit 2 ;;
+esac
+EOF
+  chmod 0755 \
+    "$fake_bin/uname" \
+    "$fake_bin/sha256sum" \
+    "$fake_bin/timeout" \
+    "$fake_bin/stat"
+fi
 
 run_installer() {
   case_root=$1

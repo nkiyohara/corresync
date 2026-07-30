@@ -216,8 +216,20 @@ selects an available ephemeral port for public-client registrations that permit
 native-app loopback ports; otherwise configure an explicitly registered port.
 Before a provider page can open, `corr auth login` prints the exact service-
 derived scope set. The flow validates state and grants belong to the OS keyring.
-There is no client-secret field and no automatic Google selection. Use only a
-client registration you are authorized to operate.
+There is no client-secret field and no automatic Google selection. Google's
+generated Desktop client may require its client credential during token
+exchange. Supply it only to the local Corresync process:
+
+```console
+CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET='generated-desktop-client-value' \
+  corr auth login --account personal
+```
+
+Do not commit that value, put it in TOML or a CLI flag, or expose it through
+MCP, logs, support output, or screen recordings. Corresync bounds the inherited
+value, sends it only to Google's fixed TLS token endpoint, and never stores it
+in the authorization URL or OS-keyring grant. Use only a client registration
+you are authorized to operate.
 
 The normal system browser owns Google sign-in. Mail then authenticates with a
 fresh access token over fixed `imap.gmail.com:993` implicit TLS and

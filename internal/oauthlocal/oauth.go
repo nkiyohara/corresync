@@ -26,6 +26,7 @@ import (
 const (
 	keyringService        = "corresync/oauth"
 	maximumGrantBytes     = 64 << 10
+	maximumClientSecret   = 4 << 10
 	authorizationTimeout  = 5 * time.Minute
 	defaultRequestTimeout = 30 * time.Second
 )
@@ -58,6 +59,7 @@ func ProviderFor(
 			TokenURL: "https://oauth2.googleapis.com/token",
 			AuthParams: map[string]string{
 				"access_type": "offline",
+				"hl":          "en",
 				"prompt":      "consent",
 			},
 		}
@@ -115,24 +117,30 @@ type browserOpener func(context.Context, string) error
 
 // Options supplies deterministic outer adapters for synthetic tests.
 type Options struct {
-	HTTP       *http.Client
-	Get        keyringGetter
-	Set        keyringSetter
-	Open       browserOpener
-	BeforeOpen func(Provider)
+	HTTP               *http.Client
+	Get                keyringGetter
+	Set                keyringSetter
+	Open               browserOpener
+	BeforeOpen         func(Provider)
+	GoogleClientSecret string
 }
 
 // Manager loads, refreshes, and explicitly creates account-scoped grants.
 type Manager struct {
-	http       *http.Client
-	get        keyringGetter
-	set        keyringSetter
-	open       browserOpener
-	beforeOpen func(Provider)
+	http         *http.Client
+	get          keyringGetter
+	set          keyringSetter
+	open         browserOpener
+	beforeOpen   func(Provider)
+	googleSecret string
 }
 
 // New creates a manager without touching the keyring or network.
 func New(options Options) (*Manager, error) {
+	if len(options.GoogleClientSecret) > maximumClientSecret ||
+		strings.ContainsAny(options.GoogleClientSecret, "\r\n\x00") {
+		return nil, errors.New("google OAuth desktop client credential is malformed")
+	}
 	client, err := secureHTTPClient(options.HTTP)
 	if err != nil {
 		return nil, err
@@ -151,7 +159,8 @@ func New(options Options) (*Manager, error) {
 	}
 	return &Manager{
 		http: client, get: get, set: set, open: open,
-		beforeOpen: options.BeforeOpen,
+		beforeOpen:   options.BeforeOpen,
+		googleSecret: options.GoogleClientSecret,
 	}, nil
 }
 
@@ -201,6 +210,11 @@ func (manager *Manager) Authorize(
 	route config.OAuthClient,
 	provider Provider,
 ) (Authorization, error) {
+	if provider.ID == domain.ProviderGoogle && manager.googleSecret == "" {
+		return nil, errors.New(
+			"google desktop OAuth requires CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET",
+		)
+	}
 	if route.Authorization.Backend != config.CredentialOSKeyring ||
 		!route.Authorization.Consent {
 		return nil, errors.New("OAuth authorization handle is not explicitly consented")
@@ -213,7 +227,7 @@ func (manager *Manager) Authorize(
 	if err != nil {
 		return nil, err
 	}
-	oauthConfig := oauthConfig(route, provider)
+	oauthConfig := oauthConfig(route, provider, manager.googleSecret)
 	// Authorization obeys the interactive login context above. The resulting
 	// token source must outlive that one RPC so later account-scoped requests
 	// can refresh without inheriting an already-cancelled context.
@@ -306,8 +320,12 @@ func hasScopes(granted, required []string) bool {
 	return true
 }
 
-func oauthConfig(route config.OAuthClient, provider Provider) oauth2.Config {
-	return oauth2.Config{
+func oauthConfig(
+	route config.OAuthClient,
+	provider Provider,
+	googleClientSecret string,
+) oauth2.Config {
+	result := oauth2.Config{
 		ClientID: route.ClientID, RedirectURL: route.RedirectURI,
 		Scopes: append([]string(nil), provider.Scopes...),
 		Endpoint: oauth2.Endpoint{
@@ -315,6 +333,10 @@ func oauthConfig(route config.OAuthClient, provider Provider) oauth2.Config {
 			AuthStyle: oauth2.AuthStyleInParams,
 		},
 	}
+	if provider.ID == domain.ProviderGoogle {
+		result.ClientSecret = googleClientSecret
+	}
+	return result
 }
 
 type persistingTokenSource struct {

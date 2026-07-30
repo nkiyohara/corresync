@@ -37,7 +37,7 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 			}
 			digest := sha256.Sum256([]byte(request.Form.Get("code_verifier")))
 			if request.Form.Get("client_id") != "synthetic-public-client" ||
-				request.Form.Get("client_secret") != "" ||
+				request.Form.Get("client_secret") != "synthetic-client-credential" ||
 				base64.RawURLEncoding.EncodeToString(digest[:]) != challenge {
 				t.Errorf("token form = %#v", request.Form)
 				http.Error(writer, "bad verifier", http.StatusBadRequest)
@@ -73,11 +73,13 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 		Scopes: []string{"mail.read", "calendar.write"},
 		AuthParams: map[string]string{
 			"access_type": "offline",
+			"hl":          "en",
 		},
 	}
 	openCalls := 0
 	manager, err := New(Options{
-		HTTP: baseClient,
+		HTTP:               baseClient,
+		GoogleClientSecret: "synthetic-client-credential",
 		Get: func(service, key string) (string, error) {
 			if service != keyringService || key != "synthetic-grant" {
 				t.Fatalf("keyring get = %q %q", service, key)
@@ -106,6 +108,7 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 				query.Get("client_id") != "synthetic-public-client" ||
 				query.Get("client_secret") != "" ||
 				query.Get("access_type") != "offline" ||
+				query.Get("hl") != "en" ||
 				!strings.Contains(query.Get("scope"), "mail.read") {
 				t.Fatalf("authorization query = %s", parsed.RawQuery)
 			}
@@ -226,6 +229,56 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	}
 	if openCalls != 2 {
 		t.Fatalf("expanded scopes did not start fresh explicit authorization: %d", openCalls)
+	}
+}
+
+func TestManagerRequiresBoundedGoogleDesktopClientCredential(t *testing.T) {
+	t.Parallel()
+
+	provider, err := ProviderFor(domain.ProviderGoogle, true, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := New(Options{
+		Get: func(string, string) (string, error) {
+			t.Fatal("missing Google client credential reached the keyring")
+			return "", nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = manager.Authorize(t.Context(), config.OAuthClient{}, provider)
+	if err == nil ||
+		!strings.Contains(err.Error(), "CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET") {
+		t.Fatalf("Authorize() error = %v", err)
+	}
+
+	_, err = New(Options{GoogleClientSecret: strings.Repeat("x", maximumClientSecret+1)})
+	if err == nil || !strings.Contains(err.Error(), "malformed") {
+		t.Fatalf("New() oversized credential error = %v", err)
+	}
+	for _, value := range []string{"line\rbreak", "line\nbreak", "nul\x00byte"} {
+		if _, malformedErr := New(Options{GoogleClientSecret: value}); malformedErr == nil ||
+			!strings.Contains(malformedErr.Error(), "malformed") {
+			t.Fatalf("New() credential %q error = %v", value, malformedErr)
+		}
+	}
+}
+
+func TestGoogleDesktopClientCredentialDoesNotCrossIntoGraph(t *testing.T) {
+	t.Parallel()
+
+	provider, err := ProviderFor(domain.ProviderMicrosoftGraph, true, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oauth := oauthConfig(config.OAuthClient{
+		ClientID:    "synthetic-graph-client",
+		RedirectURI: "http://127.0.0.1:0/oauth/callback",
+	}, provider, "synthetic-google-client-credential")
+	if oauth.ClientSecret != "" {
+		t.Fatal("Google desktop client credential crossed into Microsoft Graph")
 	}
 }
 

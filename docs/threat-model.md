@@ -36,6 +36,10 @@ gateway or tenant administration service.
 - Never accept or persist passwords, cookies, canaries, bearer tokens, OAuth
   authorization codes, access tokens, refresh tokens, or client secrets in
   config, CLI, MCP, audit, feedback, or logs.
+- A generated Google Desktop client credential may enter only through the
+  inherited `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` process environment. It is
+  bounded, excluded from browser URLs and stored grants, and sent only to
+  Google's fixed TLS token endpoint.
 - The Outlook Web route uses visible interactive sign-in. OAuth routes use
   Authorization Code with PKCE for an explicitly selected public client.
 - The Google route pins Gmail TLS endpoints, uses a fresh short-lived token for

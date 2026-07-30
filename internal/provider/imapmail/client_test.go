@@ -667,6 +667,22 @@ func TestIMAPCollectorsDrainHostileExcessResponses(t *testing.T) {
 	}
 }
 
+func TestMailboxSelectableRejectsNoSelectContainers(t *testing.T) {
+	t.Parallel()
+	if mailboxSelectable(nil) {
+		t.Fatal("mailboxSelectable(nil) = true")
+	}
+	if mailboxSelectable(&imap.MailboxInfo{
+		Name:       "[Gmail]",
+		Attributes: []string{imap.NoSelectAttr},
+	}) {
+		t.Fatal("mailboxSelectable() accepted a noselect container")
+	}
+	if !mailboxSelectable(&imap.MailboxInfo{Name: imap.InboxName}) {
+		t.Fatal("mailboxSelectable() rejected a selectable mailbox")
+	}
+}
+
 func TestParseMIMEKeepsAttachmentsBoundedAndAddressable(t *testing.T) {
 	t.Parallel()
 	raw := "From: sender@example.invalid\r\n" +

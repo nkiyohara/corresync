@@ -53,6 +53,11 @@ XOAUTH2 over `imap.gmail.com:993` and `smtp.gmail.com:587`. Google Calendar and
 Google Meet use the Calendar API with the same grant. No Gmail password, app
 password, cookie, or Gmail REST transport is accepted.
 
+Google's generated Desktop client may require its client credential at the
+token endpoint. Provide `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` only in the
+local Corresync process environment. It is never a config, CLI, MCP, grant, or
+browser-URL field.
+
 Google Workspace administrators can restrict third-party OAuth, IMAP, and
 Calendar API access. A rejected or unapproved route fails clearly and never
 falls through to a password or another provider.
@@ -73,8 +78,10 @@ loopback path and actual bound port. Configured port `0` requests an available
 ephemeral port. The same in-product notice links the public
 [Privacy Policy](https://corresync.org/privacy.html) and
 [Terms of Use](https://corresync.org/terms.html) before any
-provider page can open. Corresync never accepts a client secret, device-code
-unattended flow, password grant, or broad tenant credential.
+provider page can open. Corresync does not support a generic confidential
+client, device-code unattended flow, password grant, or broad tenant
+credential. The bounded Google Desktop client credential above is the sole
+provider-specific exception; Microsoft Graph remains secret-free.
 
 The resulting grant is stored by the operating-system keyring under the
 configured local reference. The TOML contains only that reference and the

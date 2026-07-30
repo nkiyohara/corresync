@@ -95,10 +95,12 @@ The session owner creates all authenticated provider clients:
 - Graph: interactive OAuth browser plus grant in OS keyring;
 - JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference.
 
-No application transport accepts a password. OAuth client secrets, unattended
-grants, TLS interception, and raw authorization injection are unrepresentable.
-The daemon closes secret-owning clients on logout and clears owned mutable
-secret bytes.
+No application transport accepts a password. Client-secret configuration,
+unattended grants, TLS interception, and raw authorization injection are
+unrepresentable. A generated Google Desktop client credential may enter only
+through the daemon's inherited process environment under ADR 0022; it is absent
+from configuration, browser URLs, grants, CLI/MCP input, and logs. The daemon
+closes secret-owning clients on logout and clears owned mutable secret bytes.
 
 ## Local IPC
 
