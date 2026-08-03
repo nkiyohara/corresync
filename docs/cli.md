@@ -449,12 +449,11 @@ replaced without retrying an application operation.
 
 On Unix, every process derives the same endpoint regardless of
 `XDG_RUNTIME_DIR` or `TMPDIR`. v0.8.6 can authentically drain one owner left at
-an older runtime location. If it reports multiple runtime locations, first
-close or restart the MCP clients that launched them, then use `pgrep -af
-'corr .* daemon serve'` to identify only this user's Corresync owners for the
-displayed config. Terminate those exact processes normally and retry. Do not
-delete or copy the IPC token file; Corresync deliberately refuses to guess
-between owners after their credentials have diverged.
+an older runtime location. If an installation already has multiple owners at
+old runtime locations, `corr daemon stop` pins each protected same-user
+endpoint, sends normal termination to those exact processes, and waits for all
+owners to exit. It never guesses between their diverged credentials, scans
+unrelated processes, or deletes and copies an IPC token.
 
 ## MCP
 

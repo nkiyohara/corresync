@@ -164,6 +164,25 @@ func TestUpdateDirectInstallProducesStableJSON(t *testing.T) {
 	}
 }
 
+func TestUpdateMessageExplainsLegacyDuplicateRecovery(t *testing.T) {
+	var stdout bytes.Buffer
+	app := updateTestRuntime(t, &stdout, updatecheck.Result{})
+	view := newUpdateView(app, &stdout, false)
+	if err := view.writeAction(updateActionReport{
+		Status:          string(updatecheck.InstallStatusUpdated),
+		PreviousVersion: "0.8.5",
+		CurrentVersion:  "0.8.6-rc.3",
+		Channel:         updatecheck.ChannelPreview,
+		BackupPath:      "/synthetic/corr.backup-0.8.5",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "corr daemon stop") ||
+		!strings.Contains(stdout.String(), "doctor reports duplicates") {
+		t.Fatalf("update recovery guidance = %q", stdout.String())
+	}
+}
+
 func TestUpdateRepairsMissingPrimaryCommand(t *testing.T) {
 	var stdout bytes.Buffer
 	app := updateTestRuntime(t, &stdout, updatecheck.Result{})

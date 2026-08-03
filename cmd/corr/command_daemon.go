@@ -42,6 +42,11 @@ type daemonStopCommand struct {
 	JSON bool `help:"Write machine-readable JSON."`
 }
 
+type daemonStopResult struct {
+	Stopping bool `json:"stopping"`
+	Owners   int  `json:"owners,omitempty"`
+}
+
 func (command *daemonStartCommand) Run(app *runtime) (returnErr error) {
 	client, status, err := app.openDaemon(app.context)
 	if err != nil {
@@ -149,6 +154,13 @@ func (command *daemonStopCommand) Run(app *runtime) (returnErr error) {
 	if err != nil {
 		return err
 	}
+	active, err := app.activeDaemonEndpoints(configPath)
+	if err != nil {
+		return err
+	}
+	if len(active) > 1 {
+		return command.stopSplitOwners(app, active)
+	}
 	endpoint, err := app.daemonControlEndpoint(configPath)
 	if err != nil {
 		return err
@@ -163,9 +175,7 @@ func (command *daemonStopCommand) Run(app *runtime) (returnErr error) {
 	if err := client.Shutdown(ctx, app.caller()); err != nil {
 		return fmt.Errorf("stop session owner: %w", err)
 	}
-	result := struct {
-		Stopping bool `json:"stopping"`
-	}{Stopping: true}
+	result := daemonStopResult{Stopping: true, Owners: 1}
 	if command.JSON {
 		return writeJSON(app.stdout, result)
 	}
@@ -176,6 +186,89 @@ func (command *daemonStopCommand) Run(app *runtime) (returnErr error) {
 		view.strong("Corresync session owner is stopping"),
 	)
 	return err
+}
+
+func (command *daemonStopCommand) stopSplitOwners(
+	app *runtime,
+	endpoints []localipc.Endpoint,
+) error {
+	ctx, cancel := context.WithTimeout(app.context, daemonReplacementTimeout)
+	defer cancel()
+
+	var failures []error
+	for index, endpoint := range endpoints {
+		processID, err := app.stopEndpointOwner(ctx, endpoint)
+		if err != nil {
+			failures = append(failures, fmt.Errorf(
+				"stop duplicate session owner %d of %d: %w",
+				index+1,
+				len(endpoints),
+				err,
+			))
+			continue
+		}
+		if processID < 2 {
+			failures = append(failures, fmt.Errorf(
+				"stop duplicate session owner %d of %d: unsafe process ID",
+				index+1,
+				len(endpoints),
+			))
+		}
+	}
+	if err := waitForEndpointsInactive(ctx, endpoints); err != nil {
+		failures = append(failures, err)
+	}
+	if err := errors.Join(failures...); err != nil {
+		return err
+	}
+
+	result := daemonStopResult{Stopping: false, Owners: len(endpoints)}
+	if command.JSON {
+		return writeJSON(app.stdout, result)
+	}
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err := view.printf(
+		"%s  %s\n   %s\n",
+		view.success(),
+		view.strong(fmt.Sprintf(
+			"Corresync stopped %d duplicate session owners",
+			len(endpoints),
+		)),
+		view.muted("The next provider command will start one current session owner."),
+	)
+	return err
+}
+
+func waitForEndpointsInactive(
+	ctx context.Context,
+	endpoints []localipc.Endpoint,
+) error {
+	ticker := time.NewTicker(daemonPollInterval)
+	defer ticker.Stop()
+	for {
+		remaining := 0
+		for _, endpoint := range endpoints {
+			active, err := localipc.EndpointActive(endpoint)
+			if err != nil {
+				return fmt.Errorf("confirm duplicate session owner stopped: %w", err)
+			}
+			if active {
+				remaining++
+			}
+		}
+		if remaining == 0 {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf(
+				"%d duplicate session owner(s) did not stop: %w",
+				remaining,
+				ctx.Err(),
+			)
+		case <-ticker.C:
+		}
+	}
 }
 
 func waitForDaemon(parent context.Context, app *runtime, client *daemonapi.Client, timeout time.Duration) (daemonapi.Status, error) {

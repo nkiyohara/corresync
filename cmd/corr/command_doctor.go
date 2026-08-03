@@ -277,7 +277,20 @@ func (command *doctorCommand) addDaemonStatus(
 	configPath string,
 	report *doctorReport,
 ) {
-	endpoint, err := app.endpoint(configPath)
+	active, err := app.activeDaemonEndpoints(configPath)
+	if err != nil {
+		report.add("daemon", "fail", doctorError(err))
+		return
+	}
+	if len(active) > 1 {
+		report.add(
+			"daemon",
+			"fail",
+			"multiple session owners use legacy runtime locations; run `corr daemon stop` once",
+		)
+		return
+	}
+	endpoint, err := app.daemonControlEndpoint(configPath)
 	if err != nil {
 		report.add("daemon", "fail", doctorError(err))
 		return

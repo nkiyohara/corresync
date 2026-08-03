@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/buildinfo"
@@ -191,6 +192,64 @@ func TestDoctorOfflineRejectsIncompatibleRunningDaemon(t *testing.T) {
 			t.Fatalf("doctor report lacks a daemon failure: %+v", report.Checks)
 		})
 	}
+}
+
+func TestDoctorReportsSplitOwnersWithRunnableRecovery(t *testing.T) {
+	root := t.TempDir()
+	executable := filepath.Join(root, "chromium")
+	// #nosec G306 -- the owner-only test fixture must be executable.
+	if err := os.WriteFile(executable, []byte("synthetic executable"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	configuration := config.OutlookDefault()
+	configuration.Browser.Executable = executable
+	configPath := filepath.Join(root, "config.toml")
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+	configDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDirectory := filepath.Join(root, "state")
+	current, err := localipc.ResolveInState(configPath, stateDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := previousRuntimeTestEndpoint(t, configPath, stateDirectory)
+	oldOwner := startLifecycleTestDaemon(
+		t.Context(), t, previous, daemonapi.ProtocolVersion, "0.8.3", 123, configDigest,
+	)
+	t.Cleanup(oldOwner.stop)
+	canonicalOwner := startLifecycleTestDaemon(
+		t.Context(), t, current, daemonapi.ProtocolVersion, "0.8.3", 456, configDigest,
+	)
+	t.Cleanup(canonicalOwner.stop)
+
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), configPath, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	app.endpoint = func(string) (localipc.Endpoint, error) { return current, nil }
+	app.previousEndpoints = func(string) ([]localipc.Endpoint, error) {
+		return []localipc.Endpoint{previous}, nil
+	}
+	if err := (&doctorCommand{JSON: true}).Run(app); err == nil {
+		t.Fatal("doctor unexpectedly accepted split session owners")
+	}
+	var report doctorReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	for _, check := range report.Checks {
+		if check.Name == "daemon" {
+			if check.Status != "fail" ||
+				!strings.Contains(check.Detail, "multiple session owners") ||
+				!strings.Contains(check.Detail, "corr daemon stop") {
+				t.Fatalf("daemon check = %+v", check)
+			}
+			return
+		}
+	}
+	t.Fatalf("doctor report lacks daemon check: %+v", report.Checks)
 }
 
 func TestDoctorReportsInvalidConfigBeforeOnlineWork(t *testing.T) {

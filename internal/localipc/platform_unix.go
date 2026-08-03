@@ -170,6 +170,7 @@ func Listen(endpoint Endpoint) (*Listener, error) {
 	}
 	verified := &sameUserListener{UnixListener: base, uid: effectiveUID}
 	cleanup := func() error {
+		// #nosec G703 -- Address is derived below a pinned, owner-only runtime directory.
 		removeErr := os.Remove(endpoint.Address)
 		if errors.Is(removeErr, os.ErrNotExist) {
 			removeErr = nil

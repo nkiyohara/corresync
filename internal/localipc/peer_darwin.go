@@ -31,3 +31,23 @@ func peerUID(connection *net.UnixConn) (uint32, error) {
 	}
 	return uid, nil
 }
+
+func peerProcessID(connection *net.UnixConn) (int, error) {
+	raw, err := connection.SyscallConn()
+	if err != nil {
+		return 0, err
+	}
+	var processID int
+	var controlErr error
+	if err := raw.Control(func(fd uintptr) {
+		processID, controlErr = unix.GetsockoptInt(
+			int(fd), unix.SOL_LOCAL, unix.LOCAL_PEERPID,
+		)
+	}); err != nil {
+		return 0, err
+	}
+	if controlErr != nil {
+		return 0, fmt.Errorf("read local IPC peer process: %w", controlErr)
+	}
+	return processID, nil
+}
