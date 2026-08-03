@@ -5,6 +5,15 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.5-rc.2 - 2026-08-03
+
+### Terminal Outlook login
+
+- Wait for the initial terminal login page to become interactive instead of
+  requiring a manual refresh after the browser starts.
+- Follow form submissions through transient disabled controls and Microsoft
+  sign-in progress pages until the next bounded interactive view is stable.
+
 ## 0.8.5-rc.1 - 2026-08-03
 
 ### Release channels
