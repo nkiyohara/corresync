@@ -56,6 +56,13 @@ func (*daemonServeCommand) Run(app *runtime) (returnErr error) {
 	if err != nil {
 		return err
 	}
+	configDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		return err
+	}
+	if err := app.migratePreviousDaemon(app.context, configPath, configDigest); err != nil {
+		return err
+	}
 	endpoint, err := app.endpoint(configPath)
 	if err != nil {
 		return err
@@ -66,10 +73,6 @@ func (*daemonServeCommand) Run(app *runtime) (returnErr error) {
 	}
 	defer func() { returnErr = errors.Join(returnErr, listener.Close()) }()
 
-	configDigest, err := config.Fingerprint(configPath)
-	if err != nil {
-		return err
-	}
 	backend, err := newSessionBackend(app)
 	if err != nil {
 		return err
@@ -123,7 +126,7 @@ func (command *daemonStatusCommand) Run(app *runtime) (returnErr error) {
 	if err != nil {
 		return err
 	}
-	endpoint, err := app.endpoint(configPath)
+	endpoint, err := app.daemonControlEndpoint(configPath)
 	if err != nil {
 		return err
 	}
@@ -146,7 +149,7 @@ func (command *daemonStopCommand) Run(app *runtime) (returnErr error) {
 	if err != nil {
 		return err
 	}
-	endpoint, err := app.endpoint(configPath)
+	endpoint, err := app.daemonControlEndpoint(configPath)
 	if err != nil {
 		return err
 	}

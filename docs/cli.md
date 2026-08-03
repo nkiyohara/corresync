@@ -427,6 +427,15 @@ sessions and exposes authenticated local IPC only—never TCP. A config digest
 change requires an explicit stop. A compatible old binary can be drained and
 replaced without retrying an application operation.
 
+On Unix, every process derives the same endpoint regardless of
+`XDG_RUNTIME_DIR` or `TMPDIR`. v0.8.6 can authentically drain one owner left at
+an older runtime location. If it reports multiple runtime locations, first
+close or restart the MCP clients that launched them, then use `pgrep -af
+'corr .* daemon serve'` to identify only this user's Corresync owners for the
+displayed config. Terminate those exact processes normally and retry. Do not
+delete or copy the IPC token file; Corresync deliberately refuses to guess
+between owners after their credentials have diverged.
+
 ## MCP
 
 ```console

@@ -150,17 +150,21 @@ retained.
 
 The daemon exposes no TCP port. MCP uses stdio. On Unix:
 
-1. a suitable private `XDG_RUNTIME_DIR` is preferred;
-2. otherwise a current-user-specific private temporary directory is used;
-3. the listener owns an owner-only singleton lock and Unix socket;
-4. before any bearer is sent, the client opens the runtime directory without
+1. every shell, MCP host, and desktop launcher derives the same short
+   current-user-specific directory under `/tmp`, independent of
+   `XDG_RUNTIME_DIR` and `TMPDIR`;
+2. the listener owns an owner-only singleton lock and Unix socket;
+3. before any bearer is sent, the client opens the runtime directory without
    following symlinks, validates type/owner/mode, pins directory and socket
    identities, validates the active singleton lock, connects, verifies peer
    UID, and rechecks the pinned identities;
-5. symlinks, regular files, FIFOs, wrong ownership, permissive directories,
+4. symlinks, regular files, FIFOs, wrong ownership, permissive directories,
    socket squatting, and connection-time replacement fail closed.
 
-The legacy migration client uses the same authenticated connection path.
+One authenticated owner left at a v0.8.5-and-earlier runtime location is
+drained before the canonical owner starts. Multiple active runtime locations
+are reported as a split owner and neither is stopped automatically. The v0.6
+legacy migration client uses the same authenticated connection path.
 Windows named pipes reject remote clients. Before any bearer is sent, the
 client verifies the pipe owner, protected non-null DACL, server process ID, and
 server process SID against the current user; the credential file receives the

@@ -249,9 +249,11 @@ authenticated local IPC and starts it when absent.
 
 On Unix, the client validates and pins the private runtime directory, active
 singleton lock, socket type/owner/mode/identity, and peer UID before any local
-bearer can be transmitted. Socket replacement fails closed. The daemon then
-enforces the bearer, caller identity, protocol version, config digest, request
-size, concurrency, and effect policy.
+bearer can be transmitted. CLI and MCP processes derive the same endpoint even
+when their `XDG_RUNTIME_DIR` or `TMPDIR` values differ. Socket replacement and
+multiple active legacy runtime locations fail closed. The daemon then enforces
+the bearer, caller identity, protocol version, config digest, request size,
+concurrency, and effect policy.
 
 ## Troubleshooting
 

@@ -3,6 +3,21 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.6-rc.1 - 2026-08-03
+
+### Session owner reliability
+
+- Derive the Unix session-owner socket and singleton lock from only the current
+  user and config/state namespace, so shells and MCP hosts cannot start two
+  owners merely because `XDG_RUNTIME_DIR` or `TMPDIR` differs.
+- Authentically drain one owner left at a v0.8.5-and-earlier runtime location
+  before moving it to the canonical endpoint. Detect an already split runtime
+  before reading or rotating another credential and refuse to guess which
+  owner is authoritative.
+- Keep settings and daemon lifecycle guidance out of the former
+  `daemon authorization failed` loop, while preserving fail-closed bearer,
+  peer-identity, config-digest, and exact-generation checks.
+
 ## 0.8.5 - 2026-08-03
 
 ### Settings experience

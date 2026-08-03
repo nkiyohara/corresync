@@ -63,6 +63,7 @@ type runtime struct {
 	stderr            io.Writer
 	launch            browserLauncher
 	endpoint          func(string) (localipc.Endpoint, error)
+	previousEndpoints func(string) ([]localipc.Endpoint, error)
 	startDaemon       func(context.Context, string) error
 	runCommand        commandRunner
 	runInputCommand   inputCommandRunner
@@ -96,8 +97,9 @@ func newRuntime(
 		launch: func(ctx context.Context, options browser.Options) (browserHandle, error) {
 			return browser.Launch(ctx, options)
 		},
-		endpoint:    localipc.Resolve,
-		startDaemon: startDetachedDaemon,
+		endpoint:          localipc.Resolve,
+		previousEndpoints: localipc.ResolvePrevious,
+		startDaemon:       startDetachedDaemon,
 		runCommand: func(ctx context.Context, stdout, stderr io.Writer, name string, args ...string) error {
 			// #nosec G204 -- name and args come from typed setup plans or the
 			// user's explicit editor selection.
@@ -260,6 +262,15 @@ func (app *runtime) requireDaemonStopped() error {
 	if err != nil {
 		return err
 	}
+	previous, err := app.activePreviousEndpoints(path)
+	if err != nil {
+		return err
+	}
+	if len(previous) > 0 {
+		return errors.New(
+			"account changes require every session owner to be stopped; run `corr daemon stop`",
+		)
+	}
 	endpoint, err := app.endpoint(path)
 	if err != nil {
 		return err
@@ -323,6 +334,9 @@ func (app *runtime) openDaemonWithOptions(
 	}
 	configDigest, err := config.Fingerprint(configPath)
 	if err != nil {
+		return nil, daemonapi.Status{}, err
+	}
+	if err := app.migratePreviousDaemon(ctx, configPath, configDigest); err != nil {
 		return nil, daemonapi.Status{}, err
 	}
 	endpoint, err := app.endpoint(configPath)

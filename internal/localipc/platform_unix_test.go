@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -55,24 +56,93 @@ func TestPlatformEndpointKeepsShortTemporaryDirectory(t *testing.T) {
 	}
 }
 
-func TestPlatformEndpointPrefersSuitableXDGRuntimeDirectory(t *testing.T) {
-	runtimeBase := shortTemporaryDirectory(t, "corresync-xdg-")
-	if err := os.Chmod(runtimeBase, 0o700); err != nil { // #nosec G302 -- testing a private directory.
-		t.Fatalf("Chmod() error = %v", err)
-	}
-	t.Setenv("XDG_RUNTIME_DIR", runtimeBase)
+func TestPlatformEndpointIsIndependentOfRuntimeEnvironment(t *testing.T) {
+	firstXDG := shortTemporaryDirectory(t, "corresync-xdg-first-")
+	firstTemp := shortTemporaryDirectory(t, "corresync-tmp-first-")
+	t.Setenv("XDG_RUNTIME_DIR", firstXDG)
+	t.Setenv("TMPDIR", firstTemp)
 
 	id := strings.Repeat("c", 32)
-	address, runtimeDirectory, lockPath, err := platformEndpoint(id, "corresync")
+	firstAddress, firstDirectory, firstLock, err := platformEndpoint(id, "corresync")
 	if err != nil {
-		t.Fatalf("platformEndpoint() error = %v", err)
+		t.Fatalf("platformEndpoint(first) error = %v", err)
+	}
+
+	secondXDG := shortTemporaryDirectory(t, "corresync-xdg-second-")
+	secondTemp := shortTemporaryDirectory(t, "corresync-tmp-second-")
+	t.Setenv("XDG_RUNTIME_DIR", secondXDG)
+	t.Setenv("TMPDIR", secondTemp)
+	secondAddress, secondDirectory, secondLock, err := platformEndpoint(id, "corresync")
+	if err != nil {
+		t.Fatalf("platformEndpoint(second) error = %v", err)
+	}
+
+	if firstAddress != secondAddress ||
+		firstDirectory != secondDirectory ||
+		firstLock != secondLock {
+		t.Fatalf(
+			"runtime environment split one namespace: first=(%q, %q, %q) second=(%q, %q, %q)",
+			firstAddress,
+			firstDirectory,
+			firstLock,
+			secondAddress,
+			secondDirectory,
+			secondLock,
+		)
+	}
+	if firstDirectory != filepath.Join(fallbackUnixTempDir, "corresync-"+strconv.Itoa(os.Geteuid())) {
+		t.Fatalf("canonical runtime directory = %q", firstDirectory)
+	}
+}
+
+func TestPreviousEndpointRetainsV085XDGRuntimeLocation(t *testing.T) {
+	runtimeBase := shortTemporaryDirectory(t, "corresync-previous-xdg-")
+	t.Setenv("XDG_RUNTIME_DIR", runtimeBase)
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	stateDirectory := filepath.Join(t.TempDir(), "state")
+	current, err := ResolveInState(configPath, stateDirectory)
+	if err != nil {
+		t.Fatalf("ResolveInState() error = %v", err)
+	}
+	previous, err := ResolvePreviousInState(configPath, stateDirectory)
+	if err != nil {
+		t.Fatalf("ResolvePreviousInState() error = %v", err)
 	}
 	wantDirectory := filepath.Join(runtimeBase, "corresync")
+	found := false
+	for _, endpoint := range previous {
+		if endpoint.Address == current.Address {
+			t.Fatalf("previous endpoints included canonical address %q", current.Address)
+		}
+		if endpoint.runtimeDir == wantDirectory {
+			found = true
+			if endpoint.CredentialPath != current.CredentialPath ||
+				endpoint.ID != current.ID {
+				t.Fatalf("previous endpoint changed namespace: %+v current=%+v", endpoint, current)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("previous endpoints = %+v, want runtime directory %q", previous, wantDirectory)
+	}
+}
+
+func TestLegacyPlatformEndpointRetainsXDGRuntimeLocation(t *testing.T) {
+	runtimeBase := shortTemporaryDirectory(t, "owa-legacy-xdg-")
+	t.Setenv("XDG_RUNTIME_DIR", runtimeBase)
+	address, runtimeDirectory, lockPath, err := legacyPlatformEndpoint(
+		strings.Repeat("d", 32),
+		"owa-bridge",
+	)
+	if err != nil {
+		t.Fatalf("legacyPlatformEndpoint() error = %v", err)
+	}
+	wantDirectory := filepath.Join(runtimeBase, "owa-bridge")
 	if runtimeDirectory != wantDirectory ||
-		address != filepath.Join(wantDirectory, id+".sock") ||
-		lockPath != filepath.Join(wantDirectory, id+".lock") {
+		address != filepath.Join(wantDirectory, strings.Repeat("d", 32)+".sock") ||
+		lockPath != filepath.Join(wantDirectory, strings.Repeat("d", 32)+".lock") {
 		t.Fatalf(
-			"platformEndpoint() = %q, %q, %q; want XDG runtime %q",
+			"legacy endpoint = (%q, %q, %q), want directory %q",
 			address,
 			runtimeDirectory,
 			lockPath,
@@ -81,19 +151,27 @@ func TestPlatformEndpointPrefersSuitableXDGRuntimeDirectory(t *testing.T) {
 	}
 }
 
-func TestPlatformEndpointRejectsPermissiveXDGRuntimeDirectory(t *testing.T) {
-	runtimeBase := shortTemporaryDirectory(t, "corresync-xdg-")
-	if err := os.Chmod(runtimeBase, 0o755); err != nil { // #nosec G302 -- testing rejection.
-		t.Fatalf("Chmod() error = %v", err)
+func TestEndpointActiveRequiresHeldSingleton(t *testing.T) {
+	directory := privateRuntimeDirectory(t)
+	endpoint := endpointForDirectory(directory)
+	active, err := EndpointActive(endpoint)
+	if err != nil || active {
+		t.Fatalf("EndpointActive(absent) = %t, %v", active, err)
 	}
-	t.Setenv("XDG_RUNTIME_DIR", runtimeBase)
-
-	_, runtimeDirectory, _, err := platformEndpoint(strings.Repeat("d", 32), "corresync")
+	listener, err := Listen(endpoint)
 	if err != nil {
-		t.Fatalf("platformEndpoint() error = %v", err)
+		t.Fatalf("Listen() error = %v", err)
 	}
-	if strings.HasPrefix(runtimeDirectory, runtimeBase+string(filepath.Separator)) {
-		t.Fatalf("platformEndpoint() trusted permissive runtime base %q", runtimeBase)
+	active, err = EndpointActive(endpoint)
+	if err != nil || !active {
+		t.Fatalf("EndpointActive(listening) = %t, %v", active, err)
+	}
+	if err := listener.Close(); err != nil {
+		t.Fatalf("listener.Close() error = %v", err)
+	}
+	active, err = EndpointActive(endpoint)
+	if err != nil || active {
+		t.Fatalf("EndpointActive(closed) = %t, %v", active, err)
 	}
 }
 

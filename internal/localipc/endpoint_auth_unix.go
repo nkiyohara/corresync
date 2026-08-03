@@ -184,7 +184,7 @@ func requireHeldLock(fd int) error {
 	if err == nil {
 		unlockErr := unix.Flock(fd, unix.LOCK_UN)
 		return errors.Join(
-			errors.New("IPC singleton lock is not held by an active owner"),
+			errNoActiveOwner,
 			unlockErr,
 		)
 	}
