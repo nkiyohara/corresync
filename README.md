@@ -158,7 +158,13 @@ update exists, Corresync shows the exact command for your installation:
 WinGet command. Package-managed files are never changed by Corresync.
 
 Stable releases are selected by default. Standalone users who want signed
-release candidates can opt into the preview channel with copy-paste commands:
+release candidates can choose the preview channel interactively:
+
+```console
+corr settings
+```
+
+The equivalent copy-paste commands for scripts are:
 
 ```console
 corr config set updates.channel preview
@@ -186,6 +192,14 @@ corr setup you@example.com --alias personal
 corr auth login --account personal
 corr mail folders --account personal
 corr calendar folders --account personal
+```
+
+Run `corr settings` later to rename an account, choose the default account,
+or change everyday update, safety, and login-timeout settings without editing
+TOML or remembering configuration keys. The direct rename form remains:
+
+```console
+corr account rename personal work
 ```
 
 `setup` creates a provider-neutral, secret-free local configuration when

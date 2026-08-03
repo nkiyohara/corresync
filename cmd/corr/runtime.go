@@ -72,6 +72,7 @@ type runtime struct {
 	installUpdate     func(context.Context, func(updatecheck.InstallProgress)) (updatecheck.InstallResult, error)
 	installMethod     func() updatecheck.InstallMethod
 	interactiveOutput func() bool
+	interactiveInput  func() bool
 	interactiveStdout func() bool
 	lookupEnv         func(string) (string, bool)
 	accountDiscoverer application.AccountDiscoverer
@@ -193,6 +194,7 @@ func newRuntime(
 		return updatecheck.DetectInstallation(executable)
 	}
 	app.interactiveOutput = func() bool { return outputIsTerminal(app.stderr) }
+	app.interactiveInput = func() bool { return inputIsTerminal(app.stdin) }
 	app.interactiveStdout = func() bool { return outputIsTerminal(app.stdout) }
 	return app
 }

@@ -54,6 +54,10 @@ catalogs, and promotion to a final release remains an ordinary higher SemVer
 selection.
 
 GitHub's recent-release endpoint is larger than the stable latest-release
-endpoint, so preview metadata remains size-bounded, cached for 24 hours, and
-limited to a fixed page. Preview is a testing channel, not a nightly channel;
-arbitrary branch builds and unsigned development artifacts remain ineligible.
+endpoint, so preview discovery reads at most four fixed pages of five releases.
+Each page is independently size-bounded and the result remains capped at the
+same 20 recent releases and cached for 24 hours. This avoids making one JSON
+response grow with every SBOM-bearing release while retaining deterministic
+SemVer selection across the bounded window. Preview is a testing channel, not
+a nightly channel; arbitrary branch builds and unsigned development artifacts
+remain ineligible.

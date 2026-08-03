@@ -24,11 +24,13 @@ const (
 	DefaultEndpoint = "https://api.github.com/repos/nkiyohara/corresync/releases/latest"
 	// DefaultPreviewEndpoint returns recent published releases so the highest
 	// stable or prerelease semantic version can be selected deterministically.
-	DefaultPreviewEndpoint = "https://api.github.com/repos/nkiyohara/corresync/releases?per_page=20"
+	// Preview discovery fetches at most four independently bounded pages.
+	DefaultPreviewEndpoint = "https://api.github.com/repos/nkiyohara/corresync/releases?per_page=5"
 	cacheFormat            = 2
 	cacheLifetime          = 24 * time.Hour
 	maximumBody            = 1 << 20
 	maximumCache           = 8 << 10
+	maximumPreviewReleases = 20
 )
 
 // Channel selects a signed public release stream.
@@ -220,30 +222,13 @@ func (checker Checker) fetchLatest(ctx context.Context) (string, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return "", fmt.Errorf("create release request: %w", err)
-	}
-	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	request.Header.Set("User-Agent", "corresync/"+checker.CurrentVersion)
-	response, err := client.Do(request)
-	if err != nil {
-		return "", fmt.Errorf("fetch release metadata: %w", err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maximumBody))
-		return "", fmt.Errorf("release endpoint returned HTTP %d", response.StatusCode)
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, maximumBody+1))
-	if err != nil {
-		return "", fmt.Errorf("read release metadata: %w", err)
-	}
-	if len(data) > maximumBody {
-		return "", errors.New("release metadata exceeds size limit")
-	}
 	if channel == ChannelStable {
+		data, err := fetchReleaseMetadata(
+			ctx, client, endpoint, checker.CurrentVersion, checker.Endpoint == "",
+		)
+		if err != nil {
+			return "", err
+		}
 		var release releaseResponse
 		decoder := json.NewDecoder(bytes.NewReader(data))
 		if err := decoder.Decode(&release); err != nil {
@@ -255,16 +240,110 @@ func (checker Checker) fetchLatest(ctx context.Context) (string, error) {
 		}
 		return latest.String(), nil
 	}
-	var releases []releaseResponse
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	if err := decoder.Decode(&releases); err != nil {
-		return "", fmt.Errorf("decode preview release metadata: %w", err)
+	pageEndpoints, pageSize, err := previewMetadataEndpoints(endpoint)
+	if err != nil {
+		return "", err
 	}
-	latest, ok := selectLatestRelease(releases, channel)
-	if !ok {
+	var latest semanticVersion
+	found := false
+	for _, pageEndpoint := range pageEndpoints {
+		data, fetchErr := fetchReleaseMetadata(
+			ctx, client, pageEndpoint, checker.CurrentVersion, checker.Endpoint == "",
+		)
+		if fetchErr != nil {
+			return "", fetchErr
+		}
+		var releases []releaseResponse
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		if decodeErr := decoder.Decode(&releases); decodeErr != nil {
+			return "", fmt.Errorf("decode preview release metadata: %w", decodeErr)
+		}
+		candidate, ok := selectLatestRelease(releases, channel)
+		if ok && (!found || candidate.Compare(latest) > 0) {
+			latest = candidate
+			found = true
+		}
+		if pageSize == 0 || len(releases) < pageSize {
+			break
+		}
+	}
+	if !found {
 		return "", errors.New("no eligible preview release was found")
 	}
 	return latest.String(), nil
+}
+
+func previewMetadataEndpoints(endpoint string) ([]string, int, error) {
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, 0, fmt.Errorf("parse preview release endpoint: %w", err)
+	}
+	pageSizeText := parsed.Query().Get("per_page")
+	if pageSizeText == "" {
+		return []string{endpoint}, 0, nil
+	}
+	pageSize, err := strconv.Atoi(pageSizeText)
+	if err != nil || pageSize < 1 || pageSize > maximumPreviewReleases {
+		return nil, 0, errors.New("preview release endpoint has an invalid per_page value")
+	}
+	pageCount := (maximumPreviewReleases + pageSize - 1) / pageSize
+	endpoints := make([]string, 0, pageCount)
+	for page := 1; page <= pageCount; page++ {
+		candidate := *parsed
+		query := candidate.Query()
+		query.Set("page", strconv.Itoa(page))
+		candidate.RawQuery = query.Encode()
+		endpoints = append(endpoints, candidate.String())
+	}
+	return endpoints, pageSize, nil
+}
+
+func fetchReleaseMetadata(
+	ctx context.Context,
+	client *http.Client,
+	endpoint string,
+	currentVersion string,
+	requireHTTPS bool,
+) ([]byte, error) {
+	endpointURL, err := url.Parse(endpoint)
+	if err != nil || endpointURL.Host == "" ||
+		(requireHTTPS && endpointURL.Scheme != "https") {
+		return nil, errors.New("release endpoint must be an absolute HTTPS URL")
+	}
+	effectiveClient := client
+	if endpointURL.Scheme == "https" {
+		effectiveClient = restrictedHTTPClient(client, endpointURL)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create release request: %w", err)
+	}
+	request.Header.Set("Accept", "application/vnd.github+json")
+	request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	request.Header.Set("User-Agent", "corresync/"+currentVersion)
+	response, err := effectiveClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("fetch release metadata: %w", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maximumBody))
+		return nil, fmt.Errorf("release endpoint returned HTTP %d", response.StatusCode)
+	}
+	if endpointURL.Scheme == "https" &&
+		(response.Request == nil || response.Request.URL == nil ||
+			response.Request.URL.Scheme != "https" ||
+			!allowedAssetHost(response.Request.URL, endpointURL)) {
+		return nil, errors.New("release metadata redirected to an untrusted URL")
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, maximumBody+1))
+	if err != nil {
+		return nil, fmt.Errorf("read release metadata: %w", err)
+	}
+	if len(data) > maximumBody {
+		return nil, errors.New("release metadata exceeds size limit")
+	}
+	return data, nil
 }
 
 func eligibleRelease(release releaseResponse, channel Channel) (semanticVersion, bool) {

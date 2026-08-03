@@ -18,6 +18,7 @@ and support-window rules are defined by the
 ## Prefer lifecycle commands
 
 ```console
+corr settings
 corr setup you@example.com --alias personal
 corr config init
 corr config validate
@@ -29,6 +30,11 @@ corr account show work
 corr account rename work primary
 corr account remove old --approve
 ```
+
+Use `corr settings` when working interactively. It provides numbered choices
+for account renaming, the default account, update preferences, safety mode, and
+browser login timeout. Direct `account` and `config` commands remain available
+for scripts and advanced configuration.
 
 `setup` is the provider-neutral first-run path. It creates an empty,
 secret-free configuration when needed, performs credential-free discovery,

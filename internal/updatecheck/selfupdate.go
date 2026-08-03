@@ -542,45 +542,17 @@ func (installer Installer) fetchRelease(
 	if client == nil {
 		client = http.DefaultClient
 	}
-	client = restrictedHTTPClient(client, endpointURL)
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf("create release request: %w", err)
-	}
-	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	request.Header.Set("User-Agent", "corresync/"+installer.CurrentVersion)
-	response, err := client.Do(request)
-	if err != nil {
-		return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf("fetch release metadata: %w", err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, maximumBody))
-		return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf(
-			"release endpoint returned HTTP %d",
-			response.StatusCode,
-		)
-	}
-	if response.Request == nil || response.Request.URL == nil ||
-		response.Request.URL.Scheme != "https" ||
-		!allowedAssetHost(response.Request.URL, endpointURL) {
-		return installReleaseResponse{}, semanticVersion{}, nil, errors.New(
-			"release metadata redirected to an untrusted URL",
-		)
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, maximumBody+1))
-	if err != nil {
-		return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf("read release metadata: %w", err)
-	}
-	if len(data) > maximumBody {
-		return installReleaseResponse{}, semanticVersion{}, nil, errors.New("release metadata exceeds size limit")
-	}
 	channel, err := normalizeChannel(installer.Channel)
 	if err != nil {
 		return installReleaseResponse{}, semanticVersion{}, nil, err
 	}
 	if channel == ChannelStable {
+		data, fetchErr := fetchReleaseMetadata(
+			ctx, client, endpoint, installer.CurrentVersion, true,
+		)
+		if fetchErr != nil {
+			return installReleaseResponse{}, semanticVersion{}, nil, fetchErr
+		}
 		var release installReleaseResponse
 		if err := json.Unmarshal(data, &release); err != nil {
 			return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf("decode release metadata: %w", err)
@@ -591,15 +563,41 @@ func (installer Installer) fetchRelease(
 		}
 		return release, latest, endpointURL, nil
 	}
-	var releases []installReleaseResponse
-	if err := json.Unmarshal(data, &releases); err != nil {
-		return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf("decode preview release metadata: %w", err)
+	pageEndpoints, pageSize, err := previewMetadataEndpoints(endpoint)
+	if err != nil {
+		return installReleaseResponse{}, semanticVersion{}, nil, err
 	}
-	release, latest, ok := selectLatestInstallRelease(releases, channel)
-	if !ok {
+	var selected installReleaseResponse
+	var latest semanticVersion
+	found := false
+	for _, pageEndpoint := range pageEndpoints {
+		data, fetchErr := fetchReleaseMetadata(
+			ctx, client, pageEndpoint, installer.CurrentVersion, true,
+		)
+		if fetchErr != nil {
+			return installReleaseResponse{}, semanticVersion{}, nil, fetchErr
+		}
+		var releases []installReleaseResponse
+		if decodeErr := json.Unmarshal(data, &releases); decodeErr != nil {
+			return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf(
+				"decode preview release metadata: %w",
+				decodeErr,
+			)
+		}
+		candidateRelease, candidateVersion, ok := selectLatestInstallRelease(releases, channel)
+		if ok && (!found || candidateVersion.Compare(latest) > 0) {
+			selected = candidateRelease
+			latest = candidateVersion
+			found = true
+		}
+		if pageSize == 0 || len(releases) < pageSize {
+			break
+		}
+	}
+	if !found {
 		return installReleaseResponse{}, semanticVersion{}, nil, errors.New("no eligible preview release was found")
 	}
-	return release, latest, endpointURL, nil
+	return selected, latest, endpointURL, nil
 }
 
 func eligibleInstallRelease(

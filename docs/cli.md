@@ -17,6 +17,7 @@ unstyled machine-readable value.
 ## Configuration and accounts
 
 ```console
+corr settings
 corr setup you@example.com --alias personal
 corr config init
 corr config path
@@ -43,6 +44,11 @@ corr account add reader@example.invalid --help
 corr account rename work primary
 corr account remove old --new-default primary --approve
 ```
+
+`corr settings` is the guided path for everyday changes. It lists configured
+accounts before renaming one and also manages the default account, update
+channel, automatic updates, safety mode, and browser login timeout. The
+remaining commands are stable direct forms for scripts and advanced use.
 
 `account discover` uses no credentials and performs no authentication. Its
 ranked candidates explain DNS/well-known evidence, confidence, required auth,

@@ -25,7 +25,8 @@ type cli struct {
 	VersionFlag kong.VersionFlag  `name:"version" short:"V" help:"Print version information and quit."`
 	Version     versionCommand    `cmd:"" help:"Print version and build information."`
 	Setup       setupCommand      `cmd:"" help:"Discover and add an account without authenticating."`
-	Config      configCommand     `cmd:"" help:"Initialize and inspect configuration."`
+	Settings    settingsCommand   `cmd:"" help:"Change account names and everyday settings interactively."`
+	Config      configCommand     `cmd:"" help:"Inspect and script advanced configuration."`
 	Account     accountCommand    `cmd:"" help:"Discover and manage isolated accounts."`
 	Doctor      doctorCommand     `cmd:"" help:"Diagnose local setup and opt-in provider compatibility."`
 	Import      importCommand     `cmd:"" help:"Scan local exports into private read-only staging."`
@@ -189,7 +190,9 @@ func compactHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	}
 	_, _ = fmt.Fprintf(
 		&help,
-		"\nFlags:\n  -h, --help           Show help\n  -V, --version        Print version information\n      --config <path>  Use a specific config.toml\n\nRun %s for command-specific help.\n",
+		"\nFlags:\n  -h, --help           Show help\n  -V, --version        Print version information\n      --config <path>  Use a specific config.toml\n\nStart:\n  %s\n  %s\n\nRun %s for command-specific help.\n",
+		view.command(ctx.Model.Name+" setup <email-address>"),
+		view.command(ctx.Model.Name+" settings"),
 		view.command(ctx.Model.Name+" help <command>"),
 	)
 	_, err := io.WriteString(ctx.Stdout, help.String())
@@ -216,6 +219,11 @@ func normalizeHelpArguments(arguments []string) []string {
 
 func outputIsTerminal(writer io.Writer) bool {
 	file, ok := writer.(*os.File)
+	return ok && term.IsTerminal(int(file.Fd()))
+}
+
+func inputIsTerminal(reader io.Reader) bool {
+	file, ok := reader.(*os.File)
 	return ok && term.IsTerminal(int(file.Fd()))
 }
 

@@ -85,6 +85,7 @@ func TestRootHelpCommandDescriptionsMatchCommandHelp(t *testing.T) {
 		t.Fatalf("root help code = %d, stderr = %q", code, rootErr.String())
 	}
 	commands := []string{
+		"settings",
 		"config",
 		"doctor",
 		"auth",
