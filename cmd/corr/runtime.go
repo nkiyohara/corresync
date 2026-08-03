@@ -64,6 +64,7 @@ type runtime struct {
 	launch            browserLauncher
 	endpoint          func(string) (localipc.Endpoint, error)
 	previousEndpoints func(string) ([]localipc.Endpoint, error)
+	stopEndpointOwner func(context.Context, localipc.Endpoint) (int, error)
 	startDaemon       func(context.Context, string) error
 	runCommand        commandRunner
 	runInputCommand   inputCommandRunner
@@ -99,6 +100,7 @@ func newRuntime(
 		},
 		endpoint:          localipc.Resolve,
 		previousEndpoints: localipc.ResolvePrevious,
+		stopEndpointOwner: localipc.StopEndpointOwner,
 		startDaemon:       startDetachedDaemon,
 		runCommand: func(ctx context.Context, stdout, stderr io.Writer, name string, args ...string) error {
 			// #nosec G204 -- name and args come from typed setup plans or the

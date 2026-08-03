@@ -417,6 +417,70 @@ func TestOpenDaemonRejectsSplitRuntimeOwners(t *testing.T) {
 	}
 }
 
+func TestDaemonStopRepairsSplitRuntimeOwners(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "config.toml")
+	stateDirectory := filepath.Join(root, "state")
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
+		t.Fatalf("config.Save() error = %v", err)
+	}
+	configDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatalf("config.Fingerprint() error = %v", err)
+	}
+	current, err := localipc.ResolveInState(configPath, stateDirectory)
+	if err != nil {
+		t.Fatalf("ResolveInState() error = %v", err)
+	}
+	previous := previousRuntimeTestEndpoint(t, configPath, stateDirectory)
+	oldOwner := startLifecycleTestDaemon(
+		t.Context(), t, previous, daemonapi.ProtocolVersion, "0.8.3", 123, configDigest,
+	)
+	t.Cleanup(oldOwner.stop)
+	canonicalOwner := startLifecycleTestDaemon(
+		t.Context(), t, current, daemonapi.ProtocolVersion, "0.8.3", 456, configDigest,
+	)
+	t.Cleanup(canonicalOwner.stop)
+
+	stdout := &bytes.Buffer{}
+	app := newRuntime(
+		t.Context(), configPath, stdout, &bytes.Buffer{}, buildinfo.Current(),
+	)
+	app.endpoint = func(string) (localipc.Endpoint, error) { return current, nil }
+	app.previousEndpoints = func(string) ([]localipc.Endpoint, error) {
+		return []localipc.Endpoint{previous}, nil
+	}
+	var stopped atomic.Int32
+	app.stopEndpointOwner = func(
+		_ context.Context,
+		endpoint localipc.Endpoint,
+	) (int, error) {
+		stopped.Add(1)
+		switch endpoint.Address {
+		case previous.Address:
+			oldOwner.stop()
+			return 123, nil
+		case current.Address:
+			canonicalOwner.stop()
+			return 456, nil
+		default:
+			return 0, errors.New("unexpected endpoint")
+		}
+	}
+
+	if err := (&daemonStopCommand{}).Run(app); err != nil {
+		t.Fatalf("daemonStopCommand.Run() error = %v", err)
+	}
+	if stopped.Load() != 2 ||
+		!strings.Contains(stdout.String(), "stopped 2 duplicate session owners") ||
+		!strings.Contains(stdout.String(), "next provider command") {
+		t.Fatalf("daemon stop = calls %d, output %q", stopped.Load(), stdout.String())
+	}
+	if oldOwner.shutdowns.Load() != 0 || canonicalOwner.shutdowns.Load() != 0 {
+		t.Fatal("split-owner recovery used the divergent bearer credential")
+	}
+}
+
 func TestDaemonStopControlsPreviousRuntimeOwner(t *testing.T) {
 	root := t.TempDir()
 	configPath := filepath.Join(root, "config.toml")

@@ -30,11 +30,31 @@ func (app *runtime) activePreviousEndpoints(configPath string) ([]localipc.Endpo
 	return active, nil
 }
 
+func (app *runtime) activeDaemonEndpoints(configPath string) ([]localipc.Endpoint, error) {
+	current, err := app.endpoint(configPath)
+	if err != nil {
+		return nil, err
+	}
+	active := make([]localipc.Endpoint, 0, 2)
+	currentActive, err := localipc.EndpointActive(current)
+	if err != nil {
+		return nil, fmt.Errorf("inspect canonical session-owner endpoint: %w", err)
+	}
+	if currentActive {
+		active = append(active, current)
+	}
+	previous, err := app.activePreviousEndpoints(configPath)
+	if err != nil {
+		return nil, err
+	}
+	return append(active, previous...), nil
+}
+
 func splitSessionOwnersError() error {
 	return errors.New(
 		"multiple session owners use different Unix runtime locations; Corresync " +
-			"refuses to guess which credential is authoritative; terminate every " +
-			"same-user `corr ... daemon serve` process for this config and retry",
+			"refuses to guess which credential is authoritative; run `corr daemon " +
+			"stop` once to stop every protected same-user owner, then retry",
 	)
 }
 
