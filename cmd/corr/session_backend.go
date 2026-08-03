@@ -139,6 +139,7 @@ type terminalLoginSession struct {
 const (
 	terminalProgressWait         = 5 * time.Second
 	terminalProgressPollInterval = 100 * time.Millisecond
+	terminalProgressQuietPeriod  = 500 * time.Millisecond
 )
 
 // sessionBackend lazily opens one dedicated browser per configured account and
@@ -654,6 +655,12 @@ func (backend *sessionBackend) TerminalLogin(
 	}
 
 	progressChecked := false
+	if input.Action == nil {
+		if err := awaitTerminalLoginProgress(ctx, interaction); err != nil {
+			return daemonapi.TerminalLoginResult{}, err
+		}
+		progressChecked = true
+	}
 	if input.Action != nil && input.Action.Type != "refresh" {
 		action, err := terminalBrowserAction(*input.Action)
 		if err != nil {
@@ -728,7 +735,8 @@ func awaitTerminalLoginProgress(
 	ctx context.Context,
 	interaction *terminalLoginSession,
 ) error {
-	previous := interaction.view
+	latest := interaction.view
+	var quietSince time.Time
 	timer := time.NewTimer(terminalProgressWait)
 	defer timer.Stop()
 	ticker := time.NewTicker(terminalProgressPollInterval)
@@ -746,8 +754,12 @@ func awaitTerminalLoginProgress(
 			return err
 		}
 		candidate := terminalLoginView(view)
-		if !terminalLoginViewsEqual(previous, candidate) {
+		if !terminalLoginViewsEqual(latest, candidate) {
 			interaction.view = candidate
+			latest = candidate
+			quietSince = time.Now()
+		} else if !quietSince.IsZero() && terminalLoginViewReady(candidate) &&
+			time.Since(quietSince) >= terminalProgressQuietPeriod {
 			return nil
 		}
 		select {
@@ -758,6 +770,17 @@ func awaitTerminalLoginProgress(
 		case <-ticker.C:
 		}
 	}
+}
+
+func terminalLoginViewReady(view daemonapi.TerminalLoginView) bool {
+	if view.Origin == "" || len(view.Controls) == 0 {
+		return false
+	}
+	if len(view.Controls) == 1 && view.Controls[0].Kind == "activate" &&
+		strings.EqualFold(strings.TrimSpace(view.Controls[0].Name), "cancel") {
+		return false
+	}
+	return true
 }
 
 func (backend *sessionBackend) terminalInteraction(
