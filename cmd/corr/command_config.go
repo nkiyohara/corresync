@@ -159,7 +159,7 @@ func (command *configShowCommand) Run(app *runtime) error {
 		}
 	}
 	_, err = view.printf(
-		"\n  %-18s %t\n  %-18s %t\n  %-18s %d\n  %-18s %d\n  %-18s %s\n",
+		"\n  %-18s %t\n  %-18s %t\n  %-18s %d\n  %-18s %d\n  %-18s %s\n\n  %s\n",
 		"Preview reads",
 		configuration.Policy.PreviewSensitiveReads,
 		"Preview writes",
@@ -170,6 +170,7 @@ func (command *configShowCommand) Run(app *runtime) error {
 		configuration.Policy.MaxAttendees,
 		"Login timeout",
 		time.Duration(configuration.Browser.LoginTimeout),
+		view.command("Change everyday settings: corr settings"),
 	)
 	return err
 }

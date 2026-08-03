@@ -5,6 +5,24 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.5-rc.4 - 2026-08-03
+
+### Guided settings
+
+- Add `corr settings`, an interactive numbered menu for renaming accounts,
+  choosing the default account, update preferences, safety mode, and browser
+  login timeout while retaining typed CLI commands for scripts.
+- Point account and configuration views to the guided menu and show the exact
+  direct account-rename command where the current alias is visible.
+
+### Preview update reliability
+
+- Fetch the same bounded window of 20 preview releases as four independently
+  bounded pages so SBOM-rich release metadata cannot exceed one monolithic
+  response limit.
+- Apply the updater's trusted HTTPS redirect boundary to read-only release
+  checks as well as verified installation.
+
 ## 0.8.5-rc.3 - 2026-08-03
 
 ### Terminal control semantics

@@ -246,6 +246,69 @@ func TestPreviewCheckerSelectsHighestStableOrPrerelease(t *testing.T) {
 	}
 }
 
+func TestPreviewCheckerPaginatesBoundedRecentReleases(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		if request.URL.Query().Get("per_page") != "2" {
+			t.Fatalf("per_page = %q", request.URL.Query().Get("per_page"))
+		}
+		switch request.URL.Query().Get("page") {
+		case "1":
+			_, _ = writer.Write([]byte(`[
+{"tag_name":"v1.1.0-rc.2","draft":false,"prerelease":true},
+{"tag_name":"v1.0.0","draft":false,"prerelease":false}
+]`))
+		case "2":
+			_, _ = writer.Write([]byte(`[
+{"tag_name":"v1.1.0-rc.10","draft":false,"prerelease":true},
+{"tag_name":"v9.0.0","draft":true,"prerelease":false}
+]`))
+		case "3":
+			_, _ = writer.Write([]byte(`[
+{"tag_name":"v3.0.0-dev.1","draft":false,"prerelease":true}
+]`))
+		default:
+			t.Fatalf("unexpected preview page %q", request.URL.Query().Get("page"))
+		}
+	}))
+	defer server.Close()
+
+	result, err := (Checker{
+		CurrentVersion: "1.1.0-rc.2",
+		Channel:        ChannelPreview,
+		CachePath:      filepath.Join(t.TempDir(), "latest-preview.json"),
+		Endpoint:       server.URL + "?per_page=2",
+		Client:         server.Client(),
+	}).Check(t.Context())
+	if err != nil || result.LatestVersion != "v1.1.0-rc.10" || requests != 3 {
+		t.Fatalf("preview Check() = %+v, %v; requests=%d", result, err, requests)
+	}
+}
+
+func TestCheckerRejectsUntrustedHTTPSRedirect(t *testing.T) {
+	target := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte(`{"tag_name":"v9.0.0","draft":false,"prerelease":false}`))
+	}))
+	defer target.Close()
+	targetURL := strings.Replace(target.URL, "127.0.0.1", "localhost", 1)
+	redirect := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		http.Redirect(writer, request, targetURL, http.StatusFound)
+	}))
+	defer redirect.Close()
+
+	result, err := (Checker{
+		CurrentVersion: "1.0.0",
+		CachePath:      filepath.Join(t.TempDir(), "latest.json"),
+		Endpoint:       redirect.URL,
+		Client:         redirect.Client(),
+	}).Check(t.Context())
+	if !errors.Is(err, ErrUnavailable) || result.Status != StatusUnavailable ||
+		!strings.Contains(err.Error(), "untrusted URL") {
+		t.Fatalf("redirect Check() = %+v, %v", result, err)
+	}
+}
+
 func TestPreviewChannelNeverDowngradesToOlderStable(t *testing.T) {
 	current, ok := parseVersion("v1.1.0-rc.1")
 	if !ok {

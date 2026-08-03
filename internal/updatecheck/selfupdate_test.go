@@ -660,23 +660,42 @@ func syntheticCandidate() []byte {
 }
 
 func TestPreviewInstallerSelectsHighestEligibleSignedRelease(t *testing.T) {
-	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		_, _ = writer.Write([]byte(`[
+	requests := 0
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		switch request.URL.Query().Get("page") {
+		case "1":
+			_, _ = writer.Write([]byte(`[
 {"tag_name":"v1.1.0-rc.2","draft":false,"prerelease":true,"assets":[]},
-{"tag_name":"v1.0.0","draft":false,"prerelease":false,"assets":[]},
+{"tag_name":"v1.0.0","draft":false,"prerelease":false,"assets":[]}
+]`))
+		case "2":
+			_, _ = writer.Write([]byte(`[
 {"tag_name":"v1.1.0-rc.10","draft":false,"prerelease":true,"assets":[]},
 {"tag_name":"v2.0.0","draft":true,"prerelease":false,"assets":[]}
 ]`))
+		case "3":
+			_, _ = writer.Write([]byte(`[]`))
+		default:
+			t.Fatalf("unexpected preview page %q", request.URL.Query().Get("page"))
+		}
 	}))
 	defer server.Close()
 
 	release, latest, _, err := (Installer{
 		CurrentVersion: "1.1.0-rc.2",
 		Channel:        ChannelPreview,
-		Endpoint:       server.URL,
+		Endpoint:       server.URL + "?per_page=2",
 		Client:         server.Client(),
 	}).fetchRelease(t.Context())
-	if err != nil || latest.String() != "v1.1.0-rc.10" || release.TagName != latest.String() {
-		t.Fatalf("preview fetchRelease() = release %+v, latest %s, err %v", release, latest.String(), err)
+	if err != nil || latest.String() != "v1.1.0-rc.10" ||
+		release.TagName != latest.String() || requests != 3 {
+		t.Fatalf(
+			"preview fetchRelease() = release %+v, latest %s, err %v; requests=%d",
+			release,
+			latest.String(),
+			err,
+			requests,
+		)
 	}
 }

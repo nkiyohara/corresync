@@ -157,7 +157,12 @@ func (command *accountListCommand) Run(app *runtime) error {
 			return err
 		}
 	}
-	return nil
+	_, err = view.printf(
+		"\n  %s\n  %s\n",
+		view.command("Manage interactively: corr settings"),
+		view.command("Rename directly: corr account rename <current-name> <new-name>"),
+	)
+	return err
 }
 
 func (command *accountShowCommand) Run(app *runtime) error {
@@ -228,7 +233,13 @@ func (command *accountShowCommand) Run(app *runtime) error {
 			}
 		}
 	}
-	return nil
+	_, err = view.printf(
+		"\n  %s\n",
+		view.command(
+			"Rename: corr account rename "+shellSingleQuote(account.Alias)+" <new-name>",
+		),
+	)
+	return err
 }
 
 func (command *accountAddCommand) Run(app *runtime) error {
