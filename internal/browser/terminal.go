@@ -65,11 +65,15 @@ type terminalSnapshot struct {
 }
 
 type terminalControl struct {
-	ID        string `json:"id"`
-	Kind      string `json:"kind"`
-	Name      string `json:"name"`
-	Sensitive bool   `json:"sensitive"`
-	Disabled  bool   `json:"disabled"`
+	ID          string `json:"id"`
+	Kind        string `json:"kind"`
+	Name        string `json:"name"`
+	InputType   string `json:"inputType"`
+	NativeInput bool   `json:"nativeInput"`
+	Checkable   bool   `json:"checkable"`
+	Checked     bool   `json:"checked"`
+	Sensitive   bool   `json:"sensitive"`
+	Disabled    bool   `json:"disabled"`
 }
 
 // TerminalSnapshot returns a bounded text projection of the current page and
@@ -174,7 +178,7 @@ func normalizeTerminalSnapshot(snapshot terminalSnapshot) TerminalView {
 			!terminalControlIDPattern.MatchString(control.ID) {
 			break
 		}
-		kind := control.Kind
+		kind := normalizeTerminalControlKind(control)
 		if kind != "input" && kind != "activate" {
 			continue
 		}
@@ -182,12 +186,32 @@ func normalizeTerminalSnapshot(snapshot terminalSnapshot) TerminalView {
 		if name == "" {
 			name = kind
 		}
+		if control.Checkable {
+			state := " [not checked]"
+			if control.Checked {
+				state = " [checked]"
+			}
+			name = sanitizeTerminalText(name, 160-len(state)) + state
+		}
 		view.Controls = append(view.Controls, TerminalControl{
 			ID: control.ID, Kind: kind, Name: name,
 			Sensitive: control.Sensitive, Disabled: control.Disabled,
 		})
 	}
 	return view
+}
+
+func normalizeTerminalControlKind(control terminalControl) string {
+	if control.Kind != "input" || !control.NativeInput {
+		return control.Kind
+	}
+	switch control.InputType {
+	case "", "date", "datetime-local", "email", "month", "number", "password",
+		"search", "tel", "text", "time", "url", "week":
+		return "input"
+	default:
+		return "activate"
+	}
 }
 
 func sanitizeTerminalOrigin(raw string) string {
@@ -245,7 +269,8 @@ const terminalSnapshotScript = `(() => {
   };
   const selector = [
     "input:not([type=hidden])", "textarea", "select", "button", "a[href]",
-    "[role=button]", "[role=link]", "[role=textbox]", "[contenteditable=true]"
+    "[role=button]", "[role=checkbox]", "[role=link]", "[role=radio]",
+    "[role=textbox]", "[contenteditable=true]"
   ].join(",");
   const controls = [];
   const seen = new Set();
@@ -255,14 +280,20 @@ const terminalSnapshotScript = `(() => {
     const tag = node.tagName.toLowerCase();
     const type = clean(node.getAttribute("type")).toLowerCase();
     const role = clean(node.getAttribute("role")).toLowerCase();
-    const input = tag === "input" || tag === "textarea" || tag === "select" || role === "textbox" || node.isContentEditable;
+    const nativeInput = tag === "input";
+    const input = nativeInput || tag === "textarea" || tag === "select" || role === "textbox" || node.isContentEditable;
+    const checkable = nativeInput && (type === "checkbox" || type === "radio") || role === "checkbox" || role === "radio";
     const id = "control-" + (controls.length + 1);
     node.setAttribute(marker, id);
     controls.push({
       id,
       kind: input ? "input" : "activate",
       name: label(node),
-      sensitive: tag === "input" && type === "password",
+      inputType: type,
+      nativeInput,
+      checkable,
+      checked: checkable && (Boolean(node.checked) || node.getAttribute("aria-checked") === "true"),
+      sensitive: nativeInput && type === "password",
       disabled: Boolean(node.disabled) || node.getAttribute("aria-disabled") === "true"
     });
   }

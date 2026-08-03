@@ -5,6 +5,13 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.5-rc.3 - 2026-08-03
+
+### Terminal control semantics
+
+- Treat checkbox, radio, and button-like HTML inputs as activations instead of
+  text fields, and show checked state after each bounded browser interaction.
+
 ## 0.8.5-rc.2 - 2026-08-03
 
 ### Terminal Outlook login
