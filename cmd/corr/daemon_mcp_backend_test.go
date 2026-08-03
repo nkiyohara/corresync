@@ -5,8 +5,10 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/approval"
@@ -16,6 +18,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/localipc"
 	"github.com/nkiyohara/corresync/internal/policy"
+	"github.com/nkiyohara/corresync/internal/settingsstore"
 )
 
 type daemonMCPAudit struct {
@@ -170,6 +173,82 @@ func TestDaemonMCPAccountLifecycleUsesCallerBoundPreviewCommit(t *testing.T) {
 		if recorder.events[index].Phase != phase {
 			t.Fatalf("audit event %d = %+v, want phase %q", index, recorder.events[index], phase)
 		}
+	}
+}
+
+func TestDaemonMCPSettingsUseCallerBoundStaleSafePreviewCommit(t *testing.T) {
+	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, err := application.NewSettingsService(settingsstore.Store{ConfigPath: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := &daemonMCPAudit{}
+	rules := policy.DefaultRules()
+	rules.PreviewReversibleWrites = true
+	backend := &daemonMCPBackend{
+		app: app, configuration: configuration, settings: settings,
+		defaultAccount: configuration.Accounts[configuration.DefaultAccount].ID,
+		guard:          daemonMCPGuard(t, rules, recorder),
+		settingsMutation: func(
+			ctx context.Context,
+			_ domain.Caller,
+			change func(context.Context) (application.SettingsView, error),
+		) (application.SettingsView, error) {
+			return change(ctx)
+		},
+	}
+	caller := domain.Caller{Surface: "mcp", Instance: "settings-test"}
+	otherCaller := domain.Caller{Surface: "mcp", Instance: "other-settings-test"}
+	preview, err := backend.PreviewSettingsUpdate(
+		t.Context(),
+		application.SettingsUpdateInput{
+			Key: application.SettingUpdateChannel, Value: "preview",
+		},
+		caller,
+	)
+	if err != nil || preview.Preview == nil || preview.Review == nil ||
+		preview.Review.Command != "corr config set updates.channel preview" {
+		t.Fatalf("settings preview = %+v error = %v", preview, err)
+	}
+	if _, err := backend.CommitSettingsUpdate(
+		t.Context(), preview.Preview.Token, otherCaller,
+	); err == nil {
+		t.Fatal("settings update accepted another caller's approval")
+	}
+	updated, err := backend.CommitSettingsUpdate(
+		t.Context(), preview.Preview.Token, caller,
+	)
+	if err != nil || updated.Settings == nil ||
+		updated.Settings.UpdateChannel != "preview" {
+		t.Fatalf("settings commit = %+v error = %v", updated, err)
+	}
+
+	stale, err := backend.PreviewSettingsUpdate(
+		t.Context(),
+		application.SettingsUpdateInput{
+			Key: application.SettingLoginTimeout, Value: "10m",
+		},
+		caller,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration, err = config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration.Browser.LoginTimeout = config.Duration(15 * time.Minute)
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := backend.CommitSettingsUpdate(
+		t.Context(), stale.Preview.Token, caller,
+	); err == nil || !strings.Contains(err.Error(), "changed after review") {
+		t.Fatalf("stale settings commit error = %v", err)
 	}
 }
 

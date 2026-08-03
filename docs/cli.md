@@ -45,10 +45,18 @@ corr account rename work primary
 corr account remove old --new-default primary --approve
 ```
 
-`corr settings` is the guided path for everyday changes. It lists configured
-accounts before renaming one and also manages the default account, update
-channel, automatic updates, safety mode, and browser login timeout. The
-remaining commands are stable direct forms for scripts and advanced use.
+`corr settings` is the guided path for everyday changes. Its arrow-key form is
+organized around configured accounts, updates, safety, and browser sign-in.
+The top-level Accounts category opens a second level containing **Add account**
+and the configured account list. Selecting an account opens graphical or
+terminal sign-in, rename, default, and removal actions for that account; Back
+returns to the account list. Removal shows the local-state impact, defaults to
+cancellation, and asks for a replacement before deleting the current default.
+The form stops and restarts a running session owner around account
+configuration changes. Every choice explains its effect and displays the exact
+direct command. Set `CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader
+prompts. The remaining commands are stable direct forms for scripts and
+advanced use.
 
 `account discover` uses no credentials and performs no authentication. Its
 ranked candidates explain DNS/well-known evidence, confidence, required auth,

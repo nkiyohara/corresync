@@ -13,6 +13,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/paths"
+	"github.com/nkiyohara/corresync/internal/settingsstore"
 )
 
 // daemonMCPBackend forwards the MCP application boundary to the sole local
@@ -23,6 +24,7 @@ type daemonMCPBackend struct {
 	defaultAccount  domain.AccountID
 	configuration   config.Config
 	accounts        *application.AccountService
+	settings        *application.SettingsService
 	discovery       *application.AccountDiscoveryService
 	guard           *application.Guard
 	recorder        *audit.FileRecorder
@@ -33,10 +35,15 @@ type daemonMCPBackend struct {
 		domain.Caller,
 		func(context.Context) (application.AccountView, error),
 	) (application.AccountView, error)
+	settingsMutation func(
+		context.Context,
+		domain.Caller,
+		func(context.Context) (application.SettingsView, error),
+	) (application.SettingsView, error)
 }
 
 func newDaemonMCPBackend(app *runtime) (*daemonMCPBackend, error) {
-	configuration, _, err := app.loadConfig()
+	configuration, configPath, err := app.loadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -45,6 +52,11 @@ func newDaemonMCPBackend(app *runtime) (*daemonMCPBackend, error) {
 		return nil, err
 	}
 	accounts, discoverer, err := app.accountServices()
+	if err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	settings, err := application.NewSettingsService(settingsstore.Store{ConfigPath: configPath})
 	if err != nil {
 		_ = client.Close()
 		return nil, err
@@ -75,7 +87,8 @@ func newDaemonMCPBackend(app *runtime) (*daemonMCPBackend, error) {
 	return &daemonMCPBackend{
 		Client: client, app: app,
 		defaultAccount: status.DefaultAccount, configuration: configuration,
-		accounts: accounts, discovery: discoverer, guard: guard, recorder: recorder,
+		accounts: accounts, settings: settings,
+		discovery: discoverer, guard: guard, recorder: recorder,
 	}, nil
 }
 
@@ -142,6 +155,83 @@ func (backend *daemonMCPBackend) ShowAccount(
 	reference string,
 ) (application.AccountView, error) {
 	return backend.accounts.Show(ctx, reference)
+}
+
+func (backend *daemonMCPBackend) ShowSettings(
+	ctx context.Context,
+) (application.SettingsView, error) {
+	return backend.settings.Show(ctx)
+}
+
+func (backend *daemonMCPBackend) PreviewSettingsUpdate(
+	ctx context.Context,
+	input application.SettingsUpdateInput,
+	caller domain.Caller,
+) (application.SettingsChangeAccess, error) {
+	review, err := backend.settings.Review(ctx, input)
+	if err != nil {
+		return application.SettingsChangeAccess{}, err
+	}
+	operation, err := domain.NewOperation(
+		"settings.update",
+		domain.EffectReversibleWrite,
+		backend.DefaultAccount(),
+		review,
+	)
+	if err != nil {
+		return application.SettingsChangeAccess{}, err
+	}
+	preparation, err := backend.guard.Prepare(ctx, operation, caller)
+	if err != nil {
+		return application.SettingsChangeAccess{}, err
+	}
+	if preparation.Preview == nil {
+		return application.SettingsChangeAccess{}, errors.New(
+			"settings update policy did not issue the required preview",
+		)
+	}
+	return application.SettingsChangeAccess{
+		Status: "approval_required", Review: &review,
+		Preview: preparation.Preview,
+	}, nil
+}
+
+func (backend *daemonMCPBackend) CommitSettingsUpdate(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.SettingsChangeAccess, error) {
+	operation, err := backend.guard.CommitFor(
+		ctx,
+		token,
+		caller,
+		"settings.update",
+		domain.EffectReversibleWrite,
+	)
+	if err != nil {
+		return application.SettingsChangeAccess{}, err
+	}
+	var review application.SettingsChangeReview
+	if err := operation.DecodePayload(&review); err != nil {
+		return application.SettingsChangeAccess{}, err
+	}
+	settings, err := backend.executeSettingsMutation(
+		ctx,
+		caller,
+		func(callContext context.Context) (application.SettingsView, error) {
+			return backend.settings.Apply(callContext, review)
+		},
+	)
+	auditErr := backend.guard.RecordExecution(ctx, operation, caller, err)
+	if err != nil {
+		return application.SettingsChangeAccess{}, errors.Join(err, auditErr)
+	}
+	if auditErr != nil {
+		return application.SettingsChangeAccess{}, auditErr
+	}
+	return application.SettingsChangeAccess{
+		Status: "completed", Settings: &settings,
+	}, nil
 }
 
 func (backend *daemonMCPBackend) PreviewAccountAdd(
@@ -388,28 +478,68 @@ func (backend *daemonMCPBackend) executeAccountMutation(
 	return backend.commitAccountMutation(ctx, caller, change)
 }
 
+func (backend *daemonMCPBackend) executeSettingsMutation(
+	ctx context.Context,
+	caller domain.Caller,
+	change func(context.Context) (application.SettingsView, error),
+) (application.SettingsView, error) {
+	if backend.settingsMutation != nil {
+		return backend.settingsMutation(ctx, caller, change)
+	}
+	var settings application.SettingsView
+	err := backend.commitConfigurationMutation(
+		ctx,
+		caller,
+		"settings",
+		func(callContext context.Context) error {
+			var changeErr error
+			settings, changeErr = change(callContext)
+			return changeErr
+		},
+	)
+	return settings, err
+}
+
 func (backend *daemonMCPBackend) commitAccountMutation(
 	ctx context.Context,
 	caller domain.Caller,
 	change func(context.Context) (application.AccountView, error),
 ) (application.AccountView, error) {
+	var account application.AccountView
+	err := backend.commitConfigurationMutation(
+		ctx,
+		caller,
+		"account",
+		func(callContext context.Context) error {
+			var changeErr error
+			account, changeErr = change(callContext)
+			return changeErr
+		},
+	)
+	return account, err
+}
+
+func (backend *daemonMCPBackend) commitConfigurationMutation(
+	ctx context.Context,
+	caller domain.Caller,
+	kind string,
+	change func(context.Context) error,
+) error {
 	backend.mutationMu.Lock()
 	defer backend.mutationMu.Unlock()
 	if backend.app == nil || backend.Client == nil {
-		return application.AccountView{}, errors.New(
-			"account mutation coordinator is unavailable",
+		return fmt.Errorf(
+			"%s mutation coordinator is unavailable",
+			kind,
 		)
 	}
 	configPath, err := backend.app.resolvedConfigPath()
 	if err != nil {
-		return application.AccountView{}, err
+		return err
 	}
 	owner, err := backend.InspectOwner(ctx, caller)
 	if err != nil {
-		return application.AccountView{}, fmt.Errorf(
-			"inspect session owner before account mutation: %w",
-			err,
-		)
+		return fmt.Errorf("inspect session owner before %s mutation: %w", kind, err)
 	}
 	shutdownContext, cancelShutdown := context.WithTimeout(
 		ctx,
@@ -434,44 +564,44 @@ func (backend *daemonMCPBackend) commitAccountMutation(
 		daemonReplacementTimeout,
 	)
 	if waitErr != nil {
-		return application.AccountView{}, errors.Join(
-			fmt.Errorf("stop session owner for account mutation: %w", waitErr),
+		return errors.Join(
+			fmt.Errorf("stop session owner for %s mutation: %w", kind, waitErr),
 			shutdownErr,
 		)
 	}
 	if replaced {
-		return application.AccountView{}, errors.New(
-			"session owner changed concurrently; review the account mutation again",
+		return fmt.Errorf(
+			"session owner changed concurrently; review the %s mutation again",
+			kind,
 		)
 	}
 
-	var account application.AccountView
 	changeErr := ctx.Err()
 	if changeErr == nil {
-		account, changeErr = change(ctx)
+		changeErr = change(ctx)
 	}
 	restartContext, cancelRestart := context.WithTimeout(
 		context.WithoutCancel(ctx),
 		daemonReplacementTimeout+daemonStartupTimeout,
 	)
 	defer cancelRestart()
-	restartErr := backend.restartAfterAccountMutation(
+	restartErr := backend.restartAfterConfigurationMutation(
 		restartContext,
 		configPath,
 	)
 	if changeErr != nil {
-		return application.AccountView{}, errors.Join(changeErr, restartErr)
+		return errors.Join(changeErr, restartErr)
 	}
 	if restartErr != nil {
-		return application.AccountView{}, fmt.Errorf(
-			"account configuration changed but restart failed; inspect `corr account list` and restart the daemon: %w",
-			restartErr,
+		return fmt.Errorf(
+			"%s configuration changed but restart failed; inspect `corr config show` and restart the daemon: %w",
+			kind, restartErr,
 		)
 	}
-	return account, nil
+	return nil
 }
 
-func (backend *daemonMCPBackend) restartAfterAccountMutation(
+func (backend *daemonMCPBackend) restartAfterConfigurationMutation(
 	ctx context.Context,
 	configPath string,
 ) error {

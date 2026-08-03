@@ -101,6 +101,9 @@ type fakeBackend struct {
 	accountRenameInput   application.AccountRenameInput
 	accountRemoveInput   application.AccountRemoveInput
 	accountChangeAccess  application.AccountChangeAccess
+	settingsInput        application.SettingsUpdateInput
+	settingsView         application.SettingsView
+	settingsAccess       application.SettingsChangeAccess
 	monitorStatus        application.MonitorStatus
 	monitorListInput     application.MonitorEventListInput
 	monitorPage          application.MonitorEventPage
@@ -140,6 +143,30 @@ func (backend *fakeBackend) ShowAccount(
 ) (application.AccountView, error) {
 	backend.accountReference = reference
 	return backend.accountView, backend.err
+}
+
+func (backend *fakeBackend) ShowSettings(
+	context.Context,
+) (application.SettingsView, error) {
+	return backend.settingsView, backend.err
+}
+
+func (backend *fakeBackend) PreviewSettingsUpdate(
+	_ context.Context,
+	input application.SettingsUpdateInput,
+	caller domain.Caller,
+) (application.SettingsChangeAccess, error) {
+	backend.settingsInput, backend.caller = input, caller
+	return backend.settingsAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitSettingsUpdate(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.SettingsChangeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.settingsAccess, backend.err
 }
 
 func (backend *fakeBackend) SessionStatus(
@@ -530,7 +557,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 40 || mailTool == nil {
+	if len(tools.Tools) != 43 || mailTool == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
@@ -1490,6 +1517,64 @@ func TestAccountMutationToolsUseTypedPreviewCommitBoundary(t *testing.T) {
 			tool.Annotations.DestructiveHint == nil ||
 			!*tool.Annotations.DestructiveHint {
 			t.Fatalf("%s has unsafe annotations: %+v", name, tool)
+		}
+	}
+}
+
+func TestSettingsToolsUseTypedPreviewCommitBoundary(t *testing.T) {
+	t.Parallel()
+	backend := &fakeBackend{
+		settingsView: application.SettingsView{
+			DefaultAccount: "work", UpdateChannel: "preview",
+			AutomaticChecks: true, SafetyMode: "guarded", LoginTimeout: "5m0s",
+		},
+		settingsAccess: application.SettingsChangeAccess{Status: "approval_required"},
+	}
+	server, err := New(backend, Options{Version: "dev", Instance: "settings-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+	for _, call := range []struct {
+		name      string
+		arguments map[string]any
+	}{
+		{"settings_show", map[string]any{}},
+		{"settings_update", map[string]any{
+			"key": application.SettingUpdateChannel, "value": "stable",
+		}},
+		{"settings_update_commit", map[string]any{
+			// #nosec G101 -- synthetic non-production approval fixture.
+			"token": "opv1_settings_synthetic", // gitleaks:allow
+		}},
+	} {
+		result, callErr := client.CallTool(t.Context(), &mcp.CallToolParams{
+			Name: call.name, Arguments: call.arguments,
+		})
+		if callErr != nil || result.IsError {
+			t.Fatalf("%s failed: result=%+v error=%v", call.name, result, callErr)
+		}
+	}
+	if backend.settingsInput.Key != application.SettingUpdateChannel ||
+		backend.settingsInput.Value != "stable" ||
+		backend.approvalToken != "opv1_settings_synthetic" ||
+		backend.caller != (domain.Caller{Surface: "mcp", Instance: "settings-test"}) {
+		t.Fatalf("typed settings inputs were not forwarded: %+v", backend)
+	}
+	tools, err := client.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	show := toolNamed(tools.Tools, "settings_show")
+	if show == nil || show.Annotations == nil || !show.Annotations.ReadOnlyHint ||
+		show.Annotations.DestructiveHint == nil || *show.Annotations.DestructiveHint {
+		t.Fatalf("settings_show annotations = %+v", show)
+	}
+	for _, name := range []string{"settings_update", "settings_update_commit"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil || tool.Annotations.ReadOnlyHint ||
+			tool.Annotations.DestructiveHint == nil || *tool.Annotations.DestructiveHint {
+			t.Fatalf("%s annotations = %+v", name, tool)
 		}
 	}
 }
