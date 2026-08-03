@@ -81,6 +81,43 @@ func TestConfigGetAndSetAutomaticInstall(t *testing.T) {
 	}
 }
 
+func TestConfigGetAndSetUpdateChannel(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	if err := (&configSetCommand{
+		Key: "updates.channel", Value: "preview", JSON: true,
+	}).Run(app); err != nil {
+		t.Fatalf("config set update channel: %v", err)
+	}
+	loaded, err := config.Load(path)
+	if err != nil || loaded.Updates.Channel != config.UpdateChannelPreview {
+		t.Fatalf("saved update channel = %+v, %v", loaded.Updates, err)
+	}
+	value, err := getConfigValue(loaded, "updates.channel")
+	if err != nil || value != config.UpdateChannelPreview {
+		t.Fatalf("get updates.channel = %v, %v", value, err)
+	}
+	before, err := config.Fingerprint(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&configSetCommand{
+		Key: "updates.channel", Value: "nightly", JSON: true,
+	}).Run(app); err == nil {
+		t.Fatal("unsupported update channel was accepted")
+	}
+	after, err := config.Fingerprint(path)
+	if err != nil || after != before {
+		t.Fatalf("invalid channel modified config: before=%s after=%s err=%v", before, after, err)
+	}
+}
+
 func TestConfigSetSupportsDottedAccountAliases(t *testing.T) {
 	t.Parallel()
 

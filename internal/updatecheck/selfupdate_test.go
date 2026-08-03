@@ -658,3 +658,25 @@ func syntheticCandidate() []byte {
 	return []byte("#!/bin/sh\nif [ \"$1\" = version ]; then\nprintf '%s\\n' '" +
 		payload + "'\nfi\n")
 }
+
+func TestPreviewInstallerSelectsHighestEligibleSignedRelease(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte(`[
+{"tag_name":"v1.1.0-rc.2","draft":false,"prerelease":true,"assets":[]},
+{"tag_name":"v1.0.0","draft":false,"prerelease":false,"assets":[]},
+{"tag_name":"v1.1.0-rc.10","draft":false,"prerelease":true,"assets":[]},
+{"tag_name":"v2.0.0","draft":true,"prerelease":false,"assets":[]}
+]`))
+	}))
+	defer server.Close()
+
+	release, latest, _, err := (Installer{
+		CurrentVersion: "1.1.0-rc.2",
+		Channel:        ChannelPreview,
+		Endpoint:       server.URL,
+		Client:         server.Client(),
+	}).fetchRelease(t.Context())
+	if err != nil || latest.String() != "v1.1.0-rc.10" || release.TagName != latest.String() {
+		t.Fatalf("preview fetchRelease() = release %+v, latest %s, err %v", release, latest.String(), err)
+	}
+}

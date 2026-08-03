@@ -13,7 +13,7 @@ import (
 )
 
 type updateCommand struct {
-	Action *string `arg:"" optional:"" name:"action" enum:"check" help:"Use check to report the latest stable release without installing."`
+	Action *string `arg:"" optional:"" name:"action" enum:"check" help:"Use check to report the latest release in the configured channel without installing."`
 	JSON   bool    `help:"Write machine-readable JSON without terminal styling."`
 }
 
@@ -29,9 +29,11 @@ type updateReport struct {
 	updatecheck.Result
 	InstallMethod updatecheck.InstallMethod `json:"installMethod,omitempty"`
 	Upgrade       string                    `json:"upgrade,omitempty"`
+	DirectOnly    bool                      `json:"directOnly,omitempty"`
 }
 
 type updateActionReport struct {
+	Channel         updatecheck.Channel       `json:"channel"`
 	Status          string                    `json:"status"`
 	PreviousVersion string                    `json:"previousVersion,omitempty"`
 	CurrentVersion  string                    `json:"currentVersion"`
@@ -87,6 +89,7 @@ func (command *updateApplyCommand) Run(app *runtime) error {
 			return err
 		}
 		report := updateActionReport{
+			Channel:        effectiveUpdateChannel(result.Channel),
 			Status:         string(result.Status),
 			CurrentVersion: result.CurrentVersion,
 			LatestVersion:  result.LatestVersion,
@@ -109,9 +112,10 @@ func (command *updateApplyCommand) Run(app *runtime) error {
 
 	report, err := app.updateReportFresh(ctx)
 	if err != nil {
-		return fmt.Errorf("check latest stable release: %w", err)
+		return fmt.Errorf("check latest %s release: %w", report.Channel, err)
 	}
 	action := updateActionReport{
+		Channel:        effectiveUpdateChannel(report.Channel),
 		Status:         string(report.Status),
 		CurrentVersion: report.CurrentVersion,
 		LatestVersion:  report.LatestVersion,
@@ -120,8 +124,12 @@ func (command *updateApplyCommand) Run(app *runtime) error {
 		ReleaseURL:     report.ReleaseURL,
 	}
 	if report.Status == updatecheck.StatusAvailable {
-		action.Status = "action_required"
-		action.Command = report.Upgrade
+		if report.DirectOnly {
+			action.Status = "preview_available"
+		} else {
+			action.Status = "action_required"
+			action.Command = report.Upgrade
+		}
 	}
 	if command.JSON {
 		return writeJSON(app.stdout, action)
@@ -142,10 +150,16 @@ func (app *runtime) updateReportWith(
 	check func(context.Context) (updatecheck.Result, error),
 ) (updateReport, error) {
 	result, err := check(ctx)
+	result.Channel = effectiveUpdateChannel(result.Channel)
 	report := updateReport{Result: result}
 	if result.Status == updatecheck.StatusAvailable {
 		report.InstallMethod = app.installMethod()
-		report.Upgrade = updatecheck.UpgradeAdvice(report.InstallMethod, result.LatestVersion)
+		if result.Channel == updatecheck.ChannelPreview &&
+			report.InstallMethod != updatecheck.InstallDirect {
+			report.DirectOnly = true
+		} else {
+			report.Upgrade = updatecheck.UpgradeAdvice(report.InstallMethod, result.LatestVersion)
+		}
 	}
 	return report, err
 }
@@ -176,7 +190,7 @@ func (app *runtime) maybeHandleAutomaticUpdate(parent context.Context) {
 	}
 	view := newUpdateView(app, app.stderr, true)
 	if !settings.autoInstall || report.InstallMethod != updatecheck.InstallDirect {
-		_ = view.writeNotice(report.CurrentVersion, report.LatestVersion, report.Upgrade)
+		_ = view.writeNotice(report)
 		return
 	}
 	_ = view.writeAutomaticInstallStart(report.CurrentVersion, report.LatestVersion)
@@ -188,6 +202,13 @@ func (app *runtime) maybeHandleAutomaticUpdate(parent context.Context) {
 		return
 	}
 	_ = view.writeAutomaticInstallResult(result)
+}
+
+func effectiveUpdateChannel(channel updatecheck.Channel) updatecheck.Channel {
+	if channel == "" {
+		return updatecheck.ChannelStable
+	}
+	return channel
 }
 
 func (app *runtime) automaticUpdateChecksEnabled(

@@ -126,23 +126,33 @@ func newRuntime(
 		accountDiscoverer: discovery.New(discovery.Options{}),
 	}
 	app.checkUpdate = func(ctx context.Context) (updatecheck.Result, error) {
-		cachePath, err := paths.UpdateCachePath()
+		channel, err := app.updateChannel(ctx)
+		if err != nil {
+			return updatecheck.Result{}, err
+		}
+		cachePath, err := paths.UpdateCachePathForChannel(string(channel))
 		if err != nil {
 			return updatecheck.Result{}, err
 		}
 		return (updatecheck.Checker{
 			CurrentVersion: app.info.Version,
+			Channel:        channel,
 			CachePath:      cachePath,
 			Client:         &http.Client{Timeout: 5 * time.Second},
 		}).Check(ctx)
 	}
 	app.checkUpdateFresh = func(ctx context.Context) (updatecheck.Result, error) {
-		cachePath, err := paths.UpdateCachePath()
+		channel, err := app.updateChannel(ctx)
+		if err != nil {
+			return updatecheck.Result{}, err
+		}
+		cachePath, err := paths.UpdateCachePathForChannel(string(channel))
 		if err != nil {
 			return updatecheck.Result{}, err
 		}
 		return (updatecheck.Checker{
 			CurrentVersion: app.info.Version,
+			Channel:        channel,
 			CachePath:      cachePath,
 			Client:         &http.Client{Timeout: 15 * time.Second},
 			Force:          true,
@@ -152,6 +162,10 @@ func newRuntime(
 		ctx context.Context,
 		progress func(updatecheck.InstallProgress),
 	) (updatecheck.InstallResult, error) {
+		channel, err := app.updateChannel(ctx)
+		if err != nil {
+			return updatecheck.InstallResult{}, err
+		}
 		executable, err := os.Executable()
 		if err != nil {
 			return updatecheck.InstallResult{}, fmt.Errorf("resolve running executable: %w", err)
@@ -162,6 +176,7 @@ func newRuntime(
 		}
 		return (updatecheck.Installer{
 			CurrentVersion: app.info.Version,
+			Channel:        channel,
 			Executable:     executable,
 			TrustCachePath: trustCachePath,
 			Client:         &http.Client{Timeout: 2 * time.Minute},
@@ -180,6 +195,17 @@ func newRuntime(
 	app.interactiveOutput = func() bool { return outputIsTerminal(app.stderr) }
 	app.interactiveStdout = func() bool { return outputIsTerminal(app.stdout) }
 	return app
+}
+
+func (app *runtime) updateChannel(ctx context.Context) (updatecheck.Channel, error) {
+	configuration, _, err := app.loadConfigContext(ctx)
+	if errors.Is(err, os.ErrNotExist) {
+		return updatecheck.ChannelStable, nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("load update channel: %w", err)
+	}
+	return updatecheck.Channel(configuration.Updates.Channel), nil
 }
 
 func (app *runtime) accountServices() (

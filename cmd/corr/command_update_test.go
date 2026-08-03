@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -95,6 +96,35 @@ func TestUpdateUsesPackageManagerWithoutChangingFiles(t *testing.T) {
 		!strings.Contains(stdout.String(), "brew upgrade nkiyohara/corresync/corresync") ||
 		!strings.Contains(stdout.String(), "did not modify files") {
 		t.Fatalf("unexpected package-manager output: %q", stdout.String())
+	}
+}
+
+func TestPreviewUpdateDoesNotMixPackageManagerOwnership(t *testing.T) {
+	result := updatecheck.Result{
+		Channel:         updatecheck.ChannelPreview,
+		Status:          updatecheck.StatusAvailable,
+		CurrentVersion:  "0.9.0",
+		LatestVersion:   "v0.10.0-rc.1",
+		UpdateAvailable: true,
+		ReleaseURL:      "https://github.com/nkiyohara/corresync/releases/tag/v0.10.0-rc.1",
+	}
+	var stdout bytes.Buffer
+	app := updateTestRuntime(t, &stdout, result)
+	app.installMethod = func() updatecheck.InstallMethod { return updatecheck.InstallHomebrew }
+	app.installUpdate = func(
+		context.Context,
+		func(updatecheck.InstallProgress),
+	) (updatecheck.InstallResult, error) {
+		t.Fatal("preview attempted to replace a package-managed binary")
+		return updatecheck.InstallResult{}, nil
+	}
+	if err := (&updateApplyCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "Preview available") ||
+		!strings.Contains(stdout.String(), "direct installation") ||
+		strings.Contains(stdout.String(), "brew upgrade") {
+		t.Fatalf("unexpected managed preview output: %q", stdout.String())
 	}
 }
 
@@ -372,6 +402,31 @@ func TestMachineSurfacesNeverHandleAutomaticUpdates(t *testing.T) {
 	}
 	if !shouldHandleAutomaticUpdate([]string{"mail", "list"}) {
 		t.Fatal("human-facing mail command did not allow a quiet notice")
+	}
+}
+
+func TestRuntimeUsesOnlyAValidatedConfiguredUpdateChannel(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.OutlookDefault()
+	configuration.Updates.Channel = config.UpdateChannelPreview
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	app := newRuntime(t.Context(), path, &bytes.Buffer{}, &bytes.Buffer{}, buildinfo.Current())
+	channel, err := app.updateChannel(t.Context())
+	if err != nil || channel != updatecheck.ChannelPreview {
+		t.Fatalf("updateChannel() = %q, %v", channel, err)
+	}
+	encoded, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	invalid := strings.Replace(string(encoded), "preview", "nightly", 1)
+	if err := os.WriteFile(path, []byte(invalid), 0o600); err != nil { // #nosec G703 -- path is confined to t.TempDir.
+		t.Fatal(err)
+	}
+	if _, err := app.updateChannel(t.Context()); err == nil {
+		t.Fatal("invalid configured channel silently fell back to stable")
 	}
 }
 

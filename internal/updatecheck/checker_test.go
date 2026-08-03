@@ -219,6 +219,46 @@ func TestCheckerRejectsAndCachesPrereleaseMetadata(t *testing.T) {
 	}
 }
 
+func TestPreviewCheckerSelectsHighestStableOrPrerelease(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte(`[
+{"tag_name":"v1.1.0-rc.2","draft":false,"prerelease":true},
+{"tag_name":"v1.0.0","draft":false,"prerelease":false},
+{"tag_name":"v1.1.0-rc.10","draft":false,"prerelease":true},
+{"tag_name":"v9.0.0","draft":true,"prerelease":false},
+{"tag_name":"v2.0.0-rc.1","draft":false,"prerelease":false},
+{"tag_name":"v3.0.0-dev.1","draft":false,"prerelease":true},
+{"tag_name":"v4.0.0+rebuilt","draft":false,"prerelease":false}
+]`))
+	}))
+	defer server.Close()
+
+	result, err := (Checker{
+		CurrentVersion: "1.1.0-rc.2",
+		Channel:        ChannelPreview,
+		CachePath:      filepath.Join(t.TempDir(), "latest-preview.json"),
+		Endpoint:       server.URL,
+		Client:         server.Client(),
+	}).Check(t.Context())
+	if err != nil || result.Channel != ChannelPreview ||
+		result.Status != StatusAvailable || result.LatestVersion != "v1.1.0-rc.10" {
+		t.Fatalf("preview Check() = %+v, %v", result, err)
+	}
+}
+
+func TestPreviewChannelNeverDowngradesToOlderStable(t *testing.T) {
+	current, ok := parseVersion("v1.1.0-rc.1")
+	if !ok {
+		t.Fatal("current version did not parse")
+	}
+	result, err := resultFromRecord("v1.1.0-rc.1", current, cacheRecord{
+		Channel: ChannelPreview, CheckedAt: time.Now().UTC(), LatestVersion: "v1.0.0",
+	}, false)
+	if err != nil || result.Status != StatusCurrent || result.UpdateAvailable {
+		t.Fatalf("preview downgrade result = %+v, %v", result, err)
+	}
+}
+
 func TestCheckerCachesNetworkFailureAndDevelopmentBuildSkipsNetwork(t *testing.T) {
 	requests := 0
 	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {

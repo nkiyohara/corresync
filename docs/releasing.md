@@ -78,7 +78,8 @@ stale documentation/package payloads.
 1. Merge the narrow, reviewed change through the protected default branch.
 2. Confirm the matching `main` CI run is green.
 3. Repeat the local clean-checkout rehearsal.
-4. Create an annotated tag such as `vX.Y.Z` at that exact `main` commit.
+4. Create an annotated stable tag `vX.Y.Z`, or a preview tag
+   `vX.Y.Z-{alpha,beta,rc}.N`, at that exact `main` commit.
 5. Push only the tag.
 6. Monitor release verification and package-catalog jobs.
 7. Download the published assets and independently verify checksum and
@@ -86,7 +87,8 @@ stale documentation/package payloads.
 8. Confirm the release is not advertised beyond its recorded compatibility
    evidence.
 
-The workflow rejects a tag that is not reachable from `main`. GoReleaser creates
+The workflow rejects a tag that is not reachable from `main` or does not match
+one of those two channel formats. GoReleaser creates
 a draft, injects the version/commit/source date, builds with `CGO_ENABLED=0` and
 `-trimpath`, then an isolated macOS keychain Developer ID-signs all four Darwin
 executables with hardened runtime and secure timestamp. Apple notarization must
@@ -95,7 +97,9 @@ Darwin SBOMs, catalogs, and checksum inventory are then rebuilt from the signed
 inputs. The release gate verifies archives, packages, the MCPB, catalogs,
 licenses, checksums, and SBOMs before publication.
 
-Only the verified checksum manifest is signed. The GitHub Actions OIDC identity
+Stable and preview releases pass the same archive, license, SBOM, macOS
+signing/notarization, checksum, and provenance gates. Only the verified
+checksum manifest is signed. The GitHub Actions OIDC identity
 is bound to the exact repository, release workflow, and tag. Any pre-publish
 failure leaves at most a draft; it does not expose an unverified release as
 latest.
@@ -117,8 +121,9 @@ replacement release path before revoking the prior Developer ID certificate.
 ## Package catalogs
 
 Stable releases update the owned Homebrew and Scoop catalogs and submit WinGet
-manifests only after the canonical GitHub release is public. Prereleases do not
-enter catalogs. Catalog jobs consume the exact verified manifest bundle from
+manifests only after the canonical GitHub release is public. Preview releases
+remain GitHub prereleases and do not enter catalogs. Catalog jobs consume the
+exact verified manifest bundle from
 the release job and may not rebuild or replace release artifacts.
 
 Required secrets:

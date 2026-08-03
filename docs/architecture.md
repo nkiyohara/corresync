@@ -257,15 +257,17 @@ acknowledgement transitions.
 
 ## Updates and distribution
 
-Automatic update discovery reads only public latest-release metadata, is
-cached, and is absent from machine transports and feedback. Direct updates,
+Automatic update discovery reads only public release metadata for the explicit
+stable (default) or preview channel, uses channel-isolated caches, and is absent
+from machine transports and feedback. Direct updates,
 whether invoked explicitly or through the default-off `updates.auto_install`
 consent, verify a finite GitHub Actions Sigstore identity allowlist, signed
 checksums, version, OS, architecture, and artifact inventory before
 rollback-capable replacement. Automatic installation runs only before eligible
 interactive CLI commands, never during MCP, configuration management, daemon,
 machine-readable, piped, or non-interactive execution. Package-managed binaries
-remain owned by their package manager.
+remain owned by their package manager, and preview releases never enter those
+catalogs. Selecting a different channel cannot authorize a downgrade.
 
 The v0.6 legacy names survive only in narrow migration/update inputs. Canonical
 runtime, config, state, IPC, package, plugin, and documentation names are

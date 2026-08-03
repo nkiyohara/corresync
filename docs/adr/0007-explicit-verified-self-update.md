@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-24
-- Amended: 2026-07-30
+- Amended: 2026-08-03
 
 ## Context
 
@@ -24,13 +24,16 @@ update progress, or an update attempt.
 ## Decision
 
 Keep startup update discovery read-only by default and retain the explicit
-`corr update` action. It performs one fresh stable-release check. Homebrew,
+`corr update` action. It performs one fresh check of the configured release
+channel, as refined by
+[ADR 0023](0023-stable-and-preview-release-channels.md). Homebrew,
 WinGet, Scoop, deb, RPM, and APK installations are never modified; startup
-notices and the explicit command display the exact package-manager action
-instead.
+notices and the explicit command display the exact package-manager action for
+stable releases. Preview availability displays the direct release URL because
+package catalogs remain stable-only.
 
 `updates.auto_install = true` is a separate, default-off consent for a direct
-installation to apply an available verified stable release before an eligible
+installation to apply an available verified release in that channel before an eligible
 interactive CLI command. The check remains cached and bounded. Automatic
 installation is excluded entirely from MCP, daemon, completion, feedback,
 configuration management, machine-readable, piped, and non-interactive paths;
@@ -44,7 +47,7 @@ replacement takes effect on the next `corr` start.
 For a direct installation, either the explicit command or the opted-in startup
 path may replace only the running regular file, never a symlink. It:
 
-1. accepts only the exact stable GitHub release and matching OS/architecture
+1. accepts only the exact selected GitHub release and matching OS/architecture
    archive from a bounded HTTPS asset allowlist;
 2. downloads a size-bounded checksum manifest, Sigstore bundle, and archive
    into an owner-only temporary directory;
@@ -60,7 +63,7 @@ path may replace only the running regular file, never a symlink. It:
 6. replaces the executable with rollback support while preserving the prior
    version beside it as an explicit backup.
 
-Development builds, prereleases, downgrades, incomplete release inventories,
+Development builds, downgrades, incomplete release inventories,
 existing staging or backup paths, and every failed verification leave the
 installed executable unchanged. The implementation uses the official
 `sigstore-go` verifier, `minio/selfupdate` for cross-platform rollback, and
@@ -78,8 +81,9 @@ documented compatibility window ends.
 
 Direct users get the short, memorable path `corr update` and can separately
 consent to verified startup installation. Default checks retain no write
-authority. Managed users receive their owner-specific command without risking
-mixed ownership, even if automatic installation is enabled in configuration.
+authority. Managed users receive their owner-specific stable command or a
+preview release URL without risking mixed ownership, even if automatic
+installation is enabled in configuration.
 
 The release binary and dependency review surface grow because provenance
 verification is now self-contained instead of requiring an external `cosign`

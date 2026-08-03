@@ -67,6 +67,9 @@ func TestDefaultRoundTripIsProviderNeutral(t *testing.T) {
 	if loaded.Updates.AutoInstall {
 		t.Fatal("fresh configuration enabled automatic installation")
 	}
+	if loaded.Updates.Channel != UpdateChannelStable {
+		t.Fatalf("fresh update channel = %q, want stable", loaded.Updates.Channel)
+	}
 }
 
 func TestAutomaticInstallRequiresAutomaticChecks(t *testing.T) {
@@ -202,12 +205,13 @@ func TestSaveTOMLPreservesValidatedComments(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	encoded := []byte("# retained\nversion = 4\n")
+	versionLine := fmt.Sprintf("version = %d\n", CurrentVersion)
+	encoded := []byte("# retained\n" + versionLine)
 	defaultConfig, err := toml.Marshal(OutlookDefault())
 	if err != nil {
 		t.Fatal(err)
 	}
-	encoded = append(encoded, bytes.TrimPrefix(defaultConfig, []byte("version = 4\n"))...)
+	encoded = append(encoded, bytes.TrimPrefix(defaultConfig, []byte(versionLine))...)
 	if err := SaveTOML(path, encoded); err != nil {
 		t.Fatalf("SaveTOML() error = %v", err)
 	}
@@ -543,6 +547,57 @@ disable_automatic_checks = true
 	}
 	if !bytes.Equal(raw, v3) {
 		t.Fatal("read-only Load modified the v3 source")
+	}
+}
+
+func TestLoadMigratesV4ToStableUpdateChannel(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	v4 := []byte(`
+version = 4
+default_account = ""
+
+[policy]
+mode = "guarded"
+max_recipients = 20
+max_attendees = 50
+
+[browser]
+login_timeout = "5m"
+
+[updates]
+auto_install = true
+`)
+	if err := os.WriteFile(path, v4, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.Version != CurrentVersion ||
+		configuration.Updates.Channel != UpdateChannelStable ||
+		!configuration.Updates.AutoInstall {
+		t.Fatalf("migrated v4 config = %+v", configuration)
+	}
+	raw, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(raw, v4) {
+		t.Fatal("read-only Load modified the v4 source")
+	}
+}
+
+func TestMigrateV4RejectsInventedChannelField(t *testing.T) {
+	t.Parallel()
+	_, err := MigrateV4([]byte(`
+version = 4
+[updates]
+channel = "preview"
+`))
+	if err == nil || !strings.Contains(err.Error(), "strict mode") {
+		t.Fatalf("MigrateV4() error = %v", err)
 	}
 }
 

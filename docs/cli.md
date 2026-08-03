@@ -464,6 +464,19 @@ same verified replacement path:
 corr config set updates.auto_install true
 ```
 
+The default update channel is `stable`. A standalone installation can follow
+signed prereleases, including automatic installation when separately enabled:
+
+```console
+corr config set updates.channel preview
+corr update check
+corr update
+```
+
+Use `corr config set updates.channel stable` to return. Channel changes never
+downgrade. Package-manager catalogs are stable-only, so a managed preview check
+shows the direct release URL instead of an owner command.
+
 The update becomes active on the next process start. Package-managed binaries
 continue to receive only their exact owner command. MCP, configuration
 management, daemon, completion, feedback, JSON, pipes, and non-interactive paths

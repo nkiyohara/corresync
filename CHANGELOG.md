@@ -5,6 +5,18 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Release channels
+
+- Add a default `stable` and opt-in `preview` release channel, configurable
+  with `corr config set updates.channel stable|preview` and used consistently
+  by startup checks, explicit checks, and verified direct self-update.
+- Give stable and preview releases the same signed artifact gates while keeping
+  Homebrew, Scoop, WinGet, and native package catalogs stable-only; managed
+  installs never receive a misleading preview upgrade command.
+- Migrate schema-v4 configurations deterministically to the stable channel,
+  isolate update caches by channel, compare prerelease versions with SemVer
+  precedence, and refuse channel-switch downgrades.
+
 ### Outlook login
 
 - Detect a missing Linux graphical session before attempting visible Outlook

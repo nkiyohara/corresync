@@ -122,11 +122,24 @@ func AuditPath() (string, error) {
 
 // UpdateCachePath returns the private, content-free release check cache.
 func UpdateCachePath() (string, error) {
+	return UpdateCachePathForChannel("stable")
+}
+
+// UpdateCachePathForChannel isolates stable and preview release metadata.
+// The channel is enumerated so configuration can never become a path segment.
+func UpdateCachePathForChannel(channel string) (string, error) {
+	if channel != "stable" && channel != "preview" {
+		return "", fmt.Errorf("unsupported update channel %q", channel)
+	}
 	state, err := StateDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(state, "updates", "latest.json"), nil
+	name := "latest.json"
+	if channel == "preview" {
+		name = "latest-preview.json"
+	}
+	return filepath.Join(state, "updates", name), nil
 }
 
 // UpdateTrustCachePath returns the private cache for Sigstore TUF trust

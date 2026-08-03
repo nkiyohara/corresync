@@ -349,25 +349,33 @@ func (command *doctorCommand) addDaemonStatus(
 
 func (command *doctorCommand) addUpdateStatus(app *runtime, configuration config.Config, report *doctorReport) {
 	if !app.automaticUpdateChecksEnabled(app.context, &configuration) {
-		report.add("update", "skip", "automatic stable-release checks are disabled")
+		report.add("update", "skip", "automatic "+string(configuration.Updates.Channel)+" release checks are disabled")
 		return
 	}
 	ctx, cancel := context.WithTimeout(app.context, 750*time.Millisecond)
 	defer cancel()
 	update, err := app.updateReport(ctx)
 	if err != nil {
-		report.add("update", "skip", "stable-release status is temporarily unavailable")
+		report.add("update", "skip", string(configuration.Updates.Channel)+" release status is temporarily unavailable")
 		return
 	}
 	switch update.Status {
 	case updatecheck.StatusAvailable:
-		report.add("update", "pass", fmt.Sprintf("%s is available; %s", update.LatestVersion, update.Upgrade))
+		if update.DirectOnly {
+			report.add("update", "pass", fmt.Sprintf(
+				"%s preview is available as a signed direct release; %s",
+				update.LatestVersion,
+				update.ReleaseURL,
+			))
+		} else {
+			report.add("update", "pass", fmt.Sprintf("%s is available; %s", update.LatestVersion, update.Upgrade))
+		}
 	case updatecheck.StatusCurrent:
-		report.add("update", "pass", update.LatestVersion+" is the latest stable release")
+		report.add("update", "pass", update.LatestVersion+" is the latest "+string(update.Channel)+" release")
 	case updatecheck.StatusDevelopment:
-		report.add("update", "skip", "development build; stable-release comparison skipped")
+		report.add("update", "skip", "development build; "+string(update.Channel)+" release comparison skipped")
 	case updatecheck.StatusUnavailable:
-		report.add("update", "skip", "stable-release status is temporarily unavailable")
+		report.add("update", "skip", string(update.Channel)+" release status is temporarily unavailable")
 	}
 }
 

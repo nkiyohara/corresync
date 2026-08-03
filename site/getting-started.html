@@ -163,6 +163,22 @@ scoop install corresync/corresync</code></pre>
               <code>corr</code> start.
             </p>
           </div>
+          <div class="install-block verify-block">
+            <p class="os-label" id="gs-preview">Optional · follow signed previews</p>
+            <div class="cmd" data-copy data-copy-label="select the preview release channel">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="gs-preview"
+              ><code>corr config set updates.channel preview
+corr update</code></pre>
+            </div>
+            <p class="block-note">
+              Stable is the default. Preview uses the same signed, verified standalone update path;
+              return with <code>corr config set updates.channel stable</code>. Corresync never
+              downgrades, and previews do not enter package-manager catalogs.
+            </p>
+          </div>
           <p class="step-foot">
             macOS release binaries are Developer ID-signed and Apple-notarized. Windows binaries are
             not yet Authenticode-signed—verify downloads instead of overriding Gatekeeper or
