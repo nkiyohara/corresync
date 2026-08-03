@@ -5,6 +5,8 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.5-rc.1 - 2026-08-03
+
 ### Release channels
 
 - Add a default `stable` and opt-in `preview` release channel, configurable
