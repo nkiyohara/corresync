@@ -249,6 +249,13 @@ deterministic local hash. Malformed data degrades visibly.
 Report generation performs no network operation. Copy, save, and opening a
 prefilled GitHub page occur only after report output and explicit CLI choice.
 
+The independent automatic path is default-off and interactive-CLI-only. It
+constructs a smaller closed schema with no config, provider, account, raw error,
+argument value, path, credential, mail, or calendar field, claims one
+content-free build/error attempt marker, and passes the final body to the
+user-authenticated external `gh issue create` process. Corresync never handles
+the GitHub credential. MCP can observe but cannot change this consent.
+
 ## Audit
 
 Audit events are content-free and effect-oriented. They record caller, account

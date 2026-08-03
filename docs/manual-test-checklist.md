@@ -184,6 +184,18 @@ corr feedback --open-github
 The report must appear before the action. Save must not overwrite. Opening
 GitHub must not submit.
 
+Fresh and migrated configuration must keep `feedback.auto_submit = false`.
+Enabling it through `corr settings` must first display that the GitHub identity
+and issue are public, enumerate included and excluded categories, and verify an
+external `gh auth status --hostname github.com` without reading a token. The
+automated test harness—not a live mailbox or public test issue—must prove that
+an interactive failure passes only the smaller allowlist report to the fixed
+`gh issue create --repo github.com/nkiyohara/corresync` invocation, while raw
+errors, values, paths, identifiers, credentials, mail, and calendar data remain
+absent. It must also prove default-off, MCP/machine-output/configuration-
+management/non-interactive exclusion, fixed failure messaging, and
+once-per-build/error attempt de-duplication.
+
 ## 5. Discover and configure a route
 
 Credential-free discovery:

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -143,6 +144,126 @@ func TestConfigGetAndSetUpdateChannel(t *testing.T) {
 	after, err := config.Fingerprint(path)
 	if err != nil || after != before {
 		t.Fatalf("invalid channel modified config: before=%s after=%s err=%v", before, after, err)
+	}
+}
+
+func TestConfigSetAutomaticFeedbackRequiresAuthenticatedGitHubCLI(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(path, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	app := newRuntime(t.Context(), path, &bytes.Buffer{}, &stderr, buildinfo.Current())
+	var checks int
+	app.runCommand = func(
+		_ context.Context,
+		_, _ io.Writer,
+		name string,
+		arguments ...string,
+	) error {
+		checks++
+		if name != "gh" || strings.Join(arguments, " ") != "auth status --hostname github.com" {
+			return errors.New("unexpected command")
+		}
+		return nil
+	}
+	if err := (&configSetCommand{
+		Key: "feedback.auto_submit", Value: "true", JSON: true,
+	}).Run(app); err != nil {
+		t.Fatalf("enable automatic feedback: %v", err)
+	}
+	loaded, err := config.Load(path)
+	if err != nil || !loaded.Feedback.AutoSubmit || checks != 1 {
+		t.Fatalf("automatic feedback config = %+v, checks=%d, err=%v", loaded.Feedback, checks, err)
+	}
+	if !strings.Contains(stderr.String(), "GitHub username") ||
+		!strings.Contains(stderr.String(), "Excluded: raw errors") {
+		t.Fatalf("automatic feedback disclosure = %q", stderr.String())
+	}
+	value, err := getConfigValue(loaded, "feedback.auto_submit")
+	if err != nil || value != true {
+		t.Fatalf("get feedback.auto_submit = %v, %v", value, err)
+	}
+}
+
+func TestConfigEditCannotBypassAutomaticFeedbackDisclosureAndPrerequisite(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(path, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	app := newRuntime(t.Context(), path, &bytes.Buffer{}, &stderr, buildinfo.Current())
+	var checks int
+	app.runCommand = func(
+		_ context.Context,
+		_, _ io.Writer,
+		name string,
+		arguments ...string,
+	) error {
+		switch name {
+		case "synthetic-editor":
+			editedPath := arguments[len(arguments)-1]
+			contents, err := os.ReadFile(editedPath) // #nosec G304 -- private test path.
+			if err != nil {
+				return err
+			}
+			edited := bytes.Replace(
+				contents,
+				[]byte("auto_submit = false"),
+				[]byte("auto_submit = true"),
+				1,
+			)
+			if bytes.Equal(edited, contents) {
+				return errors.New("feedback setting was not found")
+			}
+			return os.WriteFile( // #nosec G703 -- private test path supplied by the command under test.
+				editedPath, edited, 0o600,
+			)
+		case "gh":
+			checks++
+			if strings.Join(arguments, " ") != "auth status --hostname github.com" {
+				return errors.New("unexpected GitHub CLI command")
+			}
+			return nil
+		default:
+			return errors.New("unexpected command")
+		}
+	}
+	if err := (&configEditCommand{Editor: "synthetic-editor", JSON: true}).Run(app); err != nil {
+		t.Fatalf("config edit error = %v", err)
+	}
+	loaded, err := config.Load(path)
+	if err != nil || !loaded.Feedback.AutoSubmit || checks != 1 {
+		t.Fatalf("automatic feedback config = %+v, checks=%d, err=%v", loaded.Feedback, checks, err)
+	}
+	if !strings.Contains(stderr.String(), "GitHub username") {
+		t.Fatalf("automatic feedback disclosure = %q", stderr.String())
+	}
+}
+
+func TestConfigSetAutomaticFeedbackDoesNotPersistFailedPrerequisite(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(path, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	app := newRuntime(t.Context(), path, &bytes.Buffer{}, &bytes.Buffer{}, buildinfo.Current())
+	app.runCommand = func(context.Context, io.Writer, io.Writer, string, ...string) error {
+		return errors.New("not authenticated")
+	}
+	if err := (&configSetCommand{
+		Key: "feedback.auto_submit", Value: "true", JSON: true,
+	}).Run(app); err == nil {
+		t.Fatal("automatic feedback enabled without GitHub authentication")
+	}
+	loaded, err := config.Load(path)
+	if err != nil || loaded.Feedback.AutoSubmit {
+		t.Fatalf("failed prerequisite changed config = %+v, %v", loaded.Feedback, err)
 	}
 }
 

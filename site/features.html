@@ -237,7 +237,11 @@
               <li>Generation makes no network request</li>
               <li>
                 Copying, saving, or opening a prefilled GitHub page each require an explicit flag;
-                nothing is ever submitted automatically
+                that manual flow never submits
+              </li>
+              <li>
+                A separate default-off choice may submit a smaller allowlist-only public issue
+                through your authenticated GitHub CLI after an interactive failure
               </li>
             </ul>
           </article>
@@ -289,12 +293,14 @@
           <article aria-labelledby="faq-phone-home">
             <h3 id="faq-phone-home">Does Corresync phone home?</h3>
             <p>
-              There is no telemetry pipeline and no automatic crash upload. An interactive CLI may
-              quietly check for a newer public release—sending only the Corresync version string,
-              cached for 24 hours, disabled for MCP, pipes, and JSON output—and you can turn that
-              off in configuration. Standalone installs can separately opt in to verified automatic
-              updates or signed preview releases; package catalogs remain stable-only and Corresync
-              never mixes installation ownership.
+              There is no telemetry pipeline or raw crash upload. An interactive CLI may quietly
+              check for a newer public release—sending only the Corresync version string, cached
+              for 24 hours, disabled for MCP, pipes, and JSON output—and you can turn that off in
+              configuration. A separate default-off feedback choice can use your authenticated
+              GitHub CLI to post a small allowlist-only public issue after an interactive failure.
+              Standalone installs can also opt in to verified automatic updates or signed preview
+              releases; package catalogs remain stable-only and Corresync never mixes installation
+              ownership.
             </p>
           </article>
           <article aria-labelledby="faq-unknown">

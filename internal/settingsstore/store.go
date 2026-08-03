@@ -93,10 +93,11 @@ func project(configuration config.Config) application.SettingsView {
 	}
 	return application.SettingsView{
 		Accounts: accounts, DefaultAccount: configuration.DefaultAccount,
-		UpdateChannel:    string(configuration.Updates.Channel),
-		AutomaticChecks:  !configuration.Updates.DisableAutomaticChecks,
-		AutomaticInstall: configuration.Updates.AutoInstall,
-		SafetyMode:       string(configuration.Policy.Mode),
-		LoginTimeout:     time.Duration(configuration.Browser.LoginTimeout).String(),
+		UpdateChannel:      string(configuration.Updates.Channel),
+		AutomaticChecks:    !configuration.Updates.DisableAutomaticChecks,
+		AutomaticInstall:   configuration.Updates.AutoInstall,
+		FeedbackAutoSubmit: configuration.Feedback.AutoSubmit,
+		SafetyMode:         string(configuration.Policy.Mode),
+		LoginTimeout:       time.Duration(configuration.Browser.LoginTimeout).String(),
 	}
 }

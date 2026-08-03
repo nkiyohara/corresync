@@ -137,23 +137,32 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		app.maybeHandleAutomaticUpdate(executionContext)
 	}
 	if err := parsed.Run(app); err != nil {
-		if rootCommand(arguments) != "feedback" {
-			recordExecutionFailure(err, parsed.Command(), arguments)
+		root := rootCommand(arguments)
+		var record feedback.ErrorRecord
+		if root != "feedback" {
+			record = recordExecutionFailure(err, parsed.Command(), arguments)
 		}
 		_, _ = fmt.Fprintln(stderr, err)
+		if root != "feedback" {
+			app.maybeSubmitAutomaticFeedback(executionContext, root, record)
+		}
 		return 1
 	}
 	return 0
 }
 
-func recordExecutionFailure(err error, command string, arguments []string) {
+func recordExecutionFailure(
+	err error,
+	command string,
+	arguments []string,
+) feedback.ErrorRecord {
+	record := feedback.NewErrorRecord(err, command, arguments)
 	path, pathErr := paths.FeedbackErrorPath()
 	if pathErr != nil {
-		return
+		return record
 	}
-	_ = (feedback.Store{Path: path}).Save(
-		feedback.NewErrorRecord(err, command, arguments),
-	)
+	_ = (feedback.Store{Path: path}).Save(record)
+	return record
 }
 
 func compactHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {

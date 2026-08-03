@@ -220,10 +220,19 @@ Report generation makes no network request. Copy, save, and opening a prefilled
 GitHub page each require an explicit flag after the complete report is shown.
 Opening GitHub never submits an issue automatically.
 
+A separate default-off `feedback.auto_submit` consent can use the signed-in
+user's external GitHub CLI to create a public issue after an interactive command
+failure. That automatic schema is smaller: validated build/platform atoms,
+enumerated install method, command and flag names, a content-free fingerprint,
+and fixed error classes only. It cannot represent config/provider/account data,
+raw errors, values, paths, credentials, mail, or calendar content. Corresync
+does not read the GitHub token; MCP, machine-output, configuration-management,
+and non-interactive commands cannot submit.
+
 ## Intentionally absent
 
 Corresync does not implement mailbox-rule mutation, delegate-permission
 management, generic provider properties/actions, arbitrary recurrence,
 item-attachment writes, automatic provider fallback, unattended credential
 login, tenant-wide access, a remote MCP endpoint, a hosted relay, telemetry, or
-automatic crash upload.
+raw crash upload.

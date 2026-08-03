@@ -29,13 +29,14 @@ type SettingsAccount struct {
 
 // SettingsView is the secret-free everyday configuration shared by CLI and MCP.
 type SettingsView struct {
-	Accounts         []SettingsAccount `json:"accounts"`
-	DefaultAccount   string            `json:"defaultAccount,omitempty"`
-	UpdateChannel    string            `json:"updateChannel"`
-	AutomaticChecks  bool              `json:"automaticChecks"`
-	AutomaticInstall bool              `json:"automaticInstall"`
-	SafetyMode       string            `json:"safetyMode"`
-	LoginTimeout     string            `json:"loginTimeout"`
+	Accounts           []SettingsAccount `json:"accounts"`
+	DefaultAccount     string            `json:"defaultAccount,omitempty"`
+	UpdateChannel      string            `json:"updateChannel"`
+	AutomaticChecks    bool              `json:"automaticChecks"`
+	AutomaticInstall   bool              `json:"automaticInstall"`
+	FeedbackAutoSubmit bool              `json:"feedbackAutoSubmit"`
+	SafetyMode         string            `json:"safetyMode"`
+	LoginTimeout       string            `json:"loginTimeout"`
 }
 
 // SettingsUpdateInput changes one well-known everyday setting.
