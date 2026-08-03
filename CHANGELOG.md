@@ -5,6 +5,16 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Outlook login
+
+- Detect a missing Linux graphical session before attempting visible Outlook
+  Web login and point SSH users to the account-specific `--terminal` command
+  instead of exposing Chromium portal and Crashpad diagnostics.
+- After a terminal-relay activation or form submission, wait for either an
+  authenticated session or a changed bounded browser view; when neither is
+  visible yet, explain how to refresh instead of silently redisplaying the
+  same controls.
+
 ## 0.8.4 - 2026-07-30
 
 ### macOS release trust

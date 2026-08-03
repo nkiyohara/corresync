@@ -2,11 +2,51 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestRequireGraphicalSession(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		goos        string
+		environment map[string]string
+		wantError   bool
+	}{
+		{name: "linux without display", goos: "linux", wantError: true},
+		{
+			name: "linux X11", goos: "linux",
+			environment: map[string]string{"DISPLAY": ":0"},
+		},
+		{
+			name: "linux Wayland", goos: "linux",
+			environment: map[string]string{"WAYLAND_DISPLAY": "wayland-0"},
+		},
+		{name: "macOS without display variables", goos: "darwin"},
+		{name: "Windows without display variables", goos: "windows"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			lookup := func(name string) (string, bool) {
+				value, exists := test.environment[name]
+				return value, exists
+			}
+			err := requireGraphicalSession(test.goos, lookup)
+			if test.wantError && !errors.Is(err, ErrGraphicalSessionUnavailable) {
+				t.Fatalf("requireGraphicalSession() error = %v", err)
+			}
+			if !test.wantError && err != nil {
+				t.Fatalf("requireGraphicalSession() error = %v", err)
+			}
+		})
+	}
+}
 
 func TestBrowserOwnedModeCannotExposeAuthorization(t *testing.T) {
 	t.Parallel()

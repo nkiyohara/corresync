@@ -51,6 +51,11 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 	if err := validateOptions(options); err != nil {
 		return nil, err
 	}
+	if !options.Headless {
+		if err := RequireGraphicalSession(); err != nil {
+			return nil, err
+		}
+	}
 	executable, err := ResolveExecutable(options.Executable)
 	if err != nil {
 		return nil, err

@@ -25,6 +25,11 @@ remain in that browser. Corresync:
 - leaves browser-managed profile state inside the account's private local
   profile directory.
 
+On Linux, visible login checks for an available X11 or Wayland session before
+starting Chromium. If both `DISPLAY` and `WAYLAND_DISPLAY` are unset, Corresync
+stops before launching the browser and prints the exact account-specific
+`--terminal` command to use over SSH.
+
 The browser profile is isolated by stable account ID, not mutable alias. Shared
 or delegated mailbox routing reuses the signed-in user session and grants no
 new permission.
@@ -39,6 +44,10 @@ The optional terminal relay is Outlook-Web-only. It starts a dedicated
 headless browser and projects a bounded text view and numbered controls over
 authenticated, caller-bound IPC. It accepts one interactive keystroke at a time
 from a TTY, masks sensitive fields, and never returns complete form values.
+After an activation or Enter submission, it waits briefly for authentication
+or a changed page before rendering again. If the bounded view remains the same,
+the CLI says so and offers `r` to refresh rather than appearing to ignore the
+selection.
 
 Piped input is rejected. CAPTCHA, passkeys, security keys, client
 certificates, native dialogs, and graphical custom login may require the

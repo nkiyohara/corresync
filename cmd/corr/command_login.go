@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+
+	"github.com/nkiyohara/corresync/internal/browser"
 )
 
 type loginCommand struct {
@@ -19,13 +21,19 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	alias, configured, err := configuration.ResolveAccount(command.Account)
 	if err != nil {
 		return err
 	}
-	_, configured, exists := configuration.AccountByID(accountID)
-	if !exists {
-		return errors.New("configured account route disappeared")
+	accountID := configured.ID
+	if !command.Terminal && hasOutlookRoute(configured) {
+		if err := browser.RequireGraphicalSession(); err != nil {
+			return fmt.Errorf(
+				"%w; retry with `corr auth login --account %s --terminal`",
+				err,
+				shellSingleQuote(alias),
+			)
+		}
 	}
 	if command.Terminal {
 		if _, err := interactiveTerminalInput(app); err != nil {
