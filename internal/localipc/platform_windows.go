@@ -22,6 +22,21 @@ func platformEndpoint(
 	return `\\.\pipe\` + runtimeName + `-` + id, "", "", nil
 }
 
+func legacyPlatformEndpoint(
+	id,
+	runtimeName string,
+) (address, runtimeDirectory, lockPath string, err error) {
+	return platformEndpoint(id, runtimeName)
+}
+
+func previousPlatformEndpoints(string, string) ([]platformPaths, error) {
+	return nil, nil
+}
+
+func platformEndpointActive(Endpoint) (bool, error) {
+	return false, nil
+}
+
 // Listen creates a byte-mode named pipe restricted to SYSTEM and the current
 // user. go-winio creates pipes with FILE_PIPE_REJECT_REMOTE_CLIENTS.
 func Listen(endpoint Endpoint) (*Listener, error) {

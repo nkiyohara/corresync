@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"syscall"
 
@@ -27,8 +28,27 @@ func platformEndpoint(
 	if err != nil {
 		return "", "", "", err
 	}
+	// CLI shells and MCP hosts commonly disagree about XDG_RUNTIME_DIR and
+	// TMPDIR. Those process-local values must not select different singleton
+	// locks for one config-scoped credential namespace.
+	return platformEndpointInTemp(
+		fallbackUnixTempDir,
+		id,
+		int(effectiveUID),
+		runtimeName,
+	)
+}
+
+func legacyPlatformEndpoint(
+	id,
+	runtimeName string,
+) (address, runtimeDirectory, lockPath string, err error) {
+	effectiveUID, err := currentEffectiveUID()
+	if err != nil {
+		return "", "", "", err
+	}
 	if runtimeBase := os.Getenv("XDG_RUNTIME_DIR"); runtimeBase != "" {
-		if suitable, _ := suitableRuntimeBase(runtimeBase, effectiveUID); suitable {
+		if suitable, _ := suitableLegacyRuntimeBase(runtimeBase, effectiveUID); suitable {
 			runtimeDirectory = filepath.Join(filepath.Clean(runtimeBase), runtimeName)
 			address = filepath.Join(runtimeDirectory, id+".sock")
 			if len(address) <= maximumUnixSocketPath {
@@ -36,11 +56,67 @@ func platformEndpoint(
 			}
 		}
 	}
-	temporary, err := currentTempDir()
+	temporary, err := legacyTemporaryDirectory()
 	if err != nil {
 		return "", "", "", err
 	}
 	return platformEndpointInTemp(temporary, id, int(effectiveUID), runtimeName)
+}
+
+func previousPlatformEndpoints(id, runtimeName string) ([]platformPaths, error) {
+	effectiveUID, err := currentEffectiveUID()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]platformPaths, 0, 4)
+	appendXDG := func(runtimeBase string) {
+		if suitable, _ := suitableLegacyRuntimeBase(runtimeBase, effectiveUID); !suitable {
+			return
+		}
+		runtimeDirectory := filepath.Join(filepath.Clean(runtimeBase), runtimeName)
+		address := filepath.Join(runtimeDirectory, id+".sock")
+		if len(address) > maximumUnixSocketPath {
+			return
+		}
+		result = append(result, platformPaths{
+			address:    address,
+			runtimeDir: runtimeDirectory,
+			lockPath:   filepath.Join(runtimeDirectory, id+".lock"),
+		})
+	}
+	if runtimeBase := os.Getenv("XDG_RUNTIME_DIR"); runtimeBase != "" {
+		appendXDG(runtimeBase)
+	}
+	if runtime.GOOS == "linux" {
+		appendXDG(filepath.Join("/run/user", strconv.Itoa(int(effectiveUID))))
+	}
+	temporary, err := legacyTemporaryDirectory()
+	if err != nil {
+		return nil, err
+	}
+	for _, base := range []string{temporary, fallbackUnixTempDir} {
+		address, runtimeDirectory, lockPath, endpointErr := platformEndpointInTemp(
+			base,
+			id,
+			int(effectiveUID),
+			runtimeName,
+		)
+		if endpointErr != nil {
+			return nil, endpointErr
+		}
+		result = append(result, platformPaths{
+			address: address, runtimeDir: runtimeDirectory, lockPath: lockPath,
+		})
+	}
+	return result, nil
+}
+
+func legacyTemporaryDirectory() (string, error) {
+	directory := os.TempDir()
+	if !filepath.IsAbs(directory) {
+		return "", errors.New("temporary directory must be absolute")
+	}
+	return filepath.Clean(directory), nil
 }
 
 func platformEndpointInTemp(
@@ -113,6 +189,17 @@ func DialContext(ctx context.Context, endpoint Endpoint) (net.Conn, error) {
 			return dialer.DialContext(ctx, "unix", address)
 		},
 	)
+}
+
+func platformEndpointActive(endpoint Endpoint) (bool, error) {
+	guard, err := validateAndPinEndpoint(endpoint)
+	if err == nil {
+		return true, guard.Close()
+	}
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, errNoActiveOwner) {
+		return false, nil
+	}
+	return false, err
 }
 
 func dialAuthenticatedUnix(
@@ -212,7 +299,7 @@ func ensurePrivateDirectory(path string) error {
 	return nil
 }
 
-func suitableRuntimeBase(path string, effectiveUID uint32) (bool, error) {
+func suitableLegacyRuntimeBase(path string, effectiveUID uint32) (bool, error) {
 	if !filepath.IsAbs(path) {
 		return false, errors.New("runtime base must be absolute")
 	}

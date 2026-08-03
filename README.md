@@ -337,9 +337,9 @@ Humans and scripts ──────── corr ───┘              │
 ```
 
 The session owner exposes no TCP listener. On Unix, clients authenticate and
-pin the private runtime directory, singleton lock, socket, and peer UID before
-the local bearer can be sent. On Windows, clients verify the protected named
-pipe, owner, DACL, server process, and SID first.
+pin the environment-independent private runtime directory, singleton lock,
+socket, and peer UID before the local bearer can be sent. On Windows, clients
+verify the protected named pipe, owner, DACL, server process, and SID first.
 
 Read the [architecture](docs/architecture.md),
 [authentication model](docs/authentication.md), and

@@ -267,6 +267,208 @@ func TestOpenDaemonDoesNotApplyChangedConfigDuringReplacement(t *testing.T) {
 	}
 }
 
+func TestOpenDaemonMigratesPreviousRuntimeOwner(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "config.toml")
+	stateDirectory := filepath.Join(root, "state")
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
+		t.Fatalf("config.Save() error = %v", err)
+	}
+	configDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatalf("config.Fingerprint() error = %v", err)
+	}
+	current, err := localipc.ResolveInState(configPath, stateDirectory)
+	if err != nil {
+		t.Fatalf("ResolveInState() error = %v", err)
+	}
+	previous := previousRuntimeTestEndpoint(t, configPath, stateDirectory)
+	oldOwner := startLifecycleTestDaemon(
+		t.Context(),
+		t,
+		previous,
+		daemonapi.ProtocolVersion,
+		"0.8.5",
+		123,
+		configDigest,
+	)
+	t.Cleanup(oldOwner.stop)
+
+	app := newRuntime(
+		t.Context(),
+		configPath,
+		&bytes.Buffer{},
+		&bytes.Buffer{},
+		buildinfo.Current(),
+	)
+	app.endpoint = func(string) (localipc.Endpoint, error) { return current, nil }
+	app.previousEndpoints = func(string) ([]localipc.Endpoint, error) {
+		return []localipc.Endpoint{previous}, nil
+	}
+	var replacement lifecycleTestDaemon
+	app.startDaemon = func(ctx context.Context, _ string) error {
+		replacement = startLifecycleTestDaemon(
+			ctx,
+			t,
+			current,
+			daemonapi.ProtocolVersion,
+			app.info.Version,
+			456,
+			configDigest,
+		)
+		return nil
+	}
+
+	client, status, err := app.openDaemon(t.Context())
+	if err != nil {
+		t.Fatalf("openDaemon() error = %v", err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	t.Cleanup(replacement.stop)
+	if status.ProcessID != 456 || status.Version != app.info.Version {
+		t.Fatalf("replacement status = %+v", status)
+	}
+	select {
+	case <-oldOwner.stopped:
+	case <-time.After(time.Second):
+		t.Fatal("previous runtime owner did not stop")
+	}
+}
+
+func TestOpenDaemonRejectsSplitRuntimeOwners(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "config.toml")
+	stateDirectory := filepath.Join(root, "state")
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
+		t.Fatalf("config.Save() error = %v", err)
+	}
+	configDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatalf("config.Fingerprint() error = %v", err)
+	}
+	current, err := localipc.ResolveInState(configPath, stateDirectory)
+	if err != nil {
+		t.Fatalf("ResolveInState() error = %v", err)
+	}
+	previous := previousRuntimeTestEndpoint(t, configPath, stateDirectory)
+	oldOwner := startLifecycleTestDaemon(
+		t.Context(),
+		t,
+		previous,
+		daemonapi.ProtocolVersion,
+		"0.8.5",
+		123,
+		configDigest,
+	)
+	t.Cleanup(oldOwner.stop)
+	canonicalOwner := startLifecycleTestDaemon(
+		t.Context(),
+		t,
+		current,
+		daemonapi.ProtocolVersion,
+		"0.8.5",
+		456,
+		configDigest,
+	)
+	t.Cleanup(canonicalOwner.stop)
+
+	app := newRuntime(
+		t.Context(),
+		configPath,
+		&bytes.Buffer{},
+		&bytes.Buffer{},
+		buildinfo.Current(),
+	)
+	app.endpoint = func(string) (localipc.Endpoint, error) { return current, nil }
+	app.previousEndpoints = func(string) ([]localipc.Endpoint, error) {
+		return []localipc.Endpoint{previous}, nil
+	}
+	var starts atomic.Int32
+	app.startDaemon = func(context.Context, string) error {
+		starts.Add(1)
+		return errors.New("split owner must not start a replacement")
+	}
+
+	client, _, err := app.openDaemon(t.Context())
+	if client != nil {
+		_ = client.Close()
+	}
+	if err == nil || !strings.Contains(err.Error(), "multiple session owners") {
+		t.Fatalf("openDaemon() error = %v, want split-owner diagnosis", err)
+	}
+	if starts.Load() != 0 {
+		t.Fatalf("split owner replacement starts = %d, want 0", starts.Load())
+	}
+	if oldOwner.shutdowns.Load() != 0 || canonicalOwner.shutdowns.Load() != 0 {
+		t.Fatal("split-owner diagnosis stopped an owner without an authoritative credential")
+	}
+	stoppedErr := app.requireDaemonStopped()
+	if stoppedErr == nil ||
+		!strings.Contains(stoppedErr.Error(), "every session owner") ||
+		strings.Contains(stoppedErr.Error(), "authorization failed") {
+		t.Fatalf(
+			"requireDaemonStopped() error = %v, want non-circular split-owner guidance",
+			stoppedErr,
+		)
+	}
+	if _, err := app.daemonControlEndpoint(configPath); err == nil ||
+		!strings.Contains(err.Error(), "refuses to guess") {
+		t.Fatalf("daemonControlEndpoint() error = %v, want fail-closed split diagnosis", err)
+	}
+}
+
+func TestDaemonStopControlsPreviousRuntimeOwner(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "config.toml")
+	stateDirectory := filepath.Join(root, "state")
+	if err := config.Save(configPath, config.OutlookDefault()); err != nil {
+		t.Fatalf("config.Save() error = %v", err)
+	}
+	configDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatalf("config.Fingerprint() error = %v", err)
+	}
+	current, err := localipc.ResolveInState(configPath, stateDirectory)
+	if err != nil {
+		t.Fatalf("ResolveInState() error = %v", err)
+	}
+	previous := previousRuntimeTestEndpoint(t, configPath, stateDirectory)
+	owner := startLifecycleTestDaemon(
+		t.Context(),
+		t,
+		previous,
+		daemonapi.ProtocolVersion,
+		"0.8.5",
+		123,
+		configDigest,
+	)
+	t.Cleanup(owner.stop)
+
+	stdout := &bytes.Buffer{}
+	app := newRuntime(
+		t.Context(),
+		configPath,
+		stdout,
+		&bytes.Buffer{},
+		buildinfo.Current(),
+	)
+	app.endpoint = func(string) (localipc.Endpoint, error) { return current, nil }
+	app.previousEndpoints = func(string) ([]localipc.Endpoint, error) {
+		return []localipc.Endpoint{previous}, nil
+	}
+	if err := (&daemonStopCommand{}).Run(app); err != nil {
+		t.Fatalf("daemonStopCommand.Run() error = %v", err)
+	}
+	if !strings.Contains(stdout.String(), "session owner is stopping") {
+		t.Fatalf("daemon stop output = %q", stdout.String())
+	}
+	select {
+	case <-owner.stopped:
+	case <-time.After(time.Second):
+		t.Fatal("previous runtime owner did not stop")
+	}
+}
+
 func TestReplaceDaemonDoesNotStopNewGeneration(t *testing.T) {
 	t.Parallel()
 
@@ -573,4 +775,37 @@ func startLifecycleTestDaemon(
 	}
 	go func() { serveDone <- server.Serve(listener) }()
 	return lifecycleTestDaemon{stop: stop, stopped: stopped, shutdowns: shutdowns}
+}
+
+func previousRuntimeTestEndpoint(
+	t *testing.T,
+	configPath,
+	stateDirectory string,
+) localipc.Endpoint {
+	t.Helper()
+	runtimeBase, err := os.MkdirTemp("/tmp", "corr-previous-runtime-")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(runtimeBase); err != nil {
+			t.Errorf("RemoveAll() error = %v", err)
+		}
+	})
+	if err := os.Chmod(runtimeBase, 0o700); err != nil { // #nosec G302 -- owner-only test runtime directory.
+		t.Fatalf("Chmod() error = %v", err)
+	}
+	t.Setenv("XDG_RUNTIME_DIR", runtimeBase)
+	previous, err := localipc.ResolvePreviousInState(configPath, stateDirectory)
+	if err != nil {
+		t.Fatalf("ResolvePreviousInState() error = %v", err)
+	}
+	wantPrefix := filepath.Join(runtimeBase, "corresync") + string(filepath.Separator)
+	for _, endpoint := range previous {
+		if strings.HasPrefix(endpoint.Address, wantPrefix) {
+			return endpoint
+		}
+	}
+	t.Fatalf("previous endpoints = %+v, want one below %q", previous, runtimeBase)
+	return localipc.Endpoint{}
 }

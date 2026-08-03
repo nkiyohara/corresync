@@ -119,10 +119,14 @@ On Unix, the client:
 6. connects and verifies peer UID;
 7. rechecks directory/socket identities and singleton ownership.
 
-`XDG_RUNTIME_DIR` is preferred only when absolute, current-user-owned, and
-private. Symlinks, regular files, FIFOs, permissive directories, wrong owners,
-socket squatters, and replacement races fail closed. Listener-side checks
-remain in force. The legacy migration client uses the same path.
+The short current-user-specific runtime path is derived independently of
+`XDG_RUNTIME_DIR` and `TMPDIR`, so CLI and MCP process environments cannot
+select different singleton locks for one credential namespace. Symlinks,
+regular files, FIFOs, permissive directories, wrong owners, socket squatters,
+and replacement races fail closed. Listener-side checks remain in force. One
+authenticated pre-v0.8.6 runtime owner is drained before migration; multiple
+active locations fail closed. The v0.6 legacy migration client retains its
+exact historical endpoint and uses the same authenticated transport checks.
 
 Windows uses a local byte-mode named pipe that rejects remote clients. Before
 the bearer is sent, the client validates the pipe and credential-file owner,

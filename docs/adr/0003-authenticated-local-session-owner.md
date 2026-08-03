@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-17
-- Amended: 2026-07-28
+- Amended: 2026-08-03
 
 ## Context
 
@@ -24,6 +24,14 @@ singleton ownership, set the socket and runtime directory to owner-only modes,
 and verify every accepted connection has the daemon's effective UID. Use a
 byte-mode Windows named pipe whose protected DACL grants only SYSTEM and the
 current user; the pipe implementation rejects remote clients.
+
+On Unix, derive one canonical short runtime directory under `/tmp` from the
+effective UID and fixed Corresync runtime name. Neither `XDG_RUNTIME_DIR` nor
+`TMPDIR` participates in endpoint selection. CLI shells, MCP hosts, desktop
+launchers, and remote sessions routinely receive different environment
+variables; allowing those variables to choose the socket would give one
+config/state namespace multiple singleton locks while every owner still
+rotated the same state-scoped bearer credential.
 
 Add defense in depth with a randomly generated 256-bit bearer credential. Rotate
 it after acquiring the listener, store it in an owner-only state file, compare it
@@ -96,6 +104,16 @@ newer owner. Drain active work and close the old browser before releasing the
 singleton endpoint; start the current binary only afterward. No mail, calendar,
 login, preview, or commit call may use this compatibility path.
 
+During the transition from v0.8.5 and earlier, inspect the bounded set of old
+Unix runtime locations through the same pinned endpoint checks. If exactly one
+old owner is active and proves the shared bearer, protocol generation, and
+unchanged config digest, drain it before starting the canonical owner. If more
+than one runtime location is active, or the old owner cannot authenticate,
+fail closed without stopping either process or rotating another credential.
+Recovery may terminate only the signed-in user's explicitly identified
+Corresync daemon processes; the application never guesses an authoritative
+generation or bypasses local IPC authentication.
+
 ## Consequences
 
 - Provider authorization never crosses the daemon boundary.
@@ -107,6 +125,9 @@ login, preview, or commit call may use this compatibility path.
   Unix peer verification uses the already-pinned `x/sys` package.
 - Crash recovery may leave a socket or credential file, but singleton ownership
   validates and safely replaces only current-user, expected file types.
+- Process-environment differences cannot create independent singleton locks
+  for the same Unix namespace; the canonical directory remains owner-only and
+  receives the same pinning, node, peer-UID, and bearer checks.
 - Installing a newer binary does not leave an incompatible owner blocking the
   next command. Automatic replacement drains active calls but intentionally
   discards release-bound in-memory sessions and previews.
