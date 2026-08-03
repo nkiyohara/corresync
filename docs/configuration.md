@@ -31,9 +31,15 @@ corr account rename work primary
 corr account remove old --approve
 ```
 
-Use `corr settings` when working interactively. It provides numbered choices
-for account renaming, the default account, update preferences, safety mode, and
-browser login timeout. Direct `account` and `config` commands remain available
+Use `corr settings` when working interactively. It provides an arrow-key form
+organized around accounts, updates, safety, and browser login. It can add an
+account from the nested Accounts category, whose account list leads to either
+login mode, rename, default, and removal actions for one account. Removing an
+account requires an explicit local-state review; removing the default requires
+selecting its replacement first, and the only configured account cannot be
+removed. Each row shows its current value, plain-language effect, and
+equivalent direct command. Set `CORRESYNC_ACCESSIBLE=true` for line-oriented
+screen-reader prompts. Direct `account` and `config` commands remain available
 for scripts and advanced configuration.
 
 `setup` is the provider-neutral first-run path. It creates an empty,

@@ -114,15 +114,26 @@ policy.
 
 ## Tool catalog
 
-The server exposes 40 narrow tools.
+The server exposes 43 narrow tools.
 
 Accounts and local monitoring:
 
+- `settings_show`, `settings_update`, `settings_update_commit`;
 - `account_discover`, `account_list`, `account_show`, `account_status`;
 - `account_add`, `account_add_commit`;
 - `account_rename`, `account_rename_commit`;
 - `account_remove`, `account_remove_commit`;
 - `monitor_status`, `events_list`, `event_acknowledge`.
+
+Use `settings_show` before changing an everyday setting. `settings_update`
+returns the current value, proposed value, dependent changes, equivalent CLI
+command, and a caller-bound approval token; only `settings_update_commit` can
+apply that exact review. Stale reviews fail instead of overwriting newer local
+configuration. Account aliases use the existing `account_rename` preview and
+`account_rename_commit` pair. Account onboarding and removal use the separate
+`account_add` / `account_add_commit` and `account_remove` /
+`account_remove_commit` preview pairs; provider sign-in remains an explicit
+local CLI action.
 
 Read and project:
 

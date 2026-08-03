@@ -1,31 +1,46 @@
 package main
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
+	"net/mail"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/nkiyohara/corresync/internal/config"
-	"github.com/nkiyohara/corresync/internal/domain"
-)
+	"charm.land/huh/v2"
 
-const maximumSettingsInputBytes = 4 << 10
+	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/settingsstore"
+)
 
 type settingsCommand struct{}
 
-type settingsReader struct {
-	view    consoleView
-	scanner *bufio.Scanner
+const maximumSettingsInputBytes = 4 << 10
+
+type settingsAccessibleReader struct {
+	reader io.Reader
 }
 
-type settingsOption struct {
-	label string
-	value string
+func (reader *settingsAccessibleReader) Read(buffer []byte) (int, error) {
+	if len(buffer) > 1 {
+		buffer = buffer[:1]
+	}
+	return reader.reader.Read(buffer)
 }
+
+const (
+	settingsActionAccounts = "accounts"
+	settingsActionUpdates  = "updates"
+	settingsActionSafety   = "safety"
+	settingsActionLogin    = "login"
+	settingsActionAdvanced = "advanced"
+	settingsActionSetup    = "setup"
+	settingsActionDone     = "done"
+	settingsAccountPrefix  = "account:"
+)
 
 func (command *settingsCommand) Run(app *runtime) error {
 	if !app.interactiveInput() || !app.interactiveStdout() {
@@ -34,65 +49,130 @@ func (command *settingsCommand) Run(app *runtime) error {
 				"`corr config set`, or `corr config edit` in scripts",
 		)
 	}
-	reader := newSettingsReader(app)
+	if settingsAccessible(app) {
+		originalInput := app.stdin
+		app.stdin = &settingsAccessibleReader{
+			reader: io.LimitReader(originalInput, maximumSettingsInputBytes+1),
+		}
+		defer func() { app.stdin = originalInput }()
+	}
+	service, err := newLocalSettingsService(app)
+	if err != nil {
+		return err
+	}
 	for {
-		configuration, path, err := app.loadConfig()
+		settings, err := service.Show(app.context)
 		if err != nil {
 			return err
 		}
-		if err := writeSettingsMenu(reader.view, configuration); err != nil {
+		if err := writeSettingsOverview(app); err != nil {
 			return err
 		}
-		choice, err := reader.line("Choose 1-7, or q to finish: ")
+		action, selected, err := runSettingsSelect(
+			app,
+			"What would you like to change?",
+			"↑/↓ move • enter select • esc finish",
+			settingsMenuOptions(settings),
+		)
 		if err != nil {
 			return err
 		}
-		switch strings.ToLower(choice) {
-		case "1":
-			if err := renameAccountSetting(app, reader, configuration); err != nil {
+		if !selected || action == settingsActionDone {
+			return writeSettingsDone(app)
+		}
+		switch action {
+		case settingsActionAccounts:
+			if err := runAccountsSettings(app, service); err != nil {
 				return err
 			}
-		case "2":
-			if err := changeDefaultAccount(app, reader, configuration, path); err != nil {
+		case settingsActionUpdates:
+			if err := runUpdateSettings(app, service, settings); err != nil {
 				return err
 			}
-		case "3":
-			if err := chooseConfigSetting(app, reader, configuration, path, "updates.channel", []settingsOption{
-				{label: "Stable releases", value: "stable"},
-				{label: "Preview releases (alpha, beta, and RC)", value: "preview"},
-			}); err != nil {
+		case settingsActionSafety:
+			if err := runSafetySettings(app, service, settings); err != nil {
 				return err
 			}
-		case "4":
-			if err := changeAutomaticInstall(app, reader, configuration, path); err != nil {
+		case settingsActionLogin:
+			if err := runLoginSettings(app, service, settings); err != nil {
 				return err
 			}
-		case "5":
-			if err := changeAutomaticChecks(app, reader, configuration, path); err != nil {
+		case settingsActionAdvanced:
+			if err := writeAdvancedSettingsHelp(app); err != nil {
 				return err
 			}
-		case "6":
-			if err := chooseConfigSetting(app, reader, configuration, path, "policy.mode", []settingsOption{
-				{label: "Guarded (writes require the normal safety policy)", value: "guarded"},
-				{label: "Read-only (block every write)", value: "read_only"},
-			}); err != nil {
-				return err
-			}
-		case "7":
-			if err := changeLoginTimeout(app, reader, configuration, path); err != nil {
-				return err
-			}
-		case "q", "quit", "done", "exit":
-			_, err := reader.view.printf(
-				"\n%s  %s\n",
-				reader.view.success(),
-				reader.view.strong("Done"),
-			)
+		}
+	}
+}
+
+func newLocalSettingsService(app *runtime) (*application.SettingsService, error) {
+	path, err := app.resolvedConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	return application.NewSettingsService(settingsstore.Store{ConfigPath: path})
+}
+
+func settingsMenuOptions(settings application.SettingsView) []huh.Option[string] {
+	options := make([]huh.Option[string], 0, 6)
+	checks := "checks off"
+	if settings.AutomaticChecks {
+		checks = "daily checks"
+	}
+	install := "manual install"
+	if settings.AutomaticInstall {
+		install = "automatic install"
+	}
+	options = append(options,
+		huh.NewOption(accountsSettingsSummary(settings), settingsActionAccounts),
+		huh.NewOption(
+			fmt.Sprintf("Updates  %s · %s · %s", settings.UpdateChannel, checks, install),
+			settingsActionUpdates,
+		),
+		huh.NewOption(
+			"Safety   "+settings.SafetyMode+" · "+safetySummary(settings.SafetyMode),
+			settingsActionSafety,
+		),
+		huh.NewOption(
+			"Browser  "+settings.LoginTimeout+" · sign-in timeout",
+			settingsActionLogin,
+		),
+		huh.NewOption("Advanced  edit the complete validated config", settingsActionAdvanced),
+		huh.NewOption("Done", settingsActionDone),
+	)
+	return options
+}
+
+func runAccountsSettings(
+	app *runtime,
+	service *application.SettingsService,
+) error {
+	for {
+		settings, err := service.Show(app.context)
+		if err != nil {
 			return err
-		default:
-			if _, err := reader.view.printf(
-				"\n%s  Choose a number from 1 to 7, or q.\n",
-				reader.view.warning(),
+		}
+		action, selected, err := runSettingsSelect(
+			app,
+			"Accounts",
+			"Add an account or choose one to manage its sign-in and local settings.",
+			accountsSettingsMenuOptions(settings),
+		)
+		if err != nil || !selected || action == "back" {
+			return err
+		}
+		if action == settingsActionSetup {
+			if err := runAddAccountSettings(app, settings); err != nil {
+				return err
+			}
+			continue
+		}
+		if strings.HasPrefix(action, settingsAccountPrefix) {
+			if err := runAccountSettings(
+				app,
+				service,
+				settings,
+				strings.TrimPrefix(action, settingsAccountPrefix),
 			); err != nil {
 				return err
 			}
@@ -100,297 +180,677 @@ func (command *settingsCommand) Run(app *runtime) error {
 	}
 }
 
-func newSettingsReader(app *runtime) *settingsReader {
-	scanner := bufio.NewScanner(io.LimitReader(app.stdin, maximumSettingsInputBytes+1))
-	scanner.Buffer(make([]byte, 256), maximumSettingsInputBytes)
-	return &settingsReader{
-		view: newConsoleView(app, app.stdout, true), scanner: scanner,
+func accountsSettingsMenuOptions(
+	settings application.SettingsView,
+) []huh.Option[string] {
+	options := []huh.Option[string]{huh.NewOption(
+		"Add account · corr setup <email-address>",
+		settingsActionSetup,
+	)}
+	for _, account := range settings.Accounts {
+		label := account.Alias
+		if account.IsDefault {
+			label += " (default)"
+		}
+		if account.Address != "" {
+			label += " · " + sanitizeCell(account.Address, 254)
+		}
+		options = append(options, huh.NewOption(
+			label,
+			settingsAccountPrefix+account.Alias,
+		))
 	}
+	return append(options, huh.NewOption("Back", "back"))
 }
 
-func (reader *settingsReader) line(prompt string) (string, error) {
-	if _, err := reader.view.printf("%s", reader.view.command(prompt)); err != nil {
-		return "", err
+func accountsSettingsSummary(settings application.SettingsView) string {
+	count := len(settings.Accounts)
+	if count == 0 {
+		return "Accounts  none configured · add one"
 	}
-	if !reader.scanner.Scan() {
-		if err := reader.scanner.Err(); err != nil {
-			return "", fmt.Errorf("read settings input: %w", err)
-		}
-		return "", io.EOF
+	noun := "accounts"
+	if count == 1 {
+		noun = "account"
 	}
-	return strings.TrimSpace(reader.scanner.Text()), nil
+	return fmt.Sprintf(
+		"Accounts  %d %s · %s default",
+		count,
+		noun,
+		settings.DefaultAccount,
+	)
 }
 
-func (reader *settingsReader) choose(
-	prompt string,
-	options []settingsOption,
-) (settingsOption, bool, error) {
-	if len(options) == 0 {
-		return settingsOption{}, false, errors.New("no choices are available")
+func runAccountSettings(
+	app *runtime,
+	service *application.SettingsService,
+	settings application.SettingsView,
+	alias string,
+) error {
+	account, found := findSettingsAccount(settings, alias)
+	if !found {
+		return fmt.Errorf("account %q is no longer configured", alias)
 	}
-	for index, option := range options {
-		if _, err := reader.view.printf("  %d. %s\n", index+1, option.label); err != nil {
-			return settingsOption{}, false, err
+	options := []huh.Option[string]{
+		huh.NewOption(
+			"Sign in · corr auth login --account "+alias,
+			"login",
+		),
+		huh.NewOption(
+			"Sign in here · corr auth login --account "+alias+" --terminal",
+			"login_terminal",
+		),
+		huh.NewOption(
+			"Rename · corr account rename "+alias+" <new-name>",
+			"rename",
+		),
+	}
+	if !account.IsDefault {
+		options = append(options, huh.NewOption(
+			"Make default · corr config set default_account "+alias,
+			"default",
+		))
+	}
+	if len(settings.Accounts) > 1 {
+		options = append(options, huh.NewOption(
+			"Remove · deletes Corresync local state for "+alias,
+			"remove",
+		))
+	} else {
+		options = append(options, huh.NewOption(
+			"Remove unavailable · add another account first",
+			"remove_unavailable",
+		))
+	}
+	options = append(options, huh.NewOption("Back", "back"))
+	action, selected, err := runSettingsSelect(
+		app,
+		"Account · "+alias,
+		accountDescription(account),
+		options,
+	)
+	if err != nil || !selected || action == "back" {
+		return err
+	}
+	switch action {
+	case "login":
+		return (&loginCommand{Account: alias}).Run(app)
+	case "login_terminal":
+		return runSettingsTerminalLogin(app, alias)
+	case "default":
+		return applyLocalSetting(app, service, application.SettingsUpdateInput{
+			Key: application.SettingDefaultAccount, Value: alias,
+		})
+	case "remove":
+		return runRemoveAccountSettings(app, settings, account)
+	case "remove_unavailable":
+		return writeLastAccountRemovalHelp(app)
+	case "rename":
+	default:
+		return nil
+	}
+	newAlias := alias
+	selected, err = runSettingsInput(
+		app,
+		"New name for "+alias,
+		"This changes only the local name; the stable account ID and login stay unchanged.",
+		&newAlias,
+		64,
+		func(value string) error {
+			if value == alias {
+				return errors.New("enter a different account name")
+			}
+			return domain.AccountAlias(value).Validate()
+		},
+	)
+	if err != nil || !selected {
+		return err
+	}
+	return runSettingsAccountMutation(app, func() error {
+		return (&accountRenameCommand{Account: alias, Alias: newAlias}).Run(app)
+	})
+}
+
+func runSettingsTerminalLogin(app *runtime, alias string) error {
+	originalInput := app.stdin
+	if accessible, ok := app.stdin.(*settingsAccessibleReader); ok {
+		app.stdin = accessible.reader
+		defer func() { app.stdin = originalInput }()
+	}
+	return (&loginCommand{Account: alias, Terminal: true}).Run(app)
+}
+
+func runAddAccountSettings(
+	app *runtime,
+	settings application.SettingsView,
+) error {
+	address := ""
+	selected, err := runSettingsInput(
+		app,
+		"Email address",
+		"Corresync discovers a provider without signing in. Command: corr setup <email-address>",
+		&address,
+		254,
+		validateSettingsEmailAddress,
+	)
+	if err != nil || !selected {
+		return err
+	}
+	separator := strings.LastIndexByte(address, '@')
+	if separator <= 0 {
+		return errors.New("email address must contain a local name before @")
+	}
+	alias := address[:separator]
+	selected, err = runSettingsInput(
+		app,
+		"Local account name",
+		"A short name used by --account. You can rename it later without changing the login.",
+		&alias,
+		64,
+		func(value string) error { return domain.AccountAlias(value).Validate() },
+	)
+	if err != nil || !selected {
+		return err
+	}
+	makeDefault := len(settings.Accounts) == 0
+	if len(settings.Accounts) > 0 {
+		choice, chosen, selectErr := runSettingsSelect(
+			app,
+			"Default account",
+			"Choose which account commands use when --account is omitted.",
+			[]huh.Option[string]{
+				huh.NewOption("Keep "+settings.DefaultAccount+" as default", "keep"),
+				huh.NewOption("Make "+alias+" the default", "new"),
+			},
+		)
+		if selectErr != nil || !chosen {
+			return selectErr
+		}
+		makeDefault = choice == "new"
+	}
+	return runSettingsAccountMutation(app, func() error {
+		return (&setupCommand{
+			Address: address,
+			Alias:   alias,
+			Default: makeDefault,
+		}).Run(app)
+	})
+}
+
+func runRemoveAccountSettings(
+	app *runtime,
+	settings application.SettingsView,
+	account application.SettingsAccount,
+) error {
+	replacement := ""
+	if account.IsDefault {
+		options := make([]huh.Option[string], 0, len(settings.Accounts)-1)
+		for _, candidate := range settings.Accounts {
+			if candidate.Alias == account.Alias {
+				continue
+			}
+			label := candidate.Alias
+			if candidate.Address != "" {
+				label += " · " + sanitizeCell(candidate.Address, 254)
+			}
+			options = append(options, huh.NewOption(label, candidate.Alias))
+		}
+		var selected bool
+		var err error
+		replacement, selected, err = runSettingsSelect(
+			app,
+			"New default account",
+			account.Alias+" is currently the default. Choose its replacement before removal.",
+			options,
+		)
+		if err != nil || !selected {
+			return err
 		}
 	}
+	accounts, _, err := app.accountServices()
+	if err != nil {
+		return err
+	}
+	review, err := accounts.ReviewRemove(app.context, application.AccountRemoveInput{
+		Account: account.Alias, ReplacementDefault: replacement,
+	})
+	if err != nil {
+		return err
+	}
+	if err := writeAccountRemovalReview(app, review); err != nil {
+		return err
+	}
+	confirmed, err := runSettingsConfirm(
+		app,
+		"Remove "+account.Alias+" and its local state?",
+		"This removes only Corresync-owned state on this device. The provider account is not deleted.",
+	)
+	if err != nil || !confirmed {
+		if err == nil {
+			return writeSettingsNoChange(app)
+		}
+		return err
+	}
+	return runSettingsAccountMutation(app, func() error {
+		return (&accountRemoveCommand{
+			Account: account.Alias, NewDefault: replacement, Approve: true,
+		}).Run(app)
+	})
+}
+
+func runSettingsAccountMutation(app *runtime, change func() error) error {
+	if err := app.requireDaemonStopped(); err == nil {
+		return change()
+	} else if !strings.Contains(err.Error(), "account changes require a stopped session owner") {
+		return err
+	}
+	if err := (&daemonStopCommand{}).Run(app); err != nil {
+		return err
+	}
+	if err := waitForSettingsDaemonStop(app); err != nil {
+		return err
+	}
+	changeErr := change()
+	restartErr := (&daemonStartCommand{}).Run(app)
+	if changeErr != nil {
+		return errors.Join(changeErr, restartErr)
+	}
+	if restartErr != nil {
+		return fmt.Errorf(
+			"account changed but the session owner did not restart: %w",
+			restartErr,
+		)
+	}
+	return nil
+}
+
+func waitForSettingsDaemonStop(app *runtime) error {
+	deadline := time.NewTimer(daemonShutdownTimeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(daemonPollInterval)
+	defer ticker.Stop()
 	for {
-		value, err := reader.line(prompt + " (b to go back): ")
-		if err != nil {
-			return settingsOption{}, false, err
+		if err := app.requireDaemonStopped(); err == nil {
+			return nil
 		}
-		if strings.EqualFold(value, "b") || strings.EqualFold(value, "back") {
-			return settingsOption{}, false, nil
-		}
-		selected, parseErr := strconv.Atoi(value)
-		if parseErr == nil && selected >= 1 && selected <= len(options) {
-			return options[selected-1], true, nil
-		}
-		if _, err := reader.view.printf(
-			"%s  Choose a number from 1 to %d, or b.\n",
-			reader.view.warning(),
-			len(options),
-		); err != nil {
-			return settingsOption{}, false, err
+		select {
+		case <-app.context.Done():
+			return app.context.Err()
+		case <-deadline.C:
+			return errors.New("session owner did not stop before the account change")
+		case <-ticker.C:
 		}
 	}
 }
 
-func writeSettingsMenu(view consoleView, configuration config.Config) error {
-	defaultAccount := configuration.DefaultAccount
-	if defaultAccount == "" {
-		defaultAccount = "none"
+func validateSettingsEmailAddress(value string) error {
+	if value == "" || len(value) > 254 || strings.ContainsAny(value, "\r\n\x00") {
+		return errors.New("enter one bare email address")
 	}
+	parsed, err := mail.ParseAddress(value)
+	if err != nil || parsed.Name != "" || parsed.Address != value ||
+		!strings.Contains(value, "@") {
+		return errors.New("enter one bare email address")
+	}
+	return nil
+}
+
+func runUpdateSettings(
+	app *runtime,
+	service *application.SettingsService,
+	settings application.SettingsView,
+) error {
 	checks := "on"
-	if configuration.Updates.DisableAutomaticChecks {
+	if !settings.AutomaticChecks {
 		checks = "off"
 	}
-	automaticInstall := "off"
-	if configuration.Updates.AutoInstall {
-		automaticInstall = "on"
+	install := "off"
+	if settings.AutomaticInstall {
+		install = "on"
 	}
+	action, selected, err := runSettingsSelect(
+		app,
+		"Updates",
+		"Choose a row to see its values and exact command.",
+		[]huh.Option[string]{
+			huh.NewOption(
+				"Channel  "+settings.UpdateChannel+" · stable or preview releases",
+				"channel",
+			),
+			huh.NewOption(
+				"Automatic checks  "+checks+" · quiet daily version check",
+				"checks",
+			),
+			huh.NewOption(
+				"Automatic install  "+install+" · verified direct updates",
+				"install",
+			),
+			huh.NewOption("Back", "back"),
+		},
+	)
+	if err != nil || !selected || action == "back" {
+		return err
+	}
+	switch action {
+	case "channel":
+		return chooseAndApplySetting(
+			app, service, application.SettingUpdateChannel,
+			"Update channel",
+			"Stable excludes prereleases. Preview includes alpha, beta, and RC builds.",
+			[]huh.Option[string]{
+				huh.NewOption("Stable · corr config set updates.channel stable", "stable").Selected(settings.UpdateChannel == "stable"),
+				huh.NewOption("Preview · corr config set updates.channel preview", "preview").Selected(settings.UpdateChannel == "preview"),
+			},
+		)
+	case "checks":
+		return chooseAndApplySetting(
+			app, service, application.SettingUpdateChecks,
+			"Automatic update checks",
+			"When on, Corresync checks quietly at most once per day.",
+			[]huh.Option[string]{
+				huh.NewOption("On · corr config set updates.automatic_checks true", "true").Selected(settings.AutomaticChecks),
+				huh.NewOption("Off · corr config set updates.automatic_checks false", "false").Selected(!settings.AutomaticChecks),
+			},
+		)
+	case "install":
+		return chooseAndApplySetting(
+			app, service, application.SettingUpdateInstall,
+			"Automatic update installation",
+			"Turning this on also enables the required daily update check.",
+			[]huh.Option[string]{
+				huh.NewOption("Off · install only with corr update", "false").Selected(!settings.AutomaticInstall),
+				huh.NewOption("On · install verified direct updates automatically", "true").Selected(settings.AutomaticInstall),
+			},
+		)
+	default:
+		return nil
+	}
+}
+
+func runSafetySettings(
+	app *runtime,
+	service *application.SettingsService,
+	settings application.SettingsView,
+) error {
+	return chooseAndApplySetting(
+		app, service, application.SettingSafetyMode,
+		"Safety mode",
+		"Guarded uses normal previews and approvals. Read-only blocks every write, including MCP writes.",
+		[]huh.Option[string]{
+			huh.NewOption("Guarded · corr config set policy.mode guarded", "guarded").Selected(settings.SafetyMode == "guarded"),
+			huh.NewOption("Read-only · corr config set policy.mode read_only", "read_only").Selected(settings.SafetyMode == "read_only"),
+		},
+	)
+}
+
+func runLoginSettings(
+	app *runtime,
+	service *application.SettingsService,
+	settings application.SettingsView,
+) error {
+	value := settings.LoginTimeout
+	selected, err := runSettingsInput(
+		app,
+		"Browser login timeout",
+		"Use 1m through 30m. Command: corr config set browser.login_timeout <duration>",
+		&value,
+		16,
+		func(candidate string) error {
+			duration, parseErr := time.ParseDuration(candidate)
+			if parseErr != nil {
+				return errors.New("enter a duration such as 5m or 10m")
+			}
+			if duration < time.Minute || duration > 30*time.Minute {
+				return errors.New("enter a duration from 1m through 30m")
+			}
+			return nil
+		},
+	)
+	if err != nil || !selected {
+		return err
+	}
+	return applyLocalSetting(app, service, application.SettingsUpdateInput{
+		Key: application.SettingLoginTimeout, Value: value,
+	})
+}
+
+func chooseAndApplySetting(
+	app *runtime,
+	service *application.SettingsService,
+	key string,
+	title string,
+	description string,
+	options []huh.Option[string],
+) error {
+	value, selected, err := runSettingsSelect(app, title, description, options)
+	if err != nil || !selected {
+		return err
+	}
+	return applyLocalSetting(app, service, application.SettingsUpdateInput{
+		Key: key, Value: value,
+	})
+}
+
+func applyLocalSetting(
+	app *runtime,
+	service *application.SettingsService,
+	input application.SettingsUpdateInput,
+) error {
+	review, err := service.Review(app.context, input)
+	if err != nil {
+		if strings.Contains(err.Error(), " is already ") {
+			return writeSettingsNoChange(app)
+		}
+		return err
+	}
+	if _, err := service.Apply(app.context, review); err != nil {
+		return err
+	}
+	view := newConsoleView(app, app.stdout, true)
 	if _, err := view.printf(
-		"\n%s  %s\n\n  %-18s %s\n  %-18s %s\n  %-18s %s\n  %-18s %s\n  %-18s %s\n  %-18s %s\n\n",
-		view.info(),
-		view.strong("Corresync settings"),
-		"Default account", defaultAccount,
-		"Update channel", configuration.Updates.Channel,
-		"Update checks", checks,
-		"Automatic install", automaticInstall,
-		"Safety mode", configuration.Policy.Mode,
-		"Login timeout", time.Duration(configuration.Browser.LoginTimeout),
+		"\n%s  %s\n   %s\n   %s\n",
+		view.success(), view.strong("Setting updated"),
+		view.muted(review.Description), view.command(review.Command),
 	); err != nil {
 		return err
 	}
+	if len(review.RelatedChanges) > 0 {
+		_, err = view.printf("   %s\n", view.muted("Automatic checks were also enabled because installation depends on them."))
+	}
+	if err == nil && review.RestartsSessions {
+		_, err = view.printf(
+			"   %s\n",
+			view.muted("If a session owner is running, use `corr daemon stop`; it restarts on next use."),
+		)
+	}
+	return err
+}
+
+func runSettingsSelect(
+	app *runtime,
+	title string,
+	description string,
+	options []huh.Option[string],
+) (string, bool, error) {
+	if !strings.Contains(strings.ToLower(description), "esc") {
+		description += " Esc goes back."
+	}
+	var value string
+	form := settingsForm(app, huh.NewSelect[string]().
+		Title(title).
+		Description(description).
+		Options(options...).
+		Value(&value).
+		Height(min(12, len(options)+2)))
+	if err := form.RunWithContext(app.context); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("run settings selector: %w", err)
+	}
+	return value, true, nil
+}
+
+func runSettingsInput(
+	app *runtime,
+	title string,
+	description string,
+	value *string,
+	limit int,
+	validate func(string) error,
+) (bool, error) {
+	if !strings.Contains(strings.ToLower(description), "esc") {
+		description += " Esc goes back."
+	}
+	form := settingsForm(app, huh.NewInput().
+		Title(title).
+		Description(description).
+		CharLimit(limit).
+		Value(value).
+		Validate(func(candidate string) error {
+			return validate(strings.TrimSpace(candidate))
+		}))
+	if err := form.RunWithContext(app.context); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return false, nil
+		}
+		return false, fmt.Errorf("run settings input: %w", err)
+	}
+	*value = strings.TrimSpace(*value)
+	return true, nil
+}
+
+func runSettingsConfirm(
+	app *runtime,
+	title string,
+	description string,
+) (bool, error) {
+	confirmed := false
+	form := settingsForm(app, huh.NewConfirm().
+		Title(title).
+		Description(description+" Esc goes back.").
+		Affirmative("Remove").
+		Negative("Keep account").
+		Value(&confirmed))
+	if err := form.RunWithContext(app.context); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return false, nil
+		}
+		return false, fmt.Errorf("run settings confirmation: %w", err)
+	}
+	return confirmed, nil
+}
+
+func settingsForm(app *runtime, fields ...huh.Field) *huh.Form {
+	keymap := huh.NewDefaultKeyMap()
+	keymap.Quit.SetKeys("ctrl+c", "esc")
+	keymap.Quit.SetHelp("esc", "cancel")
+	return huh.NewForm(huh.NewGroup(fields...)).
+		WithInput(app.stdin).
+		WithOutput(app.stdout).
+		WithAccessible(settingsAccessible(app)).
+		WithKeyMap(keymap).
+		WithShowHelp(true).
+		WithShowErrors(true).
+		WithWidth(88)
+}
+
+func settingsAccessible(app *runtime) bool {
+	value, exists := app.lookupEnv("CORRESYNC_ACCESSIBLE")
+	if !exists {
+		return false
+	}
+	enabled, err := strconv.ParseBool(value)
+	return err == nil && enabled
+}
+
+func writeSettingsOverview(app *runtime) error {
+	view := newConsoleView(app, app.stdout, true)
 	_, err := view.printf(
-		"  1. Rename an account\n"+
-			"  2. Change the default account\n"+
-			"  3. Change the update channel\n"+
-			"  4. Change automatic update installation\n"+
-			"  5. Change automatic update checks\n"+
-			"  6. Change the safety mode\n"+
-			"  7. Change the browser login timeout\n\n"+
-			"  %s\n\n",
-		view.muted("Advanced settings remain available through corr config edit."),
+		"\n%s  %s\n   %s\n\n",
+		view.info(), view.strong("Corresync settings"),
+		view.muted("Accounts, updates, safety, and sign-in — with the exact CLI command for every change."),
 	)
 	return err
 }
 
-func accountOptions(configuration config.Config) []settingsOption {
-	aliases := sortedAccountAliases(configuration)
-	options := make([]settingsOption, 0, len(aliases))
-	for _, alias := range aliases {
-		label := alias
-		if address := configuration.Accounts[alias].Address; address != "" {
-			label += " (" + sanitizeCell(address, 254) + ")"
-		}
-		options = append(options, settingsOption{label: label, value: alias})
-	}
-	return options
-}
-
-func renameAccountSetting(
-	app *runtime,
-	reader *settingsReader,
-	configuration config.Config,
-) error {
-	options := accountOptions(configuration)
-	if len(options) == 0 {
-		_, err := reader.view.printf(
-			"%s  No accounts are configured.\n   %s\n",
-			reader.view.warning(),
-			reader.view.command("Next: corr setup <email-address>"),
-		)
-		return err
-	}
-	option, selected, err := reader.choose("Account to rename", options)
-	if err != nil || !selected {
-		return err
-	}
-	for {
-		alias, err := reader.line("New account name (up to 64 characters; b to go back): ")
-		if err != nil {
-			return err
-		}
-		if strings.EqualFold(alias, "b") || strings.EqualFold(alias, "back") {
-			return nil
-		}
-		if err := domain.AccountAlias(alias).Validate(); err != nil {
-			if _, writeErr := reader.view.printf(
-				"%s  %s\n",
-				reader.view.warning(),
-				sanitizeCell(err.Error(), 256),
-			); writeErr != nil {
-				return writeErr
-			}
-			continue
-		}
-		return (&accountRenameCommand{Account: option.value, Alias: alias}).Run(app)
-	}
-}
-
-func changeDefaultAccount(
-	app *runtime,
-	reader *settingsReader,
-	configuration config.Config,
-	path string,
-) error {
-	options := accountOptions(configuration)
-	if len(options) == 0 {
-		_, err := reader.view.printf(
-			"%s  Add an account before choosing a default.\n   %s\n",
-			reader.view.warning(),
-			reader.view.command("Next: corr setup <email-address>"),
-		)
-		return err
-	}
-	return chooseConfigSetting(
-		app,
-		reader,
-		configuration,
-		path,
-		"default_account",
-		options,
+func writeAdvancedSettingsHelp(app *runtime) error {
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf(
+		"\n%s  %s\n   %s\n   %s\n\n",
+		view.info(), view.strong("Advanced configuration"),
+		view.command("corr config edit"),
+		view.muted("The editor validates the complete file before replacing your current config."),
 	)
+	return err
 }
 
-func chooseConfigSetting(
-	app *runtime,
-	reader *settingsReader,
-	configuration config.Config,
-	path string,
-	key string,
-	options []settingsOption,
-) error {
-	option, selected, err := reader.choose("New value", options)
-	if err != nil || !selected {
-		return err
-	}
-	return saveSettingsValue(app, configuration, path, key, option.value)
-}
-
-func changeLoginTimeout(
-	app *runtime,
-	reader *settingsReader,
-	configuration config.Config,
-	path string,
-) error {
-	for {
-		value, err := reader.line("Login timeout (for example 5m or 10m; b to go back): ")
-		if err != nil {
-			return err
-		}
-		if strings.EqualFold(value, "b") || strings.EqualFold(value, "back") {
-			return nil
-		}
-		candidate := configuration
-		if err := setConfigValue(&candidate, "browser.login_timeout", value); err != nil {
-			if _, writeErr := reader.view.printf(
-				"%s  %s\n",
-				reader.view.warning(),
-				sanitizeCell(err.Error(), 256),
-			); writeErr != nil {
-				return writeErr
-			}
-			continue
-		}
-		if err := config.Save(path, candidate); err != nil {
-			return err
-		}
-		return writeConfigUpdated(app, "browser.login_timeout = "+value)
-	}
-}
-
-func changeAutomaticInstall(
-	app *runtime,
-	reader *settingsReader,
-	configuration config.Config,
-	path string,
-) error {
-	option, selected, err := reader.choose("Automatic installation", []settingsOption{
-		{label: "Ask me to run corr update", value: "false"},
-		{label: "Install verified direct updates automatically", value: "true"},
-	})
-	if err != nil || !selected {
-		return err
-	}
-	if option.value == "true" {
-		configuration.Updates.DisableAutomaticChecks = false
-	}
-	if err := setConfigValue(&configuration, "updates.auto_install", option.value); err != nil {
-		return err
-	}
-	if err := config.Save(path, configuration); err != nil {
-		return err
-	}
-	detail := "updates.auto_install = " + option.value
-	if option.value == "true" {
-		detail += "; automatic checks = on (required)"
-	}
-	return writeConfigUpdated(app, detail)
-}
-
-func changeAutomaticChecks(
-	app *runtime,
-	reader *settingsReader,
-	configuration config.Config,
-	path string,
-) error {
-	option, selected, err := reader.choose("Automatic update checks", []settingsOption{
-		{label: "Check quietly once per day", value: "false"},
-		{label: "Do not check automatically", value: "true"},
-	})
-	if err != nil || !selected {
-		return err
-	}
-	if option.value == "true" && configuration.Updates.AutoInstall {
-		_, err = reader.view.printf(
-			"%s  Automatic checks are required while automatic installation is on.\n"+
-				"   Turn off automatic installation first.\n",
-			reader.view.warning(),
-		)
-		return err
-	}
-	return saveSettingsValue(
-		app,
-		configuration,
-		path,
-		"updates.disable_automatic_checks",
-		option.value,
+func writeLastAccountRemovalHelp(app *runtime) error {
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf(
+		"\n%s  %s\n   %s\n\n",
+		view.info(), view.strong("Keep one configured account"),
+		view.muted("Add a replacement account first, then remove this one."),
 	)
+	return err
 }
 
-func saveSettingsValue(
+func writeAccountRemovalReview(
 	app *runtime,
-	configuration config.Config,
-	path string,
-	key string,
-	value string,
+	review application.AccountChangeReview,
 ) error {
-	if err := setConfigValue(&configuration, key, value); err != nil {
-		return err
+	view := newConsoleView(app, app.stdout, true)
+	replacement := ""
+	if review.ReplacementDefault != "" {
+		replacement = "\n   " + view.muted("New default: "+review.ReplacementDefault)
 	}
-	if err := config.Save(path, configuration); err != nil {
-		return err
+	oauth := ""
+	if review.MayDeleteOwnedOAuth {
+		oauth = "\n   " + view.muted("Its Corresync-owned OAuth authorization may also be removed.")
 	}
-	return writeConfigUpdated(app, key+" = "+value)
+	_, err := view.printf(
+		"\n%s  %s\n   %s%s%s\n\n",
+		view.warning(), view.strong("Review account removal"),
+		view.muted("Account: "+review.Alias+" · local sessions and state will be deleted."),
+		replacement, oauth,
+	)
+	return err
+}
+
+func writeSettingsNoChange(app *runtime) error {
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf("\n%s  %s\n", view.info(), view.strong("No change"))
+	return err
+}
+
+func writeSettingsDone(app *runtime) error {
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf("\n%s  %s\n", view.success(), view.strong("Done"))
+	return err
+}
+
+func findSettingsAccount(
+	settings application.SettingsView,
+	alias string,
+) (application.SettingsAccount, bool) {
+	for _, account := range settings.Accounts {
+		if account.Alias == alias {
+			return account, true
+		}
+	}
+	return application.SettingsAccount{}, false
+}
+
+func accountDescription(account application.SettingsAccount) string {
+	parts := []string{"Stable account identity and login are preserved when renaming."}
+	if account.Address != "" {
+		parts = append(parts, "Address: "+sanitizeCell(account.Address, 254))
+	}
+	return strings.Join(parts, " ")
+}
+
+func safetySummary(mode string) string {
+	if mode == "read_only" {
+		return "all writes blocked"
+	}
+	return "writes use normal approval policy"
 }

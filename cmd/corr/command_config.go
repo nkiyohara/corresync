@@ -351,6 +351,8 @@ func getConfigValue(configuration config.Config, key string) (any, error) {
 		return time.Duration(configuration.Browser.LoginTimeout).String(), nil
 	case "updates.disable_automatic_checks":
 		return configuration.Updates.DisableAutomaticChecks, nil
+	case "updates.automatic_checks":
+		return !configuration.Updates.DisableAutomaticChecks, nil
 	case "updates.auto_install":
 		return configuration.Updates.AutoInstall, nil
 	case "updates.channel":
@@ -431,12 +433,21 @@ func setConfigValue(configuration *config.Config, key, value string) error {
 			return fmt.Errorf("parse %s as boolean: %w", key, err)
 		}
 		configuration.Updates.DisableAutomaticChecks = parsed
+	case "updates.automatic_checks":
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("parse %s as boolean: %w", key, err)
+		}
+		configuration.Updates.DisableAutomaticChecks = !parsed
 	case "updates.auto_install":
 		parsed, err := strconv.ParseBool(value)
 		if err != nil {
 			return fmt.Errorf("parse %s as boolean: %w", key, err)
 		}
 		configuration.Updates.AutoInstall = parsed
+		if parsed {
+			configuration.Updates.DisableAutomaticChecks = false
+		}
 	case "updates.channel":
 		configuration.Updates.Channel = config.UpdateChannel(value)
 	default:

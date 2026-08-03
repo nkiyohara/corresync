@@ -144,16 +144,17 @@
           <article aria-labelledby="cap-agents">
             <h3 id="cap-agents">For AI agents, over local stdio</h3>
             <p>
-              Corresync exposes 40 narrow, typed tools and two read-only monitor resources. There is
+              Corresync exposes 43 narrow, typed tools and two read-only monitor resources. There is
               no HTTP, SSE, remote endpoint, or hosted relay.
             </p>
             <ul>
               <li>Metadata-first tools with per-account provenance in every result</li>
               <li>Preview and commit are separate tools for every consequential write</li>
-              <li>Account add, rename, and remove are preview → commit pairs too</li>
+              <li>Account lifecycle and everyday settings use preview → commit pairs too</li>
+              <li>Agents can add, rename, and remove accounts through those lifecycle tools</li>
               <li>
                 Signing in, enabling monitoring, approving a runner or remote egress, purging
-                queues, imports, and updates stay CLI-only human actions
+                queues, imports, and binary updates stay CLI-only human actions
               </li>
               <li>Tool annotations inform client UX but never replace server-side policy</li>
             </ul>

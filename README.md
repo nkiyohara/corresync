@@ -194,9 +194,16 @@ corr mail folders --account personal
 corr calendar folders --account personal
 ```
 
-Run `corr settings` later to rename an account, choose the default account,
-or change everyday update, safety, and login-timeout settings without editing
-TOML or remembering configuration keys. The direct rename form remains:
+Run `corr settings` to add, sign in to, rename, select, or remove accounts, and
+to manage updates, safety, and browser sign-in from an arrow-key form. The
+top-level Accounts category contains Add account and the configured account
+list; selecting an account opens only actions for that account. Removal
+previews the local data it deletes and asks for confirmation; removing the
+default first asks which remaining account should replace it. Each choice also
+displays the equivalent command, so the interactive flow teaches the direct
+CLI.
+Set `CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader prompts. The
+direct rename form remains:
 
 ```console
 corr account rename personal work
@@ -236,7 +243,7 @@ corr mcp setup codex
 ```
 
 Use `corr mcp --help` for Claude Code, GitHub Copilot CLI, Gemini CLI, Qwen
-Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 40
+Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 43
 narrow tools and two read-only monitor resources; there is no HTTP, SSE,
 remote MCP endpoint, or hosted relay.
 

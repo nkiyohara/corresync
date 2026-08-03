@@ -3,13 +3,31 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.8.5 - 2026-08-03
+
+### Settings experience
+
+- Replace the numbered settings menu with an arrow-key form organized around
+  accounts, updates, safety, and browser sign-in; every choice explains its
+  effect and shows the equivalent non-interactive command.
+- Add a nested Accounts category containing account creation, the configured
+  account list, and per-account graphical or terminal sign-in, rename, default,
+  and removal actions. Removal reviews local state deletion and selects a
+  replacement default when required; running session owners are stopped and
+  restarted around account configuration changes.
+- Add an accessible line-oriented mode through `CORRESYNC_ACCESSIBLE=true` and
+  use Huh v2 for validated terminal selections and inputs.
+- Expose everyday settings to MCP through read-only `settings_show` and the
+  caller-bound `settings_update` / `settings_update_commit` approval pair;
+  account aliases continue to use `account_rename` and its commit tool.
+- Share validation, dependency handling, optimistic stale-write rejection, and
+  atomic persistence between the interactive CLI and MCP settings paths.
 
 ## 0.8.5-rc.4 - 2026-08-03
 
 ### Guided settings
 
-- Add `corr settings`, an interactive numbered menu for renaming accounts,
+- Add `corr settings`, an interactive guided menu for renaming accounts,
   choosing the default account, update preferences, safety mode, and browser
   login timeout while retaining typed CLI commands for scripts.
 - Point account and configuration views to the guided menu and show the exact

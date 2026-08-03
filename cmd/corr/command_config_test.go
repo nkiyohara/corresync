@@ -61,7 +61,9 @@ func TestConfigGetAndSetAutomaticInstall(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := config.Save(path, config.OutlookDefault()); err != nil {
+	configuration := config.OutlookDefault()
+	configuration.Updates.DisableAutomaticChecks = true
+	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
@@ -72,12 +74,38 @@ func TestConfigGetAndSetAutomaticInstall(t *testing.T) {
 		t.Fatalf("config set auto-install: %v", err)
 	}
 	loaded, err := config.Load(path)
-	if err != nil || !loaded.Updates.AutoInstall {
+	if err != nil || !loaded.Updates.AutoInstall ||
+		loaded.Updates.DisableAutomaticChecks {
 		t.Fatalf("saved auto-install config = %+v, %v", loaded.Updates, err)
 	}
 	value, err := getConfigValue(loaded, "updates.auto_install")
 	if err != nil || value != true {
 		t.Fatalf("get updates.auto_install = %v, %v", value, err)
+	}
+}
+
+func TestConfigGetAndSetFriendlyAutomaticChecks(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
+		t.Fatal(err)
+	}
+	app := newRuntime(
+		t.Context(), path, &bytes.Buffer{}, &bytes.Buffer{}, buildinfo.Current(),
+	)
+	if err := (&configSetCommand{
+		Key: "updates.automatic_checks", Value: "false", JSON: true,
+	}).Run(app); err != nil {
+		t.Fatalf("config set automatic checks: %v", err)
+	}
+	loaded, err := config.Load(path)
+	if err != nil || !loaded.Updates.DisableAutomaticChecks {
+		t.Fatalf("saved automatic checks config = %+v, %v", loaded.Updates, err)
+	}
+	value, err := getConfigValue(loaded, "updates.automatic_checks")
+	if err != nil || value != false {
+		t.Fatalf("get updates.automatic_checks = %v, %v", value, err)
 	}
 }
 
