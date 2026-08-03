@@ -107,9 +107,18 @@ func (command *configShowCommand) Run(app *runtime) error {
 	); err != nil {
 		return err
 	}
+	if _, err := view.printf(
+		"  %-18s %s\n  %-18s %t\n",
+		"Update channel",
+		configuration.Updates.Channel,
+		"Automatic install",
+		configuration.Updates.AutoInstall,
+	); err != nil {
+		return err
+	}
 	if len(configuration.Accounts) == 0 {
 		_, err := view.printf(
-			"  No accounts configured.\n\n  %s\n",
+			"\n  No accounts configured.\n\n  %s\n",
 			view.command("Next: corr setup <email-address>"),
 		)
 		return err
@@ -343,6 +352,8 @@ func getConfigValue(configuration config.Config, key string) (any, error) {
 		return configuration.Updates.DisableAutomaticChecks, nil
 	case "updates.auto_install":
 		return configuration.Updates.AutoInstall, nil
+	case "updates.channel":
+		return configuration.Updates.Channel, nil
 	}
 	if alias, field, ok := accountConfigKey(key); ok {
 		account, exists := configuration.Accounts[alias]
@@ -425,6 +436,8 @@ func setConfigValue(configuration *config.Config, key, value string) error {
 			return fmt.Errorf("parse %s as boolean: %w", key, err)
 		}
 		configuration.Updates.AutoInstall = parsed
+	case "updates.channel":
+		configuration.Updates.Channel = config.UpdateChannel(value)
 	default:
 		alias, field, ok := accountConfigKey(key)
 		if !ok {

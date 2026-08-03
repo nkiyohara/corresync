@@ -15,7 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CurrentVersion = 4
+const CurrentVersion = 5
 
 const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
@@ -111,9 +111,19 @@ type Browser struct {
 // startup. Explicit `corr update` and `corr update check` remain available
 // when automatic checks are disabled.
 type Updates struct {
-	DisableAutomaticChecks bool `json:"disableAutomaticChecks" toml:"disable_automatic_checks"`
-	AutoInstall            bool `json:"autoInstall" toml:"auto_install"`
+	Channel                UpdateChannel `json:"channel" toml:"channel"`
+	DisableAutomaticChecks bool          `json:"disableAutomaticChecks" toml:"disable_automatic_checks"`
+	AutoInstall            bool          `json:"autoInstall" toml:"auto_install"`
 }
+
+// UpdateChannel selects which signed public releases update checks and direct
+// self-update may use. Package-manager catalogs remain stable-only.
+type UpdateChannel string
+
+const (
+	UpdateChannelStable  UpdateChannel = "stable"
+	UpdateChannelPreview UpdateChannel = "preview"
+)
 
 // Duration encodes a human-readable Go duration such as "5m" in TOML.
 type Duration time.Duration
@@ -152,6 +162,7 @@ func Default() Config {
 			MaxAttendees:  50,
 		},
 		Browser: Browser{LoginTimeout: Duration(5 * time.Minute)},
+		Updates: Updates{Channel: UpdateChannelStable},
 	}
 }
 
@@ -260,6 +271,11 @@ func (configuration Config) Validate() error {
 	}
 	if strings.ContainsAny(configuration.Browser.Executable, "\r\n\x00") {
 		return errors.New("browser executable contains a forbidden character")
+	}
+	switch configuration.Updates.Channel {
+	case UpdateChannelStable, UpdateChannelPreview:
+	default:
+		return errors.New("updates.channel must be stable or preview")
 	}
 	if configuration.Updates.DisableAutomaticChecks && configuration.Updates.AutoInstall {
 		return errors.New(

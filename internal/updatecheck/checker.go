@@ -1,4 +1,4 @@
-// Package updatecheck performs a quiet, cached check for newer stable releases.
+// Package updatecheck performs a quiet, cached check for signed release channels.
 package updatecheck
 
 import (
@@ -15,19 +15,44 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/mod/semver"
 )
 
 const (
 	// DefaultEndpoint returns the latest published non-prerelease GitHub release.
 	DefaultEndpoint = "https://api.github.com/repos/nkiyohara/corresync/releases/latest"
-	cacheFormat     = 1
-	cacheLifetime   = 24 * time.Hour
-	maximumBody     = 1 << 20
-	maximumCache    = 8 << 10
+	// DefaultPreviewEndpoint returns recent published releases so the highest
+	// stable or prerelease semantic version can be selected deterministically.
+	DefaultPreviewEndpoint = "https://api.github.com/repos/nkiyohara/corresync/releases?per_page=20"
+	cacheFormat            = 2
+	cacheLifetime          = 24 * time.Hour
+	maximumBody            = 1 << 20
+	maximumCache           = 8 << 10
 )
 
+// Channel selects a signed public release stream.
+type Channel string
+
+const (
+	ChannelStable  Channel = "stable"
+	ChannelPreview Channel = "preview"
+)
+
+func normalizeChannel(channel Channel) (Channel, error) {
+	if channel == "" {
+		return ChannelStable, nil
+	}
+	switch channel {
+	case ChannelStable, ChannelPreview:
+		return channel, nil
+	default:
+		return "", fmt.Errorf("unsupported update channel %q", channel)
+	}
+}
+
 // Status describes the relationship between the running binary and the latest
-// stable release without initiating an update.
+// release in its channel without initiating an update.
 type Status string
 
 const (
@@ -39,25 +64,27 @@ const (
 
 // ErrUnavailable means public release metadata could not be checked. Callers
 // may report this for an explicit check, but automatic checks must ignore it.
-var ErrUnavailable = errors.New("stable release metadata is unavailable")
+var ErrUnavailable = errors.New("release metadata is unavailable")
 
 // Result is safe for human or machine-readable output. It contains no account,
 // tenant, mailbox, configuration, or machine identifier.
 type Result struct {
-	Status          Status `json:"status"`
-	CurrentVersion  string `json:"currentVersion"`
-	LatestVersion   string `json:"latestVersion,omitempty"`
-	UpdateAvailable bool   `json:"updateAvailable"`
-	ReleaseURL      string `json:"releaseUrl,omitempty"`
-	CheckedAt       string `json:"checkedAt,omitempty"`
-	Cached          bool   `json:"cached"`
+	Channel         Channel `json:"channel"`
+	Status          Status  `json:"status"`
+	CurrentVersion  string  `json:"currentVersion"`
+	LatestVersion   string  `json:"latestVersion,omitempty"`
+	UpdateAvailable bool    `json:"updateAvailable"`
+	ReleaseURL      string  `json:"releaseUrl,omitempty"`
+	CheckedAt       string  `json:"checkedAt,omitempty"`
+	Cached          bool    `json:"cached"`
 }
 
-// Checker fetches and caches the latest stable public release. Dependencies
-// are explicit so all network, clock, and cache behavior is deterministic in
-// tests.
+// Checker fetches and caches the latest public release in one channel.
+// Dependencies are explicit so all network, clock, and cache behavior is
+// deterministic in tests.
 type Checker struct {
 	CurrentVersion string
+	Channel        Channel
 	CachePath      string
 	Endpoint       string
 	Client         *http.Client
@@ -73,6 +100,7 @@ type releaseResponse struct {
 
 type cacheRecord struct {
 	Format        int       `json:"format"`
+	Channel       Channel   `json:"channel"`
 	CheckedAt     time.Time `json:"checkedAt"`
 	LatestVersion string    `json:"latestVersion,omitempty"`
 	Unavailable   bool      `json:"unavailable,omitempty"`
@@ -82,9 +110,14 @@ type cacheRecord struct {
 // fetch is cached too, preventing unavailable endpoints from being retried by
 // every command.
 func (checker Checker) Check(ctx context.Context) (Result, error) {
+	channel, err := normalizeChannel(checker.Channel)
+	if err != nil {
+		return Result{}, err
+	}
 	current, currentOK := parseVersion(checker.CurrentVersion)
 	if !currentOK {
 		return Result{
+			Channel:        channel,
 			Status:         StatusDevelopment,
 			CurrentVersion: checker.CurrentVersion,
 		}, nil
@@ -97,7 +130,7 @@ func (checker Checker) Check(ctx context.Context) (Result, error) {
 		now = checker.Now().UTC()
 	}
 	if !checker.Force {
-		if cached, ok := loadFreshCache(checker.CachePath, now); ok {
+		if cached, ok := loadFreshCache(checker.CachePath, now, channel); ok {
 			result, err := resultFromRecord(checker.CurrentVersion, current, cached, true)
 			return result, err
 		}
@@ -105,6 +138,7 @@ func (checker Checker) Check(ctx context.Context) (Result, error) {
 	releaseLock, acquired := acquireCheckLock(checker.CachePath, now)
 	if !acquired {
 		return Result{
+			Channel:        channel,
 			Status:         StatusUnavailable,
 			CurrentVersion: checker.CurrentVersion,
 		}, ErrUnavailable
@@ -114,13 +148,13 @@ func (checker Checker) Check(ctx context.Context) (Result, error) {
 	// process acquired the lock. An explicit forced check intentionally skips
 	// it and refreshes public metadata.
 	if !checker.Force {
-		if cached, ok := loadFreshCache(checker.CachePath, now); ok {
+		if cached, ok := loadFreshCache(checker.CachePath, now, channel); ok {
 			result, err := resultFromRecord(checker.CurrentVersion, current, cached, true)
 			return result, err
 		}
 	}
 
-	record := cacheRecord{Format: cacheFormat, CheckedAt: now, Unavailable: true}
+	record := cacheRecord{Format: cacheFormat, Channel: channel, CheckedAt: now, Unavailable: true}
 	// Publish an in-progress failure sentinel before using the network. Other
 	// processes then remain quiet instead of starting a concurrent check.
 	if err := writeCache(checker.CachePath, record); err != nil {
@@ -129,6 +163,7 @@ func (checker Checker) Check(ctx context.Context) (Result, error) {
 	latest, err := checker.fetchLatest(ctx)
 	if err != nil {
 		return Result{
+			Channel:        channel,
 			Status:         StatusUnavailable,
 			CurrentVersion: checker.CurrentVersion,
 			CheckedAt:      now.Format(time.RFC3339),
@@ -169,9 +204,17 @@ func acquireCheckLock(cachePath string, now time.Time) (func(), bool) {
 }
 
 func (checker Checker) fetchLatest(ctx context.Context) (string, error) {
+	channel, err := normalizeChannel(checker.Channel)
+	if err != nil {
+		return "", err
+	}
 	endpoint := checker.Endpoint
 	if endpoint == "" {
-		endpoint = DefaultEndpoint
+		if channel == ChannelPreview {
+			endpoint = DefaultPreviewEndpoint
+		} else {
+			endpoint = DefaultEndpoint
+		}
 	}
 	client := checker.Client
 	if client == nil {
@@ -200,20 +243,90 @@ func (checker Checker) fetchLatest(ctx context.Context) (string, error) {
 	if len(data) > maximumBody {
 		return "", errors.New("release metadata exceeds size limit")
 	}
-	var release releaseResponse
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	if err := decoder.Decode(&release); err != nil {
-		return "", fmt.Errorf("decode release metadata: %w", err)
+	if channel == ChannelStable {
+		var release releaseResponse
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		if err := decoder.Decode(&release); err != nil {
+			return "", fmt.Errorf("decode release metadata: %w", err)
+		}
+		latest, ok := eligibleRelease(release, channel)
+		if !ok {
+			return "", errors.New("latest release is not a stable semantic version")
+		}
+		return latest.String(), nil
 	}
-	latest, ok := parseVersion(release.TagName)
-	if !ok || latest.prerelease != "" || release.Draft || release.Prerelease {
-		return "", errors.New("latest release is not a stable semantic version")
+	var releases []releaseResponse
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(&releases); err != nil {
+		return "", fmt.Errorf("decode preview release metadata: %w", err)
+	}
+	latest, ok := selectLatestRelease(releases, channel)
+	if !ok {
+		return "", errors.New("no eligible preview release was found")
 	}
 	return latest.String(), nil
 }
 
+func eligibleRelease(release releaseResponse, channel Channel) (semanticVersion, bool) {
+	return eligibleVersionTag(release.TagName, release.Draft, release.Prerelease, channel)
+}
+
+func eligibleVersionTag(
+	tag string,
+	draft bool,
+	prerelease bool,
+	channel Channel,
+) (semanticVersion, bool) {
+	version, ok := parseVersion(tag)
+	if !ok || tag != version.String() || draft || prerelease != (version.prerelease != "") {
+		return semanticVersion{}, false
+	}
+	if version.prerelease == "" {
+		return version, true
+	}
+	if channel != ChannelPreview || !supportedPreviewPrerelease(version.prerelease) {
+		return semanticVersion{}, false
+	}
+	return version, true
+}
+
+func supportedPreviewPrerelease(prerelease string) bool {
+	parts := strings.Split(prerelease, ".")
+	if len(parts) != 2 {
+		return false
+	}
+	switch parts[0] {
+	case "alpha", "beta", "rc":
+	default:
+		return false
+	}
+	_, err := strconv.ParseUint(parts[1], 10, 64)
+	return err == nil
+}
+
+func selectLatestRelease(releases []releaseResponse, channel Channel) (semanticVersion, bool) {
+	var latest semanticVersion
+	found := false
+	for _, release := range releases {
+		candidate, ok := eligibleRelease(release, channel)
+		if !ok {
+			continue
+		}
+		if !found || candidate.Compare(latest) > 0 {
+			latest = candidate
+			found = true
+		}
+	}
+	return latest, found
+}
+
 func resultFromRecord(currentRaw string, current semanticVersion, record cacheRecord, cached bool) (Result, error) {
+	channel, err := normalizeChannel(record.Channel)
+	if err != nil {
+		return Result{}, ErrUnavailable
+	}
 	result := Result{
+		Channel:        channel,
 		Status:         StatusUnavailable,
 		CurrentVersion: currentRaw,
 		CheckedAt:      record.CheckedAt.Format(time.RFC3339),
@@ -223,7 +336,7 @@ func resultFromRecord(currentRaw string, current semanticVersion, record cacheRe
 		return result, ErrUnavailable
 	}
 	latest, ok := parseVersion(record.LatestVersion)
-	if !ok || latest.prerelease != "" {
+	if !ok || (channel == ChannelStable && latest.prerelease != "") {
 		return result, ErrUnavailable
 	}
 	result.LatestVersion = latest.String()
@@ -238,7 +351,7 @@ func resultFromRecord(currentRaw string, current semanticVersion, record cacheRe
 	return result, nil
 }
 
-func loadFreshCache(path string, now time.Time) (cacheRecord, bool) {
+func loadFreshCache(path string, now time.Time, channel Channel) (cacheRecord, bool) {
 	file, err := os.Open(path) // #nosec G304 -- path is the fixed private application cache.
 	if err != nil {
 		return cacheRecord{}, false
@@ -258,7 +371,7 @@ func loadFreshCache(path string, now time.Time) (cacheRecord, bool) {
 	if err := decoder.Decode(&record); err != nil {
 		return cacheRecord{}, false
 	}
-	if record.Format != cacheFormat {
+	if record.Format != cacheFormat || record.Channel != channel {
 		return cacheRecord{}, false
 	}
 	age := now.Sub(record.CheckedAt)
@@ -318,6 +431,9 @@ type semanticVersion struct {
 
 func parseVersion(value string) (semanticVersion, bool) {
 	value = strings.TrimPrefix(value, "v")
+	if !semver.IsValid("v" + value) {
+		return semanticVersion{}, false
+	}
 	core, prerelease, _ := strings.Cut(value, "-")
 	if buildIndex := strings.IndexByte(prerelease, '+'); buildIndex >= 0 {
 		prerelease = prerelease[:buildIndex]
@@ -354,24 +470,5 @@ func (version semanticVersion) String() string {
 }
 
 func (version semanticVersion) Compare(other semanticVersion) int {
-	left := []uint64{version.major, version.minor, version.patch}
-	right := []uint64{other.major, other.minor, other.patch}
-	for index := range left {
-		if left[index] < right[index] {
-			return -1
-		}
-		if left[index] > right[index] {
-			return 1
-		}
-	}
-	if version.prerelease == other.prerelease {
-		return 0
-	}
-	if version.prerelease == "" {
-		return 1
-	}
-	if other.prerelease == "" {
-		return -1
-	}
-	return strings.Compare(version.prerelease, other.prerelease)
+	return semver.Compare(version.String(), other.String())
 }

@@ -46,15 +46,16 @@ and unshared Corresync-owned OAuth grant state. External standards credentials
 remain in their keyring/helper. Removing the default account requires
 `--new-default`.
 
-## Schema v4
+## Schema v5
 
-Schema v4 separates mail and calendar routes and gives Google one current
-provider ID with Gmail's fixed OAuth-backed IMAP/SMTP transport. A freshly
+Schema v5 adds an explicit signed-release channel to the provider-neutral
+schema introduced in v4. Existing v4 files migrate to `stable` without
+changing check or automatic-install consent. A freshly
 initialized provider-neutral configuration contains no account and has an
 empty `default_account`. The first account added becomes the default:
 
 ```toml
-version = 4
+version = 5
 default_account = ""
 
 [policy]
@@ -68,6 +69,7 @@ max_attendees = 50
 login_timeout = "5m0s"
 
 [updates]
+channel = "stable"
 disable_automatic_checks = false
 auto_install = false
 ```
@@ -75,7 +77,7 @@ auto_install = false
 A configured Outlook Web account then looks like:
 
 ```toml
-version = 4
+version = 5
 default_account = "work"
 
 [accounts.work]
@@ -105,6 +107,7 @@ max_attendees = 50
 login_timeout = "5m0s"
 
 [updates]
+channel = "stable"
 disable_automatic_checks = false
 auto_install = false
 ```
@@ -287,9 +290,21 @@ external sends retain mandatory review.
 checks without disabling `corr update` or `corr update check`.
 `CORRESYNC_NO_UPDATE_CHECK=1` provides a process override.
 
-Interactive CLI starts check the cached stable-release status and show one
-short, installation-specific command when an update is available. Opt in to
-verified automatic installation for a standalone/direct binary with:
+Interactive CLI starts check the cached release status for the configured
+channel and show one short, installation-specific action when an update is
+available. `stable` is the default. A direct installation can follow fully
+verified prereleases with:
+
+```console
+corr config set updates.channel preview
+```
+
+Return to the stable channel with `corr config set updates.channel stable`.
+Switching channels never causes a downgrade. Preview releases are not placed
+in Homebrew, Scoop, WinGet, APT, DNF, or APK catalogs; a package-managed binary
+can report a preview but will not mix ownership by installing it.
+
+Opt in to verified automatic installation for a standalone/direct binary with:
 
 ```console
 corr config set updates.auto_install true

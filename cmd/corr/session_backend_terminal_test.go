@@ -14,6 +14,8 @@ import (
 
 type fakeTerminalBrowser struct {
 	actions        []browser.TerminalAction
+	snapshots      []browser.TerminalView
+	snapshotCalls  int
 	closed         bool
 	snapshotErr    error
 	interactionErr error
@@ -35,15 +37,78 @@ func (*fakeTerminalBrowser) CurrentSession() (session.Credentials, error) {
 }
 
 func (browserHandle *fakeTerminalBrowser) TerminalSnapshot(context.Context) (browser.TerminalView, error) {
-	return browser.TerminalView{
+	view := browser.TerminalView{
 		Origin: "https://login.example", Title: "Sign in", Text: "Continue",
 		Controls: []browser.TerminalControl{{ID: "control-1", Kind: "input", Name: "Email"}},
-	}, browserHandle.snapshotErr
+	}
+	if len(browserHandle.snapshots) > 0 {
+		index := browserHandle.snapshotCalls
+		if index >= len(browserHandle.snapshots) {
+			index = len(browserHandle.snapshots) - 1
+		}
+		view = browserHandle.snapshots[index]
+	}
+	browserHandle.snapshotCalls++
+	return view, browserHandle.snapshotErr
 }
 
 func (browserHandle *fakeTerminalBrowser) TerminalAct(_ context.Context, action browser.TerminalAction) error {
 	browserHandle.actions = append(browserHandle.actions, action)
 	return browserHandle.interactionErr
+}
+
+func TestSessionBackendTerminalActivateWaitsForPageChange(t *testing.T) {
+	t.Setenv("OWA_STATE_DIR", t.TempDir())
+	lifecycle, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	initial := browser.TerminalView{
+		Origin: "https://login.microsoftonline.com", Title: "Sign in",
+		Text: "Pick an account",
+		Controls: []browser.TerminalControl{{
+			ID: "control-1", Kind: "activate", Name: "Sign in with work account",
+		}},
+	}
+	next := browser.TerminalView{
+		Origin: "https://login.microsoftonline.com", Title: "Enter password",
+		Text: "Enter password",
+		Controls: []browser.TerminalControl{{
+			ID: "control-1", Kind: "input", Name: "Password", Sensitive: true,
+		}},
+	}
+	fakeBrowser := &fakeTerminalBrowser{snapshots: []browser.TerminalView{initial, next}}
+	app := &runtime{launch: func(_ context.Context, _ browser.Options) (browserHandle, error) {
+		return fakeBrowser, nil
+	}}
+	backend := &sessionBackend{
+		app: app, configuration: config.OutlookDefault(), lifecycle: lifecycle, cancel: cancel,
+		accounts: make(map[domain.AccountID]sessionAccount), previews: make(map[string]sessionPreview),
+		terminalSessions: make(map[string]*terminalLoginSession),
+		terminalAccounts: make(map[domain.AccountID]string),
+	}
+	accountID := backend.configuration.Accounts["work"].ID
+	caller := domain.Caller{Surface: "cli", Instance: "process-1"}
+	result, err := backend.TerminalLogin(
+		t.Context(), daemonapi.TerminalLoginInput{Account: accountID}, caller,
+	)
+	if err != nil {
+		t.Fatalf("TerminalLogin(start) error = %v", err)
+	}
+	result, err = backend.TerminalLogin(t.Context(), daemonapi.TerminalLoginInput{
+		Account: accountID, SessionID: result.SessionID,
+		Action: &daemonapi.TerminalLoginAction{Type: "activate", ControlID: "control-1"},
+	}, caller)
+	if err != nil {
+		t.Fatalf("TerminalLogin(activate) error = %v", err)
+	}
+	if result.View == nil || result.View.Title != "Enter password" ||
+		len(fakeBrowser.actions) != 1 || fakeBrowser.snapshotCalls != 2 {
+		t.Fatalf(
+			"TerminalLogin(activate) = %+v; actions=%+v snapshots=%d",
+			result,
+			fakeBrowser.actions,
+			fakeBrowser.snapshotCalls,
+		)
+	}
 }
 
 func TestSessionBackendTerminalLoginStartsHeadlessAndBindsCaller(t *testing.T) {

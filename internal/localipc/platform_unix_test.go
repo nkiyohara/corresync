@@ -265,7 +265,14 @@ func endpointWithHeldLock(t *testing.T) (Endpoint, *os.File) {
 func privateRuntimeDirectory(t *testing.T) string {
 	t.Helper()
 
-	directory := t.TempDir()
+	// macOS runner TempDir paths can exceed sockaddr_un.sun_path before the
+	// synthetic socket filename is appended. The production resolver already
+	// has a tested short-path fallback; keep these node-attack tests focused on
+	// ownership and replacement by using an owner-only short temporary path.
+	directory := shortTemporaryDirectory(t, "corr-ipc-")
+	if socketPath := filepath.Join(directory, "synthetic.sock"); len(socketPath) > maximumUnixSocketPath {
+		t.Fatalf("short test socket path is %d bytes: %q", len(socketPath), socketPath)
+	}
 	if err := os.Chmod(directory, 0o700); err != nil { // #nosec G302 -- owner-only directory.
 		t.Fatalf("Chmod() error = %v", err)
 	}

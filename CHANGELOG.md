@@ -5,6 +5,30 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.5-rc.1 - 2026-08-03
+
+### Release channels
+
+- Add a default `stable` and opt-in `preview` release channel, configurable
+  with `corr config set updates.channel stable|preview` and used consistently
+  by startup checks, explicit checks, and verified direct self-update.
+- Give stable and preview releases the same signed artifact gates while keeping
+  Homebrew, Scoop, WinGet, and native package catalogs stable-only; managed
+  installs never receive a misleading preview upgrade command.
+- Migrate schema-v4 configurations deterministically to the stable channel,
+  isolate update caches by channel, compare prerelease versions with SemVer
+  precedence, and refuse channel-switch downgrades.
+
+### Outlook login
+
+- Detect a missing Linux graphical session before attempting visible Outlook
+  Web login and point SSH users to the account-specific `--terminal` command
+  instead of exposing Chromium portal and Crashpad diagnostics.
+- After a terminal-relay activation or form submission, wait for either an
+  authenticated session or a changed bounded browser view; when neither is
+  visible yet, explain how to refresh instead of silently redisplaying the
+  same controls.
+
 ## 0.8.4 - 2026-07-30
 
 ### macOS release trust

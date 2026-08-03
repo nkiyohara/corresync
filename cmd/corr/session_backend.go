@@ -136,6 +136,11 @@ type terminalLoginSession struct {
 	view     daemonapi.TerminalLoginView
 }
 
+const (
+	terminalProgressWait         = 5 * time.Second
+	terminalProgressPollInterval = 100 * time.Millisecond
+)
+
 // sessionBackend lazily opens one dedicated browser per configured account and
 // keeps it for the lifetime of its owning server. Every adapter call passes
 // through the same application guard and content-free audit recorder.
@@ -648,6 +653,7 @@ func (backend *sessionBackend) TerminalLogin(
 		}, backend.dropTerminalInteraction(interaction, true)
 	}
 
+	progressChecked := false
 	if input.Action != nil && input.Action.Type != "refresh" {
 		action, err := terminalBrowserAction(*input.Action)
 		if err != nil {
@@ -655,6 +661,12 @@ func (backend *sessionBackend) TerminalLogin(
 		}
 		if err := interaction.handle.TerminalAct(ctx, action); err != nil {
 			return daemonapi.TerminalLoginResult{}, err
+		}
+		if terminalActionWaitsForProgress(*input.Action) {
+			if err := awaitTerminalLoginProgress(ctx, interaction); err != nil {
+				return daemonapi.TerminalLoginResult{}, err
+			}
+			progressChecked = true
 		}
 	}
 
@@ -695,7 +707,7 @@ func (backend *sessionBackend) TerminalLogin(
 
 	refreshView := input.Action == nil || input.Action.Type == "refresh" ||
 		input.Action.Type == "activate" || input.Action.Key == "enter"
-	if refreshView {
+	if refreshView && !progressChecked {
 		view, err := interaction.handle.TerminalSnapshot(ctx)
 		if err != nil {
 			return daemonapi.TerminalLoginResult{}, err
@@ -706,6 +718,46 @@ func (backend *sessionBackend) TerminalLogin(
 	return daemonapi.TerminalLoginResult{
 		Account: input.Account, SessionID: interaction.id, Status: "pending", View: &view,
 	}, nil
+}
+
+func terminalActionWaitsForProgress(action daemonapi.TerminalLoginAction) bool {
+	return action.Type == "activate" || action.Type == "key" && action.Key == "enter"
+}
+
+func awaitTerminalLoginProgress(
+	ctx context.Context,
+	interaction *terminalLoginSession,
+) error {
+	previous := interaction.view
+	timer := time.NewTimer(terminalProgressWait)
+	defer timer.Stop()
+	ticker := time.NewTicker(terminalProgressPollInterval)
+	defer ticker.Stop()
+	for {
+		_, credentialsErr := interaction.handle.CurrentSession()
+		if credentialsErr == nil {
+			return nil
+		}
+		if !errors.Is(credentialsErr, session.ErrNotReady) {
+			return credentialsErr
+		}
+		view, err := interaction.handle.TerminalSnapshot(ctx)
+		if err != nil {
+			return err
+		}
+		candidate := terminalLoginView(view)
+		if !terminalLoginViewsEqual(previous, candidate) {
+			interaction.view = candidate
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			return nil
+		case <-ticker.C:
+		}
+	}
 }
 
 func (backend *sessionBackend) terminalInteraction(
@@ -800,6 +852,19 @@ func terminalLoginView(view browser.TerminalView) daemonapi.TerminalLoginView {
 	return daemonapi.TerminalLoginView{
 		Origin: view.Origin, Title: view.Title, Text: view.Text, Controls: controls,
 	}
+}
+
+func terminalLoginViewsEqual(left, right daemonapi.TerminalLoginView) bool {
+	if left.Origin != right.Origin || left.Title != right.Title || left.Text != right.Text ||
+		len(left.Controls) != len(right.Controls) {
+		return false
+	}
+	for index := range left.Controls {
+		if left.Controls[index] != right.Controls[index] {
+			return false
+		}
+	}
+	return true
 }
 
 func terminalBrowserAction(action daemonapi.TerminalLoginAction) (browser.TerminalAction, error) {

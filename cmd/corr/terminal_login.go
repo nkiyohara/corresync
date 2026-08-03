@@ -90,11 +90,17 @@ func runTerminalLogin(
 			continue
 		}
 		if control.Kind == "activate" {
+			previous := result.View
 			result, err = advanceTerminalLogin(app, client, result, daemonapi.TerminalLoginAction{
 				Type: "activate", ControlID: control.ID,
 			})
 			if err != nil {
 				return err
+			}
+			if terminalLoginViewUnchanged(previous, result) {
+				if err := writeTerminalProgressHint(app); err != nil {
+					return err
+				}
 			}
 			continue
 		}
@@ -228,9 +234,15 @@ func relayTerminalKeys(
 				return err
 			}
 		}
+		previous := result.View
 		*result, err = advanceTerminalLogin(app, client, *result, action)
 		if err != nil {
 			return err
+		}
+		if action.Key == "enter" && terminalLoginViewUnchanged(previous, *result) {
+			if err := writeTerminalProgressHint(app); err != nil {
+				return err
+			}
 		}
 		if action.Key == "enter" || action.Key == "tab" {
 			_, err = fmt.Fprintln(app.stdout)
@@ -238,6 +250,22 @@ func relayTerminalKeys(
 		}
 	}
 	return nil
+}
+
+func terminalLoginViewUnchanged(
+	previous *daemonapi.TerminalLoginView,
+	current daemonapi.TerminalLoginResult,
+) bool {
+	return current.Status == "pending" && previous != nil && current.View != nil &&
+		terminalLoginViewsEqual(*previous, *current.View)
+}
+
+func writeTerminalProgressHint(app *runtime) error {
+	_, err := fmt.Fprintln(
+		app.stdout,
+		"No visible page change yet. Wait a moment and press r to refresh, or choose another control.",
+	)
+	return err
 }
 
 func advanceTerminalLogin(

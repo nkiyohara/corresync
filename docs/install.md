@@ -291,8 +291,9 @@ corr update check
 corr update
 ```
 
-An interactive released CLI may perform a quiet public stable-release check,
-cached locally for 24 hours. It sends the Corresync version as a user agent and
+An interactive released CLI may perform a quiet public release check for the
+configured `stable` or `preview` channel, cached locally for 24 hours. It sends
+the Corresync version as a user agent and
 no account, tenant, config, mailbox, or machine identifier. It is disabled for
 MCP, configuration management, daemon, completion, feedback, pipes, and JSON
 output.
@@ -302,6 +303,16 @@ an eligible interactive command:
 
 ```console
 corr config set updates.auto_install true
+```
+
+Stable is the default channel. Standalone users can opt in to signed
+prereleases and switch back without allowing a downgrade:
+
+```console
+corr config set updates.channel preview
+corr update check
+corr update
+corr config set updates.channel stable
 ```
 
 The current command continues in the process version that was already loaded;
@@ -322,7 +333,9 @@ export CORRESYNC_NO_UPDATE_CHECK=1
 ```
 
 Package-managed binaries print the exact owner-specific update command and are
-never replaced by Corresync. A direct install verifies release identity,
+never replaced by Corresync. Package catalogs remain stable-only; preview
+availability points to the signed direct release instead of suggesting a
+package-manager command. A direct install verifies release identity,
 checksums, version, OS, and architecture before replacement and retains a
 rollback copy beside the executable. The default startup check never modifies a
 binary. Even with `auto_install` enabled, Corresync never invokes Homebrew,

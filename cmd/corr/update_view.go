@@ -16,12 +16,21 @@ func newUpdateView(app *runtime, writer io.Writer, interactive bool) updateView 
 	return updateView{consoleView: newConsoleView(app, writer, interactive)}
 }
 
-func (view updateView) writeNotice(current, latest, command string) error {
+func (view updateView) writeNotice(report updateReport) error {
+	if report.DirectOnly {
+		_, err := view.printf(
+			"\n%s  %s\n   %s\n",
+			view.accent(),
+			view.strong("Preview available")+"  "+view.muted(versionPair(report.CurrentVersion, report.LatestVersion)),
+			view.muted("Preview releases are direct-install only: "+report.ReleaseURL),
+		)
+		return err
+	}
 	_, err := view.printf(
 		"\n%s  %s\n   Run %s\n",
 		view.accent(),
-		view.strong("Update available")+"  "+view.muted(versionPair(current, latest)),
-		view.command(command),
+		view.strong("Update available")+"  "+view.muted(versionPair(report.CurrentVersion, report.LatestVersion)),
+		view.command(report.Upgrade),
 	)
 	return err
 }
@@ -86,12 +95,31 @@ func (view updateView) writeProgress(progress updatecheck.InstallProgress) {
 func (view updateView) writeCheck(report updateReport) error {
 	switch report.Status {
 	case updatecheck.StatusAvailable:
+		if report.DirectOnly {
+			_, err := view.printf(
+				"\n%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s\n\n%s\n",
+				view.accent(),
+				view.strong("Preview available"),
+				"Version",
+				versionPair(report.CurrentVersion, report.LatestVersion),
+				"Channel",
+				report.Channel,
+				"Managed by",
+				installationLabel(report.InstallMethod),
+				"Release",
+				report.ReleaseURL,
+				view.muted("Preview releases are signed direct downloads and are not published to package-manager catalogs."),
+			)
+			return err
+		}
 		_, err := view.printf(
-			"\n%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s\n",
+			"\n%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s\n",
 			view.accent(),
 			view.strong("Update available"),
 			"Version",
 			versionPair(report.CurrentVersion, report.LatestVersion),
+			"Channel",
+			report.Channel,
 			"Managed by",
 			installationLabel(report.InstallMethod),
 			"Run",
@@ -105,14 +133,15 @@ func (view updateView) writeCheck(report updateReport) error {
 			"%s  %s\n   %s\n",
 			view.success(),
 			view.strong("corr "+strings.TrimPrefix(report.CurrentVersion, "v")+" is up to date"),
-			view.muted("Latest stable "+strings.TrimPrefix(report.LatestVersion, "v")+" · checked "+report.CheckedAt),
+			view.muted("Latest "+string(report.Channel)+" "+strings.TrimPrefix(report.LatestVersion, "v")+" · checked "+report.CheckedAt),
 		)
 		return err
 	case updatecheck.StatusDevelopment:
 		_, err := view.printf(
-			"%s  Development build %s cannot be compared with stable releases.\n",
+			"%s  Development build %s cannot be compared with %s releases.\n",
 			view.muted("•"),
 			report.CurrentVersion,
+			report.Channel,
 		)
 		return err
 	case updatecheck.StatusUnavailable:
@@ -130,11 +159,13 @@ func (view updateView) writeAction(report updateActionReport) error {
 	switch report.Status {
 	case string(updatecheck.InstallStatusUpdated):
 		_, err := view.printf(
-			"\n%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n\n%s\n",
+			"\n%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s\n\n%s\n",
 			view.success(),
 			view.strong("Corresync updated"),
 			"Version",
 			versionPair(report.PreviousVersion, report.CurrentVersion),
+			"Channel",
+			report.Channel,
 			"Verified",
 			"Sigstore identity · SHA-256 · version · platform",
 			"Backup",
@@ -177,11 +208,26 @@ func (view updateView) writeAction(report updateActionReport) error {
 			view.muted("Corresync did not modify files owned by your package manager."),
 		)
 		return err
+	case "preview_available":
+		_, err := view.printf(
+			"\n%s  %s\n\n  %-10s %s\n  %-10s %s\n  %-10s %s\n\n%s\n",
+			view.accent(),
+			view.strong("Preview available"),
+			"Version",
+			versionPair(report.CurrentVersion, report.LatestVersion),
+			"Managed by",
+			installationLabel(report.InstallMethod),
+			"Release",
+			report.ReleaseURL,
+			view.muted("Preview releases are not installed over files owned by a package manager. Use a signed direct installation to follow preview."),
+		)
+		return err
 	case string(updatecheck.StatusDevelopment):
 		_, err := view.printf(
-			"%s  Development build %s cannot be compared with stable releases.\n",
+			"%s  Development build %s cannot be compared with %s releases.\n",
 			view.muted("•"),
 			report.CurrentVersion,
+			report.Channel,
 		)
 		return err
 	default:

@@ -140,6 +140,24 @@ func TestUpdateCachePathUsesPrivateStateTree(t *testing.T) {
 	}
 }
 
+func TestUpdateCachePathIsolatesPreviewChannel(t *testing.T) {
+	t.Setenv("OWA_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	stable, err := UpdateCachePathForChannel("stable")
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview, err := UpdateCachePathForChannel("preview")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stable == preview || filepath.Base(preview) != "latest-preview.json" {
+		t.Fatalf("channel cache paths = stable %q, preview %q", stable, preview)
+	}
+	if _, err := UpdateCachePathForChannel("../../unsafe"); err == nil {
+		t.Fatal("unrecognized update channel became a cache path")
+	}
+}
+
 func TestProfileDirDoesNotContainAccountAlias(t *testing.T) {
 	t.Setenv("OWA_STATE_DIR", t.TempDir())
 	alias := "work/team"

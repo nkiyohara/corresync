@@ -46,6 +46,7 @@ const (
 // InstallResult contains no provider or machine identity. BackupPath is
 // included because installation is a consented local filesystem operation.
 type InstallResult struct {
+	Channel         Channel       `json:"channel"`
 	Status          InstallStatus `json:"status"`
 	PreviousVersion string        `json:"previousVersion,omitempty"`
 	CurrentVersion  string        `json:"currentVersion"`
@@ -80,6 +81,7 @@ type InstallProgress struct {
 // synthetic tests.
 type Installer struct {
 	CurrentVersion   string
+	Channel          Channel
 	Executable       string
 	TrustCachePath   string
 	Endpoint         string
@@ -114,10 +116,14 @@ type releaseArtifact struct {
 	Executable string
 }
 
-// Install fetches the latest stable release, verifies its signed checksum
-// inventory and candidate metadata, then replaces a direct executable with
-// rollback support. It never installs a prerelease or downgrade.
+// Install fetches the latest release in the selected channel, verifies its
+// signed checksum inventory and candidate metadata, then replaces a direct
+// executable with rollback support. It never installs a downgrade.
 func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
+	channel, err := normalizeChannel(installer.Channel)
+	if err != nil {
+		return InstallResult{}, err
+	}
 	current, ok := parseVersion(installer.CurrentVersion)
 	if !ok {
 		return InstallResult{}, errors.New("development builds cannot self-update")
@@ -140,13 +146,14 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	repairOnly := comparison == 0 && installCanonical
 	if comparison > 0 || (comparison == 0 && !repairOnly) {
 		return InstallResult{
+			Channel:        channel,
 			Status:         InstallStatusCurrent,
 			CurrentVersion: strings.TrimPrefix(current.String(), "v"),
 			LatestVersion:  latest.String(),
 			ReleaseURL:     releaseURL,
 		}, nil
 	}
-	installer.progress(InstallStageRelease, "Found stable release "+latest.String())
+	installer.progress(InstallStageRelease, "Found "+string(channel)+" release "+latest.String())
 
 	artifactCandidates, err := releaseArtifactCandidates(latest, goos, goarch)
 	if err != nil {
@@ -306,6 +313,7 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 				"Installed the missing primary corr command for "+latest.String(),
 			)
 			return InstallResult{
+				Channel:        channel,
 				Status:         InstallStatusRepaired,
 				CurrentVersion: strings.TrimPrefix(latest.String(), "v"),
 				LatestVersion:  latest.String(),
@@ -338,6 +346,7 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	installer.progress(InstallStageReplace, "Installed "+latest.String()+" and preserved a rollback copy")
 
 	return InstallResult{
+		Channel:         channel,
 		Status:          InstallStatusUpdated,
 		PreviousVersion: strings.TrimPrefix(current.String(), "v"),
 		CurrentVersion:  strings.TrimPrefix(latest.String(), "v"),
@@ -515,7 +524,15 @@ func (installer Installer) fetchRelease(
 ) (installReleaseResponse, semanticVersion, *url.URL, error) {
 	endpoint := installer.Endpoint
 	if endpoint == "" {
-		endpoint = DefaultEndpoint
+		channel, channelErr := normalizeChannel(installer.Channel)
+		if channelErr != nil {
+			return installReleaseResponse{}, semanticVersion{}, nil, channelErr
+		}
+		if channel == ChannelPreview {
+			endpoint = DefaultPreviewEndpoint
+		} else {
+			endpoint = DefaultEndpoint
+		}
 	}
 	endpointURL, err := url.Parse(endpoint)
 	if err != nil || endpointURL.Scheme != "https" || endpointURL.Host == "" {
@@ -559,15 +576,58 @@ func (installer Installer) fetchRelease(
 	if len(data) > maximumBody {
 		return installReleaseResponse{}, semanticVersion{}, nil, errors.New("release metadata exceeds size limit")
 	}
-	var release installReleaseResponse
-	if err := json.Unmarshal(data, &release); err != nil {
-		return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf("decode release metadata: %w", err)
+	channel, err := normalizeChannel(installer.Channel)
+	if err != nil {
+		return installReleaseResponse{}, semanticVersion{}, nil, err
 	}
-	latest, ok := parseVersion(release.TagName)
-	if !ok || latest.prerelease != "" || release.Draft || release.Prerelease {
-		return installReleaseResponse{}, semanticVersion{}, nil, errors.New("latest release is not a stable semantic version")
+	if channel == ChannelStable {
+		var release installReleaseResponse
+		if err := json.Unmarshal(data, &release); err != nil {
+			return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf("decode release metadata: %w", err)
+		}
+		latest, ok := eligibleInstallRelease(release, channel)
+		if !ok {
+			return installReleaseResponse{}, semanticVersion{}, nil, errors.New("latest release is not a stable semantic version")
+		}
+		return release, latest, endpointURL, nil
+	}
+	var releases []installReleaseResponse
+	if err := json.Unmarshal(data, &releases); err != nil {
+		return installReleaseResponse{}, semanticVersion{}, nil, fmt.Errorf("decode preview release metadata: %w", err)
+	}
+	release, latest, ok := selectLatestInstallRelease(releases, channel)
+	if !ok {
+		return installReleaseResponse{}, semanticVersion{}, nil, errors.New("no eligible preview release was found")
 	}
 	return release, latest, endpointURL, nil
+}
+
+func eligibleInstallRelease(
+	release installReleaseResponse,
+	channel Channel,
+) (semanticVersion, bool) {
+	return eligibleVersionTag(release.TagName, release.Draft, release.Prerelease, channel)
+}
+
+func selectLatestInstallRelease(
+	releases []installReleaseResponse,
+	channel Channel,
+) (installReleaseResponse, semanticVersion, bool) {
+	var selected installReleaseResponse
+	var latest semanticVersion
+	found := false
+	for _, release := range releases {
+		candidate, ok := eligibleInstallRelease(release, channel)
+		if !ok {
+			continue
+		}
+		if !found || candidate.Compare(latest) > 0 {
+			selected = release
+			latest = candidate
+			found = true
+		}
+	}
+	return selected, latest, found
 }
 
 func (installer Installer) platform() (string, string) {

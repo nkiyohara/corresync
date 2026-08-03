@@ -150,15 +150,21 @@ directory.
 ```console
 corr update check
 corr update check --json
+corr config set updates.channel preview
+corr update check
+corr config set updates.channel stable
 corr config set updates.auto_install true
 corr feedback
 corr feedback --last-error
 ```
 
 The update JSON is one unstyled object. A repeated bounded public check may use
-the local cache. A package-managed binary prints its owner-specific update
+the channel-isolated local cache. Stable is the default; preview selects the
+highest eligible signed stable or prerelease without allowing a downgrade. A
+package-managed binary prints its owner-specific stable update
 action and is not replaced. A direct update verifies provenance/checksum before
-replacement and retains rollback. Test automatic installation only with a
+replacement and retains rollback. Preview must instead show the direct release
+URL for a package-managed binary. Test automatic installation only with a
 disposable direct binary and a newer synthetic release fixture: it must
 use the same verification path, keep the current command running, and activate
 the replacement on the next start. With the option enabled, MCP, configuration

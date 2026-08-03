@@ -17,6 +17,7 @@ import (
 const legacyVersion = 1
 const routeLegacyVersion = 2
 const googleAPILegacyVersion = 3
+const updateChannelLegacyVersion = 4
 
 type legacyConfig struct {
 	Version        int                      `toml:"version"`
@@ -63,6 +64,52 @@ type googleAPILegacyConfig struct {
 	Browser        Browser                           `toml:"browser"`
 	Credentials    Credentials                       `toml:"credentials,omitempty"`
 	Updates        legacyUpdates                     `toml:"updates"`
+}
+
+type updateChannelLegacyConfig struct {
+	Version        int                        `toml:"version"`
+	DefaultAccount string                     `toml:"default_account"`
+	Accounts       map[string]Account         `toml:"accounts"`
+	Policy         Policy                     `toml:"policy"`
+	Browser        Browser                    `toml:"browser"`
+	Credentials    Credentials                `toml:"credentials,omitempty"`
+	Updates        updateChannelLegacyUpdates `toml:"updates"`
+}
+
+type updateChannelLegacyUpdates struct {
+	DisableAutomaticChecks bool `toml:"disable_automatic_checks"`
+	AutoInstall            bool `toml:"auto_install"`
+}
+
+// MigrateV4 adds the stable update channel without broadening either automatic
+// checking or automatic-install consent.
+func MigrateV4(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var legacy updateChannelLegacyConfig
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&legacy); err != nil {
+		return Config{}, fmt.Errorf("decode v4 config: %w", err)
+	}
+	if legacy.Version != updateChannelLegacyVersion {
+		return Config{}, fmt.Errorf("update-channel legacy config version must be %d", updateChannelLegacyVersion)
+	}
+	configuration := Config{
+		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
+		Accounts: legacy.Accounts, Policy: legacy.Policy, Browser: legacy.Browser,
+		Credentials: legacy.Credentials,
+		Updates: Updates{
+			Channel:                UpdateChannelStable,
+			DisableAutomaticChecks: legacy.Updates.DisableAutomaticChecks,
+			AutoInstall:            legacy.Updates.AutoInstall,
+		},
+	}
+	if err := configuration.Validate(); err != nil {
+		return Config{}, fmt.Errorf("validate migrated v4 config: %w", err)
+	}
+	return configuration, nil
 }
 
 type googleAPILegacyAccount struct {
@@ -117,6 +164,7 @@ func MigrateV3(data []byte) (Config, error) {
 		Policy:   legacy.Policy, Browser: legacy.Browser,
 		Credentials: legacy.Credentials,
 		Updates: Updates{
+			Channel:                UpdateChannelStable,
 			DisableAutomaticChecks: legacy.Updates.DisableAutomaticChecks,
 		},
 	}
@@ -225,6 +273,7 @@ func MigrateV1(data []byte) (Config, error) {
 		Policy:         legacy.Policy,
 		Browser:        legacy.Browser,
 		Updates: Updates{
+			Channel:                UpdateChannelStable,
 			DisableAutomaticChecks: legacy.Updates.DisableAutomaticChecks,
 		},
 	}
@@ -270,6 +319,7 @@ func MigrateV2(data []byte) (Config, error) {
 		Accounts: make(map[string]Account, len(legacy.Accounts)),
 		Policy:   legacy.Policy, Browser: legacy.Browser,
 		Updates: Updates{
+			Channel:                UpdateChannelStable,
 			DisableAutomaticChecks: legacy.Updates.DisableAutomaticChecks,
 		},
 	}

@@ -170,7 +170,7 @@ func TestUpdateDefaultsToActionAndKeepsCheckOnlySubcommand(t *testing.T) {
 		t.Fatalf("update check help code = %d, stderr=%q", code, stderr.String())
 	}
 	normalizedHelp := strings.Join(strings.Fields(stdout.String()), " ")
-	if !strings.Contains(normalizedHelp, "Use check to report the latest stable release without installing") {
+	if !strings.Contains(normalizedHelp, "Use check to report the latest release in the configured channel without installing") {
 		t.Fatalf("update check help is ambiguous: %q", stdout.String())
 	}
 }

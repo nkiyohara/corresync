@@ -157,6 +157,18 @@ update exists, Corresync shows the exact command for your installation:
 `corr update` for the standalone build, or the matching Homebrew, Scoop, or
 WinGet command. Package-managed files are never changed by Corresync.
 
+Stable releases are selected by default. Standalone users who want signed
+release candidates can opt into the preview channel with copy-paste commands:
+
+```console
+corr config set updates.channel preview
+corr update
+```
+
+Switch back with `corr config set updates.channel stable`; Corresync never
+downgrades the running binary. Preview releases do not enter package-manager
+catalogs.
+
 Standalone users can opt in to verified automatic installation:
 
 ```console
