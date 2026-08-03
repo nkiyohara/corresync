@@ -178,6 +178,9 @@ of an unshared Corresync-owned OAuth grant; legacy shared grants are retained.
 
 Authentication, monitor enable/reconfigure, runner/egress consent, queue purge,
 local import reads, updates, and feedback external actions remain CLI-only.
+`settings_show` may display `feedbackAutoSubmit`; `settings_update` cannot
+change it. Automatic public feedback runs only after a separately consented,
+interactive CLI failure—never during an MCP tool call or MCP server exit.
 
 ## Resources
 

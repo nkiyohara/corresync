@@ -414,6 +414,26 @@ Report generation performs no network request. The last-error record is a
 replace-in-place, bounded, owner-only file containing only generalized error
 classes, a local hash ID, command/subcommand placeholders, and flag names.
 
+Automatic public issue submission is a separate, default-off choice:
+
+```console
+gh auth login --hostname github.com
+corr config set feedback.auto_submit true
+# disable at any time
+corr config set feedback.auto_submit false
+```
+
+Enabling verifies the external GitHub CLI and displays the same consent
+boundary available under `corr settings`. On an interactive command failure,
+Corresync constructs a smaller report containing only validated build/platform
+atoms, install method, command and flag names, a content-free fingerprint, and
+fixed error classes, then invokes `gh issue create` for the public Corresync
+repository. Corresync never reads or stores the GitHub token. Raw errors,
+values, paths, account/provider data, credentials, mail, and calendar data are
+not representable. MCP, `--json`, configuration management, redirected stderr,
+cancellation, and non-interactive commands never submit. Each build/error
+fingerprint is attempted once.
+
 ## Daemon
 
 ```console
@@ -515,4 +535,7 @@ installation.
 
 Errors go to stderr. Stable JSON never receives styling or automatic update
 notices. A failed non-feedback command records only the sanitized local
-last-error shape for a later explicit `corr feedback --last-error`.
+last-error shape for a later explicit `corr feedback --last-error`. When the
+signed-in human separately enabled `feedback.auto_submit`, an eligible
+interactive failure may also submit the smaller allowlist-only public issue
+described above; the original exit code and error do not change.

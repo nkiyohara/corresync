@@ -2,6 +2,9 @@
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-08-03 by
+  [ADR 0025](0025-opt-in-public-error-feedback.md), which adds a separate,
+  smaller, explicit opt-in public issue path while preserving this manual flow.
 
 ## Context
 

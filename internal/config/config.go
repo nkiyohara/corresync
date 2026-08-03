@@ -29,6 +29,7 @@ type Config struct {
 	Browser        Browser            `json:"browser" toml:"browser"`
 	Credentials    Credentials        `json:"credentials,omitempty" toml:"credentials,omitempty"`
 	Updates        Updates            `json:"updates" toml:"updates"`
+	Feedback       Feedback           `json:"feedback" toml:"feedback"`
 }
 
 // Account is one provider routing and isolation boundary. The map key in
@@ -114,6 +115,13 @@ type Updates struct {
 	Channel                UpdateChannel `json:"channel" toml:"channel"`
 	DisableAutomaticChecks bool          `json:"disableAutomaticChecks" toml:"disable_automatic_checks"`
 	AutoInstall            bool          `json:"autoInstall" toml:"auto_install"`
+}
+
+// Feedback records only the signed-in human's explicit consent for public,
+// allowlist-only diagnostic issue submission. GitHub credentials are owned by
+// the external gh client and can never be represented here.
+type Feedback struct {
+	AutoSubmit bool `json:"autoSubmit" toml:"auto_submit"`
 }
 
 // UpdateChannel selects which signed public releases update checks and direct

@@ -161,6 +161,16 @@ func FeedbackErrorPath() (string, error) {
 	return filepath.Join(state, "diagnostics", "last-error.json"), nil
 }
 
+// FeedbackSubmissionDir returns the private directory containing content-free
+// once-per-build/error attempt markers for explicitly enabled public reports.
+func FeedbackSubmissionDir() (string, error) {
+	state, err := StateDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(state, "diagnostics", "automatic-submissions"), nil
+}
+
 func stateDir(
 	goos, home, configDirectory, cacheDirectory string,
 	configErr, cacheErr error,

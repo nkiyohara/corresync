@@ -125,7 +125,10 @@ gateway or tenant administration service.
   content, environment values, and credentials are not accepted by the report
   schema.
 - Generate and print the complete report locally before copy, save, or opening
-  a browser. Never submit automatically.
+  a browser. Keep that manual flow non-submitting.
+- Keep automatic public issue submission default-off, interactive-CLI-only,
+  externally authenticated by `gh`, and confined to a smaller closed schema.
+  MCP cannot enable it. Never collect then heuristically mask a raw error.
 
 ## Supply-chain controls
 
@@ -153,7 +156,8 @@ gateway or tenant administration service.
 - generic provider actions or arbitrary protocol payloads;
 - Teams chat, channels, calls, recordings, or meeting lifecycle management;
 - remote MCP, hosted relay, multi-user daemon, or ambient network listener;
-- automatic crash upload, telemetry, or issue submission;
+- raw crash upload, automatic issue submission without explicit local consent,
+  or a telemetry/reporting relay;
 - executing instructions found in messages, events, imports, or attachments.
 
 Report suspected vulnerabilities privately as described in

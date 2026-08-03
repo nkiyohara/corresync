@@ -108,11 +108,13 @@ func (command *configShowCommand) Run(app *runtime) error {
 		return err
 	}
 	if _, err := view.printf(
-		"  %-18s %s\n  %-18s %t\n",
+		"  %-18s %s\n  %-18s %t\n  %-18s %t\n",
 		"Update channel",
 		configuration.Updates.Channel,
 		"Automatic install",
 		configuration.Updates.AutoInstall,
+		"Automatic feedback",
+		configuration.Feedback.AutoSubmit,
 	); err != nil {
 		return err
 	}
@@ -220,6 +222,14 @@ func (command *configSetCommand) Run(app *runtime) error {
 	if err := setConfigValue(&configuration, command.Key, command.Value); err != nil {
 		return err
 	}
+	if command.Key == "feedback.auto_submit" && configuration.Feedback.AutoSubmit {
+		if err := writeAutomaticFeedbackConsent(app.stderr); err != nil {
+			return err
+		}
+		if err := validateAutomaticFeedbackPrerequisite(app); err != nil {
+			return err
+		}
+	}
 	if err := config.Save(path, configuration); err != nil {
 		return err
 	}
@@ -242,7 +252,7 @@ type configEditCommand struct {
 }
 
 func (command *configEditCommand) Run(app *runtime) error {
-	_, path, err := app.loadConfig()
+	configuration, path, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
@@ -298,6 +308,18 @@ func (command *configEditCommand) Run(app *runtime) error {
 	edited, err := os.ReadFile(temporaryPath) // #nosec G304 -- private edit file created above.
 	if err != nil {
 		return fmt.Errorf("read edited config: %w", err)
+	}
+	editedConfiguration, err := config.Parse(edited)
+	if err != nil {
+		return fmt.Errorf("edited config is invalid and was not applied: %w", err)
+	}
+	if !configuration.Feedback.AutoSubmit && editedConfiguration.Feedback.AutoSubmit {
+		if err := writeAutomaticFeedbackConsent(app.stderr); err != nil {
+			return err
+		}
+		if err := validateAutomaticFeedbackPrerequisite(app); err != nil {
+			return err
+		}
 	}
 	if err := config.SaveTOML(path, edited); err != nil {
 		return fmt.Errorf("edited config is invalid and was not applied: %w", err)
@@ -357,6 +379,8 @@ func getConfigValue(configuration config.Config, key string) (any, error) {
 		return configuration.Updates.AutoInstall, nil
 	case "updates.channel":
 		return configuration.Updates.Channel, nil
+	case "feedback.auto_submit":
+		return configuration.Feedback.AutoSubmit, nil
 	}
 	if alias, field, ok := accountConfigKey(key); ok {
 		account, exists := configuration.Accounts[alias]
@@ -450,6 +474,12 @@ func setConfigValue(configuration *config.Config, key, value string) error {
 		}
 	case "updates.channel":
 		configuration.Updates.Channel = config.UpdateChannel(value)
+	case "feedback.auto_submit":
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("parse %s as boolean: %w", key, err)
+		}
+		configuration.Feedback.AutoSubmit = parsed
 	default:
 		alias, field, ok := accountConfigKey(key)
 		if !ok {

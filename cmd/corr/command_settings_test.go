@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +21,7 @@ func TestSettingsRenamesAccountInteractively(t *testing.T) {
 	path := saveSettingsFixture(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n2\n3\noffice\n3\n6\n")
+	app.stdin = strings.NewReader("1\n2\n3\noffice\n3\n7\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -51,7 +53,7 @@ func TestSettingsChangesEverydayConfiguration(t *testing.T) {
 			"2\n2\n2\n" +
 			"3\n2\n" +
 			"4\n10m\n" +
-			"6\n",
+			"7\n",
 	)
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
@@ -86,7 +88,7 @@ func TestSettingsEnablingAutomaticInstallAlsoEnablesChecks(t *testing.T) {
 
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("2\n3\n2\n6\n")
+	app.stdin = strings.NewReader("2\n3\n2\n7\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -103,11 +105,43 @@ func TestSettingsEnablingAutomaticInstallAlsoEnablesChecks(t *testing.T) {
 	}
 }
 
+func TestSettingsEnablesAutomaticFeedbackOnlyAfterPublicConsent(t *testing.T) {
+	path := saveSettingsFixture(t)
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	app.stdin = strings.NewReader("5\n2\ny\n7\n")
+	app.interactiveInput = func() bool { return true }
+	app.interactiveStdout = func() bool { return true }
+	app.lookupEnv = settingsTestEnvironment
+	app.runCommand = func(
+		_ context.Context,
+		_, _ io.Writer,
+		name string,
+		arguments ...string,
+	) error {
+		if name != "gh" || strings.Join(arguments, " ") != "auth status --hostname github.com" {
+			t.Fatalf("prerequisite command = %s %v", name, arguments)
+		}
+		return nil
+	}
+	if err := (&settingsCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil || !configuration.Feedback.AutoSubmit {
+		t.Fatalf("saved automatic feedback = %+v, %v", configuration.Feedback, err)
+	}
+	if !strings.Contains(stdout.String(), "GitHub username and the generated issue will be public") ||
+		!strings.Contains(stdout.String(), "Feedback setting updated") {
+		t.Fatalf("settings consent output = %q", stdout.String())
+	}
+}
+
 func TestSettingsRepromptsInvalidAliasAndLoginTimeout(t *testing.T) {
 	path := saveSettingsFixture(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n2\n3\n \noffice\n3\n4\nsoon\n10m\n6\n")
+	app.stdin = strings.NewReader("1\n2\n3\n \noffice\n3\n4\nsoon\n10m\n7\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -156,6 +190,7 @@ func TestSettingsTopLevelUsesAccountCategory(t *testing.T) {
 	}
 	options := settingsMenuOptions(settings)
 	if !hasSettingsOption(options, settingsActionAccounts) ||
+		!hasSettingsOption(options, settingsActionFeedback) ||
 		hasSettingsOption(options, settingsActionSetup) ||
 		hasSettingsOption(options, settingsAccountPrefix+"work") {
 		t.Fatalf("top-level settings hierarchy = %+v", options)
@@ -166,7 +201,7 @@ func TestSettingsRemovesNonDefaultAccountAfterConfirmation(t *testing.T) {
 	path := saveSettingsFixtureWithSecondAccount(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n3\n5\ny\n3\n6\n")
+	app.stdin = strings.NewReader("1\n3\n5\ny\n3\n7\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -192,7 +227,7 @@ func TestSettingsRequiresReplacementBeforeRemovingDefault(t *testing.T) {
 	path := saveSettingsFixtureWithSecondAccount(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n2\n4\n1\ny\n3\n6\n")
+	app.stdin = strings.NewReader("1\n2\n4\n1\ny\n3\n7\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -217,7 +252,7 @@ func TestSettingsCancelsAccountRemovalByDefault(t *testing.T) {
 	path := saveSettingsFixtureWithSecondAccount(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n3\n5\nn\n4\n6\n")
+	app.stdin = strings.NewReader("1\n3\n5\nn\n4\n7\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment

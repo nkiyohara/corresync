@@ -3,6 +3,23 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.6-rc.2 - 2026-08-03
+
+### Explicit automatic feedback
+
+- Add a default-off `feedback.auto_submit` setting for interactive CLI
+  failures. Enabling requires an authenticated GitHub CLI and an explicit
+  acknowledgement that the generated issue and GitHub username are public.
+- Construct automatic reports from a smaller closed allowlist containing only
+  validated build/platform atoms, installation method, command and flag names,
+  a content-free fingerprint, and fixed error classes. Raw errors, values,
+  paths, account/provider data, credentials, mail, and calendar data are not
+  representable.
+- Use the user's external `gh` authentication without reading or storing its
+  token, impose a short deadline, and attempt each build/error fingerprint at
+  most once. MCP cannot enable the setting; MCP, machine-output,
+  configuration-management, and non-interactive commands never submit.
+
 ## 0.8.6-rc.1 - 2026-08-03
 
 ### Session owner reliability

@@ -12,6 +12,7 @@ import (
 	"charm.land/huh/v2"
 
 	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/settingsstore"
 )
@@ -35,6 +36,7 @@ const (
 	settingsActionAccounts = "accounts"
 	settingsActionUpdates  = "updates"
 	settingsActionSafety   = "safety"
+	settingsActionFeedback = "feedback"
 	settingsActionLogin    = "login"
 	settingsActionAdvanced = "advanced"
 	settingsActionSetup    = "setup"
@@ -93,6 +95,10 @@ func (command *settingsCommand) Run(app *runtime) error {
 			if err := runSafetySettings(app, service, settings); err != nil {
 				return err
 			}
+		case settingsActionFeedback:
+			if err := runFeedbackSettings(app, settings); err != nil {
+				return err
+			}
 		case settingsActionLogin:
 			if err := runLoginSettings(app, service, settings); err != nil {
 				return err
@@ -114,7 +120,7 @@ func newLocalSettingsService(app *runtime) (*application.SettingsService, error)
 }
 
 func settingsMenuOptions(settings application.SettingsView) []huh.Option[string] {
-	options := make([]huh.Option[string], 0, 6)
+	options := make([]huh.Option[string], 0, 7)
 	checks := "checks off"
 	if settings.AutomaticChecks {
 		checks = "daily checks"
@@ -137,10 +143,21 @@ func settingsMenuOptions(settings application.SettingsView) []huh.Option[string]
 			"Browser  "+settings.LoginTimeout+" · sign-in timeout",
 			settingsActionLogin,
 		),
+		huh.NewOption(
+			"Feedback "+automaticFeedbackSummary(settings.FeedbackAutoSubmit),
+			settingsActionFeedback,
+		),
 		huh.NewOption("Advanced  edit the complete validated config", settingsActionAdvanced),
 		huh.NewOption("Done", settingsActionDone),
 	)
 	return options
+}
+
+func automaticFeedbackSummary(enabled bool) string {
+	if enabled {
+		return "on · allowlisted errors may become public GitHub Issues"
+	}
+	return "off · no automatic issue submission"
 }
 
 func runAccountsSettings(
@@ -582,6 +599,91 @@ func runSafetySettings(
 	)
 }
 
+func runFeedbackSettings(
+	app *runtime,
+	settings application.SettingsView,
+) error {
+	value, selected, err := runSettingsSelect(
+		app,
+		"Automatic error feedback",
+		"Off is the default. On uses your signed-in GitHub CLI to create a public issue after an interactive corr command fails.",
+		[]huh.Option[string]{
+			huh.NewOption(
+				"Off · corr config set feedback.auto_submit false",
+				"false",
+			).Selected(!settings.FeedbackAutoSubmit),
+			huh.NewOption(
+				"On · public allowlist-only issues via gh",
+				"true",
+			).Selected(settings.FeedbackAutoSubmit),
+		},
+	)
+	if err != nil || !selected {
+		return err
+	}
+	enabled := value == "true"
+	if enabled == settings.FeedbackAutoSubmit {
+		return writeSettingsNoChange(app)
+	}
+	if enabled {
+		confirmed, err := confirmAutomaticFeedbackConsent(app)
+		if err != nil || !confirmed {
+			return err
+		}
+		if err := validateAutomaticFeedbackPrerequisite(app); err != nil {
+			return err
+		}
+	}
+	path, err := app.resolvedConfigPath()
+	if err != nil {
+		return err
+	}
+	if err := config.Update(app.context, path, func(configuration *config.Config) error {
+		configuration.Feedback.AutoSubmit = enabled
+		return nil
+	}); err != nil {
+		return err
+	}
+	view := newConsoleView(app, app.stdout, true)
+	description := "Automatic public issue submission is off."
+	if enabled {
+		description = "Automatic public issue submission is on for allowlisted interactive command errors."
+	}
+	_, err = view.printf(
+		"\n%s  %s\n   %s\n   %s\n",
+		view.success(),
+		view.strong("Feedback setting updated"),
+		view.muted(description),
+		view.command("corr config set feedback.auto_submit "+value),
+	)
+	return err
+}
+
+func confirmAutomaticFeedbackConsent(app *runtime) (bool, error) {
+	if _, err := fmt.Fprintln(app.stdout); err != nil {
+		return false, err
+	}
+	if err := writeAutomaticFeedbackConsent(app.stdout); err != nil {
+		return false, err
+	}
+	confirmed := false
+	form := settingsForm(app, huh.NewConfirm().
+		Title("Enable automatic public GitHub Issues?").
+		Description(
+			"Your GitHub username will be public. Corresync sends only version/OS, install method, command and flag names, and fixed error classes—never raw errors, values, paths, accounts, credentials, mail, or calendar data. Each build/error fingerprint is attempted once. Esc keeps this off.",
+		).
+		Affirmative("Enable public reports").
+		Negative("Keep off").
+		Value(&confirmed))
+	if err := form.RunWithContext(app.context); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return false, nil
+		}
+		return false, fmt.Errorf("confirm automatic feedback consent: %w", err)
+	}
+	return confirmed, nil
+}
+
 func runLoginSettings(
 	app *runtime,
 	service *application.SettingsService,
@@ -768,7 +870,7 @@ func writeSettingsOverview(app *runtime) error {
 	_, err := view.printf(
 		"\n%s  %s\n   %s\n\n",
 		view.info(), view.strong("Corresync settings"),
-		view.muted("Accounts, updates, safety, and sign-in — with the exact CLI command for every change."),
+		view.muted("Accounts, updates, safety, feedback, and sign-in — with the exact CLI command for every change."),
 	)
 	return err
 }

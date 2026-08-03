@@ -68,6 +68,7 @@ func TestSettingsServiceRejectsUnsafeOrUnclearChanges(t *testing.T) {
 		{Key: SettingLoginTimeout, Value: "31m"},
 		{Key: SettingSafetyMode, Value: "unsafe"},
 		{Key: SettingDefaultAccount, Value: "missing"},
+		{Key: "feedback.auto_submit", Value: "true"},
 		{Key: "unknown", Value: "true"},
 	}
 	for _, input := range tests {

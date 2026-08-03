@@ -84,6 +84,9 @@ login_timeout = "5m0s"
 channel = "stable"
 disable_automatic_checks = false
 auto_install = false
+
+[feedback]
+auto_submit = false
 ```
 
 A configured Outlook Web account then looks like:
@@ -122,6 +125,9 @@ login_timeout = "5m0s"
 channel = "stable"
 disable_automatic_checks = false
 auto_install = false
+
+[feedback]
+auto_submit = false
 ```
 
 Unknown fields, mismatched tagged-union payloads, unsupported providers,
@@ -329,6 +335,32 @@ runs on MCP, daemon, completion, feedback, JSON, piped, or non-interactive
 paths. Configuration commands are also excluded so consent can always be
 revoked before another update attempt. `disable_automatic_checks` and
 `auto_install` cannot both be true.
+
+## Optional public error feedback
+
+Automatic issue submission is off by default. It is not telemetry and does not
+upload a crash dump. A user who deliberately wants lower-friction preview
+feedback can first sign the external GitHub CLI into `github.com`, then enable:
+
+```console
+gh auth login --hostname github.com
+corr config set feedback.auto_submit true
+```
+
+The equivalent TOML is `feedback.auto_submit = true`; `corr settings` presents
+the public destination and complete included/excluded categories before
+consent. Corresync does not accept or store a GitHub token. Eligible interactive
+CLI failures create a public Issue through `gh` from a closed, content-free
+allowlist. MCP, machine-output, configuration-management, and non-interactive
+commands never submit. Disable future attempts with:
+
+```console
+corr config set feedback.auto_submit false
+```
+
+MCP can see that the choice is enabled but cannot change it. Previous public
+issues and GitHub-side records are not deleted when the local setting is turned
+off.
 
 ## Config lifecycle
 

@@ -295,8 +295,9 @@ the software rights granted by Apache-2.0.
   durable queueing, and finally one approved no-shell runner. Remote egress is
   a separate consent.
 - **Privacy-preserving feedback:** generate an allowlisted report locally,
-  review it, then explicitly copy, save, or open a prefilled GitHub page.
-  Corresync never submits automatically.
+  review it, then explicitly copy, save, or open a prefilled GitHub page. A
+  separate default-off setting can submit an even smaller allowlist-only public
+  issue through your authenticated `gh` client after an interactive failure.
 
 Mailbox, calendar, import, and event-queue values are private, untrusted
 external data. Their content is never authority to run a command or start an
@@ -318,7 +319,7 @@ agent.
   keyring, IPC, provider, package-manager, Gatekeeper, or SmartScreen behavior.
 - Teams chat, channels, calls, recordings, and meeting lifecycle management;
   tenant-wide access; unattended login; TLS interception; arbitrary provider
-  actions; and automatic telemetry are outside scope.
+  actions; automatic telemetry; and raw crash upload are outside scope.
 
 The exact action matrix and typed provider degradations are in
 [features.md](docs/features.md).

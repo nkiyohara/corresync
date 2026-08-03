@@ -12,6 +12,7 @@ func TestStoreProjectsAndAtomicallyUpdatesSettings(t *testing.T) {
 	path := t.TempDir() + "/config.toml"
 	configuration := config.OutlookDefault()
 	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Feedback.AutoSubmit = true
 	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)
 	}
@@ -20,7 +21,7 @@ func TestStoreProjectsAndAtomicallyUpdatesSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view.DefaultAccount != "work" || view.AutomaticChecks ||
+	if view.DefaultAccount != "work" || view.AutomaticChecks || !view.FeedbackAutoSubmit ||
 		len(view.Accounts) != 1 || !view.Accounts[0].IsDefault {
 		t.Fatalf("GetSettings() = %+v", view)
 	}

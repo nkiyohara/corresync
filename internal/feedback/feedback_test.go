@@ -223,3 +223,107 @@ func TestGenerateDoesNotReflectMalformedDiagnosticInputs(t *testing.T) {
 		t.Fatalf("collection failures were not visible:\n%s", report)
 	}
 }
+
+func TestGenerateAutomaticUsesOnlyClosedAllowlist(t *testing.T) {
+	t.Parallel()
+
+	record := NewErrorRecord(
+		os.ErrPermission,
+		"mail search",
+		[]string{"--account", "person@example.test", "--query=confidential-subject"},
+	)
+	report, err := GenerateAutomatic(AutomaticInput{
+		Build: Build{
+			Version: "v0.8.6-rc.2", Commit: "0123456789abcdef",
+			BuildDate: "2026-08-03T12:00:00Z", GoVersion: "go1.25.1",
+			Platform: "linux/amd64",
+		},
+		InstallMethod: "direct",
+		LastError:     record,
+	})
+	if err != nil {
+		t.Fatalf("GenerateAutomatic() error = %v", err)
+	}
+	for _, want := range []string{
+		`"submission": "automatic-opt-in"`,
+		`"destination": "public-github-issue"`,
+		`"raw_error_included": false`,
+		`"argument_values_included": false`,
+		`"account_data_included": false`,
+		`"mail_or_calendar_content_included": false`,
+		`"path": "corr mail search"`,
+		`"--account"`,
+		`"--query"`,
+	} {
+		if !bytes.Contains(report, []byte(want)) {
+			t.Fatalf("automatic report is missing %q:\n%s", want, report)
+		}
+	}
+	for _, forbidden := range []string{
+		"person@example.test",
+		"confidential-subject",
+		"config",
+		"providers",
+	} {
+		if bytes.Contains(report, []byte(forbidden)) {
+			t.Fatalf("automatic report retained forbidden value %q:\n%s", forbidden, report)
+		}
+	}
+}
+
+func TestGenerateAutomaticRejectsInvalidRecord(t *testing.T) {
+	t.Parallel()
+
+	if _, err := GenerateAutomatic(AutomaticInput{
+		Build:         Build{Version: "dev", Commit: "none", BuildDate: "unknown"},
+		InstallMethod: "direct",
+	}); err == nil {
+		t.Fatal("GenerateAutomatic() accepted an invalid record")
+	}
+}
+
+func TestGenerateAutomaticDoesNotReflectMalformedBuildInput(t *testing.T) {
+	t.Parallel()
+
+	record := NewErrorRecord(os.ErrNotExist, "mail list", nil)
+	secrets := []string{
+		"person@example.test", "/home/private-user", "ghp_SyntheticToken", "private-subject",
+	}
+	report, err := GenerateAutomatic(AutomaticInput{
+		Build: Build{
+			Version: secrets[0], Commit: secrets[1], BuildDate: secrets[2],
+			GoVersion: secrets[3], Platform: secrets[0],
+		},
+		InstallMethod: secrets[2],
+		LastError:     record,
+	})
+	if err != nil {
+		t.Fatalf("GenerateAutomatic() error = %v", err)
+	}
+	for _, secret := range secrets {
+		if bytes.Contains(report, []byte(secret)) {
+			t.Fatalf("automatic report reflected %q:\n%s", secret, report)
+		}
+	}
+}
+
+func TestSubmissionStoreClaimsOneAttemptPerBuildAndError(t *testing.T) {
+	t.Parallel()
+
+	store := SubmissionStore{Directory: filepath.Join(t.TempDir(), "attempts")}
+	build := Build{Version: "v0.8.6-rc.2", Commit: "0123456789abcdef"}
+	record := NewErrorRecord(os.ErrNotExist, "mail list", []string{"--account", "private"})
+	claimed, err := store.Claim(build, record)
+	if err != nil || !claimed {
+		t.Fatalf("Claim(first) = %t, %v", claimed, err)
+	}
+	claimed, err = store.Claim(build, record)
+	if err != nil || claimed {
+		t.Fatalf("Claim(second) = %t, %v", claimed, err)
+	}
+	other := NewErrorRecord(os.ErrPermission, "mail list", []string{"--account", "private"})
+	claimed, err = store.Claim(build, other)
+	if err != nil || !claimed {
+		t.Fatalf("Claim(other) = %t, %v", claimed, err)
+	}
+}

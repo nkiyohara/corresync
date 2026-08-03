@@ -67,6 +67,9 @@ func TestDefaultRoundTripIsProviderNeutral(t *testing.T) {
 	if loaded.Updates.AutoInstall {
 		t.Fatal("fresh configuration enabled automatic installation")
 	}
+	if loaded.Feedback.AutoSubmit {
+		t.Fatal("fresh configuration enabled automatic public feedback")
+	}
 	if loaded.Updates.Channel != UpdateChannelStable {
 		t.Fatalf("fresh update channel = %q, want stable", loaded.Updates.Channel)
 	}
