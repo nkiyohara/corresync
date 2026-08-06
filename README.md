@@ -115,33 +115,44 @@ Prefer a guided page? Follow
 
 ### 1. Install
 
-Each block below is complete for its platform: it installs `corr` and then
-verifies the installed version.
+The official standalone installers are the shortest path on every platform.
+They select the latest stable release, verify its archive and candidate binary,
+install for the current user without elevation, and leave account setup untouched.
 
-#### Linux
+#### macOS and Linux
 
 ```console
 curl -LsSf https://corresync.org/install.sh | sh
 corr --version
 ```
 
-#### macOS (Homebrew — also works on Linux)
+#### Windows PowerShell
 
-```console
-brew install nkiyohara/corresync/corresync
+```powershell
+powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"
 corr --version
 ```
 
-#### Windows (Scoop)
+Review [`install.sh`](https://corresync.org/install.sh) or
+[`install.ps1`](https://corresync.org/install.ps1) before running it if you
+prefer. Package managers remain fully supported alternatives:
 
 ```console
+# Homebrew · macOS or Linux
+brew install nkiyohara/corresync/corresync
+
+# WinGet · Windows
+winget install --id nkiyohara.Corresync --exact
+
+# Scoop · Windows
 scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
 scoop install corresync/corresync
-corr --version
 ```
 
-Direct archives, native Linux packages, checksums, Sigstore provenance, and
-current WinGet status are in the [installation guide](docs/install.md).
+Direct archives, native Linux packages, version pinning, checksums, and
+Sigstore provenance are in the [installation guide](docs/install.md). The
+[guided website](https://corresync.org/getting-started.html#step-install) keeps
+the same copy-paste choices visible for people who do not use GitHub regularly.
 
 Claude Desktop users can also install the platform-universal `.mcpb` from the
 [latest release](https://github.com/nkiyohara/corresync/releases/latest).

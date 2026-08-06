@@ -7,13 +7,13 @@ finite v0.8–v0.9 command-transition window also contain the identical
 
 ## Install now
 
-### Linux: one command, no sudo
+### macOS and Linux: one command, no sudo
 
 ```console
 curl -LsSf https://corresync.org/install.sh | sh
 ```
 
-The standalone installer supports Linux amd64 and arm64. It:
+The shell installer supports macOS and Linux on amd64 and arm64. It:
 
 - resolves only a stable tag from the canonical GitHub repository;
 - downloads the exact archive, checksum inventory, and Sigstore bundle over
@@ -40,7 +40,7 @@ Review the exact script before running it:
 curl -LsSf https://corresync.org/install.sh | less
 ```
 
-The Pages script is a mutable bootstrap delivered over HTTPS. For a
+Each Pages installer is a mutable bootstrap delivered over HTTPS. For a
 commit-bound, high-assurance installation, download a tagged release and
 perform the checksum and Sigstore verification below before extraction.
 
@@ -54,20 +54,63 @@ CORRESYNC_VERSION=v0.8.0 \
   sh -c 'curl -LsSf https://corresync.org/install.sh | sh'
 ```
 
-### macOS
+### Windows PowerShell: one command, no elevation
 
-```console
-brew install nkiyohara/corresync/corresync
-corr --version
+```powershell
+powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"
 ```
 
-### Windows
+The PowerShell installer supports Windows amd64 and arm64. It follows the same
+stable-tag, checksum, optional Sigstore, candidate validation, and rollback
+contract as the shell installer. Redirects remain HTTPS-only and limited to
+the canonical repository and GitHub release-asset host. ZIP metadata, expanded
+size, entry names, executable size, candidate output, and execution time are
+bounded before installation.
+
+The default destination is `%USERPROFILE%\.local\bin`. The directory and any
+existing target must be local, current-user-owned, non-reparse paths without
+broad write access. If necessary, the installer adds the directory once to the
+current user's `PATH`; it never changes the machine `PATH` or requests
+administrator rights. Open a new terminal after a PATH update.
+
+Review the exact PowerShell script before running it:
+
+```powershell
+powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | more"
+```
+
+Pin a version, select another local destination, or leave `PATH` unchanged:
+
+```powershell
+$env:CORRESYNC_VERSION = "v0.8.0"
+$env:CORRESYNC_NO_PATH_UPDATE = "1"
+$env:CORRESYNC_INSTALL_DIR = "$HOME\bin"
+irm https://corresync.org/install.ps1 | iex
+```
+
+Neither standalone installer creates configuration, reads a credential, signs
+in, connects a provider, starts a daemon, or registers an MCP client.
+
+### Other installation methods
+
+Use a package manager when you prefer it to own upgrades and removal:
 
 ```console
+# Homebrew on macOS or Linux
+brew install nkiyohara/corresync/corresync
+
+# WinGet on Windows
+winget install --id nkiyohara.Corresync --exact
+
+# Scoop on Windows
 scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
 scoop install corresync/corresync
-corr --version
 ```
+
+Linux releases also include `.deb`, `.rpm`, and `.apk` packages. Every platform
+has a direct archive for commit-bound manual verification. Package-manager
+installs stay owned by that manager; Corresync reports its exact upgrade command
+instead of replacing the managed executable.
 
 ## Release targets
 
@@ -113,12 +156,12 @@ runtime. Account setup and authentication remain separate explicit CLI actions.
 # Homebrew on macOS or Linux
 brew install nkiyohara/corresync/corresync
 
+# WinGet on Windows
+winget install --id nkiyohara.Corresync --exact
+
 # Scoop on Windows
 scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
 scoop install corresync/corresync
-
-# WinGet after its manifest has passed Microsoft review
-winget install --id nkiyohara.Corresync --exact
 ```
 
 Homebrew builds the tagged source. Scoop and WinGet install checksum-pinned
