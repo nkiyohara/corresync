@@ -91,50 +91,90 @@
               </p>
             </div>
           </header>
-          <div class="install-grid">
+          <div class="install-grid primary-install-grid">
             <div class="install-block">
-              <p class="os-label" id="gs-linux">Linux</p>
-              <div class="cmd" data-copy data-copy-label="Linux install command">
+              <p class="os-label" id="gs-unix">macOS · Linux</p>
+              <div class="cmd" data-copy data-copy-label="macOS and Linux install command">
                 <pre
                   tabindex="0"
                   role="region"
-                  aria-labelledby="gs-linux"
+                  aria-labelledby="gs-unix"
                 ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
               </div>
               <p class="block-note">
-                The script is short—review <a href="install.sh">install.sh</a> first if you like.
-                Prefer packages? Every release also ships <code>.deb</code>, <code>.rpm</code>, and
-                <code>.apk</code>, and Homebrew works on Linux too.
+                Installs the verified stable release for your current user. Review
+                <a href="install.sh">install.sh</a> first if you like; no account or MCP client is
+                changed.
               </p>
             </div>
             <div class="install-block">
-              <p class="os-label" id="gs-macos">macOS · Homebrew</p>
-              <div class="cmd" data-copy data-copy-label="macOS install command">
-                <pre
-                  tabindex="0"
-                  role="region"
-                  aria-labelledby="gs-macos"
-                ><code>brew install nkiyohara/corresync/corresync</code></pre>
-              </div>
-              <p class="block-note">Homebrew builds the tagged source of the latest release.</p>
-            </div>
-            <div class="install-block">
-              <p class="os-label" id="gs-windows">Windows · Scoop</p>
-              <div class="cmd" data-copy data-copy-label="Windows install commands">
+              <p class="os-label" id="gs-windows">Windows · PowerShell</p>
+              <div class="cmd" data-copy data-copy-label="Windows PowerShell install command">
                 <pre
                   tabindex="0"
                   role="region"
                   aria-labelledby="gs-windows"
-                ><code>scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
-scoop install corresync/corresync</code></pre>
+                ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
               </div>
               <p class="block-note">
-                Prefer not to use Scoop? Download the release <code>.zip</code> directly and verify
-                its checksum before extracting. Corresync never asks you to weaken an execution
-                policy or organization script restriction.
+                Installs without elevation and updates only your user <code>PATH</code>. Review
+                <a href="install.ps1">install.ps1</a> first; organization policy still takes
+                precedence.
               </p>
             </div>
           </div>
+          <section
+            class="install-alternatives"
+            id="other-install-methods"
+            aria-labelledby="other-install-title"
+          >
+            <div class="install-alternatives-head">
+              <h3 id="other-install-title">Other installation methods</h3>
+              <p>Prefer a package manager? It keeps ownership of upgrades and removal.</p>
+            </div>
+            <div class="install-grid">
+              <div class="install-block">
+                <p class="os-label" id="gs-winget">Windows · WinGet</p>
+                <div class="cmd" data-copy data-copy-label="Windows WinGet install command">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-winget"
+                  ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
+                </div>
+                <p class="block-note">Microsoft-reviewed manifest, managed by WinGet.</p>
+              </div>
+              <div class="install-block">
+                <p class="os-label" id="gs-homebrew">macOS · Linux · Homebrew</p>
+                <div class="cmd" data-copy data-copy-label="Homebrew install command">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-homebrew"
+                  ><code>brew install nkiyohara/corresync/corresync</code></pre>
+                </div>
+                <p class="block-note">Homebrew builds the latest stable tagged source.</p>
+              </div>
+              <div class="install-block">
+                <p class="os-label" id="gs-scoop">Windows · Scoop</p>
+                <div class="cmd" data-copy data-copy-label="Windows Scoop install commands">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-scoop"
+                  ><code>scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
+scoop install corresync/corresync</code></pre>
+                </div>
+                <p class="block-note">Uses the checksum-pinned Corresync Scoop bucket.</p>
+              </div>
+            </div>
+            <p class="install-alternatives-note">
+              Linux releases also include <code>.deb</code>, <code>.rpm</code>, and
+              <code>.apk</code> packages. Direct archives, checksums, Sigstore provenance, and the
+              Claude Desktop <code>.mcpb</code> are available from the
+              <a href="https://github.com/nkiyohara/corresync/releases/latest">latest release</a>.
+            </p>
+          </section>
           <div class="install-block verify-block">
             <p class="os-label" id="gs-verify">Verify</p>
             <div class="cmd" data-copy data-copy-label="version check command">

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Install the latest stable Corresync release on Linux without sudo.
+# Install the latest stable Corresync release on macOS or Linux without sudo.
 # Review this script before running it:
 #   https://corresync.org/install.sh
 #
@@ -102,6 +102,57 @@ file_size() {
   wc -c <"$1" | tr -d '[:space:]'
 }
 
+file_owner() {
+  case "$operating_system" in
+    darwin) stat -f '%u' "$1" ;;
+    linux) stat -c '%u' "$1" ;;
+  esac
+}
+
+file_mode() {
+  case "$operating_system" in
+    darwin) stat -f '%Lp' "$1" ;;
+    linux) stat -c '%a' "$1" ;;
+  esac
+}
+
+sha256_file() {
+  case "$operating_system" in
+    darwin) shasum -a 256 "$1" | awk '{ print $1 }' ;;
+    linux) sha256sum "$1" | awk '{ print $1 }' ;;
+  esac
+}
+
+run_with_timeout() {
+  timeout_seconds=$1
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$timeout_seconds" "$@"
+    return
+  fi
+
+  "$@" &
+  command_pid=$!
+  (
+    sleep "$timeout_seconds"
+    if kill -0 "$command_pid" 2>/dev/null; then
+      kill -TERM "$command_pid" 2>/dev/null || :
+      sleep 1
+      kill -KILL "$command_pid" 2>/dev/null || :
+    fi
+  ) &
+  watchdog_pid=$!
+
+  if wait "$command_pid"; then
+    command_status=0
+  else
+    command_status=$?
+  fi
+  kill "$watchdog_pid" 2>/dev/null || :
+  wait "$watchdog_pid" 2>/dev/null || :
+  return "$command_status"
+}
+
 require_bounded_file() {
   bounded_path=$1
   bounded_limit=$2
@@ -131,16 +182,28 @@ need_command install
 need_command mkdir
 need_command mktemp
 need_command mv
-need_command sha256sum
+need_command sleep
 need_command stat
 need_command tar
-need_command timeout
 need_command tr
 need_command uname
 need_command wc
 
-[ "$(uname -s)" = "Linux" ] ||
-  fail "the standalone installer currently supports Linux; use Homebrew on macOS or Scoop on Windows"
+case "$(uname -s)" in
+  Darwin)
+    operating_system="darwin"
+    platform_label="macOS"
+    need_command shasum
+    ;;
+  Linux)
+    operating_system="linux"
+    platform_label="Linux"
+    need_command sha256sum
+    ;;
+  *)
+    fail "the shell installer supports macOS and Linux; use install.ps1 on Windows"
+    ;;
+esac
 
 case "$(uname -m)" in
   x86_64 | amd64)
@@ -150,7 +213,7 @@ case "$(uname -m)" in
     architecture="arm64"
     ;;
   *)
-    fail "unsupported Linux architecture: $(uname -m)"
+    fail "unsupported ${platform_label} architecture: $(uname -m)"
     ;;
 esac
 
@@ -198,7 +261,7 @@ printf '%s\n' "$tag" |
   fail "version must be a stable tag such as v0.8.0"
 
 version=${tag#v}
-archive_name="corresync_${version}_linux_${architecture}.tar.gz"
+archive_name="corresync_${version}_${operating_system}_${architecture}.tar.gz"
 release_url="${repository_url}/releases/download/${tag}"
 
 home_dir=${HOME:-}
@@ -231,7 +294,7 @@ manifest_path="${work_dir}/checksums.txt"
 bundle_path="${work_dir}/checksums.txt.sigstore.json"
 archive_path="${work_dir}/${archive_name}"
 
-say "Downloading Corresync ${tag} for linux/${architecture}..."
+say "Downloading Corresync ${tag} for ${operating_system}/${architecture}..."
 download "${release_url}/checksums.txt" "$manifest_path"
 download "${release_url}/checksums.txt.sigstore.json" "$bundle_path"
 download "${release_url}/${archive_name}" "$archive_path"
@@ -259,7 +322,7 @@ esac
 [ "${#expected_checksum}" -eq 64 ] ||
   fail "release archive checksum must contain 64 hexadecimal characters"
 
-actual_checksum=$(sha256sum "$archive_path" | awk '{ print $1 }')
+actual_checksum=$(sha256_file "$archive_path")
 [ "$actual_checksum" = "$expected_checksum" ] ||
   fail "release archive checksum does not match checksums.txt"
 say "Verified the release archive SHA-256 checksum."
@@ -281,7 +344,7 @@ mkdir "$extract_dir"
 listing_path="${work_dir}/archive-entries.txt"
 if ! (
   ulimit -f 512
-  timeout 30 tar -tzf "$archive_path" >"$listing_path"
+  run_with_timeout 30 tar -tzf "$archive_path" >"$listing_path"
 ); then
   fail "release archive inventory is invalid, too large, or took too long to parse"
 fi
@@ -304,7 +367,7 @@ for candidate_name in corr corresync; do
   candidate_path="${extract_dir}/${candidate_name}"
   if ! (
     ulimit -f 131072
-    timeout 30 tar -xOzf "$archive_path" "$candidate_name" >"$candidate_path"
+    run_with_timeout 30 tar -xOzf "$archive_path" "$candidate_name" >"$candidate_path"
   ); then
     fail "release archive ${candidate_name} entry is invalid, too large, or took too long to extract"
   fi
@@ -319,7 +382,7 @@ cmp -s "$extract_dir/corr" "$extract_dir/corresync" ||
 candidate_json_path="${work_dir}/candidate-version.json"
 if ! (
   ulimit -f 128
-  timeout 5 "$extract_dir/corr" version --json >"$candidate_json_path"
+  run_with_timeout 5 "$extract_dir/corr" version --json >"$candidate_json_path"
 ); then
   fail "candidate version check failed, produced too much output, or took too long"
 fi
@@ -330,8 +393,8 @@ candidate_os=$(printf '%s\n' "$candidate_json" | json_string_field os)
 candidate_arch=$(printf '%s\n' "$candidate_json" | json_string_field arch)
 [ "$candidate_version" = "$version" ] ||
   fail "candidate version ${candidate_version:-unknown} does not match ${version}"
-[ "$candidate_os" = "linux" ] ||
-  fail "candidate operating system ${candidate_os:-unknown} is not linux"
+[ "$candidate_os" = "$operating_system" ] ||
+  fail "candidate operating system ${candidate_os:-unknown} is not ${operating_system}"
 [ "$candidate_arch" = "$architecture" ] ||
   fail "candidate architecture ${candidate_arch:-unknown} does not match ${architecture}"
 say "Validated candidate version, operating system, and architecture."
@@ -343,10 +406,10 @@ mkdir -p "$install_dir"
 [ -d "$install_dir" ] && [ ! -L "$install_dir" ] ||
   fail "install target is not a regular directory: $install_dir"
 
-install_owner=$(stat -c '%u' "$install_dir")
+install_owner=$(file_owner "$install_dir")
 [ "$install_owner" = "$(id -u)" ] ||
   fail "install directory must be owned by the current user: $install_dir"
-install_mode=$(stat -c '%a' "$install_dir")
+install_mode=$(file_mode "$install_dir")
 case "$install_mode" in
   '' | *[!0-7]*) fail "could not determine install directory permissions" ;;
 esac
@@ -364,7 +427,7 @@ for target_path in "$corr_target" "$compat_target"; do
   fi
   if [ -e "$target_path" ]; then
     [ -f "$target_path" ] || fail "refusing to replace a non-regular file: $target_path"
-    [ "$(stat -c '%u' "$target_path")" = "$(id -u)" ] ||
+    [ "$(file_owner "$target_path")" = "$(id -u)" ] ||
       fail "refusing to replace a file not owned by the current user: $target_path"
   fi
 done
@@ -411,10 +474,10 @@ case ":${PATH:-}:" in
             warn "did not edit symlinked shell profile: $profile_path"
           elif [ -e "$profile_path" ] && [ ! -f "$profile_path" ]; then
             warn "did not edit non-regular shell profile: $profile_path"
-          elif [ -e "$profile_path" ] && [ "$(stat -c '%u' "$profile_path")" != "$(id -u)" ]; then
+          elif [ -e "$profile_path" ] && [ "$(file_owner "$profile_path")" != "$(id -u)" ]; then
             warn "did not edit shell profile not owned by the current user: $profile_path"
           elif [ -e "$profile_path" ] &&
-            [ $((0$(stat -c '%a' "$profile_path") & 0022)) -ne 0 ]; then
+            [ $((0$(file_mode "$profile_path") & 0022)) -ne 0 ]; then
             warn "did not edit group- or world-writable shell profile: $profile_path"
           else
             if [ ! -e "$profile_path" ]; then

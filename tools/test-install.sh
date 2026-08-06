@@ -2,10 +2,27 @@
 
 set -eu
 
-if [ "$(uname -s)" != "Linux" ]; then
-  printf 'standalone installer tests skipped: Linux-only installer\n'
-  exit 0
-fi
+case "$(uname -s)" in
+  Darwin)
+    test_operating_system="darwin"
+    ;;
+  Linux)
+    test_operating_system="linux"
+    ;;
+  *)
+    printf 'standalone installer tests skipped: unsupported host\n'
+    exit 0
+    ;;
+esac
+
+case "$(uname -m)" in
+  x86_64 | amd64) test_architecture="amd64" ;;
+  aarch64 | arm64) test_architecture="arm64" ;;
+  *)
+    printf 'standalone installer tests skipped: unsupported architecture\n'
+    exit 0
+    ;;
+esac
 
 repository_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 installer="${repository_root}/site/install.sh"
@@ -45,17 +62,17 @@ fixture_dir="${test_root}/fixtures"
 fake_bin="${test_root}/fake-bin"
 mkdir -p "$fixture_dir/archive" "$fake_bin"
 
-cat >"$fixture_dir/archive/corr" <<'EOF'
+cat >"$fixture_dir/archive/corr" <<EOF
 #!/bin/sh
-if [ "${1:-}" = "version" ] && [ "${2:-}" = "--json" ]; then
+if [ "\${1:-}" = "version" ] && [ "\${2:-}" = "--json" ]; then
   cat <<'JSON'
 {
   "version": "9.8.7",
   "commit": "0123456789abcdef0123456789abcdef01234567",
   "buildDate": "2026-07-29T00:00:00Z",
   "goVersion": "go1.26.5",
-  "os": "linux",
-  "arch": "amd64"
+  "os": "${test_operating_system}",
+  "arch": "${test_architecture}"
 }
 JSON
   exit 0
@@ -65,9 +82,12 @@ EOF
 chmod 0755 "$fixture_dir/archive/corr"
 cp "$fixture_dir/archive/corr" "$fixture_dir/archive/corresync"
 
-archive_name="corresync_9.8.7_linux_amd64.tar.gz"
+archive_name="corresync_9.8.7_${test_operating_system}_${test_architecture}.tar.gz"
 tar -czf "$fixture_dir/$archive_name" -C "$fixture_dir/archive" corr corresync
-archive_checksum=$(sha256sum "$fixture_dir/$archive_name" | awk '{ print $1 }')
+case "$test_operating_system" in
+  darwin) archive_checksum=$(shasum -a 256 "$fixture_dir/$archive_name" | awk '{ print $1 }') ;;
+  linux) archive_checksum=$(sha256sum "$fixture_dir/$archive_name" | awk '{ print $1 }') ;;
+esac
 printf '%s  %s\n' "$archive_checksum" "$archive_name" >"$fixture_dir/checksums.txt"
 printf '{}\n' >"$fixture_dir/checksums.txt.sigstore.json"
 
@@ -95,9 +115,11 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ -n "$output" ] || exit 2
-case "${url##*/}" in
-  checksums.txt | checksums.txt.sigstore.json | corresync_9.8.7_linux_amd64.tar.gz)
-    cp "${CORRESYNC_TEST_FIXTURES}/${url##*/}" "$output"
+file_name=${url##*/}
+case "$file_name" in
+  checksums.txt | checksums.txt.sigstore.json | corresync_9.8.7_*.tar.gz)
+    [ -f "${CORRESYNC_TEST_FIXTURES}/${file_name}" ] || exit 2
+    cp "${CORRESYNC_TEST_FIXTURES}/${file_name}" "$output"
     ;;
   *)
     printf 'unexpected test URL: %s\n' "$url" >&2
@@ -106,40 +128,6 @@ case "${url##*/}" in
 esac
 EOF
 chmod 0755 "$fake_bin/curl"
-
-if [ "$(uname -s)" = "Darwin" ]; then
-  cat >"$fake_bin/uname" <<'EOF'
-#!/bin/sh
-case "${1:-}" in
-  -s) printf 'Linux\n' ;;
-  -m) printf 'x86_64\n' ;;
-  *) printf 'Linux\n' ;;
-esac
-EOF
-  cat >"$fake_bin/sha256sum" <<'EOF'
-#!/bin/sh
-exec /usr/bin/shasum -a 256 "$@"
-EOF
-  cat >"$fake_bin/timeout" <<'EOF'
-#!/bin/sh
-shift
-exec "$@"
-EOF
-  cat >"$fake_bin/stat" <<'EOF'
-#!/bin/sh
-[ "${1:-}" = "-c" ] || exit 2
-case "${2:-}" in
-  %u) exec /usr/bin/stat -f '%u' "$3" ;;
-  %a) exec /usr/bin/stat -f '%Lp' "$3" ;;
-  *) exit 2 ;;
-esac
-EOF
-  chmod 0755 \
-    "$fake_bin/uname" \
-    "$fake_bin/sha256sum" \
-    "$fake_bin/timeout" \
-    "$fake_bin/stat"
-fi
 
 run_installer() {
   case_root=$1

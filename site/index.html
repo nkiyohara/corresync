@@ -126,34 +126,33 @@
             <p>One command per platform. Then connect the agent you already use.</p>
           </div>
           <div class="install-block">
-            <p class="os-label" id="install-linux">Linux</p>
-            <div class="cmd" data-copy data-copy-label="Linux install command">
+            <p class="os-label" id="install-unix">macOS · Linux</p>
+            <div class="cmd" data-copy data-copy-label="macOS and Linux install command">
               <pre
                 tabindex="0"
                 role="region"
-                aria-labelledby="install-linux"
+                aria-labelledby="install-unix"
               ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
             </div>
           </div>
           <div class="install-block">
-            <p class="os-label" id="install-macos">macOS · Homebrew</p>
-            <div class="cmd" data-copy data-copy-label="macOS install command">
-              <pre
-                tabindex="0"
-                role="region"
-                aria-labelledby="install-macos"
-              ><code>brew install nkiyohara/corresync/corresync</code></pre>
-            </div>
-          </div>
-          <div class="install-block">
-            <p class="os-label" id="install-windows">Windows · Scoop</p>
-            <div class="cmd" data-copy data-copy-label="Windows install commands">
+            <p class="os-label" id="install-windows">Windows · PowerShell</p>
+            <div class="cmd" data-copy data-copy-label="Windows PowerShell install command">
               <pre
                 tabindex="0"
                 role="region"
                 aria-labelledby="install-windows"
-              ><code>scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
-scoop install corresync/corresync</code></pre>
+              ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-winget">Windows · WinGet alternative</p>
+            <div class="cmd" data-copy data-copy-label="Windows WinGet install command">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-winget"
+              ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
             </div>
           </div>
           <div class="install-block">
@@ -170,8 +169,10 @@ scoop install corresync/corresync</code></pre>
             Replace the example address and alias. Setup performs credential-free discovery and
             never opens a sign-in page. Then <a href="getting-started.html#connect"
             >connect Codex, Claude Code, Copilot, Gemini CLI, or another MCP client</a>. Prefer to
-            read before you run? Review <a href="install.sh">install.sh</a> first, or see every
-            platform option in <a href="getting-started.html#step-install">getting started</a>.
+            read before you run? Review <a href="install.sh">install.sh</a> or
+            <a href="install.ps1">install.ps1</a> first. Homebrew, Scoop, native Linux packages, and
+            direct downloads are listed in
+            <a href="getting-started.html#other-install-methods">getting started</a>.
           </p>
         </div>
       </section>

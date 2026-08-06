@@ -109,6 +109,45 @@ jobs:
       - name: Test
         run: go test -shuffle=on ./...
 
+      - name: Verify standalone installer
+        run: ./tools/test-install.sh
+
+  test-windows-installer:
+    name: Test Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Lint PowerShell installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.22.0 -Scope CurrentUser -Force
+          Import-Module PSScriptAnalyzer -RequiredVersion 1.22.0
+          $findings = @(
+            Invoke-ScriptAnalyzer -Path site/install.ps1 -Severity Warning, Error
+            Invoke-ScriptAnalyzer -Path tools/test-install.ps1 -Severity Warning, Error
+          )
+          $findings | Format-Table -AutoSize
+          if ($findings.Count -ne 0) {
+            throw "PSScriptAnalyzer found $($findings.Count) issue(s)"
+          }
+
+      - name: Verify PowerShell installer
+        shell: pwsh
+        run: ./tools/test-install.ps1
+
   docs:
     name: Documentation
     runs-on: ubuntu-latest

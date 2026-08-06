@@ -49,6 +49,7 @@ jobs:
           test -s site/styles.css
           test -s site/copy.js
           test -s site/install.sh
+          test -s site/install.ps1
           test -s site/favicon.ico
           test -s site/favicon.svg
           test -s site/favicon-32x32.png
@@ -91,6 +92,9 @@ jobs:
           grep -Fq 'Apache License, Version 2.0' site/terms.html
           grep -Fq 'curl -LsSf https://corresync.org/install.sh | sh' site/index.html
           grep -Fq 'curl -LsSf https://corresync.org/install.sh | sh' site/getting-started.html
+          grep -Fq 'irm https://corresync.org/install.ps1 | iex' site/index.html
+          grep -Fq 'irm https://corresync.org/install.ps1 | iex' site/getting-started.html
+          grep -Fq 'winget install --id nkiyohara.Corresync --exact' site/getting-started.html
           grep -Fq 'corr mcp setup codex' site/index.html
           grep -Fq 'corr mcp setup claude-code' site/getting-started.html
           grep -Fq 'corr mcp setup github-copilot' site/getting-started.html

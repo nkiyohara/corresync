@@ -140,7 +140,7 @@ checks are scoped to the same author/version. A catalog failure does not mutate
 the published release; repair the credential/upstream condition and rerun only
 the failed job.
 
-Homebrew builds the verified tagged source. Do not publish a Cask unless it
+Homebrew builds the stable tagged source. Do not publish a Cask unless it
 installs the exact signed and notarized release archive and passes a
 quarantine-path Gatekeeper test. Never add instructions that weaken Gatekeeper
 or SmartScreen.
@@ -156,10 +156,10 @@ Keep these controls enabled:
 - `github-pages` deployment limited to the default branch.
 
 The Pages site deploys at its canonical Corresync URL. It intentionally creates
-no redirect from the former Pages path. Its user-facing HTML, one-line Linux
-installer, social preview, internal links, structured metadata, canonical URLs,
-Privacy Policy, Terms of Use, robots policy, and sitemap are one reviewed
-artifact. Run
+no redirect from the former Pages path. Its user-facing HTML, one-line
+macOS/Linux and Windows installers, social preview, internal links, structured
+metadata, canonical URLs, Privacy Policy, Terms of Use, robots policy, and
+sitemap are one reviewed artifact. Run
 `go run ./tools/siteverify` before deployment.
 
 ## Failed or withdrawn release
