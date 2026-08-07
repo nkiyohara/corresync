@@ -63,12 +63,13 @@ reported and never automatically retried.
 Provider differences remain visible:
 
 - Gmail uses bounded IMAP text search. Labels are projected as IMAP mailboxes,
-  so one message may appear in more than one folder. Move and permanent delete
-  require the server-advertised MOVE/UIDPLUS features used by the standards
-  adapter, and any confirmed partial mutation requires reconciliation. Gmail
-  does not expose push history or scheduled send through this route. The
-  provider-documented `https://mail.google.com/` XOAUTH2 scope is displayed
-  before authorization;
+  so one message may appear in more than one folder. Move requires the
+  server-advertised MOVE/UIDPLUS features used by the standards adapter, and
+  any confirmed partial mutation requires reconciliation. The Google route
+  disables permanent delete because Gmail's expunge behavior is
+  account-configurable. Gmail does not expose push history or scheduled send
+  through this route. The provider-documented `https://mail.google.com/`
+  XOAUTH2 scope is displayed before authorization;
 - Graph query syntax differs from Outlook AQS. Reply/forward and move
   revalidate the exact reviewed source before invoking actions that expose no
   atomic source ETag precondition. Permanent deletion uses Graph's explicit

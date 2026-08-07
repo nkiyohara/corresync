@@ -381,9 +381,11 @@ test is permitted only when the selected calendar reports capability and the
 sole attendee is controlled by the tester. Never include the returned join URL
 in evidence.
 
-Permanent delete requires a disposable self-owned message and separate
-authorization. Gmail permanent delete requires the explicitly reviewed
-full-mailbox grant; do not test it with non-disposable mail.
+Permanent delete requires a disposable self-owned message, separate
+authorization, and a provider route that reports the capability. The Google
+route disables permanent delete because Gmail's expunge behavior is
+account-configurable; do not attempt it there or test any other route with
+non-disposable mail.
 
 ## 11. Monitoring and dispatch
 
