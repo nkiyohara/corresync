@@ -254,6 +254,15 @@ function Get-CorresyncOwnerSid {
   return $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
 }
 
+function Initialize-CorresyncCurrentUserOwnership {
+  param([Parameter(Mandatory = $true)][string]$Path)
+
+  $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+  $acl = Get-Acl -LiteralPath $Path
+  $acl.SetOwner($currentSid)
+  Set-Acl -LiteralPath $Path -AclObject $acl
+}
+
 function Test-CorresyncWriteAccess {
   param(
     [Parameter(Mandatory = $true)]
@@ -517,6 +526,9 @@ function Install-CorresyncCandidateSet {
     Assert-CorresyncOwnedPath -Path $InstallDirectory -Directory $true
   } else {
     [IO.Directory]::CreateDirectory($InstallDirectory) | Out-Null
+    # An elevated Windows token may otherwise assign BUILTIN\Administrators
+    # as the default owner even though this is a per-user installation.
+    Initialize-CorresyncCurrentUserOwnership -Path $InstallDirectory
     Assert-CorresyncOwnedPath -Path $InstallDirectory -Directory $true
   }
 
@@ -553,6 +565,7 @@ function Install-CorresyncCandidateSet {
       }
       Move-Item -LiteralPath (Join-Path $transaction "$name.new") -Destination $target
       $installed[$name] = $true
+      Initialize-CorresyncCurrentUserOwnership -Path $target
     }
     $committed = $true
   } finally {
