@@ -166,6 +166,17 @@ try {
   Install-CorresyncCandidateSet `
     -CandidateDirectory $candidateDirectory `
     -InstallDirectory $installDirectory
+  $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  Assert-True `
+    -Condition ((Get-CorresyncOwnerSid -Path $installDirectory) -ceq $currentSid) `
+    -Message "fresh install directory is not owned by the current user"
+  foreach ($installedName in @("corr.exe", "corresync.exe")) {
+    Assert-True `
+      -Condition ((Get-CorresyncOwnerSid `
+          -Path (Join-Path $installDirectory $installedName)
+        ) -ceq $currentSid) `
+      -Message "$installedName is not owned by the current user"
+  }
   Assert-BytesEqual `
     -Expected $corrFixture `
     -Actual (Join-Path $installDirectory "corr.exe") `
