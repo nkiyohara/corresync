@@ -151,6 +151,21 @@ test("DNS redirects, timeouts, malformed and oversized answers become unavailabl
   }
 });
 
+test("DNS fetches use the redirect mode supported by the Workers runtime", async () => {
+  const redirects = [];
+  const result = await discoverDomain("unknown.test", async (request, init) => {
+    redirects.push(init.redirect);
+    return dnsResponse(
+      [],
+      {},
+      new URL(request).searchParams.get("name"),
+      { CNAME: 5, MX: 15, SRV: 33 }[new URL(request).searchParams.get("type")],
+    );
+  });
+  assert.deepEqual(new Set(redirects), new Set(["manual"]));
+  assert.equal(result.classification.status, "unknown");
+});
+
 test("private and rebinding-like DNS data can never become an outbound target", async () => {
   const targets = [];
   const result = await discoverDomain("unknown.test", async request => {

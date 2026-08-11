@@ -3,6 +3,16 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.6-rc.5 - 2026-08-11
+
+### Provider compatibility checker
+
+- Use the Cloudflare Workers-supported manual redirect mode for fixed-origin
+  DNS-over-HTTPS requests, while continuing to reject every redirect response.
+  This restores live provider detection for domains outside the built-in
+  catalog, including Microsoft 365 domains identified by public MX and
+  Autodiscover records.
+
 ## 0.8.6-rc.4 - 2026-08-11
 
 ### Approval-gated Gmail API route

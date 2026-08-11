@@ -143,11 +143,16 @@ async function queryDNS(name, type, fetcher, outerSignal) {
   const response = await fetcher(url, {
     method: "GET",
     headers: { Accept: "application/dns-json" },
-    redirect: "error",
+    // Workerd does not implement redirect "error". Manual mode returns the
+    // redirect response without following it, and the checks below reject it.
+    redirect: "manual",
     signal: AbortSignal.any(signals),
   });
-  if (response.url && new URL(response.url).origin !== new URL(DNS_ENDPOINT).origin) {
+  if (response.status >= 300 && response.status < 400) {
     throw new Error("DNS resolver redirected");
+  }
+  if (response.url && new URL(response.url).origin !== new URL(DNS_ENDPOINT).origin) {
+    throw new Error("DNS response came from an unexpected origin");
   }
   if (!response.ok || !response.headers.get("Content-Type")?.toLowerCase().includes("json")) {
     throw new Error("DNS resolver failed");
