@@ -15,6 +15,7 @@ test("Microsoft MX and Autodiscover produce a high-confidence family with policy
   const result = await discoverDomain("example.test", dnsFixture({
     MX: ["0 tenant.mail.protection.outlook.com."],
     CNAME: ["autodiscover.outlook.com."],
+    SRV: ["0 1 443 service.example.test."],
   }));
   assert.deepEqual(result.classification, {
     family: "microsoft",
@@ -28,18 +29,26 @@ test("Microsoft MX and Autodiscover produce a high-confidence family with policy
   assert.deepEqual(result.routes.map(route => route.provider), [
     "microsoft-owa",
     "microsoft-graph",
+    "jmap",
+    "imap-smtp",
+    "caldav",
   ]);
   assert.match(result.caveats.join(" "), /Organization policy/);
   assert.doesNotMatch(JSON.stringify(result), /tenant\.mail\.protection/);
 });
 
 test("Google families are identified while the generated approval gate stays closed", async () => {
-  const result = await discoverDomain("gmail.com", dnsFixture({}));
-  assert.equal(result.classification.family, "google");
-  assert.equal(result.classification.status, "not_available");
-  assert.equal(result.routes.length, 1);
-  assert.equal(result.routes[0].provider, "google");
-  assert.equal(result.routes[0].status, "not_available");
+  for (const records of [
+    {},
+    { SRV: ["0 1 443 service.gmail.com."] },
+  ]) {
+    const result = await discoverDomain("gmail.com", dnsFixture(records));
+    assert.equal(result.classification.family, "google");
+    assert.equal(result.classification.status, "not_available");
+    assert.equal(result.routes.length, 1);
+    assert.equal(result.routes[0].provider, "google");
+    assert.equal(result.routes[0].status, "not_available");
+  }
 
   const catalog = JSON.parse(await readFile(
     new URL("../catalog.json", import.meta.url),

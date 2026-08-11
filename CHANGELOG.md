@@ -3,7 +3,7 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.8.6-rc.5 - 2026-08-11
+## 0.8.6-rc.5 - 2026-08-12
 
 ### Provider compatibility checker
 
@@ -11,7 +11,8 @@ All notable user-facing changes are recorded here. The project follows
   DNS-over-HTTPS requests, while continuing to reject every redirect response.
   This restores live provider detection for domains outside the built-in
   catalog, including Microsoft 365 domains identified by public MX and
-  Autodiscover records.
+  Autodiscover records. Published standards records remain supporting evidence
+  rather than overriding a recognized provider or an approval-closed route.
 
 ## 0.8.6-rc.4 - 2026-08-11
 
