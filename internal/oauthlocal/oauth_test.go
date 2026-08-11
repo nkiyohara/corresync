@@ -7,10 +7,12 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 
@@ -18,6 +20,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
@@ -235,10 +238,7 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 func TestManagerRequiresBoundedGoogleDesktopClientCredential(t *testing.T) {
 	t.Parallel()
 
-	provider, err := ProviderFor(domain.ProviderGoogle, true, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	provider := googleProviderProfile(true, false)
 	manager, err := New(Options{
 		Get: func(string, string) (string, error) {
 			t.Fatal("missing Google client credential reached the keyring")
@@ -263,6 +263,26 @@ func TestManagerRequiresBoundedGoogleDesktopClientCredential(t *testing.T) {
 			!strings.Contains(malformedErr.Error(), "malformed") {
 			t.Fatalf("New() credential %q error = %v", value, malformedErr)
 		}
+	}
+}
+
+func TestGoogleOAuthProfileIsPresentButApprovalGated(t *testing.T) {
+	t.Parallel()
+
+	_, err := ProviderFor(domain.ProviderGoogle, true, true)
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		t.Fatalf("ProviderFor() error = %v", err)
+	}
+	provider := googleProviderProfile(true, true)
+	if !slices.Contains(
+		provider.Scopes,
+		"https://www.googleapis.com/auth/gmail.modify",
+	) || slices.Contains(provider.Scopes, "https://mail.google.com/") ||
+		!slices.Contains(
+			provider.Scopes,
+			"https://www.googleapis.com/auth/calendar.events",
+		) {
+		t.Fatalf("staged Google scopes = %#v", provider.Scopes)
 	}
 }
 

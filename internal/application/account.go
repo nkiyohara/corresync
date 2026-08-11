@@ -100,7 +100,7 @@ type AccountIMAPSMTPInput struct {
 	Credential AccountCredentialInput  `json:"credential"`
 }
 
-// AccountGoogleMailInput configures Gmail's fixed IMAP/SMTP XOAUTH2 route.
+// AccountGoogleMailInput configures Gmail's fixed API route.
 // It contains only public-client metadata and an OS-keyring grant handle.
 type AccountGoogleMailInput struct {
 	Username      string                 `json:"username"`

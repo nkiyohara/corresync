@@ -16,7 +16,7 @@ public transports and one authenticated local session owner.
                   ▼
        config-scoped session owner
        ├── Outlook Web browser adapter
-       ├── Google Gmail XOAUTH2 + Calendar API adapters
+       ├── approval-gated Gmail + Google Calendar API adapters
        ├── Microsoft Graph OAuth adapter
        ├── JMAP adapter
        ├── IMAP/SMTP adapter
@@ -25,6 +25,24 @@ public transports and one authenticated local session owner.
 
 There is no remote MCP transport, TCP daemon listener, hosted relay, or
 tenant-wide component.
+
+The optional website compatibility checker is a deliberately separate public
+projection, not an application transport:
+
+```text
+browser: full address
+  -> local validation and domain extraction
+  -> POST {domain} to fixed Worker origin
+  -> fixed Cloudflare DNS-over-HTTPS origin
+  -> typed signal categories and route hints
+```
+
+The Worker receives no address local part, credential, provider content, or
+authentication authority. It cannot connect to a user-derived host and shares
+only the generated provider-signal catalog and approval gate with local
+discovery. It has no dependency on the application core, daemon, provider
+adapters, configuration, keyring, or MCP. See
+[ADR 0027](adr/0027-domain-only-public-compatibility-checker.md).
 
 ## Dependency direction
 
@@ -70,6 +88,11 @@ well-known HTTPS metadata and returns ranked explainable candidates. It cannot
 read credentials, launch authentication, request admin consent, or modify
 config.
 
+The public checker intentionally exposes a smaller projection: recognized
+domains, MX and Autodiscover families, and selected SRV presence. Local
+well-known HTTPS discovery is omitted so the public Worker never needs an SSRF,
+redirect, rebinding, or private-address exception policy.
+
 Account add requires explicit selection when evidence is ambiguous. Add,
 rename, and remove use typed application commands over an atomic config store.
 Remove also coordinates deletion of only Corresync-owned account state,
@@ -90,8 +113,9 @@ handle, which cannot be rebound from another account.
 The session owner creates all authenticated provider clients:
 
 - Outlook Web: dedicated browser profile and in-memory captured session;
-- Google: interactive OAuth browser, OS-keyring grant, Gmail XOAUTH2, and
-  Calendar API;
+- Google: staged Gmail/Calendar API route, release-gated before OAuth and
+  network access until approval; normal-browser OAuth and OS-keyring grant
+  after activation;
 - Graph: interactive OAuth browser plus grant in OS keyring;
 - JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference.
 

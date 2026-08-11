@@ -55,20 +55,26 @@ visible browser. Do not use the relay to bypass organization policy.
 
 ## Google
 
-Choose `google` explicitly with a desktop public OAuth client you are
-authorized to use. Corresync opens the normal system browser for Google
-authorization; it never automates the sign-in page. Gmail then uses only
-XOAUTH2 over `imap.gmail.com:993` and `smtp.gmail.com:587`. Google Calendar and
-Google Meet use the Calendar API with the same grant. No Gmail password, app
-password, cookie, or Gmail REST transport is accepted.
+The Gmail and Google Calendar integration is included in RC builds but disabled
+while Corresync's production OAuth application awaits Google approval. Gmail
+discovery explains that support is coming soon. Explicit account addition,
+existing configurations, migrated grants, and mixed-provider accounts all stop
+before a browser opens, the keyring is read, or Google traffic is sent.
+
+After approval, activation will be a separate reviewed release. The normal
+system browser will own authorization; Corresync will never automate the
+sign-in page. Gmail will use the pinned Gmail API and Google Calendar/Meet will
+use the Calendar API with the account-scoped OS-keyring grant. No Gmail
+password, app password, cookie, configurable Google host, or unattended login
+is accepted.
 
 Google's generated Desktop client may require its client credential at the
 token endpoint. Provide `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` only in the
 local Corresync process environment. It is never a config, CLI, MCP, grant, or
 browser-URL field.
 
-Google Workspace administrators can restrict third-party OAuth, IMAP, and
-Calendar API access. A rejected or unapproved route fails clearly and never
+Google Workspace administrators can restrict third-party OAuth and API access.
+A rejected or unapproved route fails clearly and never
 falls through to a password or another provider.
 
 ## Google and Microsoft Graph OAuth
@@ -95,10 +101,12 @@ provider-specific exception; Microsoft Graph remains secret-free.
 The resulting grant is stored by the operating-system keyring under the
 configured local reference. The TOML contains only that reference and the
 explicit consent bit. Scopes are selected from the configured mail/calendar
-services; choosing Graph or Google is never an automatic fallback. Google mail
-requests the provider-documented `https://mail.google.com/` scope required by
-XOAUTH2 and fetches a fresh short-lived access token immediately before each
-encrypted IMAP or SMTP authentication.
+services; choosing Graph or Google is never an automatic fallback. Once the
+production gate is separately enabled after approval, Google mail requests
+only the provider-documented
+`https://www.googleapis.com/auth/gmail.modify` scope. The pending RC does not
+construct or display that scope through a production command and cannot begin
+authorization.
 
 Use only an application registration and account you are authorized to use.
 

@@ -115,7 +115,7 @@ func TestGoogleCalendarContractUsesBoundedReadsAndConditionalWrites(
 
 	client, err := New(t.Context(), Options{
 		APIBase: server.URL, Address: "reader@example.test",
-		HTTP: server.Client(),
+		Calendar: true, HTTP: server.Client(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -225,7 +225,7 @@ func TestGoogleCalendarRouteBindsTheConfiguredIdentity(t *testing.T) {
 
 	client, err := New(t.Context(), Options{
 		APIBase: server.URL, Address: "reader@example.test",
-		HTTP: server.Client(),
+		Calendar: true, HTTP: server.Client(),
 	})
 	if client != nil {
 		_ = client.Close()
@@ -265,7 +265,7 @@ func TestGoogleCalendarRejectsReadOnlyPrimaryCalendar(t *testing.T) {
 	}))
 	defer server.Close()
 	client, err := New(t.Context(), Options{
-		APIBase: server.URL, HTTP: server.Client(),
+		APIBase: server.URL, Calendar: true, HTTP: server.Client(),
 	})
 	if client != nil || err == nil || !strings.Contains(err.Error(), "not editable") {
 		t.Fatalf("client = %#v error = %v", client, err)
@@ -345,7 +345,7 @@ func TestGoogleMeetPendingCreateUsesOneBoundedConfirmationRead(
 
 	client, err := New(t.Context(), Options{
 		APIBase: server.URL, Address: "reader@example.test",
-		HTTP: server.Client(),
+		Calendar: true, HTTP: server.Client(),
 	})
 	if err != nil {
 		t.Fatal(err)

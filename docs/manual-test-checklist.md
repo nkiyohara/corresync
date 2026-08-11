@@ -257,7 +257,7 @@ The Outlook-Web-only `--terminal` relay is optional, requires a real TTY, and
 must reject piped input. Do not record entered or rendered identity values.
 
 Record Google observations only through the current explicit `google` route:
-system-browser OAuth, Gmail IMAP/SMTP XOAUTH2, and the Calendar API. Workspace
+system-browser OAuth and the pinned Gmail and Calendar APIs. Workspace
 policy may require administrator approval or disable one of those services.
 
 ## 7. Read-only CLI

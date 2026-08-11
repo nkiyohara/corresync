@@ -9,7 +9,7 @@ not available through a raw protocol escape hatch.
 | Provider ID | Mail | Calendar | Authentication | v0.8 evidence |
 | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
-| `google` | Gmail over IMAP/SMTP XOAUTH2 | Selectable Google calendars, observed Google Meet link | Normal browser OAuth with a BYO desktop public client; grant in OS keyring | Implemented; synthetic protocol/API integration contracts; live-unobserved |
+| `google` (coming soon) | Gmail API; no permanent delete | Selectable Google calendars and Google Meet when advertised | Included but disabled until production OAuth approval; no sign-in starts | Synthetic API/application contracts; live-unobserved |
 | `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `jmap` | Mail | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
 | `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts; live-unobserved |
@@ -32,10 +32,21 @@ otherwise it directs the human to explicit selection. `corr account add` require
 explicit provider selection whenever discovery is ambiguous. Microsoft domain
 or hosted-MX evidence offers both Outlook Web and Microsoft Graph, but Graph is
 always marked as an explicit OAuth choice and is never selected as a fallback.
-Google evidence advertises only the explicit `google` route with fixed Gmail
-IMAP/SMTP endpoints and the Calendar API base. Workspace policy may require
-administrator approval or block OAuth, IMAP, or Calendar API access; Corresync
-does not silently fall back to another route.
+Google evidence identifies the staged `google` route but cannot select or add
+it while production OAuth approval is pending. The CLI explains that Gmail was
+found, no sign-in started, and support is coming soon. When separately
+activated after approval, the route pins the Gmail and Calendar API base.
+Workspace policy may still require administrator approval or block API access;
+Corresync never silently falls back to another route.
+
+The optional public checker on the Providers page is a deliberately smaller
+projection of that knowledge for first-time visitors. Its browser code sends
+only a normalized domain, and its Worker queries only a fixed public DNS
+resolver for bounded provider-family signals. It does not perform well-known
+HTTP probes, receive an address local part, authenticate, add an account, or
+guarantee compatibility. Unknown and conflicting results direct the user to
+the fuller local discovery command. See
+[ADR 0027](adr/0027-domain-only-public-compatibility-checker.md).
 
 ## Mail
 
@@ -62,14 +73,13 @@ reported and never automatically retried.
 
 Provider differences remain visible:
 
-- Gmail uses bounded IMAP text search. Labels are projected as IMAP mailboxes,
-  so one message may appear in more than one folder. Move requires the
-  server-advertised MOVE/UIDPLUS features used by the standards adapter, and
-  any confirmed partial mutation requires reconciliation. The Google route
-  disables permanent delete because Gmail's expunge behavior is
-  account-configurable. Gmail does not expose push history or scheduled send
-  through this route. The provider-documented `https://mail.google.com/`
-  XOAUTH2 scope is displayed before authorization;
+- The staged Gmail API adapter uses bounded native search, message, attachment,
+  label, draft, send, modify, Trash, and untrash operations. It never calls the
+  immediate permanent-delete endpoint; move to Trash is available instead.
+  Confirmed partial mutations require reconciliation. Push history and
+  scheduled send are not exposed. After production approval, mail requests
+  the provider-documented `gmail.modify` scope; while approval is pending no
+  Google scope or authorization page is presented;
 - Graph query syntax differs from Outlook AQS. Reply/forward and move
   revalidate the exact reviewed source before invoking actions that expose no
   atomic source ETag precondition. Permanent deletion uses Graph's explicit

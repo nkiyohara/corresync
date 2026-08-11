@@ -74,29 +74,22 @@ management are not exposed.
 
 ## Google
 
-The Google adapter uses an explicitly selected public OAuth client and a grant
-held by the operating-system credential facility. Gmail mail is transported
-only over fixed TLS IMAP and SMTP Submission endpoints with SASL XOAUTH2; it
-does not use Gmail REST, a password, an app password, or a configurable host.
-When Google's generated Desktop client requires its client credential for token
-exchange, the local session owner receives it only through
-`CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET`; it is absent from configuration,
-browser URLs, MCP, logs, and the stored grant.
-The short-lived bearer is fetched immediately before each authentication,
-bounded, kept out of logs, and overwritten afterwards.
-After Gmail accepts an SMTP submission, Corresync confirms Gmail's
-automatically stored Sent copy by its unique Message-ID and does not issue a
-duplicate IMAP APPEND.
+The Gmail and Google Calendar adapters ship behind a release-owned approval
+gate. While it is false, account selection, explicit addition, session
+activation, and OAuth profile creation independently fail before browser,
+keyring, grant, or network access. The gate has no environment, configuration,
+CLI, MCP, or BYO-client override.
 
-Gmail labels project through IMAP mailboxes and are reported as lossy.
-Search uses bounded IMAP text criteria. Move and permanent delete depend on
-observed MOVE/UIDPLUS behavior for general standards routes. The Google route
-disables permanent delete because Gmail's expunge behavior is account
-configurable. Ambiguous mutation or submission outcomes require reconciliation
-under the shared standards-mail contract. The route does not enable
-push/history monitoring or scheduled send.
+After a separate post-approval release enables the route, Gmail uses the pinned
+Gmail API with `gmail.modify`. Reads, MIME traversal, pagination, identifiers,
+attachments, and provider payloads are bounded. Draft, send, read-state, label,
+archive, Trash, and untrash mutations map to closed typed endpoints. The
+immediate permanent-delete endpoint is never called; the provider-neutral hard
+delete operation fails locally and directs the user to Trash. Confirmed partial
+mutations require reconciliation and are not retried. Push watches, durable
+history cursors, and scheduled send remain unavailable.
 
-Google Calendar remains a bounded REST adapter sharing the same OAuth grant.
+Google Calendar is a bounded REST adapter sharing the same OAuth grant.
 When the authenticated primary calendar advertises `hangoutsMeet`, a reviewed
 provider-native online-meeting request uses a unique conference request ID and
 returns only that event's Meet link.
@@ -163,9 +156,9 @@ represented explicitly. Errors after a mutating IMAP command or an accepted
 SMTP submission are partial outcomes requiring reconciliation; Corresync does
 not repeat the operation automatically.
 
-The `google` route reuses this adapter only with provider-pinned Gmail
-endpoints and XOAUTH2. Generic `imap-smtp` routes continue to use an explicitly
-approved external credential and cannot inherit a Google OAuth grant.
+The staged `google` route does not reuse this adapter. Generic `imap-smtp`
+routes continue to use an explicitly approved external credential and cannot
+inherit a Google OAuth grant.
 
 ## CalDAV
 

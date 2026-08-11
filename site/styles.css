@@ -1238,6 +1238,237 @@ pre {
   box-shadow: 0 0 0 5px var(--accent-wash);
 }
 
+/* ---------- Private provider compatibility check ---------- */
+
+.compatibility-checker {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: clamp(2rem, 5vw, 4rem);
+  padding: clamp(2rem, 6vw, 4.5rem) !important;
+  border: 1px solid var(--line-strong);
+  border-radius: 1.5rem;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    repeating-linear-gradient(
+    -45deg,
+    var(--stripe-red) 0 11px,
+    transparent 11px 19px,
+    var(--stripe-blue) 19px 30px,
+    transparent 30px 38px
+  ) border-box;
+  box-shadow: var(--shadow);
+}
+
+.compatibility-checker::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 5px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--stripe-red) 0 11px,
+    transparent 11px 19px,
+    var(--stripe-blue) 19px 30px,
+    transparent 30px 38px
+  );
+  content: "";
+}
+
+.checker-intro {
+  max-width: 48rem;
+}
+
+.checker-intro > p:last-child,
+.checker-privacy,
+.checker-noscript,
+.checker-result-body,
+.checker-details {
+  color: var(--muted);
+}
+
+.checker-form {
+  max-width: 52rem;
+  margin-top: 2rem;
+}
+
+.checker-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.checker-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+}
+
+.checker-fields input {
+  min-width: 0;
+  min-height: 3.1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.7rem;
+  color: var(--ink);
+  background: var(--paper);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.checker-fields input::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.checker-fields input[aria-invalid="true"] {
+  border-color: var(--stripe-red);
+}
+
+.checker-fields .button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+  transform: none;
+}
+
+.checker-validation {
+  margin: 0.6rem 0 0;
+  color: var(--stripe-red);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.checker-privacy,
+.checker-noscript {
+  max-width: 52rem;
+  margin: 1rem 0 0;
+  font-size: 0.84rem;
+}
+
+.checker-privacy strong {
+  color: var(--ink);
+}
+
+.checker-result {
+  max-width: 52rem;
+  margin-top: 1.75rem;
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--accent-wash);
+}
+
+.checker-result-status {
+  margin-bottom: 0.7rem;
+  color: var(--accent);
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.checker-result-title {
+  margin-bottom: 0.6rem;
+  font-size: clamp(1.3rem, 2.6vw, 1.7rem);
+}
+
+.checker-result-family {
+  margin-bottom: 0.65rem;
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.checker-subtitle {
+  margin: 1.35rem 0 0.35rem;
+}
+
+.checker-route-list {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.checker-route {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--card);
+}
+
+.checker-route-heading {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.checker-route-heading h5 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.checker-route dl {
+  margin: 0.7rem 0 0;
+}
+
+.checker-route dl > div {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: 0.65rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.checker-route dt {
+  color: var(--ink);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.checker-route dd {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.checker-route-note,
+.checker-isolation {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.checker-isolation {
+  padding-left: 0.8rem;
+  border-left: 2px solid var(--accent);
+}
+
+.checker-details {
+  margin-top: 1.2rem;
+  font-size: 0.86rem;
+}
+
+.checker-details summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.checker-details p {
+  margin: 0.7rem 0 0;
+}
+
+.checker-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1.4rem;
+}
+
 .honest-edges {
   display: grid;
   grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.2fr);
@@ -1658,6 +1889,12 @@ pre {
   }
   .site-nav {
     gap: 0.4rem 1.1rem;
+  }
+  .checker-fields {
+    grid-template-columns: 1fr;
+  }
+  .checker-fields .button {
+    width: 100%;
   }
   main > section {
     padding-block: 3.5rem;

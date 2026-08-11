@@ -260,11 +260,12 @@
           <article aria-labelledby="faq-provider">
             <h3 id="faq-provider">Will it work with my accounts?</h3>
             <p>
-              Corresync speaks Outlook Web, Google, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV,
-              and you pick mail and calendar routes independently per account. What a route can
-              do—and any degradation your specific account reports—is always explicit. <a
-                href="providers.html"
-              >Compare the routes</a>.
+              Outlook Web, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV routes are available now;
+              Gmail and Google Calendar are built but disabled pending production OAuth approval.
+              You pick mail and calendar routes independently per account, and any degradation is
+              explicit. The optional <a href="providers.html#check"
+              >private compatibility checker</a> sends only the domain after the @, or you can skip
+              it and discover locally after installation.
             </p>
           </article>
           <article aria-labelledby="faq-cost">
@@ -273,7 +274,7 @@
               No. Corresync is open source under the Apache-2.0 license. You bring the accounts you
               already have. Microsoft Graph additionally needs a public OAuth client registration
               you are authorized to use; Corresync is preparing its official OAuth application
-              before guided Google connection can open.
+              before any Corresync Google connection can open.
             </p>
           </article>
           <article aria-labelledby="faq-data">
@@ -329,9 +330,9 @@
         </div>
         <ul>
           <li>
-            <strong>Guided Google connection is not available yet.</strong> Corresync is preparing
-            its official OAuth application for verification; use Google’s official Workspace MCP
-            servers in the meantime.
+            <strong>Corresync Google connection is not available yet.</strong> The production OAuth
+            application is awaiting approval, so the route is completely disabled. Use Google’s
+            official Workspace MCP servers in the meantime.
           </li>
           <li>
             <strong>No token relay.</strong> Microsoft Graph uses a public client you register and

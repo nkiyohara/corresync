@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "googleOAuthApproved": false,
+  "families": [
+    {
+      "id": "microsoft-consumer",
+      "displayName": "Microsoft Outlook.com",
+      "knownDomains": [
+        "hotmail.com",
+        "live.com",
+        "msn.com",
+        "outlook.com"
+      ]
+    },
+    {
+      "id": "microsoft-365",
+      "displayName": "Microsoft 365 / Exchange Online",
+      "mailExchangeSuffixes": [
+        "mail.protection.outlook.com"
+      ],
+      "autodiscoverCnameSuffixes": [
+        "autodiscover.outlook.com"
+      ]
+    },
+    {
+      "id": "google-consumer",
+      "displayName": "Google Gmail",
+      "knownDomains": [
+        "gmail.com",
+        "googlemail.com"
+      ]
+    },
+    {
+      "id": "google-workspace",
+      "displayName": "Google Workspace",
+      "mailExchangeSuffixes": [
+        "aspmx.l.google.com",
+        "google.com"
+      ]
+    }
+  ]
+}

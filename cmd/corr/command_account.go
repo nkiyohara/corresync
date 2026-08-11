@@ -10,6 +10,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type accountCommand struct {
@@ -98,6 +99,18 @@ var errUnsupportedLegacyGoogleRoute = errors.New(
 )
 
 const googleWorkspaceMCPGuide = "https://developers.google.com/workspace/guides/configure-mcp-servers"
+
+func googleOAuthPendingError(prefix string) error {
+	return fmt.Errorf(
+		"%s %w. Outlook Web is available now; JMAP, IMAP/SMTP, CalDAV, and "+
+			"Microsoft Graph can also be configured when your provider supports "+
+			"them. Until then, Google's official Workspace MCP servers are an "+
+			"independent Developer Preview: %s",
+		prefix,
+		rollout.ErrGoogleOAuthPending,
+		googleWorkspaceMCPGuide,
+	)
+}
 
 func (command *accountDiscoverCommand) Run(app *runtime) error {
 	_, discoverer, err := app.accountServices()
@@ -479,6 +492,9 @@ func (command accountAddCommand) routes(
 	case domain.ProviderCalDAV:
 		return command.finishRoutes(nil, nil, "", selected, discovery)
 	case domain.ProviderGoogle:
+		if !rollout.GoogleOAuthApproved {
+			return nil, nil, "", googleOAuthPendingError("A Google route was selected.")
+		}
 		oauth, err := command.oauthRoute(
 			domain.ProviderGoogle,
 			selected,
@@ -644,6 +660,12 @@ func (command accountAddCommand) finishRoutes(
 			provider,
 		)
 	case domain.ProviderGoogle, domain.ProviderMicrosoftGraph:
+		if provider == string(domain.ProviderGoogle) &&
+			!rollout.GoogleOAuthApproved {
+			return nil, nil, "", googleOAuthPendingError(
+				"A Google Calendar route was selected.",
+			)
+		}
 		if calendar == nil ||
 			calendar.Provider != domain.ProviderID(provider) ||
 			command.hasDistinctCalendarOAuth() {
@@ -844,6 +866,11 @@ func selectAccountCandidate(
 				provider,
 			)
 		}
+		if provider == domain.ProviderGoogle && !rollout.GoogleOAuthApproved {
+			return application.ProviderCandidate{}, googleOAuthPendingError(
+				"A Google route was selected.",
+			)
+		}
 		for _, candidate := range result.Candidates {
 			if candidate.Provider == provider {
 				if !candidate.Available {
@@ -908,14 +935,10 @@ func selectAccountCandidate(
 		}
 	}
 	for _, candidate := range result.Candidates {
-		if candidate.Provider == domain.ProviderGoogle && candidate.Available {
-			return application.ProviderCandidate{}, errors.New(
-				"google account discovered, but Corresync's Google OAuth " +
-					"application is being prepared for verification, so " +
-					"guided Google connection is not available yet. For now, connect your " +
-					"agent directly to Google's official Workspace MCP servers " +
-					"(Developer Preview; follow Google's setup guide): " +
-					googleWorkspaceMCPGuide,
+		if candidate.Provider == domain.ProviderGoogle &&
+			!rollout.GoogleOAuthApproved {
+			return application.ProviderCandidate{}, googleOAuthPendingError(
+				"Gmail was found.",
 			)
 		}
 	}

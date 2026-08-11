@@ -6,7 +6,7 @@
     <title>Corresync Privacy Policy — local-first provider data handling</title>
     <meta
       name="description"
-      content="How Corresync handles mail, calendar, credentials, local storage, and optional monitoring data across Google, Microsoft, Outlook Web, JMAP, IMAP/SMTP, and CalDAV."
+      content="How Corresync handles mail, calendar, credentials, local storage, and the optional domain-only provider checker across Google, Microsoft, JMAP, IMAP/SMTP, and CalDAV."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="How Corresync handles mail, calendar, credentials, local storage, and optional monitoring data across Google, Microsoft, Outlook Web, JMAP, IMAP/SMTP, and CalDAV."
+      content="How Corresync handles mail, calendar, credentials, local storage, and the optional domain-only provider checker across Google, Microsoft, JMAP, IMAP/SMTP, and CalDAV."
     >
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://corresync.org/privacy.html">
@@ -34,7 +34,7 @@
     >
     <meta
       name="twitter:description"
-      content="How Corresync handles mail, calendar, credentials, local storage, and optional monitoring data across Google, Microsoft, Outlook Web, JMAP, IMAP/SMTP, and CalDAV."
+      content="How Corresync handles mail, calendar, credentials, local storage, and the optional domain-only provider checker across Google, Microsoft, JMAP, IMAP/SMTP, and CalDAV."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -74,10 +74,11 @@
         <p class="lede">
           Corresync is a local-first open-source application. It connects your device directly to
           providers you authorize; the Corresync project does not operate a hosted mailbox,
-          calendar, token relay, analytics service, or remote MCP server.
+          calendar, token relay, analytics service, or remote MCP server. Its optional website
+          checker receives only a domain and reads public DNS—never your full address or account.
         </p>
         <p class="legal-date">
-          Effective and last updated: <time datetime="2026-08-03">3 August 2026</time>
+          Effective and last updated: <time datetime="2026-08-11">11 August 2026</time>
         </p>
         <nav class="legal-toc" aria-label="Privacy Policy sections">
           <a href="#scope">Scope</a>
@@ -85,6 +86,7 @@
           <a href="#other-data">Route details</a>
           <a href="#storage">Local storage</a>
           <a href="#sharing">Sharing</a>
+          <a href="#website">Website checker</a>
           <a href="#choices">Your choices</a>
           <a href="#contact">Contact</a>
         </nav>
@@ -114,11 +116,12 @@
               This Privacy Policy explains how Naoki Kiyohara, maintainer of the Corresync
               open-source project, and project contributors (“Corresync”, “we”, or “the
               project”) handle information in the official Corresync application, its
-              project-operated OAuth identities, and this website. It covers every supported route:
-              Google, Outlook Web, Microsoft Graph, JMAP, IMAP/SMTP, CalDAV, and approved local
-              imports. It does not govern independent forks, third-party builds, your email or
-              calendar provider, operating system, package manager, MCP client, AI provider, or
-              optional runner; those parties apply their own terms and privacy policies.
+              project-operated OAuth identities, and this website. It covers every available or
+              staged route: Google, Outlook Web, Microsoft Graph, JMAP, IMAP/SMTP, CalDAV, and
+              approved local imports. It does not govern independent forks, third-party builds, your
+              email or calendar provider, operating system, package manager, MCP client, AI
+              provider, or optional runner; those parties apply their own terms and privacy
+              policies.
             </p>
             <p>
               Corresync has no user-account database. You install and run it on a device you
@@ -144,10 +147,11 @@
               endpoint credentials.
             </p>
             <p>
-              Guided connection through the project’s official Google OAuth application is not
-              generally available while that application is prepared and verified. The practices
-              below apply both to that official application when available and to the same local
-              Google route when you explicitly configure a public client you are authorized to use.
+              Gmail and Google Calendar code is included in RC releases, but the entire Google route
+              is disabled while the production OAuth application awaits approval. Account addition,
+              browser OAuth, consent, keyring access, and Google API traffic cannot start. The
+              practices below describe the route that a separate reviewed release may enable only
+              after approval.
             </p>
             <div
               class="legal-table-wrap"
@@ -165,16 +169,16 @@
                 </thead>
                 <tbody>
                   <tr>
-                    <td><code>https://mail.google.com/</code></td>
+                    <td><code>https://www.googleapis.com/auth/gmail.modify</code></td>
                     <td>
                       Gmail folders and labels; message identifiers, headers, participants,
                       subjects, timestamps, bodies, attachments, state, drafts, and sent mail.
                     </td>
                     <td>
                       Search, list, read, download an attachment you request, draft, send, mark read
-                      or unread, and move or organize mail. Gmail IMAP/SMTP XOAUTH2 requires this
-                      broad scope. Corresync’s Google route does not expose permanent message
-                      deletion even though the scope itself is capable of broader mailbox access.
+                      or unread, apply labels, move, and organize mail through the Gmail API.
+                      Corresync does not request permanent-delete authority and does not expose
+                      permanent message deletion; its destructive operation moves mail to Trash.
                     </td>
                   </tr>
                   <tr>
@@ -321,11 +325,12 @@
             <p class="legal-kicker">04 · How processing works</p>
             <h2 id="processing-title">Direct connections, explicit actions</h2>
             <p>
-              The official Google route opens Google’s authorization page in your system browser
-              using OAuth 2.0 with PKCE and a loopback redirect. Corresync then connects directly
-              from your device to Google’s fixed Gmail IMAP, Gmail SMTP, and Calendar API
-              endpoints over TLS. The project does not receive your password, OAuth grant, email,
-              attachment, or calendar content.
+              The Google route is currently stopped before authentication or network access. After
+              approval and a separate release-gate change, it will open Google’s authorization
+              page in your system browser using OAuth 2.0 with PKCE and a loopback redirect, then
+              connect directly from your device to Google’s fixed Gmail and Calendar API endpoints
+              over TLS. The project does not receive your password, OAuth grant, email, attachment,
+              or calendar content.
             </p>
             <p>
               Microsoft Graph uses the same local public-client OAuth pattern against Microsoft’s
@@ -468,6 +473,26 @@
               >GitHub’s privacy statement</a>.
             </p>
             <p>
+              The optional provider compatibility checker separates your address in your browser,
+              immediately clears the address field, and sends only the normalized domain—the part
+              after the @—in a JSON <code>POST</code> body to
+              <code>discover.corresync.org</code>. It never sends or stores the part before the @,
+              puts either value in the address bar, sets a cookie, uses browser storage, starts
+              sign-in, or contacts your mail provider. You can skip the checker entirely and run
+              local credential-free discovery after installation.
+            </p>
+            <p>
+              That endpoint is a single-purpose Cloudflare Worker. It asks Cloudflare’s fixed
+              public DNS-over-HTTPS resolver for bounded MX, Autodiscover CNAME, and service
+              records, then returns categories and possible Corresync routes rather than raw DNS
+              records. It does not fetch a domain-supplied URL, retain an application record, use an
+              application cache, or enable Workers logs or analytics. Responses are marked
+              <code>no-store</code>. As the network operator, Cloudflare necessarily processes
+              ordinary connection metadata such as an IP address under its
+              <a href="https://www.cloudflare.com/privacypolicy/">privacy policy</a>, even though
+              Corresync does not inspect or use the address for its rate-limit key.
+            </p>
+            <p>
               Eligible interactive CLI starts may ask GitHub’s public Releases API whether a newer
               Corresync release exists in the stable or user-selected preview channel. The request
               contains the current Corresync version in its user agent, not your account address,
@@ -515,13 +540,14 @@
             <p class="legal-kicker">09 · Security</p>
             <h2 id="security-title">Controls and unavoidable risk</h2>
             <p>
-              Corresync uses provider-pinned Google and Microsoft API endpoints, explicit TLS
-              endpoints for standards routes, visible browser-owned Outlook sessions, normal
-              system-browser OAuth, PKCE and state validation, OS-keyring grant storage,
-              account-isolated sessions, authenticated local IPC, MCP over stdio, bounded parsing,
-              and preview-before-commit controls. No method of local storage or transmission is
-              completely secure. Protect your device, keyring, MCP configuration, selected model,
-              and backups, and install only releases whose provenance you trust.
+              Corresync uses provider-pinned Google and Microsoft API endpoints, a fixed public DNS
+              resolver for the optional domain-only website checker, explicit TLS endpoints for
+              standards routes, visible browser-owned Outlook sessions, normal system-browser OAuth,
+              PKCE and state validation, OS-keyring grant storage, account-isolated sessions,
+              authenticated local IPC, MCP over stdio, bounded parsing, and preview-before-commit
+              controls. No method of local storage or transmission is completely secure. Protect
+              your device, keyring, MCP configuration, selected model, and backups, and install only
+              releases whose provenance you trust.
             </p>
             <p>
               Report a suspected vulnerability through
@@ -535,6 +561,11 @@
             <p class="legal-kicker">10 · Your choices and deletion</p>
             <h2 id="choices-title">Disconnect and remove access at any time</h2>
             <ol>
+              <li>
+                Skip the optional website checker whenever you prefer; it has no account, cookie, or
+                application record to delete. Clearing or leaving the form ends its browser-only
+                handling of the full address.
+              </li>
               <li>
                 Run <code>corr account remove ALIAS --approve</code> to remove that account’s
                 Corresync configuration and account-local profile, import, cursor, and queue state.

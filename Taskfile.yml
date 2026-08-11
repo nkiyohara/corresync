@@ -51,6 +51,19 @@ tasks:
     cmds:
       - go run ./tools/siteverify
 
+  discovery:generate:
+    desc: Generate the public credential-free discovery catalog
+    cmds:
+      - go run ./tools/discoverycatalog
+
+  discovery:check:
+    desc: Verify the public discovery catalog and Worker/browser contracts
+    cmds:
+      - go run ./tools/discoverycatalog --check
+      - node --check web/discovery-worker/src/worker.mjs
+      - node --check site/check.js
+      - node --test web/discovery-worker/test/*.test.mjs site/check.test.cjs
+
   vet:
     desc: Run the Go static analyzer
     cmds:
@@ -128,6 +141,7 @@ tasks:
       - task: format:check
       - task: docs
       - task: site
+      - task: discovery:check
       - task: vet
       - task: lint
       - task: test

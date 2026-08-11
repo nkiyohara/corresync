@@ -135,6 +135,9 @@ func verifySite(root string) error {
 	if err := verifyWebManifest(root); err != nil {
 		return err
 	}
+	if err := verifyCompatibilityChecker(root, pages); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -196,7 +199,9 @@ func parsePage(path string) (page, error) {
 				}
 			case "script":
 				if source := attributes["src"]; source != "" {
-					if source != "copy.js" {
+					allowed := source == "copy.js" ||
+						(filepath.Base(path) == "providers.html" && source == "check.js")
+					if !allowed {
 						return fmt.Errorf("%s loads unexpected script %q", path, source)
 					}
 					item.assets = append(item.assets, source)
@@ -356,6 +361,56 @@ func verifyLocalReferences(root string, item page, pages map[string]page) error 
 		}
 		if !strings.HasPrefix(targetPath, filepath.Clean(root)+string(filepath.Separator)) {
 			return fmt.Errorf("%s reference escapes the site root: %q", item.path, rawReference)
+		}
+	}
+	return nil
+}
+
+func verifyCompatibilityChecker(root string, pages map[string]page) error {
+	providersPath := filepath.Join(root, "providers.html")
+	providers, ok := pages[filepath.Clean(providersPath)]
+	if !ok {
+		return errors.New("site does not contain providers.html")
+	}
+	for _, id := range []string{
+		"check",
+		"compatibility-form",
+		"compatibility-email",
+		"compatibility-submit",
+		"compatibility-live",
+		"compatibility-result",
+	} {
+		if _, ok := providers.ids[id]; !ok {
+			return fmt.Errorf("providers.html compatibility checker is missing id %q", id)
+		}
+	}
+	if !containsString(providers.assets, "check.js") {
+		return errors.New("providers.html does not load the compatibility checker")
+	}
+
+	path := filepath.Join(root, "check.js")
+	data, err := os.ReadFile(path) // #nosec G304 -- repository-owned site root.
+	if err != nil {
+		return fmt.Errorf("read compatibility checker: %w", err)
+	}
+	source := string(data)
+	if !strings.Contains(source, "https://discover.corresync.org/v1/check") ||
+		!strings.Contains(source, `JSON.stringify({ domain: normalized })`) {
+		return errors.New("compatibility checker does not use the fixed domain-only contract")
+	}
+	for _, forbidden := range []string{
+		"localStorage",
+		"sessionStorage",
+		"document.cookie",
+		"indexedDB",
+		"sendBeacon",
+		"location.search",
+		"location.hash",
+		"innerHTML",
+		"outerHTML",
+	} {
+		if strings.Contains(source, forbidden) {
+			return fmt.Errorf("compatibility checker contains forbidden browser API %q", forbidden)
 		}
 	}
 	return nil

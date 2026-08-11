@@ -24,6 +24,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/localipc"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
 	"github.com/nkiyohara/corresync/internal/paths"
+	"github.com/nkiyohara/corresync/internal/rollout"
 	"github.com/nkiyohara/corresync/internal/session"
 	"github.com/nkiyohara/corresync/internal/updatecheck"
 )
@@ -227,31 +228,27 @@ func (app *runtime) accountServices() (
 		ConfigPath:               path,
 		DeleteOAuthAuthorization: oauthlocal.DeleteAuthorization,
 	}
+	available := []domain.ProviderID{
+		domain.ProviderMicrosoftOWA,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderCalDAV,
+		domain.ProviderMicrosoftGraph,
+	}
+	if rollout.GoogleOAuthApproved {
+		available = append(available, domain.ProviderGoogle)
+	}
 	accounts, err := application.NewAccountService(
 		store,
 		store,
-		[]domain.ProviderID{
-			domain.ProviderMicrosoftOWA,
-			domain.ProviderJMAP,
-			domain.ProviderIMAPSMTP,
-			domain.ProviderCalDAV,
-			domain.ProviderGoogle,
-			domain.ProviderMicrosoftGraph,
-		},
+		available,
 	)
 	if err != nil {
 		return nil, nil, err
 	}
 	discoverer, err := application.NewAccountDiscoveryService(
 		app.accountDiscoverer,
-		[]domain.ProviderID{
-			domain.ProviderMicrosoftOWA,
-			domain.ProviderJMAP,
-			domain.ProviderIMAPSMTP,
-			domain.ProviderCalDAV,
-			domain.ProviderGoogle,
-			domain.ProviderMicrosoftGraph,
-		},
+		available,
 	)
 	if err != nil {
 		return nil, nil, err

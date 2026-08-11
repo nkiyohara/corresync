@@ -14,6 +14,8 @@ gateway or tenant administration service.
 - configuration, content-free audit records, approval tokens, daemon
   credentials, and privacy-preserving error records;
 - release artifacts, checksums, SBOMs, and update provenance.
+- website-checker input domains, fixed resolver responses, and the integrity of
+  public compatibility classifications.
 
 ## Trust boundaries
 
@@ -30,6 +32,29 @@ gateway or tenant administration service.
   cross an explicit disclosure boundary;
 - CI logs, fixtures, feedback reports, and public issues must be safe to
   publish.
+- GitHub Pages, Cloudflare Workers, and Cloudflare's public DNS resolver are
+  external infrastructure for the optional domain-only website checker;
+  ordinary connection metadata is visible to those operators.
+
+## Public compatibility-checker controls
+
+- Derive the domain in the browser, clear the full address after validation,
+  and send only one normalized domain in a bounded JSON `POST` body. Never put
+  the address or domain in a query string, browser history, cookie, persistent
+  storage, analytics event, application log, or cache.
+- Accept only the fixed production origin, host, path, method, content type,
+  object shape, and normalized non-IP domain. Rate-limit with one global key so
+  application code does not inspect or retain a visitor IP.
+- Query only the fixed Cloudflare DNS-over-HTTPS origin with bounded names,
+  types, time, answers, and bytes. Reject redirects. Never fetch a user-derived
+  host, provider API, well-known URL, private address, or DNS answer target.
+- Return only a versioned closed schema with typed classifications, signal
+  categories, route IDs, and next-step IDs. Return no raw DNS record or free
+  URL; browser code maps IDs to reviewed static text and uses text-only DOM
+  construction.
+- Use `no-store`, no Cache API or storage binding, and disable Workers
+  observability and invocation logs. The checker never authenticates, adds an
+  account, probes consent, or claims that DNS evidence guarantees capability.
 
 ## Authentication controls
 
@@ -42,9 +67,10 @@ gateway or tenant administration service.
   Google's fixed TLS token endpoint.
 - The Outlook Web route uses visible interactive sign-in. OAuth routes use
   Authorization Code with PKCE for an explicitly selected public client.
-- The Google route pins Gmail TLS endpoints, uses a fresh short-lived token for
-  each IMAP/SMTP XOAUTH2 exchange, and cannot represent a password, app
-  password, alternate mail host, or Gmail REST transport.
+- The staged Google route is release-gated before browser, OAuth, keyring,
+  session, and network access until production approval. After activation it
+  pins the Google API base and cannot represent a password, app password,
+  alternate host, or arbitrary Google API transport.
 - Standards credentials remain behind an OS-keyring entry or an explicitly
   approved helper reference.
 - Account-add approval displays the exact external backend/key handles and
@@ -159,6 +185,9 @@ gateway or tenant administration service.
 - raw crash upload, automatic issue submission without explicit local consent,
   or a telemetry/reporting relay;
 - executing instructions found in messages, events, imports, or attachments.
+- turning the optional public compatibility checker into an arbitrary DNS/HTTP
+  proxy, provider probe, authentication surface, account service, or telemetry
+  endpoint.
 
 Report suspected vulnerabilities privately as described in
 [SECURITY.md](../SECURITY.md).

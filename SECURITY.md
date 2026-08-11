@@ -54,11 +54,13 @@ controls. It does not bypass authentication, tenant policy, MFA, Conditional
 Access, disabled services, mailbox permissions, or administrator consent.
 
 The Outlook Web route does not require a third-party Microsoft Graph
-application. The Google route uses an explicitly selected desktop public OAuth
-client: the normal system browser owns authorization, the grant stays in the OS
-keyring, Gmail uses fixed IMAP/SMTP XOAUTH2 endpoints, and Calendar uses the
-Google Calendar API. Automated Google Web sign-in, passwords, app passwords,
-cookies, custom Gmail hosts, and silent fallback are not supported. Microsoft
+application. Gmail and Google Calendar code is included in RC builds but the
+route is disabled while production OAuth approval is pending: no Google browser
+sign-in, keyring access, scope request, or API traffic can start. After a
+separate approval-activation release, the normal browser will own authorization,
+the grant will stay in the OS keyring, and Gmail and Calendar will use pinned
+Google APIs. Automated Google Web sign-in, passwords, app passwords, cookies,
+custom Google hosts, and silent fallback are not supported. Microsoft
 Graph also requires an explicitly selected public OAuth client. JMAP,
 IMAP/SMTP, and CalDAV routes use only an OS-keyring entry or approved helper
 reference. None of these models is an authorization bypass: the provider must
@@ -96,6 +98,13 @@ Corresync is not a multi-user server, remote MCP gateway, hosted relay, endpoint
 security product, tenant administration tool, or credential recovery system.
 A deployment that exposes its local IPC or MCP process remotely needs an
 independent security design and is not covered by the project defaults.
+
+The optional public provider checker is a separate domain-only DNS
+classification service, not a provider transport. The browser must never send
+an address local part, and the Worker must never fetch a user-derived host,
+start authentication, log or persist application input, or return a free-form
+link. Report any violation of those boundaries through private vulnerability
+reporting.
 
 Messages, attachments, calendar fields, import files, event-queue values, and
 links are untrusted external input. Agents, scripts, and monitor runners must

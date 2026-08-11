@@ -6,7 +6,7 @@
     <title>Corresync Terms of Use — open-source software and project services</title>
     <meta
       name="description"
-      content="Terms for Corresync’s website, releases, provider integrations, and project-operated OAuth identity without adding conditions to the Apache-2.0 software license."
+      content="Terms for Corresync’s website, domain-only compatibility checker, releases, and provider integrations without changing the Apache-2.0 software license."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="Terms for Corresync’s website, releases, provider integrations, and project-operated OAuth identity without adding conditions to the Apache-2.0 software license."
+      content="Terms for Corresync’s website, domain-only compatibility checker, releases, and provider integrations without changing the Apache-2.0 software license."
     >
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://corresync.org/terms.html">
@@ -34,7 +34,7 @@
     >
     <meta
       name="twitter:description"
-      content="Terms for Corresync’s website, releases, provider integrations, and project-operated OAuth identity without adding conditions to the Apache-2.0 software license."
+      content="Terms for Corresync’s website, domain-only compatibility checker, releases, and provider integrations without changing the Apache-2.0 software license."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -72,14 +72,15 @@
         <p class="eyebrow"><span aria-hidden="true"></span>Terms of Use</p>
         <h1 id="page-title">Clear terms, without taking away <em>open-source rights.</em></h1>
         <p class="lede">
-          These Terms cover the official Corresync website, release distribution channels, and
-          project-operated OAuth identity. They also explain your responsibilities when the software
-          connects to Google, Microsoft, Outlook Web, JMAP, IMAP/SMTP, CalDAV, a local import, or a
-          user-selected client. Your copy of the software remains governed by Apache License 2.0;
-          these Terms do not add a condition to the rights that license grants.
+          These Terms cover the official Corresync website and its optional domain-only checker,
+          release distribution channels, and project-operated OAuth identity. They also explain your
+          responsibilities when the software connects to Google, Microsoft, Outlook Web, JMAP,
+          IMAP/SMTP, CalDAV, a local import, or a user-selected client. Your copy of the software
+          remains governed by Apache License 2.0; these Terms do not add a condition to the rights
+          that license grants.
         </p>
         <p class="legal-date">
-          Effective and last updated: <time datetime="2026-08-03">3 August 2026</time>
+          Effective and last updated: <time datetime="2026-08-11">11 August 2026</time>
         </p>
         <nav class="legal-toc" aria-label="Terms of Use sections">
           <a href="#acceptance">Acceptance</a>
@@ -112,11 +113,11 @@
             <p>
               These Terms of Use (“Terms”) are an agreement between you and Naoki Kiyohara,
               maintainer of the Corresync open-source project (“Corresync”, “we”, or “the
-              project”). They apply when you use the official Corresync website, official release
-              distribution infrastructure, or a project-operated OAuth identity (currently the
-              Corresync Google OAuth application). Together, these are “Project Services”. By
-              using Project Services, you agree to these Terms. If you do not agree, do not use
-              those Project Services.
+              project”). They apply when you use the official Corresync website and optional
+              domain-only compatibility checker, official release distribution infrastructure, or a
+              project-operated OAuth identity (currently the disabled Corresync Google OAuth
+              application). Together, these are “Project Services”. By using Project Services,
+              you agree to these Terms. If you do not agree, do not use those Project Services.
             </p>
             <p>
               These Terms do not govern your rights to possess, run, study, reproduce, modify, or
@@ -218,6 +219,10 @@
                 person’s systems, except for good-faith security research reported privately;
               </li>
               <li>
+                submit addresses or domains you are not authorized to check, evade the checker’s
+                bounds or rate limit, or attempt to turn it into a network probe;
+              </li>
+              <li>
                 misrepresent Corresync as affiliated with or endorsed by Google, Microsoft, another
                 provider, or an agent vendor; or
               </li>
@@ -237,12 +242,24 @@
               applicable Google product policies.
             </p>
             <p>
+              The Gmail and Google Calendar integration is included in RC code but is not a
+              currently available Project Service: production OAuth approval is pending, the route
+              is disabled, and no Corresync Google sign-in or API request can start. A separate
+              reviewed release is required to change that status.
+            </p>
+            <p>
               Outlook Web uses Microsoft’s live website; Microsoft Graph uses delegated API
               permissions from a public client you authorize; standards routes use the TLS endpoints
               and credential references you choose. Corresync does not control and is not
               responsible for a provider’s availability, data, security, policy decisions,
               authentication flow, API or website changes, delivery outcome, or account action.
               Links to third-party resources are provided for context, not endorsement.
+            </p>
+            <p>
+              The optional compatibility checker sends only a domain to a narrowly configured
+              Cloudflare Worker and fixed public DNS resolver. Its result is informational evidence,
+              not a guarantee of compatibility, permission, sign-in, or service availability.
+              Cloudflare’s terms and privacy policy also apply to its network processing.
             </p>
           </section>
 
@@ -253,8 +270,9 @@
               The <a href="privacy.html">Corresync Privacy Policy</a> explains what every supported
               provider route and local import can access, why Google and Microsoft scopes are
               requested, what browser, credential, content, audit, queue, and staging data can
-              remain locally, when data can reach a user-selected client or model, and how to
-              disconnect and delete authorization. It is incorporated into these Terms by reference.
+              remain locally, what the optional domain-only checker sends, when data can reach a
+              user-selected client or model, and how to disconnect and delete authorization. It is
+              incorporated into these Terms by reference.
             </p>
             <p>
               Automatic public error feedback is off by default. Enabling it is your instruction to

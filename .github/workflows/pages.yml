@@ -5,11 +5,21 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "web/discovery-worker/**"
+      - "internal/discovery/catalog.go"
+      - "internal/rollout/google.go"
+      - "tools/discoverycatalog/**"
+      - "tools/siteverify/**"
       - ".github/workflows/pages.yml"
   pull_request:
     branches: [main]
     paths:
       - "site/**"
+      - "web/discovery-worker/**"
+      - "internal/discovery/catalog.go"
+      - "internal/rollout/google.go"
+      - "tools/discoverycatalog/**"
+      - "tools/siteverify/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -37,6 +47,11 @@ jobs:
           go-version: "1.26.x"
           cache: true
 
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.18.0"
+
       - name: Validate static site
         run: |
           test -s site/index.html
@@ -48,6 +63,7 @@ jobs:
           test -s site/terms.html
           test -s site/styles.css
           test -s site/copy.js
+          test -s site/check.js
           test -s site/install.sh
           test -s site/install.ps1
           test -s site/favicon.ico
@@ -87,7 +103,7 @@ jobs:
           grep -Fq 'https://corresync.org/terms.html' site/terms.html
           grep -Fq 'href="privacy.html"' site/index.html
           grep -Fq 'href="terms.html"' site/index.html
-          grep -Fq 'https://mail.google.com/' site/privacy.html
+          grep -Fq 'https://www.googleapis.com/auth/gmail.modify' site/privacy.html
           grep -Fq 'Google API Services User Data Policy' site/privacy.html
           grep -Fq 'Apache License, Version 2.0' site/terms.html
           grep -Fq 'curl -LsSf https://corresync.org/install.sh | sh' site/index.html
@@ -109,11 +125,15 @@ jobs:
           grep -Fq 'https://corresync.org/safety.html' site/sitemap.xml
           grep -Fq 'https://corresync.org/privacy.html' site/sitemap.xml
           grep -Fq 'https://corresync.org/terms.html' site/sitemap.xml
-          test -z "$(grep -Rh '<script[^>]* src=' site --include='*.html' | grep -Fv 'src="copy.js" defer' || true)"
+          test -z "$(grep -Rh '<script[^>]* src=' site --include='*.html' | grep -Ev 'src="(copy|check)\.js" defer' || true)"
           if grep -Eiq 'fetch\\(|XMLHttpRequest|WebSocket|EventSource' site/copy.js; then
             exit 1
           fi
+          node --check site/check.js
+          node --check web/discovery-worker/src/worker.mjs
+          node --test web/discovery-worker/test/*.test.mjs site/check.test.cjs
           test -z "$(find site -type l -print -quit)"
+          go run ./tools/discoverycatalog --check
           go run ./tools/siteverify
 
       - name: Configure GitHub Pages

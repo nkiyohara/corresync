@@ -139,8 +139,8 @@ type googleAPILegacyCalendarRoute struct {
 	MicrosoftGraph *OAuthRoute       `toml:"microsoft_graph,omitempty"`
 }
 
-// MigrateV3 replaces the Google Gmail REST route with Gmail's fixed
-// IMAP/SMTP XOAUTH2 route while preserving account IDs, public-client
+// MigrateV3 replaces the legacy Google route with the unified API route while
+// preserving account IDs, public-client
 // settings, authorization handles, calendar API routing, and local policy.
 func MigrateV3(data []byte) (Config, error) {
 	if len(data) > maximumConfigBytes {

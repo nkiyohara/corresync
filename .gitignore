@@ -12,6 +12,8 @@
 !/.env.example
 /.corresync/
 /.owa-bridge/
+.dev.vars*
+.wrangler/
 *.sock
 
 # Browser profiles and protocol captures are never source material

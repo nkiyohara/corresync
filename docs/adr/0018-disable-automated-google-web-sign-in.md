@@ -1,11 +1,13 @@
 # ADR 0018: Disable automated Google Web sign-in
 
-Google's supported route was subsequently simplified by
-[ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md): Gmail now uses
-IMAP/SMTP XOAUTH2 under provider ID `google`, while Calendar remains API-backed.
+The replacement Google route was subsequently changed and approval-gated by
+[ADR 0026](0026-approval-gated-gmail-api-route.md): Gmail and Calendar both use
+pinned APIs under provider ID `google`, but the route is unavailable until
+production OAuth approval.
 
 - Status: accepted
 - Date: 2026-07-29
+- Amended: 2026-08-11
 
 ## Context
 
@@ -40,8 +42,9 @@ standards access such as IMAP:
 Corresync does not attempt to conceal browser automation from Google.
 
 Credential-free discovery for Gmail and Google-hosted MX records advertises
-only `google-api`, labelled as requiring explicit OAuth selection. Automatic
-setup does not choose it and does not open authorization. Explicit
+only `google`, currently labelled unavailable pending production OAuth
+approval. Automatic setup does not choose it and does not open authorization.
+Explicit
 `google-web` account selection is rejected with an actionable error.
 
 Configuration keeps the legacy Google Web tagged-union shape so v0.8.0 and
@@ -50,9 +53,10 @@ one of those accounts returns the same actionable error before a browser,
 profile, remote connection, or provider adapter is opened. No automatic
 migration invents an OAuth client or external credential.
 
-Users may choose:
+After the approval gate is opened in a separately reviewed release, users may
+choose:
 
-- `google-api`, with a public OAuth client they are authorized to operate and a
+- `google`, with the approved public OAuth client and a
   grant stored through the Corresync OS-keyring port; or
 - explicit IMAP/SMTP and CalDAV routes when the account and its administrator
   permit those services and the credential remains behind an approved external

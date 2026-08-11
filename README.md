@@ -35,9 +35,10 @@
 </p>
 <!-- markdownlint-enable MD013 MD033 -->
 
-`corr` brings isolated Outlook, Google, Microsoft 365, JMAP, IMAP/SMTP,
-and CalDAV accounts into one terminal—and one local
+`corr` brings isolated Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV
+accounts into one terminal—and one local
 [Model Context Protocol](https://modelcontextprotocol.io/) server.
+Gmail and Google Calendar support are coming soon after Google OAuth approval.
 
 - Search mail and build one agenda across accounts without collapsing their
   identity or provider provenance.
@@ -54,7 +55,7 @@ and CalDAV accounts into one terminal—and one local
 $ corr mail search --all-accounts \
     --query 'subject:"Quarterly plan"' --limit 3
 ● work · microsoft-owa   Ana Ruiz   Plan review
-· personal · google     Finance    Plan receipt
+· personal · jmap       Finance    Plan receipt
 
 $ corr agenda list --all-accounts \
     --start 2026-07-29T00:00:00Z \
@@ -86,7 +87,7 @@ can pair IMAP/SMTP mail with a CalDAV calendar.
 | Route | Mail | Calendar | Authentication |
 | --- | --- | --- | --- |
 | Outlook Web | Typed reads and writes | Selectable calendars; provider-supported Teams link | Dedicated visible browser profile |
-| Google (not yet available) | Gmail over IMAP/SMTP XOAUTH2 | Selectable calendars; Google Meet when advertised | Built; the official OAuth application is being prepared for verification |
+| Google (coming soon) | Gmail API reads and writes; no permanent delete | Selectable calendars; Google Meet when advertised | Included but disabled in RC builds while production OAuth approval is pending |
 | Microsoft Graph | Typed reads and writes | Selectable calendars; typed Teams-link creation | Your authorized public OAuth client; OS-keyring grant |
 | JMAP | Typed mail operations | — | OS keyring or approved credential helper |
 | IMAP / SMTP | IMAP read/manage and SMTP draft/send | — | OS keyring or approved credential helper |
@@ -96,14 +97,15 @@ can pair IMAP/SMTP mail with a CalDAV calendar.
 Discovery gathers DNS, well-known, and provider metadata without credentials.
 It never authenticates or adds an account. Microsoft Graph and managed Google
 authorization remain explicit choices and are never automatic fallbacks.
-Google discovery does not add an account while Corresync prepares and verifies
-its official Google OAuth application. For now, connect Gmail and Calendar through
-Google's official
+Google discovery does not add an account while Corresync awaits approval for
+its official Google OAuth application. No Google sign-in starts. For now,
+connect Gmail and Calendar through Google's official
 [Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers)
 (Developer Preview).
 
-Every v0.8 route above has synthetic provider-contract and application
-coverage. The v0.8 provider and platform implementations remain
+Every available or staged v0.8 route above has synthetic provider-contract and
+application coverage. The Gmail API route included in RC builds is disabled
+and live-unobserved. Other v0.8 provider and platform implementations remain
 **live-unobserved** until an authorized, content-free observation is bound to
 the exact commit. See [compatibility evidence](docs/compatibility.md) before
 connecting a sensitive account.
@@ -233,11 +235,21 @@ corr account discover reader@example.invalid
 corr account add reader@example.invalid --help
 ```
 
-For Gmail and Google Calendar, Corresync's OAuth application is still under
-review. Until guided connection opens, use Google's official
+For Gmail and Google Calendar, the integration is included but disabled while
+Corresync's production OAuth application awaits approval. Account addition,
+browser sign-in, keyring access, and Google API traffic remain blocked. Until
+the route opens in a separate approved release, use Google's official
 [Workspace MCP setup](https://developers.google.com/workspace/guides/configure-mcp-servers)
 with your agent. It is currently a Google Developer Preview and has its own
 Google Cloud and OAuth setup requirements.
+
+Before installing, the optional
+[provider compatibility checker](https://corresync.org/providers.html#check)
+can classify public evidence for an address. The browser sends only the domain
+after the `@` in a request body; it never sends the local part, persists the
+address, or starts sign-in. The public service uses only a fixed DNS resolver
+and returns no raw DNS record. Skip it whenever you prefer and run `corr account
+discover ADDRESS` locally.
 
 Account addition does not authenticate. OAuth routes require a public-client
 registration you are authorized to use. Standards routes use a keyring entry
@@ -316,9 +328,10 @@ agent.
 
 ## Honest edges
 
-- Corresync is preparing its official Google OAuth application for
-  verification. Guided Google connection is not offered yet; use Google's
-  official Workspace MCP in the meantime.
+- Gmail and Google Calendar code is included in RC builds, but Corresync's
+  production Google OAuth application is awaiting approval. The route is
+  disabled and starts no Google sign-in; use Google's official Workspace MCP
+  in the meantime.
 - Microsoft Graph requires your own authorized public-client registration.
   Corresync ships no token relay.
 - Windows desktop notification setup is unavailable because Corresync does

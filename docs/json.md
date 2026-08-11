@@ -39,7 +39,7 @@ Provider-backed results include or inherit provenance:
 {
   "accountId": "acc_0123456789abcdef0123456789abcdef",
   "provider": "google",
-  "mailboxId": "gmail-imap",
+  "mailboxId": "gmail-api",
   "sourceObjectId": "opaque-provider-id"
 }
 ```

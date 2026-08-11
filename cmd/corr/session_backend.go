@@ -30,6 +30,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
 	"github.com/nkiyohara/corresync/internal/provider/outlookweb"
+	"github.com/nkiyohara/corresync/internal/rollout"
 	"github.com/nkiyohara/corresync/internal/session"
 )
 
@@ -807,6 +808,9 @@ func (backend *sessionBackend) terminalInteraction(
 	}
 	if hasGoogleWebRoute(configured) {
 		return nil, errUnsupportedLegacyGoogleRoute
+	}
+	if hasGoogleRoute(configured) && !rollout.GoogleOAuthApproved {
+		return nil, rollout.ErrGoogleOAuthPending
 	}
 	profileDirectory, err := paths.ProfileDir(input.Account)
 	if err != nil {
@@ -1812,6 +1816,9 @@ func (backend *sessionBackend) activateAccount(
 	if hasGoogleWebRoute(configured) {
 		return sessionAccount{}, errUnsupportedLegacyGoogleRoute
 	}
+	if hasGoogleRoute(configured) && !rollout.GoogleOAuthApproved {
+		return sessionAccount{}, rollout.ErrGoogleOAuthPending
+	}
 	var services sessionAccount
 	if hasOutlookRoute(configured) {
 		var handle browserHandle
@@ -2233,7 +2240,31 @@ func (backend *sessionBackend) googleAccount(
 	if err != nil {
 		return sessionAccount{}, err
 	}
+	apiBase := "https://www.googleapis.com"
+	if calendarEnabled {
+		apiBase = calendarRoute.APIBase
+	}
+	sender := ""
+	if mailEnabled {
+		sender = mailRoute.Mailbox
+	}
+	factory := backend.newGoogle
+	if factory == nil {
+		factory = googleapi.New
+	}
+	client, err := factory(ctx, googleapi.Options{
+		APIBase:  apiBase,
+		Address:  configured.Address,
+		Sender:   sender,
+		Mail:     mailEnabled,
+		Calendar: calendarEnabled,
+		HTTP:     authorization.HTTPClient(),
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
 	result := sessionAccount{
+		closers:  []sessionCloser{client},
 		captured: time.Now().UTC(),
 		capabilities: domain.Capabilities{
 			Mail: mailEnabled, Calendar: calendarEnabled,
@@ -2242,31 +2273,6 @@ func (backend *sessionBackend) googleAccount(
 		},
 	}
 	if mailEnabled {
-		factory := backend.newIMAP
-		if factory == nil {
-			factory = imapmail.New
-		}
-		sender := mailRoute.Mailbox
-		if sender == "" {
-			sender = configured.Address
-		}
-		client, clientErr := factory(ctx, imapmail.Options{
-			IMAP: imapmail.Endpoint{
-				Host: "imap.gmail.com", Port: 993, Mode: imapmail.TLSImplicit,
-			},
-			SMTP: imapmail.Endpoint{
-				Host: "smtp.gmail.com", Port: 587, Mode: imapmail.TLSStartTLS,
-			},
-			Username:               mailRoute.Username,
-			Sender:                 sender,
-			OAuth2:                 authorization,
-			SMTPStoresSent:         true,
-			DisablePermanentDelete: true,
-		})
-		if clientErr != nil {
-			return sessionAccount{}, clientErr
-		}
-		result.closers = append(result.closers, client)
 		result.mail, err = application.NewMailService(
 			backend.guard,
 			client,
@@ -2275,64 +2281,30 @@ func (backend *sessionBackend) googleAccount(
 				Provenance: domain.Provenance{
 					AccountID: configured.ID,
 					Provider:  domain.ProviderGoogle,
-					MailboxID: "gmail-imap",
+					MailboxID: "gmail-api",
 				},
 			},
 		)
 		if err != nil {
 			return sessionAccount{}, errors.Join(err, closeSessionAccount(result))
 		}
-		observed := client.ObservedCapabilities()
-		if !observed.Move && !observed.UIDPlus {
-			result.degradations = append(result.degradations, domain.Degradation{
-				Feature: "mail.move",
-				Reason:  "Gmail IMAP advertises neither MOVE nor UIDPLUS; safe targeted move is unavailable",
-			})
-		}
-		if !observed.Sent {
-			result.degradations = append(result.degradations, domain.Degradation{
-				Feature: "mail.send",
-				Reason:  "Gmail IMAP exposes no Sent mailbox; SMTP submission fails closed before sending",
-			})
-		}
 		result.degradations = append(
 			result.degradations,
 			domain.Degradation{
 				Feature: "mail.delete",
-				Reason:  "Gmail IMAP expunge behavior is account-configurable, so Corresync cannot guarantee permanent deletion",
-			},
-			domain.Degradation{
-				Feature: "mail.labels",
-				Reason:  "Gmail labels are projected through IMAP mailboxes and may appear in more than one folder",
-				Lossy:   true,
+				Reason:  "the approved gmail.modify design does not permit immediate permanent deletion; move the message to Trash instead",
 			},
 			domain.Degradation{
 				Feature: "mail.push_history",
-				Reason:  "the Gmail IMAP route does not register push watches or expose durable history cursors",
+				Reason:  "the Gmail API route does not register push watches or expose durable history cursors",
 			},
 			domain.Degradation{
 				Feature: "mail.scheduled_send",
-				Reason:  "Gmail SMTP submission does not expose scheduled sending",
+				Reason:  "the Gmail API adapter does not expose scheduled sending",
 			},
 		)
 	}
 	if calendarEnabled {
-		factory := backend.newGoogle
-		if factory == nil {
-			factory = googleapi.New
-		}
-		client, clientErr := factory(ctx, googleapi.Options{
-			APIBase: calendarRoute.APIBase,
-			Address: configured.Address,
-			HTTP:    authorization.HTTPClient(),
-		})
-		if clientErr != nil {
-			return sessionAccount{}, errors.Join(
-				clientErr,
-				closeSessionAccount(result),
-			)
-		}
-		result.closers = append(result.closers, client)
 		if client.MeetAvailable() {
 			result.capabilities.OnlineMeeting = "google-meet"
 		} else {
@@ -2690,6 +2662,13 @@ func hasGoogleWebRoute(account config.Account) bool {
 		account.Mail.Provider == domain.ProviderGoogleWeb ||
 		account.Calendar != nil &&
 			account.Calendar.Provider == domain.ProviderGoogleWeb
+}
+
+func hasGoogleRoute(account config.Account) bool {
+	return account.Mail != nil &&
+		account.Mail.Provider == domain.ProviderGoogle ||
+		account.Calendar != nil &&
+			account.Calendar.Provider == domain.ProviderGoogle
 }
 
 func hasBrowserRoute(account config.Account) bool {

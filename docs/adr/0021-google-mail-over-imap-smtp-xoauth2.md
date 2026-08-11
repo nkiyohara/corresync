@@ -1,5 +1,9 @@
 # ADR 0021: Google mail over IMAP/SMTP XOAUTH2
 
+The Gmail transport and Google-availability decisions are superseded by
+[ADR 0026](0026-approval-gated-gmail-api-route.md). This document remains the
+historical record for the retired IMAP/SMTP route.
+
 The generated Google Desktop client credential required during token exchange
 is amended by [ADR 0022](0022-google-desktop-client-credential.md).
 

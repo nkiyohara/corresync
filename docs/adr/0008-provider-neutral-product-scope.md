@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-07-29
+- Amended: 2026-08-11
 
 ## Context
 
@@ -62,6 +62,12 @@ unimplemented:
   one calendar event remains calendar scope exactly as decided in
   [ADR 0005](0005-calendar-hosted-teams-links.md).
 
+The domain-only public compatibility checker accepted by
+[ADR 0027](0027-domain-only-public-compatibility-checker.md) is not a relay or
+mailbox intermediary. It receives no address local part, credential, provider
+data, or authentication authority and can query only one fixed public DNS
+resolver. That narrow service does not broaden the hosted product scope.
+
 Scope is not capability. At the time of this decision, the current release
 implemented exactly one provider adapter. A provider may be described as
 live-compatible only after synthetic fixture contract tests and a documented
@@ -88,10 +94,10 @@ monitoring.
 
 ## Implementation amendment
 
-Google Gmail-XOAUTH2/Calendar-API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV
-adapters are implemented behind the shared application boundary. The current
-Google transport is defined by
-[ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md). The former read-only
+Gmail-API/Google-Calendar-API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV
+adapters are implemented behind the shared application boundary. The Google
+route is approval-gated by
+[ADR 0026](0026-approval-gated-gmail-api-route.md). The former read-only
 Google Web route is disabled before browser launch by
 [ADR 0018](0018-disable-automated-google-web-sign-in.md); its legacy schema and
 synthetic fixtures are not a runtime capability. Remaining route evidence is
