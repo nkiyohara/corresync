@@ -23,6 +23,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
+	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type oauthManagerStub struct {
@@ -377,7 +378,7 @@ func TestSessionBackendOnlyResolvesCalDAVCredentialForExplicitCLILogin(t *testin
 	}
 }
 
-func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
+func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
 	t *testing.T,
 ) {
 	t.Parallel()
@@ -409,7 +410,6 @@ func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
 		},
 	}
 	manager := &oauthManagerStub{client: http.DefaultClient}
-	factoryError := errors.New("synthetic Google factory stop")
 	factoryCalls := 0
 	backend := &sessionBackend{
 		configuration: configuration,
@@ -421,23 +421,12 @@ func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
 		oauth:    manager,
 		accounts: make(map[domain.AccountID]sessionAccount),
 		previews: make(map[string]sessionPreview),
-		newIMAP: func(
-			_ context.Context,
-			options imapmail.Options,
-		) (*imapmail.Client, error) {
+		newGoogle: func(
+			context.Context,
+			googleapi.Options,
+		) (*googleapi.Client, error) {
 			factoryCalls++
-			if options.IMAP.Host != "imap.gmail.com" ||
-				options.IMAP.Port != 993 ||
-				options.SMTP.Host != "smtp.gmail.com" ||
-				options.SMTP.Port != 587 ||
-				options.Username != "reader@example.test" ||
-				options.OAuth2 == nil ||
-				!options.SMTPStoresSent ||
-				!options.DisablePermanentDelete ||
-				len(options.Password) != 0 {
-				t.Fatalf("Google IMAP options = %#v", options)
-			}
-			return nil, factoryError
+			return nil, errors.New("pending Google route reached its adapter")
 		},
 	}
 	mcpCaller := domain.Caller{Surface: "mcp", Instance: "synthetic-client"}
@@ -471,26 +460,16 @@ func TestSessionBackendOnlyAuthorizesSharedGoogleRouteForExplicitCLILogin(
 		)
 	}
 	if _, err := backend.Login(t.Context(), accountID, cliCaller); !errors.Is(
-		err,
-		factoryError,
+		err, rollout.ErrGoogleOAuthPending,
 	) {
 		t.Fatalf("CLI Login() error = %v", err)
 	}
-	if manager.calls != 1 || factoryCalls != 1 || manager.route != route.Client() ||
-		manager.provider.ID != domain.ProviderGoogle ||
-		!slices.Contains(manager.provider.Scopes, "https://mail.google.com/") ||
-		!slices.Contains(manager.provider.Scopes, "https://www.googleapis.com/auth/calendar.events") {
-		t.Fatalf(
-			"explicit Google OAuth = calls %d factory %d route %#v provider %#v",
-			manager.calls,
-			factoryCalls,
-			manager.route,
-			manager.provider,
-		)
+	if manager.calls != 0 || factoryCalls != 0 {
+		t.Fatalf("pending Google touched OAuth or API: manager=%d factory=%d", manager.calls, factoryCalls)
 	}
 }
 
-func TestSessionBackendPreservesDistinctMigratedGoogleGrants(t *testing.T) {
+func TestSessionBackendBlocksDistinctMigratedGoogleGrants(t *testing.T) {
 	t.Parallel()
 
 	const accountID domain.AccountID = "acc_00000000000000000000000000000001"
@@ -536,7 +515,7 @@ func TestSessionBackendPreservesDistinctMigratedGoogleGrants(t *testing.T) {
 		"google-mail":     http.DefaultClient,
 		"google-calendar": http.DefaultClient,
 	}}
-	factoryError := errors.New("synthetic Google Calendar factory stop")
+	factoryCalls := 0
 	backend := &sessionBackend{
 		configuration: configuration,
 		guard: daemonMCPGuard(
@@ -557,7 +536,8 @@ func TestSessionBackendPreservesDistinctMigratedGoogleGrants(t *testing.T) {
 			context.Context,
 			googleapi.Options,
 		) (*googleapi.Client, error) {
-			return nil, factoryError
+			factoryCalls++
+			return nil, errors.New("pending Google route reached its adapter")
 		},
 	}
 	_, err := backend.Login(
@@ -565,29 +545,11 @@ func TestSessionBackendPreservesDistinctMigratedGoogleGrants(t *testing.T) {
 		accountID,
 		domain.Caller{Surface: "cli", Instance: "synthetic-process"},
 	)
-	if !errors.Is(err, factoryError) {
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
 		t.Fatalf("Login() error = %v", err)
 	}
-	if len(manager.calls) != 2 ||
-		manager.calls[0].route != mailClient ||
-		manager.calls[1].route != calendarRoute.Client() ||
-		!slices.Contains(
-			manager.calls[0].provider.Scopes,
-			"https://mail.google.com/",
-		) ||
-		slices.Contains(
-			manager.calls[0].provider.Scopes,
-			"https://www.googleapis.com/auth/calendar.events",
-		) ||
-		slices.Contains(
-			manager.calls[1].provider.Scopes,
-			"https://mail.google.com/",
-		) ||
-		!slices.Contains(
-			manager.calls[1].provider.Scopes,
-			"https://www.googleapis.com/auth/calendar.events",
-		) {
-		t.Fatalf("distinct Google OAuth calls = %+v", manager.calls)
+	if len(manager.calls) != 0 || factoryCalls != 0 {
+		t.Fatalf("pending migrated grants touched OAuth or API: calls=%+v factory=%d", manager.calls, factoryCalls)
 	}
 }
 
@@ -794,7 +756,7 @@ func TestMergeSessionAccountsPreservesServiceSpecificCapabilities(t *testing.T) 
 	}
 }
 
-func TestSessionBackendKeepsHybridProvidersAndAccountsIsolated(t *testing.T) {
+func TestSessionBackendDoesNotPartiallyActivateMixedPendingGoogleAccount(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -888,77 +850,17 @@ func TestSessionBackendKeepsHybridProvidersAndAccountsIsolated(t *testing.T) {
 	}
 	caller := domain.Caller{Surface: "cli", Instance: "hybrid-provider-test"}
 	for _, accountID := range []domain.AccountID{alphaID, betaID} {
-		result, err := backend.Login(t.Context(), accountID, caller)
-		if err != nil || !result.Authenticated || result.Account != accountID {
-			t.Fatalf("Login(%s) = %+v, %v", accountID, result, err)
+		_, err := backend.Login(t.Context(), accountID, caller)
+		if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+			t.Fatalf("Login(%s) error = %v", accountID, err)
 		}
 	}
-	requireHybridOAuthScopes(t, manager.calls)
-
-	assertSessionMailProvider(
-		t,
-		backend,
-		caller,
-		alphaID,
-		domain.ProviderMicrosoftGraph,
-		"graph-alpha",
-	)
-	assertSessionCalendarProvider(
-		t,
-		backend,
-		caller,
-		alphaID,
-		domain.ProviderGoogle,
-		"google-alpha",
-	)
-	assertSessionMailProvider(
-		t,
-		backend,
-		caller,
-		betaID,
-		domain.ProviderMicrosoftGraph,
-		"graph-beta",
-	)
-	assertSessionCalendarProvider(
-		t,
-		backend,
-		caller,
-		betaID,
-		domain.ProviderGoogle,
-		"google-beta",
-	)
-
-	status, err := backend.SessionStatus(t.Context(), caller)
-	if err != nil || len(status.Accounts) != 2 {
-		t.Fatalf("SessionStatus() = %+v, %v", status, err)
-	}
-	for _, account := range status.Accounts {
-		if !account.Authenticated || account.Capabilities == nil ||
-			!account.Capabilities.Mail || !account.Capabilities.Calendar {
-			t.Fatalf("hybrid account status = %+v", account)
-		}
-	}
-
-	if _, err := backend.Logout(t.Context(), alphaID, caller); err != nil {
-		t.Fatalf("Logout(alpha) error = %v", err)
-	}
-	if _, err := backend.ListMail(
-		t.Context(),
-		sessionMailInput(alphaID),
-		caller,
-	); err == nil || !strings.Contains(err.Error(), "corr auth login") {
-		t.Fatalf("logged-out alpha mail error = %v", err)
-	}
-	assertSessionMailProvider(
-		t,
-		backend,
-		caller,
-		betaID,
-		domain.ProviderMicrosoftGraph,
-		"graph-beta",
-	)
-	if _, err := backend.Logout(t.Context(), betaID, caller); err != nil {
-		t.Fatalf("Logout(beta) error = %v", err)
+	if len(manager.calls) != 0 || len(backend.accounts) != 0 {
+		t.Fatalf(
+			"mixed pending accounts were partially activated: OAuth=%+v sessions=%+v",
+			manager.calls,
+			backend.accounts,
+		)
 	}
 }
 
@@ -972,102 +874,6 @@ func sessionOAuthRoute(base, key string) config.OAuthRoute {
 			Key:     key,
 			Consent: true,
 		},
-	}
-}
-
-func requireHybridOAuthScopes(t *testing.T, calls []routedOAuthCall) {
-	t.Helper()
-	if len(calls) != 4 {
-		t.Fatalf("OAuth calls = %+v", calls)
-	}
-	for _, call := range calls {
-		hasMail := slices.Contains(
-			call.provider.Scopes,
-			"https://mail.google.com/",
-		) || slices.Contains(call.provider.Scopes, "Mail.ReadWrite")
-		hasCalendar := slices.Contains(
-			call.provider.Scopes,
-			"https://www.googleapis.com/auth/calendar.events",
-		) || slices.Contains(call.provider.Scopes, "Calendars.ReadWrite")
-		if hasMail == hasCalendar {
-			t.Fatalf(
-				"hybrid service grant was not least-privilege: %+v",
-				call,
-			)
-		}
-	}
-}
-
-func sessionMailInput(account domain.AccountID) application.MailListInput {
-	return application.MailListInput{
-		Account: account,
-		Folder: application.MailFolder{
-			Kind: application.MailFolderDistinguished,
-			ID:   "inbox",
-		},
-		Limit: 10,
-	}
-}
-
-func assertSessionMailProvider(
-	t *testing.T,
-	backend *sessionBackend,
-	caller domain.Caller,
-	account domain.AccountID,
-	provider domain.ProviderID,
-	subject string,
-) {
-	t.Helper()
-	page, err := backend.ListMail(
-		t.Context(),
-		sessionMailInput(account),
-		caller,
-	)
-	if err != nil || len(page.Messages) != 1 ||
-		page.Messages[0].Subject != subject ||
-		page.Messages[0].Provenance.AccountID != account ||
-		page.Messages[0].Provenance.Provider != provider {
-		t.Fatalf(
-			"ListMail(%s) = %+v, %v",
-			account,
-			page,
-			err,
-		)
-	}
-}
-
-func assertSessionCalendarProvider(
-	t *testing.T,
-	backend *sessionBackend,
-	caller domain.Caller,
-	account domain.AccountID,
-	provider domain.ProviderID,
-	subject string,
-) {
-	t.Helper()
-	page, err := backend.ListCalendar(
-		t.Context(),
-		application.CalendarListInput{
-			Account: account,
-			Calendar: application.CalendarFolder{
-				Kind: application.CalendarFolderDistinguished,
-				ID:   "calendar",
-			},
-			Start: "2026-08-01T00:00:00Z",
-			End:   "2026-08-02T00:00:00Z",
-		},
-		caller,
-	)
-	if err != nil || len(page.Events) != 1 ||
-		page.Events[0].Subject != subject ||
-		page.Events[0].Provenance.AccountID != account ||
-		page.Events[0].Provenance.Provider != provider {
-		t.Fatalf(
-			"ListCalendar(%s) = %+v, %v",
-			account,
-			page,
-			err,
-		)
 	}
 }
 

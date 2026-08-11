@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/paths"
+	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type accountDiscovererStub struct {
@@ -92,9 +94,12 @@ func TestSetupCreatesProviderNeutralConfigThenDirectsGoogleToOfficialMCP(
 		t.Fatal("setup automatically selected a Google route")
 	}
 	for _, expected := range []string{
-		"google account discovered",
-		"Google OAuth application is being prepared for verification",
-		"guided Google connection is not available yet",
+		"Gmail was found",
+		"awaiting approval",
+		"includes the Google integration but keeps it disabled",
+		"no Google sign-in was started",
+		"coming soon after approval",
+		"Outlook Web is available now",
 		"Google's official Workspace MCP servers",
 		"Developer Preview",
 		googleWorkspaceMCPGuide,
@@ -418,7 +423,7 @@ func TestAccountAddPersistsMixedIMAPAndCalDAVRoutes(t *testing.T) {
 	}
 }
 
-func TestAccountAddPersistsExplicitGooglePublicClientWithoutAuthorizing(t *testing.T) {
+func TestAccountAddRejectsExplicitGoogleWhileOAuthApprovalIsPending(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{{
@@ -441,24 +446,19 @@ func TestAccountAddPersistsExplicitGooglePublicClientWithoutAuthorizing(t *testi
 		AuthorizationKey: "google-reader",
 		ApproveOAuth:     true,
 	}
-	if err := command.Run(app); err != nil {
-		t.Fatal(err)
+	err := command.Run(app)
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		t.Fatalf("account add error = %v", err)
 	}
 	configuration, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	account := configuration.Accounts["google"]
-	if account.Mail == nil || account.Mail.Google == nil ||
-		account.Calendar == nil || account.Calendar.Google == nil ||
-		account.Mail.Google.ClientID != command.OAuthClientID ||
-		account.Mail.Google.Username != command.Address ||
-		account.Mail.Google.Authorization.Key != command.AuthorizationKey ||
-		account.Mail.Google.Authorization.Backend != config.CredentialOSKeyring {
-		t.Fatalf("Google account = %#v", account)
+	if _, exists := configuration.Accounts["google"]; exists {
+		t.Fatalf("pending Google route was persisted: %#v", configuration)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
-		t.Fatalf("account output = %q", stdout.String())
+	if stdout.Len() != 0 {
+		t.Fatalf("pending Google output = %q", stdout.String())
 	}
 }
 
@@ -508,7 +508,7 @@ func TestAccountAddPersistsExplicitGraphPublicClientWithoutAuthorizing(t *testin
 	}
 }
 
-func TestAccountAddPersistsCalendarOnlyGoogleRoute(t *testing.T) {
+func TestAccountAddRejectsCalendarOnlyGoogleWhileApprovalIsPending(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{{
@@ -523,7 +523,7 @@ func TestAccountAddPersistsCalendarOnlyGoogleRoute(t *testing.T) {
 			}},
 		},
 	}
-	app, path, _ := newAccountCommandRuntime(t, discoverer)
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
 	command := accountAddCommand{
 		Address: "calendar@example.test", Alias: "calendar-only",
 		MailProvider:             "none",
@@ -533,21 +533,19 @@ func TestAccountAddPersistsCalendarOnlyGoogleRoute(t *testing.T) {
 		CalendarAuthorizationKey: "calendar-only-google",
 		ApproveCalendarOAuth:     true,
 	}
-	if err := command.Run(app); err != nil {
-		t.Fatal(err)
+	err := command.Run(app)
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		t.Fatalf("account add error = %v", err)
 	}
 	configuration, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	account := configuration.Accounts["calendar-only"]
-	if account.Mail != nil ||
-		account.Calendar == nil ||
-		account.Calendar.Google == nil ||
-		account.Calendar.Google.ClientID != command.CalendarOAuthClientID ||
-		account.Calendar.Google.Authorization.Key !=
-			command.CalendarAuthorizationKey {
-		t.Fatalf("calendar-only Google account = %#v", account)
+	if _, exists := configuration.Accounts["calendar-only"]; exists {
+		t.Fatalf("pending Google route was persisted: %#v", configuration)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("pending Google output = %q", stdout.String())
 	}
 }
 

@@ -19,13 +19,15 @@ assessment; the Google verification team makes those decisions.
 | Desktop OAuth client | Created as `Corresync desktop` |
 | Data access scopes | Registered exactly as listed below |
 | Authorized domain and public URLs | Configured and live on `corresync.org` |
-| Synthetic test account | Authorized and live-observed |
-| Google verification submission | Not submitted |
+| Synthetic test account | Prior route observed; Gmail API not observed live |
+| Google verification submission | Submitted; approval pending |
 
-Do not describe the Google route as generally available until the production
-OAuth identity is configured, the public policy URLs are live, and Google has
-approved the requested access. Testing with named test users is not production
-approval and remains subject to Google's test-user limits and warnings.
+Do not describe the Google route as generally available until Google has
+approved the requested access and a separate reviewed release enables the
+production gate. RC builds include the code but reject every Google route before
+OAuth, keyring, browser, or network access. Testing with named test users is not
+production approval and remains subject to Google's test-user limits and
+warnings.
 
 ## Canonical public identity
 
@@ -78,9 +80,7 @@ submission.
 
 In project `strong-surfer-504009-i0`:
 
-1. Enable **Gmail API**. Although Gmail mail transport uses IMAP/SMTP XOAUTH2
-   rather than Gmail REST, Google classifies and verifies the requested Gmail
-   OAuth scope through the Gmail API product.
+1. Enable **Gmail API** for the staged native Gmail API adapter.
 2. Enable **Google Calendar API**.
 3. Do not enable unrelated Workspace APIs for future use.
 
@@ -148,35 +148,37 @@ after a replacement has completed an end-to-end token exchange.
 Register only these three scopes:
 
 ```text
-https://mail.google.com/
+https://www.googleapis.com/auth/gmail.modify
 https://www.googleapis.com/auth/calendar.calendarlist.readonly
 https://www.googleapis.com/auth/calendar.events
 ```
 
 Corresync derives the requested set from the enabled services:
 
-- mail only requests `https://mail.google.com/`;
+- mail only requests `https://www.googleapis.com/auth/gmail.modify`;
 - calendar only requests the two Calendar scopes; and
 - mail plus calendar requests all three in one account-scoped grant.
 
-It never requests Google access during discovery, setup, MCP registration,
-status, or an ordinary tool read. `corr auth login --account ALIAS` first prints
-the exact derived scope set and opens Google only when no matching valid grant
-is already in the OS keyring.
+While approval is pending, no production command constructs, displays, or
+requests these Google scopes. After the separate activation release, discovery,
+setup, MCP registration, status, and ordinary tool reads still never start
+OAuth. `corr auth login --account ALIAS` will first print the exact derived
+scope set and open Google only when no matching valid grant is already in the
+OS keyring.
 
 ### Scope justifications for the verification form
 
 Use the following factual descriptions, adjusting only for form length:
 
-#### `https://mail.google.com/`
+#### `gmail.modify`
 
 > Corresync is a local desktop mail client and MCP server. It uses Gmail's
-> documented IMAP and SMTP XOAUTH2 endpoints to let the signed-in user list and
-> search mailbox folders, read selected messages and attachments, compose and
-> save drafts, send mail, change read state, and move or organize messages. IMAP
-> and SMTP XOAUTH2 require the `https://mail.google.com/` scope; a narrower Gmail
-> REST scope cannot authorize this standards-based transport. The Google route
-> does not expose permanent message deletion. Mail data travels directly
+> documented API to let the signed-in user list and search labels and messages,
+> read selected messages and attachments, compose and save drafts, send mail,
+> change read state, and move or organize messages, including Trash. The
+> `gmail.modify` scope is the narrowest Gmail scope that supports those read,
+> compose, send, and label changes together. Corresync never calls Gmail's
+> immediate permanent-delete method. Mail data travels directly
 > between the user's device and Google over TLS and is not transmitted to or
 > stored on a Corresync-operated server.
 
@@ -203,17 +205,16 @@ release and may require Google re-verification.
 
 ## Restricted-scope data architecture
 
-`https://mail.google.com/` is a restricted scope. The submission must answer
-the restricted-data questions precisely:
+`https://www.googleapis.com/auth/gmail.modify` is a restricted scope. The
+submission must answer the restricted-data questions precisely:
 
 - Corresync is a user-installed local desktop CLI and MCP stdio server.
 - The official project operates no hosted mailbox, calendar store, token relay,
   remote MCP endpoint, analytics collector, or telemetry backend.
 - OAuth grants are stored in the user's OS keyring. Configuration holds only an
   opaque handle and public-client metadata.
-- Gmail mail traffic goes directly from the local process to
-  `imap.gmail.com:993` using implicit TLS and `smtp.gmail.com:587` using
-  STARTTLS. Calendar traffic goes directly to Google's fixed Calendar API.
+- Gmail and Calendar traffic goes directly from the local process to Google's
+  fixed HTTPS APIs.
 - There is no general persistent Gmail or Calendar content cache.
 - Content-free audit records retain only bounded operation/security fields and
   opaque account and target/provider identifiers; they exclude addresses,
@@ -249,7 +250,7 @@ address bar visible. Show:
 4. the exact three scopes printed before browser launch;
 5. the Google account chooser and consent screen identifying `Corresync`;
 6. successful return through the loopback callback;
-7. a Gmail folder list, bounded search, one selected message read, draft/send
+7. a Gmail label list, bounded search, one selected message read, draft/send
    preview and approval, and a reversible organization action;
 8. calendar list and event list, then an event create preview and approval;
 9. where the Privacy Policy and Terms are linked in the homepage;
@@ -299,6 +300,11 @@ Monitor the developer contact address, answer reviewer questions with links and
 reproducible synthetic evidence, and keep production branding and behavior
 stable during review. Restricted-scope verification can take weeks; do not
 promise a completion date.
+
+The public RC must keep the production approval gate disabled throughout
+review. After approval, change the gate only in a separate reviewed commit,
+rerun full verification and the final security review, and update every public
+availability claim before release.
 
 ## Ongoing compliance
 

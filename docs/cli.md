@@ -73,7 +73,7 @@ corr account add reader@example.invalid \
   --mail-provider microsoft-owa \
   --origin https://outlook.cloud.microsoft
 
-# Gmail over IMAP/SMTP XOAUTH2 and Google Calendar with one public client
+# Coming soon: Gmail API and Google Calendar (disabled pending OAuth approval)
 corr account add reader@example.invalid \
   --alias personal \
   --mail-provider google \
@@ -118,6 +118,11 @@ alias for `--mail-provider`. No account command accepts a password or token.
 Approved removal discloses and purges account-local state plus an unshared
 Corresync-owned OAuth grant; it never deletes an external standards credential.
 
+The Google example documents the future route shape. In this RC it returns an
+approval-pending message, persists nothing, and starts no browser, keyring, or
+Google API work. Outlook Web, Graph, JMAP, IMAP/SMTP, and CalDAV routes remain
+available as described above.
+
 ## Authentication and doctor
 
 ```console
@@ -135,9 +140,10 @@ open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
 closes the entire local session owner.
 `--terminal` is an optional Outlook-Web-only browser relay and requires an
-interactive TTY. The `google` route opens the normal system browser for OAuth,
-then uses Gmail IMAP/SMTP XOAUTH2 and Google Calendar API access; it never
-automates Google sign-in. `auth status` is content-free.
+interactive TTY. The staged `google` route is disabled pending production OAuth
+approval and stops before sign-in or network access. After a separate activation
+release it will use normal-browser OAuth and pinned Gmail/Calendar APIs; it will
+never automate Google sign-in. `auth status` is content-free.
 
 `doctor` validates local config, browser prerequisites, IPC, daemon state, and
 update policy. `--online` validates only an already authenticated session; it

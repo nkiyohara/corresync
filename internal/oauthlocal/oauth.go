@@ -21,6 +21,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 const (
@@ -52,30 +53,10 @@ func ProviderFor(
 	var result Provider
 	switch provider {
 	case domain.ProviderGoogle:
-		// #nosec G101 -- these are public OAuth endpoint URLs, not credentials.
-		result = Provider{
-			ID:       provider,
-			AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
-			TokenURL: "https://oauth2.googleapis.com/token",
-			AuthParams: map[string]string{
-				"access_type": "offline",
-				"hl":          "en",
-				"prompt":      "consent",
-			},
+		if !rollout.GoogleOAuthApproved {
+			return Provider{}, rollout.ErrGoogleOAuthPending
 		}
-		if mailEnabled {
-			result.Scopes = append(
-				result.Scopes,
-				"https://mail.google.com/",
-			)
-		}
-		if calendarEnabled {
-			result.Scopes = append(
-				result.Scopes,
-				"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
-				"https://www.googleapis.com/auth/calendar.events",
-			)
-		}
+		result = googleProviderProfile(mailEnabled, calendarEnabled)
 	case domain.ProviderMicrosoftGraph:
 		// #nosec G101 -- these are public OAuth endpoint URLs, not credentials.
 		result = Provider{
@@ -109,6 +90,36 @@ func ProviderFor(
 	slices.Sort(result.Scopes)
 	result.Scopes = slices.Compact(result.Scopes)
 	return result, nil
+}
+
+func googleProviderProfile(mailEnabled, calendarEnabled bool) Provider {
+	// #nosec G101 -- these are public OAuth endpoint and scope URLs, not credentials.
+	result := Provider{
+		ID:       domain.ProviderGoogle,
+		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL: "https://oauth2.googleapis.com/token",
+		AuthParams: map[string]string{
+			"access_type": "offline",
+			"hl":          "en",
+			"prompt":      "consent",
+		},
+	}
+	if mailEnabled {
+		result.Scopes = append(
+			result.Scopes,
+			"https://www.googleapis.com/auth/gmail.modify",
+		)
+	}
+	if calendarEnabled {
+		result.Scopes = append(
+			result.Scopes,
+			"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+			"https://www.googleapis.com/auth/calendar.events",
+		)
+	}
+	slices.Sort(result.Scopes)
+	result.Scopes = slices.Compact(result.Scopes)
+	return result
 }
 
 type keyringGetter func(service, key string) (string, error)

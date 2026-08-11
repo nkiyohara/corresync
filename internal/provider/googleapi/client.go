@@ -1,6 +1,6 @@
-// Package googleapi adapts the explicitly authorized Google Calendar API to
-// Corresync's closed calendar application port. Google mail uses the separate
-// Gmail IMAP/SMTP XOAUTH2 route.
+// Package googleapi adapts explicitly authorized Gmail and Google Calendar
+// APIs to Corresync's closed application ports. Production Google OAuth stays
+// release-gated until the configured scopes are approved.
 package googleapi
 
 import (
@@ -13,31 +13,48 @@ import (
 	"net/http"
 	"net/mail"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/provider/restapi"
 )
 
-// Options selects one explicit Google Calendar public-client grant.
+// Options selects services sharing one explicit Google public-client grant.
 type Options struct {
-	APIBase string
-	Address string
-	HTTP    *http.Client
+	APIBase  string
+	Address  string
+	Sender   string
+	Mail     bool
+	Calendar bool
+	HTTP     *http.Client
 }
 
 // Client owns one authorized account-scoped Google API transport.
 type Client struct {
-	api  *restapi.Client
-	meet bool
+	api      *restapi.Client
+	address  string
+	mail     bool
+	calendar bool
+	meet     bool
 }
 
-// New confirms the configured primary calendar identity and write role with a
-// read-only request. Authorization itself is owned by oauthlocal.
+// New confirms only the explicitly configured services with read-only profile
+// requests. Authorization itself is owned by oauthlocal.
 func New(ctx context.Context, options Options) (*Client, error) {
+	if !options.Mail && !options.Calendar {
+		return nil, errors.New("google API route requires mail or calendar")
+	}
 	if options.Address != "" {
 		parsed, err := mail.ParseAddress(options.Address)
 		if err != nil || parsed.Address != options.Address || parsed.Name != "" {
 			return nil, errors.New("google account address must be one bare address")
+		}
+	}
+	if options.Sender != "" {
+		parsed, err := mail.ParseAddress(options.Sender)
+		if err != nil || parsed.Address != options.Sender || parsed.Name != "" {
+			return nil, errors.New("gmail sender must be one bare address")
 		}
 	}
 	api, err := restapi.New(restapi.Options{
@@ -46,40 +63,70 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := &Client{api: api}
-	var calendar struct {
-		ID                   string `json:"id"`
-		AccessRole           string `json:"accessRole"`
-		ConferenceProperties struct {
-			AllowedSolutionTypes []string `json:"allowedConferenceSolutionTypes"`
-		} `json:"conferenceProperties"`
+	client := &Client{
+		api:  api,
+		mail: options.Mail, calendar: options.Calendar,
 	}
-	if _, err := api.DoJSON(
-		ctx, http.MethodGet, "calendar/v3/users/me/calendarList/primary", nil,
-		nil, &calendar, false, nil, http.StatusOK,
-	); err != nil {
-		_ = api.Close()
-		return nil, fmt.Errorf("confirm Google Calendar access: %w", err)
+	identity := options.Address
+	if options.Mail {
+		var profile struct {
+			EmailAddress string `json:"emailAddress"`
+		}
+		if _, err := api.DoJSON(
+			ctx, http.MethodGet, "gmail/v1/users/me/profile", nil,
+			nil, &profile, false, nil, http.StatusOK,
+		); err != nil {
+			_ = api.Close()
+			return nil, fmt.Errorf("confirm Gmail access: %w", err)
+		}
+		if profile.EmailAddress == "" ||
+			options.Address != "" &&
+				!strings.EqualFold(profile.EmailAddress, options.Address) {
+			_ = api.Close()
+			return nil, errors.New("gmail grant identity does not match the configured account")
+		}
+		if identity == "" {
+			identity = profile.EmailAddress
+		}
+		client.address = profile.EmailAddress
+		if options.Sender != "" {
+			client.address = options.Sender
+		}
 	}
-	if calendar.ID == "" {
-		_ = api.Close()
-		return nil, errors.New("google Calendar returned no primary calendar identity")
-	}
-	if options.Address != "" &&
-		!strings.EqualFold(calendar.ID, options.Address) {
-		_ = api.Close()
-		return nil, errors.New(
-			"google Calendar grant identity does not match the configured account",
-		)
-	}
-	if calendar.AccessRole != "owner" && calendar.AccessRole != "writer" {
-		_ = api.Close()
-		return nil, errors.New("google primary calendar is not editable")
-	}
-	for _, solution := range calendar.ConferenceProperties.AllowedSolutionTypes {
-		if solution == "hangoutsMeet" {
-			client.meet = true
-			break
+	if options.Calendar {
+		var calendar struct {
+			ID                   string `json:"id"`
+			AccessRole           string `json:"accessRole"`
+			ConferenceProperties struct {
+				AllowedSolutionTypes []string `json:"allowedConferenceSolutionTypes"`
+			} `json:"conferenceProperties"`
+		}
+		if _, err := api.DoJSON(
+			ctx, http.MethodGet, "calendar/v3/users/me/calendarList/primary", nil,
+			nil, &calendar, false, nil, http.StatusOK,
+		); err != nil {
+			_ = api.Close()
+			return nil, fmt.Errorf("confirm Google Calendar access: %w", err)
+		}
+		if calendar.ID == "" {
+			_ = api.Close()
+			return nil, errors.New("google Calendar returned no primary calendar identity")
+		}
+		if identity != "" && !strings.EqualFold(calendar.ID, identity) {
+			_ = api.Close()
+			return nil, errors.New(
+				"google Calendar grant identity does not match the configured account",
+			)
+		}
+		if calendar.AccessRole != "owner" && calendar.AccessRole != "writer" {
+			_ = api.Close()
+			return nil, errors.New("google primary calendar is not editable")
+		}
+		for _, solution := range calendar.ConferenceProperties.AllowedSolutionTypes {
+			if solution == "hangoutsMeet" {
+				client.meet = true
+				break
+			}
 		}
 	}
 	return client, nil
@@ -88,7 +135,39 @@ func New(ctx context.Context, options Options) (*Client, error) {
 // MeetAvailable reports the authenticated primary calendar's observed,
 // side-effect-free conference capability.
 func (client *Client) MeetAvailable() bool {
-	return client != nil && client.meet
+	return client != nil && client.calendar && client.meet
+}
+
+type googleMessageReference struct {
+	ID string `json:"id"`
+}
+
+func encodeMessageID(id string) (string, error) {
+	return encodeReference("ggm1_", googleMessageReference{ID: id})
+}
+
+func decodeMessageID(value string) (googleMessageReference, error) {
+	var reference googleMessageReference
+	if err := decodeReference(value, "ggm1_", &reference); err != nil ||
+		!validGmailID(reference.ID) {
+		return googleMessageReference{}, errors.New("message ID is not a Google identifier")
+	}
+	return reference, nil
+}
+
+func encodeHistoryID(value string) string {
+	return "ggh1_" + base64.RawURLEncoding.EncodeToString([]byte(value))
+}
+
+func decodeHistoryID(value string) (string, error) {
+	if !strings.HasPrefix(value, "ggh1_") {
+		return "", errors.New("message change key is not a Google history identifier")
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(value, "ggh1_"))
+	if err != nil || !validGmailID(string(decoded)) {
+		return "", errors.New("google message change key is malformed")
+	}
+	return string(decoded), nil
 }
 
 // Close releases account-scoped idle connections.
@@ -160,6 +239,11 @@ func validGoogleID(value string) bool {
 		!strings.ContainsAny(value, "\r\n\x00")
 }
 
+func validGmailID(value string) bool {
+	return validGoogleID(value) && len(value) <= 2048 &&
+		!strings.ContainsAny(value, "/?#")
+}
+
 func validETag(value string) bool {
 	return value != "" && len(value) <= 1024 &&
 		!strings.ContainsAny(value, "\r\n\x00")
@@ -167,4 +251,12 @@ func validETag(value string) bool {
 
 func escaped(value string) string {
 	return url.PathEscape(value)
+}
+
+func millisecondsTime(value string) string {
+	milliseconds, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return ""
+	}
+	return time.UnixMilli(milliseconds).UTC().Format(time.RFC3339)
 }

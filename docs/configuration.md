@@ -155,10 +155,11 @@ Each account may have mail, calendar, or both. Supported route payloads are:
 | calendar | `caldav` | `calendar.caldav` |
 <!-- markdownlint-enable MD013 -->
 
-The payload must match the provider exactly. New Google mail-and-calendar
-setup shares one OAuth public client and grant: mail has fixed Gmail IMAP/SMTP
-endpoints while calendar pins the Google Calendar API base. A migrated
-schema-v3 account with deliberately distinct Google clients remains separate.
+The payload must match the provider exactly. The staged Google mail-and-calendar
+route shares one OAuth public client and grant and pins the Gmail and Calendar
+API base. It is not selectable while production OAuth approval is pending. A
+migrated schema-v3 account with deliberately distinct Google clients remains
+valid configuration but cannot activate before approval.
 Graph mail and calendar may share one identical API route. An independent
 IMAP/SMTP mail route can be paired with a CalDAV calendar route.
 
@@ -216,9 +217,16 @@ configuration—not suitable for support reports.
 Corresync never stores a password, cookie, OAuth access/refresh token,
 authorization header, or browser canary in TOML.
 
-## Google OAuth route
+## Google OAuth route (coming soon)
 
-Google is an explicit BYO desktop public-client integration:
+The Google integration is included but disabled in RC builds while Corresync's
+production OAuth application awaits approval. Discovery may identify Gmail,
+but `account add`, existing routes, and `auth login` stop before persistence,
+browser launch, keyring access, or Google API traffic. There is no environment,
+configuration, CLI, MCP, or BYO-client override for the approval gate.
+
+After approval, a separate reviewed release will enable the existing explicit
+desktop public-client shape:
 
 ```console
 corr account add reader@example.invalid \
@@ -235,8 +243,9 @@ corr auth login --account personal
 The redirect must be an allowed loopback `http://127.0.0.1` URI. Port `0`
 selects an available ephemeral port for public-client registrations that permit
 native-app loopback ports; otherwise configure an explicitly registered port.
-Before a provider page can open, `corr auth login` prints the exact service-
-derived scope set. The flow validates state and grants belong to the OS keyring.
+When the route is enabled, `corr auth login` will print the exact service-derived
+scope set before a provider page can open. The flow validates state and grants
+belong to the OS keyring.
 There is no client-secret field and no automatic Google selection. Google's
 generated Desktop client may require its client credential during token
 exchange. Supply it only to the local Corresync process:
@@ -252,11 +261,10 @@ value, sends it only to Google's fixed TLS token endpoint, and never stores it
 in the authorization URL or OS-keyring grant. Use only a client registration
 you are authorized to operate.
 
-The normal system browser owns Google sign-in. Mail then authenticates with a
-fresh access token over fixed `imap.gmail.com:993` implicit TLS and
-`smtp.gmail.com:587` STARTTLS endpoints. Calendar uses the pinned Google
-Calendar API. Passwords, app passwords, cookies, custom Gmail hosts, and Gmail
-REST are not accepted by the Google route.
+The normal system browser owns Google sign-in. Gmail then uses the pinned Gmail
+API with `gmail.modify`; Calendar uses the pinned Google Calendar API. The
+adapter never calls Gmail's immediate permanent-delete method. Passwords, app
+passwords, cookies, and custom Google hosts are not accepted by the route.
 
 Microsoft Graph and hybrid accounts can use distinct OAuth providers and
 grants. Prefix calendar settings with `calendar-`, for example

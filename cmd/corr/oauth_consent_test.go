@@ -2,15 +2,16 @@ package main
 
 import (
 	"bytes"
-	"strings"
+	"errors"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
-func TestOAuthConsentNoticeCombinesSharedRouteScopesBeforeLogin(t *testing.T) {
+func TestOAuthConsentNoticeStopsBeforePendingGoogleLogin(t *testing.T) {
 	t.Parallel()
 	route := config.OAuthRoute{
 		APIBase:     "https://www.googleapis.com",
@@ -43,16 +44,11 @@ func TestOAuthConsentNoticeCombinesSharedRouteScopesBeforeLogin(t *testing.T) {
 		&stderr,
 		buildinfo.Info{Version: "dev"},
 	)
-	if err := writeOAuthConsentNotice(app, account); err != nil {
-		t.Fatal(err)
+	err := writeOAuthConsentNotice(app, account)
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		t.Fatalf("writeOAuthConsentNotice() error = %v", err)
 	}
-	output := stderr.String()
-	if strings.Count(output, "google:") != 1 ||
-		!strings.Contains(output, "mail.google.com") ||
-		!strings.Contains(output, "calendar.events") ||
-		!strings.Contains(output, "only when no matching valid local grant") ||
-		!strings.Contains(output, privacyPolicyURL) ||
-		!strings.Contains(output, termsOfUseURL) {
-		t.Fatalf("consent notice = %q", output)
+	if stderr.Len() != 0 {
+		t.Fatalf("pending Google consent notice = %q", stderr.String())
 	}
 }

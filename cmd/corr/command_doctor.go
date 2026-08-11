@@ -15,6 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
+	"github.com/nkiyohara/corresync/internal/rollout"
 	"github.com/nkiyohara/corresync/internal/updatecheck"
 )
 
@@ -65,7 +66,11 @@ func (command *doctorCommand) Run(app *runtime) error {
 	}
 	report.Account = string(accountID)
 	report.add("account", "pass", "configured account identity and provider routes are valid")
-	command.addOAuthScopes(configured, &report)
+	if hasGoogleRoute(configured) && !rollout.GoogleOAuthApproved {
+		report.add("google_oauth", "fail", rollout.ErrGoogleOAuthPending.Error())
+	} else {
+		command.addOAuthScopes(configured, &report)
+	}
 	command.addUpdateStatus(app, configuration, &report)
 
 	switch {

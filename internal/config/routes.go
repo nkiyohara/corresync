@@ -89,8 +89,8 @@ type OAuthClient struct {
 	Authorization CredentialRef `json:"authorization" toml:"authorization"`
 }
 
-// GoogleMailRoute binds Gmail's fixed IMAP/SMTP endpoints to one explicit
-// desktop OAuth public client. The endpoints are product policy, not mutable
+// GoogleMailRoute binds Gmail's fixed API endpoint to one explicit desktop
+// OAuth public client. The endpoint is product policy, not mutable
 // configuration, so a Google grant cannot be redirected to another host.
 type GoogleMailRoute struct {
 	Username      string        `json:"username" toml:"username"`

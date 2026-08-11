@@ -245,8 +245,8 @@ func (collector *candidateCollector) candidates() []application.ProviderCandidat
 }
 
 func addKnownDomainCandidates(collector *candidateCollector, domainName string) {
-	switch domainName {
-	case "outlook.com", "hotmail.com", "live.com", "msn.com":
+	switch knownDomainFamily(domainName) {
+	case familyMicrosoftConsumer:
 		collector.add(candidateInput{
 			provider: domain.ProviderMicrosoftOWA, confidence: 98,
 			authentication: application.DiscoveryBrowserFirstParty,
@@ -268,7 +268,7 @@ func addKnownDomainCandidates(collector *candidateCollector, domainName string) 
 				Source: "known_domain", Detail: domainName,
 			},
 		})
-	case "gmail.com", "googlemail.com":
+	case familyGoogleConsumer:
 		addGoogleCandidate(collector, 98, "known_domain", domainName)
 	}
 }
@@ -276,8 +276,8 @@ func addKnownDomainCandidates(collector *candidateCollector, domainName string) 
 func addMXCandidates(collector *candidateCollector, records []*net.MX) {
 	for _, record := range records {
 		host := strings.TrimSuffix(strings.ToLower(record.Host), ".")
-		switch {
-		case strings.HasSuffix(host, ".mail.protection.outlook.com"):
+		switch mailExchangeFamily(host) {
+		case familyMicrosoft365:
 			collector.add(candidateInput{
 				provider: domain.ProviderMicrosoftOWA, confidence: 55,
 				authentication: application.DiscoveryBrowserFirstParty,
@@ -299,7 +299,7 @@ func addMXCandidates(collector *candidateCollector, records []*net.MX) {
 					Source: "mx", Detail: "mail.protection.outlook.com",
 				},
 			})
-		case host == "aspmx.l.google.com" || strings.HasSuffix(host, ".google.com"):
+		case familyGoogleWorkspace:
 			addGoogleCandidate(
 				collector,
 				55,
@@ -316,20 +316,16 @@ func addGoogleCandidate(
 	source string,
 	detail string,
 ) {
-	for _, endpoint := range []application.DiscoveredEndpoint{
-		{Kind: "imap", Value: "imap.gmail.com:993"},
-		{Kind: "smtp", Value: "smtp.gmail.com:587"},
-		{Kind: "api", Value: "https://www.googleapis.com"},
-	} {
-		collector.add(candidateInput{
-			provider: domain.ProviderGoogle, confidence: confidence,
-			authentication: application.DiscoveryExplicitOAuth, explicit: true,
-			endpoint: endpoint,
-			evidence: application.DiscoveryEvidence{
-				Source: source, Detail: detail,
-			},
-		})
-	}
+	collector.add(candidateInput{
+		provider: domain.ProviderGoogle, confidence: confidence,
+		authentication: application.DiscoveryExplicitOAuth, explicit: true,
+		endpoint: application.DiscoveredEndpoint{
+			Kind: "api", Value: "https://www.googleapis.com",
+		},
+		evidence: application.DiscoveryEvidence{
+			Source: source, Detail: detail,
+		},
+	})
 }
 
 func diagnostic(source, status, detail string) application.DiscoveryDiagnostic {
