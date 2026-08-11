@@ -207,7 +207,13 @@ test("the deployment remains bounded for the Workers Free plan", async () => {
     new URL("../wrangler.jsonc", import.meta.url),
     "utf8",
   ));
-  assert.equal(config.limits.cpu_ms, 10);
+  const cpuLimit = config.limits?.cpu_ms;
+  assert.equal(
+    cpuLimit === undefined || (
+      Number.isInteger(cpuLimit) && cpuLimit > 0 && cpuLimit <= 10
+    ),
+    true,
+  );
   assert.equal(config.observability.enabled, false);
   assert.equal(config.observability.logs.invocation_logs, false);
 });
