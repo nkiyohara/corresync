@@ -1,0 +1,32 @@
+{
+  "name": "corresync-provider-discovery",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-08-11",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "discover.corresync.org",
+      "custom_domain": true
+    }
+  ],
+  "limits": {
+    "cpu_ms": 50
+  },
+  "observability": {
+    "enabled": false,
+    "logs": {
+      "invocation_logs": false
+    }
+  },
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "9101",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    }
+  ]
+}

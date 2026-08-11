@@ -3,6 +3,33 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.6-rc.4 - 2026-08-11
+
+### Approval-gated Gmail API route
+
+- Replace the staged Google mail transport with bounded Gmail API operations
+  using the future `gmail.modify` scope while preserving search, selected
+  reads, MIME attachments, drafts, send/reply/forward, labels, archive, and
+  Trash. Immediate permanent deletion remains unavailable.
+- Keep every Google account-add, login, keyring, session, and provider-network
+  path disabled behind a release-owned constant while production OAuth
+  approval is pending. RC inclusion does not activate the route and no runtime
+  override exists.
+
+### Private provider compatibility checker
+
+- Add a beginner-facing compatibility checker that derives an address domain
+  in the browser and sends only that domain in a request body. The local part
+  is cleared, never transmitted or persisted, and the checker never starts
+  authentication.
+- Add a single-purpose Cloudflare Worker with a generated provider catalog,
+  fixed DNS-over-HTTPS destination, strict CORS and request schema, bounded
+  parsing, global rate limiting, no application cache or logs, typed route
+  results, and adversarial DNS/redirect/SSRF fixtures.
+- Make multiple isolated work and personal accounts, familiar address
+  families, available routes, and the approval-pending Google status clear in
+  Pages copy, setup guidance, SEO metadata, privacy disclosures, and terms.
+
 ## 0.8.6-rc.2 - 2026-08-03
 
 ### Explicit automatic feedback

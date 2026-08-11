@@ -67,15 +67,16 @@
         <p class="eyebrow"><span aria-hidden="true"></span>Getting started</p>
         <h1 id="page-title">Install to first answer, <em>in four clear steps.</em></h1>
         <p class="lede">
-          Install <code>corr</code>, sign in to an account you control, register the local MCP
-          server with your agent, and ask something that spans every inbox and calendar you
-          connected. Outlook Web sign-in stays browser-owned; API and standards grants stay behind
+          Install <code>corr</code>, connect multiple work or personal email and calendar accounts,
+          register the local MCP server with your agent, and ask something that spans them. Each
+          account keeps a separate identity and authorization even when a search or agenda combines
+          results. Outlook Web sign-in stays browser-owned; API and standards grants stay behind
           your OS keyring. Agents never receive Corresync-managed credentials, and the MCP
           connection is local stdio—no hosted relay.
         </p>
         <div class="actions">
           <a class="button primary" href="#step-install">Start at step 1</a>
-          <a class="button secondary" href="providers.html">Check your provider first</a>
+          <a class="button secondary" href="providers.html#check">Check your provider first</a>
         </div>
       </section>
 
@@ -253,12 +254,13 @@ corr update</code></pre>
                 alias you name.
               </p>
               <p>
-                <strong>Using Gmail?</strong> Corresync is still preparing its official Google OAuth
-                application for verification, so guided Google connection is not available yet. For
-                now, connect your agent directly to Google’s official Workspace MCP servers.
+                <strong>Using Gmail?</strong> The Gmail and Calendar API code is in this RC, but the
+                production OAuth application is awaiting approval, so the route is completely
+                disabled and no Google sign-in can start. For now, connect your agent directly to
+                Google’s official Workspace MCP servers.
               </p>
               <p class="step-links">
-                <a href="providers.html">Compare provider routes</a> ·
+                <a href="providers.html#check">Check your address without sending it</a> ·
                 <a href="safety.html">see how sign-in ownership works</a>
               </p>
             </div>

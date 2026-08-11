@@ -11,10 +11,11 @@ authorized live observations.
 | --- | --- | --- | --- |
 | CLI, stable JSON, configuration schema v4 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
+| Public domain-only compatibility checker | Browser privacy/source checks; DNS, CORS, bounds, redirect, failure, and SSRF fixtures | Not run | Deterministic only; no provider authentication |
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
 | Outlook Web mail/calendar | Synthetic typed wire contracts | Historical Microsoft 365 notes, not commit-bound | Deterministic only; live-unobserved |
 | Legacy Google Web adapter | Synthetic semantic-DOM contracts retained; runtime sign-in disabled before browser launch | Live sign-in rejected by Google on 2026-07-29 | Unsupported |
-| Google Gmail XOAUTH2 mail and Calendar API/Google Meet field | Synthetic TLS protocol, REST, OAuth, and application integration contracts | [macOS arm64 authorization and bounded reads](evidence/google-macos-arm64-2026-07-30.md) | Authorization and listed read path live-observed; writes deterministic only |
+| Approval-gated Gmail and Google Calendar APIs/Google Meet field | Synthetic REST, OAuth-gate, and application integration contracts | Prior [IMAP/SMTP observation](evidence/google-macos-arm64-2026-07-30.md) does not cover the new route | Included but disabled; deterministic only; live-unobserved |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
 | IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
@@ -30,8 +31,9 @@ authorized live observations.
 Historical Outlook Web notes were made on 2026-07-18, 2026-07-19, and
 2026-07-25 using synthetic content and no third-party recipient. Those notes did
 not record the exact commit, so they are context only and do not substantiate
-v0.8. Google now has the bounded commit-bound observation linked above. No
-other provider or native-platform boundary has a commit-bound live observation
+v0.8. Google's retired IMAP/SMTP route has the bounded commit-bound observation
+linked above; it is not evidence for the staged Gmail API route. No current
+provider or native-platform boundary has a commit-bound live observation
 for the v0.8 implementation. The explicit marker and required template live in
 the [live evidence index](evidence/README.md).
 
@@ -48,12 +50,12 @@ evidence.
   safe handling of v0.8.0-v0.8.1 configuration, but runtime sign-in is
   unsupported and stops before browser launch. Google rejected the observed
   software-controlled browser sign-in; Corresync does not disguise automation.
-- `google`: Gmail IMAP/SMTP XOAUTH2, selectable Google calendars, and Google
-  Meet creation after observed calendar capability are implemented with one
-  BYO desktop public OAuth client. Authorization, selectable-folder discovery,
-  bounded mail search, selectable-calendar discovery, and bounded event listing
-  are live-observed on the exact macOS arm64 candidate linked above; writes and
-  Meet creation remain deterministic-only.
+- `google`: Gmail API mail, selectable Google calendars, and Google Meet
+  creation after observed calendar capability are implemented behind an
+  approval gate. RC builds reject account addition and activation before OAuth,
+  keyring, browser, or API access. The route has synthetic contracts only and
+  remains live-unobserved. The linked macOS observation covers the retired
+  IMAP/SMTP transport and is historical context only.
 - `microsoft-graph`: mail, selectable calendars, and typed Teams-link creation are
   implemented with a BYO public OAuth client, but have no recorded live
   observation.

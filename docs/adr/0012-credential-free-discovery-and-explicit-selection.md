@@ -1,12 +1,14 @@
 # ADR 0012: Credential-free discovery and explicit provider selection
 
-The Google candidate described here is amended by
-[ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md): it now advertises the
-`google` route with fixed Gmail IMAP/SMTP endpoints and the Calendar API base.
+The Google candidate and its availability described here are amended by
+[ADR 0026](0026-approval-gated-gmail-api-route.md): it advertises one staged
+`google` API route that remains unavailable until production OAuth approval.
+The optional domain-only public projection is constrained separately by
+[ADR 0027](0027-domain-only-public-compatibility-checker.md).
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-07-29
+- Amended: 2026-08-11
 
 ## Context
 
@@ -80,8 +82,9 @@ selection; merely discovering it never opens a browser or reads a grant.
 The former automatic `google-web` decision is superseded by
 [ADR 0018](0018-disable-automated-google-web-sign-in.md). Google consumer
 domains and Google-hosted Workspace MX evidence now produce only a
-`google-api` provider candidate, and that candidate always requires explicit
-selection. Discovery never starts its authorization.
+`google` provider candidate. Until production OAuth approval, that candidate is
+reported as unavailable and cannot be selected; discovery never starts its
+authorization.
 
 Before an authorization browser opens, the CLI displays the exact mail and
 calendar scopes. Submitting consent or an admin-review request always requires
@@ -133,12 +136,13 @@ trade against storing one in a file this project controls.
 Discovery will sometimes be wrong. It is built to be explainable and
 overridable rather than authoritative, so a wrong guess costs a manual
 configuration instead of an unwanted authorization request. Corresync ships no
-centrally held OAuth client secret; Google API and Graph use an explicitly
-selected bring-your-own public-client registration as detailed in
-[ADR 0015](0015-per-service-provider-routes.md).
+centrally held OAuth client secret. Graph uses an explicitly selected
+bring-your-own public-client registration. The staged Google route has no
+runtime override and stops before OAuth until the release gate is changed
+after production approval.
 
 Google Web no longer trades API completeness for consent safety because its
 software-controlled browser cannot reliably reach the authenticated provider
-surface. Users must explicitly select and authorize `google-api` or configure
-a standards route that their account and administrator permit. Corresync does
-not disguise automation or fall back around a blocked route.
+surface. After approval, users must explicitly select and authorize `google`,
+or configure a standards route that their account and administrator permit.
+Corresync does not disguise automation or fall back around a blocked route.
