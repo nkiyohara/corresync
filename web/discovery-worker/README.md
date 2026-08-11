@@ -22,11 +22,16 @@ WRANGLER_SEND_METRICS=false npx --yes wrangler@4.120.1 deploy
 
 The operator must first authenticate Wrangler to the Cloudflare account that
 owns `corresync.org`. The custom-domain route, disabled observability and
-invocation logs, CPU limit, and rate-limit binding are declared in
-`wrangler.jsonc`. After deployment, verify that responses use `Cache-Control:
+invocation logs, rate-limit binding, and 10 ms CPU ceiling are declared in
+`wrangler.jsonc`. That ceiling keeps this small, I/O-bound Worker compatible
+with the Workers Free plan; DNS request wait time does not consume CPU time.
+Confirm the current [Workers pricing and limits][workers-pricing] before
+deployment. After deployment, verify that responses use `Cache-Control:
 no-store`, reject an unapproved `Origin`, and that the Cloudflare dashboard
 still reports Workers Logs and invocation logs as disabled.
 
 Do not add user-derived HTTP probes, arbitrary resolver selection, query-string
 input, provider APIs, secrets, storage bindings, analytics, or application
 logging. Any expansion requires a new security review and an ADR amendment.
+
+[workers-pricing]: https://developers.cloudflare.com/workers/platform/pricing/

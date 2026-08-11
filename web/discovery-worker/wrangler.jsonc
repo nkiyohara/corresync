@@ -11,7 +11,7 @@
     }
   ],
   "limits": {
-    "cpu_ms": 50
+    "cpu_ms": 10
   },
   "observability": {
     "enabled": false,
