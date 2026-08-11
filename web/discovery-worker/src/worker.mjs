@@ -143,11 +143,16 @@ async function queryDNS(name, type, fetcher, outerSignal) {
   const response = await fetcher(url, {
     method: "GET",
     headers: { Accept: "application/dns-json" },
-    redirect: "error",
+    // Workerd does not implement redirect "error". Manual mode returns the
+    // redirect response without following it, and the checks below reject it.
+    redirect: "manual",
     signal: AbortSignal.any(signals),
   });
-  if (response.url && new URL(response.url).origin !== new URL(DNS_ENDPOINT).origin) {
+  if (response.status >= 300 && response.status < 400) {
     throw new Error("DNS resolver redirected");
+  }
+  if (response.url && new URL(response.url).origin !== new URL(DNS_ENDPOINT).origin) {
+    throw new Error("DNS response came from an unexpected origin");
   }
   if (!response.ok || !response.headers.get("Content-Type")?.toLowerCase().includes("json")) {
     throw new Error("DNS resolver failed");
@@ -251,7 +256,7 @@ function classify(domain, observations, unavailable) {
 
   const grouped = groupedScores(scores);
   const standardsCount = Object.values(standards).filter(Boolean).length;
-  if (standardsCount > 0) {
+  if (standardsCount > 0 && grouped.size === 0) {
     grouped.set("standards", standardsCount * 30);
   }
   const ranked = [...grouped.entries()].sort((left, right) => right[1] - left[1]);
@@ -340,6 +345,7 @@ function classificationFor(group, variant, score, conflict) {
 
 function routesFor(primary, standards, groups) {
   const wanted = new Set(groups.length ? groups : [primary]);
+  const hasStandards = Object.values(standards).some(Boolean);
   const routes = [];
   if (wanted.has("microsoft")) {
     routes.push(route(
@@ -374,7 +380,8 @@ function routesFor(primary, standards, groups) {
         : ["Production OAuth approval is pending.", "A separate reviewed release must enable the route."],
     ));
   }
-  if (wanted.has("standards") || groups.length > 0) {
+  if (wanted.has("standards") || groups.length > 0 ||
+    (primary !== "google" && hasStandards)) {
     if (standards.jmap) {
       routes.push(route(
         "jmap", "JMAP", "additional_setup", "Typed JMAP mail operations", "Not provided by this route",
