@@ -87,12 +87,24 @@ jobs:
             grep -Fq '<link rel="apple-touch-icon"' "site/${page}.html"
             grep -Fq '<link rel="manifest" href="site.webmanifest">' "site/${page}.html"
             grep -Fq 'https://corresync.org/social-card.png' "site/${page}.html"
-            if grep -Eiq 'http-equiv=.*refresh|window\.location|location\.(href|replace)' "site/${page}.html"; then
-              exit 1
-            fi
-            if grep -Eiq 'on(click|load|error|focus|mouseover)=' "site/${page}.html"; then
-              exit 1
-            fi
+          done
+          if grep -REiq --include='*.html' 'http-equiv=.*refresh|window\.location|location\.(href|replace)' site; then
+            exit 1
+          fi
+          if grep -REiq --include='*.html' 'on(click|load|error|focus|mouseover)[[:space:]]*=' site; then
+            exit 1
+          fi
+          for locale_and_lang in ja:ja zh-cn:zh-Hans zh-tw:zh-Hant ko:ko; do
+            locale="${locale_and_lang%%:*}"
+            lang="${locale_and_lang#*:}"
+            for page in index getting-started features providers safety privacy terms; do
+              localized="site/${locale}/${page}.html"
+              test -s "${localized}"
+              grep -Fq "<html lang=\"${lang}\">" "${localized}"
+              grep -Fq '<link rel="canonical"' "${localized}"
+              grep -Fq 'href="privacy.html"' "${localized}"
+              grep -Fq 'href="terms.html"' "${localized}"
+            done
           done
           grep -Fq 'https://corresync.org/' site/index.html
           grep -Fq 'https://corresync.org/getting-started.html' site/getting-started.html
@@ -125,10 +137,14 @@ jobs:
           grep -Fq 'https://corresync.org/safety.html' site/sitemap.xml
           grep -Fq 'https://corresync.org/privacy.html' site/sitemap.xml
           grep -Fq 'https://corresync.org/terms.html' site/sitemap.xml
-          test -z "$(grep -Rh '<script[^>]* src=' site --include='*.html' | grep -Ev 'src="(copy|check)\.js" defer' || true)"
-          if grep -Eiq 'fetch\\(|XMLHttpRequest|WebSocket|EventSource' site/copy.js; then
+          grep -Fq 'https://corresync.org/ja/' site/sitemap.xml
+          grep -Fq 'https://corresync.org/zh-cn/' site/sitemap.xml
+          grep -Fq 'https://corresync.org/zh-tw/' site/sitemap.xml
+          grep -Fq 'https://corresync.org/ko/' site/sitemap.xml
+          if grep -Eiq 'fetch\(|XMLHttpRequest|WebSocket|EventSource' site/copy.js; then
             exit 1
           fi
+          node --check site/copy.js
           node --check site/check.js
           node --check web/discovery-worker/src/worker.mjs
           node --test web/discovery-worker/test/*.test.mjs site/check.test.cjs
