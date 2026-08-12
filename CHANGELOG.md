@@ -3,6 +3,19 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Localized Pages
+
+- Publish complete English, Japanese, Simplified Chinese, Traditional Chinese,
+  and Korean journeys for every public Pages route, including localized setup,
+  provider guidance, safety information, privacy disclosures, terms, copy
+  controls, and compatibility-checker results.
+- Add explicit language navigation, reciprocal `hreflang` and Open Graph locale
+  metadata, and a 35-URL multilingual sitemap without automatic redirects or
+  browser-language tracking. Extend the site verifier and Pages checks so every
+  locale remains a complete, internally linked static artifact.
+
 ## 0.8.6-rc.5 - 2026-08-12
 
 ### Provider compatibility checker

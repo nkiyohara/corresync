@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync — 用一個本機 MCP 管理所有信箱和行事曆</title>
+    <meta
+      name="description"
+      content="面向 Outlook、Microsoft 365、JMAP、IMAP/SMTP 和 CalDAV 的本機優先 MCP 伺服器與 CLI。Gmail 和 Google 行事曆將在 OAuth 通過審核後上線。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta
+      property="og:title"
+      content="Corresync — 用一個本機 MCP 管理所有信箱和行事曆"
+    >
+    <meta
+      property="og:description"
+      content="工作與個人帳號彼此隔離，卻能統一搜尋、查看日程，並在傳送前逐項確認。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/zh-tw/">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync 標誌，以及介紹本機郵件與行事曆 MCP 的英文文字"
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta
+      name="twitter:title"
+      content="Corresync — 用一個本機 MCP 管理所有信箱和行事曆"
+    >
+    <meta
+      name="twitter:description"
+      content="統一搜尋多個帳號、彙總日程，並在每次傳送前確認。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync 標誌，以及介紹本機郵件與行事曆 MCP 的英文文字"
+    >
+    <link rel="canonical" href="https://corresync.org/zh-tw/">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../copy.js" defer></script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "name": "Corresync",
+          "url": "https://corresync.org/zh-tw/",
+          "inLanguage": "zh-Hant"
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "Corresync",
+          "url": "https://corresync.org/zh-tw/",
+          "codeRepository": "https://github.com/nkiyohara/corresync",
+          "programmingLanguage": "Go",
+          "runtimePlatform": ["macOS", "Linux", "Windows"],
+          "license": "https://www.apache.org/licenses/LICENSE-2.0",
+          "inLanguage": "zh-Hant",
+          "description": "本機優先、供應商中立的郵件與行事曆 MCP 伺服器和 CLI。"
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到內文</a><div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 首頁"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="主導航">
+          <a href="./" aria-current="page">首頁</a><a href="getting-started.html"
+          >開始使用</a><a href="providers.html">支援服務</a><a href="features.html"
+          >功能</a><a href="safety.html">安全</a>
+        </nav>
+        <nav class="language-nav" aria-label="語言">
+          <a href="../" lang="en" hreflang="en">EN</a><a href="../ja/" lang="ja" hreflang="ja"
+          >日本語</a><a href="../zh-cn/" lang="zh-Hans" hreflang="zh-Hans">简中</a><a
+            href="./"
+            lang="zh-Hant"
+            hreflang="zh-Hant"
+            aria-current="page"
+          >繁中</a><a href="../ko/" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span aria-hidden="true"></span>本機優先 · MCP 伺服器 + CLI</p>
+          <h1 id="hero-title">所有信箱和行事曆，<em>一個本機 MCP 就夠了。</em></h1>
+          <p class="lede">
+            把工作與個人郵件、行事曆連線到 Codex、Claude Code、任何 MCP
+            智慧體和終端。Corresync
+            始終隔離每個帳號的身分與授權，同時讓你跨收件匣搜尋、彙總日程，並在任何傳送發生前親自確認。
+          </p>
+          <p class="hero-providers">
+            <strong>現已支援：</strong>Outlook Web · Microsoft Graph · JMAP · IMAP/SMTP ·
+            CalDAV。<strong>即將支援：</strong>Gmail 和 Google 行事曆，等待 Google
+            OAuth 審核。每個帳號的能力與管理員要求都會明確展示——<a
+              href="providers.html"
+            >比較連線方式</a>。
+          </p>
+          <div class="actions">
+            <a class="button primary" href="getting-started.html">四步完成設定</a><a
+              class="button secondary"
+              href="providers.html#check"
+            >檢查信箱是否支援</a>
+          </div>
+          <p class="hero-note">
+            登入留在瀏覽器或系統鑰匙圈中，智慧體不會持有由 Corresync
+            管理的認證資料，也不存在託管中繼。重要寫操作會先顯示準確預覽，只有確認後才會提交。
+          </p>
+        </div>
+        <div class="install-panel" id="install" aria-labelledby="install-title">
+          <div class="install-head">
+            <h2 id="install-title">立即安裝</h2>
+            <p>按系統選擇一條命令，再連線你已經在用的智慧體。</p>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-unix">macOS · Linux</p>
+            <div class="cmd" data-copy data-copy-label="macOS 和 Linux 安裝命令">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-unix"
+              ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-windows">Windows · PowerShell</p>
+            <div class="cmd" data-copy data-copy-label="Windows PowerShell 安裝命令">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-windows"
+              ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-winget">Windows · WinGet</p>
+            <div class="cmd" data-copy data-copy-label="Windows WinGet 安裝命令">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-winget"
+              ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-connect">下一步 · 新增帳號</p>
+            <div class="cmd" data-copy data-copy-label="帳號設定命令">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-connect"
+              ><code>corr setup you@example.com --alias personal</code></pre>
+            </div>
+          </div>
+          <p class="install-note">
+            請替換示例位址和別名。設定過程只做無認證資料發現，不會自動開啟登入頁面。其他安裝方式和各
+            MCP 用戶端命令請見<a href="getting-started.html">開始使用</a>。
+          </p>
+        </div>
+      </section>
+
+      <section class="trust-row" aria-label="為什麼選擇 Corresync">
+        <div>
+          <strong>一個 MCP，連線每個帳號</strong><span
+          >工作和個人身分始終隔離；每條結果都會保留來源帳號和供應商。</span>
+        </div>
+        <div>
+          <strong>智慧體不接觸認證資料</strong><span
+          >登入由可見瀏覽器或系統鑰匙圈管理，沒有託管中繼或遠端
+            MCP。</span>
+        </div>
+        <div>
+          <strong>先預覽，再提交</strong><span
+          >傳送和破壞性操作先回傳伺服器強制的審閱；核准短時且僅可使用一次。</span>
+        </div>
+      </section>
+
+      <section class="policy-callout" aria-labelledby="policy-callout-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>Google 支援狀態</p>
+          <h2 id="policy-callout-title">程式碼已經就緒，目前只等審核。</h2>
+          <p>
+            Gmail 和 Google 行事曆程式碼已經包含在 RC 中，但正式環境 OAuth
+            仍然關閉：不會啟動 Google 登入、讀取鑰匙圈、要求 OAuth
+            權限範圍或傳送 API
+            請求。通過審核後也必須透過另一次獨立審閱的發布才能啟用。
+          </p>
+        </div>
+        <div class="actions">
+          <a class="button primary" href="privacy.html">隱私政策</a><a
+            class="button secondary"
+            href="terms.html"
+          >使用條款</a>
+        </div>
+      </section>
+
+      <section class="journey" id="quickstart" aria-labelledby="journey-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>安裝後只需三組短命令</p>
+          <h2 id="journey-title">選擇。登入。提問。</h2>
+          <p>
+            Corresync
+            不會預選供應商。它先為位址收集無認證資料證據，新增你明確選擇的帳號路徑，然後才允許啟動該帳號的登入。
+          </p>
+        </div>
+        <div class="journey-grid">
+          <div class="journey-step">
+            <p class="os-label" id="journey-signin">1 · 選擇並登入</p>
+            <div class="cmd" data-copy data-copy-label="帳號與登入命令">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="journey-signin"
+              ><code>corr setup you@example.com --alias personal
+corr auth login --account personal</code></pre>
+            </div>
+            <p>
+              發現過程不會開啟任何頁面；單獨的 login 命令只使用已選路徑。
+            </p>
+          </div>
+          <div class="journey-step">
+            <p class="os-label" id="journey-connect">2 · 連線</p>
+            <div class="cmd" data-copy data-copy-label="智慧體設定命令">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="journey-connect"
+              ><code>corr mcp setup codex</code></pre>
+            </div>
+            <p>在智慧體中註冊本機 stdio 伺服器，重啟用戶端一次即可。</p>
+          </div>
+          <div class="journey-step">
+            <p class="os-label" id="journey-ask">3 · 提問</p>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-labelledby="journey-ask"
+            ><code><span class="t-ask">›</span> 彙總所有帳號裡今天中午前
+  需要我處理的事情</code></pre>
+            <p>智慧體呼叫型別化工具，回答會標明每條資訊來自哪個帳號。</p>
+          </div>
+        </div>
+        <p class="center-link">
+          <a href="getting-started.html">查看完整開始使用指南<span aria-hidden="true">
+              →</span></a>
+        </p>
+      </section>
+
+      <section class="outcomes" id="outcomes" aria-labelledby="outcomes-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>第一天就能完成</p>
+          <h2 id="outcomes-title">一次提問，覆蓋多個收件匣和行事曆。</h2>
+          <p>CLI 與 MCP 共享相同的型別化操作、帳號隔離和策略檢查。</p>
+        </div>
+        <div class="outcome-grid">
+          <article class="outcome-card">
+            <h3>同時搜尋所有收件匣</h3>
+            <p class="outcome-ask">
+              “找出季度計劃郵件，我忘了它在工作還是個人信箱。”
+            </p>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="跨帳號郵件搜尋示例"
+            ><code><span class="t-prompt">$</span> corr mail search --all-accounts \
+    --query 'subject:"quarterly plan"'
+<span class="t-unread">●</span> <span class="t-dim">work · microsoft-owa</span>  Ana Ruiz  Plan review
+<span class="t-read">·</span> <span class="t-dim">personal · jmap</span>   Finance      Plan receipt</code></pre>
+            <p class="outcome-note">
+              某個帳號失敗時會明確顯示為部分結果，不會悄悄隱藏。
+            </p>
+          </article>
+          <article class="outcome-card">
+            <h3>查看統一日程</h3>
+            <p class="outcome-ask">“工作和個人行事曆裡的今天安排是什麼？”</p>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="跨帳號日程示例"
+            ><code><span class="t-prompt">$</span> corr agenda list --all-accounts \
+    --start 2026-07-29T00:00:00Z \
+    --end 2026-07-30T00:00:00Z
+09:30 <span class="t-dim">work</span>      Design review · Teams
+12:30 <span class="t-dim">personal</span>  Dentist</code></pre>
+            <p class="outcome-note">
+              時區、行事曆和供應商來源會保留在每個事件上。
+            </p>
+          </article>
+          <article class="outcome-card">
+            <h3>傳送前先看清內容</h3>
+            <p class="outcome-ask">“替我起草給 Ana 的回覆，傳送由我確認。”</p>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="傳送預覽示例"
+            ><code><span class="t-ask">›</span> 起草給 Ana 的回覆
+  <span class="t-tool">mail_send</span>
+<span class="t-review">REVIEW · send new message</span>
+  to    ana@example.invalid
+  body  text/plain · 412 B
+<span class="t-dim">確認這份內容之前不會傳送。</span></code></pre>
+            <p class="outcome-note">
+              提交必須與審閱過的帳號、收件人和位元組完全一致。
+            </p>
+          </article>
+        </div>
+        <p class="center-link">
+          <a href="features.html">查看全部功能與明確限制<span aria-hidden="true">
+              →</span></a>
+        </p>
+      </section>
+
+      <section class="safety safety-預覽" aria-labelledby="safety-title">
+        <div class="safety-head">
+          <p class="eyebrow light"><span aria-hidden="true"></span>看得見的安全設計</p>
+          <h2 id="safety-title">第一次呼叫絕不會直接傳送。</h2>
+          <p class="safety-lede">
+            重要操作先回傳審閱。核准會繫結呼叫方、帳號、供應商、目標、內容、有效期，並且只能使用一次。
+          </p>
+        </div>
+        <div class="safety-body">
+          <figure class="terminal safety-terminal">
+            <figcaption class="term-bar">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
+                class="term-title"
+              >操作前審閱</span>
+            </figcaption>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="郵件傳送前預覽"
+            ><code><span class="t-prompt">$</span> corr mail send --account work \
+    --to ana@example.invalid \
+    --subject 'Quarterly plan' \
+    --body-file reply.txt
+
+<span class="t-review">REVIEW · send new message</span>
+  account  work · microsoft-owa
+  to       ana@example.invalid
+  body     text/plain · 412 B
+
+<span class="t-dim">尚未傳送。</span></code></pre>
+          </figure>
+          <ul class="safety-points">
+            <li>
+              <strong>智慧體只拿到型別化工具。</strong>密碼、Cookie 和 OAuth 授權
+              不會出現在 MCP 或設定裡。
+            </li>
+            <li>
+              <strong>只在本機執行。</strong>MCP 透過本機 stdio
+              通訊，沒有託管中繼或遠端端點。
+            </li>
+            <li>
+              <strong
+              >結果不明就停止。</strong>不會自動重試狀態不確定的遠端寫入。
+            </li>
+            <li>
+              <strong
+              >郵件內容是不可信資料。</strong>它不能授予執行命令或啟動智慧體的權限。
+            </li>
+          </ul>
+        </div>
+        <p class="safety-links">
+          <a href="safety.html">瞭解完整安全模型<span aria-hidden="true"> →</span></a>
+        </p>
+      </section>
+
+      <section class="provider-預覽" aria-labelledby="provider-預覽-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>使用你已有的連線方式</p>
+          <h2 id="provider-預覽-title">
+            需要時用原生 API，可以時優先開放標準。
+          </h2>
+          <p>
+            郵件和行事曆路徑分別選擇，因此一個帳號可以把 IMAP/SMTP 郵件與
+            CalDAV 行事曆組合起來。
+          </p>
+        </div>
+        <div class="route-family-grid">
+          <article class="route-family">
+            <p class="chip">瀏覽器管理</p>
+            <h3>Outlook Web</h3>
+            <p>
+              互動式 Outlook
+              登入留在專用可見瀏覽器中，同時提供型別化郵件和行事曆操作。
+            </p>
+          </article>
+          <article class="route-family accent-card">
+            <p class="chip">明確 OAuth</p>
+            <h3>Microsoft Graph · Google 即將上線</h3>
+            <p>
+              Graph 使用你有權使用的公開用戶端。Google 路徑在正式環境 OAuth
+              通過審核前完全關閉。
+            </p>
+          </article>
+          <article class="route-family">
+            <p class="chip">開放標準</p>
+            <h3>JMAP、IMAP/SMTP、CalDAV</h3>
+            <p>
+              使用加密端點，以及系統鑰匙圈或明確核准的認證資料輔助程式。
+            </p>
+          </article>
+        </div>
+        <div class="evidence-note">
+          <span class="status-dot" aria-hidden="true"></span><p>
+            <strong
+            >證據也說清楚。</strong>每條路徑都有確定性的合成契約測試；Google
+            API 路徑目前關閉且尚未進行即時觀測。
+          </p><a href="providers.html#check">私密檢查信箱位址<span aria-hidden="true">
+              →</span></a>
+        </div>
+      </section>
+
+      <section class="honest-edges" aria-labelledby="edges-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>限制同樣透明</p>
+          <h2 id="edges-title">做不到什麼，也是產品的一部分。</h2>
+          <p class="fine-print">
+            完整能力、限制和證據範圍請見<a href="features.html">功能頁面</a>。
+          </p>
+        </div>
+        <ul>
+          <li>
+            <strong>Gmail 和 Google 行事曆仍在等待審核。</strong>程式碼在 RC
+            中，但正式環境 OAuth 保持關閉。
+          </li>
+          <li>
+            <strong>Microsoft Graph 需自備 OAuth。</strong>Corresync
+            不營運權杖中繼服務。
+          </li>
+          <li>
+            <strong>Windows 桌面通知暫不可用。</strong>佇列與已核准的執行器
+            仍可使用。
+          </li>
+          <li>
+            <strong
+            >支援宣告受證據約束。</strong>合成契約不會被包裝成即時相容性證明。
+          </li>
+          <li>
+            <strong>不管理 Teams
+              聊天或會議生命週期。</strong>僅處理行事曆事件上的原生加入連結。
+          </li>
+        </ul>
+      </section>
+
+      <section class="final-cta" aria-labelledby="final-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>準備好整理收件匣時</p>
+        <h2 id="final-title">把所有往來帶進一場本機對話。</h2>
+        <p>一條命令安裝，再用一條命令連線智慧體。</p>
+        <div class="actions centered">
+          <a class="button primary" href="#install">查看安裝命令</a><a
+            class="button secondary"
+            href="getting-started.html"
+          >閱讀完整指南</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        獨立的本機優先郵件與行事曆工具。與此處提到的
+        Google、Microsoft、供應商或智慧體廠商無隸屬或背書關係。
+      </p>
+      <nav aria-label="頁尾">
+        <a href="getting-started.html">開始使用</a><a href="providers.html">支援服務</a><a
+          href="features.html"
+        >功能</a><a href="safety.html">安全</a><a href="privacy.html">隱私</a><a
+          href="terms.html"
+        >條款</a><a href="https://github.com/nkiyohara/corresync">原始碼</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >安全報告</a><a href="https://github.com/nkiyohara/corresync/releases">發布</a><a
+          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

@@ -76,6 +76,58 @@ html {
   scroll-behavior: smooth;
 }
 
+html[lang="ja"] {
+  font-family:
+    system-ui,
+    -apple-system,
+    "Hiragino Sans",
+    "Yu Gothic UI",
+    "Yu Gothic",
+    Meiryo,
+    sans-serif;
+}
+
+html[lang="zh-Hans"] {
+  font-family:
+    system-ui,
+    -apple-system,
+    "PingFang SC",
+    "Microsoft YaHei",
+    "Noto Sans CJK SC",
+    sans-serif;
+}
+
+html[lang="zh-Hant"] {
+  font-family:
+    system-ui,
+    -apple-system,
+    "PingFang TC",
+    "Microsoft JhengHei",
+    "Noto Sans CJK TC",
+    sans-serif;
+}
+
+html[lang="ko"] {
+  font-family:
+    system-ui,
+    -apple-system,
+    "Apple SD Gothic Neo",
+    "Malgun Gothic",
+    "Noto Sans KR",
+    sans-serif;
+}
+
+html:is([lang="ja"], [lang="zh-Hans"], [lang="zh-Hant"], [lang="ko"]) body {
+  line-break: strict;
+  word-break: normal;
+}
+
+html:is([lang="ja"], [lang="zh-Hans"], [lang="zh-Hant"], [lang="ko"]) .eyebrow,
+html:is([lang="ja"], [lang="zh-Hans"], [lang="zh-Hant"], [lang="ko"]) .legal-kicker {
+  letter-spacing: 0.08em;
+  text-transform: none;
+}
+
 body {
   margin: 0;
   color: var(--ink);
@@ -190,6 +242,14 @@ code, pre, .brand-name, .eyebrow, .chip, .badge, .step-number, .flow-edge, .term
   letter-spacing: -0.02em;
 }
 
+.header-navs {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(0.9rem, 2vw, 1.4rem);
+  min-width: 0;
+}
+
 .site-nav {
   display: flex;
   align-items: center;
@@ -214,6 +274,39 @@ code, pre, .brand-name, .eyebrow, .chip, .badge, .step-number, .flow-edge, .term
   text-decoration: underline;
   text-decoration-color: var(--coral);
   text-decoration-thickness: 2px;
+}
+
+.language-nav {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.15rem;
+  max-width: 100%;
+  padding: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.language-nav a {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.language-nav a:hover {
+  color: var(--ink);
+}
+
+.language-nav a[aria-current="page"] {
+  color: var(--btn-primary-ink);
+  background: var(--btn-primary-bg);
 }
 
 /* ---------- Shared section rhythm ---------- */
@@ -1795,6 +1888,11 @@ pre {
 /* ---------- Responsive ---------- */
 
 @media (max-width: 980px) {
+  .header-navs {
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+  }
+
   /* minmax(0, 1fr), not 1fr: a bare 1fr track cannot shrink below its
      content's min-content width, and the unbreakable install-command URLs
      inside the panel would force the whole page wider than the viewport. */
@@ -1880,6 +1978,20 @@ pre {
   }
 }
 
+@media (max-width: 860px) {
+  .site-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding-block: 0.85rem;
+  }
+
+  .header-navs {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 680px) {
   .site-header {
     flex-direction: column;
@@ -1889,6 +2001,11 @@ pre {
   }
   .site-nav {
     gap: 0.4rem 1.1rem;
+  }
+  .header-navs {
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
   .checker-fields {
     grid-template-columns: 1fr;
@@ -2734,7 +2851,7 @@ main > .gs-steps {
 }
 
 @media print {
-  .airmail, .skip-link, .dots, .copy-button {
+  .airmail, .skip-link, .dots, .copy-button, .language-nav {
     display: none;
   }
   body {

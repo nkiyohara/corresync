@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>支援的郵件與行事曆服務 — Corresync</title>
+    <meta
+      name="description"
+      content="比較 Outlook、Microsoft 365、JMAP、IMAP/SMTP 和 CalDAV 的 Corresync 連線方式。Gmail 與 Google 行事曆等待 OAuth 審核。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="支援的郵件與行事曆服務 — Corresync">
+    <meta
+      property="og:description"
+      content="只用信箱網域檢查可用路徑、設定要求和明確限制。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/zh-tw/providers.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Corresync 標誌和英文產品簡介">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="支援的郵件與行事曆服務 — Corresync">
+    <meta
+      name="twitter:description"
+      content="查看目前可用路徑與等待審核的 Google 支援。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
+    <link rel="canonical" href="https://corresync.org/zh-tw/providers.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/providers.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/providers.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/providers.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/providers.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/providers.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/providers.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到內文</a><div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 首頁"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="主導航">
+          <a href="./">首頁</a><a href="getting-started.html">開始使用</a><a
+            href="providers.html"
+            aria-current="page"
+          >支援服務</a><a href="features.html">功能</a><a href="safety.html">安全</a>
+        </nav>
+        <nav class="language-nav" aria-label="語言">
+          <a href="../providers.html" lang="en" hreflang="en">EN</a><a
+            href="../ja/providers.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a href="../zh-cn/providers.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="providers.html" lang="zh-Hant" hreflang="zh-Hant" aria-current="page"
+          >繁中</a><a href="../ko/providers.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>路徑明確，取捨可見</p>
+        <h1 id="page-title">選擇真正適合<em>你的帳號</em>的路徑。</h1>
+        <p class="lede">
+          Corresync
+          不會根據標誌猜測能力。發現階段只收集無認證資料證據；你在認證開始前選擇郵件和行事曆路徑。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#check">檢查信箱位址</a><a
+            class="button secondary"
+            href="getting-started.html#sign-in"
+          >查看設定步驟</a>
+        </div>
+      </section>
+      <section
+        class="compatibility-相容性檢查工具"
+        id="check"
+        aria-labelledby="相容性檢查工具-title"
+      >
+        <div class="相容性檢查工具-intro">
+          <p class="eyebrow"><span aria-hidden="true"></span>這個位址能用嗎？</p>
+          <h2 id="相容性檢查工具-title">
+            無需傳送完整位址，也能檢查支援情況。
+          </h2>
+          <p>
+            輸入要連線的信箱。瀏覽器會保留完整位址，只把 @
+            後面的網域交給檢查服務。
+          </p>
+        </div>
+        <form id="compatibility-form" class="相容性檢查工具-form" novalidate>
+          <label for="compatibility-email"
+          >信箱位址</label><div class="相容性檢查工具-fields">
+            <input
+              id="compatibility-email"
+              name="compatibility-email"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              spellcheck="false"
+              placeholder="you@example.com"
+              aria-describedby="compatibility-privacy compatibility-validation"
+              required
+            ><button id="compatibility-submit" class="button primary" type="submit" disabled>
+              檢查支援情況
+            </button>
+          </div>
+          <p id="compatibility-validation" class="相容性檢查工具-validation" hidden>
+            請輸入完整信箱位址，例如 you@example.com。@
+            後有完整網域之前不會查詢。
+          </p>
+        </form>
+        <p id="compatibility-privacy" class="相容性檢查工具-privacy">
+          <strong>只有網域會離開瀏覽器。</strong>@
+          前的內容不會傳送、儲存、記錄或放進位址列。服務只讀取公共
+          DNS，不保留記錄，也不會啟動登入。你也可以跳過網頁檢查，安裝後在本機執行
+          <code>corr account discover you@example.com</code>。
+        </p><noscript><p class="相容性檢查工具-noscript">
+            這項可選檢查需要 JavaScript。也可以安裝後在本機執行 <code>corr
+              account discover you@example.com</code>。
+          </p></noscript><p
+          id="compatibility-live"
+          class="visually-hidden"
+          role="status"
+          aria-live="polite"
+        >
+        </p>
+        <article
+          id="compatibility-result"
+          class="相容性檢查工具-result"
+          tabindex="-1"
+          aria-label="支援情況結果"
+          hidden
+        >
+        </article>
+      </section>
+      <section class="evidence-banner" aria-label="供應商證據狀態">
+        <span class="status-dot" aria-hidden="true"></span><div>
+          <strong>v0.8 證據是確定且按路徑區分的。</strong><p>
+            下列可用或準備中的路徑都有合成 服務供應商契約 與 application
+            測試。新 Gmail API 路徑處於關閉狀態，尚未即時觀測。
+          </p>
+        </div><a href="features.html#evidence">證據如何解讀<span aria-hidden="true">
+            →</span></a>
+      </section>
+      <section id="route-cards" aria-labelledby="microsoft-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Microsoft 路徑</p>
+          <h2 id="microsoft-title">使用你信任的瀏覽器，或明確選擇 Graph。</h2>
+          <p>
+            Outlook Web 的登入由瀏覽器管理。Microsoft Graph 是單獨設定的公開 OAuth
+            用戶端，絕不會成為自動 替代路徑。
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card" id="microsoft-owa">
+            <header>
+              <span class="route-icon" aria-hidden="true">OW</span><div>
+                <p class="chip">瀏覽器管理</p>
+                <h3>Outlook Web</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>郵件</dt>
+                <dd>讀取、撰寫、整理和需確認的破壞性操作</dd>
+              </div>
+              <div>
+                <dt>行事曆</dt>
+                <dd>選擇行事曆與供應商支援的 Teams 加入連結</dd>
+              </div>
+              <div>
+                <dt>登入</dt>
+                <dd>專用可見瀏覽器設定</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              SSO、MFA、Conditional Access 與組織提示都留在瀏覽器中。
+            </p>
+          </article>
+          <article class="route-card accent-card" id="microsoft-graph">
+            <header>
+              <span class="route-icon" aria-hidden="true">G</span><div>
+                <p class="chip">明確 OAuth</p>
+                <h3>Microsoft Graph</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>郵件</dt>
+                <dd>讀取、撰寫、整理和需確認的破壞性操作</dd>
+              </div>
+              <div>
+                <dt>行事曆</dt>
+                <dd>選擇行事曆與型別化 Teams 連結建立</dd>
+              </div>
+              <div>
+                <dt>登入</dt>
+                <dd>你有權使用的公開用戶端；授權 存入系統鑰匙圈</dd>
+              </div>
+            </dl>
+            <p class="route-foot">Graph 僅在明確選擇或已有授權時提供。</p>
+          </article>
+        </div>
+      </section>
+      <section class="tinted-section" id="google" aria-labelledby="google-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Google 路徑</p>
+          <h2 id="google-title">Gmail 和 Google 行事曆即將上線。</h2>
+          <p>
+            Gmail 與 Calendar API 整合已包含在 RC 並透過合成契約測試。Google
+            通過審核前，正式環境 OAuth 完全關閉，因此不會啟動登入、要求
+            OAuth 權限範圍、存取鑰匙圈或產生 API 流量。暫時可使用 Google 官方
+            Workspace MCP。
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card accent-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">GA</span><div>
+                <p class="chip">等待審核 · 已關閉</p>
+                <h3>Corresync Google 路徑</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>郵件</dt>
+                <dd>
+                  Gmail API
+                  標籤、搜尋、按需讀取、撰寫、傳送和整理；移入垃圾箱而非永久刪除
+                </dd>
+              </div>
+              <div>
+                <dt>行事曆</dt>
+                <dd>選擇行事曆，並在支援時建立 Google Meet</dd>
+              </div>
+              <div>
+                <dt>登入</dt>
+                <dd>
+                  本 RC 不可用；通過審核後使用普通瀏覽器 OAuth，帳號 授權
+                  存入系統鑰匙圈
+                </dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              通過審核後仍需另一次獨立審閱的發布才能啟用。
+            </p>
+          </article>
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">✓</span><div>
+                <p class="chip">現已可用</p>
+                <h3>Google Workspace MCP</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>提供者</dt>
+                <dd>Google 營運的遠端 MCP 伺服器</dd>
+              </div>
+              <div>
+                <dt>狀態</dt>
+                <dd>Google Developer Preview</dd>
+              </div>
+              <div>
+                <dt>設定</dt>
+                <dd>需要 Google Cloud 與 OAuth 設定</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              請參閱 Google 官方<a
+                href="https://developers.google.com/workspace/guides/configure-mcp-servers"
+              >設定指南</a>。
+            </p>
+          </article>
+        </div>
+      </section>
+      <section aria-labelledby="standards-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>開放標準</p>
+          <h2 id="standards-title">按供應商真正開放的服務自由組合。</h2>
+          <p>
+            標準路徑要求有效
+            TLS，並使用系統鑰匙圈或明確核准的認證資料輔助程式。
+          </p>
+        </div>
+        <div class="route-grid three">
+          <article class="route-card" id="jmap">
+            <header>
+              <span class="route-icon" aria-hidden="true">J</span><div>
+                <p class="chip">郵件</p>
+                <h3>JMAP</h3>
+              </div>
+            </header>
+            <p>
+              透過型別化 RFC 8620
+              契約讀取、草稿、支援時提交、移動、狀態更改和需確認的刪除。
+            </p>
+            <p class="route-foot">
+              只讀帳號或缺少 Submission 能力會明確顯示不可用。
+            </p>
+          </article>
+          <article class="route-card" id="imap-smtp">
+            <header>
+              <span class="route-icon" aria-hidden="true">IM</span><div>
+                <p class="chip">郵件</p>
+                <h3>IMAP / SMTP</h3>
+              </div>
+            </header>
+            <p>
+              資料夾、讀取、MIME、草稿、安全移動，以及能確認已傳送信箱結果的
+              SMTP 提交。
+            </p>
+            <p class="route-foot">
+              需要 UIDPLUS 或 Sent 信箱的操作會在不安全模擬前失敗。
+            </p>
+          </article>
+          <article class="route-card" id="caldav">
+            <header>
+              <span class="route-icon" aria-hidden="true">C</span><div>
+                <p class="chip">行事曆</p>
+                <h3>CalDAV</h3>
+              </div>
+            </header>
+            <p>
+              行事曆發現、受限重複事件、建立、更新和取消，使用條件式
+              WebDAV/iCalendar 寫入。
+            </p>
+            <p class="route-foot">
+              參與者排程要求已觀測到 RFC 6638 與 schedule-tag 保護。
+            </p>
+          </article>
+        </div>
+      </section>
+      <section class="mix-panel" aria-labelledby="mix-title">
+        <div>
+          <p class="eyebrow light"><span aria-hidden="true"></span>一個帳號，兩條路徑</p>
+          <h2 id="mix-title">郵件和行事曆不必來自同一協議。</h2>
+          <p>
+            可組合 IMAP/SMTP 與
+            CalDAV，也可只設定郵件或行事曆。穩定帳號身分會隔離設定、認證資料、游標、預覽
+            與 audit context。
+          </p>
+        </div>
+        <figure class="terminal">
+          <figcaption class="term-bar">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
+              class="term-title"
+            >無認證資料探索</span>
+          </figcaption>
+          <pre
+            tabindex="0"
+            role="region"
+            aria-label="發現並新增明確路徑"
+          ><code><span class="t-prompt">$</span> corr account discover reader@example.invalid
+<span class="t-dim">evidence  DNS · well-known · provider metadata</span>
+<span class="t-dim">action    none — discovery never authenticates</span></code></pre>
+        </figure>
+      </section>
+      <section class="honest-edges" aria-labelledby="provider-limits-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>沒有隱藏 替代路徑</p>
+          <h2 id="provider-limits-title">缺少的能力會保持缺少。</h2>
+        </div>
+        <ul>
+          <li>限制會作為型別化能力或降級明確回傳。</li>
+          <li>
+            等待審核的 Google
+            路徑在瀏覽器、OAuth、鑰匙圈、會話和網路前停止。
+          </li>
+          <li>自動發現不會啟動 Graph 授權。</li>
+          <li>只有所選行事曆路徑報告支援時才請求會議連結。</li>
+          <li>未知寫入結果需要核對，絕不自動重試。</li>
+        </ul>
+      </section>
+      <section class="final-cta" aria-labelledby="provider-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>明確選擇</p>
+        <h2 id="provider-cta-title">先看證據，再認證。</h2>
+        <p>發現過程不讀取認證資料，也不新增帳號。</p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">設定第一個帳號</a><a
+            class="button secondary"
+            href="features.html"
+          >查看全部功能</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        獨立的本機優先郵件與行事曆工具。與所列廠商無隸屬或背書關係。
+      </p>
+      <nav aria-label="頁尾">
+        <a href="getting-started.html">開始使用</a><a href="providers.html">支援服務</a><a
+          href="features.html"
+        >功能</a><a href="safety.html">安全</a><a href="privacy.html">隱私</a><a
+          href="terms.html"
+        >條款</a><a href="https://github.com/nkiyohara/corresync">原始碼</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >安全報告</a><a href="https://github.com/nkiyohara/corresync/releases">發布</a><a
+          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+    <script src="../check.js" defer></script>
+  </body>
+</html>

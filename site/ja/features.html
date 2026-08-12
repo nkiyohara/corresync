@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresyncでできること — 機能と制限をわかりやすく</title>
+    <meta
+      name="description"
+      content="メール、カレンダー、AIエージェント、スクリプトでCorresyncができることと、意図的に行わないことを、制限まで含めて説明します。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Corresyncでできること — 機能と制限">
+    <meta
+      property="og:description"
+      content="複数アカウントのメールと予定を安全に扱う機能を、できないことも含めて紹介します。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="ko_KR">
+
+    <meta property="og:url" content="https://corresync.org/ja/features.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresyncのロゴと製品概要を示す英語のメッセージ"
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Corresyncでできること — 機能と制限">
+    <meta
+      name="twitter:description"
+      content="メール、カレンダー、AIエージェント、スクリプトでできることを紹介します。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresyncのロゴと製品概要を示す英語のメッセージ"
+    >
+    <link rel="canonical" href="https://corresync.org/ja/features.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/features.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/features.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/features.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/features.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/features.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/features.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../copy.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へ移動</a><div class="airmail" aria-hidden="true">
+    </div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync ホーム"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="メインメニュー">
+          <a href="./">ホーム</a><a href="getting-started.html">はじめる</a><a
+            href="providers.html"
+          >対応サービス</a><a href="features.html" aria-current="page">できること</a><a
+            href="safety.html"
+          >安全性</a>
+        </nav>
+        <nav class="language-nav" aria-label="言語">
+          <a href="../features.html" lang="en" hreflang="en">EN</a><a
+            href="features.html"
+            lang="ja"
+            hreflang="ja"
+            aria-current="page"
+          >日本語</a><a href="../zh-cn/features.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="../zh-tw/features.html" lang="zh-Hant" hreflang="zh-Hant">繁中</a><a
+            href="../ko/features.html"
+            lang="ko"
+            hreflang="ko"
+          >한국어</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>できること</p>
+        <h1 id="page-title">できることのすべてと、<em>越えない境界。</em></h1>
+        <p class="lede">
+          受信箱や予定を横断しても、アカウントは混ざりません。CLIとMCPは同じ型付き操作、権限確認、プレビュー→実行を共有します。ここでは便利な点だけでなく、制限も同じ重さで説明します。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="getting-started.html">4ステップではじめる</a><a
+            class="button secondary"
+            href="providers.html#check"
+          >対応サービスを確認</a>
+        </div>
+      </section>
+
+      <section id="mail-calendar" aria-labelledby="mailcal-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>日々のやり取り</p>
+          <h2 id="mailcal-title">
+            本人性を混ぜずに、メールと予定をまとめる。
+          </h2>
+          <p>
+            読み取り結果には、どのアカウント・プロバイダーから来たかが必ず残ります。書き込みは対象アカウントをひとつに決めます。
+          </p>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" id="mail">
+            <p class="card-index" aria-hidden="true">01</p>
+            <h3 id="cap-mail">メール</h3>
+            <ul>
+              <li>フォルダー・ラベル一覧と機能確認</li>
+              <li>上限付きの一覧・検索・スレッド検索</li>
+              <li>
+                選択したメッセージのヘッダー、本文、上限付き添付ファイル
+              </li>
+              <li>下書きの作成・更新、返信、転送、送信</li>
+              <li>既読・未読、アーカイブ、移動、ゴミ箱</li>
+              <li>複数アカウントの横断検索と明示的な部分失敗</li>
+            </ul>
+            <p class="card-foot">
+              送信、移動、削除などはレビューを先に返し、確認した内容だけを一度確定できます。
+            </p>
+          </article>
+          <article class="capability-card" id="calendar">
+            <p class="card-index" aria-hidden="true">02</p>
+            <h3 id="cap-calendar">カレンダーと予定</h3>
+            <ul>
+              <li>利用可能なカレンダーを明示的に選択</li>
+              <li>上限付き予定一覧と複数アカウント予定一覧</li>
+              <li>タイムゾーンと繰り返し予定を保持</li>
+              <li>予定の作成・更新・キャンセル</li>
+              <li>経路が対応するときだけTeamsまたはGoogle Meetリンクを依頼</li>
+              <li>会議リンクをひとつの予定のプロパティとして保持</li>
+            </ul>
+            <p class="card-foot">
+              Teams
+              チャット、経路、通話、録画、会議ライフサイクル管理は対象外です。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="tinted-section" id="agents" aria-labelledby="agents-page-title">
+        <div class="section-heading">
+          <p class="eyebrow">
+            <span aria-hidden="true"></span>ひとつのコア、ふたつの使い方
+          </p>
+          <h2 id="agents-page-title">
+            AIエージェントもスクリプトも、同じ安全境界から。
+          </h2>
+          <p>
+            MCP専用の抜け道はありません。CLIとMCPは同じアプリ
+            ユースケースを呼びます。
+          </p>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <p class="card-index" aria-hidden="true">03</p>
+            <h3 id="cap-agents">AIエージェントから、ローカルstdioで</h3>
+            <ul>
+              <li>メールとカレンダーに限定した狭い型付きツール</li>
+              <li>認証情報、Cookie、任意操作、汎用プロパティAPIは非公開</li>
+              <li>
+                読み取りツールと書き込みのプレビュー/実行を明確に分離
+              </li>
+              <li>アカウント・プロバイダーの来歴を保持</li>
+              <li>リモートMCP エンドポイントを作らない</li>
+            </ul>
+            <div class="cmd" data-copy data-copy-label="CodexへのMCP登録コマンド">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-label="CodexへのMCP登録コマンド"
+              ><code>corr mcp setup codex</code></pre>
+            </div>
+          </article>
+          <article class="capability-card" id="scripting">
+            <p class="card-index" aria-hidden="true">04</p>
+            <h3 id="cap-scripting">スクリプトから、安定したJSONで</h3>
+            <ul>
+              <li>人向け表示と機械可読JSONを分離</li>
+              <li>同じアカウント選択とポリシー確認</li>
+              <li>部分失敗・機能低下・結果不明を隠さない</li>
+              <li>stdoutをデータ、stderrを診断に利用</li>
+              <li>バージョンポリシーに沿ったスキーマ</li>
+            </ul>
+            <div class="cmd" data-copy data-copy-label="JSON形式のagendaコマンド">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-label="JSON形式のagendaコマンド"
+              ><code>corr agenda list --all-accounts --format json</code></pre>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="local-options" aria-labelledby="local-title">
+        <div class="section-heading">
+          <p class="eyebrow">
+            <span aria-hidden="true"></span>明示的に有効化するローカル機能
+          </p>
+          <h2 id="local-title">必要なときだけ、自分でスイッチを入れる。</h2>
+        </div>
+        <div class="control-grid">
+          <article>
+            <h3 id="cap-import">読み取り専用インポート用の一時領域</h3>
+            <p>
+              他のアプリの設定を走査して候補を表示します。秘密情報は再利用せず、アカウント追加や認証も行いません。
+            </p>
+          </article>
+          <article>
+            <h3 id="cap-monitoring">任意で有効にするモニタリング</h3>
+            <p>
+              既定は無効です。アカウント、検索条件、間隔、通知先を明示したときだけ端末上で動きます。MCPから有効化できません。
+            </p>
+          </article>
+          <article>
+            <h3 id="cap-feedback">プライバシーを守るフィードバック</h3>
+            <p>
+              自動送信はありません。共有前に内容を確認でき、メール本文・宛先・トークン・認証情報は含めません。
+            </p>
+          </article>
+          <article>
+            <h3>検証済みupdate</h3>
+            <p>
+              署名されたチェックサムと来歴を確認します。パッケージマネージャーで導入した場合は、そのmanagerが更新を管理します。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="faq-section" id="faq" aria-labelledby="faq-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>インストール前の疑問</p>
+          <h2 id="faq-title">先に知っておきたいこと。</h2>
+        </div>
+        <div class="faq-grid">
+          <article>
+            <h3 id="faq-provider">自分のアカウントで使える？</h3>
+            <p>
+              Outlook Web、明示設定したMicrosoft
+              Graph、JMAP、IMAP/SMTP、CalDAVを利用できます。GmailとGoogleカレンダーは実装済みですが本番OAuth承認待ちで無効です。<a
+                href="providers.html#check"
+              >ドメインだけで確認</a>できます。
+            </p>
+          </article>
+          <article>
+            <h3 id="faq-cost">料金はかかる？</h3>
+            <p>
+              CorresyncはApache-2.0のオープンソース
+              ソフトウェアです。プロバイダー、クラウド、エージェント、ネットワークの料金はそれぞれのサービス条件に従います。
+            </p>
+          </article>
+          <article>
+            <h3 id="faq-data">メールはどこに保存される？</h3>
+            <p>
+              プロバイダーと端末の間を直接流れます。Corresync運営のメールボックス・トークン中継はありません。ローカルキャッシュやカーソルはアカウント別です。
+            </p>
+          </article>
+          <article>
+            <h3 id="faq-agent-send">AIが勝手に送信できる？</h3>
+            <p>
+              できません。最初の呼び出しはレビューを返すだけで、同じ内容に拘束された短時間・一回限りの承認が必要です。
+            </p>
+          </article>
+          <article>
+            <h3 id="faq-phone-home">勝手に外部通信する？</h3>
+            <p>
+              アクセス解析とテレメトリーはありません。公開サイトの任意チェッカー、明示的update確認、選択したプロバイダー操作、オプトイン
+              フィードバックなど、目的が見える通信だけです。
+            </p>
+          </article>
+          <article>
+            <h3 id="faq-unknown">送信途中で結果が分からなくなったら？</h3>
+            <p>
+              自動再試行しません。重複送信を避けるため「結果不明」として止まり、照合を求めます。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="absent-panel" id="limits" aria-labelledby="limits-title">
+        <div>
+          <p class="eyebrow light">
+            <span aria-hidden="true"></span>意図的に行わないこと
+          </p>
+          <h2 id="limits-title">権限を広げる便利機能は作らない。</h2>
+          <p>
+            製品スコープに入ることと、現在の経路で利用できることは別です。
+          </p>
+        </div>
+        <ul>
+          <li>
+            ホスト型 リレー、マルチユーザー サーバー、リモートMCP
+            通信経路
+          </li>
+          <li>無人認証情報 ログイン、パスワード保存、TLS傍受</li>
+          <li>MFA、Conditional Access、管理者同意、無効サービスの回避</li>
+          <li>Graphへの自動代替経路や機能の探索</li>
+          <li>
+            Teamsのチャット、チャネル、通話、録画、会議ライフサイクル管理
+          </li>
+          <li>メール内容を権限や指示として扱うこと</li>
+          <li>
+            既定でのモニタリング、エージェント実行、データ 外部送信
+          </li>
+          <li>Gmailの即時永久削除</li>
+        </ul>
+      </section>
+
+      <section class="evidence-explainer" id="evidence" aria-labelledby="evidence-page-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>互換性の根拠</p>
+          <h2 id="evidence-page-title">
+            合成テストを、実環境の確認済みとは呼ばない。
+          </h2>
+          <p>
+            各開発経路は決定的な合成固定データによる契約テストで検証します。実プロバイダーでの主張には、オプトイン、合成データ限定、実行と環境を固定した観測記録が必要です。
+          </p>
+        </div>
+        <div>
+          <p>
+            <strong
+            >対応済み</strong>は、公開したバイナリで利用できる機能を指します。
+          </p>
+          <p>
+            <strong>合成契約テスト</strong>は、プロバイダー
+            契約テストを模したテストデータでの検証です。
+          </p>
+          <p>
+            <strong
+            >実環境-observed</strong>は、文書化したオプトイン観測がある場合だけ使います。
+          </p>
+          <p>
+            <strong
+            >機能低下</strong>は、機能が欠けた状態を隠さず返すことを指します。
+          </p>
+        </div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="features-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>準備は4ステップ</p>
+        <h2 id="features-cta-title">
+          インストールから、複数アカウントの回答まで。
+        </h2>
+        <p>経路と制限を確認したら、最初のアカウントを追加できます。</p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">はじめる</a><a
+            class="button secondary"
+            href="safety.html"
+          >安全設計を読む</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        独立したローカルファーストのメール・カレンダーツールです。記載された企業・サービスの公式製品ではありません。
+      </p>
+      <nav aria-label="フッター">
+        <a href="getting-started.html">はじめる</a><a href="providers.html"
+        >対応サービス</a><a href="features.html">できること</a><a href="safety.html"
+        >安全性</a><a href="privacy.html">プライバシー</a><a href="terms.html"
+        >利用規約</a><a href="https://github.com/nkiyohara/corresync">ソースコード</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >脆弱性の報告</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >リリース</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

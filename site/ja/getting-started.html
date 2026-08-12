@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresyncのはじめ方 — インストールから最初の回答まで</title>
+    <meta
+      name="description"
+      content="Corresyncをインストールし、アカウントを追加して、CodexやClaude CodeなどのMCPクライアントから使い始めるまでを4ステップで案内します。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Corresyncのはじめ方 — 4ステップで準備完了">
+    <meta
+      property="og:description"
+      content="インストール、サインイン、MCPクライアントへの接続、最初の質問までを順番に説明します。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="ko_KR">
+
+    <meta property="og:url" content="https://corresync.org/ja/getting-started.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresyncのロゴと製品概要を示す英語のメッセージ"
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Corresyncのはじめ方 — 4ステップで準備完了">
+    <meta
+      name="twitter:description"
+      content="インストールから最初の質問までを順番に説明します。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresyncのロゴと製品概要を示す英語のメッセージ"
+    >
+    <link rel="canonical" href="https://corresync.org/ja/getting-started.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/getting-started.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/getting-started.html">
+    <link
+      rel="alternate"
+      hreflang="zh-Hans"
+      href="https://corresync.org/zh-cn/getting-started.html"
+    >
+    <link
+      rel="alternate"
+      hreflang="zh-Hant"
+      href="https://corresync.org/zh-tw/getting-started.html"
+    >
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/getting-started.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/getting-started.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../copy.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync ホーム"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a>
+      <div class="header-navs">
+        <nav class="site-nav" aria-label="メインメニュー">
+          <a href="./">ホーム</a><a href="getting-started.html" aria-current="page"
+          >はじめる</a><a href="providers.html">対応サービス</a><a href="features.html"
+          >できること</a><a href="safety.html">安全性</a>
+        </nav>
+        <nav class="language-nav" aria-label="言語">
+          <a href="../getting-started.html" lang="en" hreflang="en">EN</a><a
+            href="getting-started.html"
+            lang="ja"
+            hreflang="ja"
+            aria-current="page"
+          >日本語</a><a href="../zh-cn/getting-started.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="../zh-tw/getting-started.html" lang="zh-Hant" hreflang="zh-Hant"
+          >繁中</a><a href="../ko/getting-started.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>スタートガイド</p>
+        <h1 id="page-title">
+          インストールから最初の回答まで、<em>迷わない4ステップ。</em>
+        </h1>
+        <p class="lede">
+          <code
+          >corr</code>を入れ、仕事用や個人用のアカウントを追加し、ローカルMCPをエージェントに登録します。
+          横断検索してもアカウントの本人性と認可は別々です。Outlook
+          Webのサインインはブラウザ、APIや標準経路の認可情報はOSキーチェーンが管理し、MCPは端末上のstdioだけで動きます。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#step-install">ステップ1から始める</a><a
+            class="button secondary"
+            href="providers.html#check"
+          >先に対応状況を確認</a>
+        </div>
+      </section>
+
+      <ol class="gs-steps">
+        <li class="gs-step" id="step-install" aria-labelledby="install-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">1</span><div>
+              <h2 id="install-title"><code>corr</code>をインストール</h2>
+              <p>
+                ここではソフトウェアを入れるだけです。アカウント追加もサインインも、まだ行いません。
+              </p>
+            </div>
+          </header>
+          <div class="install-grid primary-install-grid">
+            <div class="install-block">
+              <p class="os-label" id="gs-unix">macOS · Linux</p>
+              <div
+                class="cmd"
+                data-copy
+                data-copy-label="macOS・Linux用インストールコマンド"
+              >
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="gs-unix"
+                ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
+              </div>
+              <p class="block-note">
+                現在のユーザー向けに検証済み安定版版を入れます。実行前に<a
+                  href="../install.sh"
+                >スクリプト本体</a>も確認できます。
+              </p>
+            </div>
+            <div class="install-block">
+              <p class="os-label" id="gs-windows">Windows · PowerShell</p>
+              <div
+                class="cmd"
+                data-copy
+                data-copy-label="Windows PowerShell用インストールコマンド"
+              >
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="gs-windows"
+                ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
+              </div>
+              <p class="block-note">
+                管理者権限を使わず、ユーザーの<code
+                >PATH</code>だけを更新します。<a href="../install.ps1"
+                >スクリプト本体</a>を先に読めます。
+              </p>
+            </div>
+          </div>
+          <section
+            class="install-alternatives"
+            id="other-install-methods"
+            aria-labelledby="other-install-title"
+          >
+            <div class="install-alternatives-head">
+              <h3 id="other-install-title">パッケージマネージャーから入れる</h3>
+              <p>更新と削除も同じツールに任せられます。</p>
+            </div>
+            <div class="install-grid">
+              <div class="install-block">
+                <p class="os-label" id="gs-winget">Windows · WinGet</p>
+                <div
+                  class="cmd"
+                  data-copy
+                  data-copy-label="WinGet用インストールコマンド"
+                >
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-winget"
+                  ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
+                </div>
+                <p class="block-note">Microsoft審査済みのmanifestを使います。</p>
+              </div>
+              <div class="install-block">
+                <p class="os-label" id="gs-homebrew">macOS · Linux · Homebrew</p>
+                <div
+                  class="cmd"
+                  data-copy
+                  data-copy-label="Homebrew用インストールコマンド"
+                >
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-homebrew"
+                  ><code>brew install nkiyohara/corresync/corresync</code></pre>
+                </div>
+                <p class="block-note">
+                  最新の安定版タグからHomebrewがビルドします。
+                </p>
+              </div>
+              <div class="install-block">
+                <p class="os-label" id="gs-scoop">Windows · Scoop</p>
+                <div class="cmd" data-copy data-copy-label="Scoop用インストールコマンド">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-scoop"
+                  ><code>scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
+scoop install corresync/corresync</code></pre>
+                </div>
+                <p class="block-note">チェックサム固定済みのbucketを使います。</p>
+              </div>
+            </div>
+            <p class="install-alternatives-note">
+              Linux向け<code>.deb</code>、<code>.rpm</code>、<code
+              >.apk</code>、直接配布アーカイブ、チェックサム、Sigstore
+              来歴、Claude Desktop用<code>.mcpb</code>は<a
+                href="https://github.com/nkiyohara/corresync/releases/latest"
+              >最新リリース</a>にあります。
+            </p>
+          </section>
+          <div class="install-block verify-block">
+            <p class="os-label" id="gs-verify">動作確認</p>
+            <div class="cmd" data-copy data-copy-label="バージョン確認コマンド">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="gs-verify"
+              ><code>corr --version</code></pre>
+            </div>
+          </div>
+          <div class="install-block verify-block">
+            <p class="os-label" id="gs-updates">任意 · 単体版版を自動更新</p>
+            <div
+              class="cmd"
+              data-copy
+              data-copy-label="検証済み自動更新を有効にするコマンド"
+            >
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="gs-updates"
+              ><code>corr config set updates.auto_install true</code></pre>
+            </div>
+            <p class="block-note">
+              署名・検証済みの単体版リリースだけを自動導入します。MCPツール呼び出し中や機械可読出力中には更新しません。
+            </p>
+          </div>
+          <div class="install-block verify-block">
+            <p class="os-label" id="gs-preview">任意 · 署名済みプレビューを使う</p>
+            <div class="cmd" data-copy data-copy-label="previewリリースを選ぶコマンド">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="gs-preview"
+              ><code>corr config set updates.channel preview
+corr update</code></pre>
+            </div>
+            <p class="block-note">
+              既定は安定版です。戻すときは<code>corr config set updates.channel
+                stable</code>。自動downgradeはしません。
+            </p>
+          </div>
+          <p class="step-foot">
+            macOS版はDeveloper ID署名とApple
+            notarization済みです。Windows版はまだAuthenticode未署名なので、警告を無視せずチェックサムと署名済み来歴を確認してください。
+          </p>
+        </li>
+
+        <li class="gs-step" id="sign-in" aria-labelledby="signin-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">2</span><div>
+              <h2 id="signin-title">アカウントを選んでから、サインイン</h2>
+              <p>
+                最初からプロバイダーを決めつけません。認証情報なしで候補を集め、選んだ経路を追加し、別のアカウント専用コマンドで初めて認証します。
+              </p>
+            </div>
+          </header>
+          <div class="duo">
+            <div>
+              <p>
+                Outlook Webは十分な根拠があれば<code>corr
+                  setup</code>で候補になります。候補検索と追加だけではブラウザを開きません。次の<code
+                >auth
+                  login</code>が、指定した別名のアカウントだけをサインインさせます。
+              </p>
+              <p>
+                <strong>Gmailを使う場合：</strong>Gmail・Calendar
+                APIのコードはRCに入っていますが、本番OAuth承認待ちのため完全に無効です。Googleサインインは開始できません。当面はGoogle公式Workspace
+                MCPを利用してください。
+              </p>
+              <p class="step-links">
+                <a href="providers.html#check">アドレスを送らずに対応確認</a> · <a
+                  href="safety.html"
+                >認証の持ち主を確認</a>
+              </p>
+            </div>
+            <div class="stack">
+              <div class="install-block">
+                <p class="os-label" id="gs-signin-default">Outlook Web · ガイド付き設定</p>
+                <div
+                  class="cmd"
+                  data-copy
+                  data-copy-label="アカウント追加とサインインのコマンド"
+                >
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-signin-default"
+                  ><code>corr setup you@example.com --alias personal
+corr auth login --account personal
+corr doctor --account personal</code></pre>
+                </div>
+              </div>
+              <div class="install-block">
+                <p class="os-label">Gmail · 承認までの一時的な選択肢</p>
+                <p class="block-note">
+                  Google公式の<a
+                    href="https://developers.google.com/workspace/guides/configure-mcp-servers"
+                  >Workspace MCP設定ガイド</a>を参照してください。Developer
+                  Previewで、Google CloudとOAuthの設定が別途必要です。
+                </p>
+              </div>
+            </div>
+          </div>
+        </li>
+
+        <li class="gs-step" id="connect" aria-labelledby="connect-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">3</span><div>
+              <h2 id="connect-title">いつものエージェントにつなぐ</h2>
+              <p>
+                クライアント自身の設定に、ローカルstdio
+                MCPの絶対パスを登録します。遠隔エンドポイントは作りません。登録後にクライアントを再起動してください。
+              </p>
+            </div>
+          </header>
+          <div class="client-grid">
+            <div class="client">
+              <h3>Codex</h3>
+              <div class="cmd" data-copy data-copy-label="Codex設定コマンド">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Codex設定コマンド"
+                ><code>corr mcp setup codex</code></pre>
+              </div>
+              <p><code>codex mcp get corresync</code>で確認。</p>
+            </div>
+            <div class="client">
+              <h3>Claude Code</h3>
+              <div class="cmd" data-copy data-copy-label="Claude Code設定コマンド">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Claude Code設定コマンド"
+                ><code>corr mcp setup claude-code</code></pre>
+              </div>
+              <p>ユーザー単位・プロジェクト単位に対応。</p>
+            </div>
+            <div class="client">
+              <h3>GitHub Copilot CLI</h3>
+              <div class="cmd" data-copy data-copy-label="GitHub Copilot CLI設定コマンド">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="GitHub Copilot CLI設定コマンド"
+                ><code>corr mcp setup github-copilot</code></pre>
+              </div>
+              <p><code>copilot mcp get corresync</code>で確認。</p>
+            </div>
+            <div class="client">
+              <h3>Gemini CLI</h3>
+              <div class="cmd" data-copy data-copy-label="Gemini CLI設定コマンド">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Gemini CLI設定コマンド"
+                ><code>corr mcp setup gemini-cli</code></pre>
+              </div>
+              <p><code>gemini mcp list</code>で確認。</p>
+            </div>
+            <div class="client">
+              <h3>Qwen Code</h3>
+              <div class="cmd" data-copy data-copy-label="Qwen Code設定コマンド">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Qwen Code設定コマンド"
+                ><code>corr mcp setup qwen-code</code></pre>
+              </div>
+              <p><code>qwen mcp list</code>で確認。</p>
+            </div>
+            <div class="client">
+              <h3>Qoder</h3>
+              <div class="cmd" data-copy data-copy-label="Qoder設定コマンド">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Qoder設定コマンド"
+                ><code>corr mcp setup qoder</code></pre>
+              </div>
+              <p><code>qodercli mcp list</code>で確認。</p>
+            </div>
+            <div class="client">
+              <h3>Kimi Code CLI</h3>
+              <div class="cmd" data-copy data-copy-label="Kimi Code設定コマンド">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Kimi Code設定コマンド"
+                ><code>corr mcp config kimi-code</code></pre>
+              </div>
+              <p>追加するMCP設定を表示します。</p>
+            </div>
+            <div class="client">
+              <h3>その他のMCPクライアント</h3>
+              <div class="cmd" data-copy data-copy-label="汎用MCP起動コマンド">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="汎用MCP起動コマンド"
+                ><code>corr mcp serve</code></pre>
+              </div>
+              <p>汎用stdio 通信経路として登録できます。</p>
+            </div>
+          </div>
+          <p class="step-foot">
+            どのクライアントも同じ型付きツールと同じポリシーチェックを使います。CodexとClaude
+            Code向けにはPluginとAgent Skillも同梱しています。
+          </p>
+        </li>
+
+        <li class="gs-step" id="first-asks" aria-labelledby="ask-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">4</span><div>
+              <h2 id="ask-title">複数アカウントをまたいで質問</h2>
+              <p>
+                読み取りはアカウントを混ぜずに横断できます。書き込みは、必ず別の確認段階を通ります。
+              </p>
+            </div>
+          </header>
+          <div class="duo">
+            <div>
+              <ul class="prompt-list">
+                <li>
+                  「Anaから来た四半期計画のメールを、全アカウントから探して」
+                </li>
+                <li>
+                  「明日の午前中の予定を、すべてのカレンダーから教えて」
+                </li>
+                <li>「Anaへの返信を下書きして。送る前に自分で確認する」</li>
+              </ul>
+              <p>
+                結果にはアカウントとプロバイダーが残ります。一部の経路が失敗しても、成功分を隠さず部分失敗として示します。
+              </p>
+              <p>
+                送信では、正確な本文を含むレビューが先に返ります。同じアカウント・宛先・バイト列に一致する操作だけを、CLIの<code
+                >--approve</code>またはMCPの実行ツールで確定できます。承認は短時間・一回限りです。
+              </p>
+            </div>
+            <figure class="terminal">
+              <figcaption class="term-bar">
+                <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
+                  class="term-title"
+                >実行前レビュー</span>
+              </figcaption>
+              <pre
+                tabindex="0"
+                role="region"
+                aria-label="メール送信の確認と確定"
+              ><code><span class="t-prompt">$</span> corr mail send --account work \
+    --to ana@example.invalid \
+    --subject 'Quarterly plan' \
+    --body-file reply.txt
+
+<span class="t-review">REVIEW · send new message</span>
+  account   work · microsoft-owa
+  to        ana@example.invalid
+  body      text/plain · 412 B
+
+<span class="t-dim">まだ送信されていません。</span>
+
+<span class="t-prompt">$</span> corr mail send … <span class="t-approve">--approve</span>
+<span class="t-sent">SENT · one attempt · review 9f2c1a…</span></code></pre>
+            </figure>
+          </div>
+        </li>
+      </ol>
+
+      <section aria-labelledby="next-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>次に読むなら</p>
+          <h2 id="next-title">必要になったところから、詳しく。</h2>
+        </div>
+        <div class="control-grid">
+          <article>
+            <h3>対応サービスと制限</h3>
+            <p>
+              経路ごとに何ができるかを確認。<a href="providers.html"
+              >対応サービスを見る</a>。
+            </p>
+          </article>
+          <article>
+            <h3>安全設計</h3>
+            <p>
+              認証情報、分離、プレビュー→実行を確認。<a href="safety.html"
+              >安全性を読む</a>。
+            </p>
+          </article>
+          <article>
+            <h3>できること</h3>
+            <p>
+              メール、予定、agent、script、モニタリングを一覧。<a
+                href="features.html"
+              >機能を見る</a>。
+            </p>
+          </article>
+          <article>
+            <h3>スクリプトとJSON</h3>
+            <p>
+              同じコアとポリシーで自動化。<a href="features.html#scripting"
+              >スクリプト利用を見る</a>。
+            </p>
+          </article>
+        </div>
+        <div class="evidence-note">
+          <span class="status-dot" aria-hidden="true"></span><p>
+            <strong
+            >機密性の高いアカウントをつなぐ前に：</strong>各経路には決定的な合成データによる契約テストがあります。合成テストだけの経路は、実環境で確認済みとは表現しません。
+          </p><a href="features.html#evidence">根拠の読み方<span aria-hidden="true">
+              →</span></a>
+        </div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="gs-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>操作はこれだけ</p>
+        <h2 id="gs-cta-title">入れる。サインインする。つなぐ。質問する。</h2>
+        <p>細かな仕様は、必要になったときに読めます。</p>
+        <div class="actions centered">
+          <a class="button primary" href="safety.html">安全設計を読む</a><a
+            class="button secondary"
+            href="features.html"
+          >できることを見る</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a>
+      <p>
+        独立したローカルファーストのメール・カレンダーツールです。記載された企業・サービスの公式製品ではありません。
+      </p>
+      <nav aria-label="フッター">
+        <a href="getting-started.html">はじめる</a><a href="providers.html"
+        >対応サービス</a><a href="features.html">できること</a><a href="safety.html"
+        >安全性</a><a href="privacy.html">プライバシー</a><a href="terms.html"
+        >利用規約</a><a href="https://github.com/nkiyohara/corresync">ソースコード</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >脆弱性の報告</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >リリース</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

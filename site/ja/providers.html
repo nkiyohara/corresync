@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>対応メール・カレンダーサービス — Corresync</title>
+    <meta
+      name="description"
+      content="Outlook、Microsoft 365、JMAP、IMAP/SMTP、CalDAVの対応経路を比較。GmailとGoogleカレンダーはOAuth承認待ちで近日対応です。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="対応メール・カレンダーサービス — Corresync">
+    <meta
+      property="og:description"
+      content="利用中のメールアドレスから、Corresyncで使える接続経路と必要な設定を確認できます。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="ko_KR">
+
+    <meta property="og:url" content="https://corresync.org/ja/providers.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresyncのロゴと製品概要を示す英語のメッセージ"
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta
+      name="twitter:title"
+      content="対応メール・カレンダーサービス — Corresync"
+    >
+    <meta
+      name="twitter:description"
+      content="Outlook、Microsoft 365、標準プロトコルの対応状況と、承認待ちのGoogle経路を確認できます。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresyncのロゴと製品概要を示す英語のメッセージ"
+    >
+    <link rel="canonical" href="https://corresync.org/ja/providers.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/providers.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/providers.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/providers.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/providers.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/providers.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/providers.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync ホーム"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a>
+      <div class="header-navs">
+        <nav class="site-nav" aria-label="メインメニュー">
+          <a href="./">ホーム</a><a href="getting-started.html">はじめる</a><a
+            href="providers.html"
+            aria-current="page"
+          >対応サービス</a><a href="features.html">できること</a><a href="safety.html"
+          >安全性</a>
+        </nav>
+        <nav class="language-nav" aria-label="言語">
+          <a href="../providers.html" lang="en" hreflang="en">EN</a><a
+            href="providers.html"
+            lang="ja"
+            hreflang="ja"
+            aria-current="page"
+          >日本語</a><a href="../zh-cn/providers.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="../zh-tw/providers.html" lang="zh-Hant" hreflang="zh-Hant"
+          >繁中</a><a href="../ko/providers.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow">
+          <span aria-hidden="true"></span>接続経路と違いを、はっきり表示
+        </p>
+        <h1 id="page-title"><em>あなたのアカウント</em>に合う経路を選ぶ。</h1>
+        <p class="lede">
+          ロゴだけで機能を決めつけません。まず認証情報なしで公開情報を集め、メールとカレンダーの経路を選んでから認証します。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#check">アドレスで確認</a><a
+            class="button secondary"
+            href="getting-started.html#sign-in"
+          >設定手順を見る</a>
+        </div>
+      </section>
+
+      <section class="compatibility-checker" id="check" aria-labelledby="checker-title">
+        <div class="checker-intro">
+          <p class="eyebrow"><span aria-hidden="true"></span>このアドレスで使える？</p>
+          <h2 id="checker-title">
+            メールアドレスを外へ出さずに、対応状況を確認。
+          </h2>
+          <p>
+            接続したいメールアドレスを入力してください。ブラウザはアドレス全体を手元に残し、@より後ろのドメインだけを確認サービスへ送ります。
+          </p>
+        </div>
+        <form id="compatibility-form" class="checker-form" novalidate>
+          <label for="compatibility-email">メールアドレス</label>
+          <div class="checker-fields">
+            <input
+              id="compatibility-email"
+              name="compatibility-email"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              spellcheck="false"
+              placeholder="you@example.com"
+              aria-describedby="compatibility-privacy compatibility-validation"
+              required
+            >
+            <button id="compatibility-submit" class="button primary" type="submit" disabled>
+              対応状況を確認
+            </button>
+          </div>
+          <p id="compatibility-validation" class="checker-validation" hidden>
+            you@example.comのように、@より後ろまで含むメールアドレスを入力してください。ドメインが揃うまで問い合わせは行いません。
+          </p>
+        </form>
+        <p id="compatibility-privacy" class="checker-privacy">
+          <strong
+          >ブラウザの外へ出るのはドメインだけです。</strong>@より前はこのページ内に残り、送信・保存・記録されず、URLにも入りません。確認サービスは公開DNSだけを読み、何も保持せず、サインインも開始しません。オンライン確認を使わず、インストール後に<code
+          >corr account discover you@example.com</code>を実行することもできます。
+        </p>
+        <noscript><p class="checker-noscript">
+            この任意の確認にはJavaScriptが必要です。省略して、インストール後に<code
+            >corr account discover you@example.com</code>をローカルで実行できます。
+          </p></noscript>
+        <p id="compatibility-live" class="visually-hidden" role="status" aria-live="polite"></p>
+        <article
+          id="compatibility-result"
+          class="checker-result"
+          tabindex="-1"
+          aria-label="対応状況の確認結果"
+          hidden
+        >
+        </article>
+      </section>
+
+      <section class="evidence-banner" aria-label="対応根拠の状態">
+        <span class="status-dot" aria-hidden="true"></span><div>
+          <strong>v0.8の根拠は、決定的かつ経路別です。</strong><p>
+            以下の利用可能・準備中の経路には、合成データを使ったプロバイダー契約テストとアプリテストがあります。新しいGmail
+            API経路は無効で実環境未観測です。
+          </p>
+        </div><a href="features.html#evidence">根拠の読み方<span aria-hidden="true">
+            →</span></a>
+      </section>
+
+      <section id="route-cards" aria-labelledby="microsoft-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Microsoftの経路</p>
+          <h2 id="microsoft-title">
+            信頼しているブラウザを使うか、Graphを明示的に選ぶ。
+          </h2>
+          <p>
+            Outlook Webはブラウザがサインインを管理します。Microsoft
+            Graphは別途設定する公開OAuthクライアントで、自動代替経路にはなりません。
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card" id="microsoft-owa">
+            <header>
+              <span class="route-icon" aria-hidden="true">OW</span><div>
+                <p class="chip">ブラウザ管理</p>
+                <h3>Outlook Web</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>メール</dt>
+                <dd>読み取り、作成、整理、確認付きの破壊的操作</dd>
+              </div>
+              <div>
+                <dt>カレンダー</dt>
+                <dd>カレンダー選択と、プロバイダー対応のTeams参加リンク</dd>
+              </div>
+              <div>
+                <dt>サインイン</dt>
+                <dd>専用の見えるブラウザプロファイル</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              SSO、MFA、Conditional Access、組織の通知はブラウザ内に残ります。
+            </p>
+          </article>
+          <article class="route-card accent-card" id="microsoft-graph">
+            <header>
+              <span class="route-icon" aria-hidden="true">G</span><div>
+                <p class="chip">明示的OAuth</p>
+                <h3>Microsoft Graph</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>メール</dt>
+                <dd>読み取り、作成、整理、確認付きの破壊的操作</dd>
+              </div>
+              <div>
+                <dt>カレンダー</dt>
+                <dd>カレンダー選択と型付きTeams参加リンク作成</dd>
+              </div>
+              <div>
+                <dt>サインイン</dt>
+                <dd>
+                  自分が利用を許可された公開クライアント。認可情報はOSキーチェーンに保存
+                </dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              Graphは明示的に選んだ場合、または既存の認可がある場合だけ利用します。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="tinted-section" id="google" aria-labelledby="google-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Googleの経路</p>
+          <h2 id="google-title">GmailとGoogleカレンダーは近日対応です。</h2>
+          <p>
+            Gmail・Calendar
+            API連携はRCに含まれ、合成契約テストでも検証済みです。ただしGoogleの承認までは本番OAuthを無効にしているため、サインイン、スコープ要求、キーチェーン参照、API通信は始まりません。当面はGoogle公式Workspace
+            MCPを利用できます。
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card accent-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">GA</span><div>
+                <p class="chip">承認待ち · 無効</p>
+                <h3>Corresync Google経路</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>メール</dt>
+                <dd>
+                  Gmail
+                  APIによるラベル、検索、選択読み取り、作成、送信、整理。永久削除ではなくゴミ箱へ移動
+                </dd>
+              </div>
+              <div>
+                <dt>カレンダー</dt>
+                <dd>カレンダー選択と、対応時のGoogle Meet</dd>
+              </div>
+              <div>
+                <dt>サインイン</dt>
+                <dd>
+                  このRCでは無効。承認後は通常ブラウザOAuthとアカウント別認可情報をOSキーチェーンに保存
+                </dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              承認後も、別のレビュー済みリリースで有効化するまで動きません。有効化後は固定したGoogle
+              APIへ端末から直接接続します。
+            </p>
+          </article>
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">✓</span><div>
+                <p class="chip">現在利用可能</p>
+                <h3>Google Workspace MCP</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>提供元</dt>
+                <dd>Googleが運営するリモートMCPサーバー</dd>
+              </div>
+              <div>
+                <dt>状態</dt>
+                <dd>Google Developer Preview</dd>
+              </div>
+              <div>
+                <dt>設定</dt>
+                <dd>Google CloudとOAuth設定が必要</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              Google公式の<a
+                href="https://developers.google.com/workspace/guides/configure-mcp-servers"
+              >Workspace MCP設定ガイド</a>を参照してください。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section aria-labelledby="standards-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>オープン標準</p>
+          <h2 id="standards-title">
+            プロバイダーが実際に提供するサービスを組み合わせる。
+          </h2>
+          <p>
+            有効なTLSと、OSキーチェーンまたは明示的に許可した絶対パスの認証ヘルパーを使います。
+          </p>
+        </div>
+        <div class="route-grid three">
+          <article class="route-card" id="jmap">
+            <header>
+              <span class="route-icon" aria-hidden="true">J</span><div>
+                <p class="chip">メール</p>
+                <h3>JMAP</h3>
+              </div>
+            </header>
+            <p>
+              RFC
+              8620の型付き契約テストで、読み取り、下書き、対応時の送信、移動、状態変更、確認付き削除を扱います。
+            </p>
+            <p class="route-foot">
+              読み取り専用やSubmission未対応は、利用不可として明示します。
+            </p>
+          </article>
+          <article class="route-card" id="imap-smtp">
+            <header>
+              <span class="route-icon" aria-hidden="true">IM</span><div>
+                <p class="chip">メール</p>
+                <h3>IMAP / SMTP</h3>
+              </div>
+            </header>
+            <p>
+              フォルダー、読み取り、MIME、下書き、安全な移動、送信済みメールボックスを確認できるSMTP
+              submissionに対応します。
+            </p>
+            <p class="route-foot">
+              UIDPLUSやSent
+              メールボックスが必要な操作は、安全でない代替処理をせず事前に失敗します。
+            </p>
+          </article>
+          <article class="route-card" id="caldav">
+            <header>
+              <span class="route-icon" aria-hidden="true">C</span><div>
+                <p class="chip">カレンダー</p>
+                <h3>CalDAV</h3>
+              </div>
+            </header>
+            <p>
+              カレンダー検索、上限付きの繰り返し予定、作成、更新、キャンセルを条件付きWebDAV/iCalendar書き込みで扱います。
+            </p>
+            <p class="route-foot">
+              参加者を含む調整には、観測済みRFC
+              6638対応とschedule-tag保護が必要です。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="mix-panel" aria-labelledby="mix-title">
+        <div>
+          <p class="eyebrow light">
+            <span aria-hidden="true"></span>ひとつのアカウント、ふたつの経路
+          </p>
+          <h2 id="mix-title">
+            メールと予定が同じプロトコルである必要はありません。
+          </h2>
+          <p>
+            IMAP/SMTPとCalDAVを組み合わせるほか、メール専用・カレンダー専用にもできます。アカウントの安定した本人性により、プロファイル、認証情報、カーソル、プレビュー、監査
+            コンテキストを分離します。
+          </p>
+        </div>
+        <figure class="terminal">
+          <figcaption class="term-bar">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
+              class="term-title"
+            >認証情報を使わない探索</span>
+          </figcaption>
+          <pre
+            tabindex="0"
+            role="region"
+            aria-label="利用経路を検索して明示的に追加する例"
+          ><code><span class="t-prompt">$</span> corr account discover reader@example.invalid
+<span class="t-dim">evidence  DNS · well-known · provider metadata</span>
+<span class="t-dim">action    none — discovery never authenticates</span>
+
+<span class="t-prompt">$</span> corr account add reader@example.invalid --help
+<span class="t-dim">choose one mail route and one calendar route</span></code></pre>
+        </figure>
+      </section>
+
+      <section class="honest-edges" aria-labelledby="provider-limits-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>隠れた代替経路なし</p>
+          <h2 id="provider-limits-title">ない機能を、あるようには見せません。</h2>
+          <p class="fine-print">
+            エージェントが使える操作と部分対応の表示方法は<a
+              href="features.html"
+            >できること</a>で説明しています。
+          </p>
+        </div>
+        <ul>
+          <li>制限は型付き機能または機能低下として返します。</li>
+          <li>
+            承認待ちのGoogle経路は、ブラウザ、OAuth、キーチェーン、セッション、ネットワークより前で停止します。
+          </li>
+          <li>自動検索からGraphの認可を開始しません。</li>
+          <li>
+            会議リンクは、選んだカレンダー経路が対応を報告した場合だけ要求します。
+          </li>
+          <li>結果不明の書き込みは照合を求め、自動再試行しません。</li>
+        </ul>
+      </section>
+
+      <section class="final-cta" aria-labelledby="provider-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>自分で選ぶ</p>
+        <h2 id="provider-cta-title">根拠を確認してから、認証する。</h2>
+        <p>
+          候補検索は認証情報を読み取らず、アカウントも追加しません。
+        </p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html"
+          >最初のアカウントを設定</a><a class="button secondary" href="features.html"
+          >できることを見る</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        独立したローカルファーストのメール・カレンダーツールです。記載された企業・サービスの公式製品ではありません。
+      </p>
+      <nav aria-label="フッター">
+        <a href="getting-started.html">はじめる</a><a href="providers.html"
+        >対応サービス</a><a href="features.html">できること</a><a href="safety.html"
+        >安全性</a><a href="privacy.html">プライバシー</a><a href="terms.html"
+        >利用規約</a><a href="https://github.com/nkiyohara/corresync">ソースコード</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >脆弱性の報告</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >リリース</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+    <script src="../check.js" defer></script>
+  </body>
+</html>

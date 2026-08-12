@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync — 모든 메일과 캘린더를 하나의 로컬 MCP로</title>
+    <meta
+      name="description"
+      content="Outlook, Microsoft 365, JMAP, IMAP/SMTP, CalDAV를 연결하는 로컬 우선 MCP 서버와 CLI입니다. Gmail과 Google 캘린더는 OAuth 승인 후 지원됩니다."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta
+      property="og:title"
+      content="Corresync — 모든 메일과 캘린더를 하나의 로컬 MCP로"
+    >
+    <meta
+      property="og:description"
+      content="업무용과 개인용 계정을 격리한 채 통합 검색하고, 보내기 전에 직접 확인하세요."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ko_KR">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:url" content="https://corresync.org/ko/">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Corresync 로고와 영문 제품 소개">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Corresync — 로컬 메일·캘린더 MCP">
+    <meta
+      name="twitter:description"
+      content="여러 계정을 한 번에 검색하고 일정을 모아 보되, 보내기는 직접 승인하세요."
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta name="twitter:image:alt" content="Corresync 로고와 영문 제품 소개">
+    <link rel="canonical" href="https://corresync.org/ko/">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../copy.js" defer></script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "name": "Corresync",
+          "url": "https://corresync.org/ko/",
+          "inLanguage": "ko"
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "name": "Corresync",
+          "url": "https://corresync.org/ko/",
+          "codeRepository": "https://github.com/nkiyohara/corresync",
+          "programmingLanguage": "Go",
+          "runtimePlatform": ["macOS", "Linux", "Windows"],
+          "license": "https://www.apache.org/licenses/LICENSE-2.0",
+          "inLanguage": "ko",
+          "description": "로컬 우선 방식의 제공자 중립 메일·캘린더 MCP 서버 및 CLI."
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 건너뛰기</a><div
+      class="airmail"
+      aria-hidden="true"
+    >
+    </div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 홈"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="주 메뉴">
+          <a href="./" aria-current="page">홈</a><a href="getting-started.html">시작하기</a><a
+            href="providers.html"
+          >지원 서비스</a><a href="features.html">기능</a><a href="safety.html">보안</a>
+        </nav>
+        <nav class="language-nav" aria-label="언어">
+          <a href="../" lang="en" hreflang="en">EN</a><a href="../ja/" lang="ja" hreflang="ja"
+          >日本語</a><a href="../zh-cn/" lang="zh-Hans" hreflang="zh-Hans">简中</a><a
+            href="../zh-tw/"
+            lang="zh-Hant"
+            hreflang="zh-Hant"
+          >繁中</a><a href="./" lang="ko" hreflang="ko" aria-current="page">한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span aria-hidden="true"></span>로컬 우선 · MCP 서버 + CLI</p>
+          <h1 id="hero-title">모든 메일과 캘린더를, <em>하나의 로컬 MCP로.</em></h1>
+          <p class="lede">
+            업무용과 개인용 메일·캘린더를 Codex, Claude Code, MCP 에이전트 또는
+            터미널에 연결하세요. Corresync는 계정마다 신원과 권한을
+            분리하면서도 여러 받은편지함을 함께 검색하고 일정을 한눈에
+            보여 줍니다. 보내기 같은 중요한 작업은 언제나 사용자가 먼저
+            확인합니다.
+          </p>
+          <p class="hero-providers">
+            <strong>지금 사용 가능:</strong> Outlook Web · Microsoft Graph · JMAP ·
+            IMAP/SMTP · CalDAV. <strong>곧 지원:</strong> Gmail과 Google 캘린더는 Google
+            OAuth 승인을 기다리고 있습니다. 계정별 기능과 관리자 요구
+            사항은 숨기지 않고 표시합니다. <a href="providers.html"
+            >연결 방식 비교</a>
+          </p>
+          <div class="actions">
+            <a class="button primary" href="getting-started.html">4단계로 설정하기</a><a
+              class="button secondary"
+              href="providers.html#check"
+            >내 메일 지원 여부 확인</a>
+          </div>
+          <p class="hero-note">
+            로그인은 브라우저나 운영체제 키체인이 맡습니다. Corresync가
+            관리하는 비밀 정보를 에이전트에 넘기지 않으며, 중계 서버도
+            없습니다. 중요한 쓰기 작업은 정확한 미리보기를 확인하고
+            승인한 뒤에만 실행됩니다.
+          </p>
+        </div>
+        <div class="install-panel" id="install" aria-labelledby="install-title">
+          <div class="install-head">
+            <h2 id="install-title">바로 설치하기</h2>
+            <p>
+              운영체제에 맞는 명령 하나를 고른 다음, 사용 중인 에이전트를
+              연결하세요.
+            </p>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-unix">macOS · Linux</p>
+            <div class="cmd" data-copy data-copy-label="macOS 및 Linux 설치 명령">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-unix"
+              ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-windows">Windows · PowerShell</p>
+            <div class="cmd" data-copy data-copy-label="Windows PowerShell 설치 명령">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-windows"
+              ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-winget">Windows · WinGet</p>
+            <div class="cmd" data-copy data-copy-label="Windows WinGet 설치 명령">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-winget"
+              ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
+            </div>
+          </div>
+          <div class="install-block">
+            <p class="os-label" id="install-connect">다음 단계 · 계정 추가</p>
+            <div class="cmd" data-copy data-copy-label="계정 설정 명령">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="install-connect"
+              ><code>corr setup you@example.com --alias personal</code></pre>
+            </div>
+          </div>
+          <p class="install-note">
+            예시 주소와 별칭을 바꾸어 입력하세요. 설정 명령은 자격 증명
+            없이 연결 후보만 찾으며, 로그인 페이지를 자동으로 열지
+            않습니다. 다른 설치 방법과 MCP 클라이언트별 명령은 <a
+              href="getting-started.html"
+            >시작 안내</a>에서 확인할 수 있습니다.
+          </p>
+        </div>
+      </section>
+      <section class="trust-row" aria-label="Corresync를 선택하는 이유">
+        <div>
+          <strong>MCP 하나로 모든 계정 연결</strong><span>업무용과 개인용 신원은
+            분리하고, 결과에는 원래 계정과 서비스가 표시됩니다.</span>
+        </div>
+        <div>
+          <strong>에이전트에 비밀 정보 없음</strong><span>로그인은 보이는
+            브라우저나 운영체제 키체인이 맡으며, 원격 중계 서버가
+            없습니다.</span>
+        </div>
+        <div>
+          <strong>미리보기 후 실행</strong><span>전송과 파괴적 작업은 서버가
+            만든 검토 화면과 짧은 일회성 승인을 거칩니다.</span>
+        </div>
+      </section>
+      <section class="policy-callout" aria-labelledby="policy-callout-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>Google 지원 현황</p>
+          <h2 id="policy-callout-title">
+            코드는 준비됐고, 지금은 승인만 기다립니다.
+          </h2>
+          <p>
+            Gmail과 Google 캘린더 코드는 RC에 포함되어 있지만 운영 환경 OAuth는
+            완전히 꺼져 있습니다. Google 로그인, 권한 요청, 키체인 접근, API
+            호출은 시작되지 않습니다. 승인이 나더라도 별도로 검토한
+            릴리스에서만 기능을 켤 수 있습니다.
+          </p>
+        </div>
+        <div class="actions">
+          <a class="button primary" href="privacy.html">개인정보 처리방침</a><a
+            class="button secondary"
+            href="terms.html"
+          >이용 약관</a>
+        </div>
+      </section>
+      <section class="journey" id="quickstart" aria-labelledby="journey-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>설치 후 세 단계</p>
+          <h2 id="journey-title">선택하고, 로그인하고, 물어보세요.</h2>
+          <p>
+            Corresync는 서비스 경로를 미리 고르지 않습니다. 먼저 자격 증명
+            없이 공개 정보를 확인하고, 사용자가 명시적으로 선택한 계정
+            경로만 추가한 뒤 해당 계정의 로그인을 시작합니다.
+          </p>
+        </div>
+        <div class="journey-grid">
+          <div class="journey-step">
+            <p class="os-label" id="journey-signin">1 · 선택 및 로그인</p>
+            <div class="cmd" data-copy data-copy-label="계정 및 로그인 명령">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="journey-signin"
+              ><code>corr setup you@example.com --alias personal
+corr auth login --account personal</code></pre>
+            </div>
+            <p>
+              탐색 단계에서는 페이지를 열지 않습니다. 별도의 로그인 명령은
+              선택한 경로만 사용합니다.
+            </p>
+          </div>
+          <div class="journey-step">
+            <p class="os-label" id="journey-connect">2 · 에이전트 연결</p>
+            <div class="cmd" data-copy data-copy-label="에이전트 설정 명령">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="journey-connect"
+              ><code>corr mcp setup codex</code></pre>
+            </div>
+            <p>
+              로컬 stdio 서버를 등록한 뒤 클라이언트를 한 번 다시
+              시작하세요.
+            </p>
+          </div>
+          <div class="journey-step">
+            <p class="os-label" id="journey-ask">3 · 질문</p>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-labelledby="journey-ask"
+            ><code><span class="t-ask">›</span> 모든 계정에서 오늘 정오 전까지
+  처리해야 할 일을 정리해 줘</code></pre>
+            <p>답변의 각 항목에는 출처 계정이 그대로 표시됩니다.</p>
+          </div>
+        </div>
+        <p class="center-link">
+          <a href="getting-started.html">전체 시작 안내 보기<span aria-hidden="true">
+              →</span></a>
+        </p>
+      </section>
+      <section class="outcomes" id="outcomes" aria-labelledby="outcomes-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>첫날부터 가능한 일</p>
+          <h2 id="outcomes-title">
+            한 번의 질문으로 여러 받은편지함과 캘린더를.
+          </h2>
+          <p>
+            CLI와 MCP는 같은 명확히 정의된 작업, 계정 격리, 정책 검사를
+            공유합니다.
+          </p>
+        </div>
+        <div class="outcome-grid">
+          <article class="outcome-card">
+            <h3>모든 받은편지함 검색</h3>
+            <p>
+              어느 계정에 있는지 몰라도 한꺼번에 찾고, 결과마다 출처를
+              확인할 수 있습니다. 한 계정이 실패하면 부분 결과라고
+              명시합니다.
+            </p>
+          </article>
+          <article class="outcome-card">
+            <h3>통합 일정 보기</h3>
+            <p>
+              업무용과 개인용 일정을 모아 보면서도 시간대, 캘린더, 서비스
+              출처를 각 일정에 유지합니다.
+            </p>
+          </article>
+          <article class="outcome-card">
+            <h3>보내기 전 정확히 확인</h3>
+            <p>
+              승인은 미리 본 계정, 받는 사람, 첨부 파일과 본문 바이트에
+              묶입니다. 내용이 달라지면 다시 승인해야 합니다.
+            </p>
+          </article>
+        </div>
+        <p class="center-link">
+          <a href="features.html">전체 기능과 명확한 제한 보기<span aria-hidden="true">
+              →</span></a>
+        </p>
+      </section>
+      <section class="safety safety-preview" aria-labelledby="safety-title">
+        <div class="safety-head">
+          <p class="eyebrow light"><span aria-hidden="true"></span>보이는 안전장치</p>
+          <h2 id="safety-title">첫 호출에서 바로 전송하지 않습니다.</h2>
+          <p class="safety-lede">
+            중요한 작업은 먼저 검토 화면을 반환합니다. 승인은 호출자,
+            계정, 서비스, 대상, 내용, 만료 시각에 묶이며 한 번만 쓸 수
+            있습니다.
+          </p>
+        </div>
+        <div class="safety-body">
+          <figure class="terminal safety-terminal">
+            <figcaption class="term-bar">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
+                class="term-title"
+              >작업 전 검토</span>
+            </figcaption>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="메일 전송 전 미리보기"
+            ><code><span class="t-review">REVIEW · send new message</span>
+  account  work · microsoft-owa
+  to       ana@example.invalid
+  body     text/plain · 412 B
+
+<span class="t-dim">아직 전송되지 않았습니다.</span></code></pre>
+          </figure>
+          <ul class="safety-points">
+            <li>
+              <strong>에이전트에는 명확히 정의된 도구만 제공합니다.</strong>
+              비밀번호, Cookie, OAuth 권한은 MCP나 설정에 들어가지 않습니다.
+            </li>
+            <li>
+              <strong>로컬에서만 실행됩니다.</strong> MCP는 로컬 stdio로 통신하며
+              호스팅 중계가 없습니다.
+            </li>
+            <li>
+              <strong>결과가 불확실하면 멈춥니다.</strong> 상태를 알 수 없는
+              원격 쓰기를 자동 재시도하지 않습니다.
+            </li>
+            <li>
+              <strong>메일 내용은 신뢰하지 않는 데이터입니다.</strong> 명령
+              실행이나 에이전트 시작 권한을 줄 수 없습니다.
+            </li>
+          </ul>
+        </div>
+        <p class="safety-links">
+          <a href="safety.html">전체 보안 모델 보기<span aria-hidden="true"> →</span></a>
+        </p>
+      </section>
+      <section class="provider-preview" aria-labelledby="provider-preview-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>기존 연결 방식 그대로</p>
+          <h2 id="provider-preview-title">
+            필요하면 기본 API를, 가능하면 개방형 표준을.
+          </h2>
+          <p>
+            메일과 캘린더 경로를 따로 선택할 수 있어 IMAP/SMTP 메일과 CalDAV
+            캘린더를 한 계정에서 조합할 수도 있습니다.
+          </p>
+        </div>
+        <div class="route-family-grid">
+          <article class="route-family">
+            <p class="chip">브라우저 소유</p>
+            <h3>Outlook Web</h3>
+            <p>
+              대화형 로그인은 전용으로 보이는 브라우저에 남고, 메일과
+              캘린더에는 명확히 정의된 작업을 제공합니다.
+            </p>
+          </article>
+          <article class="route-family accent-card">
+            <p class="chip">명시적 OAuth</p>
+            <h3>Microsoft Graph · Google 곧 지원</h3>
+            <p>
+              Graph는 사용 권한이 있는 공개 클라이언트를 씁니다. Google 경로는
+              승인 전까지 완전히 닫혀 있습니다.
+            </p>
+          </article>
+          <article class="route-family">
+            <p class="chip">개방형 표준</p>
+            <h3>JMAP · IMAP/SMTP · CalDAV</h3>
+            <p>
+              암호화된 엔드포인트와 운영체제 키체인 또는 명시적으로
+              승인한 자격 증명 도우미를 사용합니다.
+            </p>
+          </article>
+        </div>
+        <div class="evidence-note">
+          <span class="status-dot" aria-hidden="true"></span><p>
+            <strong>근거도 함께 공개합니다.</strong> 모든 개발 경로에는
+            결정적인 합성 계약 테스트가 있으며, Google API 경로는 현재 꺼져
+            있고 실사용 관찰 전입니다.
+          </p><a href="providers.html#check">메일 주소를 비공개로 확인하기<span
+              aria-hidden="true"
+            >
+              →</span></a>
+        </div>
+      </section>
+      <section class="honest-edges" aria-labelledby="edges-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>한계도 투명하게</p>
+          <h2 id="edges-title">할 수 없는 일까지 제품의 일부입니다.</h2>
+        </div>
+        <ul>
+          <li>
+            <strong>Gmail과 Google 캘린더는 승인 대기 중입니다.</strong> 코드는
+            RC에 있지만 운영 환경 OAuth는 꺼져 있습니다.
+          </li>
+          <li>
+            <strong>Microsoft Graph OAuth 클라이언트는 사용자가 준비합니다.</strong>
+            Corresync는 토큰 중계 서비스를 운영하지 않습니다.
+          </li>
+          <li><strong>Windows 데스크톱 알림은 아직 지원하지 않습니다.</strong></li>
+          <li>
+            <strong>지원 주장은 근거 범위를 넘지 않습니다.</strong> 합성 계약
+            테스트를 실사용 호환성 증거처럼 표현하지 않습니다.
+          </li>
+          <li>
+            <strong>Teams 채팅이나 회의 수명 주기는 관리하지 않습니다.</strong>
+            캘린더 일정의 기본 참여 링크만 다룹니다.
+          </li>
+        </ul>
+      </section>
+      <section class="final-cta" aria-labelledby="final-title">
+        <p class="eyebrow">
+          <span aria-hidden="true"></span>받은편지함을 정리할 준비가 됐다면
+        </p>
+        <h2 id="final-title">모든 연락을 하나의 로컬 대화로 가져오세요.</h2>
+        <p>명령 하나로 설치하고, 명령 하나로 에이전트를 연결합니다.</p>
+        <div class="actions centered">
+          <a class="button primary" href="#install">설치 명령 보기</a><a
+            class="button secondary"
+            href="getting-started.html"
+          >전체 안내 읽기</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        독립적인 로컬 우선 메일·캘린더 도구입니다. 여기에 언급된 업체와
+        제휴하거나 보증받지 않았습니다.
+      </p>
+      <nav aria-label="바닥글">
+        <a href="getting-started.html">시작하기</a><a href="providers.html"
+        >지원 서비스</a><a href="features.html">기능</a><a href="safety.html">보안</a><a
+          href="privacy.html"
+        >개인정보</a><a href="terms.html">이용 약관</a><a
+          href="https://github.com/nkiyohara/corresync"
+        >소스 코드</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >보안 문제 신고</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >릴리스</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

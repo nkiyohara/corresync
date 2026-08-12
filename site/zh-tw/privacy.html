@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync 隱私政策 — 本機優先的郵件與行事曆處理</title>
+    <meta
+      name="description"
+      content="瞭解 Corresync 如何處理信箱、行事曆、登入認證資料、本機資料，以及只查詢信箱網域的相容性檢查工具。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Corresync 隱私政策">
+    <meta
+      property="og:description"
+      content="郵件與行事曆直接在你的裝置和所選服務之間流轉。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/zh-tw/privacy.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Corresync 標誌和英文產品簡介">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Corresync 隱私政策">
+    <meta
+      name="twitter:description"
+      content="本機優先的郵件、行事曆與認證資料處理說明。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
+    <link rel="canonical" href="https://corresync.org/zh-tw/privacy.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/privacy.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/privacy.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/privacy.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/privacy.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/privacy.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/privacy.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到內文</a><div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 首頁"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="主導航">
+          <a href="./">首頁</a><a href="getting-started.html">開始使用</a><a
+            href="providers.html"
+          >支援服務</a><a href="features.html">功能</a><a href="safety.html">安全</a>
+        </nav>
+        <nav class="language-nav" aria-label="語言">
+          <a href="../privacy.html" lang="en" hreflang="en">EN</a><a
+            href="../ja/privacy.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a href="../zh-cn/privacy.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="privacy.html" lang="zh-Hant" hreflang="zh-Hant" aria-current="page"
+          >繁中</a><a href="../ko/privacy.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero legal-page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>隱私政策</p>
+        <h1 id="page-title">你的通訊，始終由<em>你來掌控。</em></h1>
+        <p class="lede">
+          Corresync
+          是本機優先的開源應用。它從你的裝置直接連線到你授權的郵件和行事曆服務。專案不營運託管信箱、行事曆、權杖中繼、分析系統或遠端
+          MCP
+          伺服器。可選的網頁檢查工具只接收信箱網域，不接收完整位址。
+        </p>
+        <p class="legal-date">
+          生效及最後更新：<time datetime="2026-08-11">2026 年 8 月 11 日</time>
+        </p>
+        <nav class="legal-toc" aria-label="隱私政策目錄">
+          <a href="#scope">範圍</a><a href="#provider-data">帳號資料</a><a href="#storage"
+          >本機儲存</a><a href="#sharing">共享</a><a href="#website">網站工具</a><a
+            href="#choices"
+          >你的選擇</a><a href="#contact">聯絡</a>
+        </nav>
+      </section>
+      <section class="legal-shell" aria-label="隱私政策">
+        <div class="legal-summary" role="note" aria-labelledby="summary-title">
+          <div>
+            <p class="eyebrow"><span aria-hidden="true"></span>先看重點</p>
+            <h2 id="summary-title">Corresync 沒有雲端信箱副本。</h2>
+          </div>
+          <ul>
+            <li>登入由你明確選擇的服務路徑管理。</li>
+            <li>
+              OAuth
+              授權和標準協議認證資料留在作業系統鑰匙圈或你核准的認證資料輔助程式中。
+            </li>
+            <li>郵件與行事曆請求透過 TLS 從裝置直達服務供應商。</li>
+            <li>
+              資料不會用於廣告、出售、建立使用者輪廓或通用模型訓練。
+            </li>
+          </ul>
+        </div>
+        <article class="legal-copy">
+          <section id="scope" aria-labelledby="scope-title">
+            <p class="legal-kicker">01 · 範圍與責任方</p>
+            <h2 id="scope-title">這份政策涵蓋什麼</h2>
+            <p>
+              本政策說明 Corresync 開源專案維護者 Naoki Kiyohara
+              與貢獻者如何處理官方應用、專案營運的 OAuth
+              身分和本網站上的資訊。它涵蓋可用或開發中的 Google、Outlook
+              Web、Microsoft Graph、JMAP、IMAP/SMTP、CalDAV 與經核准的本機匯入路徑。
+            </p>
+            <p>
+              獨立分支、第三方構建、郵件或行事曆服務供應商、作業系統、套件管理器、MCP
+              用戶端、AI 服務及可選執行器有各自的條款。Corresync
+              沒有使用者帳號資料庫；服務供應商資料只在你的裝置上為你要求的功能而處理。
+            </p>
+          </section>
+          <section id="provider-data" aria-labelledby="provider-data-title">
+            <p class="legal-kicker">02 · 服務供應商帳號資料</p>
+            <h2 id="provider-data-title">只讀取完成所選操作所需的資訊</h2>
+            <p>
+              按啟用路徑不同，Corresync
+              可能處理帳號身分、資料夾和行事曆後設資料、郵件、附件、草稿、已傳送郵件、事件、參與者、重複規則、提醒、會議屬性和服務能力。帳號身分不會合併，也不會啟用你沒有選擇的路徑。
+            </p>
+            <p>
+              Outlook Web 的登入保留在專用可見瀏覽器中；Microsoft Graph
+              的委託授權保留在系統鑰匙圈中；JMAP、IMAP/SMTP 與 CalDAV
+              的密碼或權杖由鑰匙圈或明確核准的認證資料輔助程式持有，設定只儲存外部引用。
+            </p>
+            <p>
+              Gmail 與 Google 行事曆程式碼已包含在 RC 中，但正式環境 OAuth
+              通過審核前整條 Google
+              路徑保持關閉。帳號新增、瀏覽器授權、權限請求、鑰匙圈讀取和
+              Google API
+              流量都無法啟動。以下說明只適用於將來經另一次獨立審閱後啟用的版本。
+            </p>
+            <div
+              class="legal-table-wrap"
+              tabindex="0"
+              role="region"
+              aria-label="Google OAuth 資料與用途"
+            >
+              <table class="legal-table">
+                <thead>
+                  <tr>
+                    <th scope="col">權限</th>
+                    <th scope="col">資料</th>
+                    <th scope="col">用途</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>https://www.googleapis.com/auth/gmail.modify</code></td>
+                    <td>Gmail 標籤、郵件、內文、附件、草稿和已傳送郵件。</td>
+                    <td>
+                      搜尋、讀取、下載指定附件、撰寫、傳送和整理。不會申請永久刪除權限。
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>https://www.googleapis.com/auth/calendar.calendarlist.readonly</code>
+                    </td>
+                    <td>行事曆名稱、ID、存取角色和後設資料。</td>
+                    <td>顯示並選擇帳號中已有的行事曆。</td>
+                  </tr>
+                  <tr>
+                    <td><code>https://www.googleapis.com/auth/calendar.events</code></td>
+                    <td>事件、參與者、時間、重複、提醒和會議屬性。</td>
+                    <td>
+                      讀取、建立、更新、取消事件，並在服務支援時請求 Meet
+                      連結。
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              Google
+              資料只用於你明確呼叫或設定的郵件、行事曆、監控和自動化功能。Corresync
+              不存取聯絡人、雲端硬碟、密碼、瀏覽器
+              Cookie、廣告建立使用者輪廓或非公開 API。
+            </p>
+          </section>
+          <section id="processing" aria-labelledby="processing-title">
+            <p class="legal-kicker">03 · 處理方式</p>
+            <h2 id="processing-title">直接連線，明確操作</h2>
+            <p>
+              CLI 與 MCP
+              使用相同的型別化操作和策略檢查。讀取儘量從後設資料開始；傳送郵件、邀請參與者等重要寫入先顯示精確預覽，再要求一份與呼叫方、帳號、目標和內容繫結的短時單次核准。系統不會悄悄切換到另一條服務路徑，也不會在結果未知時自動重試寫入。
+            </p>
+            <p>
+              Microsoft OAuth 使用系統瀏覽器；Outlook Web
+              使用專用可見瀏覽器設定；開放標準路徑只連線你選擇的有效 TLS
+              端點。專案不接收密碼、OAuth 授權、郵件、附件或行事曆內文。
+            </p>
+          </section>
+          <section id="storage" aria-labelledby="storage-title">
+            <p class="legal-kicker">04 · 本機儲存與保留</p>
+            <h2 id="storage-title">可能留在裝置上的內容</h2>
+            <ul>
+              <li>
+                <strong>授權與會話：</strong>OAuth
+                權杖以帳號隔離的控制代碼儲存在系統鑰匙圈；瀏覽器 Cookie
+                和網站資料留在專用本機設定中。
+              </li>
+              <li>
+                <strong>設定：</strong>帳號位址、本機別名、所選路徑、公開 OAuth
+                用戶端 ID、迴環重定向和鑰匙圈控制代碼，不包含機密資訊。
+              </li>
+              <li>
+                <strong
+                >無內容審計：</strong>受限儲存操作型別、結果、時間、呼叫方及不透明帳號和目標
+                ID；不儲存收件人、主題、內文、附件名、事件文字、查詢、權杖或核准值。
+              </li>
+              <li>
+                <strong
+                >可選佇列與匯入：</strong>僅在你另行啟用後，儲存有上限的帳號本機記錄；郵件內文和附件不會進入監控佇列。
+              </li>
+              <li>
+                <strong
+                >臨時資料：</strong>請求結果會短暫出現在程式記憶體和本機
+                stdio 中；不會建立信箱或行事曆的通用持久副本。
+              </li>
+            </ul>
+            <p>
+              帳號刪除、佇列清理或匯入清理會移除對應記錄。服務供應商上的資料仍按服務供應商設定和你的操作保留。
+            </p>
+          </section>
+          <section id="sharing" aria-labelledby="sharing-title">
+            <p class="legal-kicker">05 · 共享與傳輸</p>
+            <h2 id="sharing-title">誰可能收到資料</h2>
+            <p>
+              專案沒有接收服務供應商帳號資料的託管服務，因此不會收集或出售這些資料。在你的裝置上，資料可能按需要提供給所選服務供應商、本機
+              CLI 或 MCP
+              用戶端；若該用戶端把工具結果發給遠端模型，則還會提供給你選擇的
+              AI
+              服務。另行啟用監控執行器和遠端輸出時，也適用其隱私條款。
+            </p>
+            <p>
+              服務供應商資料不會用於廣告、資料仲介、信貸判斷、監控或通用
+              AI/ML
+              模型訓練。請勿在公開問題或支援報告中貼上真實郵件、行事曆、權杖或帳號資料。
+            </p>
+          </section>
+          <section id="limited-use" aria-labelledby="limited-use-title">
+            <p class="legal-kicker">06 · Google Limited Use</p>
+            <h2 id="limited-use-title">用途受到明確限制</h2>
+            <p>
+              從 Google API 獲得的資訊將依照包含 Limited Use 要求的 <a
+                href="https://developers.google.com/terms/api-services-user-data-policy"
+              >Google API Services User Data Policy</a>
+              使用和傳輸。存取只用於本政策清楚說明的使用者功能。除獲得針對具體專案的明確同意、安全調查、法律要求或內部聚合匿名處理外，不允許人工查看
+              Google 使用者資料。
+            </p>
+          </section>
+          <section id="website" aria-labelledby="website-title">
+            <p class="legal-kicker">07 · 網站、檢查工具與意見回饋</p>
+            <h2 id="website-title">預設不使用分析或遙測</h2>
+            <p>
+              此靜態網站不設定 Corresync
+              Cookie，不載入分析、廣告或第三方指令碼。GitHub Pages 可能依照 <a
+                href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+              >GitHub 隱私宣告</a>處理正常請求資料。
+            </p>
+            <p>
+              可選相容性檢查在瀏覽器中拆分信箱位址，立即清空輸入框，只把
+              @ 後經規範化的網域透過 JSON <code>POST</code> 傳送給 <code
+              >discover.corresync.org</code>。它不傳送 @ 前內容，不使用 Cookie
+              或瀏覽器儲存，也不啟動登入。單用途 Cloudflare Worker
+              只向固定公共 DNS-over-HTTPS
+              解析器查詢有上限的公開記錄，不抓取網域提供的網址，不保留應用程式記錄或快取，並回傳
+              <code>no-store</code>
+              回應。你也可以完全跳過它，在安裝後執行本機發現。
+            </p>
+            <p>
+              互動式 CLI 可以查詢 GitHub 公共 Releases API
+              檢查更新，但不會傳送帳號位址、信箱資料或持久裝置
+              ID。意見回饋與自動公開錯誤報告預設關閉；只有你主動啟用後，經過允許清單和刪減的無內容診斷資訊才可能透過已登入的
+              GitHub CLI 建立公開問題。
+            </p>
+          </section>
+          <section id="security" aria-labelledby="security-title">
+            <p class="legal-kicker">08 · 安全</p>
+            <h2 id="security-title">邊界清晰，但沒有絕對安全</h2>
+            <p>
+              Corresync 使用固定 API 端點、有效 TLS、PKCE、state
+              驗證、作業系統鑰匙圈、帳號隔離、經過認證的本機
+              IPC、有上限的解析和先預覽後提交。任何本機儲存與通訊都無法保證絕對安全；請保護裝置、鑰匙圈、MCP
+              設定、模型和備份，並只安裝來源可信的版本。
+            </p>
+          </section>
+          <section id="choices" aria-labelledby="choices-title">
+            <p class="legal-kicker">09 · 你的選擇與刪除</p>
+            <h2 id="choices-title">隨時斷開並移除存取</h2>
+            <ol>
+              <li>
+                網頁檢查工具完全可選，離開頁面即可結束完整位址的瀏覽器內處理。
+              </li>
+              <li>
+                執行 <code>corr account remove ALIAS --approve</code>
+                可刪除該帳號的本機設定、設定檔案、匯入、遊標和佇列狀態；不會刪除服務供應商上的郵件或行事曆。
+              </li>
+              <li>
+                在服務供應商的“已連線應用”或安全設定中撤銷授權。Google
+                可使用 <a href="https://myaccount.google.com/connections"
+                >Google 帳號連線</a>。
+              </li>
+              <li>
+                用 <code>corr events purge --account ALIAS --approve</code>
+                清除監控佇列；解除安裝應用並刪除本機設定與資料目錄可完成本機移除。
+              </li>
+            </ol>
+            <p>
+              <code>corr auth logout</code>
+              關閉本機會話，但會保留供下次登入使用的鑰匙圈授權；要徹底撤銷，請刪除帳號並在服務供應商一側撤銷。
+            </p>
+          </section>
+          <section id="children" aria-labelledby="children-title">
+            <p class="legal-kicker">10 · 兒童</p>
+            <h2 id="children-title">本服務不面向兒童</h2>
+            <p>
+              Corresync 是技術型郵件與行事曆工具，不面向 13
+              歲以下兒童，也不有意營運收集兒童個人資訊的服務。
+            </p>
+          </section>
+          <section id="changes" aria-labelledby="changes-title">
+            <p class="legal-kicker">11 · 政策更新</p>
+            <h2 id="changes-title">重要變化會公開說明</h2>
+            <p>
+              政策會隨產品、法律或服務供應商要求更新。生效日期顯示在頁面頂部，重要變化會同時出現在本頁和版本說明中；若帳號資料將用於新目的，會在使用前通知並取得同意。舊版本保留在公開原始碼歷史中。
+            </p>
+          </section>
+          <section id="contact" aria-labelledby="contact-title">
+            <p class="legal-kicker">12 · 聯絡方式</p>
+            <h2 id="contact-title">問題與隱私疑慮</h2>
+            <p>
+              不含私密資料的政策問題請提交到 <a
+                href="https://github.com/nkiyohara/corresync/issues/new?template=policy.yml"
+              >Corresync GitHub 問題</a>。涉及私密細節的安全或隱私疑慮請使用<a
+                href="https://github.com/nkiyohara/corresync/security/advisories/new"
+              >私密安全報告</a>。專案不託管你的帳號、信箱或行事曆，因此無法取得或刪除只存在於裝置或服務供應商處的資料。
+            </p>
+          </section>
+        </article>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        獨立的本機優先郵件與行事曆工具。與此處提到的廠商沒有隸屬或背書關係。
+      </p>
+      <nav aria-label="頁尾">
+        <a href="getting-started.html">開始使用</a><a href="providers.html">支援服務</a><a
+          href="features.html"
+        >功能</a><a href="safety.html">安全</a><a href="privacy.html" aria-current="page"
+        >隱私</a><a href="terms.html">條款</a><a href="https://github.com/nkiyohara/corresync"
+        >原始碼</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >安全報告</a><a href="https://github.com/nkiyohara/corresync/releases">發布</a><a
+          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>
