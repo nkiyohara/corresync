@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync 安全模型 — 本機權限與寫入審閱</title>
+    <meta
+      name="description"
+      content="瞭解 Corresync 如何讓登入歸瀏覽器或鑰匙圈管理、隔離帳號，並在每項重要寫入提交前顯示準確預覽。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Corresync 安全模型">
+    <meta
+      property="og:description"
+      content="認證資料歸屬、帳號隔離、預覽→提交 與不可信資料邊界。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/zh-tw/safety.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Corresync 標誌和英文產品簡介">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Corresync 安全模型">
+    <meta name="twitter:description" content="本機權限、帳號隔離與寫入審閱。">
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
+    <link rel="canonical" href="https://corresync.org/zh-tw/safety.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/safety.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/safety.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/safety.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/safety.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/safety.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/safety.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../copy.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到內文</a><div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 首頁"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="主導航">
+          <a href="./">首頁</a><a href="getting-started.html">開始使用</a><a
+            href="providers.html"
+          >支援服務</a><a href="features.html">功能</a><a
+            href="safety.html"
+            aria-current="page"
+          >安全</a>
+        </nav>
+        <nav class="language-nav" aria-label="語言">
+          <a href="../safety.html" lang="en" hreflang="en">EN</a><a
+            href="../ja/safety.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a href="../zh-cn/safety.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="safety.html" lang="zh-Hant" hreflang="zh-Hant" aria-current="page"
+          >繁中</a><a href="../ko/safety.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>安全模型</p>
+        <h1 id="page-title">
+          智慧體獲得型別化工具，<em>絕不獲得你的認證資料。</em>
+        </h1>
+        <p class="lede">
+          Corresync 只在本機使用你已經擁有的帳號權限。密碼、Cookie 和 OAuth
+          權杖不會進入 MCP；每次寫入都先確認目標與內容，再單次提交。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#promises">查看核心保證</a><a
+            class="button secondary"
+            href="privacy.html"
+          >查看資料處理</a>
+        </div>
+      </section>
+      <section id="promises" aria-labelledby="promises-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>不變的保證</p>
+          <h2 id="promises-title">權限保持狹窄，效果始終可見。</h2>
+        </div>
+        <div class="promise-grid">
+          <article>
+            <span class="promise-mark" aria-hidden="true">01</span><h3>
+              認證資料留在應有的位置
+            </h3>
+            <p>
+              瀏覽器會話留在專用可見瀏覽器，API 授權 與標準協議 機密資訊
+              留在系統鑰匙圈或明確核准的輔助程式。核心設定不會儲存機密資訊。
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">02</span><h3>
+              每次寫入只選一個帳號
+            </h3>
+            <p>
+              讀取可跨帳號；寫入前必須從穩定 opaque identity
+              解析出一個準確帳號和容器。
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">03</span><h3>重要操作先審閱</h3>
+            <p>
+              傳送、事件更改、移動和刪除先回傳伺服器繫結的預覽；目標或
+              內容不一致就無法提交。
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">04</span><h3>結果未知就停止</h3>
+            <p>
+              遠端寫入結果不明確時不自動重試，避免重複傳送或二次修改。
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">05</span><h3>預設不監控</h3>
+            <p>
+              匯入掃描只讀；monitoring、agent dispatch、data egress
+              分別選擇啟用，初始關閉，MCP 無法開啟。
+            </p>
+          </article>
+          <article>
+            <span class="promise-mark" aria-hidden="true">06</span><h3>不掩蓋限制</h3>
+            <p>
+              能力在登入後按帳號觀測，不從品牌推斷；降級和部分失敗會明確回傳。
+            </p>
+          </article>
+        </div>
+      </section>
+      <section class="architecture-panel" aria-labelledby="architecture-title">
+        <div>
+          <p class="eyebrow light"><span aria-hidden="true"></span>一個 application core</p>
+          <h2 id="architecture-title">人、指令碼、智慧體都遵守同一邊界。</h2>
+          <p>
+            CLI 和 MCP 呼叫同一型別化 use case。服務供應商介接層
+            只做協議翻譯，不持有策略。
+          </p>
+        </div>
+        <div class="flow" aria-label="Corresync 信任邊界">
+          <span class="flow-in">CLI · MCP</span><span class="flow-edge" aria-hidden="true"
+          >→</span><span class="flow-core">typed application use cases<br><small>account · policy
+              · 預覽／提交</small></span><span class="flow-edge" aria-hidden="true"
+          >→</span><span class="flow-in">服務供應商介接層</span>
+        </div>
+      </section>
+      <section id="review" aria-labelledby="review-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>預覽 → 提交</p>
+          <h2 id="review-title">第一次顯示效果，第二次必須完全匹配。</h2>
+          <p>
+            核准繫結呼叫者、帳號、供應商、目標、版本、內容、操作效果、有效期與單次使用。
+          </p>
+        </div>
+        <div class="review-grid">
+          <figure class="terminal">
+            <figcaption class="term-bar">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
+                class="term-title"
+              >server-enforced review</span>
+            </figcaption>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="傳送審閱示例"
+            ><code><span class="t-prompt">$</span> corr mail send --account work \
+    --to ana@example.invalid \
+    --body-file reply.txt
+
+<span class="t-review">REVIEW · send new message</span>
+  account  work · microsoft-owa
+  target   ana@example.invalid
+  digest   sha256 9f2c1a…
+
+<span class="t-dim">尚未傳送。</span></code></pre>
+          </figure>
+          <div class="review-copy">
+            <article>
+              <h3>短時有效</h3>
+              <p>舊審閱不能以後複用。</p>
+            </article>
+            <article>
+              <h3>僅可一次</h3>
+              <p>同一核准不能提交兩次。</p>
+            </article>
+            <article>
+              <h3>繫結目標</h3>
+              <p>帳號、收件人或位元組改變就需要新審閱。</p>
+            </article>
+            <article>
+              <h3>CLI 與 MCP 共用</h3>
+              <p>核心強制策略，不依賴 annotation。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+      <section class="tinted-section" id="authentication" aria-labelledby="auth-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>誰管理認證</p>
+          <h2 id="auth-title">先選路徑，只在你要求時認證。</h2>
+          <p>
+            發現過程不使用認證資料，要求有效
+            TLS，也不會啟動管理員同意流程。
+          </p>
+        </div>
+        <div class="auth-grid">
+          <article>
+            <h3>Outlook Web</h3>
+            <p>
+              專用可見瀏覽器管理互動式登入，不把密碼或 Cookie
+              匯入核心，也不繞過 SSO、MFA 或 Conditional Access。
+            </p>
+          </article>
+          <article>
+            <h3>Google 與 Graph</h3>
+            <p>
+              使用一般系統瀏覽器 OAuth 與 PKCE，授權存入系統鑰匙圈。Graph
+              必須明確選擇；Google 路徑在審核前已於編譯階段完全關閉。
+            </p>
+          </article>
+          <article>
+            <h3>JMAP、IMAP/SMTP、CalDAV</h3>
+            <p>
+              設定只儲存認證資料參照；機密資訊
+              透過已同意的外部認證資料介面讀取。始終要求有效 TLS，不做 TLS
+              攔截。
+            </p>
+          </article>
+        </div>
+      </section>
+      <section id="untrusted-data" aria-labelledby="data-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>信箱是不可信輸入</p>
+          <h2 id="data-title">一封郵件永遠不能給自己授權。</h2>
+          <p>
+            內文、附件、事件與供應商回應都是不可信資料。其中的文字不能授權工具呼叫、新增帳號、啟動監控或代替核准。
+          </p>
+        </div>
+        <div class="control-grid">
+          <article>
+            <h3>後設資料優先</h3>
+            <p>選定訊息前不讀取內文和附件，所有讀取都有上限。</p>
+          </article>
+          <article>
+            <h3>只讀匯入</h3>
+            <p>不復用其他應用的 機密資訊，只顯示候選。</p>
+          </article>
+          <article>
+            <h3>選擇性監控</h3>
+            <p>只有明確設定查詢、帳號、間隔與目標後才執行。</p>
+          </article>
+          <article>
+            <h3>明確意見回饋</h3>
+            <p>分享前審閱，不包含郵件、位址、權杖或認證資料。</p>
+          </article>
+        </div>
+      </section>
+      <section class="absent-panel" id="out-of-scope" aria-labelledby="absent-title">
+        <div>
+          <p class="eyebrow light"><span aria-hidden="true"></span>不存在的能力</p>
+          <h2 id="absent-title">Corresync 不會擴大帳號權限。</h2>
+        </div>
+        <ul>
+          <li>託管權杖與郵件中繼服務、多使用者伺服器、遠端 MCP 端點</li>
+          <li>在核心設定中儲存密碼、應用程式密碼、OAuth權杖或 Cookie</li>
+          <li>無人登入、TLS 攔截、繞過 MFA 或 Conditional Access</li>
+          <li>tenant-wide 或 administrator access</li>
+          <li>自動 替代路徑 到 Graph 或自動探測</li>
+          <li>Teams 聊天、頻道、通話、錄製或會議生命週期管理</li>
+        </ul>
+      </section>
+      <section class="evidence-explainer" id="evidence" aria-labelledby="evidence-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>證據邊界</p>
+          <h2 id="evidence-title">合成 coverage 不是即時供應商承諾。</h2>
+          <p>
+            預設測試和 CI 只用不含認證資料與個人資訊的合成測試資料。live
+            mailbox 測試必須選擇啟用，無法從預設命令或 CI 執行。
+          </p>
+        </div>
+        <div>
+          <p><strong>Provider-native 宣告：</strong>按官方資料與合成契約驗證。</p>
+          <p>
+            <strong>Live-observed 宣告：</strong>只有繫結
+            提交、release、環境和合成資料的記錄才可使用。
+          </p>
+          <p><strong>Capability：</strong>登入後按帳號觀測，不根據品牌猜測。</p>
+        </div>
+      </section>
+      <section class="final-cta" aria-labelledby="safety-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>設計公開，檢查可執行</p>
+        <h2 id="safety-cta-title">邊界寫在文件裡，也寫在測試裡。</h2>
+        <div class="actions centered">
+          <a class="button primary" href="https://github.com/nkiyohara/corresync"
+          >查看原始碼</a><a class="button secondary" href="getting-started.html"
+          >安全開始</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        獨立的本機優先郵件與行事曆工具。與所列廠商無隸屬或背書關係。
+      </p>
+      <nav aria-label="頁尾">
+        <a href="getting-started.html">開始使用</a><a href="providers.html">支援服務</a><a
+          href="features.html"
+        >功能</a><a href="safety.html">安全</a><a href="privacy.html">隱私</a><a
+          href="terms.html"
+        >條款</a><a href="https://github.com/nkiyohara/corresync">原始碼</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >安全報告</a><a href="https://github.com/nkiyohara/corresync/releases">發布</a><a
+          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

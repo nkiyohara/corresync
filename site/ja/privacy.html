@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+      Corresync プライバシーポリシー — ローカルファーストなデータ処理
+    </title>
+    <meta
+      name="description"
+      content="Corresyncがメール、カレンダー、認証情報、端末内データ、ドメインだけを使う対応確認をどのように扱うか説明します。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Corresync プライバシーポリシー">
+    <meta
+      property="og:description"
+      content="メールと予定は、利用者の端末と選んだサービスの間を直接流れます。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/ja/privacy.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresyncのロゴと製品概要を示す英語のメッセージ"
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Corresync プライバシーポリシー">
+    <meta
+      name="twitter:description"
+      content="ローカルファーストなメール、カレンダー、認証情報の扱い。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresyncのロゴと製品概要を示す英語のメッセージ"
+    >
+    <link rel="canonical" href="https://corresync.org/ja/privacy.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/privacy.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/privacy.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/privacy.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/privacy.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/privacy.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/privacy.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へ移動</a><div class="airmail" aria-hidden="true">
+    </div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync ホーム"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="メインメニュー">
+          <a href="./">ホーム</a><a href="getting-started.html">はじめる</a><a
+            href="providers.html"
+          >対応サービス</a><a href="features.html">できること</a><a href="safety.html"
+          >安全性</a>
+        </nav>
+        <nav class="language-nav" aria-label="言語">
+          <a href="../privacy.html" lang="en" hreflang="en">EN</a><a
+            href="privacy.html"
+            lang="ja"
+            hreflang="ja"
+            aria-current="page"
+          >日本語</a><a href="../zh-cn/privacy.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="../zh-tw/privacy.html" lang="zh-Hant" hreflang="zh-Hant">繁中</a><a
+            href="../ko/privacy.html"
+            lang="ko"
+            hreflang="ko"
+          >한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero legal-page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>プライバシーポリシー</p>
+        <h1 id="page-title">あなたのやり取りは、<em>あなたの管理下に。</em></h1>
+        <p class="lede">
+          Corresyncはローカルファーストのオープンソースアプリです。利用者の端末から、許可したメール・カレンダーサービスへ直接接続します。プロジェクトは、メールボックスやカレンダーのホスティング、トークン中継、アクセス解析、リモートMCPサーバーを運営しません。任意のウェブ確認が受け取るのはメールアドレス全体ではなく、ドメインだけです。
+        </p>
+        <p class="legal-date">
+          施行日・最終更新日：<time datetime="2026-08-11">2026年8月11日</time>
+        </p>
+        <nav class="legal-toc" aria-label="プライバシーポリシーの目次">
+          <a href="#scope">適用範囲</a><a href="#provider-data">アカウントデータ</a><a
+            href="#storage"
+          >端末内保存</a><a href="#sharing">共有</a><a href="#website">ウェブ確認</a><a
+            href="#choices"
+          >利用者の選択</a><a href="#contact">連絡先</a>
+        </nav>
+      </section>
+      <section class="legal-shell" aria-label="プライバシーポリシー">
+        <div class="legal-summary" role="note" aria-labelledby="summary-title">
+          <div>
+            <p class="eyebrow"><span aria-hidden="true"></span>要点</p>
+            <h2 id="summary-title">
+              Corresyncのクラウドに、メールボックスの複製はありません。
+            </h2>
+          </div>
+          <ul>
+            <li>認証は、利用者が明示的に選んだ接続経路が管理します。</li>
+            <li>
+              OAuthの認可情報と標準プロトコルの認証情報は、OSキーチェーンか承認済みのヘルパーに残ります。
+            </li>
+            <li>
+              メールと予定の通信は、TLSで端末からサービスへ直接送られます。
+            </li>
+            <li>
+              広告、データ販売、人物像の作成、汎用モデルの学習には使いません。
+            </li>
+          </ul>
+        </div>
+        <article class="legal-copy">
+          <section id="scope" aria-labelledby="scope-title">
+            <p class="legal-kicker">01 · 適用範囲と主体</p>
+            <h2 id="scope-title">このポリシーが対象とするもの</h2>
+            <p>
+              本ポリシーは、CorresyncオープンソースプロジェクトのメンテナーであるNaoki
+              Kiyoharaと貢献者が、公式アプリ、プロジェクトが運用するOAuthアプリ、本ウェブサイトで情報をどのように扱うかを説明します。利用可能または開発中のGoogle、Outlook
+              Web、Microsoft
+              Graph、JMAP、IMAP/SMTP、CalDAV、承認済みのローカルインポートを対象とします。
+            </p>
+            <p>
+              独立したフォーク、サードパーティ製ビルド、メール・カレンダーサービス、OS、パッケージマネージャー、MCPクライアント、AIサービス、任意のランナーには、それぞれの規約が適用されます。Corresyncに利用者のアカウントデータベースはなく、プロバイダーのデータは要求された機能のために端末内で処理されます。
+            </p>
+          </section>
+          <section id="provider-data" aria-labelledby="provider-data-title">
+            <p class="legal-kicker">02 · プロバイダーのアカウントデータ</p>
+            <h2 id="provider-data-title">選んだ操作に必要な情報だけを扱います</h2>
+            <p>
+              有効にした経路に応じて、アカウントの識別情報、フォルダーとカレンダーのメタデータ、メッセージ、添付ファイル、下書き、送信済みメール、予定、参加者、繰り返し、リマインダー、会議のプロパティ、サービスの機能を処理する場合があります。異なるプロバイダーの本人性を統合せず、選んでいない経路を有効にしません。
+            </p>
+            <p>
+              Outlook
+              Webのサインインは専用の見えるブラウザに残ります。Microsoft
+              Graphの委任された認可情報はOSキーチェーンに保存します。JMAP、IMAP/SMTP、CalDAVのパスワードやトークンはキーチェーンまたは明示的に承認した認証ヘルパーが保持し、設定には外部参照だけを保存します。
+            </p>
+            <p>
+              GmailとGoogleカレンダーのコードはRCに含まれていますが、本番OAuthが承認されるまでGoogle経路全体を無効にしています。アカウント追加、ブラウザOAuth、同意画面、キーチェーン参照、Google
+              API通信はいずれも開始できません。以下の説明は、将来、別のレビュー済みリリースで経路を有効にした場合にだけ適用されます。
+            </p>
+            <div
+              class="legal-table-wrap"
+              tabindex="0"
+              role="region"
+              aria-label="Google OAuthのデータと利用目的"
+            >
+              <table class="legal-table">
+                <thead>
+                  <tr>
+                    <th scope="col">権限</th>
+                    <th scope="col">アクセスするデータ</th>
+                    <th scope="col">目的</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>https://www.googleapis.com/auth/gmail.modify</code></td>
+                    <td>
+                      Gmailのラベル、メッセージ、本文、添付ファイル、下書き、送信済みメール。
+                    </td>
+                    <td>
+                      検索、読み取り、指定した添付ファイルのダウンロード、作成、送信、整理。永久削除の権限は要求しません。
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>https://www.googleapis.com/auth/calendar.calendarlist.readonly</code>
+                    </td>
+                    <td>カレンダー名、ID、アクセス権、メタデータ。</td>
+                    <td>
+                      アカウントですでに利用できるカレンダーの表示と選択。
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><code>https://www.googleapis.com/auth/calendar.events</code></td>
+                    <td>
+                      予定、参加者、時刻、繰り返し、リマインダー、会議プロパティ。
+                    </td>
+                    <td>
+                      予定の読み取り、作成、更新、キャンセルと、対応時のMeetリンク作成。
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              Googleデータは、利用者が明示的に実行または設定したメール、カレンダー、モニタリング、自動化機能にだけ使います。Google連絡先、Google
+              Drive、パスワード、ブラウザCookie、広告プロフィール、非公開APIにはアクセスしません。
+            </p>
+          </section>
+          <section id="processing" aria-labelledby="processing-title">
+            <p class="legal-kicker">03 · 処理の仕組み</p>
+            <h2 id="processing-title">直接接続し、操作は明示的に</h2>
+            <p>
+              CLIとMCPは、同じ型付き操作とポリシーチェックを使います。読み取りはできるだけメタデータから始めます。メール送信や参加者招待などの重要な書き込みは正確なプレビューを示し、呼び出し元、アカウント、対象、内容に結び付いた短時間・一回限りの承認を求めます。別の経路へ勝手に切り替えたり、結果が不明な書き込みを自動再試行したりしません。
+            </p>
+            <p>
+              Microsoft OAuthはシステムブラウザ、Outlook
+              Webは専用ローカルブラウザ、オープン標準は利用者が選んだ有効なTLSエンドポイントを使います。プロジェクトはパスワード、OAuthの認可情報、メール、添付ファイル、予定の本文を受け取りません。
+            </p>
+          </section>
+          <section id="storage" aria-labelledby="storage-title">
+            <p class="legal-kicker">04 · 端末内保存と保持期間</p>
+            <h2 id="storage-title">端末に残る可能性があるもの</h2>
+            <ul>
+              <li>
+                <strong
+                >認可情報とセッション：</strong>OAuthトークンはアカウント別の不透明なハンドルでOSキーチェーンに保存し、ブラウザCookieとサイトデータは専用ローカルプロファイルに残します。
+              </li>
+              <li>
+                <strong
+                >設定：</strong>アカウントアドレス、ローカルの別名、選んだ経路、公開OAuthクライアントID、ループバックリダイレクト、キーチェーンハンドル。秘密情報は含みません。
+              </li>
+              <li>
+                <strong
+                >内容を記録しない監査：</strong>上限付きの操作種別、結果、時刻、呼び出し元、不透明なアカウント・対象ID。アドレス、宛先、件名、本文、添付ファイル名、予定本文、検索条件、トークン、承認値は除外します。
+              </li>
+              <li>
+                <strong
+                >任意のキューとインポート：</strong>別途有効にした場合だけ、上限付きのアカウント別記録を保持します。メール本文と添付ファイルはモニターキューに入れません。
+              </li>
+              <li>
+                <strong
+                >一時データ：</strong>要求した値は処理中のメモリとローカルstdioに現れますが、メールボックスやカレンダー全体の永続的な複製は作りません。
+              </li>
+            </ul>
+            <p>
+              アカウント削除、キュー消去、インポート消去により対応するローカル記録を削除します。プロバイダー上のデータは、そのサービスの設定と利用者の操作に従って保持されます。
+            </p>
+          </section>
+          <section id="sharing" aria-labelledby="sharing-title">
+            <p class="legal-kicker">05 · 共有と移転</p>
+            <h2 id="sharing-title">データを受け取り得る相手</h2>
+            <p>
+              プロジェクトにはプロバイダーのアカウントデータを受け取るホスティングサービスがないため、そのデータを収集・販売しません。端末上では、選んだプロバイダー、ローカルCLI、MCPクライアントが必要なデータを受け取る場合があります。MCPクライアントが結果をリモートモデルへ送る場合は、利用者が選んだAIサービスのプライバシー条件が適用されます。別途有効にしたモニターランナーや外部送信先にも、それぞれの条件が適用されます。
+            </p>
+            <p>
+              プロバイダーデータを広告、データ仲介、信用判断、監視、汎用AI・機械学習モデルの訓練には使いません。公開Issueやサポート報告に、実際のメール、予定、トークン、アカウント情報を貼り付けないでください。
+            </p>
+          </section>
+          <section id="limited-use" aria-labelledby="limited-use-title">
+            <p class="legal-kicker">06 · Google Limited Use</p>
+            <h2 id="limited-use-title">利用目的を明確に限定します</h2>
+            <p>
+              Google APIから受け取る情報の利用と移転は、Limited Use要件を含む<a
+                href="https://developers.google.com/terms/api-services-user-data-policy"
+              >Google API Services User Data
+                Policy</a>に従います。アクセスは本ポリシーで明確に説明した利用者向け機能に限ります。特定項目への明示的な同意、セキュリティ調査、法令遵守、内部向けの集計・匿名化を除き、人がGoogleユーザーデータを読むことを認めません。
+            </p>
+          </section>
+          <section id="website" aria-labelledby="website-title">
+            <p class="legal-kicker">
+              07 · ウェブサイト、対応確認、フィードバック
+            </p>
+            <h2 id="website-title">
+              アクセス解析もテレメトリーも既定では使いません
+            </h2>
+            <p>
+              この静的ウェブサイトはCorresyncのCookieを設定せず、アクセス解析、広告、サードパーティ製スクリプトを読み込みません。GitHub
+              Pagesは<a
+                href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement"
+              >GitHubのプライバシー声明</a>に従い、通常のリクエスト情報を処理する場合があります。
+            </p>
+            <p>
+              任意の対応確認はブラウザ内でメールアドレスを分け、入力欄をすぐ空にし、@より後ろの正規化済みドメインだけをJSON
+              <code>POST</code>で<code
+              >discover.corresync.org</code>へ送ります。@より前を送らず、Cookieやブラウザストレージを使わず、サインインも始めません。単一目的のCloudflare
+              Workerは、固定した公開DNS-over-HTTPSリゾルバーへ上限付きの公開レコードだけを問い合わせます。ドメインが示すURLを取得せず、アプリの記録やキャッシュを保持せず、レスポンスは<code
+              >no-store</code>です。ウェブ確認を使わず、インストール後にローカル探索を実行することもできます。
+            </p>
+            <p>
+              対話式CLIはGitHubの公開Releases
+              APIで更新を確認する場合がありますが、アカウントアドレス、メールデータ、永続的な端末IDを送りません。フィードバックと公開エラーの自動報告は既定で無効です。有効にした場合だけ、許可リストと秘匿処理を通った、内容を含まない診断情報が認証済みGitHub
+              CLIから公開Issueへ送られることがあります。
+            </p>
+          </section>
+          <section id="security" aria-labelledby="security-title">
+            <p class="legal-kicker">08 · セキュリティ</p>
+            <h2 id="security-title">
+              境界を強くしますが、絶対的な安全は保証できません
+            </h2>
+            <p>
+              Corresyncは固定APIエンドポイント、有効なTLS、PKCE、state検証、OSキーチェーン、アカウント分離、認証済みローカルIPC、上限付きの解析、プレビュー後の実行を使います。端末、キーチェーン、MCP設定、選んだモデル、バックアップを保護し、信頼できる来歴のリリースだけをインストールしてください。
+            </p>
+          </section>
+          <section id="choices" aria-labelledby="choices-title">
+            <p class="legal-kicker">09 · 利用者の選択と削除</p>
+            <h2 id="choices-title">いつでも接続と権限を削除できます</h2>
+            <ol>
+              <li>
+                ウェブ確認は任意です。ページを離れれば、メールアドレス全体のブラウザ内処理は終了します。
+              </li>
+              <li>
+                <code>corr account remove ALIAS
+                  --approve</code>で、そのアカウントのローカル設定、プロファイル、インポート、カーソル、キュー状態を削除できます。プロバイダー上のメールや予定は削除しません。
+              </li>
+              <li>
+                プロバイダー側の接続済みアプリまたはセキュリティ設定で認可を取り消せます。Googleでは<a
+                  href="https://myaccount.google.com/connections"
+                >Googleアカウントの接続</a>を利用してください。
+              </li>
+              <li>
+                <code>corr events purge --account ALIAS
+                  --approve</code>でモニターキューを消去できます。アプリのアンインストールとローカル設定・データディレクトリの削除により、端末から完全に削除できます。
+              </li>
+            </ol>
+            <p>
+              <code>corr auth
+                logout</code>はローカルセッションを閉じますが、次回のサインインに使うキーチェーンの認可情報は保持します。完全に取り消すには、アカウント削除とプロバイダー側の取り消しを両方行ってください。
+            </p>
+          </section>
+          <section id="children" aria-labelledby="children-title">
+            <p class="legal-kicker">10 · 子ども</p>
+            <h2 id="children-title">子ども向けのサービスではありません</h2>
+            <p>
+              Corresyncは技術的なメール・カレンダーツールで、13歳未満の子どもを対象としていません。子どもの個人情報を収集するサービスを意図的に運営しません。
+            </p>
+          </section>
+          <section id="changes" aria-labelledby="changes-title">
+            <p class="legal-kicker">11 · ポリシーの更新</p>
+            <h2 id="changes-title">重要な変更は見える形で公開します</h2>
+            <p>
+              製品、法令、プロバイダー要件に応じて本ポリシーを更新する場合があります。施行日はページ上部に表示し、重要な変更は本ページとリリースノートで公開します。アカウントデータを新しい目的に使う場合は、利用前に通知し同意を得ます。以前の版は公開ソース履歴に残ります。
+            </p>
+          </section>
+          <section id="contact" aria-labelledby="contact-title">
+            <p class="legal-kicker">12 · 連絡先</p>
+            <h2 id="contact-title">質問やプライバシー上の懸念</h2>
+            <p>
+              非公開データを含まないポリシーの質問は<a
+                href="https://github.com/nkiyohara/corresync/issues/new?template=policy.yml"
+              >CorresyncのGitHub
+                Issue</a>へ。非公開の詳細を含むセキュリティ・プライバシー上の懸念は<a
+                href="https://github.com/nkiyohara/corresync/security/advisories/new"
+              >非公開の脆弱性報告</a>を使ってください。プロジェクトは利用者のアカウント、メールボックス、カレンダーをホストしていないため、端末またはプロバイダーだけにあるデータを取得・削除できません。
+            </p>
+          </section>
+        </article>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        独立したローカルファーストのメール・カレンダーツールです。記載された企業・サービスの公式製品ではありません。
+      </p>
+      <nav aria-label="フッター">
+        <a href="getting-started.html">はじめる</a><a href="providers.html"
+        >対応サービス</a><a href="features.html">できること</a><a href="safety.html"
+        >安全性</a><a href="privacy.html" aria-current="page">プライバシー</a><a
+          href="terms.html"
+        >利用規約</a><a href="https://github.com/nkiyohara/corresync">ソースコード</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >脆弱性の報告</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >リリース</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync 快速开始 — 从安装到第一次回答</title>
+    <meta
+      name="description"
+      content="四步安装 Corresync、添加账号、连接 Codex、Claude Code 或其他 MCP 客户端，并完成第一次跨账号查询。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Corresync 快速开始 — 四步完成设置">
+    <meta
+      property="og:description"
+      content="安装、登录、连接本地 MCP，再跨所有邮箱和日历提问。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/zh-cn/getting-started.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Corresync 标志和英文产品简介">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Corresync 快速开始">
+    <meta name="twitter:description" content="四步完成本地 MCP 设置。">
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta name="twitter:image:alt" content="Corresync 标志和英文产品简介">
+    <link rel="canonical" href="https://corresync.org/zh-cn/getting-started.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/getting-started.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/getting-started.html">
+    <link
+      rel="alternate"
+      hreflang="zh-Hans"
+      href="https://corresync.org/zh-cn/getting-started.html"
+    >
+    <link
+      rel="alternate"
+      hreflang="zh-Hant"
+      href="https://corresync.org/zh-tw/getting-started.html"
+    >
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/getting-started.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/getting-started.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+    <script src="../copy.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a><div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 首页"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="主导航">
+          <a href="./">首页</a><a href="getting-started.html" aria-current="page"
+          >快速开始</a><a href="providers.html">支持服务</a><a href="features.html"
+          >功能</a><a href="safety.html">安全</a>
+        </nav>
+        <nav class="language-nav" aria-label="語言">
+          <a href="../getting-started.html" lang="en" hreflang="en">EN</a><a
+            href="../ja/getting-started.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a
+            href="getting-started.html"
+            lang="zh-Hans"
+            hreflang="zh-Hans"
+            aria-current="page"
+          >简中</a><a href="../zh-tw/getting-started.html" lang="zh-Hant" hreflang="zh-Hant"
+          >繁中</a><a href="../ko/getting-started.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>快速开始</p>
+        <h1 id="page-title">从安装到第一次回答，<em>清晰的四个步骤。</em></h1>
+        <p class="lede">
+          安装 <code>corr</code>，添加工作或个人账号，把本地 MCP
+          注册到智能体，然后提出跨账号问题。即使结果合并展示，每个账号的身份和授权仍然隔离。Outlook
+          Web 登录由浏览器管理；API 和标准协议的 授权 留在系统钥匙串；MCP
+          只通过本地 stdio 通信。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#step-install">从第 1 步开始</a><a
+            class="button secondary"
+            href="providers.html#check"
+          >先检查支持情况</a>
+        </div>
+      </section>
+      <ol class="gs-steps">
+        <li class="gs-step" id="step-install" aria-labelledby="install-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">1</span><div>
+              <h2 id="install-title">安装 <code>corr</code></h2>
+              <p>这里只安装程序，不添加账号，也不会登录。</p>
+            </div>
+          </header>
+          <div class="install-grid primary-install-grid">
+            <div class="install-block">
+              <p class="os-label" id="gs-unix">macOS · Linux</p>
+              <div class="cmd" data-copy data-copy-label="macOS 和 Linux 安装命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="gs-unix"
+                ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
+              </div>
+              <p class="block-note">
+                为当前用户安装已验证的 stable 版本。运行前可阅读<a
+                  href="../install.sh"
+                >脚本</a>。
+              </p>
+            </div>
+            <div class="install-block">
+              <p class="os-label" id="gs-windows">Windows · PowerShell</p>
+              <div class="cmd" data-copy data-copy-label="Windows PowerShell 安装命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="gs-windows"
+                ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
+              </div>
+              <p class="block-note">
+                无需管理员权限，只更新当前用户的 <code>PATH</code>。可先阅读<a
+                  href="../install.ps1"
+                >脚本</a>。
+              </p>
+            </div>
+          </div>
+          <section
+            class="install-alternatives"
+            id="other-install-methods"
+            aria-labelledby="other-install-title"
+          >
+            <div class="install-alternatives-head">
+              <h3 id="other-install-title">其他安装方式</h3>
+              <p>交给包管理器管理升级与卸载。</p>
+            </div>
+            <div class="install-grid">
+              <div class="install-block">
+                <p class="os-label" id="gs-winget">Windows · WinGet</p>
+                <div class="cmd" data-copy data-copy-label="WinGet 安装命令">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-winget"
+                  ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
+                </div>
+              </div>
+              <div class="install-block">
+                <p class="os-label" id="gs-homebrew">macOS · Linux · Homebrew</p>
+                <div class="cmd" data-copy data-copy-label="Homebrew 安装命令">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-homebrew"
+                  ><code>brew install nkiyohara/corresync/corresync</code></pre>
+                </div>
+              </div>
+              <div class="install-block">
+                <p class="os-label" id="gs-scoop">Windows · Scoop</p>
+                <div class="cmd" data-copy data-copy-label="Scoop 安装命令">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-scoop"
+                  ><code>scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
+scoop install corresync/corresync</code></pre>
+                </div>
+              </div>
+            </div>
+            <p class="install-alternatives-note">
+              Linux 的 <code>.deb</code>、<code>.rpm</code>、<code
+              >.apk</code>，直接下载包、校验和、Sigstore 来源证明和 Claude Desktop
+              <code>.mcpb</code> 都在<a
+                href="https://github.com/nkiyohara/corresync/releases/latest"
+              >最新发布</a>中。
+            </p>
+          </section>
+          <div class="install-block verify-block">
+            <p class="os-label" id="gs-verify">验证</p>
+            <div class="cmd" data-copy data-copy-label="版本检查命令">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="gs-verify"
+              ><code>corr --version</code></pre>
+            </div>
+          </div>
+          <div class="install-block verify-block">
+            <p class="os-label" id="gs-updates">可选 · 自动更新独立安装版</p>
+            <div class="cmd" data-copy data-copy-label="启用已验证自动更新">
+              <pre
+                tabindex="0"
+                role="region"
+                aria-labelledby="gs-updates"
+              ><code>corr config set updates.auto_install true</code></pre>
+            </div>
+            <p class="block-note">
+              只自动安装已签名并验证的独立安装版；MCP
+              调用或机器可读输出期间不会更新。
+            </p>
+          </div>
+        </li>
+        <li class="gs-step" id="sign-in" aria-labelledby="signin-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">2</span><div>
+              <h2 id="signin-title">先选账号，再登录</h2>
+              <p>
+                Corresync
+                先用地址收集无凭据证据，添加你选择的路径，随后通过单独的账号命令认证。
+              </p>
+            </div>
+          </header>
+          <div class="duo">
+            <div>
+              <p>
+                Outlook Web 的发现和账号添加不会打开浏览器；<code>auth login</code>
+                只为指定别名启动登录。
+              </p>
+              <p>
+                <strong>使用 Gmail？</strong>Gmail 和 Calendar API 代码已在 RC
+                中，但生产环境 OAuth 等待审批，因此路径完全关闭，Google
+                登录无法启动。暂时请使用 Google 官方 Workspace MCP。
+              </p>
+              <p class="step-links">
+                <a href="providers.html#check">不发送完整地址即可检查</a> · <a
+                  href="safety.html"
+                >了解登录归属</a>
+              </p>
+            </div>
+            <div class="stack">
+              <div class="install-block">
+                <p class="os-label" id="gs-signin-default">Outlook Web · 引导设置</p>
+                <div class="cmd" data-copy data-copy-label="账号与登录命令">
+                  <pre
+                    tabindex="0"
+                    role="region"
+                    aria-labelledby="gs-signin-default"
+                  ><code>corr setup you@example.com --alias personal
+corr auth login --account personal
+corr doctor --account personal</code></pre>
+                </div>
+              </div>
+              <div class="install-block">
+                <p class="os-label">Gmail · 审批前的临时方式</p>
+                <p class="block-note">
+                  参阅 Google 官方<a
+                    href="https://developers.google.com/workspace/guides/configure-mcp-servers"
+                  >Workspace MCP 设置指南</a>。该服务目前是 Developer Preview。
+                </p>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li class="gs-step" id="connect" aria-labelledby="connect-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">3</span><div>
+              <h2 id="connect-title">连接你常用的智能体</h2>
+              <p>
+                命令会把本地 stdio MCP
+                的绝对路径写入客户端自己的配置，不创建远程端点。之后重启客户端。
+              </p>
+            </div>
+          </header>
+          <div class="client-grid">
+            <div class="client">
+              <h3>Codex</h3>
+              <div class="cmd" data-copy data-copy-label="Codex 设置命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Codex 设置命令"
+                ><code>corr mcp setup codex</code></pre>
+              </div>
+            </div>
+            <div class="client">
+              <h3>Claude Code</h3>
+              <div class="cmd" data-copy data-copy-label="Claude Code 设置命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Claude Code 设置命令"
+                ><code>corr mcp setup claude-code</code></pre>
+              </div>
+            </div>
+            <div class="client">
+              <h3>GitHub Copilot CLI</h3>
+              <div class="cmd" data-copy data-copy-label="GitHub Copilot CLI 设置命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="GitHub Copilot CLI 设置命令"
+                ><code>corr mcp setup github-copilot</code></pre>
+              </div>
+            </div>
+            <div class="client">
+              <h3>Gemini CLI</h3>
+              <div class="cmd" data-copy data-copy-label="Gemini CLI 设置命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Gemini CLI 设置命令"
+                ><code>corr mcp setup gemini-cli</code></pre>
+              </div>
+            </div>
+            <div class="client">
+              <h3>Qwen Code</h3>
+              <div class="cmd" data-copy data-copy-label="Qwen Code 设置命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Qwen Code 设置命令"
+                ><code>corr mcp setup qwen-code</code></pre>
+              </div>
+            </div>
+            <div class="client">
+              <h3>Qoder</h3>
+              <div class="cmd" data-copy data-copy-label="Qoder 设置命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Qoder 设置命令"
+                ><code>corr mcp setup qoder</code></pre>
+              </div>
+            </div>
+            <div class="client">
+              <h3>Kimi Code CLI</h3>
+              <div class="cmd" data-copy data-copy-label="Kimi Code 配置命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="Kimi Code 配置命令"
+                ><code>corr mcp config kimi-code</code></pre>
+              </div>
+            </div>
+            <div class="client">
+              <h3>任意 MCP 客户端</h3>
+              <div class="cmd" data-copy data-copy-label="通用 MCP 启动命令">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-label="通用 MCP 启动命令"
+                ><code>corr mcp serve</code></pre>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li class="gs-step" id="first-asks" aria-labelledby="ask-title">
+          <header>
+            <span class="step-badge" aria-hidden="true">4</span><div>
+              <h2 id="ask-title">跨所有账号提问</h2>
+              <p>
+                读取可以跨账号但不会合并身份；写入则先审阅，再单独提交。
+              </p>
+            </div>
+          </header>
+          <div class="duo">
+            <div>
+              <ul class="prompt-list">
+                <li>“在所有账号里找 Ana 发来的季度计划邮件。”</li>
+                <li>“明天上午所有日历里有什么安排？”</li>
+                <li>“起草给 Ana 的回复，发送前让我确认。”</li>
+              </ul>
+              <p>
+                结果保留账号和提供商；失败路径显示为部分失败。发送时，只有与审阅过的账号、收件人和字节完全一致的内容才能通过
+                CLI <code>--approve</code> 或 MCP 提交
+                工具提交。批准短时且单次有效。
+              </p>
+            </div>
+            <figure class="terminal">
+              <figcaption class="term-bar">
+                <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
+                  class="term-title"
+                >操作前审阅</span>
+              </figcaption>
+              <pre
+                tabindex="0"
+                role="region"
+                aria-label="邮件发送审阅与提交"
+              ><code><span class="t-prompt">$</span> corr mail send --account work \
+    --to ana@example.invalid \
+    --subject 'Quarterly plan' \
+    --body-file reply.txt
+
+<span class="t-review">REVIEW · send new message</span>
+  account  work · microsoft-owa
+  to       ana@example.invalid
+
+<span class="t-dim">尚未发送。</span></code></pre>
+            </figure>
+          </div>
+        </li>
+      </ol>
+      <section aria-labelledby="next-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>继续了解</p>
+          <h2 id="next-title">需要时，再深入细节。</h2>
+        </div>
+        <div class="control-grid">
+          <article>
+            <h3>支持服务与限制</h3>
+            <p><a href="providers.html">比较每条路径</a>的能力。</p>
+          </article>
+          <article>
+            <h3>安全模型</h3>
+            <p><a href="safety.html">了解凭据、隔离和预览→提交</a>。</p>
+          </article>
+          <article>
+            <h3>全部功能</h3>
+            <p><a href="features.html">浏览邮件、日历、脚本与监控功能</a>。</p>
+          </article>
+          <article>
+            <h3>脚本与 JSON</h3>
+            <p><a href="features.html#scripting">使用同一核心自动化</a>。</p>
+          </article>
+        </div>
+      </section>
+      <section class="final-cta" aria-labelledby="gs-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>完整流程</p>
+        <h2 id="gs-cta-title">安装、登录、连接、提问。</h2>
+        <p>其余细节可以在需要时再读。</p>
+        <div class="actions centered">
+          <a class="button primary" href="safety.html">阅读安全模型</a><a
+            class="button secondary"
+            href="features.html"
+          >查看全部功能</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        独立的本地优先邮件与日历工具。与此处提到的厂商无隶属或背书关系。
+      </p>
+      <nav aria-label="页脚">
+        <a href="getting-started.html">快速开始</a><a href="providers.html">支持服务</a><a
+          href="features.html"
+        >功能</a><a href="safety.html">安全</a><a href="privacy.html">隐私</a><a
+          href="terms.html"
+        >条款</a><a href="https://github.com/nkiyohara/corresync">源代码</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >安全报告</a><a href="https://github.com/nkiyohara/corresync/releases">发布</a><a
+          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

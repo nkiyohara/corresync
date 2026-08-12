@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync 보안 모델 — 로컬 권한과 쓰기 작업 승인</title>
+    <meta
+      name="description"
+      content="로그인을 브라우저와 키체인에 맡기고 계정을 격리하며, 중요한 쓰기 작업 전에 정확한 미리보기와 별도 승인을 요구하는 방식을 설명합니다."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Corresync 보안 모델">
+    <meta
+      property="og:description"
+      content="자격 증명 소유권, 계정 격리, 미리보기 후 실행, 신뢰하지 않는 데이터 경계."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ko_KR">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:url" content="https://corresync.org/ko/safety.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Corresync 로고와 영문 제품 소개">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Corresync 보안 모델">
+    <meta name="twitter:description" content="로컬 권한, 계정 격리, 쓰기 작업 승인.">
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta name="twitter:image:alt" content="Corresync 로고와 영문 제품 소개">
+    <link rel="canonical" href="https://corresync.org/ko/safety.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/safety.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/safety.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/safety.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/safety.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/safety.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/safety.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 건너뛰기</a><div
+      class="airmail"
+      aria-hidden="true"
+    >
+    </div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 홈"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="주 메뉴">
+          <a href="./">홈</a><a href="getting-started.html">시작하기</a><a
+            href="providers.html"
+          >지원 서비스</a><a href="features.html">기능</a><a
+            href="safety.html"
+            aria-current="page"
+          >보안</a>
+        </nav>
+        <nav class="language-nav" aria-label="언어">
+          <a href="../safety.html" lang="en" hreflang="en">EN</a><a
+            href="../ja/safety.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a href="../zh-cn/safety.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="../zh-tw/safety.html" lang="zh-Hant" hreflang="zh-Hant">繁中</a><a
+            href="safety.html"
+            lang="ko"
+            hreflang="ko"
+            aria-current="page"
+          >한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>보안 모델</p>
+        <h1 id="page-title">권한은 좁게, 영향은 <em>실행 전에 보이게.</em></h1>
+        <p class="lede">
+          Corresync는 인증을 브라우저와 운영체제 키체인에 맡기고, 계정마다
+          세션과 권한을 격리합니다. 중요한 원격 쓰기는 정확한 미리보기와
+          별도의 일회성 승인 없이는 실행할 수 없습니다.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#preview">미리보기 흐름 보기</a><a
+            class="button secondary"
+            href="privacy.html"
+          >개인정보 처리방침</a>
+        </div>
+      </section>
+      <section class="trust-row" aria-label="핵심 보안 원칙">
+        <div>
+          <strong>비밀 정보 없는 설정</strong><span>구성 스키마에는 비밀번호,
+            토큰, Cookie 또는 새로 고침 토큰을 표현할 수 없습니다.</span>
+        </div>
+        <div>
+          <strong>계정별 격리</strong><span>신원, 세션, 프로필, 커서, 캐시, 감사
+            맥락이 각각 분리됩니다.</span>
+        </div>
+        <div>
+          <strong>서버가 강제하는 승인</strong><span>승인은 미리 본 호출자,
+            계정, 대상, 내용에만 한 번 사용할 수 있습니다.</span>
+        </div>
+      </section>
+      <section id="credentials" aria-labelledby="credentials-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>인증 소유권</p>
+          <h2 id="credentials-title">
+            에이전트나 코어가 비밀번호를 맡지 않습니다.
+          </h2>
+          <p>
+            브라우저 기반 경로는 사용자가 보는 브라우저가 인증을
+            소유합니다. 표준 경로의 비밀 정보는 동의가 필요한 외부 자격
+            증명 포트를 통해 운영체제 키체인이나 승인한 도우미에서
+            읽습니다.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3>Outlook Web</h3>
+            <p>
+              전용 로컬 브라우저 프로필에 로그인과 사이트 데이터를 남기고
+              설정, 감사 로그, MCP 출력으로 복사하지 않습니다.
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>OAuth 경로</h3>
+            <p>
+              시스템 브라우저, PKCE, state 검증, 고정된 회신 주소를
+              사용합니다. Graph는 명시적으로 선택해야 하며 자동 대체 경로가
+              아닙니다.
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>개방형 표준</h3>
+            <p>
+              유효한 TLS를 요구하고 설정에는 비밀 정보가 아닌 외부 참조만
+              둡니다. 인증이 필요한 탐색은 자동으로 시작하지 않습니다.
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>Google 승인 게이트</h3>
+            <p>
+              코드는 RC에 있지만 운영 환경 OAuth 승인 전에는 계정 추가,
+              브라우저, 동의, 키체인, 세션, 네트워크보다 앞에서 중단됩니다.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section class="safety" id="preview" aria-labelledby="preview-title">
+        <div class="safety-head">
+          <p class="eyebrow light"><span aria-hidden="true"></span>미리보기 → 실행</p>
+          <h2 id="preview-title">승인은 정확히 미리 본 작업에만 유효합니다.</h2>
+          <p class="safety-lede">
+            서버가 만든 미리보기에는 계정, 공급자, 대상과 페이로드가
+            포함됩니다. 승인 토큰은 호출자, 이 값들, 만료 시각에
+            암호학적으로 묶이며 재사용할 수 없습니다.
+          </p>
+        </div>
+        <div class="safety-body">
+          <figure class="terminal safety-terminal">
+            <figcaption class="term-bar">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
+                class="term-title"
+              >작업 전 검토</span>
+            </figcaption>
+            <pre
+              tabindex="0"
+              role="region"
+              aria-label="메일 전송 미리보기"
+            ><code><span class="t-review">REVIEW · send new message</span>
+  account  work · microsoft-owa
+  to       ana@example.invalid
+  subject  Quarterly plan
+  body     text/plain · 412 B
+
+<span class="t-dim">아직 전송되지 않았습니다.</span></code></pre>
+          </figure>
+          <ul class="safety-points">
+            <li>
+              계정, 받는 사람, 첨부 파일 또는 본문이 달라지면 기존 승인을
+              거부합니다.
+            </li>
+            <li>승인은 짧게 만료되고 한 번 사용하면 폐기됩니다.</li>
+            <li>
+              상태를 알 수 없는 원격 쓰기는 자동으로 다시 보내지 않습니다.
+            </li>
+            <li>
+              CLI와 MCP가 같은 애플리케이션 정책을 거치므로 우회 경로가
+              없습니다.
+            </li>
+          </ul>
+        </div>
+      </section>
+      <section aria-labelledby="data-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>신뢰하지 않는 데이터</p>
+          <h2 id="data-title">메일과 캘린더 내용은 지시가 아닙니다.</h2>
+          <p>
+            메시지, 첨부 파일, 링크, 일정 필드, 가져온 파일, 모니터
+            이벤트는 모두 신뢰하지 않는 입력입니다. 이런 내용이 명령 실행,
+            권한 확대, 로그인 시작, 모니터링 활성화 또는 데이터 외부
+            전송을 허가할 수 없습니다.
+          </p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <h3>명확히 정의된 도구만</h3>
+            <p>
+              임의 작업이나 범용 속성 API를 제공하지 않습니다. 각 입력은
+              크기와 형식을 제한해 파싱합니다.
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>로컬 stdio MCP</h3>
+            <p>
+              로컬 프로세스 사이에서 통신하며 호스팅 중계, 원격 MCP
+              엔드포인트 또는 TLS 가로채기를 사용하지 않습니다.
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>분리된 선택 항목</h3>
+            <p>
+              가져오기, 모니터링, 에이전트 실행, 외부 전송은 별도 동의이며
+              기본으로 꺼져 있습니다. MCP는 이를 켤 수 없습니다.
+            </p>
+          </article>
+          <article class="feature-card">
+            <h3>내용 없는 감사</h3>
+            <p>
+              운영 결과를 조사할 최소 맥락만 남기고 주소, 받는 사람, 제목,
+              본문, 첨부 파일명과 비밀 정보는 기록하지 않습니다.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section class="tinted-section" aria-labelledby="network-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>네트워크 경계</p>
+          <h2 id="network-title">
+            탐색은 좁고, 로그인은 사용자가 선택한 뒤에만.
+          </h2>
+          <p>
+            자격 증명 없는 탐색은 유효한 TLS와 공개 메타데이터만
+            사용합니다. 관리자 동의 화면을 만들거나 Graph 또는 Google 권한
+            요청을 자동으로 시작하지 않습니다.
+          </p>
+        </div>
+        <ul class="check-list">
+          <li>
+            표준 경로의 리디렉션과 엔드포인트는 SSRF와 프로토콜
+            다운그레이드를 막는 규칙으로 제한합니다.
+          </li>
+          <li>
+            웹 호환성 검사는 도메인만 고정 DNS-over-HTTPS 해석기로 보내며
+            도메인이 가리키는 URL을 가져오지 않습니다.
+          </li>
+          <li>
+            계정 기능은 브랜드에서 추측하지 않고 로그인 후 계정별로
+            관찰합니다.
+          </li>
+          <li>
+            기능 저하, 부분 실패, 알 수 없는 결과는 성공으로 정규화하지
+            않습니다.
+          </li>
+        </ul>
+      </section>
+      <section class="honest-edges" aria-labelledby="responsibility-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>사용자의 책임</p>
+          <h2 id="responsibility-title">
+            로컬 우선도 안전을 자동으로 보장하지는 않습니다.
+          </h2>
+        </div>
+        <ul>
+          <li>
+            신뢰할 수 있는 출처의 릴리스만 설치하고 장치, 운영체제 계정,
+            브라우저, 키체인과 백업을 보호하세요.
+          </li>
+          <li>
+            MCP 클라이언트가 결과를 원격 모델로 보낼 수 있으므로 해당
+            서비스의 개인정보 처리 조건을 확인하세요.
+          </li>
+          <li>
+            중요한 작업은 승인 전에 계정, 대상, 날짜와 내용을 직접
+            확인하세요.
+          </li>
+          <li>
+            조직 정책, MFA, Conditional Access, 관리자 동의와 기존 권한은 계속
+            적용됩니다.
+          </li>
+          <li>
+            민감한 취약점은 공개 이슈가 아니라 비공개 보안 신고로
+            보내세요.
+          </li>
+        </ul>
+      </section>
+      <section class="final-cta" aria-labelledby="safety-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>투명한 경계</p>
+        <h2 id="safety-cta-title">
+          데이터 처리 방식과 계정 경로를 함께 확인하세요.
+        </h2>
+        <div class="actions centered">
+          <a class="button primary" href="privacy.html">개인정보 처리방침</a><a
+            class="button secondary"
+            href="providers.html"
+          >지원 서비스</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        독립적인 로컬 우선 메일·캘린더 도구입니다. 여기에 언급된 업체와
+        제휴하거나 보증받지 않았습니다.
+      </p>
+      <nav aria-label="바닥글">
+        <a href="getting-started.html">시작하기</a><a href="providers.html"
+        >지원 서비스</a><a href="features.html">기능</a><a
+          href="safety.html"
+          aria-current="page"
+        >보안</a><a href="privacy.html">개인정보</a><a href="terms.html">이용 약관</a><a
+          href="https://github.com/nkiyohara/corresync"
+        >소스 코드</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >보안 문제 신고</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >릴리스</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>
