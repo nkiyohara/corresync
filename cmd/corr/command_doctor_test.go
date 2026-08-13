@@ -9,12 +9,23 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/localipc"
 )
+
+func allowDoctorBrowserProbe(t *testing.T, app *runtime, expected string) {
+	t.Helper()
+	app.probeBrowser = func(_ context.Context, configured string) (string, error) {
+		if configured != expected {
+			t.Fatalf("browser probe configured path = %q, want %q", configured, expected)
+		}
+		return expected, nil
+	}
+}
 
 func TestDoctorOfflineProducesContentFreeHealthyReport(t *testing.T) {
 	t.Parallel()
@@ -34,6 +45,7 @@ func TestDoctorOfflineProducesContentFreeHealthyReport(t *testing.T) {
 
 	var stdout bytes.Buffer
 	app := newRuntime(context.Background(), configPath, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	allowDoctorBrowserProbe(t, app, executable)
 	app.endpoint = func(path string) (localipc.Endpoint, error) {
 		return localipc.ResolveInState(path, filepath.Join(root, "state"))
 	}
@@ -94,6 +106,10 @@ func TestDoctorDoesNotRequireBrowserForStandardsRoutes(t *testing.T) {
 		&bytes.Buffer{},
 		buildinfo.Current(),
 	)
+	app.probeBrowser = func(context.Context, string) (string, error) {
+		t.Fatal("standards route unexpectedly probed Chromium")
+		return "", nil
+	}
 	app.endpoint = func(path string) (localipc.Endpoint, error) {
 		return localipc.ResolveInState(path, filepath.Join(root, "state"))
 	}
@@ -172,6 +188,7 @@ func TestDoctorOfflineRejectsIncompatibleRunningDaemon(t *testing.T) {
 				&bytes.Buffer{},
 				buildinfo.Current(),
 			)
+			allowDoctorBrowserProbe(t, app, executable)
 			app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
 			command := doctorCommand{JSON: true}
 			if err := command.Run(app); err == nil {
@@ -228,6 +245,7 @@ func TestDoctorReportsSplitOwnersWithRunnableRecovery(t *testing.T) {
 
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), configPath, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	allowDoctorBrowserProbe(t, app, executable)
 	app.endpoint = func(string) (localipc.Endpoint, error) { return current, nil }
 	app.previousEndpoints = func(string) ([]localipc.Endpoint, error) {
 		return []localipc.Endpoint{previous}, nil
@@ -311,6 +329,7 @@ func TestDoctorOnlineRequiresAnExistingSessionWithoutStartingLogin(t *testing.T)
 		&bytes.Buffer{},
 		buildinfo.Current(),
 	)
+	allowDoctorBrowserProbe(t, app, executable)
 	app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
 	daemon := startLifecycleTestDaemon(
 		t.Context(),
@@ -342,4 +361,53 @@ func TestDoctorOnlineRequiresAnExistingSessionWithoutStartingLogin(t *testing.T)
 		return
 	}
 	t.Fatalf("doctor report lacks session check: %+v", report.Checks)
+}
+
+func TestDoctorRejectsChromiumWithoutLinuxSandbox(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	executable := filepath.Join(root, "private", "chrome")
+	if err := os.MkdirAll(filepath.Dir(executable), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// #nosec G306 -- the owner-only synthetic executable is intentional.
+	if err := os.WriteFile(executable, []byte("synthetic executable"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	configuration := config.OutlookDefault()
+	configuration.Browser.Executable = executable
+	configPath := filepath.Join(root, "config.toml")
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), configPath, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	app.probeBrowser = func(context.Context, string) (string, error) {
+		return "", browser.ErrLinuxSandboxUnavailable
+	}
+	app.endpoint = func(path string) (localipc.Endpoint, error) {
+		return localipc.ResolveInState(path, filepath.Join(root, "state"))
+	}
+	if err := (&doctorCommand{JSON: true}).Run(app); err == nil {
+		t.Fatal("doctor accepted a browser that cannot start its sandbox")
+	}
+	var report doctorReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	for _, check := range report.Checks {
+		if check.Name != "browser" {
+			continue
+		}
+		if check.Status != "fail" ||
+			!strings.Contains(check.Detail, "AppArmor policy") ||
+			!strings.Contains(check.Detail, "will not disable the sandbox") ||
+			strings.Contains(check.Detail, executable) {
+			t.Fatalf("browser check = %+v", check)
+		}
+		return
+	}
+	t.Fatalf("doctor report lacks browser failure: %+v", report.Checks)
 }

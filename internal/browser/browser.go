@@ -74,16 +74,7 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 			return nil, err
 		}
 	}
-	execOptions := append([]chromedp.ExecAllocatorOption{}, chromedp.DefaultExecAllocatorOptions[:]...)
-	execOptions = append(
-		execOptions,
-		chromedp.ExecPath(executable),
-		chromedp.UserDataDir(options.ProfileDir),
-		chromedp.Flag("headless", options.Headless),
-		chromedp.Flag("disable-gpu", false),
-		chromedp.NoFirstRun,
-		chromedp.NoDefaultBrowserCheck,
-	)
+	execOptions := allocatorOptions(executable, options.ProfileDir, options.Headless)
 	allocatorContext, cancelAllocator := chromedp.NewExecAllocator(parent, execOptions...)
 	browserContext, cancelContext := chromedp.NewContext(allocatorContext)
 	instance := &Browser{
@@ -110,6 +101,24 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 		return nil, fmt.Errorf("navigate to Outlook Web: %w", err)
 	}
 	return instance, nil
+}
+
+func allocatorOptions(executable, profileDirectory string, headless bool) []chromedp.ExecAllocatorOption {
+	options := append(
+		[]chromedp.ExecAllocatorOption{},
+		chromedp.DefaultExecAllocatorOptions[:]...,
+	)
+	return append(
+		options,
+		chromedp.ExecPath(executable),
+		// chromedp otherwise adds --no-sandbox implicitly for root processes.
+		chromedp.Flag("no-sandbox", false),
+		chromedp.UserDataDir(profileDirectory),
+		chromedp.Flag("headless", headless),
+		chromedp.Flag("disable-gpu", false),
+		chromedp.NoFirstRun,
+		chromedp.NoDefaultBrowserCheck,
+	)
 }
 
 // WaitForSession waits for an authorized first-party Outlook Web request.
