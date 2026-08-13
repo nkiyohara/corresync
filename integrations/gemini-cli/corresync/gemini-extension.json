@@ -1,0 +1,14 @@
+{
+  "description": "Use the guarded local Corresync mail and calendar MCP server. Requires corr on PATH; no binary, account, or credential is bundled.",
+  "mcpServers": {
+    "corresync": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": "corr"
+    }
+  },
+  "name": "corresync",
+  "version": "0.8.6-rc.6"
+}

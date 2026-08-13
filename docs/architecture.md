@@ -309,6 +309,21 @@ acknowledgement transitions.
 
 ## Updates and distribution
 
+Integration packaging has one inward-facing specification in
+`internal/integrationbundle`. It owns public identity, URLs, effect disclosure,
+and the fixed `corr mcp serve` stdio launch contract. The portable Agent Skill
+remains the reviewed workflow source. Deterministic renderers produce thin
+Codex/OpenAI and shared Claude/Copilot/VS Code plugins, a Gemini extension, a
+Kiro Power, neutral config-only metadata, and release documentation. Host
+lifecycle adapters may specialize an installed executable/config path, but do
+not redefine package semantics.
+
+Thin packages depend on an installed local CLI and carry no executable or
+private state. The Claude Desktop MCPB is a distinct self-contained release
+artifact whose binaries, version, checksum, registry entry, and SBOMs are bound
+after the build. Release staging renders the exact tag version rather than
+editing checked-in snapshots.
+
 Automatic update discovery reads only public release metadata for the explicit
 stable (default) or preview channel, uses channel-isolated caches, and is absent
 from machine transports and feedback. Direct updates,

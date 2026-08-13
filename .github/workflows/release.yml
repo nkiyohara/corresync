@@ -167,7 +167,7 @@ jobs:
       - name: Verify every release output
         run: go run ./tools/releaseverify --dist dist
 
-      - name: Replace signed macOS assets and attach the verified MCP Bundle
+      - name: Attach signed macOS assets, MCP Bundle, and registry manifest
         run: >-
           gh release upload "$GITHUB_REF_NAME"
           dist/corresync_*_darwin_*.tar.gz
@@ -176,6 +176,7 @@ jobs:
           dist/*.mcpb
           dist/*.mcpb.spdx.json
           dist/*.mcpb.cdx.json
+          dist/server.json
           dist/checksums.txt
           --clobber
         env:

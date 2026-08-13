@@ -5,6 +5,21 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Generated native agent integrations
+
+- Generate combined local MCP + Agent Skill packages for Codex/OpenAI, the
+  shared Claude Code/GitHub Copilot CLI/VS Code plugin format, Gemini CLI, and
+  Kiro IDE from one reviewed public bundle specification. Keep config-only
+  metadata explicit for other editors and distinguish every thin package from
+  the self-contained Claude Desktop MCPB.
+- Render stable and preview release versions into a fresh staging tree, derive
+  the MCPB and MCP Registry manifest from the same identity, and bind the
+  registry entry to the exact MCPB SHA-256. CI now rejects generated drift and
+  validates the portable Skill plus Claude plugin with pinned upstream tools.
+- Keep integration packages local-only, credential-free, and unable to
+  auto-approve writes. Hosted ChatGPT, Kiro Web, and remote sandboxes are
+  explicitly unsupported by the local stdio packages.
+
 ### Local agent-host catalog and detection
 
 - Add `corr integrations detect/list/show` with stable JSON, a typed catalog,

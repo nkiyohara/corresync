@@ -117,6 +117,21 @@ gateway or tenant administration service.
 - The text-only terminal browser relay requires an interactive TTY, sends at
   most one sanitized control event, and is never exposed through MCP.
 
+## Integration-package controls
+
+- Generate native wrappers from one closed public metadata schema and the
+  reviewed Agent Skill. The schema cannot represent an account, credential,
+  token, cookie, environment secret, private config value, or auto-approval.
+- Thin packages invoke only `corr mcp serve` over local stdio and require the
+  CLI on `PATH`. Never imply that hosted ChatGPT, Kiro Web, or a remote sandbox
+  can reach local state.
+- Keep the self-contained MCPB distinct from thin plugins. Bind its exact
+  release binaries, version, launchers, licenses, checksums, SBOMs, and MCP
+  Registry manifest in the release verifier.
+- Treat host-specific configuration as external state. Generic bundle metadata
+  is not permission to guess a host schema or overwrite user-authored files;
+  lifecycle adapters own scoped inspection and previewed mutation.
+
 ## Local IPC controls
 
 - Use an owner-only Unix socket or protected local Windows named pipe; never a

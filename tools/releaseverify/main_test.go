@@ -1,11 +1,46 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 	"testing"
 )
+
+func TestVerifyIntegrationVersions(t *testing.T) {
+	t.Parallel()
+	const version = "1.2.3-rc.4"
+	versionedJSON := func(extra map[string]any) []byte {
+		document := map[string]any{"version": version}
+		for key, value := range extra {
+			document[key] = value
+		}
+		data, err := json.Marshal(document)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return data
+	}
+	files := map[string][]byte{
+		".claude-plugin/marketplace.json": versionedJSON(map[string]any{
+			"plugins": []any{map[string]any{"version": version}},
+		}),
+		"integrations/config-hosts.json":                          versionedJSON(nil),
+		"integrations/gemini-cli/corresync/gemini-extension.json": versionedJSON(nil),
+		"plugins/corresync/.claude-plugin/plugin.json":            versionedJSON(nil),
+		"plugins/corresync/.codex-plugin/plugin.json":             versionedJSON(nil),
+		"docs/generated/integration-bundles.md":                   []byte("Canonical source snapshot:\n\n`" + version + "`."),
+		"integrations/kiro/corresync/POWER.md":                    []byte("Version: " + version),
+	}
+	if err := verifyIntegrationVersions(files, version); err != nil {
+		t.Fatal(err)
+	}
+	files["plugins/corresync/.codex-plugin/plugin.json"] = versionedJSON(map[string]any{"version": "9.9.9"})
+	if err := verifyIntegrationVersions(files, version); err == nil {
+		t.Fatal("version verifier accepted a mismatched plugin")
+	}
+}
 
 func TestValidateGitHubAssetName(t *testing.T) {
 	t.Parallel()
@@ -32,6 +67,7 @@ func TestPackageInventoryRequiresPublicChangelog(t *testing.T) {
 		"/usr/share/doc/corresync/CHANGELOG.md",
 		"/usr/share/doc/corresync/third_party_licenses",
 		"/usr/share/corresync/plugins/corresync",
+		"/usr/share/corresync/integrations",
 		"/usr/share/corresync/.agents/plugins/marketplace.json",
 		"/usr/share/corresync/.claude-plugin/marketplace.json",
 	}

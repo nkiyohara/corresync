@@ -1,7 +1,7 @@
 ---
-name: corresync
-description: Access guarded local multi-account mail and calendar through Corresync MCP tools. Use whenever a request concerns Gmail, Google Calendar, Outlook, Microsoft 365, JMAP, IMAP, SMTP, CalDAV, an inbox or mailbox, email or messages, a calendar or schedule, availability, meetings, Teams links, or local mail monitoring. Covers checking and summarizing across accounts, searching or reading messages, drafting, replying, forwarding, sending, organizing messages, listing/creating/updating/cancelling events, and inspecting local monitor events. Providers are explicit routes; no operation silently changes provider.
+inclusion: auto
 ---
+
 
 # Corresync
 

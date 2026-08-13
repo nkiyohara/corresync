@@ -1,36 +1,45 @@
 {
-  "name": "corresync",
-  "version": "0.7.0",
-  "description": "Makes guarded local mail and calendar tools discoverable from natural-language requests.",
   "author": {
     "name": "Corresync contributors",
     "url": "https://github.com/nkiyohara/corresync"
   },
+  "description": "Makes guarded local mail and calendar tools discoverable from natural-language requests.",
   "homepage": "https://corresync.org/",
-  "repository": "https://github.com/nkiyohara/corresync",
-  "license": "Apache-2.0",
-  "keywords": ["email", "calendar", "gmail", "outlook", "mcp", "local-first"],
-  "skills": "./skills/",
   "interface": {
-    "displayName": "Corresync — Mail & Calendar",
-    "shortDescription": "Use guarded local mail and calendar tools",
-    "longDescription": "Recognizes inbox, email, calendar, schedule, and meeting requests and routes them to the guarded local Corresync MCP server.",
-    "developerName": "Corresync contributors",
-    "category": "Productivity",
+    "brandColor": "#3F7AD6",
     "capabilities": [
       "Multi-account mail",
       "Multi-account calendar",
       "Reviewed writes",
       "Local monitoring"
     ],
-    "websiteURL": "https://corresync.org/",
-    "brandColor": "#3F7AD6",
+    "category": "Productivity",
     "composerIcon": "./assets/icon.svg",
-    "logo": "./assets/icon.svg",
     "defaultPrompt": [
       "Check all my inboxes and summarize what needs attention.",
       "Show my calendars for today.",
       "Find the latest email about this project across my accounts."
-    ]
-  }
+    ],
+    "developerName": "Corresync contributors",
+    "displayName": "Corresync — Mail \u0026 Calendar",
+    "logo": "./assets/icon.svg",
+    "longDescription": "For local Codex sessions, recognizes inbox, email, calendar, schedule, and meeting requests and routes them to the guarded local Corresync MCP server. Hosted ChatGPT cannot reach this local stdio integration.",
+    "shortDescription": "Use guarded local mail and calendar tools",
+    "websiteURL": "https://corresync.org/"
+  },
+  "keywords": [
+    "email",
+    "calendar",
+    "gmail",
+    "outlook",
+    "mcp",
+    "local-first",
+    "privacy"
+  ],
+  "license": "Apache-2.0",
+  "mcpServers": "./.mcp.json",
+  "name": "corresync",
+  "repository": "https://github.com/nkiyohara/corresync",
+  "skills": "./skills/",
+  "version": "0.8.6-rc.6"
 }

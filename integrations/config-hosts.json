@@ -1,0 +1,208 @@
+{
+  "bundle": "corresync",
+  "effects": {
+    "readsPrivateData": true,
+    "writesRequirePreviewCommit": true,
+    "autoApproval": false,
+    "networkScope": "Only providers explicitly configured and authenticated by the signed-in user.",
+    "secretPolicy": "The bundle contains no account, credential, token, cookie, or private configuration data."
+  },
+  "hosts": [
+    {
+      "id": "cursor",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    },
+    {
+      "id": "windsurf",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    },
+    {
+      "id": "opencode",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    },
+    {
+      "id": "cline",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    },
+    {
+      "id": "roo-code",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    },
+    {
+      "id": "zed",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    },
+    {
+      "id": "goose",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    },
+    {
+      "id": "qwen-code",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    },
+    {
+      "id": "qoder",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    },
+    {
+      "id": "kimi-code",
+      "limitation": "This neutral fragment is input for a host-specific lifecycle adapter; it is not a native marketplace package.",
+      "mcp": {
+        "args": [
+          "mcp",
+          "serve"
+        ],
+        "command": "corr",
+        "serverName": "corresync",
+        "transport": "stdio"
+      },
+      "mode": "thin",
+      "package": "config-only",
+      "skill": {
+        "name": "corresync",
+        "source": "plugins/corresync/skills/corresync/SKILL.md"
+      }
+    }
+  ],
+  "requirements": [
+    "Install the matching Corresync CLI release and make corr available on PATH.",
+    "Configure and authenticate each account explicitly in a local terminal before use."
+  ],
+  "schemaVersion": 1,
+  "version": "0.8.6-rc.6"
+}

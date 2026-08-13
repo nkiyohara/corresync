@@ -20,8 +20,9 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"text/template"
 	"time"
+
+	"github.com/nkiyohara/corresync/internal/integrationbundle"
 )
 
 const (
@@ -102,10 +103,7 @@ func augmentRelease(dist, source, sbomCommand string) error {
 	if err != nil {
 		return err
 	}
-	manifestData, err := renderManifest(
-		filepath.Join(source, "manifest.json.tmpl"),
-		release.Version,
-	)
+	manifestData, err := renderManifest(release.Version)
 	if err != nil {
 		return err
 	}
@@ -119,13 +117,25 @@ func augmentRelease(dist, source, sbomCommand string) error {
 	if err := buildBundle(bundlePath, ".", source, manifestData, binaries, when.UTC()); err != nil {
 		return err
 	}
+	bundleHash, err := hashFile(bundlePath)
+	if err != nil {
+		return err
+	}
+	registryData, err := integrationbundle.RenderRegistryManifest(release.Version, bundleHash)
+	if err != nil {
+		return fmt.Errorf("render MCP registry manifest: %w", err)
+	}
+	const registryName = "server.json"
+	if err := writeAtomic(filepath.Join(dist, registryName), registryData); err != nil {
+		return fmt.Errorf("write MCP registry manifest: %w", err)
+	}
 
 	sbomNames, err := createSBOMs(dist, bundleName, release.Version, sbomCommand)
 	if err != nil {
 		return err
 	}
-	generatedNames := append([]string{bundleName}, sbomNames...)
-	if err := updateArtifacts(artifactsPath, dist, artifacts, bundleName, sbomNames); err != nil {
+	generatedNames := append([]string{bundleName, registryName}, sbomNames...)
+	if err := updateArtifacts(artifactsPath, dist, artifacts, bundleName, registryName, sbomNames); err != nil {
 		return err
 	}
 	if err := updateChecksums(filepath.Join(dist, "checksums.txt"), dist, generatedNames); err != nil {
@@ -244,23 +254,14 @@ func releaseArtifactPath(dist, path string) (string, error) {
 	return absolutePath, nil
 }
 
-func renderManifest(path, version string) ([]byte, error) {
+func renderManifest(version string) ([]byte, error) {
 	if !versionPattern.MatchString(version) {
 		return nil, fmt.Errorf("invalid manifest version %q", version)
 	}
-	source, err := os.ReadFile(path) // #nosec G304 -- repository-owned MCPB template.
+	data, err := integrationbundle.RenderMCPBManifest(version)
 	if err != nil {
-		return nil, fmt.Errorf("read MCPB manifest template: %w", err)
+		return nil, fmt.Errorf("render canonical MCPB manifest: %w", err)
 	}
-	parsed, err := template.New("manifest").Option("missingkey=error").Parse(string(source))
-	if err != nil {
-		return nil, fmt.Errorf("parse MCPB manifest template: %w", err)
-	}
-	var rendered bytes.Buffer
-	if err := parsed.Execute(&rendered, struct{ Version string }{Version: version}); err != nil {
-		return nil, fmt.Errorf("render MCPB manifest: %w", err)
-	}
-	data := append(bytes.TrimSpace(rendered.Bytes()), '\n')
 	if err := validateManifest(data, version); err != nil {
 		return nil, err
 	}
@@ -565,9 +566,10 @@ func updateArtifacts(
 	dist string,
 	artifacts []artifact,
 	bundleName string,
+	registryName string,
 	sbomNames []string,
 ) error {
-	generated := map[string]bool{bundleName: true}
+	generated := map[string]bool{bundleName: true, registryName: true}
 	for _, name := range sbomNames {
 		generated[name] = true
 	}
@@ -585,6 +587,15 @@ func updateArtifacts(
 			"Ext":    ".mcpb",
 			"Format": "mcpb",
 			"ID":     bundleArtifactID,
+		},
+	})
+	filtered = append(filtered, artifact{
+		Name: registryName,
+		Path: filepath.ToSlash(filepath.Join(dist, registryName)),
+		Type: "Registry Manifest",
+		Extra: map[string]any{
+			"Format": "json",
+			"ID":     "mcp-registry",
 		},
 	})
 	for _, name := range sbomNames {

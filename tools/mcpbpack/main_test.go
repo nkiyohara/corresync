@@ -19,10 +19,7 @@ import (
 func TestRenderManifestBindsReleaseAndLocalLauncher(t *testing.T) {
 	t.Parallel()
 
-	data, err := renderManifest(
-		filepath.Join("..", "..", "mcpb", "manifest.json.tmpl"),
-		"1.2.3-rc.1",
-	)
+	data, err := renderManifest("1.2.3-rc.1")
 	if err != nil {
 		t.Fatalf("renderManifest() error = %v", err)
 	}
