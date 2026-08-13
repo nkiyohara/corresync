@@ -30,6 +30,9 @@ gateway or tenant administration service.
   to escape their selected root;
 - clipboard tools, browsers, issue trackers, and remote runner destinations
   cross an explicit disclosure boundary;
+- OS credential prompts and user-approved credential helpers are external
+  secret owners; Corresync may pass a reviewed handle but must not proxy their
+  secret input;
 - CI logs, fixtures, feedback reports, and public issues must be safe to
   publish.
 - GitHub Pages, Cloudflare Workers, and Cloudflare's public DNS resolver are
@@ -73,12 +76,19 @@ gateway or tenant administration service.
   alternate host, or arbitrary Google API transport.
 - Standards credentials remain behind an OS-keyring entry or an explicitly
   approved helper reference.
+- Guided OS-keyring enrollment invokes only the fixed platform credential tool
+  with a bounded reviewed handle and no password argument. The child owns the
+  TTY prompt; `corr` receives only its exit status. MCP, JSON, pipes, and
+  non-interactive setup cannot launch it.
 - Account-add approval displays the exact external backend/key handles and
   rejects cross-account handle reuse before both preview and atomic commit.
 - Discovery cannot access credentials, start consent, or probe administrator
   approval.
 - Never automate around MFA, Conditional Access, consent, or provider policy.
 - Never use TLS interception or silently downgrade TLS.
+- iCloud custom-domain classification requires the exact Apple endpoint set
+  from separate IMAPS, Submission, and CalDAV SRV evidence; a suffix or one DNS
+  record cannot activate the preset.
 - The text-only terminal browser relay requires an interactive TTY, sends at
   most one sanitized control event, and is never exposed through MCP.
 

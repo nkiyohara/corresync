@@ -137,6 +137,7 @@ corr auth logout
 
 corr doctor
 corr doctor --online --account work
+corr doctor --online --connection-only --account personal
 ```
 
 `auth login` displays the exact OAuth scope set before any provider page can
@@ -155,6 +156,10 @@ update policy. It performs no navigation or authentication. `--online` validates
 only an already authenticated session; it never starts login or OAuth. Run
 `auth login` first. The report includes the configured OAuth scope set and is
 never run by default tests.
+For standards routes, `--connection-only` reports when the active session last
+established TLS and authorization, with Mail/Calendar capability state shown
+separately. The status check makes no fresh authentication attempt and requests
+no folder, message, event, contact, or attachment metadata.
 
 ## Mail reads
 

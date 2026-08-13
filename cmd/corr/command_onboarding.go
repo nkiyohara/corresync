@@ -20,12 +20,24 @@ const (
 	onboardingAdd      = "add"
 	onboardingReview   = "review"
 	onboardingCancel   = "__cancel_onboarding__"
+
+	onboardingPresetICloud = "icloud"
+
+	iCloudAccountManagementURL = "https://account.apple.com/account/manage"
+	iCloudKeyringService       = "corresync"
 )
 
 type onboardingRoutePlan struct {
 	mail     *application.ProviderCandidate
 	calendar *application.ProviderCandidate
 	label    string
+	preset   string
+}
+
+type onboardingRegistration struct {
+	account    application.AccountView
+	preset     string
+	credential onboardingCredentialReference
 }
 
 func runGuidedAccountSetup(app *runtime, createdConfig bool) error {
@@ -34,7 +46,7 @@ func runGuidedAccountSetup(app *runtime, createdConfig bool) error {
 	}
 	added := 0
 	for {
-		account, completed, err := runAccountRegistrationWizard(app)
+		registration, completed, err := runAccountRegistrationWizard(app)
 		if err != nil {
 			if added > 0 {
 				return fmt.Errorf(
@@ -49,10 +61,10 @@ func runGuidedAccountSetup(app *runtime, createdConfig bool) error {
 			return writeOnboardingCancelled(app, added, createdConfig)
 		}
 		added++
-		if err := runOnboardingAccountHandoff(app, account); err != nil {
+		if err := runOnboardingAccountHandoff(app, registration); err != nil {
 			return fmt.Errorf(
 				"account %q remains configured, but its post-add action failed: %w",
-				account.Alias,
+				registration.account.Alias,
 				err,
 			)
 		}
@@ -86,10 +98,10 @@ func runGuidedAccountSetup(app *runtime, createdConfig bool) error {
 
 func runAccountRegistrationWizard(
 	app *runtime,
-) (application.AccountView, bool, error) {
+) (onboardingRegistration, bool, error) {
 	accounts, discoverer, err := app.accountServices()
 	if err != nil {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	address := ""
 	selected, err := runSettingsInput(
@@ -101,29 +113,29 @@ func runAccountRegistrationWizard(
 		validateSettingsEmailAddress,
 	)
 	if err != nil || !selected {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	discovery, err := discoverer.Discover(app.context, address)
 	if err != nil {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	if err := writeOnboardingDiscovery(app, discovery); err != nil {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	plans := onboardingRoutePlans(discovery)
 	if len(plans) == 0 {
 		if onboardingDiscoveredPendingGoogle(discovery) {
-			return application.AccountView{}, false, googleOAuthPendingError(
+			return onboardingRegistration{}, false, googleOAuthPendingError(
 				"Gmail or Google Calendar was found.",
 			)
 		}
-		return application.AccountView{}, false, errors.New(
+		return onboardingRegistration{}, false, errors.New(
 			"discovery found no available route; use `corr account add ADDRESS --help` for explicit advanced setup",
 		)
 	}
 	plan, selected, err := selectOnboardingRoutePlan(app, plans)
 	if err != nil || !selected {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 
 	alias := discovery.Address[:strings.LastIndexByte(discovery.Address, '@')]
@@ -136,15 +148,15 @@ func runAccountRegistrationWizard(
 		func(value string) error { return domain.AccountAlias(value).Validate() },
 	)
 	if err != nil || !selected {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	catalog, err := accounts.List(app.context)
 	if err != nil {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	makeDefault, selected, err := chooseOnboardingDefault(app, catalog, alias)
 	if err != nil || !selected {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	routing, selected, err := configureOnboardingRoutes(
 		app,
@@ -153,7 +165,7 @@ func runAccountRegistrationWizard(
 		alias,
 	)
 	if err != nil || !selected {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	selectedCandidate := onboardingSelectedCandidate(plan)
 	mailRoute, calendarRoute, _, err := routing.routes(
@@ -161,7 +173,7 @@ func runAccountRegistrationWizard(
 		discovery,
 	)
 	if err != nil {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	input := application.AccountAddInput{
 		Alias: alias, Address: discovery.Address,
@@ -169,10 +181,10 @@ func runAccountRegistrationWizard(
 	}
 	review, err := accounts.ReviewAdd(app.context, input)
 	if err != nil {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	if err := writeOnboardingAccountReview(app, review); err != nil {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	confirmed, err := runOnboardingConfirm(
 		app,
@@ -182,7 +194,7 @@ func runAccountRegistrationWizard(
 		"Cancel this account",
 	)
 	if err != nil || !confirmed {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	var account application.AccountView
 	err = runSettingsAccountMutation(app, func() error {
@@ -191,12 +203,19 @@ func runAccountRegistrationWizard(
 		return addErr
 	})
 	if err != nil {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
 	if err := writeOnboardingAccountAdded(app, account); err != nil {
-		return application.AccountView{}, false, err
+		return onboardingRegistration{}, false, err
 	}
-	return account, true, nil
+	return onboardingRegistration{
+		account: account,
+		preset:  plan.preset,
+		credential: onboardingCredentialReference{
+			backend: routing.CredentialBackend,
+			key:     routing.CredentialKey,
+		},
+	}, true, nil
 }
 
 func onboardingRoutePlans(
@@ -216,7 +235,13 @@ func onboardingRoutePlans(
 		domain.ProviderJMAP,
 	} {
 		if mail := available[mailProvider]; mail != nil && calDAV != nil {
-			plans = append(plans, newOnboardingRoutePlan(mail, calDAV))
+			plan := newOnboardingRoutePlan(mail, calDAV)
+			if isICloudOnboardingPlan(discovery, plan) {
+				plan.preset = onboardingPresetICloud
+				plan.label = "iCloud Mail + Calendar · app-specific password · " +
+					fmt.Sprintf("%d/100 evidence", onboardingPlanConfidence(mail, calDAV))
+			}
+			plans = append(plans, plan)
 		}
 	}
 	for _, candidate := range discovery.Candidates {
@@ -236,6 +261,52 @@ func onboardingRoutePlans(
 		}
 	}
 	return plans
+}
+
+func isICloudOnboardingPlan(
+	discovery application.AccountDiscoveryResult,
+	plan onboardingRoutePlan,
+) bool {
+	if plan.mail == nil || plan.mail.Provider != domain.ProviderIMAPSMTP ||
+		plan.calendar == nil || plan.calendar.Provider != domain.ProviderCalDAV {
+		return false
+	}
+	mailEndpoints := map[string]bool{}
+	for _, endpoint := range plan.mail.Endpoints {
+		mailEndpoints[endpoint.Kind+"="+strings.ToLower(endpoint.Value)] = true
+	}
+	calendarEndpoint := false
+	for _, endpoint := range plan.calendar.Endpoints {
+		if endpoint.Kind == "caldav" &&
+			strings.EqualFold(endpoint.Value, "https://caldav.icloud.com:443/") {
+			calendarEndpoint = true
+		}
+	}
+	if !mailEndpoints["imap=imap.mail.me.com:993"] ||
+		!mailEndpoints["smtp=smtp.mail.me.com:587"] || !calendarEndpoint {
+		return false
+	}
+	if discovery.Domain == "icloud.com" || discovery.Domain == "mac.com" ||
+		discovery.Domain == "me.com" {
+		return true
+	}
+	// A custom domain is identified only by the complete credential-free Apple
+	// endpoint set. A suffix or a single generic standards record is insufficient.
+	return candidateHasDiscoveryEvidence(*plan.mail, "srv_imaps") &&
+		candidateHasDiscoveryEvidence(*plan.mail, "srv_submission") &&
+		candidateHasDiscoveryEvidence(*plan.calendar, "srv_caldavs")
+}
+
+func candidateHasDiscoveryEvidence(
+	candidate application.ProviderCandidate,
+	source string,
+) bool {
+	for _, evidence := range candidate.Evidence {
+		if evidence.Source == source {
+			return true
+		}
+	}
+	return false
 }
 
 func onboardingDiscoveredPendingGoogle(
@@ -308,7 +379,10 @@ func selectOnboardingRoutePlan(
 	}
 	options := make([]huh.Option[int], 0, len(plans))
 	for index, plan := range plans {
-		options = append(options, huh.NewOption(plan.label, index))
+		options = append(
+			options,
+			huh.NewOption(plan.label, index).Selected(plan.preset == onboardingPresetICloud),
+		)
 	}
 	index, selected, err := runOnboardingSelect(
 		app,
@@ -388,6 +462,9 @@ func configureOnboardingRoutes(
 		Provider: "none", CalendarProvider: "none",
 		CredentialBackend: "os-keyring",
 	}
+	if plan.preset == onboardingPresetICloud {
+		return configureICloudOnboardingRoutes(app, command, discovery, alias)
+	}
 	if plan.mail != nil {
 		command.Provider = string(plan.mail.Provider)
 	}
@@ -456,6 +533,55 @@ func configureOnboardingRoutes(
 			return accountAddCommand{}, false, err
 		}
 	}
+	return command, true, nil
+}
+
+func configureICloudOnboardingRoutes(
+	app *runtime,
+	command accountAddCommand,
+	discovery application.AccountDiscoveryResult,
+	alias string,
+) (accountAddCommand, bool, error) {
+	if err := writeICloudOnboardingGuidance(app, discovery.Address); err != nil {
+		return accountAddCommand{}, false, err
+	}
+	calendarUsername := discovery.Address
+	selected, err := runSettingsInput(
+		app,
+		"Apple Account email for Calendar",
+		"Keep the discovered address unless your Apple Account sign-in uses another email.",
+		&calendarUsername,
+		254,
+		validateSettingsEmailAddress,
+	)
+	if err != nil || !selected {
+		return accountAddCommand{}, false, err
+	}
+	reference, selected, err := configureOnboardingCredentialReference(
+		app,
+		"iCloud Mail and Calendar",
+		alias+"-icloud",
+	)
+	if err != nil || !selected {
+		return accountAddCommand{}, false, err
+	}
+	command.Provider = string(domain.ProviderIMAPSMTP)
+	command.CalendarProvider = string(domain.ProviderCalDAV)
+	command.IMAPHost = "imap.mail.me.com"
+	command.IMAPPort = 993
+	command.IMAPTLS = "implicit"
+	command.SMTPHost = "smtp.mail.me.com"
+	command.SMTPPort = 587
+	command.SMTPTLS = "starttls"
+	command.CalDAVEndpoint = "https://caldav.icloud.com:443/"
+	command.Username = discovery.Address
+	command.CalendarUsername = calendarUsername
+	command.CredentialBackend = reference.backend
+	command.CredentialKey = reference.key
+	command.ApproveCredential = true
+	command.CalendarCredentialBackend = reference.backend
+	command.CalendarCredentialKey = reference.key
+	command.ApproveCalendarCredential = true
 	return command, true, nil
 }
 
@@ -809,8 +935,12 @@ func runOnboardingConfirm(
 
 func runOnboardingAccountHandoff(
 	app *runtime,
-	account application.AccountView,
+	registration onboardingRegistration,
 ) error {
+	if registration.preset == onboardingPresetICloud {
+		return runICloudAccountHandoff(app, registration)
+	}
+	account := registration.account
 	authentication := accountAuthenticationKind(account)
 	for {
 		options := make([]huh.Option[string], 0, 4)
@@ -823,7 +953,8 @@ func runOnboardingAccountHandoff(
 			)
 		case application.DiscoveryExternalCredential:
 			options = append(options,
-				huh.NewOption("Run an opt-in provider connection check", "doctor_online"),
+				huh.NewOption("Authenticate with the external credential now", "login"),
+				huh.NewOption("Run a content-free connection check", "doctor_online"),
 			)
 		}
 		options = append(options,
@@ -846,7 +977,10 @@ func runOnboardingAccountHandoff(
 		case "login_terminal":
 			err = runSettingsTerminalLogin(app, account.Alias)
 		case "doctor_online":
-			err = (&doctorCommand{Account: account.Alias, Online: true}).Run(app)
+			err = (&doctorCommand{
+				Account: account.Alias,
+				Online:  true, ConnectionOnly: authentication == application.DiscoveryExternalCredential,
+			}).Run(app)
 		case "doctor":
 			err = (&doctorCommand{Account: account.Alias}).Run(app)
 		}
@@ -854,6 +988,181 @@ func runOnboardingAccountHandoff(
 			return err
 		}
 	}
+}
+
+func runICloudAccountHandoff(
+	app *runtime,
+	registration onboardingRegistration,
+) error {
+	account := registration.account
+	credential := registration.credential
+	if err := validateOnboardingCredentialKey(credential.key); err != nil {
+		return errors.New("iCloud credential handoff is missing its reviewed handle")
+	}
+	for {
+		options := []huh.Option[string]{
+			huh.NewOption("Open Apple's app-specific password page", "apple_password"),
+		}
+		if credential.backend == "os-keyring" {
+			options = append(
+				options,
+				huh.NewOption("Store it with the OS credential prompt", "enroll"),
+			)
+		} else {
+			options = append(
+				options,
+				huh.NewOption("Show the approved-helper handoff", "helper"),
+			)
+		}
+		options = append(options,
+			huh.NewOption("Authenticate Mail and Calendar now", "login"),
+			huh.NewOption("Run a content-free connection check", "doctor_online"),
+			huh.NewOption("Run local setup checks", "doctor"),
+			huh.NewOption("Finish this account later", "finish").
+				Selected(settingsAccessible(app)),
+		)
+		action, selected, err := runSettingsSelect(
+			app,
+			"Secure iCloud handoff · "+account.Alias,
+			"Create one app-specific password after 2FA, then let an external credential owner store it. Corresync never reads the prompt.",
+			options,
+		)
+		if err != nil || !selected || action == "finish" {
+			return err
+		}
+		switch action {
+		case "apple_password":
+			err = openOnboardingURL(app, iCloudAccountManagementURL)
+		case "enroll":
+			err = runICloudCredentialEnrollment(app, credential)
+		case "helper":
+			err = writeICloudHelperHandoff(app, credential.key)
+		case "login":
+			err = (&loginCommand{Account: account.Alias}).Run(app)
+		case "doctor_online":
+			err = (&doctorCommand{
+				Account: account.Alias, Online: true, ConnectionOnly: true,
+			}).Run(app)
+		case "doctor":
+			err = (&doctorCommand{Account: account.Alias}).Run(app)
+		}
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func openOnboardingURL(app *runtime, target string) error {
+	parsed, err := url.Parse(target)
+	if err != nil || parsed.Scheme != "https" || parsed.User != nil ||
+		parsed.Host != "account.apple.com" || parsed.RawQuery != "" ||
+		parsed.Fragment != "" {
+		return errors.New("refusing to open an unexpected onboarding URL")
+	}
+	name, arguments, err := feedbackBrowserCommand(app.info.OS, parsed.String())
+	if err != nil {
+		return err
+	}
+	return app.runCommand(app.context, app.stdout, app.stderr, name, arguments...)
+}
+
+func runICloudCredentialEnrollment(
+	app *runtime,
+	credential onboardingCredentialReference,
+) error {
+	if credential.backend != "os-keyring" {
+		return errors.New("credential enrollment is owned by the configured helper")
+	}
+	name, arguments, err := iCloudCredentialEnrollmentCommand(
+		app.info.OS,
+		credential.key,
+	)
+	if err != nil {
+		return err
+	}
+	if err := writeICloudCredentialPrompt(app); err != nil {
+		return err
+	}
+	if err := app.runCommand(
+		app.context,
+		app.stdout,
+		app.stderr,
+		name,
+		arguments...,
+	); err != nil {
+		return fmt.Errorf("OS credential prompt failed: %w", err)
+	}
+	return writeICloudCredentialStored(app)
+}
+
+func iCloudCredentialEnrollmentCommand(
+	goos string,
+	key string,
+) (string, []string, error) {
+	if err := validateOnboardingCredentialKey(key); err != nil {
+		return "", nil, err
+	}
+	switch goos {
+	case "darwin":
+		return "/usr/bin/security", []string{
+			"add-generic-password", "-U",
+			"-s", iCloudKeyringService,
+			"-a", key,
+			"-l", "Corresync iCloud",
+			"-w",
+		}, nil
+	case "linux":
+		return "secret-tool", []string{
+			"store", "--label=Corresync iCloud",
+			"service", iCloudKeyringService,
+			"username", key,
+		}, nil
+	case "windows":
+		return "cmdkey.exe", []string{
+			"/generic:" + iCloudKeyringService + ":" + key,
+			"/user:" + key,
+		}, nil
+	default:
+		return "", nil, fmt.Errorf(
+			"OS credential enrollment is unsupported on %s; select an approved helper instead",
+			goos,
+		)
+	}
+}
+
+func writeICloudCredentialPrompt(app *runtime) error {
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf(
+		"\n%s  %s\n   %s\n   %s\n",
+		view.info(),
+		view.strong("OS credential prompt"),
+		view.muted("Paste the Apple app-specific password into the operating system's prompt."),
+		view.muted("Its value is absent from Corresync config, arguments, environment, output, and logs."),
+	)
+	return err
+}
+
+func writeICloudCredentialStored(app *runtime) error {
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf(
+		"%s  %s\n   %s\n",
+		view.success(),
+		view.strong("External credential stored"),
+		view.muted("The OS-owned store completed the prompt; Corresync received only its exit status."),
+	)
+	return err
+}
+
+func writeICloudHelperHandoff(app *runtime, key string) error {
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf(
+		"\n%s  %s\n   %s\n   %s\n",
+		view.info(),
+		view.strong("Approved credential helper"),
+		view.muted("Use the helper's own enrollment UI for the reviewed handle "+sanitizeCell(key, 256)+"."),
+		view.muted("The helper must return that credential only for its existing version 1 get request."),
+	)
+	return err
 }
 
 func accountAuthenticationKind(
@@ -919,6 +1228,19 @@ func writeOnboardingWelcome(app *runtime) error {
 	return err
 }
 
+func writeICloudOnboardingGuidance(app *runtime, address string) error {
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf(
+		"\n%s  %s\n   %s\n   %s\n   %s\n\n",
+		view.info(),
+		view.strong("iCloud Mail + Calendar"),
+		view.muted("Apple requires two-factor authentication before you can create an app-specific password."),
+		view.muted("Mail uses "+sanitizeCell(address, 254)+" as the full username; Calendar can use a different Apple Account email."),
+		view.muted("Nothing is opened and no credential is requested until you explicitly choose the post-add handoff."),
+	)
+	return err
+}
+
 func writeOnboardingDiscovery(
 	app *runtime,
 	discovery application.AccountDiscoveryResult,
@@ -978,6 +1300,15 @@ func writeOnboardingAccountReview(
 	} {
 		if route.view == nil {
 			continue
+		}
+		if route.view.Identity != "" {
+			if _, err := view.printf(
+				"  %-18s %s\n",
+				sanitizeCell(route.service+" identity", 18),
+				sanitizeCell(route.view.Identity, 320),
+			); err != nil {
+				return err
+			}
 		}
 		for _, endpoint := range route.view.Endpoints {
 			label := sanitizeCell(route.service+" "+endpoint.Kind, 16)

@@ -6,7 +6,7 @@
     <title>Getting started with Corresync — install to first answer</title>
     <meta
       name="description"
-      content="Install Corresync, sign in, connect Codex, Claude Code, or any MCP client, and ask your first cross-account question—four clear steps from install to first answer."
+      content="Install Corresync, add Outlook, iCloud Mail and Calendar, or standards-based accounts, connect any local MCP client, and ask your first cross-account question."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -287,6 +287,14 @@ corr update</code></pre>
                 opens a browser, reads a keyring, or asks an administrator for consent.
               </p>
               <p>
+                <strong>Using iCloud?</strong> <code>corr setup</code> recognises iCloud Mail and
+                Calendar together for <code>@icloud.com</code>, <code>@me.com</code>, and
+                <code>@mac.com</code> addresses, or from complete verified service records for a
+                custom iCloud domain. After you approve the account, it explains Apple’s
+                two-factor authentication and app-specific password requirement. Your operating
+                system asks for that password directly; Corresync never receives it.
+              </p>
+              <p>
                 <strong>Using Gmail?</strong> The Gmail and Calendar API code is in this RC, but the
                 production OAuth application is awaiting approval, so the route is completely
                 disabled and no Google sign-in can start. For now, connect your agent directly to
@@ -321,6 +329,15 @@ corr doctor --account personal</code></pre>
                 </div>
                 <p class="block-note">
                   These commands stay non-interactive and are suitable for scripts.
+                </p>
+              </div>
+              <div class="install-block">
+                <p class="os-label">iCloud Mail + Calendar · available now</p>
+                <p class="block-note">
+                  The guided preset adds both services, can share one reviewed credential handle,
+                  and shows their last-authenticated status without reading content. Read Apple’s
+                  <a href="https://support.apple.com/en-gb/102654">app-specific password guide</a>
+                  before connecting.
                 </p>
               </div>
               <div class="install-block">

@@ -20,6 +20,7 @@ authorized live observations.
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
 | IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
 | CalDAV calendar | Synthetic WebDAV/iCalendar/conditional-write contracts | Not run | Deterministic only |
+| iCloud guided IMAP/SMTP + CalDAV preset | Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts | Not run | Deterministic only; live-unobserved |
 | Cross-account search and agenda | Isolation, ordering, bounds, partial-failure tests | Not run | Deterministic only |
 | Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
 | Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
@@ -62,6 +63,10 @@ evidence.
 - `jmap`, `imap-smtp`, and `caldav`: implemented against synthetic standards
   contracts, with server-specific behavior exposed through capabilities and
   degradations.
+- `apple-icloud`: a guided discovery family, not a provider adapter. It composes
+  the existing `imap-smtp` and `caldav` routes with Apple's published endpoints
+  and an external credential reference. It has synthetic coverage only and
+  remains live-unobserved.
 
 `pop3` is a reserved unavailable identifier. Its presence in discovery and
 config validation does not constitute an adapter claim.
@@ -113,7 +118,8 @@ authorized to test. Prefer a dedicated test account and synthetic content.
 2. Run `corr config validate`, `corr account list`, and `corr doctor`.
 3. Review the selected provider route and required authentication.
 4. Run `corr auth login --account ALIAS` and complete all controls visibly.
-5. Run `corr doctor --online --account ALIAS`.
+5. Run `corr doctor --online --connection-only --account ALIAS` first, then the
+   broader metadata-contract check when that is part of the observation scope.
 6. Exercise metadata-only reads before sensitive reads.
 7. Exercise save-only draft before an external send.
 8. For each write, review the exact preview, commit once, and reconcile remote
@@ -124,6 +130,10 @@ The online doctor is bounded and content-free in its output. It requires the
 session established in step 4 and never initiates authentication or OAuth. It
 does not prove mutation compatibility. Monitoring, remote egress, permanent
 deletion, and calendar invitations require separate explicit authorization.
+The `--connection-only` form reports when the active session last established
+TLS and authorization. It makes no fresh authentication attempt, makes no
+folder, message, event, contact, or attachment metadata request, and reports
+Mail/Calendar status independently.
 
 The former managed Google Web live harness is no longer an accepted observation
 path. Do not use automation-hiding flags or browser fingerprint spoofing to

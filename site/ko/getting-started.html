@@ -6,7 +6,7 @@
     <title>Corresync 시작하기 — 설치부터 첫 메일·캘린더 작업까지</title>
     <meta
       name="description"
-      content="macOS, Linux, Windows에 Corresync를 설치하고 계정 경로를 선택한 뒤 Codex, Claude Code 등 MCP 클라이언트에 연결하는 방법입니다."
+      content="Corresync를 설치하고 Outlook, iCloud Mail·캘린더 또는 표준 계정을 추가한 뒤 로컬 MCP 클라이언트에 연결하는 방법입니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -211,6 +211,17 @@ scoop install corresync/corresync</code></pre>
             ><code>corr setup you@example.com --alias personal</code></pre>
           </div>
           <aside class="note-card">
+            <h3>iCloud Mail과 캘린더도 함께 설정할 수 있나요?</h3>
+            <p>
+              네. <code>corr setup</code>은 <code>@icloud.com</code>, <code>@me.com</code>,
+              <code>@mac.com</code> 주소와 서비스 레코드가 모두 검증된 iCloud
+              사용자 도메인을 인식해 Mail과 캘린더를 한 번에 제안합니다.
+              계정을 추가한 뒤 Apple 이중 인증과 앱 암호를 안내합니다.
+              암호는 운영체제 자격 증명 화면이 직접 받아 Corresync에는
+              전달되지 않습니다.
+            </p>
+          </aside>
+          <aside class="note-card">
             <h3>Google 계정은 지금 어떻게 되나요?</h3>
             <p>
               Gmail과 Google 캘린더 코드는 RC에 들어 있지만 운영 환경 OAuth 승인
@@ -249,6 +260,11 @@ scoop install corresync/corresync</code></pre>
               <strong>Microsoft Graph:</strong> 사용 권한이 있는 공개 OAuth
               클라이언트를 명시적으로 선택하고, 권한은 운영체제 키체인에
               둡니다.
+            </li>
+            <li>
+              <strong>iCloud:</strong> 앱 암호는 운영체제 자격 증명 저장소에 직접
+              입력합니다. Mail과 캘린더는 메시지 본문이나 일정 내용을 읽지
+              않고 마지막으로 인증된 상태를 각각 표시합니다.
             </li>
             <li>
               <strong>JMAP · IMAP/SMTP · CalDAV:</strong> 비밀 정보는 키체인 또는

@@ -236,6 +236,7 @@ This is the first mailbox/calendar access:
 ```console
 corr auth login --account ALIAS
 corr auth status
+corr doctor --online --connection-only --account ALIAS --json
 corr doctor --online --account ALIAS --json
 ```
 
@@ -252,6 +253,16 @@ Pass criteria:
 - no mailbox/calendar write occurs;
 - unavailable behavior appears as a degradation, not a silent provider
   fallback.
+
+For iCloud, create the app-specific password only on the fixed Apple Account
+page opened by an explicit guided action. Confirm that macOS Keychain, Linux
+Secret Service, or Windows Credential Manager owns the password prompt and that
+the `corr` process receives only the reviewed handle. The connection-only report
+must show Mail and Calendar separately, identify the last authenticated
+observation rather than claiming a new probe, and must not request folder,
+message, event, contact, or attachment metadata. Record the observation as
+opt-in and content-free; a successful local run does not change the public
+evidence marker until a commit-bound record is reviewed.
 
 The Outlook-Web-only `--terminal` relay is optional, requires a real TTY, and
 must reject piped input. Do not record entered or rendered identity values.

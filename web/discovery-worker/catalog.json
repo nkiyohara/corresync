@@ -37,6 +37,15 @@
         "aspmx.l.google.com",
         "google.com"
       ]
+    },
+    {
+      "id": "apple-icloud",
+      "displayName": "Apple iCloud",
+      "knownDomains": [
+        "icloud.com",
+        "mac.com",
+        "me.com"
+      ]
     }
   ]
 }

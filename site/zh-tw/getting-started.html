@@ -6,7 +6,7 @@
     <title>Corresync 開始使用 — 從安裝到第一次回答</title>
     <meta
       name="description"
-      content="四步安裝 Corresync、新增帳號、連線 Codex、Claude Code 或其他 MCP 用戶端，並完成第一次跨帳號查詢。"
+      content="安裝 Corresync，新增 Outlook、iCloud 郵件與行事曆或標準協定帳號，連線本機 MCP 用戶端，並完成第一次跨帳號查詢。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -239,6 +239,15 @@ scoop install corresync/corresync</code></pre>
                 也可在服務供應商支援，且你明確選擇相應路徑或認證資料存放位置時使用。探索過程不會開啟瀏覽器、讀取鑰匙圈，也不會啟動管理員同意流程。
               </p>
               <p>
+                <strong>使用 iCloud？</strong><code>corr setup</code>會辨識<code
+                >@icloud.com</code>、<code>@me.com</code>、<code
+                >@mac.com</code>，以及具備完整且已驗證服務記錄的 iCloud
+                自訂網域，並一次設定郵件與行事曆。新增帳號後，引導程式會說明
+                Apple 雙重認證和 App
+                專用密碼要求。密碼由作業系統的認證資料介面直接接收，不會經過
+                Corresync。
+              </p>
+              <p>
                 <strong>使用 Gmail？</strong>Gmail 和 Calendar API 程式碼已在 RC
                 中，但正式環境 OAuth 等待審核，因此路徑完全關閉，Google
                 登入無法啟動。暫時請使用 Google 官方 Workspace MCP。
@@ -272,6 +281,14 @@ corr doctor --account personal</code></pre>
                 </div>
                 <p class="block-note">
                   原有指令維持非互動行為，適合指令碼與自動化。
+                </p>
+              </div>
+              <div class="install-block">
+                <p class="os-label">iCloud 郵件與行事曆 · 現已支援</p>
+                <p class="block-note">
+                  引導預設會新增兩項服務，可共用一個經過確認的認證資料參照，並在不讀取郵件內文或行程內容的情況下顯示最近一次認證狀態。連線前請閱讀
+                  Apple 官方的<a href="https://support.apple.com/zh-tw/102654"
+                  >App 專用密碼說明</a>。
                 </p>
               </div>
               <div class="install-block">

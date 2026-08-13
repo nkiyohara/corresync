@@ -40,7 +40,10 @@ The guided setup begins from no selected provider, performs credential-free
 discovery, explains route choices, previews the account, and keeps sign-in or
 external-credential access as a separate explicit step. It also offers a doctor
 check and multi-account continuation. The same flow is available under
-`corr settings`.
+`corr settings`. For Apple's documented iCloud address families—or a custom
+domain with the complete verified Apple service-record set—the wizard combines
+Mail and Calendar and hands app-specific-password enrollment to the operating
+system's own credential prompt. Corresync never reads that password.
 
 For deterministic scripts, or to inspect and manually select another route
 without sending credentials or starting authentication:

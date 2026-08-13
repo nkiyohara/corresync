@@ -8,7 +8,7 @@ The optional domain-only public projection is constrained separately by
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-08-11
+- Amended: 2026-08-13
 
 ## Context
 
@@ -120,6 +120,28 @@ see where later login will resolve a secret. This is the single narrow
 exception to "no secrets in core": the secret belongs to an external facility
 that the human already trusts, and this project holds a reference to it rather
 than a copy of it.
+
+Guided enrollment may launch a fixed operating-system credential command after
+the account route and handle have been reviewed and added. The `corr` process
+passes only the bounded handle and fixed service name, inherits the interactive
+terminal, and receives only the child exit status. It never reads the prompt or
+places the credential in argv, environment, stdout, configuration, or logs.
+The approved commands are macOS `security add-generic-password` with its secure
+prompt, Linux Secret Service `secret-tool store` with its TTY prompt, and
+Windows `cmdkey` with the password argument omitted so Windows prompts. A
+configured helper continues to own its own enrollment UI; its retrieval
+contract remains the bounded version 1 `get` request. No enrollment action is
+available through MCP or an implicit/non-interactive setup path.
+
+The first-class iCloud preset is a composition of the existing IMAP/SMTP and
+CalDAV routes, not a provider escape hatch. Exact `@icloud.com`, `@me.com`, and
+`@mac.com` domains may supply the reviewed preset. A custom domain requires the
+complete Apple endpoint set from independent IMAPS, Submission, and CalDAV SRV
+evidence; suffix guessing or one generic record is insufficient. The preset
+uses Apple's documented encrypted mail endpoints, the observed CalDAV SRV
+endpoint, full-address mail identity, and one external credential handle for
+both routes by default. Direct advanced setup retains distinct per-route
+handles.
 
 ## Consequences
 

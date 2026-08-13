@@ -183,7 +183,11 @@ shape means data was sent to a provider.
 - `config validate --json`: validity and local path. The path is private.
 - `config show --json`: complete validated secret-free configuration; still
   private for the reasons above.
-- `doctor --json`: local check rows; `--online` is opt-in.
+- `doctor --json`: local check rows; `--online` is opt-in. With
+  `--online --connection-only`, the same check-row schema reports Mail and
+  Calendar's last-authenticated connectivity separately and makes neither a
+  fresh authentication attempt nor any folder, message, event, contact, or
+  attachment metadata request.
 - `version --json`: version, commit, source build date, Go version, OS, and
   architecture.
 - `update check --json`: current/latest version, cache and release status.

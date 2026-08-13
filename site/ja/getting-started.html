@@ -6,7 +6,7 @@
     <title>Corresyncのはじめ方 — インストールから最初の回答まで</title>
     <meta
       name="description"
-      content="Corresyncをインストールし、アカウントを追加して、CodexやClaude CodeなどのMCPクライアントから使い始めるまでを4ステップで案内します。"
+      content="Corresyncをインストールし、OutlookやiCloudメール・カレンダーなどのアカウントを追加して、ローカルMCPクライアントから使い始めるまでを案内します。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -299,6 +299,11 @@ corr update</code></pre>
                 Graph、JMAP、IMAP/SMTP、CalDAVも、プロバイダーが対応していて必要な経路や認証情報の保管先を明示的に選んだ場合に利用できます。候補検索だけでブラウザやキーチェーンを開いたり、管理者の同意を求めたりすることはありません。
               </p>
               <p>
+                <strong>iCloudを使う場合：</strong><code>corr setup</code>は<code
+                >@icloud.com</code>、<code>@me.com</code>、<code
+                >@mac.com</code>、または必要なサービス記録がすべて確認できたカスタムiCloudドメインから、メールとカレンダーをまとめて提案します。アカウント追加後にAppleの2ファクタ認証とアプリ用パスワードを案内し、パスワードはOSの資格情報画面が直接受け取ります。Corresyncには渡りません。
+              </p>
+              <p>
                 <strong>Gmailを使う場合：</strong>Gmail・Calendar
                 APIのコードはRCに入っていますが、本番OAuth承認待ちのため完全に無効です。Googleサインインは開始できません。当面はGoogle公式Workspace
                 MCPを利用してください。
@@ -340,6 +345,14 @@ corr doctor --account personal</code></pre>
                 </div>
                 <p class="block-note">
                   従来のコマンドは非対話のままなので、自動化にも利用できます。
+                </p>
+              </div>
+              <div class="install-block">
+                <p class="os-label">iCloudメール＋カレンダー · 現在利用可能</p>
+                <p class="block-note">
+                  ガイド付きプリセットで両方のサービスを追加し、確認済みの認証情報ハンドルを共有できます。本文を読まず、最後に認証できた状態も確認できます。接続前にApple公式の<a
+                    href="https://support.apple.com/ja-jp/102654"
+                  >アプリ用パスワードの案内</a>を確認してください。
                 </p>
               </div>
               <div class="install-block">

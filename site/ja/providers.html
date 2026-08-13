@@ -6,14 +6,14 @@
     <title>対応メール・カレンダーサービス — Corresync</title>
     <meta
       name="description"
-      content="Outlook、Microsoft 365、JMAP、IMAP/SMTP、CalDAVの対応経路を比較。GmailとGoogleカレンダーはOAuth承認待ちで近日対応です。"
+      content="Outlook、Microsoft 365、iCloudメール・カレンダー、JMAP、IMAP/SMTP、CalDAVの対応経路を比較。GmailはOAuth承認待ちで近日対応です。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="対応メール・カレンダーサービス — Corresync">
     <meta
       property="og:description"
-      content="利用中のメールアドレスから、Corresyncで使える接続経路と必要な設定を確認できます。"
+      content="iCloudを含む現在利用可能な接続経路と、承認待ちのGoogle対応を確認できます。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -37,7 +37,7 @@
     >
     <meta
       name="twitter:description"
-      content="Outlook、Microsoft 365、標準プロトコルの対応状況と、承認待ちのGoogle経路を確認できます。"
+      content="Outlook、iCloud、標準プロトコルの対応状況と、承認待ちのGoogle経路を確認できます。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -231,6 +231,65 @@
             </dl>
             <p class="route-foot">
               Graphは明示的に選んだ場合、または既存の認可がある場合だけ利用します。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="icloud" aria-labelledby="icloud-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Apple iCloud</p>
+          <h2 id="icloud-title">
+            iCloudメールとカレンダーを、ひとつのガイドで設定。
+          </h2>
+          <p>
+            <code>corr
+              setup</code>はAppleの公開済みアドレス種別と、必要なサービス記録がすべて確認できたカスタムiCloudドメインを認識します。Apple公式のIMAP、SMTP、CalDAV接続先を提案し、アカウントを追加する前に利用者名と経路をすべて確認できます。
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card accent-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">iC</span><div>
+                <p class="chip">現在利用可能 · ガイド付き</p>
+                <h3>iCloudメール＋カレンダー</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>メール</dt>
+                <dd>IMAPでの読み取りと整理、SMTPでの作成と送信</dd>
+              </div>
+              <div>
+                <dt>カレンダー</dt>
+                <dd>CalDAVでの検索、読み取り、確認付きの書き込み</dd>
+              </div>
+              <div>
+                <dt>サインイン</dt>
+                <dd>
+                  Appleのアプリ用パスワードをOSの資格情報画面に直接入力
+                </dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              CorresyncがOSへ渡すのは固定サービス名と確認済みハンドルだけで、パスワードは読みません。最後に認証できたメールとカレンダーの状態を、本文や予定内容を取得せず別々に表示します。
+            </p>
+          </article>
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">2F</span><div>
+                <p class="chip">Apple Accountの要件</p>
+                <h3>2ファクタ認証</h3>
+              </div>
+            </header>
+            <p>
+              2ファクタ認証を有効にし、Apple
+              Accountのページでアプリ用パスワードを作成します。ガイドは、確認済みのローカルアカウントを追加した後、明示的に選んだ場合だけAppleのページを開きます。
+            </p>
+            <p class="route-foot">
+              Apple公式の<a href="https://support.apple.com/ja-jp/102525"
+              >iCloudメール設定</a>と<a href="https://support.apple.com/ja-jp/102654"
+              >アプリ用パスワードの案内</a>を参照してください。このプリセットは合成契約テスト済みで、オプトインの実環境観測が記録されるまでは実環境未観測です。
             </p>
           </article>
         </div>

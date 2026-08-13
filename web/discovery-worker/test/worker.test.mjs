@@ -57,6 +57,35 @@ test("Google families are identified while the generated approval gate stays clo
   assert.equal(catalog.googleOAuthApproved, false);
 });
 
+test("iCloud domains and complete Apple service records expose one guided preset", async () => {
+  const known = await discoverDomain("icloud.com", dnsFixture({}));
+  assert.deepEqual(known.classification, {
+    family: "apple",
+    displayName: "Apple iCloud",
+    variant: "apple-icloud",
+    confidence: "high",
+    status: "verified",
+    conflict: false,
+    summary: "Public records match the available guided iCloud Mail and Calendar preset.",
+  });
+  assert.deepEqual(known.routes.map(route => route.provider), ["apple-icloud"]);
+  assert.equal(known.routes[0].signIn.owner, "external_credential");
+
+  const custom = await discoverDomain("custom.test", dnsNameFixture({
+    "_imaps._tcp.custom.test": ["0 1 993 imap.mail.me.com."],
+    "_submission._tcp.custom.test": ["0 1 587 smtp.mail.me.com."],
+    "_caldavs._tcp.custom.test": ["0 1 443 caldav.icloud.com."],
+  }));
+  assert.equal(custom.classification.variant, "apple-icloud");
+  assert.deepEqual(custom.routes.map(route => route.provider), ["apple-icloud"]);
+
+  const incomplete = await discoverDomain("custom.test", dnsNameFixture({
+    "_imaps._tcp.custom.test": ["0 1 993 imap.mail.me.com."],
+  }));
+  assert.equal(incomplete.classification.family, "standards");
+  assert.notEqual(incomplete.classification.variant, "apple-icloud");
+});
+
 test("standards signals return useful setup guidance without guessing a brand", async () => {
   const result = await discoverDomain("standards.test", dnsFixture({
     SRV: ["0 0 993 mail.standards.test."],
@@ -262,6 +291,20 @@ function dnsFixture(records) {
       records[type] || [],
       {},
       url.searchParams.get("name"),
+      { CNAME: 5, MX: 15, SRV: 33 }[type],
+    );
+  };
+}
+
+function dnsNameFixture(records) {
+  return async request => {
+    const url = new URL(request);
+    const type = url.searchParams.get("type");
+    const name = url.searchParams.get("name");
+    return dnsResponse(
+      records[name] || [],
+      {},
+      name,
       { CNAME: 5, MX: 15, SRV: 33 }[type],
     );
   };

@@ -18,6 +18,7 @@
   const routeNames = Object.freeze({
     "microsoft-owa": "Outlook Web",
     "microsoft-graph": "Microsoft Graph",
+    "apple-icloud": "iCloud Mail and Calendar",
     google: "Gmail and Google Calendar",
     jmap: "JMAP",
     "imap-smtp": "IMAP / SMTP",
@@ -36,6 +37,10 @@
     "microsoft-graph": Object.freeze({
       mail: "Typed mail reads and writes",
       calendar: "Selectable calendars and typed Teams-link creation",
+    }),
+    "apple-icloud": Object.freeze({
+      mail: "IMAP reads and organization with SMTP composition and sending",
+      calendar: "CalDAV calendar reads and reviewed writes",
     }),
     google: Object.freeze({
       mail: "Gmail API support is included but disabled",
@@ -59,6 +64,7 @@
     "microsoft-365": "Microsoft 365 / Exchange Online (commonly used through Outlook)",
     "google-consumer": "Gmail",
     "google-workspace": "Google Workspace",
+    "apple-icloud": "Apple iCloud",
     standards: "Standards-based provider",
     unknown: "Provider not identified",
   });
@@ -76,6 +82,7 @@
   });
   const nextLinks = Object.freeze({
     "providers/google": { href: "#google", label: "Read about Google support" },
+    "providers/apple-icloud": { href: "#icloud", label: "See iCloud setup" },
     "providers/route-cards": { href: "#route-cards", label: "Compare provider routes" },
     "providers/microsoft-owa": { href: "#microsoft-owa", label: "See Outlook Web" },
     "providers/microsoft-graph": { href: "#microsoft-graph", label: "See Microsoft Graph" },
@@ -171,6 +178,7 @@
     routeNames: Object.freeze({
       "microsoft-owa": "Outlook Web",
       "microsoft-graph": "Microsoft Graph",
+      "apple-icloud": "iCloudメール・カレンダー",
       google: "Gmail・Googleカレンダー",
       jmap: "JMAP",
       "imap-smtp": "IMAP / SMTP",
@@ -186,6 +194,7 @@
       "microsoft-365": "Microsoft 365 / Exchange Online（通常はOutlookで利用）",
       "google-consumer": "Gmail",
       "google-workspace": "Google Workspace",
+      "apple-icloud": "Apple iCloud",
       standards: "標準プロトコル対応プロバイダー",
       unknown: "プロバイダーを特定できませんでした",
     }),
@@ -203,6 +212,7 @@
     }),
     nextLinks: Object.freeze({
       "providers/google": { href: "#google", label: "Google対応について読む" },
+      "providers/apple-icloud": { href: "#icloud", label: "iCloudの設定を見る" },
       "providers/route-cards": { href: "#route-cards", label: "利用経路を比較する" },
       "providers/microsoft-owa": { href: "#microsoft-owa", label: "Outlook Webを見る" },
       "providers/microsoft-graph": { href: "#microsoft-graph", label: "Microsoft Graphを見る" },
@@ -258,6 +268,7 @@
     routeCapabilities: Object.freeze({
       "microsoft-owa": { mail: "型付きのメール読み取り・書き込み", calendar: "選択可能なカレンダーと、対応時のTeams参加リンク" },
       "microsoft-graph": { mail: "型付きのメール読み取り・書き込み", calendar: "選択可能なカレンダーと型付きTeamsリンク作成" },
+      "apple-icloud": { mail: "IMAPでの読み取りと整理、SMTPでの作成と送信", calendar: "CalDAVでの読み取りと確認付き書き込み" },
       google: { mail: "Gmail API対応は実装済みですが無効", calendar: "GoogleカレンダーとMeet対応は実装済みですが無効" },
       jmap: { mail: "型付きJMAPメール操作", calendar: "この経路では提供されません" },
       "imap-smtp": { mail: "IMAPでの読み取り・整理。両サービスが利用可能ならSMTPで下書き・送信", calendar: "この経路では提供されません" },
@@ -267,6 +278,8 @@
       "Organization policy and existing mailbox permissions still apply.": "組織のポリシーと既存のメールボックス権限が適用されます。",
       "Register or use a public OAuth client your organization authorizes.": "組織が許可した公開OAuthクライアントを登録または使用してください。",
       "Graph is explicit and never an automatic fallback.": "Graphは明示的に選ぶ経路で、自動的な代替経路にはなりません。",
+      "Enable Apple Account two-factor authentication and create an app-specific password.": "Apple Accountの2ファクタ認証を有効にし、アプリ用パスワードを作成してください。",
+      "The guided preset is synthetic-contract covered and remains live-unobserved.": "ガイド付きプリセットは合成契約テスト済みで、実環境では未観測です。",
       "Provider policy and existing mailbox permissions still apply.": "プロバイダーのポリシーと既存のメールボックス権限が適用されます。",
       "Production OAuth approval is pending.": "本番OAuthは承認待ちです。",
       "A separate reviewed release must enable the route.": "有効化には別のレビュー済みリリースが必要です。",
@@ -288,6 +301,7 @@
     routeNames: Object.freeze({
       "microsoft-owa": "Outlook Web",
       "microsoft-graph": "Microsoft Graph",
+      "apple-icloud": "iCloud 邮件与日历",
       google: "Gmail 和 Google 日历",
       jmap: "JMAP",
       "imap-smtp": "IMAP / SMTP",
@@ -303,6 +317,7 @@
       "microsoft-365": "Microsoft 365 / Exchange Online（通常通过 Outlook 使用）",
       "google-consumer": "Gmail",
       "google-workspace": "Google Workspace",
+      "apple-icloud": "Apple iCloud",
       standards: "基于开放标准的服务",
       unknown: "尚未识别服务提供商",
     }),
@@ -320,6 +335,7 @@
     }),
     nextLinks: Object.freeze({
       "providers/google": { href: "#google", label: "了解 Google 支持状态" },
+      "providers/apple-icloud": { href: "#icloud", label: "查看 iCloud 设置" },
       "providers/route-cards": { href: "#route-cards", label: "比较连接方式" },
       "providers/microsoft-owa": { href: "#microsoft-owa", label: "查看 Outlook Web" },
       "providers/microsoft-graph": { href: "#microsoft-graph", label: "查看 Microsoft Graph" },
@@ -375,6 +391,7 @@
     routeCapabilities: Object.freeze({
       "microsoft-owa": { mail: "类型明确的邮件读取与写入", calendar: "可选择日历，并在支持时使用 Teams 加入链接" },
       "microsoft-graph": { mail: "类型明确的邮件读取与写入", calendar: "可选择日历，并创建类型明确的 Teams 链接" },
+      "apple-icloud": { mail: "通过 IMAP 读取和整理，通过 SMTP 撰写和发送", calendar: "通过 CalDAV 读取日历并执行需确认的写入" },
       google: { mail: "Gmail API 支持已实现但尚未启用", calendar: "Google 日历与 Meet 支持已实现但尚未启用" },
       jmap: { mail: "类型明确的 JMAP 邮件操作", calendar: "这条路径不提供日历" },
       "imap-smtp": { mail: "通过 IMAP 读取和整理；两项服务都可用时通过 SMTP 撰写和发送", calendar: "这条路径不提供日历" },
@@ -384,6 +401,8 @@
       "Organization policy and existing mailbox permissions still apply.": "组织政策与现有邮箱权限仍然适用。",
       "Register or use a public OAuth client your organization authorizes.": "请注册或使用组织授权的公开 OAuth 客户端。",
       "Graph is explicit and never an automatic fallback.": "Graph 必须明确选择，绝不会自动作为替代路径。",
+      "Enable Apple Account two-factor authentication and create an app-specific password.": "请启用 Apple 账号双重认证并创建 App 专用密码。",
+      "The guided preset is synthetic-contract covered and remains live-unobserved.": "引导预设已通过合成契约测试，目前尚未进行实机观察。",
       "Provider policy and existing mailbox permissions still apply.": "服务商政策与现有邮箱权限仍然适用。",
       "Production OAuth approval is pending.": "生产环境 OAuth 正在等待审批。",
       "A separate reviewed release must enable the route.": "这条路径只能通过另一次独立审阅的发布启用。",
@@ -405,6 +424,7 @@
     routeNames: Object.freeze({
       "microsoft-owa": "Outlook Web",
       "microsoft-graph": "Microsoft Graph",
+      "apple-icloud": "iCloud 郵件與行事曆",
       google: "Gmail 和 Google 行事曆",
       jmap: "JMAP",
       "imap-smtp": "IMAP / SMTP",
@@ -416,6 +436,7 @@
       "microsoft-365": "Microsoft 365 / Exchange Online（通常透過 Outlook 使用）",
       "google-consumer": "Gmail",
       "google-workspace": "Google Workspace",
+      "apple-icloud": "Apple iCloud",
       standards: "採用開放標準的服務",
       unknown: "尚未識別服務供應商",
     }),
@@ -428,6 +449,7 @@
     }),
     nextLinks: Object.freeze({
       "providers/google": { href: "#google", label: "瞭解 Google 支援狀態" },
+      "providers/apple-icloud": { href: "#icloud", label: "查看 iCloud 設定" },
       "providers/route-cards": { href: "#route-cards", label: "比較連線方式" },
       "providers/microsoft-owa": { href: "#microsoft-owa", label: "查看 Outlook Web" },
       "providers/microsoft-graph": { href: "#microsoft-graph", label: "查看 Microsoft Graph" },
@@ -460,6 +482,7 @@
     routeCapabilities: Object.freeze({
       "microsoft-owa": { mail: "型別明確的郵件讀取與寫入", calendar: "可選擇行事曆，並在支援時使用 Teams 加入連結" },
       "microsoft-graph": { mail: "型別明確的郵件讀取與寫入", calendar: "可選擇行事曆，並建立型別明確的 Teams 連結" },
+      "apple-icloud": { mail: "透過 IMAP 讀取和整理，透過 SMTP 撰寫和傳送", calendar: "透過 CalDAV 讀取行事曆並執行需確認的寫入" },
       google: { mail: "Gmail API 支援已完成但尚未啟用", calendar: "Google 行事曆與 Meet 支援已完成但尚未啟用" },
       jmap: { mail: "型別明確的 JMAP 郵件操作", calendar: "這條路徑不提供行事曆" },
       "imap-smtp": { mail: "透過 IMAP 讀取和整理；兩項服務都可用時透過 SMTP 撰寫和傳送", calendar: "這條路徑不提供行事曆" },
@@ -469,6 +492,8 @@
       "Organization policy and existing mailbox permissions still apply.": "組織政策與現有信箱權限仍然適用。",
       "Register or use a public OAuth client your organization authorizes.": "請註冊或使用組織授權的公開 OAuth 用戶端。",
       "Graph is explicit and never an automatic fallback.": "Graph 必須明確選擇，絕不會自動成為替代路徑。",
+      "Enable Apple Account two-factor authentication and create an app-specific password.": "請啟用 Apple 帳號雙重認證並建立 App 專用密碼。",
+      "The guided preset is synthetic-contract covered and remains live-unobserved.": "引導預設已通過合成契約測試，目前尚未進行實機觀察。",
       "Provider policy and existing mailbox permissions still apply.": "服務供應商政策與現有信箱權限仍然適用。",
       "Production OAuth approval is pending.": "正式環境 OAuth 正在等待審核。",
       "A separate reviewed release must enable the route.": "這條路徑只能透過另一次獨立審閱的版本啟用。",
@@ -489,13 +514,13 @@
   const koreanCopy = Object.freeze({
     routeNames: Object.freeze({
       "microsoft-owa": "Outlook Web", "microsoft-graph": "Microsoft Graph", google: "Gmail 및 Google 캘린더",
-      jmap: "JMAP", "imap-smtp": "IMAP / SMTP", caldav: "CalDAV",
+      "apple-icloud": "iCloud Mail과 캘린더", jmap: "JMAP", "imap-smtp": "IMAP / SMTP", caldav: "CalDAV",
     }),
     routeStatus: Object.freeze({ available: "지금 사용 가능", additional_setup: "설정 후 사용 가능", not_available: "곧 지원" }),
     familyNames: Object.freeze({
       "microsoft-consumer": "Outlook.com, Hotmail 또는 Live",
       "microsoft-365": "Microsoft 365 / Exchange Online(일반적으로 Outlook에서 사용)",
-      "google-consumer": "Gmail", "google-workspace": "Google Workspace", standards: "개방형 표준 서비스", unknown: "서비스 제공자를 찾지 못함",
+      "google-consumer": "Gmail", "google-workspace": "Google Workspace", "apple-icloud": "Apple iCloud", standards: "개방형 표준 서비스", unknown: "서비스 제공자를 찾지 못함",
     }),
     confidenceNames: Object.freeze({ high: "신뢰도 높음", medium: "신뢰도 보통", low: "신뢰도 낮음", unknown: "신뢰도 알 수 없음" }),
     signInNames: Object.freeze({
@@ -504,6 +529,7 @@
     }),
     nextLinks: Object.freeze({
       "providers/google": { href: "#google", label: "Google 지원 현황 보기" }, "providers/route-cards": { href: "#route-cards", label: "연결 방식 비교" },
+      "providers/apple-icloud": { href: "#icloud", label: "iCloud 설정 보기" },
       "providers/microsoft-owa": { href: "#microsoft-owa", label: "Outlook Web 보기" }, "providers/microsoft-graph": { href: "#microsoft-graph", label: "Microsoft Graph 보기" },
       "providers/jmap": { href: "#jmap", label: "JMAP 보기" }, "providers/imap-smtp": { href: "#imap-smtp", label: "IMAP / SMTP 보기" },
       "providers/caldav": { href: "#caldav", label: "CalDAV 보기" }, "getting-started/install": { href: "getting-started.html#step-install", label: "Corresync 설치" },
@@ -531,6 +557,7 @@
     routeCapabilities: Object.freeze({
       "microsoft-owa": { mail: "명확히 정의된 메일 읽기와 쓰기", calendar: "캘린더 선택과 지원되는 경우 Teams 참여 링크" },
       "microsoft-graph": { mail: "명확히 정의된 메일 읽기와 쓰기", calendar: "캘린더 선택과 명확히 정의된 Teams 링크 생성" },
+      "apple-icloud": { mail: "IMAP 읽기와 정리, SMTP 작성과 전송", calendar: "CalDAV 캘린더 읽기와 승인 후 쓰기" },
       google: { mail: "Gmail API 지원은 구현됐지만 비활성", calendar: "Google 캘린더와 Meet 지원은 구현됐지만 비활성" },
       jmap: { mail: "명확히 정의된 JMAP 메일 작업", calendar: "이 경로에서는 제공하지 않음" },
       "imap-smtp": { mail: "IMAP 읽기와 정리, 두 서비스가 모두 가능하면 SMTP 작성과 전송", calendar: "이 경로에서는 제공하지 않음" },
@@ -540,6 +567,8 @@
       "Organization policy and existing mailbox permissions still apply.": "조직 정책과 기존 메일함 권한은 계속 적용됩니다.",
       "Register or use a public OAuth client your organization authorizes.": "조직에서 허용한 공개 OAuth 클라이언트를 등록하거나 사용하세요.",
       "Graph is explicit and never an automatic fallback.": "Graph는 명시적으로 선택해야 하며 자동 대체 경로가 아닙니다.",
+      "Enable Apple Account two-factor authentication and create an app-specific password.": "Apple 계정 이중 인증을 켜고 앱 암호를 만드세요.",
+      "The guided preset is synthetic-contract covered and remains live-unobserved.": "안내 프리셋은 합성 계약 테스트를 통과했으며 아직 실제 환경에서 관찰되지 않았습니다.",
       "Provider policy and existing mailbox permissions still apply.": "서비스 제공자 정책과 기존 메일함 권한은 계속 적용됩니다.",
       "Production OAuth approval is pending.": "운영 환경 OAuth 승인을 기다리고 있습니다.",
       "A separate reviewed release must enable the route.": "이 경로는 별도로 검토한 릴리스에서만 활성화할 수 있습니다.",

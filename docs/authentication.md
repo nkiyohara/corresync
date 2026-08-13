@@ -122,6 +122,17 @@ directly without a shell. Output and environment are bounded. Corresync does
 not provide a password prompt, store helper output, or use credentials during
 discovery.
 
+For an iCloud preset, guided setup explains Apple's 2FA and app-specific
+password prerequisite and can open the fixed Apple Account management page
+only after an explicit choice. After the secret-free account is added, it can
+hand the reviewed key to the OS-owned secure prompt: macOS `security`, Linux
+Secret Service `secret-tool`, or Windows `cmdkey`. The OS process—not
+`corr`—reads the app-specific password. No credential value appears in a
+Corresync argument, environment variable, config file, output, or log. A user
+who selected an approved helper uses that helper's own enrollment UI instead.
+One iCloud credential handle is shared by Mail and Calendar by default; direct
+advanced configuration still permits separate handles.
+
 All remote endpoints require encrypted transport. IMAP/SMTP support implicit
 TLS or STARTTLS according to the explicit route. IMAP response literals are
 bounded individually and in aggregate from the first greeting, including after
@@ -202,6 +213,12 @@ an already authenticated session. Run `corr auth login --account ALIAS` first.
 Doctor reports the exact configured OAuth scopes, never starts OAuth or opens a
 provider login, and requests only bounded folder, mail, and calendar metadata
 contracts. It must not be part of default tests or CI.
+
+`corr doctor --online --connection-only` is the narrower authenticated-session
+status check used by standards onboarding. It reports when TLS and authorization
+were last established, shows Mail and Calendar independently, and requests no
+folder, message, event, contact, or attachment metadata. It never silently
+reauthenticates or claims a new network probe, so run `corr auth login` first.
 
 For shareable support material, use `corr feedback --last-error`. It records
 only generalized error classes and a redacted command shape; it never copies

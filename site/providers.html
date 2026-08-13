@@ -6,14 +6,14 @@
     <title>Email and calendar providers — Corresync</title>
     <meta
       name="description"
-      content="Compare Corresync routes for Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV. Gmail and Google Calendar are coming soon pending OAuth approval."
+      content="Compare Corresync routes for Outlook, Microsoft 365, iCloud Mail and Calendar, JMAP, IMAP/SMTP, and CalDAV. Gmail is coming soon pending OAuth approval."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Email and calendar providers — Corresync">
     <meta
       property="og:description"
-      content="Compare Corresync routes for Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV. Gmail and Google Calendar are coming soon pending OAuth approval."
+      content="Compare Corresync routes for Outlook, Microsoft 365, iCloud Mail and Calendar, JMAP, IMAP/SMTP, and CalDAV. Gmail is coming soon pending OAuth approval."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -34,7 +34,7 @@
     <meta name="twitter:title" content="Email and calendar providers — Corresync">
     <meta
       name="twitter:description"
-      content="Compare Corresync routes for Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV. Gmail and Google Calendar are coming soon pending OAuth approval."
+      content="Compare Corresync routes for Outlook, Microsoft 365, iCloud Mail and Calendar, JMAP, IMAP/SMTP, and CalDAV. Gmail is coming soon pending OAuth approval."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -231,6 +231,70 @@
             <p class="route-foot">
               Graph is offered only as an explicit choice or for an authorization you already
               granted.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="tinted-section" id="icloud" aria-labelledby="icloud-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Apple iCloud</p>
+          <h2 id="icloud-title">Set up iCloud Mail and Calendar in one guided flow.</h2>
+          <p>
+            <code>corr setup</code> recognises Apple’s documented address families and complete
+            verified service records for custom iCloud domains. It proposes Apple’s published
+            IMAP, SMTP, and CalDAV endpoints, then lets you review every identity and route before
+            adding the account.
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card accent-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">iC</span>
+              <div>
+                <p class="chip">Available now · guided preset</p>
+                <h3>iCloud Mail + Calendar</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>Mail</dt>
+                <dd>IMAP reads and organization, with SMTP composition and sending</dd>
+              </div>
+              <div>
+                <dt>Calendar</dt>
+                <dd>CalDAV calendar discovery, reads, and reviewed writes</dd>
+              </div>
+              <div>
+                <dt>Sign-in</dt>
+                <dd>Apple app-specific password entered directly into the OS credential store</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              Corresync passes only a fixed service name and reviewed handle to the system prompt;
+              it never reads the password. The last-authenticated Mail and Calendar status is shown
+              independently without reading message or event content.
+            </p>
+          </article>
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">2F</span>
+              <div>
+                <p class="chip">Apple Account requirement</p>
+                <h3>Two-factor authentication</h3>
+              </div>
+            </header>
+            <p>
+              Enable two-factor authentication, then create an app-specific password on Apple’s
+              account page. The guided flow opens that page only when you explicitly choose it,
+              after the reviewed local account has been added.
+            </p>
+            <p class="route-foot">
+              Check Apple’s official
+              <a href="https://support.apple.com/en-us/102525">iCloud Mail settings</a> and
+              <a href="https://support.apple.com/en-gb/102654">app-specific password guide</a>. This
+              preset has synthetic contract coverage and remains live-unobserved until an opt-in
+              observation is recorded.
             </p>
           </article>
         </div>

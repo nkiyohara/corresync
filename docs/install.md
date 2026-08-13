@@ -272,6 +272,15 @@ Corresync never asks for a password or copies an authorization header into its
 configuration. Online doctor reuses that authenticated session and never starts
 login or OAuth itself.
 
+For `@icloud.com`, `@me.com`, and `@mac.com` addresses—or a custom domain with
+the complete verified Apple SRV endpoint set—the same wizard offers one iCloud
+Mail + Calendar account. It pins the reviewed encrypted IMAP/SMTP and CalDAV
+routes, explains Apple's 2FA/app-specific-password requirement, and can launch
+the OS credential prompt after the account is added. The prompt belongs to
+macOS Keychain, Linux Secret Service, or Windows Credential Manager; `corr`
+never reads the password. Mail and Calendar share one external handle by
+default and remain independently visible in account and doctor status.
+
 If automatic selection is unavailable, or you want an API or standards route:
 
 ```console

@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
@@ -16,6 +19,64 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/localipc"
 )
+
+type doctorConnectionBackend struct {
+	adapterTestBackend
+	contentCalls int
+}
+
+func (*doctorConnectionBackend) SessionStatus(
+	context.Context,
+	domain.Caller,
+) (daemonapi.SessionStatusResult, error) {
+	capabilities := domain.Capabilities{Mail: true, Calendar: true}
+	capturedAt := time.Unix(1, 0).UTC()
+	return daemonapi.SessionStatusResult{Accounts: []daemonapi.SessionStatus{{
+		Account: adapterTestAccountID, Alias: "work",
+		Provider:     domain.ProviderIMAPSMTP,
+		MailProvider: domain.ProviderIMAPSMTP, CalendarProvider: domain.ProviderCalDAV,
+		State: "authenticated", Authenticated: true,
+		CapturedAt: &capturedAt, Capabilities: &capabilities,
+	}}}, nil
+}
+
+func (backend *doctorConnectionBackend) ListMailFolders(
+	context.Context,
+	application.MailFolderListInput,
+	domain.Caller,
+) (application.MailFolderPage, error) {
+	backend.contentCalls++
+	return application.MailFolderPage{}, errors.New("content-free check requested mail folders")
+}
+
+func (backend *doctorConnectionBackend) ListMail(
+	context.Context,
+	application.MailListInput,
+	domain.Caller,
+) (application.MailPage, error) {
+	backend.contentCalls++
+	return application.MailPage{}, errors.New("content-free check requested mail")
+}
+
+func (backend *doctorConnectionBackend) ListCalendarFolders(
+	context.Context,
+	application.CalendarFolderListInput,
+	domain.Caller,
+) (application.CalendarFolderPage, error) {
+	backend.contentCalls++
+	return application.CalendarFolderPage{}, errors.New(
+		"content-free check requested calendar folders",
+	)
+}
+
+func (backend *doctorConnectionBackend) ListCalendar(
+	context.Context,
+	application.CalendarListInput,
+	domain.Caller,
+) (application.CalendarPage, error) {
+	backend.contentCalls++
+	return application.CalendarPage{}, errors.New("content-free check requested events")
+}
 
 func allowDoctorBrowserProbe(t *testing.T, app *runtime, expected string) {
 	t.Helper()
@@ -133,6 +194,103 @@ func TestDoctorDoesNotRequireBrowserForStandardsRoutes(t *testing.T) {
 		}
 	}
 	t.Fatalf("doctor report lacks browser check: %+v", report.Checks)
+}
+
+func TestDoctorConnectionOnlyReportsMailAndCalendarWithoutRemoteItemReads(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	configuration := config.OutlookDefault()
+	configuration.Updates.DisableAutomaticChecks = true
+	account := configuration.Accounts[configuration.DefaultAccount]
+	account.Address = "reader@icloud.com"
+	shared := config.CredentialRef{
+		Backend: config.CredentialOSKeyring, Key: "icloud-shared", Consent: true,
+	}
+	account.Mail = &config.MailRoute{
+		Provider: domain.ProviderIMAPSMTP,
+		IMAPSMTP: &config.IMAPSMTPRoute{
+			IMAP: config.TLSEndpoint{
+				Host: "imap.mail.me.com", Port: 993, Mode: config.TLSImplicit,
+			},
+			SMTP: config.TLSEndpoint{
+				Host: "smtp.mail.me.com", Port: 587, Mode: config.TLSStartTLS,
+			},
+			Username: "reader@icloud.com", Credential: shared,
+		},
+	}
+	account.Calendar = &config.CalendarRoute{
+		Provider: domain.ProviderCalDAV,
+		CalDAV: &config.CalDAVRoute{
+			Endpoint: "https://caldav.icloud.com:443/",
+			Username: "reader@icloud.com", Credential: shared,
+		},
+	}
+	configuration.Accounts[configuration.DefaultAccount] = account
+	configPath := filepath.Join(root, "config.toml")
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+	digest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := localipc.ResolveInState(configPath, filepath.Join(root, "state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &doctorConnectionBackend{}
+	stop := startAdapterTestDaemon(t, endpoint, digest, backend)
+	t.Cleanup(stop)
+
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), configPath, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
+	runErr := (&doctorCommand{
+		Online: true, ConnectionOnly: true, JSON: true,
+	}).Run(app)
+	if backend.contentCalls != 0 {
+		t.Fatalf("connection-only doctor made %d remote item reads", backend.contentCalls)
+	}
+	var report doctorReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if runErr != nil || !report.Healthy {
+		t.Fatalf("connection-only report = %+v, error = %v", report, runErr)
+	}
+	checks := make(map[string]doctorCheck)
+	for _, check := range report.Checks {
+		checks[check.Name] = check
+	}
+	for _, name := range []string{"mail_connection", "calendar_connection"} {
+		if checks[name].Status != "pass" ||
+			!strings.Contains(checks[name].Detail, "read no") {
+			t.Fatalf("%s check = %+v", name, checks[name])
+		}
+	}
+	for _, forbidden := range []string{
+		"folder_contract", "mail_contract", "calendar_folder_contract", "calendar_contract",
+	} {
+		if _, exists := checks[forbidden]; exists {
+			t.Fatalf("connection-only report contains %s: %+v", forbidden, report.Checks)
+		}
+	}
+}
+
+func TestDoctorConnectionOnlyRequiresOnline(t *testing.T) {
+	t.Parallel()
+	app := newRuntime(
+		t.Context(),
+		filepath.Join(t.TempDir(), "missing.toml"),
+		&bytes.Buffer{},
+		&bytes.Buffer{},
+		buildinfo.Current(),
+	)
+	if err := (&doctorCommand{ConnectionOnly: true}).Run(app); err == nil ||
+		!strings.Contains(err.Error(), "requires --online") {
+		t.Fatalf("connection-only validation error = %v", err)
+	}
 }
 
 func TestDoctorOfflineRejectsIncompatibleRunningDaemon(t *testing.T) {

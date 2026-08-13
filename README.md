@@ -103,6 +103,14 @@ connect Gmail and Calendar through Google's official
 [Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers)
 (Developer Preview).
 
+iCloud has a first-class guided preset over the same provider-neutral
+IMAP/SMTP and CalDAV adapters. `corr setup` recognizes documented iCloud Mail
+address families or the complete verified Apple SRV endpoint set, reviews both
+routes as one account, and uses one external credential handle by default.
+After the account is added, an explicit handoff can open Apple's app-password
+page and the OS-owned credential prompt; the `corr` process never reads the
+app-specific password.
+
 Every available or staged v0.8 route above has synthetic provider-contract and
 application coverage. The Gmail API route included in RC builds is disabled
 and live-unobserved. Other v0.8 provider and platform implementations remain

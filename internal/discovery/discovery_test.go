@@ -108,6 +108,55 @@ func TestDiscoverCombinesCredentialFreeEvidence(t *testing.T) {
 	}
 }
 
+func TestDiscoverAddsFirstClassICloudRoutesForDocumentedAddressFamilies(t *testing.T) {
+	t.Parallel()
+	for _, domainName := range []string{"icloud.com", "me.com", "mac.com"} {
+		t.Run(domainName, func(t *testing.T) {
+			t.Parallel()
+			discoverer := New(Options{
+				Resolver: resolverStub{
+					mxErr: errors.New("offline"),
+					srvErr: map[string]error{
+						"imaps": errors.New("offline"), "submission": errors.New("offline"),
+						"caldavs": errors.New("offline"), "jmap": errors.New("offline"),
+					},
+				},
+				Prober: proberStub{errors: map[string]error{
+					"https://" + domainName + "/.well-known/jmap":   errors.New("offline"),
+					"https://" + domainName + "/.well-known/caldav": errors.New("offline"),
+				}},
+			})
+			observation, err := discoverer.Discover(
+				t.Context(),
+				"reader@"+domainName,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			providers := make(map[domain.ProviderID]application.ProviderCandidate)
+			for _, candidate := range observation.Candidates {
+				providers[candidate.Provider] = candidate
+			}
+			mail := providers[domain.ProviderIMAPSMTP]
+			calendar := providers[domain.ProviderCalDAV]
+			if mail.Confidence != 98 || mail.RequiresExplicitSelection ||
+				len(mail.Endpoints) != 2 || calendar.Confidence != 98 ||
+				calendar.RequiresExplicitSelection || len(calendar.Endpoints) != 1 {
+				t.Fatalf("iCloud candidates = %#v", providers)
+			}
+			if mail.Endpoints[0] != (application.DiscoveredEndpoint{
+				Kind: "imap", Value: "imap.mail.me.com:993",
+			}) || mail.Endpoints[1] != (application.DiscoveredEndpoint{
+				Kind: "smtp", Value: "smtp.mail.me.com:587",
+			}) || calendar.Endpoints[0] != (application.DiscoveredEndpoint{
+				Kind: "caldav", Value: "https://caldav.icloud.com:443/",
+			}) {
+				t.Fatalf("iCloud endpoints = %#v", providers)
+			}
+		})
+	}
+}
+
 func TestDiscoverConstructsCredentialFreeCalDAVSRVURL(t *testing.T) {
 	t.Parallel()
 	discoverer := New(Options{

@@ -207,6 +207,12 @@ account may intentionally share one handle. Existing external credential
 records remain owned by their keyring or helper and are never copied into this
 file.
 
+Guided iCloud setup uses one handle for its IMAP/SMTP and CalDAV routes by
+default. The post-add enrollment action invokes the platform credential tool
+with only service `corresync` and that reviewed handle; the OS tool owns the
+secure prompt and `corr` receives only its exit status. Advanced direct account
+configuration may still select distinct mail and calendar handles.
+
 The executable is invoked directly without a shell. It receives one bounded
 JSON line on stdin:
 
