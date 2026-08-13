@@ -185,12 +185,23 @@ and effect-policy checks remain in force.
 
 ## Online diagnostics
 
-`corr doctor` is local and does not authenticate. `corr doctor --online` is the
-explicit opt-in provider compatibility check for an already authenticated
-session. Run `corr auth login --account ALIAS` first. Doctor reports the exact
-configured OAuth scopes, never starts OAuth or opens a provider login, and
-requests only bounded folder, mail, and calendar metadata contracts. It must
-not be part of default tests or CI.
+`corr doctor` is local and does not authenticate. For a browser-backed route it
+starts a temporary headless blank target with the same sandbox-relevant launch
+options as authentication, then closes it without navigation. A resolved
+executable is not reported healthy unless Chromium can actually start.
+
+On Linux, prefer a system-managed Chrome or Chromium whose sandbox and AppArmor
+policy cover the executable's installed path. A browser copied into a user cache
+may be executable but unable to create its sandbox. Configure the managed path
+with `corr config set browser.executable /absolute/path/to/chrome`, stop the
+daemon, and rerun `corr doctor --account ALIAS`. Corresync never adds or suggests
+`--no-sandbox`; fix the package or host policy instead.
+
+`corr doctor --online` is the explicit opt-in provider compatibility check for
+an already authenticated session. Run `corr auth login --account ALIAS` first.
+Doctor reports the exact configured OAuth scopes, never starts OAuth or opens a
+provider login, and requests only bounded folder, mail, and calendar metadata
+contracts. It must not be part of default tests or CI.
 
 For shareable support material, use `corr feedback --last-error`. It records
 only generalized error classes and a redacted command shape; it never copies

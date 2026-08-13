@@ -44,6 +44,8 @@ type terminalBrowserHandle interface {
 
 type browserLauncher func(context.Context, browser.Options) (browserHandle, error)
 
+type browserProber func(context.Context, string) (string, error)
+
 type commandRunner func(context.Context, io.Writer, io.Writer, string, ...string) error
 
 type inputCommandRunner func(
@@ -63,6 +65,7 @@ type runtime struct {
 	stdout            io.Writer
 	stderr            io.Writer
 	launch            browserLauncher
+	probeBrowser      browserProber
 	endpoint          func(string) (localipc.Endpoint, error)
 	previousEndpoints func(string) ([]localipc.Endpoint, error)
 	stopEndpointOwner func(context.Context, localipc.Endpoint) (int, error)
@@ -99,6 +102,7 @@ func newRuntime(
 		launch: func(ctx context.Context, options browser.Options) (browserHandle, error) {
 			return browser.Launch(ctx, options)
 		},
+		probeBrowser:      browser.Probe,
 		endpoint:          localipc.Resolve,
 		previousEndpoints: localipc.ResolvePrevious,
 		stopEndpointOwner: localipc.StopEndpointOwner,

@@ -145,10 +145,12 @@ approval and stops before sign-in or network access. After a separate activation
 release it will use normal-browser OAuth and pinned Gmail/Calendar APIs; it will
 never automate Google sign-in. `auth status` is content-free.
 
-`doctor` validates local config, browser prerequisites, IPC, daemon state, and
-update policy. `--online` validates only an already authenticated session; it
-never starts login or OAuth. Run `auth login` first. The report includes the
-configured OAuth scope set and is never run by default tests.
+`doctor` validates local config, starts and closes a blank sandboxed Chromium
+target when the selected route needs a browser, checks IPC, daemon state, and
+update policy. It performs no navigation or authentication. `--online` validates
+only an already authenticated session; it never starts login or OAuth. Run
+`auth login` first. The report includes the configured OAuth scope set and is
+never run by default tests.
 
 ## Mail reads
 

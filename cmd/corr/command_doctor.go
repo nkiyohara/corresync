@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
-	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
@@ -38,6 +37,8 @@ type doctorCheck struct {
 	Status string `json:"status"`
 	Detail string `json:"detail,omitempty"`
 }
+
+const browserProbeTimeout = 20 * time.Second
 
 func (command *doctorCommand) Run(app *runtime) error {
 	report := doctorReport{
@@ -77,11 +78,18 @@ func (command *doctorCommand) Run(app *runtime) error {
 	case hasGoogleWebRoute(configured):
 		report.add("account", "fail", errUnsupportedLegacyGoogleRoute.Error())
 	case hasBrowserRoute(configured):
-		executable, err := browser.ResolveExecutable(configuration.Browser.Executable)
+		ctx, cancel := context.WithTimeout(app.context, browserProbeTimeout)
+		executable, err := app.probeBrowser(ctx, configuration.Browser.Executable)
+		cancel()
 		if err != nil {
 			report.add("browser", "fail", doctorError(err))
 		} else {
-			report.add("browser", "pass", "resolved "+sanitizeCell(filepath.Base(executable), 80))
+			report.add(
+				"browser",
+				"pass",
+				"started "+sanitizeCell(filepath.Base(executable), 80)+
+					" with normal sandbox settings; no navigation performed",
+			)
 		}
 	default:
 		report.add("browser", "skip", "not required by the selected provider routes")
