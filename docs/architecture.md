@@ -62,6 +62,23 @@ The domain does not import provider, browser, CLI, MCP, persistence, or IPC
 packages. Provider adapters translate a protocol into application ports; they
 do not own effect policy. CLI and MCP call the same use cases and result types.
 
+Local agent-host integration has a separate dependency chain:
+
+```text
+typed host catalog
+  ├── read-only bounded detector
+  ├── generated documentation/package metadata
+  └── lifecycle adapters
+        ▲
+      guided setup and direct compatibility commands
+```
+
+The catalog holds identity, aliases, surfaces, support maturity, capabilities,
+and adapter routing without imperative probes. Detection returns evidence and
+never mutates or executes a host. Lifecycle adapters may later inspect the
+minimum documented host-owned state and produce explicit plans, but provider
+credentials and account data never enter this layer.
+
 ## Account identity and routes
 
 An account has:

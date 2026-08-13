@@ -410,6 +410,8 @@ func TestMachineSurfacesNeverHandleAutomaticUpdates(t *testing.T) {
 		{"completion", "bash"},
 		{"version", "--json"},
 		{"doctor", "--json"},
+		{"integrations", "detect"},
+		{"integrations", "detect", "--json"},
 		{"update", "check"},
 		{"config", "set", "updates.auto_install", "false"},
 		{"daemon", "run"},

@@ -304,7 +304,25 @@ corr agenda list --all-accounts \
 Verify deterministic ordering, provider/account provenance, global bounds, and
 explicit partial failures. No cross-account write must be available.
 
-## 8. Read-only MCP
+## 8. Local agent-host discovery
+
+Before configuring an MCP client, run:
+
+```console
+corr integrations detect
+corr integrations detect --json
+corr integrations list
+corr integrations show codex
+```
+
+Confirm that installed executables/applications are identified without being
+launched, stale configuration-only evidence is `probable`, unsupported
+surfaces stay explicit, and absolute locations appear only in private local
+output. Repeat from local, SSH, or WSL contexts in scope for the observation;
+the reported context must match. Detection must not change any host config,
+start an agent process, read an agent conversation, or contact the network.
+
+## 9. Read-only MCP
 
 Inspect before registering:
 
@@ -343,7 +361,7 @@ Pass criteria:
 
 Do not share raw MCP frames.
 
-## 9. Read-only import staging
+## 10. Read-only import staging
 
 Use a disposable synthetic export, never a production profile for a first
 test:
@@ -360,7 +378,7 @@ reads it, and creates the bounded account-local plan in one operation. Verify
 bounds and recognized-format counts locally, then verify purge removes only
 account-local Corresync staging and never changes the source.
 
-## 10. Consequential writes
+## 11. Consequential writes
 
 Stop unless each operation and target is separately authorized. Use a
 disposable message, controlled recipient, controlled calendar, and synthetic
@@ -398,7 +416,7 @@ route disables permanent delete because Gmail's expunge behavior is
 account-configurable; do not attempt it there or test any other route with
 non-disposable mail.
 
-## 11. Monitoring and dispatch
+## 12. Monitoring and dispatch
 
 Use a dedicated account with synthetic incoming messages.
 
@@ -445,7 +463,7 @@ corr monitor disable --account ALIAS --purge-queue --approve
 Confirm disabled monitoring collects nothing. Queue purge must remove only the
 selected account's local events.
 
-## 12. Finish and record
+## 13. Finish and record
 
 ```console
 corr daemon status --json

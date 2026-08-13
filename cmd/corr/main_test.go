@@ -92,6 +92,7 @@ func TestRootHelpCommandDescriptionsMatchCommandHelp(t *testing.T) {
 		"mail",
 		"calendar",
 		"daemon",
+		"integrations",
 		"mcp",
 		"update",
 		"completion",

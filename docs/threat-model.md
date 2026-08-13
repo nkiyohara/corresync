@@ -35,6 +35,9 @@ gateway or tenant administration service.
   secret input;
 - CI logs, fixtures, feedback reports, and public issues must be safe to
   publish.
+- Agent-host executables, applications, and configuration footprints are
+  external local state. Detection may reveal a private installation path but
+  cannot execute an agent or read its configuration or conversations.
 - GitHub Pages, Cloudflare Workers, and Cloudflare's public DNS resolver are
   external infrastructure for the optional domain-only website checker;
   ordinary connection metadata is visible to those operators.
@@ -58,6 +61,28 @@ gateway or tenant administration service.
 - Use `no-store`, no Cache API or storage binding, and disable Workers
   observability and invocation logs. The checker never authenticates, adds an
   account, probes consent, or claims that DNS evidence guarantees capability.
+
+## Local agent-host detection controls
+
+- Keep the declarative catalog separate from the filesystem detector and from
+  mutation-capable lifecycle adapters. Detection is always read-only.
+- Treat inherited `PATH` as primary evidence. Probe only a fixed, validated,
+  bounded set of common manager directories, application paths, and config
+  footprints; never source a profile or run a login shell implicitly.
+- Never execute a detected binary, enumerate arbitrary directories, read a
+  host config file, inspect credentials, or scan conversation/session state.
+- Resolve symlinks, require an executable regular file where applicable, cap
+  search-path bytes/directories, bound total hosts, concurrency, and duration,
+  and expose typed partial failure instead of silently returning an empty set.
+- Scope cached evidence to one detector/runtime context. Keep local, SSH, and
+  WSL context visible, and apply previously selected/missing state per request
+  rather than persisting it as detection evidence.
+- Report detection, connection, support maturity, and package capabilities as
+  separate fields. No detected brand may imply that MCP, a Skill, or a native
+  package is installed or enabled.
+- Keep evidence paths out of public diagnostics. Structured local output never
+  contains environment values, file contents, tokens, provider/account data,
+  mail/calendar data, or agent conversations.
 
 ## Authentication controls
 

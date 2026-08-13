@@ -171,6 +171,19 @@ bounded counts/sizes, exact approval identity/digest, detected degradations,
 and staging status. Paths and discovered local metadata are private. No import
 shape means data was sent to a provider.
 
+## Agent-host integrations
+
+`integrations list/show/detect --json` use schema version `1` and stable host
+IDs. Detection reports the inspected local/SSH/WSL runtime context, cache
+disposition, independent detection/support/connection/package fields, bounded
+evidence, and typed content-free probe problems or a partial failure. Absolute
+evidence locations are private local diagnostics. The document never contains
+environment values, file contents, credentials, provider/account data, or
+agent conversations.
+
+Connection is `not_inspected` during read-only detection. A detected executable
+must never be interpreted as a connected or supported integration.
+
 ## Auth, daemon, config, doctor, version, and update
 
 - `auth status --json`: content-free account lifecycle, capability, and

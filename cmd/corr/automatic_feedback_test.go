@@ -128,6 +128,7 @@ func TestAutomaticFeedbackIsDefaultOffAndInteractiveOnly(t *testing.T) {
 	app.maybeSubmitAutomaticFeedback(t.Context(), "feedback", record)
 	app.maybeSubmitAutomaticFeedback(t.Context(), "config", record)
 	app.maybeSubmitAutomaticFeedback(t.Context(), "settings", record)
+	app.maybeSubmitAutomaticFeedback(t.Context(), "integrations", record)
 	app.maybeSubmitAutomaticFeedback(t.Context(), "mcp", record)
 	app.maybeSubmitAutomaticFeedback(t.Context(), "completion", record)
 	app.maybeSubmitAutomaticFeedback(t.Context(), "daemon", feedback.NewErrorRecord(

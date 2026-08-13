@@ -491,6 +491,20 @@ unrelated processes, or deletes and copies an IPC token.
 
 ## MCP
 
+Read-only local agent-host discovery is available before MCP registration:
+
+```console
+corr integrations detect
+corr integrations detect --refresh
+corr integrations list
+corr integrations show codex
+corr integrations detect --json
+```
+
+The detector never executes an agent or reads a host configuration file. See
+[integrations.md](integrations.md) for evidence, cache, context, support, and
+privacy semantics.
+
 ```console
 corr mcp setup codex
 corr mcp setup claude-code --scope user

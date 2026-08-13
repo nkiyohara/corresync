@@ -27,7 +27,7 @@ func (app *runtime) maybeSubmitAutomaticFeedback(
 	record feedback.ErrorRecord,
 ) {
 	if root == "feedback" || root == "config" || root == "settings" ||
-		root == "mcp" || root == "completion" ||
+		root == "integrations" || root == "mcp" || root == "completion" ||
 		record.Command.Path == "corr daemon serve" ||
 		slices.Contains(record.Command.Flags, "--json") || !app.interactiveOutput() ||
 		slices.Contains(record.Classes, "canceled") {

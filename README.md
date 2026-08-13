@@ -65,6 +65,7 @@ $ corr agenda list --all-accounts \
 Connect an agent to the same local core:
 
 ```console
+corr integrations detect
 corr mcp setup codex
 # also: claude-code, github-copilot, gemini-cli, qwen-code, qoder
 ```
