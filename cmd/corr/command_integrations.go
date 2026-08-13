@@ -12,6 +12,11 @@ type integrationsCommand struct {
 	Detect integrationsDetectCommand `cmd:"" help:"Detect installed local agent hosts without executing them."`
 	List   integrationsListCommand   `cmd:"" help:"List the declarative agent-host catalog."`
 	Show   integrationsShowCommand   `cmd:"" help:"Show one host and its supported integration surfaces."`
+	Plan   integrationsPlanCommand   `cmd:"" help:"Inspect and preview setup for one or more hosts."`
+	Setup  integrationsSetupCommand  `cmd:"" help:"Preview, confirm, apply, and verify one or more hosts."`
+	Doctor integrationsDoctorCommand `cmd:"" help:"Inspect Corresync integration state without changing it."`
+	Repair integrationsRepairCommand `cmd:"" help:"Preview and repair stale Corresync-owned fields."`
+	Remove integrationsRemoveCommand `cmd:"" help:"Preview and remove only Corresync-owned entries."`
 }
 
 type integrationsDetectCommand struct {
@@ -200,7 +205,7 @@ func yesNoLabel(value bool) string {
 
 func lifecycleLabel(lifecycle agenthost.Lifecycle) string {
 	if lifecycle.Setup {
-		return "setup + verify"
+		return "setup + inspect + verify + repair + remove"
 	}
 	if lifecycle.AdapterID != "" {
 		return "planned adapter"

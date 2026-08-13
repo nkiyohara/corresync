@@ -3,6 +3,7 @@ package filelock
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -38,5 +39,43 @@ func TestAcquireRejectsRelativePath(t *testing.T) {
 	t.Parallel()
 	if _, err := Acquire(context.Background(), "relative.lock"); err == nil {
 		t.Fatal("Acquire() accepted a relative path")
+	}
+}
+
+func TestAcquireSidecarPreservesExistingDirectoryMode(t *testing.T) {
+	t.Parallel()
+	directory := t.TempDir()
+	if err := os.Chmod(directory, 0o755); err != nil { // #nosec G302 -- host-owned public directory fixture.
+		t.Fatal(err)
+	}
+	lock, err := AcquireSidecar(context.Background(), filepath.Join(directory, "config.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o755 {
+		t.Fatalf("directory mode = %o", info.Mode().Perm())
+	}
+}
+
+func TestAcquireRejectsSymlinkLockPath(t *testing.T) {
+	t.Parallel()
+	directory := t.TempDir()
+	target := filepath.Join(directory, "target")
+	if err := os.WriteFile(target, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(directory, "config.lock")
+	if err := os.Symlink(target, path); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := AcquireSidecar(context.Background(), path); err == nil {
+		t.Fatal("AcquireSidecar() accepted a symlink lock path")
 	}
 }

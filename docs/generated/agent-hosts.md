@@ -4,23 +4,23 @@
 <!-- markdownlint-disable MD013 -->
 | Host | Stable ID and aliases | Surfaces | Support | Local stdio MCP | Agent Skill | Native format | MCPB | Marketplace surface | Published | Current lifecycle |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [Codex](https://developers.openai.com/codex/) | `codex` (openai-codex) | cli | `verified` | yes | yes | plugin | — | yes | — | setup + verify |
-| [Claude Code](https://code.claude.com/docs/en/overview) | `claude-code` (claude) | cli | `verified` | yes | yes | plugin | — | yes | — | setup + verify |
+| [Codex](https://developers.openai.com/codex/) | `codex` (openai-codex) | cli | `verified` | yes | yes | plugin | — | yes | — | setup + inspect + verify + repair + remove |
+| [Claude Code](https://code.claude.com/docs/en/overview) | `claude-code` (claude) | cli | `verified` | yes | yes | plugin | — | yes | — | setup + inspect + verify + repair + remove |
 | [Claude Desktop](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop) | `claude-desktop` (—) | desktop | `verified` | yes | — | — | yes | — | — | planned adapter |
-| [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli) | `github-copilot` (copilot, copilot-cli) | cli | `verified` | yes | yes | plugin | — | yes | — | setup + verify |
-| [Visual Studio Code](https://code.visualstudio.com/docs/agent-customization/agent-plugins) | `vscode` (code) | ide | `experimental` | yes | yes | plugin | — | yes | — | planned adapter |
-| [Gemini CLI](https://geminicli.com/docs/) | `gemini-cli` (gemini) | cli | `verified` | yes | yes | extension | — | yes | — | setup + verify |
+| [GitHub Copilot CLI](https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli) | `github-copilot` (copilot, copilot-cli) | cli | `verified` | yes | yes | plugin | — | yes | — | setup + inspect + verify + repair + remove |
+| [Visual Studio Code](https://code.visualstudio.com/docs/agent-customization/agent-plugins) | `vscode` (code) | ide | `experimental` | yes | yes | plugin | — | yes | — | setup + inspect + verify + repair + remove |
+| [Gemini CLI](https://geminicli.com/docs/) | `gemini-cli` (gemini) | cli | `verified` | yes | yes | extension | — | yes | — | setup + inspect + verify + repair + remove |
 | [Kiro IDE](https://kiro.dev/docs/) | `kiro` (kiro-ide) | ide | `experimental` | yes | yes | power | — | yes | — | planned adapter |
-| [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/) | `qwen-code` (qwen) | cli | `verified` | yes | — | — | — | — | — | setup + verify |
-| [Qoder](https://docs.qoder.com/) | `qoder` (qodercli) | cli, ide | `verified` | yes | — | — | — | — | — | setup + verify |
-| [Kimi Code CLI](https://moonshotai.github.io/kimi-cli/) | `kimi-code` (kimi, kimi-cli) | cli | `config_only` | yes | — | — | — | — | — | planned adapter |
-| [Cursor](https://docs.cursor.com/context/model-context-protocol) | `cursor` (cursor-agent) | cli, ide | `experimental` | yes | yes | — | — | yes | — | planned adapter |
-| [Windsurf](https://docs.windsurf.com/windsurf/cascade/mcp) | `windsurf` (cascade) | cli, ide | `experimental` | yes | yes | — | — | yes | — | planned adapter |
-| [OpenCode](https://opencode.ai/v2/docs/mcp-servers) | `opencode` (—) | cli | `experimental` | yes | yes | — | — | yes | — | planned adapter |
-| [Cline](https://docs.cline.bot/mcp/mcp-overview) | `cline` (—) | cli, ide | `experimental` | yes | yes | — | — | yes | — | planned adapter |
-| [Roo Code](https://docs.roocode.com/features/mcp/overview) | `roo-code` (roo) | ide | `experimental` | yes | yes | — | — | yes | — | planned adapter |
-| [Zed](https://zed.dev/docs/ai/mcp) | `zed` (—) | ide | `experimental` | yes | yes | — | — | yes | — | planned adapter |
-| [goose](https://block.github.io/goose/) | `goose` (—) | cli, desktop | `experimental` | yes | yes | — | — | yes | — | planned adapter |
+| [Qwen Code](https://qwenlm.github.io/qwen-code-docs/en/) | `qwen-code` (qwen) | cli | `verified` | yes | — | — | — | — | — | setup + inspect + verify + repair + remove |
+| [Qoder](https://docs.qoder.com/) | `qoder` (qodercli) | cli, ide | `verified` | yes | — | — | — | — | — | setup + inspect + verify + repair + remove |
+| [Kimi Code CLI](https://moonshotai.github.io/kimi-cli/) | `kimi-code` (kimi, kimi-cli) | cli | `config_only` | yes | — | — | — | — | — | setup + inspect + verify + repair + remove |
+| [Cursor](https://docs.cursor.com/context/model-context-protocol) | `cursor` (cursor-agent) | cli, ide | `experimental` | yes | — | — | — | yes | — | setup + inspect + verify + repair + remove |
+| [Windsurf](https://docs.windsurf.com/windsurf/cascade/mcp) | `windsurf` (cascade) | cli, ide | `experimental` | yes | — | — | — | yes | — | setup + inspect + verify + repair + remove |
+| [OpenCode](https://opencode.ai/v2/docs/mcp-servers) | `opencode` (—) | cli | `experimental` | yes | yes | — | — | yes | — | setup + inspect + verify + repair + remove |
+| [Cline](https://docs.cline.bot/mcp/mcp-overview) | `cline` (—) | cli, ide | `experimental` | yes | yes | — | — | yes | — | setup + inspect + verify + repair + remove |
+| [Roo Code](https://docs.roocode.com/features/mcp/overview) | `roo-code` (roo) | ide | `experimental` | yes | — | — | — | yes | — | setup + inspect + verify + repair + remove |
+| [Zed](https://zed.dev/docs/ai/mcp) | `zed` (—) | ide | `experimental` | yes | yes | — | — | yes | — | setup + inspect + verify + repair + remove |
+| [goose](https://block.github.io/goose/) | `goose` (—) | cli, desktop | `experimental` | yes | — | — | — | yes | — | setup + inspect + verify + repair + remove |
 | [Aider](https://aider.chat/docs/) | `aider` (—) | cli | `catalog_only` | — | — | — | — | — | — | detect only |
 | [Amp](https://ampcode.com/manual) | `amp` (—) | cli | `catalog_only` | — | — | — | — | — | — | detect only |
 | [Augment Code](https://docs.augmentcode.com/) | `augment` (—) | ide | `catalog_only` | — | — | — | — | — | — | detect only |

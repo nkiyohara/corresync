@@ -63,8 +63,8 @@ List, acknowledge, or explicitly purge the durable account-local event queue.
 Start, inspect, or stop the authenticated local session owner.
 .TP
 .B integrations
-Detect installed local agent hosts and inspect the typed support catalog without
-executing an agent or changing its configuration.
+Detect installed local agent hosts, inspect the typed support catalog, or
+preview, apply, verify, repair, and remove exact local integrations.
 .TP
 .B mcp
 Run the local stdio MCP server, register it through supported client CLIs, or
@@ -109,12 +109,18 @@ corr calendar cancel --event-id EVENT --change-key KEY
 # Both commands preview only; repeat with --approve to commit.
 corr integrations detect
 corr integrations show codex
+corr integrations plan codex claude-code
+corr integrations setup codex claude-code
+corr integrations doctor
+corr integrations repair codex
+corr integrations remove codex
 corr mcp setup codex
 corr mcp setup claude-code
 corr mcp setup github-copilot
 corr mcp setup gemini-cli
 corr mcp setup qwen-code
 corr mcp setup qoder
+corr mcp setup kimi-code
 corr import scan ./synthetic-export --approve-read
 corr monitor enable --mode notify --notification-field sender --approve
 corr monitor status

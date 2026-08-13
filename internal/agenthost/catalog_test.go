@@ -29,7 +29,7 @@ func TestDefaultCatalogIsValidUniqueAndDetached(t *testing.T) {
 	}
 }
 
-func TestCatalogResolvesCompatibilityAliasesAndOfficialCLI(t *testing.T) {
+func TestCatalogResolvesCompatibilityAliasesAndLifecycle(t *testing.T) {
 	t.Parallel()
 
 	catalog := DefaultCatalog()
@@ -37,22 +37,17 @@ func TestCatalogResolvesCompatibilityAliasesAndOfficialCLI(t *testing.T) {
 	if !ok || claude.ID != IDClaudeCode {
 		t.Fatalf("Lookup(claude) = %+v, %t", claude, ok)
 	}
-	command, arguments, ok := claude.OfficialCLI("work_mail")
-	if !ok || command != "claude" || strings.Join(arguments, " ") != "mcp get work_mail" {
-		t.Fatalf("OfficialCLI() = %q %#v, %t", command, arguments, ok)
-	}
-	arguments[2] = "mutated"
-	_, freshArguments, _ := claude.OfficialCLI("personal")
-	if strings.Join(freshArguments, " ") != "mcp get personal" {
-		t.Fatalf("OfficialCLI() retained caller mutation: %#v", freshArguments)
+	if !claude.Lifecycle.Setup || !claude.Lifecycle.Inspect || !claude.Lifecycle.Verify ||
+		!claude.Lifecycle.Repair || !claude.Lifecycle.Remove {
+		t.Fatalf("Claude lifecycle = %+v", claude.Lifecycle)
 	}
 
 	kimi, ok := catalog.Lookup("kimi-cli")
 	if !ok || kimi.ID != IDKimiCode || kimi.Support != SupportConfigOnly {
 		t.Fatalf("Lookup(kimi-cli) = %+v, %t", kimi, ok)
 	}
-	if _, _, ok := kimi.OfficialCLI("corresync"); ok {
-		t.Fatal("config-only host unexpectedly exposed an official setup command")
+	if !kimi.Lifecycle.Setup || kimi.Lifecycle.AdapterID != "kimi-code-cli" {
+		t.Fatalf("Kimi lifecycle = %+v", kimi.Lifecycle)
 	}
 }
 
@@ -110,6 +105,31 @@ func TestCatalogOnlyHostsDoNotClaimIntegrationSupport(t *testing.T) {
 		if host.Capabilities.LocalStdioMCP || host.Capabilities.AgentSkill ||
 			host.Capabilities.NativePackage != "" || host.Capabilities.Published || host.Lifecycle.AdapterID != "" {
 			t.Errorf("catalog-only host %q claims an integration: %+v %+v", host.ID, host.Capabilities, host.Lifecycle)
+		}
+	}
+}
+
+func TestPhaseBScopesAndPortableSkillClaimsAreExact(t *testing.T) {
+	t.Parallel()
+	fixtures := map[ID]struct {
+		scopes []Scope
+		skill  bool
+	}{
+		IDVSCode:   {[]Scope{ScopeUser, ScopeWorkspace}, true},
+		IDCursor:   {[]Scope{ScopeUser, ScopeProject}, false},
+		IDWindsurf: {[]Scope{ScopeUser}, false},
+		IDOpenCode: {[]Scope{ScopeUser, ScopeProject}, true},
+		IDCline:    {[]Scope{ScopeUser}, true},
+		IDRooCode:  {[]Scope{ScopeProject}, false},
+		IDZed:      {[]Scope{ScopeUser, ScopeProject}, true},
+		IDGoose:    {[]Scope{ScopeUser}, false},
+	}
+	catalog := DefaultCatalog()
+	for id, want := range fixtures {
+		host, ok := catalog.Lookup(string(id))
+		if !ok || !slices.Equal(host.Scopes, want.scopes) || host.Capabilities.AgentSkill != want.skill ||
+			!host.Lifecycle.Setup || !host.Lifecycle.Remove {
+			t.Errorf("host %s = %+v, found %v; want scopes %v skill %v", id, host, ok, want.scopes, want.skill)
 		}
 	}
 }

@@ -191,8 +191,12 @@ func TestMCPSetupUsesOfficialClientCommands(t *testing.T) {
 		t.Fatalf("save config: %v", err)
 	}
 	executable := filepath.Join(t.TempDir(), "corresync")
-	if err := os.WriteFile(executable, []byte("test executable"), 0o600); err != nil {
+	if err := os.WriteFile(executable, []byte("test executable"), 0o700); err != nil { // #nosec G306 -- fixture must be executable.
 		t.Fatalf("write executable: %v", err)
+	}
+	executable, err := filepath.EvalSymlinks(executable)
+	if err != nil {
+		t.Fatalf("resolve executable: %v", err)
 	}
 
 	tests := []struct {
@@ -375,7 +379,7 @@ func TestMCPSetupDryRunDoesNotInvokeClient(t *testing.T) {
 		t.Fatalf("save config: %v", err)
 	}
 	executable := filepath.Join(t.TempDir(), "corresync binary")
-	if err := os.WriteFile(executable, []byte("test executable"), 0o600); err != nil {
+	if err := os.WriteFile(executable, []byte("test executable"), 0o700); err != nil { // #nosec G306 -- fixture must be executable.
 		t.Fatalf("write executable: %v", err)
 	}
 

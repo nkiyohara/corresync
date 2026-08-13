@@ -135,6 +135,9 @@ jobs:
           go-version: "1.26.x"
           cache: true
 
+      - name: Test Windows integration paths
+        run: go test -shuffle=on ./internal/integrationlifecycle ./cmd/corr
+
       - name: Lint PowerShell installer
         shell: pwsh
         run: |

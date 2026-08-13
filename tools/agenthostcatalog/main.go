@@ -97,7 +97,7 @@ func yesNo(value bool) string {
 
 func lifecycleSummary(lifecycle agenthost.Lifecycle) string {
 	if lifecycle.Setup {
-		return "setup + verify"
+		return "setup + inspect + verify + repair + remove"
 	}
 	if lifecycle.AdapterID != "" {
 		return "planned adapter"
