@@ -18,6 +18,7 @@ unstyled machine-readable value.
 
 ```console
 corr settings
+corr setup
 corr setup you@example.com --alias personal
 corr config init
 corr config path
@@ -28,11 +29,14 @@ corr config set policy.max_recipients 25
 corr config edit
 ```
 
-`setup` is the user-first path: it creates a provider-neutral configuration
-when absent, performs credential-free discovery, and adds an automatically
-selectable first-party route. It does not authenticate. `config init` is the
-lower-level alternative and creates a valid configuration with zero accounts
-and no selected provider.
+Interactive `corr setup` is the user-first path. It creates a provider-neutral
+configuration when absent, performs credential-free discovery, explains and
+previews selectable mail/calendar routes, and adds an account only after
+confirmation. Authentication and provider verification remain separate
+choices. `corr setup ADDRESS` keeps the deterministic, non-interactive contract
+for scripts; it never prompts or authenticates. `config init` is the lower-level
+alternative and creates a valid configuration with zero accounts and no
+selected provider.
 
 Provider route changes belong to the account lifecycle:
 
@@ -55,8 +59,8 @@ cancellation, and asks for a replacement before deleting the current default.
 The form stops and restarts a running session owner around account
 configuration changes. Every choice explains its effect and displays the exact
 direct command. Set `CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader
-prompts. The remaining commands are stable direct forms for scripts and
-advanced use.
+prompts and type `:cancel` to leave an input step safely. The remaining
+commands are stable direct forms for scripts and advanced use.
 
 `account discover` uses no credentials and performs no authentication. Its
 ranked candidates explain DNS/well-known evidence, confidence, required auth,

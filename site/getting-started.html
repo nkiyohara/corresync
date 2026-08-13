@@ -263,26 +263,28 @@ corr update</code></pre>
           <header>
             <span class="step-badge" aria-hidden="true">2</span>
             <div>
-              <h2 id="signin-title">Choose an account, then sign in</h2>
+              <h2 id="signin-title">Set up your mail and calendar account</h2>
               <p>
-                Corresync starts with no provider selected. It uses your address only to gather
-                credential-free evidence, adds the route you choose, and authenticates only after a
-                separate account-specific command.
+                Start with one command. The guided setup asks for your email address, discovers
+                likely mail and calendar services without credentials, explains the choices, and
+                shows a final review before anything is added.
               </p>
               <p>
-                Prefer a guided flow? The Accounts category in <code>corr settings</code> groups
-                account creation, your account list, and each account’s sign-in, rename, default,
-                and safe removal actions in one keyboard-friendly form.
+                Sign-in or access to an external credential is always a separate, clearly labelled
+                choice after that review. The wizard can then run a bounded connection check or add
+                another account. <code>corr settings</code> opens the same keyboard-friendly flow;
+                set <code>CORRESYNC_ACCESSIBLE=true</code> for line-oriented screen-reader prompts,
+                and type <code>:cancel</code> to leave an input step safely.
               </p>
             </div>
           </header>
           <div class="duo">
             <div>
               <p>
-                For Outlook Web, <code>corr setup</code> can select the first-party browser route
-                when the evidence is strong enough. Discovery and account addition never open that
-                browser. The next <code>auth login</code> command starts sign-in for exactly the
-                alias you name.
+                Outlook Web works with provider-owned browser sign-in. Microsoft Graph, JMAP,
+                IMAP/SMTP, and CalDAV are also available when your provider supports them and you
+                explicitly choose the required route or credential owner. Discovery itself never
+                opens a browser, reads a keyring, or asks an administrator for consent.
               </p>
               <p>
                 <strong>Using Gmail?</strong> The Gmail and Calendar API code is in this RC, but the
@@ -297,16 +299,29 @@ corr update</code></pre>
             </div>
             <div class="stack">
               <div class="install-block">
-                <p class="os-label" id="gs-signin-default">Outlook Web · guided setup</p>
-                <div class="cmd" data-copy data-copy-label="account and sign-in commands">
+                <p class="os-label" id="gs-signin-default">Guided setup · recommended</p>
+                <div class="cmd" data-copy data-copy-label="guided account setup command">
                   <pre
                     tabindex="0"
                     role="region"
                     aria-labelledby="gs-signin-default"
-                  ><code>corr setup you@example.com --alias personal
+                  ><code>corr setup</code></pre>
+                </div>
+                <p class="block-note">
+                  The wizard proposes a local account name and default, previews the route, keeps
+                  authentication separate, and offers verification and multi-account continuation.
+                </p>
+              </div>
+              <div class="install-block">
+                <p class="os-label">Advanced or scripted setup</p>
+                <div class="cmd" data-copy data-copy-label="deterministic account setup commands">
+                  <pre tabindex="0" role="region"><code>corr setup you@example.com --alias personal
 corr auth login --account personal
 corr doctor --account personal</code></pre>
                 </div>
+                <p class="block-note">
+                  These commands stay non-interactive and are suitable for scripts.
+                </p>
               </div>
               <div class="install-block">
                 <p class="os-label" id="gs-signin-discover">Gmail · temporary connection path</p>
