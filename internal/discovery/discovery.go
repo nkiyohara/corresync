@@ -363,11 +363,18 @@ func discoveredSRVEndpoint(
 	}
 	hostPort := net.JoinHostPort(host, strconv.Itoa(int(port)))
 	value := hostPort
-	if kind == "caldav" {
+	var path string
+	switch kind {
+	case "caldav":
+		path = "/"
+	case "jmap":
+		path = "/.well-known/jmap"
+	}
+	if path != "" {
 		value = (&url.URL{
 			Scheme: "https",
 			Host:   hostPort,
-			Path:   "/",
+			Path:   path,
 		}).String()
 	}
 	return application.DiscoveredEndpoint{Kind: kind, Value: value}, true

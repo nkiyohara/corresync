@@ -379,6 +379,49 @@ func TestAccountAddPersistsJMAPRouteWithoutAuthenticating(t *testing.T) {
 	}
 }
 
+func TestAccountAddUsesDiscoveredJMAPSRVSessionURL(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{{
+				Provider:                  domain.ProviderJMAP,
+				Confidence:                80,
+				Authentication:            application.DiscoveryExternalCredential,
+				RequiresExplicitSelection: true,
+				Endpoints: []application.DiscoveredEndpoint{{
+					Kind: "jmap", Value: "https://jmap.example.test:443/.well-known/jmap",
+				}},
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "srv_jmap", Detail: "example.test",
+				}},
+			}},
+		},
+	}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.test", Alias: "standards",
+		Provider:          string(domain.ProviderJMAP),
+		CredentialBackend: "os-keyring",
+		CredentialKey:     "jmap-standards",
+		ApproveCredential: true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["standards"]
+	if account.Mail == nil || account.Mail.JMAP == nil ||
+		account.Mail.JMAP.SessionURL != "https://jmap.example.test:443/.well-known/jmap" {
+		t.Fatalf("persisted JMAP route = %#v", account)
+	}
+	if !strings.Contains(stdout.String(), "https://jmap.example.test:443/.well-known/jmap") ||
+		!strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("account output = %q", stdout.String())
+	}
+}
+
 func TestAccountAddPersistsMixedIMAPAndCalDAVRoutes(t *testing.T) {
 	discoverer := &accountDiscovererStub{}
 	app, path, stdout := newAccountCommandRuntime(t, discoverer)
