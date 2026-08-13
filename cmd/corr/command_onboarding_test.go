@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -248,9 +249,14 @@ func TestGuidedSetupAddsICloudMailAndCalendarWithOneExternalCredential(t *testin
 		!mail.Credential.Consent {
 		t.Fatalf("iCloud credential references = %+v, %+v", mail.Credential, calendar.Credential)
 	}
-	if commandName != "secret-tool" ||
-		strings.Join(commandArguments, " ") !=
-			"store --label=Corresync iCloud service corresync username icloud-personal-shared" {
+	wantCommand, wantArguments, err := iCloudCredentialEnrollmentCommand(
+		app.info.OS,
+		"icloud-personal-shared",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commandName != wantCommand || !slices.Equal(commandArguments, wantArguments) {
 		t.Fatalf("OS credential command = %q %#v", commandName, commandArguments)
 	}
 	for _, expected := range []string{
