@@ -26,6 +26,13 @@ const (
 	IDQwenCode      ID = "qwen-code"
 	IDQoder         ID = "qoder"
 	IDKimiCode      ID = "kimi-code"
+	IDCursor        ID = "cursor"
+	IDWindsurf      ID = "windsurf"
+	IDOpenCode      ID = "opencode"
+	IDCline         ID = "cline"
+	IDRooCode       ID = "roo-code"
+	IDZed           ID = "zed"
+	IDGoose         ID = "goose"
 )
 
 type Surface string
@@ -82,9 +89,6 @@ type Lifecycle struct {
 	Repair         bool   `json:"repair"`
 	Remove         bool   `json:"remove"`
 	ReloadRequired bool   `json:"reloadRequired"`
-
-	command         string
-	verifyArguments []string
 }
 
 type DetectionSpec struct {
@@ -192,22 +196,6 @@ func (catalog Catalog) Lookup(value string) (Host, bool) {
 	return cloneHost(catalog.hosts[index]), true
 }
 
-// OfficialCLI returns the fixed executable and verification argv declared for
-// an existing setup adapter. The server name replaces one exact placeholder;
-// no shell string is constructed.
-func (host Host) OfficialCLI(serverName string) (string, []string, bool) {
-	if !host.Lifecycle.Setup || host.Lifecycle.command == "" {
-		return "", nil, false
-	}
-	arguments := slices.Clone(host.Lifecycle.verifyArguments)
-	for index := range arguments {
-		if arguments[index] == "{server}" {
-			arguments[index] = serverName
-		}
-	}
-	return host.Lifecycle.command, arguments, true
-}
-
 func normalizeAlias(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
@@ -294,14 +282,10 @@ func validateHost(host Host) error {
 	if host.Lifecycle.AdapterID != "" && !idPattern.MatchString(host.Lifecycle.AdapterID) {
 		return fmt.Errorf("invalid lifecycle adapter ID %q", host.Lifecycle.AdapterID)
 	}
-	for _, argument := range host.Lifecycle.verifyArguments {
-		if hasControl(argument) {
-			return errors.New("verification argument contains a control character")
-		}
-	}
 	if host.Lifecycle.Setup {
-		if host.Lifecycle.AdapterID == "" || !commandPattern.MatchString(host.Lifecycle.command) || !host.Lifecycle.Verify {
-			return errors.New("setup lifecycle requires an adapter, fixed command, and verification")
+		if host.Lifecycle.AdapterID == "" || !host.Lifecycle.Inspect || !host.Lifecycle.Verify ||
+			!host.Lifecycle.Repair || !host.Lifecycle.Remove {
+			return errors.New("setup lifecycle requires complete inspect, verify, repair, and remove support")
 		}
 	}
 	return nil
@@ -344,7 +328,6 @@ func cloneHost(host Host) Host {
 	for index := range host.Detection.paths {
 		host.Detection.paths[index].parts = slices.Clone(host.Detection.paths[index].parts)
 	}
-	host.Lifecycle.verifyArguments = slices.Clone(host.Lifecycle.verifyArguments)
 	return host
 }
 
@@ -362,10 +345,10 @@ func detectionKinds(spec DetectionSpec) []EvidenceKind {
 	return kinds
 }
 
-func setupLifecycle(adapter, command string, verify ...string) Lifecycle {
+func setupLifecycle(adapter string) Lifecycle {
 	return Lifecycle{
-		AdapterID: adapter, Setup: true, Verify: true, ReloadRequired: true,
-		command: command, verifyArguments: verify,
+		AdapterID: adapter, Setup: true, Inspect: true, Verify: true,
+		Repair: true, Remove: true, ReloadRequired: true,
 	}
 }
 
@@ -385,7 +368,7 @@ func defaultHosts() []Host {
 			DocumentationURL: "https://developers.openai.com/codex/", Surfaces: cli, Platforms: all,
 			Scopes: user, Support: SupportVerified,
 			Capabilities: Capabilities{LocalStdioMCP: true, AgentSkill: true, NativePackage: NativePlugin, MarketplaceSurface: true},
-			Lifecycle:    setupLifecycle("codex-cli", "codex", "mcp", "get", "{server}"),
+			Lifecycle:    setupLifecycle("codex-cli"),
 			Detection:    DetectionSpec{Commands: []string{"codex"}, paths: []knownPath{known("", rootHome, EvidenceConfig, ".codex")}},
 		},
 		{
@@ -393,7 +376,7 @@ func defaultHosts() []Host {
 			DocumentationURL: "https://code.claude.com/docs/en/overview", Surfaces: cli, Platforms: all,
 			Scopes: localProjectUser, Support: SupportVerified,
 			Capabilities: Capabilities{LocalStdioMCP: true, AgentSkill: true, NativePackage: NativePlugin, MarketplaceSurface: true},
-			Lifecycle:    setupLifecycle("claude-code-cli", "claude", "mcp", "get", "{server}"),
+			Lifecycle:    setupLifecycle("claude-code-cli"),
 			Detection:    DetectionSpec{Commands: []string{"claude"}, paths: []knownPath{known("", rootHome, EvidenceConfig, ".claude")}},
 		},
 		{
@@ -414,7 +397,7 @@ func defaultHosts() []Host {
 			DocumentationURL: "https://docs.github.com/en/copilot/concepts/agents/about-copilot-cli", Surfaces: cli, Platforms: all,
 			Scopes: user, Support: SupportVerified,
 			Capabilities: Capabilities{LocalStdioMCP: true, AgentSkill: true, NativePackage: NativePlugin, MarketplaceSurface: true},
-			Lifecycle:    setupLifecycle("github-copilot-cli", "copilot", "mcp", "get", "{server}"),
+			Lifecycle:    setupLifecycle("github-copilot-cli"),
 			Detection:    DetectionSpec{Commands: []string{"copilot"}, paths: []knownPath{known("", rootHome, EvidenceConfig, ".copilot")}},
 		},
 		{
@@ -422,7 +405,7 @@ func defaultHosts() []Host {
 			DocumentationURL: "https://code.visualstudio.com/docs/agent-customization/agent-plugins", Surfaces: ide, Platforms: all,
 			Scopes: []Scope{ScopeUser, ScopeWorkspace}, Support: SupportExperimental,
 			Capabilities: Capabilities{LocalStdioMCP: true, AgentSkill: true, NativePackage: NativePlugin, MarketplaceSurface: true},
-			Lifecycle:    Lifecycle{AdapterID: "vscode-agent-plugin", ReloadRequired: true},
+			Lifecycle:    setupLifecycle("vscode-workspace-config"),
 			Detection: DetectionSpec{Commands: []string{"code"}, paths: []knownPath{
 				known("darwin", rootApplications, EvidenceApplication, "Visual Studio Code.app"),
 				known("windows", rootLocalAppData, EvidenceApplication, "Programs", "Microsoft VS Code", "Code.exe"),
@@ -433,7 +416,7 @@ func defaultHosts() []Host {
 			DocumentationURL: "https://geminicli.com/docs/", Surfaces: cli, Platforms: all,
 			Scopes: userProject, Support: SupportVerified,
 			Capabilities: Capabilities{LocalStdioMCP: true, AgentSkill: true, NativePackage: NativeExtension, MarketplaceSurface: true},
-			Lifecycle:    setupLifecycle("gemini-cli", "gemini", "mcp", "list"),
+			Lifecycle:    setupLifecycle("gemini-cli"),
 			Detection:    DetectionSpec{Commands: []string{"gemini"}, paths: []knownPath{known("", rootHome, EvidenceConfig, ".gemini")}},
 		},
 		{
@@ -452,14 +435,14 @@ func defaultHosts() []Host {
 			ID: IDQwenCode, DisplayName: "Qwen Code", Aliases: []string{"qwen"},
 			DocumentationURL: "https://qwenlm.github.io/qwen-code-docs/en/", Surfaces: cli, Platforms: all,
 			Scopes: userProject, Support: SupportVerified, Capabilities: verifiedMCP,
-			Lifecycle: setupLifecycle("qwen-code-cli", "qwen", "mcp", "list"),
+			Lifecycle: setupLifecycle("qwen-code-cli"),
 			Detection: DetectionSpec{Commands: []string{"qwen"}, paths: []knownPath{known("", rootHome, EvidenceConfig, ".qwen")}},
 		},
 		{
 			ID: IDQoder, DisplayName: "Qoder", Aliases: []string{"qodercli"},
 			DocumentationURL: "https://docs.qoder.com/", Surfaces: cliIDE, Platforms: all,
 			Scopes: localProjectUser, Support: SupportVerified, Capabilities: verifiedMCP,
-			Lifecycle: setupLifecycle("qoder-cli", "qodercli", "mcp", "list"),
+			Lifecycle: setupLifecycle("qoder-cli"),
 			Detection: DetectionSpec{Commands: []string{"qodercli"}, paths: []knownPath{
 				known("darwin", rootApplications, EvidenceApplication, "Qoder.app"),
 				known("", rootHome, EvidenceConfig, ".qoder"),
@@ -468,28 +451,28 @@ func defaultHosts() []Host {
 		{
 			ID: IDKimiCode, DisplayName: "Kimi Code CLI", Aliases: []string{"kimi", "kimi-cli"},
 			DocumentationURL: "https://moonshotai.github.io/kimi-cli/", Surfaces: cli, Platforms: all,
-			Scopes: userProject, Support: SupportConfigOnly, Capabilities: verifiedMCP,
-			Lifecycle: Lifecycle{AdapterID: "kimi-code-config", ReloadRequired: true},
+			Scopes: user, Support: SupportConfigOnly, Capabilities: verifiedMCP,
+			Lifecycle: setupLifecycle("kimi-code-cli"),
 			Detection: DetectionSpec{Commands: []string{"kimi"}, paths: []knownPath{known("", rootHome, EvidenceConfig, ".kimi")}},
 		},
-		experimentalHost("cursor", "Cursor", []string{"cursor-agent"}, "https://docs.cursor.com/context/model-context-protocol", cliIDE, []string{"cursor", "cursor-agent"}, []knownPath{
+		experimentalHost(IDCursor, "Cursor", []string{"cursor-agent"}, "https://docs.cursor.com/context/model-context-protocol", cliIDE, []string{"cursor", "cursor-agent"}, []knownPath{
 			known("darwin", rootApplications, EvidenceApplication, "Cursor.app"),
 			known("windows", rootLocalAppData, EvidenceApplication, "Programs", "cursor", "Cursor.exe"),
 			known("", rootHome, EvidenceConfig, ".cursor"),
 		}),
-		experimentalHost("windsurf", "Windsurf", []string{"cascade"}, "https://docs.windsurf.com/windsurf/cascade/mcp", cliIDE, []string{"windsurf"}, []knownPath{
+		experimentalHost(IDWindsurf, "Windsurf", []string{"cascade"}, "https://docs.windsurf.com/windsurf/cascade/mcp", cliIDE, []string{"windsurf"}, []knownPath{
 			known("darwin", rootApplications, EvidenceApplication, "Windsurf.app"),
 			known("windows", rootProgramFiles, EvidenceApplication, "Windsurf", "Windsurf.exe"),
 			known("", rootHome, EvidenceConfig, ".codeium", "windsurf"),
 		}),
-		experimentalHost("opencode", "OpenCode", nil, "https://opencode.ai/v2/docs/mcp-servers", cli, []string{"opencode", "opencode2"}, []knownPath{known("", rootConfig, EvidenceConfig, "opencode")}),
-		experimentalHost("cline", "Cline", nil, "https://docs.cline.bot/mcp/mcp-overview", cliIDE, []string{"cline"}, nil),
-		experimentalHost("roo-code", "Roo Code", []string{"roo"}, "https://docs.roocode.com/features/mcp/overview", ide, nil, nil),
-		experimentalHost("zed", "Zed", nil, "https://zed.dev/docs/ai/mcp", ide, nil, []knownPath{
+		experimentalHost(IDOpenCode, "OpenCode", nil, "https://opencode.ai/v2/docs/mcp-servers", cli, []string{"opencode", "opencode2"}, []knownPath{known("", rootConfig, EvidenceConfig, "opencode")}),
+		experimentalHost(IDCline, "Cline", nil, "https://docs.cline.bot/mcp/mcp-overview", cliIDE, []string{"cline"}, nil),
+		experimentalHost(IDRooCode, "Roo Code", []string{"roo"}, "https://docs.roocode.com/features/mcp/overview", ide, nil, nil),
+		experimentalHost(IDZed, "Zed", nil, "https://zed.dev/docs/ai/mcp", ide, nil, []knownPath{
 			known("darwin", rootApplications, EvidenceApplication, "Zed.app"),
 			known("", rootConfig, EvidenceConfig, "zed"),
 		}),
-		experimentalHost("goose", "goose", nil, "https://block.github.io/goose/", []Surface{SurfaceCLI, SurfaceDesktop}, []string{"goose"}, []knownPath{
+		experimentalHost(IDGoose, "goose", nil, "https://block.github.io/goose/", []Surface{SurfaceCLI, SurfaceDesktop}, []string{"goose"}, []knownPath{
 			known("darwin", rootApplications, EvidenceApplication, "Goose.app"),
 			known("", rootConfig, EvidenceConfig, "goose"),
 		}),
@@ -520,10 +503,46 @@ func experimentalHost(
 	return Host{
 		ID: id, DisplayName: display, Aliases: aliases, DocumentationURL: documentation,
 		Surfaces: surfaces, Platforms: []string{"darwin", "linux", "windows"},
-		Scopes: []Scope{ScopeUser, ScopeProject}, Support: SupportExperimental,
-		Capabilities: Capabilities{LocalStdioMCP: true, AgentSkill: true, MarketplaceSurface: true},
-		Lifecycle:    Lifecycle{AdapterID: string(id) + "-adapter", ReloadRequired: true},
-		Detection:    DetectionSpec{Commands: commands, paths: paths},
+		Scopes: experimentalScopes(id), Support: SupportExperimental,
+		Capabilities: Capabilities{
+			LocalStdioMCP: true, AgentSkill: experimentalSkill(id), MarketplaceSurface: true,
+		},
+		Lifecycle: experimentalLifecycle(id),
+		Detection: DetectionSpec{Commands: commands, paths: paths},
+	}
+}
+
+func experimentalScopes(id ID) []Scope {
+	//nolint:exhaustive // Only experimental hosts with a non-user scope need an override.
+	switch id {
+	case IDVSCode:
+		return []Scope{ScopeUser, ScopeWorkspace}
+	case IDCursor, IDOpenCode, IDZed:
+		return []Scope{ScopeUser, ScopeProject}
+	case IDRooCode:
+		return []Scope{ScopeProject}
+	default:
+		return []Scope{ScopeUser}
+	}
+}
+
+func experimentalSkill(id ID) bool {
+	//nolint:exhaustive // The portable Skill is advertised only for explicitly documented hosts.
+	switch id {
+	case IDVSCode, IDOpenCode, IDCline, IDZed:
+		return true
+	default:
+		return false
+	}
+}
+
+func experimentalLifecycle(id ID) Lifecycle {
+	//nolint:exhaustive // Hosts without a reviewed adapter intentionally keep the planned lifecycle.
+	switch id {
+	case IDCursor, IDWindsurf, IDOpenCode, IDCline, IDRooCode, IDZed, IDGoose:
+		return setupLifecycle(string(id) + "-config")
+	default:
+		return Lifecycle{AdapterID: string(id) + "-adapter", ReloadRequired: true}
 	}
 }
 

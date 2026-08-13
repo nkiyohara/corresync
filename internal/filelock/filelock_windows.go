@@ -5,9 +5,16 @@ package filelock
 import (
 	"errors"
 	"os"
+	"syscall"
 
 	"golang.org/x/sys/windows"
 )
+
+func isLinkLike(info os.FileInfo) bool {
+	attributes, ok := info.Sys().(*syscall.Win32FileAttributeData)
+	return info.Mode()&os.ModeSymlink != 0 ||
+		(ok && attributes.FileAttributes&syscall.FILE_ATTRIBUTE_REPARSE_POINT != 0)
+}
 
 func tryLock(file *os.File) (bool, error) {
 	var overlapped windows.Overlapped

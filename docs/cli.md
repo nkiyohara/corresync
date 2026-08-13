@@ -499,11 +499,18 @@ corr integrations detect --refresh
 corr integrations list
 corr integrations show codex
 corr integrations detect --json
+corr integrations plan codex claude-code
+corr integrations setup codex claude-code
+corr integrations doctor
+corr integrations repair codex
+corr integrations remove codex
 ```
 
 The detector never executes an agent or reads a host configuration file. See
 [integrations.md](integrations.md) for evidence, cache, context, support, and
-privacy semantics.
+privacy semantics, plus exact lifecycle scopes and safety behavior. Lifecycle
+mutation commands preview first and require an interactive confirmation or
+`--yes`. Their `--json` form emits a preview and never applies it.
 
 ```console
 corr mcp setup codex

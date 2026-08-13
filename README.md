@@ -66,8 +66,9 @@ Connect an agent to the same local core:
 
 ```console
 corr integrations detect
-corr mcp setup codex
-# also: claude-code, github-copilot, gemini-cli, qwen-code, qoder
+corr integrations plan codex claude-code
+corr integrations setup codex claude-code
+# Phase A also includes github-copilot, gemini-cli, qwen-code, qoder, kimi-code
 ```
 
 Then ask naturally:

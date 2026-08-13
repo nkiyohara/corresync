@@ -131,6 +131,31 @@ gateway or tenant administration service.
 - Treat host-specific configuration as external state. Generic bundle metadata
   is not permission to guess a host schema or overwrite user-authored files;
   lifecycle adapters own scoped inspection and previewed mutation.
+- Bind every lifecycle apply to the exact request and freshly re-derived typed
+  plan. Execute official clients as executable plus argv with bounded time and
+  output; never interpolate a shell program or retain raw host output.
+- For documented file fallbacks, lock and fully parse a bounded document,
+  reject unknown schema versions, unsafe owners/modes/types, symlinks and name
+  conflicts, and compare the post-preview fingerprint before changing only the
+  exact Corresync entry. Use a private same-filesystem temporary file, sync,
+  atomic replacement, and one bounded permission-preserving recovery copy.
+- On Windows, rely on the signed-in user's inherited filesystem ACLs rather
+  than synthesized Unix owner/mode bits, reject all reparse points including
+  directory junctions, and treat directory-sync durability as unavailable.
+  Re-inspect actual state through `doctor` after a crash, require the previewed
+  `repair` flow for any new write, and retain the bounded recovery copy.
+- Stage native packages only from the installed, reviewed bundle tree into a
+  private Corresync-owned directory. Strip the package's duplicate MCP
+  declaration so the separately previewed absolute executable/config launch
+  contract remains authoritative. Version and source hashes participate in
+  inspect, repair, and removal.
+- Install portable Skills only at documented locations. An ownership marker
+  and per-host references prevent overwrite or removal of a user-authored or
+  still-shared Skill. Never create host auto-approval, credential, token, or
+  environment-secret fields.
+- Verify only registration/package identity. Never use a mailbox, calendar, or
+  provider authentication request as an integration health check. Treat host
+  reload/new-session as an explicit remaining step.
 
 ## Local IPC controls
 

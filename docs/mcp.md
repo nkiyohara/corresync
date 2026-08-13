@@ -34,8 +34,8 @@ configuration. Verify its checksum and Sigstore provenance using
 [install.md](install.md) before installation.
 
 Replace `codex` with `claude-code`, `github-copilot`, `gemini-cli`,
-`qwen-code`, or `qoder`. Use `--dry-run` to print the official client command
-without changing client configuration.
+`qwen-code`, `qoder`, or `kimi-code`. Use `--dry-run` to print the official
+client command without changing client configuration.
 
 Start a new agent session, then ask normally:
 
@@ -63,7 +63,7 @@ configuration. Detection does not imply connection or support.
 | Gemini CLI | `corr mcp setup gemini-cli` | `gemini mcp list` |
 | Qwen Code | `corr mcp setup qwen-code` | `qwen mcp list` |
 | Qoder | `corr mcp setup qoder` | `qodercli mcp list` |
-| Kimi Code CLI | `corr mcp config kimi-code` | `/mcp` |
+| Kimi Code CLI | `corr mcp setup kimi-code` | `kimi mcp list` |
 <!-- markdownlint-enable MD013 -->
 
 Setup resolves the running `corr` executable and config file to absolute paths.
@@ -133,6 +133,11 @@ server-enforced authentication or preview/commit policy.
 
 The generated package and limitation matrix is in
 [Integration bundles](generated/integration-bundles.md).
+
+For previewable multi-host setup, native/portable Skill installation, health,
+repair, and exact removal, use `corr integrations plan/setup/doctor/repair/remove`.
+The compatibility `corr mcp setup/config` commands remain registration-only
+aliases over the same reviewed command and rendering contracts.
 
 ## Tool catalog
 

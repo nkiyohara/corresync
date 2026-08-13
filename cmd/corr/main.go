@@ -38,7 +38,7 @@ type cli struct {
 	Monitor      monitorCommand      `cmd:"" help:"Configure account-scoped opt-in monitoring."`
 	Events       eventsCommand       `cmd:"" help:"Inspect and acknowledge the durable local event queue."`
 	Daemon       daemonCommand       `cmd:"" help:"Run and inspect the local session owner."`
-	Integrations integrationsCommand `cmd:"" help:"Detect and inspect local AI-agent hosts without changing them."`
+	Integrations integrationsCommand `cmd:"" help:"Detect and safely manage local AI-agent integrations."`
 	MCP          mcpCommand          `cmd:"" help:"Expose guarded mail and calendar tools over MCP."`
 	Update       updateCommand       `cmd:"" help:"Install verified updates or show the package-manager command."`
 	Completion   completionCommand   `cmd:"" help:"Generate or install shell completion."`

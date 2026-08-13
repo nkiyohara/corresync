@@ -75,9 +75,13 @@ typed host catalog
 
 The catalog holds identity, aliases, surfaces, support maturity, capabilities,
 and adapter routing without imperative probes. Detection returns evidence and
-never mutates or executes a host. Lifecycle adapters may later inspect the
-minimum documented host-owned state and produce explicit plans, but provider
-credentials and account data never enter this layer.
+never mutates or executes a host. The separate integration lifecycle inspects
+only one named registration or managed package, builds typed preview-bound
+plans, applies official executable-plus-argv commands or exact file merges,
+and verifies each host independently. Document adapters, native package
+staging, and portable Skill copies sit outside the application core. Provider
+credentials, account state, mail, calendar data, and agent conversations never
+enter this layer.
 
 ## Account identity and routes
 

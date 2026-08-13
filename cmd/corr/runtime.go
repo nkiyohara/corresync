@@ -49,6 +49,8 @@ type browserProber func(context.Context, string) (string, error)
 
 type commandRunner func(context.Context, io.Writer, io.Writer, string, ...string) error
 
+type directoryCommandRunner func(context.Context, io.Writer, io.Writer, string, string, ...string) error
+
 type inputCommandRunner func(
 	context.Context,
 	io.Reader,
@@ -59,34 +61,40 @@ type inputCommandRunner func(
 ) error
 
 type runtime struct {
-	context           context.Context
-	configPath        string
-	info              buildinfo.Info
-	stdin             io.Reader
-	stdout            io.Writer
-	stderr            io.Writer
-	launch            browserLauncher
-	probeBrowser      browserProber
-	endpoint          func(string) (localipc.Endpoint, error)
-	previousEndpoints func(string) ([]localipc.Endpoint, error)
-	stopEndpointOwner func(context.Context, localipc.Endpoint) (int, error)
-	startDaemon       func(context.Context, string) error
-	runCommand        commandRunner
-	runInputCommand   inputCommandRunner
-	processID         int
-	checkUpdate       func(context.Context) (updatecheck.Result, error)
-	checkUpdateFresh  func(context.Context) (updatecheck.Result, error)
-	installUpdate     func(context.Context, func(updatecheck.InstallProgress)) (updatecheck.InstallResult, error)
-	installMethod     func() updatecheck.InstallMethod
-	interactiveOutput func() bool
-	interactiveInput  func() bool
-	interactiveStdout func() bool
-	lookupEnv         func(string) (string, bool)
-	accountDiscoverer application.AccountDiscoverer
-	agentHosts        agenthost.Catalog
-	detectAgentHosts  func(context.Context, agenthost.Request) (agenthost.Report, error)
-	migrationOnce     sync.Once
-	migrationErr      error
+	context                        context.Context
+	configPath                     string
+	info                           buildinfo.Info
+	stdin                          io.Reader
+	stdout                         io.Writer
+	stderr                         io.Writer
+	launch                         browserLauncher
+	probeBrowser                   browserProber
+	endpoint                       func(string) (localipc.Endpoint, error)
+	previousEndpoints              func(string) ([]localipc.Endpoint, error)
+	stopEndpointOwner              func(context.Context, localipc.Endpoint) (int, error)
+	startDaemon                    func(context.Context, string) error
+	runCommand                     commandRunner
+	runIntegrationCommand          commandRunner
+	runIntegrationDirectoryCommand directoryCommandRunner
+	runInputCommand                inputCommandRunner
+	processID                      int
+	checkUpdate                    func(context.Context) (updatecheck.Result, error)
+	checkUpdateFresh               func(context.Context) (updatecheck.Result, error)
+	installUpdate                  func(context.Context, func(updatecheck.InstallProgress)) (updatecheck.InstallResult, error)
+	installMethod                  func() updatecheck.InstallMethod
+	interactiveOutput              func() bool
+	interactiveInput               func() bool
+	interactiveStdout              func() bool
+	lookupEnv                      func(string) (string, bool)
+	userHomeDir                    func() (string, error)
+	userConfigDir                  func() (string, error)
+	workingDirectory               func() (string, error)
+	integrationBundleDirectory     func(string) (string, error)
+	accountDiscoverer              application.AccountDiscoverer
+	agentHosts                     agenthost.Catalog
+	detectAgentHosts               func(context.Context, agenthost.Request) (agenthost.Report, error)
+	migrationOnce                  sync.Once
+	migrationErr                   error
 }
 
 func newRuntime(
@@ -120,6 +128,22 @@ func newRuntime(
 			command.Stderr = stderr
 			return command.Run()
 		},
+		runIntegrationCommand: func(ctx context.Context, stdout, stderr io.Writer, name string, args ...string) error {
+			// #nosec G204 -- name and args come from a typed integration plan.
+			command := exec.CommandContext(ctx, name, args...)
+			command.Stdout = stdout
+			command.Stderr = stderr
+			return command.Run()
+		},
+		runIntegrationDirectoryCommand: func(ctx context.Context, stdout, stderr io.Writer, directory, name string, args ...string) error {
+			// #nosec G204 -- directory, name, and args are bound to a typed,
+			// previewed integration plan. Host commands receive no terminal input.
+			command := exec.CommandContext(ctx, name, args...)
+			command.Dir = directory
+			command.Stdout = stdout
+			command.Stderr = stderr
+			return command.Run()
+		},
 		runInputCommand: func(
 			ctx context.Context,
 			stdin io.Reader,
@@ -135,10 +159,14 @@ func newRuntime(
 			command.Stderr = stderr
 			return command.Run()
 		},
-		processID:         os.Getpid(),
-		lookupEnv:         os.LookupEnv,
-		accountDiscoverer: discovery.New(discovery.Options{}),
-		agentHosts:        agentHosts,
+		processID:                  os.Getpid(),
+		lookupEnv:                  os.LookupEnv,
+		userHomeDir:                os.UserHomeDir,
+		userConfigDir:              os.UserConfigDir,
+		workingDirectory:           os.Getwd,
+		integrationBundleDirectory: findIntegrationBundleDirectory,
+		accountDiscoverer:          discovery.New(discovery.Options{}),
+		agentHosts:                 agentHosts,
 	}
 	var detectorOnce sync.Once
 	var agentHostDetector *agenthost.Detector

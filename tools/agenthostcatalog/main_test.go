@@ -19,7 +19,7 @@ func TestRenderIncludesEveryCatalogEntryAndTruthfulLifecycle(t *testing.T) {
 	}
 	for _, want := range []string{
 		"`codex` (openai-codex)",
-		"`verified` | yes | yes | plugin | — | yes | — | setup + verify",
+		"`verified` | yes | yes | plugin | — | yes | — | setup + inspect + verify + repair + remove",
 		"`claude-desktop` (—) | desktop | `verified` | yes | — | — | yes | — | — | planned adapter",
 		"`catalog_only` | — | — | — | — | — | — | detect only",
 	} {

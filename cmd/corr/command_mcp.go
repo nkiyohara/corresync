@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -11,10 +10,9 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/pelletier/go-toml/v2"
-
 	"github.com/nkiyohara/corresync/internal/agenthost"
 	"github.com/nkiyohara/corresync/internal/integrationbundle"
+	"github.com/nkiyohara/corresync/internal/integrationlifecycle"
 	"github.com/nkiyohara/corresync/internal/mcpserver"
 )
 
@@ -64,6 +62,7 @@ type mcpSetupCommand struct {
 	GeminiCLI     mcpGeminiCLISetupCommand     `cmd:"" name:"gemini-cli" help:"Register with Gemini CLI using gemini mcp add."`
 	QwenCode      mcpQwenCodeSetupCommand      `cmd:"" name:"qwen-code" help:"Register with Qwen Code using qwen mcp add."`
 	Qoder         mcpQoderSetupCommand         `cmd:"" help:"Register with Qoder using qodercli mcp add."`
+	KimiCode      mcpKimiCodeSetupCommand      `cmd:"" name:"kimi-code" help:"Register with Kimi Code using kimi mcp add."`
 }
 
 type mcpClientConfigFlags struct {
@@ -108,111 +107,52 @@ type mcpQoderSetupCommand struct {
 	Scope string `default:"user" enum:"local,project,user" help:"Qoder configuration scope."`
 }
 
-type codexMCPDocument struct {
-	Servers map[string]codexMCPServer `toml:"mcp_servers"`
-}
+type mcpKimiCodeSetupCommand struct{ mcpSetupFlags }
 
-type codexMCPServer struct {
-	Command         string   `toml:"command"`
-	Arguments       []string `toml:"args"`
-	StartupTimeout  int      `toml:"startup_timeout_sec"`
-	ToolTimeout     int      `toml:"tool_timeout_sec"`
-	DefaultApproval string   `toml:"default_tools_approval_mode"`
-	Enabled         bool     `toml:"enabled"`
-	Required        bool     `toml:"required"`
-}
-
-type jsonMCPDocument struct {
-	Servers map[string]jsonMCPServer `json:"mcpServers"`
-}
-
-type jsonMCPServer struct {
-	Type             string            `json:"type,omitempty"`
-	Command          string            `json:"command"`
-	Arguments        []string          `json:"args"`
-	Env              map[string]string `json:"env,omitempty"`
-	Tools            []string          `json:"tools,omitempty"`
-	Description      string            `json:"description,omitempty"`
-	TimeoutMS        int               `json:"timeout,omitempty"`
-	Enabled          *bool             `json:"enabled,omitempty"`
-	StartupTimeoutMS int               `json:"startupTimeoutMs,omitempty"`
-	ToolTimeoutMS    int               `json:"toolTimeoutMs,omitempty"`
-}
+type codexMCPDocument = integrationlifecycle.CodexDocument
+type jsonMCPDocument = integrationlifecycle.JSONDocument
 
 var mcpClientNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 
 func (command *mcpCodexConfigCommand) Run(app *runtime) error {
-	name, executable, arguments, err := resolveMCPClientConfig(app, command.Name, command.Executable)
-	if err != nil {
-		return err
-	}
-	document := codexMCPDocument{Servers: map[string]codexMCPServer{
-		name: {
-			Command:         executable,
-			Arguments:       arguments,
-			StartupTimeout:  30,
-			ToolTimeout:     360,
-			DefaultApproval: "writes",
-			Enabled:         true,
-			Required:        false,
-		},
-	}}
-	encoded, err := toml.Marshal(document)
-	if err != nil {
-		return fmt.Errorf("encode Codex MCP config: %w", err)
-	}
-	_, err = app.stdout.Write(encoded)
-	return err
+	return writeRenderedMCPConfig(app, agenthost.IDCodex, command.mcpClientConfigFlags)
 }
 
 func (command *mcpClaudeCodeConfigCommand) Run(app *runtime) error {
-	return writeJSONMCPConfig(app, command.mcpClientConfigFlags, jsonMCPServer{Type: "stdio"})
+	return writeRenderedMCPConfig(app, agenthost.IDClaudeCode, command.mcpClientConfigFlags)
 }
 
 func (command *mcpGitHubCopilotConfigCommand) Run(app *runtime) error {
-	return writeJSONMCPConfig(app, command.mcpClientConfigFlags, jsonMCPServer{
-		Type:      "stdio",
-		Tools:     []string{"*"},
-		TimeoutMS: 360_000,
-	})
+	return writeRenderedMCPConfig(app, agenthost.IDGitHubCopilot, command.mcpClientConfigFlags)
 }
 
 func (command *mcpGeminiCLIConfigCommand) Run(app *runtime) error {
-	return writeJSONMCPConfig(app, command.mcpClientConfigFlags, jsonMCPServer{
-		Description: "Local-first guarded mail and calendar",
-		TimeoutMS:   360_000,
-	})
+	return writeRenderedMCPConfig(app, agenthost.IDGeminiCLI, command.mcpClientConfigFlags)
 }
 
 func (command *mcpQwenCodeConfigCommand) Run(app *runtime) error {
-	return writeJSONMCPConfig(app, command.mcpClientConfigFlags, jsonMCPServer{})
+	return writeRenderedMCPConfig(app, agenthost.IDQwenCode, command.mcpClientConfigFlags)
 }
 
 func (command *mcpQoderConfigCommand) Run(app *runtime) error {
-	return writeJSONMCPConfig(app, command.mcpClientConfigFlags, jsonMCPServer{})
+	return writeRenderedMCPConfig(app, agenthost.IDQoder, command.mcpClientConfigFlags)
 }
 
 func (command *mcpKimiCodeConfigCommand) Run(app *runtime) error {
-	enabled := true
-	return writeJSONMCPConfig(app, command.mcpClientConfigFlags, jsonMCPServer{
-		Enabled:          &enabled,
-		StartupTimeoutMS: 30_000,
-		ToolTimeoutMS:    360_000,
-	})
+	return writeRenderedMCPConfig(app, agenthost.IDKimiCode, command.mcpClientConfigFlags)
 }
 
-func writeJSONMCPConfig(app *runtime, flags mcpClientConfigFlags, server jsonMCPServer) error {
+func writeRenderedMCPConfig(app *runtime, host agenthost.ID, flags mcpClientConfigFlags) error {
 	name, executable, arguments, err := resolveMCPClientConfig(app, flags.Name, flags.Executable)
 	if err != nil {
 		return err
 	}
-	server.Command = executable
-	server.Arguments = arguments
-	document := jsonMCPDocument{Servers: map[string]jsonMCPServer{name: server}}
-	encoder := json.NewEncoder(app.stdout)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(document)
+	encoded, err := integrationlifecycle.RenderConfig(host, name, executable, arguments)
+	if err != nil {
+		return err
+	}
+	_, err = app.stdout.Write(encoded)
+	return err
 }
 
 func (command *mcpCodexSetupCommand) Run(app *runtime) error {
@@ -220,10 +160,7 @@ func (command *mcpCodexSetupCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	clientArguments := make([]string, 0, 5+len(arguments))
-	clientArguments = append(clientArguments, "mcp", "add", name, "--", executable)
-	clientArguments = append(clientArguments, arguments...)
-	return applyCatalogMCPSetup(app, agenthost.IDCodex, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDCodex, agenthost.ScopeUser, name, executable, arguments, command.DryRun)
 }
 
 func (command *mcpClaudeCodeSetupCommand) Run(app *runtime) error {
@@ -231,10 +168,7 @@ func (command *mcpClaudeCodeSetupCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	clientArguments := make([]string, 0, 7+len(arguments))
-	clientArguments = append(clientArguments, "mcp", "add", "--scope", command.Scope, name, "--", executable)
-	clientArguments = append(clientArguments, arguments...)
-	return applyCatalogMCPSetup(app, agenthost.IDClaudeCode, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDClaudeCode, agenthost.Scope(command.Scope), name, executable, arguments, command.DryRun)
 }
 
 func (command *mcpGitHubCopilotSetupCommand) Run(app *runtime) error {
@@ -242,16 +176,7 @@ func (command *mcpGitHubCopilotSetupCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	clientArguments := make([]string, 0, 11+len(arguments))
-	clientArguments = append(clientArguments,
-		"mcp", "add", name,
-		"--type", "stdio",
-		"--tools", "*",
-		"--timeout", "360000",
-		"--", executable,
-	)
-	clientArguments = append(clientArguments, arguments...)
-	return applyCatalogMCPSetup(app, agenthost.IDGitHubCopilot, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDGitHubCopilot, agenthost.ScopeUser, name, executable, arguments, command.DryRun)
 }
 
 func (command *mcpGeminiCLISetupCommand) Run(app *runtime) error {
@@ -259,16 +184,7 @@ func (command *mcpGeminiCLISetupCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	clientArguments := make([]string, 0, 11+len(arguments))
-	clientArguments = append(clientArguments,
-		"mcp", "add",
-		"--scope", command.Scope,
-		"--description", "Local-first guarded mail and calendar",
-		"--timeout", "360000",
-		name, executable, "--",
-	)
-	clientArguments = append(clientArguments, arguments...)
-	return applyCatalogMCPSetup(app, agenthost.IDGeminiCLI, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDGeminiCLI, agenthost.Scope(command.Scope), name, executable, arguments, command.DryRun)
 }
 
 func (command *mcpQwenCodeSetupCommand) Run(app *runtime) error {
@@ -276,14 +192,7 @@ func (command *mcpQwenCodeSetupCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	clientArguments := make([]string, 0, 8+len(arguments))
-	clientArguments = append(clientArguments,
-		"mcp", "add", "--scope", command.Scope,
-		"--description", "Local-first guarded mail and calendar",
-		name, executable,
-	)
-	clientArguments = append(clientArguments, arguments...)
-	return applyCatalogMCPSetup(app, agenthost.IDQwenCode, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDQwenCode, agenthost.Scope(command.Scope), name, executable, arguments, command.DryRun)
 }
 
 func (command *mcpQoderSetupCommand) Run(app *runtime) error {
@@ -291,10 +200,15 @@ func (command *mcpQoderSetupCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	clientArguments := make([]string, 0, 7+len(arguments))
-	clientArguments = append(clientArguments, "mcp", "add", "-s", command.Scope, name, "--", executable)
-	clientArguments = append(clientArguments, arguments...)
-	return applyCatalogMCPSetup(app, agenthost.IDQoder, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDQoder, agenthost.Scope(command.Scope), name, executable, arguments, command.DryRun)
+}
+
+func (command *mcpKimiCodeSetupCommand) Run(app *runtime) error {
+	name, executable, arguments, err := resolveMCPSetup(app, command.Name, command.Executable)
+	if err != nil {
+		return err
+	}
+	return applyCatalogMCPSetup(app, agenthost.IDKimiCode, agenthost.ScopeUser, name, executable, arguments, command.DryRun)
 }
 
 func resolveMCPSetup(app *runtime, name, executable string) (string, string, []string, error) {
@@ -314,12 +228,9 @@ func resolveMCPSetup(app *runtime, name, executable string) (string, string, []s
 	if err != nil {
 		return "", "", nil, err
 	}
-	info, err := os.Stat(executable)
+	executable, err = verifyIntegrationExecutable(executable)
 	if err != nil {
-		return "", "", nil, fmt.Errorf("inspect Corresync executable %s: %w", executable, err)
-	}
-	if !info.Mode().IsRegular() {
-		return "", "", nil, fmt.Errorf("configured executable is not a regular file: %s", executable)
+		return "", "", nil, err
 	}
 	return name, executable, arguments, nil
 }
@@ -333,21 +244,44 @@ type mcpSetupClient struct {
 func applyCatalogMCPSetup(
 	app *runtime,
 	hostID agenthost.ID,
+	scope agenthost.Scope,
 	name string,
-	arguments []string,
+	executable string,
+	serverArguments []string,
 	dryRun bool,
 ) error {
 	host, ok := app.agentHosts.Lookup(string(hostID))
 	if !ok {
 		return fmt.Errorf("agent-host catalog is missing %q", hostID)
 	}
-	command, verify, ok := host.OfficialCLI(name)
+	projectDirectory := ""
+	var err error
+	if scope != agenthost.ScopeUser {
+		projectDirectory, err = app.workingDirectory()
+		if err != nil {
+			return fmt.Errorf("resolve project directory: %w", err)
+		}
+		projectDirectory, err = filepath.Abs(projectDirectory)
+		if err != nil {
+			return fmt.Errorf("resolve project directory: %w", err)
+		}
+		projectDirectory = filepath.Clean(projectDirectory)
+	}
+	request := integrationlifecycle.Request{
+		Operation: integrationlifecycle.OperationSetup,
+		Host:      hostID, Scope: scope, ServerName: name,
+		Executable: executable, Arguments: serverArguments, ProjectDirectory: projectDirectory,
+	}
+	add, verify, _, _, ok, err := integrationlifecycle.OfficialCommands(request)
+	if err != nil {
+		return err
+	}
 	if !ok {
 		return fmt.Errorf("agent host %q has no verified setup adapter", hostID)
 	}
 	return applyMCPSetup(app, mcpSetupClient{
-		Label: host.DisplayName, Command: command, Verify: verify,
-	}, name, arguments, dryRun)
+		Label: host.DisplayName, Command: add.Executable, Verify: verify.Arguments,
+	}, name, add.Arguments, dryRun)
 }
 
 func applyMCPSetup(app *runtime, client mcpSetupClient, name string, arguments []string, dryRun bool) error {
