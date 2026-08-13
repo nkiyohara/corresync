@@ -175,29 +175,39 @@ scoop install corresync/corresync</code></pre>
       <section class="setup-step tinted-section" id="step-account" aria-labelledby="account-title">
         <div class="step-copy">
           <p class="step-number">2단계</p>
-          <h2 id="account-title">계정 경로 찾기와 선택</h2>
+          <h2 id="account-title">메일과 캘린더 계정 설정</h2>
           <p>
-            탐색은 자격 증명 없이 유효한 TLS와 공개 정보만 확인합니다.
-            계정을 추가하거나 로그인을 시작하지 않습니다.
+            처음에는 명령 하나만 실행하면 됩니다. 안내 화면이 이메일
+            주소를 묻고, 자격 증명 없이 메일과 캘린더 서비스를 찾은 뒤
+            계정을 추가하기 전에 선택한 경로를 보여 줍니다.
           </p>
         </div>
         <div class="setup-content">
-          <div class="cmd" data-copy data-copy-label="계정 탐색 명령">
+          <div class="cmd" data-copy data-copy-label="대화형 계정 설정 명령">
             <pre
               tabindex="0"
               role="region"
-              aria-label="계정 연결 경로 탐색"
-            ><code>corr account discover you@example.com</code></pre>
+              aria-label="대화형 계정 설정"
+            ><code>corr setup</code></pre>
           </div>
           <p>
-            결과를 확인한 뒤 메일과 캘린더 경로를 명시적으로 고르세요.
-            간단한 설정 명령은 탐색 결과를 보여 주고 선택을 받습니다.
+            로컬 계정 이름과 기본 계정을 제안하고, 확인 후에만 저장합니다.
+            로그인이나 외부 자격 증명 접근은 그 다음에 별도로 선택하며,
+            연결 확인과 여러 계정 추가도 이어서 안내합니다. <code>corr
+              settings</code>에서도 같은 흐름을 열 수 있습니다. 화면 읽기
+            프로그램을 사용한다면 <code>CORRESYNC_ACCESSIBLE=true</code>로 줄 단위
+            안내를 켤 수 있으며, 입력 단계에서 안전하게 나가려면 <code
+            >:cancel</code>을 입력하세요.
           </p>
-          <div class="cmd" data-copy data-copy-label="계정 설정 명령">
+          <p>
+            <strong>고급 사용 또는 스크립트:</strong> 기존 명령은 대화 없이
+            그대로 동작합니다.
+          </p>
+          <div class="cmd" data-copy data-copy-label="비대화형 계정 설정 명령">
             <pre
               tabindex="0"
               role="region"
-              aria-label="계정 설정"
+              aria-label="비대화형 계정 설정"
             ><code>corr setup you@example.com --alias personal</code></pre>
           </div>
           <aside class="note-card">
@@ -217,8 +227,9 @@ scoop install corresync/corresync</code></pre>
           <p class="step-number">3단계</p>
           <h2 id="signin-title">선택한 계정에 로그인</h2>
           <p>
-            로그인은 항상 별도의 명령입니다. 탐색 중이나 자동 선택
-            과정에서 브라우저 인증을 시작하지 않습니다.
+            안내 화면에서 로그인을 선택하거나 아래 명령을 직접 실행할 수
+            있습니다. 어느 쪽이든 탐색이나 계정 추가만으로 브라우저,
+            키체인, 관리자 동의가 시작되지는 않습니다.
           </p>
         </div>
         <div class="setup-content">

@@ -201,31 +201,43 @@ normally and the new binary is active on the next `corr` start.
 ### 2. Add and sign in to your account
 
 ```console
-corr setup you@example.com --alias personal
-corr auth login --account personal
-corr mail folders --account personal
-corr calendar folders --account personal
+corr setup
 ```
 
-Run `corr settings` to add, sign in to, rename, select, or remove accounts, and
-to manage updates, safety, and browser sign-in from an arrow-key form. The
+The guided setup performs credential-free discovery, proposes an editable
+local name and default, previews the selected mail/calendar routes, and adds
+the account only after confirmation. Authentication or external-credential
+access is a separate choice after the account exists; the wizard then offers a
+bounded doctor check and multi-account continuation.
+
+Run `corr settings` to open the same account wizard; sign in to, rename,
+select, or remove accounts; and manage updates, safety, and browser sign-in
+from an arrow-key form. The
 top-level Accounts category contains Add account and the configured account
 list; selecting an account opens only actions for that account. Removal
 previews the local data it deletes and asks for confirmation; removing the
 default first asks which remaining account should replace it. Each choice also
 displays the equivalent command, so the interactive flow teaches the direct
 CLI.
-Set `CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader prompts. The
-direct rename form remains:
+Set `CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader prompts; type
+`:cancel` to leave an input step safely. The direct rename form remains:
 
 ```console
 corr account rename personal work
 ```
 
-`setup` creates a provider-neutral, secret-free local configuration when
-needed, performs credential-free discovery, and adds only an automatically
-selectable first-party route. It never opens a sign-in page. Authentication is
-a separate, account-specific action.
+Scripts and advanced users retain the deterministic form:
+
+```console
+corr setup you@example.com --alias personal
+corr auth login --account personal
+corr doctor --account personal
+```
+
+The direct `setup ADDRESS` form creates the same provider-neutral, secret-free
+local configuration, performs credential-free discovery, and adds only an
+automatically selectable first-party route. It never opens a sign-in page.
+Authentication is a separate, account-specific action.
 
 If no route can be selected safely—or if you want an API or standards route—
 inspect the evidence and choose the exact provider settings:

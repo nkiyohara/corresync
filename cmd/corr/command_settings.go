@@ -19,17 +19,25 @@ import (
 
 type settingsCommand struct{}
 
-const maximumSettingsInputBytes = 4 << 10
+const (
+	maximumSettingsInputBytes = 64 << 10
+	settingsAccessibleCancel  = ":cancel"
+)
 
 type settingsAccessibleReader struct {
-	reader io.Reader
+	reader    io.Reader
+	exhausted bool
 }
 
 func (reader *settingsAccessibleReader) Read(buffer []byte) (int, error) {
 	if len(buffer) > 1 {
 		buffer = buffer[:1]
 	}
-	return reader.reader.Read(buffer)
+	read, err := reader.reader.Read(buffer)
+	if errors.Is(err, io.EOF) {
+		reader.exhausted = true
+	}
+	return read, err
 }
 
 const (
@@ -52,11 +60,8 @@ func (command *settingsCommand) Run(app *runtime) error {
 		)
 	}
 	if settingsAccessible(app) {
-		originalInput := app.stdin
-		app.stdin = &settingsAccessibleReader{
-			reader: io.LimitReader(originalInput, maximumSettingsInputBytes+1),
-		}
-		defer func() { app.stdin = originalInput }()
+		restoreInput := prepareAccessibleSettingsInput(app)
+		defer restoreInput()
 	}
 	service, err := newLocalSettingsService(app)
 	if err != nil {
@@ -338,59 +343,13 @@ func runSettingsTerminalLogin(app *runtime, alias string) error {
 
 func runAddAccountSettings(
 	app *runtime,
-	settings application.SettingsView,
+	_ application.SettingsView,
 ) error {
-	address := ""
-	selected, err := runSettingsInput(
-		app,
-		"Email address",
-		"Corresync discovers a provider without signing in. Command: corr setup <email-address>",
-		&address,
-		254,
-		validateSettingsEmailAddress,
-	)
-	if err != nil || !selected {
+	account, completed, err := runAccountRegistrationWizard(app)
+	if err != nil || !completed {
 		return err
 	}
-	separator := strings.LastIndexByte(address, '@')
-	if separator <= 0 {
-		return errors.New("email address must contain a local name before @")
-	}
-	alias := address[:separator]
-	selected, err = runSettingsInput(
-		app,
-		"Local account name",
-		"A short name used by --account. You can rename it later without changing the login.",
-		&alias,
-		64,
-		func(value string) error { return domain.AccountAlias(value).Validate() },
-	)
-	if err != nil || !selected {
-		return err
-	}
-	makeDefault := len(settings.Accounts) == 0
-	if len(settings.Accounts) > 0 {
-		choice, chosen, selectErr := runSettingsSelect(
-			app,
-			"Default account",
-			"Choose which account commands use when --account is omitted.",
-			[]huh.Option[string]{
-				huh.NewOption("Keep "+settings.DefaultAccount+" as default", "keep"),
-				huh.NewOption("Make "+alias+" the default", "new"),
-			},
-		)
-		if selectErr != nil || !chosen {
-			return selectErr
-		}
-		makeDefault = choice == "new"
-	}
-	return runSettingsAccountMutation(app, func() error {
-		return (&setupCommand{
-			Address: address,
-			Alias:   alias,
-			Default: makeDefault,
-		}).Run(app)
-	})
+	return runOnboardingAccountHandoff(app, account)
 }
 
 func runRemoveAccountSettings(
@@ -767,17 +726,17 @@ func applyLocalSetting(
 	return err
 }
 
-func runSettingsSelect(
+func runSettingsSelect[T comparable](
 	app *runtime,
 	title string,
 	description string,
-	options []huh.Option[string],
-) (string, bool, error) {
+	options []huh.Option[T],
+) (T, bool, error) {
 	if !strings.Contains(strings.ToLower(description), "esc") {
-		description += " Esc goes back."
+		description += " Esc cancels."
 	}
-	var value string
-	form := settingsForm(app, huh.NewSelect[string]().
+	var value T
+	form := settingsForm(app, huh.NewSelect[T]().
 		Title(title).
 		Description(description).
 		Options(options...).
@@ -785,9 +744,12 @@ func runSettingsSelect(
 		Height(min(12, len(options)+2)))
 	if err := form.RunWithContext(app.context); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
-			return "", false, nil
+			return value, false, nil
 		}
-		return "", false, fmt.Errorf("run settings selector: %w", err)
+		return value, false, fmt.Errorf("run settings selector: %w", err)
+	}
+	if settingsInputExhausted(app) {
+		return value, false, nil
 	}
 	return value, true, nil
 }
@@ -801,7 +763,12 @@ func runSettingsInput(
 	validate func(string) error,
 ) (bool, error) {
 	if !strings.Contains(strings.ToLower(description), "esc") {
-		description += " Esc goes back."
+		description += " Esc cancels."
+	}
+	accessible := settingsAccessible(app)
+	if accessible {
+		description += " Type :cancel to cancel."
+		title += " (type :cancel to cancel)"
 	}
 	form := settingsForm(app, huh.NewInput().
 		Title(title).
@@ -809,6 +776,9 @@ func runSettingsInput(
 		CharLimit(limit).
 		Value(value).
 		Validate(func(candidate string) error {
+			if accessible && strings.TrimSpace(candidate) == settingsAccessibleCancel {
+				return nil
+			}
 			return validate(strings.TrimSpace(candidate))
 		}))
 	if err := form.RunWithContext(app.context); err != nil {
@@ -818,6 +788,9 @@ func runSettingsInput(
 		return false, fmt.Errorf("run settings input: %w", err)
 	}
 	*value = strings.TrimSpace(*value)
+	if settingsInputExhausted(app) || accessible && *value == settingsAccessibleCancel {
+		return false, nil
+	}
 	return true, nil
 }
 
@@ -838,6 +811,9 @@ func runSettingsConfirm(
 			return false, nil
 		}
 		return false, fmt.Errorf("run settings confirmation: %w", err)
+	}
+	if settingsInputExhausted(app) {
+		return false, nil
 	}
 	return confirmed, nil
 }
@@ -863,6 +839,11 @@ func settingsAccessible(app *runtime) bool {
 	}
 	enabled, err := strconv.ParseBool(value)
 	return err == nil && enabled
+}
+
+func settingsInputExhausted(app *runtime) bool {
+	reader, ok := app.stdin.(*settingsAccessibleReader)
+	return ok && reader.exhausted
 }
 
 func writeSettingsOverview(app *runtime) error {

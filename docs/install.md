@@ -135,9 +135,12 @@ Install the CLI with one of the methods above, then configure and authenticate
 the exact accounts you control:
 
 ```console
-corr setup you@example.com --alias personal
-corr auth login --account personal
+corr setup
 ```
+
+The wizard adds a reviewed account, then separately offers sign-in and a
+bounded connection check. The deterministic commands remain available for
+advanced use and scripts.
 
 Download `corresync_VERSION.mcpb` from the
 [matching GitHub release](https://github.com/nkiyohara/corresync/releases),
@@ -254,16 +257,15 @@ SmartScreen, or organization policy to run a release.
 ## First run
 
 ```console
-corr setup you@example.com --alias personal
-corr auth login --account personal
+corr setup
 corr auth status
-corr doctor --account personal
 ```
 
-Replace the example address and alias. `setup` creates a provider-neutral local
-configuration, performs credential-free discovery, and adds an automatically
-selectable first-party route. It never starts authentication. The following
-`auth login` is explicit and account-specific.
+The wizard creates a provider-neutral local configuration, performs
+credential-free discovery, previews the route, and adds it only after
+confirmation. Sign-in and doctor are separate choices inside the flow. For a
+non-interactive script, use `corr setup ADDRESS --alias NAME`, followed by the
+explicit account-specific `corr auth login` and `corr doctor` commands.
 
 The browser owns sign-in, MFA, Conditional Access, and session cookies.
 Corresync never asks for a password or copies an authorization header into its

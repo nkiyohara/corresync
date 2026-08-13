@@ -31,18 +31,22 @@ evidence contracts.
 ## First run
 
 ```console
-corr setup you@example.com --alias personal
-corr auth login --account personal
+corr setup
 corr mail folders --account personal
 corr calendar folders --account personal
 ```
 
-`setup` begins from no selected provider, performs credential-free discovery,
-and adds only an automatically selectable first-party route. To inspect or
-manually select another route without sending credentials or starting
-authentication:
+The guided setup begins from no selected provider, performs credential-free
+discovery, explains route choices, previews the account, and keeps sign-in or
+external-credential access as a separate explicit step. It also offers a doctor
+check and multi-account continuation. The same flow is available under
+`corr settings`.
+
+For deterministic scripts, or to inspect and manually select another route
+without sending credentials or starting authentication:
 
 ```console
+corr setup you@example.com --alias personal
 corr account discover reader@example.invalid
 corr account add reader@example.invalid --help
 ```

@@ -8,14 +8,15 @@ private authenticated local connection.
 ## Quick setup
 
 ```console
-corr setup you@example.com --alias personal
-corr auth login --account personal
+corr setup
 corr mcp setup codex
 ```
 
-`setup` performs credential-free discovery and route addition but never
-authenticates. MCP registration is refused until at least one account route is
-configured.
+The guided setup performs credential-free discovery, previews the route, adds
+it only after confirmation, and then separately offers authentication and a
+doctor check. MCP registration is refused until at least one account route is
+configured. Scripts can use the non-interactive `corr setup ADDRESS` and
+account-specific `corr auth login` form instead.
 
 `corr mcp serve` itself can start against a freshly initialized, account-free
 configuration so MCP clients and registries can inspect the complete catalog

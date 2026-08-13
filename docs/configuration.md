@@ -19,6 +19,7 @@ and support-window rules are defined by the
 
 ```console
 corr settings
+corr setup
 corr setup you@example.com --alias personal
 corr config init
 corr config validate
@@ -31,21 +32,25 @@ corr account rename work primary
 corr account remove old --approve
 ```
 
-Use `corr settings` when working interactively. It provides an arrow-key form
-organized around accounts, updates, safety, and browser login. It can add an
-account from the nested Accounts category, whose account list leads to either
-login mode, rename, default, and removal actions for one account. Removing an
-account requires an explicit local-state review; removing the default requires
-selecting its replacement first, and the only configured account cannot be
-removed. Each row shows its current value, plain-language effect, and
-equivalent direct command. Set `CORRESYNC_ACCESSIBLE=true` for line-oriented
-screen-reader prompts. Direct `account` and `config` commands remain available
-for scripts and advanced configuration.
+Use `corr setup` for the complete first-run wizard, or `corr settings` to open
+the same account registration flow alongside everyday settings. The settings
+form is organized around accounts, updates, safety, and browser login. It can
+add an account from the nested Accounts category, whose account list leads to
+either login mode, rename, default, and removal actions for one account.
+Removing an account requires an explicit local-state review. Removing the
+default requires selecting its replacement first, and the only configured
+account cannot be removed. Each row shows its current value, plain-language
+effect, and equivalent direct command. Set `CORRESYNC_ACCESSIBLE=true` for
+line-oriented screen-reader prompts and type `:cancel` to leave an input step
+safely. Direct `account` and `config` commands remain available for scripts and
+advanced configuration.
 
-`setup` is the provider-neutral first-run path. It creates an empty,
-secret-free configuration when needed, performs credential-free discovery,
-and adds an automatically selectable first-party route. It does not
-authenticate. `config init` creates only the empty configuration for users who
+Interactive `corr setup` is the provider-neutral first-run path. It creates an
+empty, secret-free configuration when needed, performs credential-free
+discovery, previews the chosen routes, and adds only after confirmation. It
+offers authentication or external-credential verification afterward as a
+separate action. `corr setup ADDRESS` remains deterministic and non-interactive
+for scripts. `config init` creates only the empty configuration for users who
 want to inspect candidates and select every route manually.
 
 Discovery is read-only and credential-free. Adding a route never

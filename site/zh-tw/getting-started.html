@@ -218,18 +218,25 @@ scoop install corresync/corresync</code></pre>
         <li class="gs-step" id="sign-in" aria-labelledby="signin-title">
           <header>
             <span class="step-badge" aria-hidden="true">2</span><div>
-              <h2 id="signin-title">先選帳號，再登入</h2>
+              <h2 id="signin-title">設定郵件與行事曆帳號</h2>
               <p>
-                Corresync
-                先用位址收集無認證資料證據，新增你選擇的路徑，隨後透過單獨的帳號命令認證。
+                第一次只需執行一個指令。引導程式會詢問電子郵件地址，在不讀取認證資料的情況下尋找郵件與行事曆服務、說明可選路徑，並在新增帳號前顯示完整預覽。
+              </p>
+              <p>
+                登入或讀取外部認證資料始終是確認後的獨立選擇。接著還可檢查連線或繼續新增其他帳號。<code
+                >corr
+                  settings</code>使用同一套鍵盤友善流程；螢幕閱讀器使用者可設定<code
+                >CORRESYNC_ACCESSIBLE=true</code>，改用逐行提示；輸入<code
+                >:cancel</code>即可安全離開目前的輸入步驟。
               </p>
             </div>
           </header>
           <div class="duo">
             <div>
               <p>
-                Outlook Web 的發現和帳號新增不會開啟瀏覽器；<code>auth login</code>
-                只為指定別名啟動登入。
+                Outlook Web 使用由服務供應商掌控的瀏覽器登入。Microsoft
+                Graph、JMAP、IMAP/SMTP 與 CalDAV
+                也可在服務供應商支援，且你明確選擇相應路徑或認證資料存放位置時使用。探索過程不會開啟瀏覽器、讀取鑰匙圈，也不會啟動管理員同意流程。
               </p>
               <p>
                 <strong>使用 Gmail？</strong>Gmail 和 Calendar API 程式碼已在 RC
@@ -244,16 +251,28 @@ scoop install corresync/corresync</code></pre>
             </div>
             <div class="stack">
               <div class="install-block">
-                <p class="os-label" id="gs-signin-default">Outlook Web · 引導設定</p>
-                <div class="cmd" data-copy data-copy-label="帳號與登入命令">
+                <p class="os-label" id="gs-signin-default">引導設定 · 建議</p>
+                <div class="cmd" data-copy data-copy-label="引導帳號設定指令">
                   <pre
                     tabindex="0"
                     role="region"
                     aria-labelledby="gs-signin-default"
-                  ><code>corr setup you@example.com --alias personal
+                  ><code>corr setup</code></pre>
+                </div>
+                <p class="block-note">
+                  引導程式會建議本機帳號名稱與預設帳號，預覽路徑後再新增，並讓你逐項確認登入、連線檢查與多帳號設定。
+                </p>
+              </div>
+              <div class="install-block">
+                <p class="os-label">進階用法或指令碼設定</p>
+                <div class="cmd" data-copy data-copy-label="非互動帳號設定指令">
+                  <pre tabindex="0" role="region"><code>corr setup you@example.com --alias personal
 corr auth login --account personal
 corr doctor --account personal</code></pre>
                 </div>
+                <p class="block-note">
+                  原有指令維持非互動行為，適合指令碼與自動化。
+                </p>
               </div>
               <div class="install-block">
                 <p class="os-label">Gmail · 審核前的臨時方式</p>

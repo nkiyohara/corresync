@@ -278,19 +278,25 @@ corr update</code></pre>
         <li class="gs-step" id="sign-in" aria-labelledby="signin-title">
           <header>
             <span class="step-badge" aria-hidden="true">2</span><div>
-              <h2 id="signin-title">アカウントを選んでから、サインイン</h2>
+              <h2 id="signin-title">メールとカレンダーのアカウントを設定</h2>
               <p>
-                最初からプロバイダーを決めつけません。認証情報なしで候補を集め、選んだ経路を追加し、別のアカウント専用コマンドで初めて認証します。
+                はじめに実行するのは1コマンドだけです。ガイドがメールアドレスを尋ね、認証情報なしでメールとカレンダーの候補を探し、内容を確認してからアカウントを追加します。
+              </p>
+              <p>
+                サインインや外部認証情報へのアクセスは、追加後に改めて選ぶ別の操作です。接続確認や2つ目のアカウント追加も続けて案内します。<code
+                >corr
+                  settings</code>からも同じ画面を開けます。スクリーンリーダーでは<code
+                >CORRESYNC_ACCESSIBLE=true</code>を指定すると行単位で操作できます。入力途中で安全に戻るには<code
+                >:cancel</code>と入力してください。
               </p>
             </div>
           </header>
           <div class="duo">
             <div>
               <p>
-                Outlook Webは十分な根拠があれば<code>corr
-                  setup</code>で候補になります。候補検索と追加だけではブラウザを開きません。次の<code
-                >auth
-                  login</code>が、指定した別名のアカウントだけをサインインさせます。
+                Outlook
+                Webはプロバイダー所有のブラウザでサインインできます。Microsoft
+                Graph、JMAP、IMAP/SMTP、CalDAVも、プロバイダーが対応していて必要な経路や認証情報の保管先を明示的に選んだ場合に利用できます。候補検索だけでブラウザやキーチェーンを開いたり、管理者の同意を求めたりすることはありません。
               </p>
               <p>
                 <strong>Gmailを使う場合：</strong>Gmail・Calendar
@@ -305,20 +311,36 @@ corr update</code></pre>
             </div>
             <div class="stack">
               <div class="install-block">
-                <p class="os-label" id="gs-signin-default">Outlook Web · ガイド付き設定</p>
+                <p class="os-label" id="gs-signin-default">ガイド付き設定 · おすすめ</p>
                 <div
                   class="cmd"
                   data-copy
-                  data-copy-label="アカウント追加とサインインのコマンド"
+                  data-copy-label="ガイド付きアカウント設定コマンド"
                 >
                   <pre
                     tabindex="0"
                     role="region"
                     aria-labelledby="gs-signin-default"
-                  ><code>corr setup you@example.com --alias personal
+                  ><code>corr setup</code></pre>
+                </div>
+                <p class="block-note">
+                  別名と既定アカウントを提案し、経路をプレビューしてから追加します。認証、接続確認、複数アカウントの追加はその後に選べます。
+                </p>
+              </div>
+              <div class="install-block">
+                <p class="os-label">上級者向け・スクリプトでの設定</p>
+                <div
+                  class="cmd"
+                  data-copy
+                  data-copy-label="非対話アカウント設定コマンド"
+                >
+                  <pre tabindex="0" role="region"><code>corr setup you@example.com --alias personal
 corr auth login --account personal
 corr doctor --account personal</code></pre>
                 </div>
+                <p class="block-note">
+                  従来のコマンドは非対話のままなので、自動化にも利用できます。
+                </p>
               </div>
               <div class="install-block">
                 <p class="os-label">Gmail · 承認までの一時的な選択肢</p>

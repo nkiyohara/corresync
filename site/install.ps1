@@ -796,8 +796,7 @@ function Invoke-CorresyncInstall {
     }
     Write-CorresyncMessage ""
     Write-CorresyncMessage "Next:"
-    Write-CorresyncMessage "  corr setup you@example.com --alias personal"
-    Write-CorresyncMessage "  corr auth login --account personal"
+    Write-CorresyncMessage "  corr setup"
     Write-CorresyncMessage "  corr mcp setup codex"
     Write-CorresyncMessage ""
     Write-CorresyncMessage "No account was configured, no login was started, and no MCP client was changed."

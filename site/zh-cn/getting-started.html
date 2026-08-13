@@ -219,18 +219,25 @@ scoop install corresync/corresync</code></pre>
         <li class="gs-step" id="sign-in" aria-labelledby="signin-title">
           <header>
             <span class="step-badge" aria-hidden="true">2</span><div>
-              <h2 id="signin-title">先选账号，再登录</h2>
+              <h2 id="signin-title">设置邮件与日历账号</h2>
               <p>
-                Corresync
-                先用地址收集无凭据证据，添加你选择的路径，随后通过单独的账号命令认证。
+                第一次只需运行一条命令。引导程序会询问邮箱地址，在不读取凭据的前提下查找邮件和日历服务，说明可选路径，并在添加账号前显示完整预览。
+              </p>
+              <p>
+                登录或读取外部凭据始终是确认之后的独立选择。随后还可以检查连接或继续添加其他账号。<code
+                >corr
+                  settings</code>使用同一套键盘友好流程；屏幕阅读器用户可设置<code
+                >CORRESYNC_ACCESSIBLE=true</code>，改用逐行提示；输入<code
+                >:cancel</code>即可安全退出当前输入步骤。
               </p>
             </div>
           </header>
           <div class="duo">
             <div>
               <p>
-                Outlook Web 的发现和账号添加不会打开浏览器；<code>auth login</code>
-                只为指定别名启动登录。
+                Outlook Web 使用由服务商掌控的浏览器登录。Microsoft
+                Graph、JMAP、IMAP/SMTP 和 CalDAV
+                也可在服务商支持且你明确选择相应路径或凭据存储位置时使用。发现过程不会打开浏览器、读取钥匙串，也不会发起管理员同意流程。
               </p>
               <p>
                 <strong>使用 Gmail？</strong>Gmail 和 Calendar API 代码已在 RC
@@ -245,16 +252,28 @@ scoop install corresync/corresync</code></pre>
             </div>
             <div class="stack">
               <div class="install-block">
-                <p class="os-label" id="gs-signin-default">Outlook Web · 引导设置</p>
-                <div class="cmd" data-copy data-copy-label="账号与登录命令">
+                <p class="os-label" id="gs-signin-default">引导设置 · 推荐</p>
+                <div class="cmd" data-copy data-copy-label="引导账号设置命令">
                   <pre
                     tabindex="0"
                     role="region"
                     aria-labelledby="gs-signin-default"
-                  ><code>corr setup you@example.com --alias personal
+                  ><code>corr setup</code></pre>
+                </div>
+                <p class="block-note">
+                  引导程序会建议本地账号名和默认账号，预览路径后再添加，并把登录、连接检查和多账号设置留给你逐项确认。
+                </p>
+              </div>
+              <div class="install-block">
+                <p class="os-label">高级用法或脚本设置</p>
+                <div class="cmd" data-copy data-copy-label="非交互账号设置命令">
+                  <pre tabindex="0" role="region"><code>corr setup you@example.com --alias personal
 corr auth login --account personal
 corr doctor --account personal</code></pre>
                 </div>
+                <p class="block-note">
+                  原有命令仍保持非交互行为，适合脚本和自动化。
+                </p>
               </div>
               <div class="install-block">
                 <p class="os-label">Gmail · 审批前的临时方式</p>
