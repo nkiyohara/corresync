@@ -14,8 +14,11 @@ type fakeMailReader struct {
 	page       MailPage
 	pages      []MailPage
 	folderPage MailFolderPage
+	draft      MailDraftSnapshot
 	err        error
 	calls      int
+	draftReads int
+	draftSends int
 }
 
 func (reader *fakeMailReader) ListMessages(context.Context, MailListInput) (MailPage, error) {
@@ -58,6 +61,22 @@ func (reader *fakeMailReader) CreateMailDraft(context.Context, MailDraftInput) (
 func (reader *fakeMailReader) SendMail(context.Context, MailSendInput) (MailSendResult, error) {
 	reader.calls++
 	return MailSendResult{ID: "sent-1", ChangeKey: "change-1"}, reader.err
+}
+
+func (reader *fakeMailReader) GetMailDraftSnapshot(
+	context.Context,
+	MailDraftSendInput,
+) (MailDraftSnapshot, error) {
+	reader.draftReads++
+	return reader.draft, reader.err
+}
+
+func (reader *fakeMailReader) SendMailDraft(
+	context.Context,
+	MailDraftSendInput,
+) (MailSendResult, error) {
+	reader.draftSends++
+	return MailSendResult{ID: "sent-draft-1"}, reader.err
 }
 
 func (reader *fakeMailReader) MoveMail(context.Context, MailMoveInput) (MailMoveResult, error) {

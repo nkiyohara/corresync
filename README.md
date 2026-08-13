@@ -266,7 +266,7 @@ corr mcp setup codex
 ```
 
 Use `corr mcp --help` for Claude Code, GitHub Copilot CLI, Gemini CLI, Qwen
-Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 43
+Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 45
 narrow tools and two read-only monitor resources; there is no HTTP, SSE,
 remote MCP endpoint, or hosted relay.
 

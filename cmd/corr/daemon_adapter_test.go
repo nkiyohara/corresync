@@ -31,6 +31,8 @@ type adapterTestBackend struct {
 	draftReview           application.MailReview
 	sendCommits           int
 	sendReview            application.MailReview
+	sendDraftCommits      int
+	sendDraftReview       application.MailDraftSendReview
 	calendarCommits       int
 	calendarReview        application.CalendarCreateReview
 	calendarUpdateCommits int
@@ -180,6 +182,29 @@ func (backend *adapterTestBackend) CommitMailSend(context.Context, string, domai
 	backend.sendCommits++
 	return application.MailSendAccess{
 		Status: "sent", Sent: &application.MailSendResult{}, Review: backend.sendReview,
+	}, nil
+}
+func (backend *adapterTestBackend) SendMailDraft(_ context.Context, input application.MailDraftSendInput, _ domain.Caller) (application.MailDraftSendAccess, error) {
+	backend.sendDraftReview = application.MailDraftSendReview{
+		DraftID: input.DraftID, DraftChangeKey: input.DraftChangeKey,
+		To: []string{"recipient@example.invalid"}, BodySHA256: strings.Repeat("b", 64),
+		BodyFormat: application.MailBodyText,
+	}
+	return application.MailDraftSendAccess{
+		Status: "approval_required", Review: backend.sendDraftReview,
+		Preview: &approval.Preview{
+			Token: "opv1_synthetic", ExpiresAt: time.Now().Add(time.Minute), // gitleaks:allow -- synthetic fixture
+			Operation: domain.OperationView{
+				Name: "mail.send_draft", Effect: domain.EffectExternalWrite,
+				Account: input.Account, Digest: strings.Repeat("b", 64),
+			},
+		},
+	}, nil
+}
+func (backend *adapterTestBackend) CommitMailSendDraft(context.Context, string, domain.Caller) (application.MailDraftSendAccess, error) {
+	backend.sendDraftCommits++
+	return application.MailDraftSendAccess{
+		Status: "sent", Sent: &application.MailSendResult{}, Review: backend.sendDraftReview,
 	}, nil
 }
 func (backend *adapterTestBackend) MoveMail(context.Context, application.MailMoveInput, domain.Caller) (application.MailMoveAccess, error) {
@@ -476,6 +501,33 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 		t.Fatalf(
 			"commit count=%d stdout=%s stderr=%s",
 			backend.sendCommits, stdout.String(), stderr.String(),
+		)
+	}
+	stdout.Reset()
+	stderr.Reset()
+	sendDraft := mailSendDraftCommand{
+		DraftID: "draft-1", DraftChangeKey: "draft-change-1",
+	}
+	if err := sendDraft.Run(app); err != nil {
+		t.Fatalf("mail send-draft preview Run() error = %v", err)
+	}
+	if backend.sendDraftCommits != 0 ||
+		!bytes.Contains(stdout.Bytes(), []byte("saved draft was not sent")) ||
+		!bytes.Contains(stdout.Bytes(), []byte("draft-change-1")) {
+		t.Fatalf("saved-draft preview commits=%d output=%s", backend.sendDraftCommits, stdout.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	sendDraft.Approve = true
+	if err := sendDraft.Run(app); err != nil {
+		t.Fatalf("mail send-draft commit Run() error = %v", err)
+	}
+	if backend.sendDraftCommits != 1 ||
+		!bytes.Contains(stdout.Bytes(), []byte("Sent saved draft draft-1")) ||
+		!bytes.Contains(stderr.Bytes(), []byte("Committing this exact saved draft version")) {
+		t.Fatalf(
+			"saved-draft commit count=%d stdout=%s stderr=%s",
+			backend.sendDraftCommits, stdout.String(), stderr.String(),
 		)
 	}
 	stdout.Reset()

@@ -105,6 +105,7 @@ type MailService struct {
 	attachmentReader MailAttachmentReader
 	draftWriter      MailDraftWriter
 	sender           MailSender
+	draftSender      MailDraftSender
 	mover            MailMover
 	readState        MailReadStateWriter
 	deleter          MailDeleter
@@ -123,23 +124,29 @@ func NewMailService(guard *Guard, reader MailPort, options MailOptions) (*MailSe
 	if options.MaxRecipients < 1 || options.MaxRecipients > MaxMailRecipients {
 		return nil, fmt.Errorf("max mail recipients must be between 1 and %d", MaxMailRecipients)
 	}
-	return &MailService{
+	service := &MailService{
 		guard: guard, reader: reader, searcher: reader, folderReader: reader,
 		bodyReader: reader, attachmentReader: reader, draftWriter: reader,
 		sender: reader, mover: reader, readState: reader, deleter: reader,
 		maxRecipients: options.MaxRecipients, provenance: options.Provenance,
-	}, nil
+	}
+	service.draftSender, _ = reader.(MailDraftSender)
+	return service, nil
 }
 
-func (service *MailService) validateExecutionAccount(operation domain.Operation) error {
+func (service *MailService) validateRoutedAccount(account domain.AccountID) error {
 	expected := service.provenance.AccountID
 	if expected == "" {
 		return errors.New("mail service lacks routed account provenance")
 	}
-	if operation.Account() != expected {
+	if account != expected {
 		return errors.New("mail operation account does not match the routed service")
 	}
 	return nil
+}
+
+func (service *MailService) validateExecutionAccount(operation domain.Operation) error {
+	return service.validateRoutedAccount(operation.Account())
 }
 
 // List returns metadata only through the shared policy and audit boundary.

@@ -28,6 +28,7 @@ type mailCommand struct {
 	Delete     mailDeleteCommand     `cmd:"" help:"Review and permanently delete one versioned message."`
 	Draft      mailDraftCommand      `cmd:"" help:"Review and save a new, reply, or forward draft without sending."`
 	Send       mailSendCommand       `cmd:"" help:"Review and send one new message, reply, or forward."`
+	SendDraft  mailSendDraftCommand  `cmd:"" help:"Review and send one exact saved draft version."`
 }
 
 type mailFoldersCommand struct {
@@ -55,6 +56,14 @@ type mailSendCommand struct {
 	Attachments        []string `name:"attachment" type:"path" help:"File to attach; repeat as needed."`
 	Approve            bool     `help:"Send the exact preview generated from these arguments."`
 	JSON               bool     `help:"Write the stable machine-readable schema."`
+}
+
+type mailSendDraftCommand struct {
+	Account        string `help:"Configured account alias; defaults to default_account."`
+	DraftID        string `name:"draft-id" help:"Exact saved draft ID returned by mail draft or mail list."`
+	DraftChangeKey string `name:"draft-change-key" help:"Exact saved draft change key returned with the draft ID."`
+	Approve        bool   `help:"Send the exact saved draft preview generated from these arguments."`
+	JSON           bool   `help:"Write the stable machine-readable schema."`
 }
 
 type mailDraftCommand struct {
@@ -833,6 +842,66 @@ func (command *mailSendCommand) Run(app *runtime) (returnErr error) {
 	return err
 }
 
+func (command *mailSendDraftCommand) Run(app *runtime) (returnErr error) {
+	configuration, _, err := app.loadConfig()
+	if err != nil {
+		return err
+	}
+	accountID, err := app.account(configuration, command.Account)
+	if err != nil {
+		return err
+	}
+	input := application.MailDraftSendInput{
+		Account: accountID, DraftID: command.DraftID,
+		DraftChangeKey: command.DraftChangeKey,
+	}
+	if err := input.Validate(); err != nil {
+		return err
+	}
+	client, _, err := app.openDaemon(app.context)
+	if err != nil {
+		return err
+	}
+	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
+	access, err := client.SendMailDraft(app.context, input, app.caller())
+	if err != nil {
+		return err
+	}
+	if access.Status != "approval_required" || access.Preview == nil {
+		return errors.New("saved draft send did not produce its mandatory preview")
+	}
+	if !command.Approve {
+		if command.JSON {
+			return writeJSON(app.stdout, access)
+		}
+		return writeSendDraftReview(app.stdout, access.Review, false)
+	}
+	if err := writeSendDraftReview(app.stderr, access.Review, true); err != nil {
+		return err
+	}
+	access, err = client.CommitMailSendDraft(
+		app.context,
+		access.Preview.Token,
+		app.caller(),
+	)
+	if err != nil {
+		return err
+	}
+	if access.Status != "sent" || access.Sent == nil {
+		return errors.New("saved draft send commit completed without sent status")
+	}
+	if command.JSON {
+		return writeJSON(app.stdout, access)
+	}
+	_, err = fmt.Fprintf(
+		app.stdout,
+		"Sent saved draft %s to %d recipient(s); the exact version was attempted once.\n",
+		sanitizeCell(access.Review.DraftID, 80),
+		len(access.Review.To)+len(access.Review.CC)+len(access.Review.BCC),
+	)
+	return err
+}
+
 func writeSendReview(writer io.Writer, review application.MailReview, committing bool) error {
 	action := "Preview only; nothing was sent. Rerun with --approve to send this exact content."
 	if committing {
@@ -847,6 +916,48 @@ func writeDraftReview(writer io.Writer, review application.MailReview, committin
 		action = "Saving this exact draft now; no message will be sent."
 	}
 	return writeMailContentReview(writer, review, action)
+}
+
+func writeSendDraftReview(
+	writer io.Writer,
+	review application.MailDraftSendReview,
+	committing bool,
+) error {
+	action := "Preview only; the saved draft was not sent. Rerun with --approve to send this exact version."
+	if committing {
+		action = "Committing this exact saved draft version now."
+	}
+	_, err := fmt.Fprintf(
+		writer,
+		"%s\nDraft ID: %s\nChange key: %s\nTo: %s\nCc: %s\nBcc: %s\nSubject: %s\nBody format: %s\nBody (%d bytes, SHA-256 %s):\n%s\n",
+		action,
+		sanitizeCell(review.DraftID, 4096),
+		sanitizeCell(review.DraftChangeKey, 4096),
+		sanitizeCell(strings.Join(review.To, ", "), 512),
+		sanitizeCell(strings.Join(review.CC, ", "), 512),
+		sanitizeCell(strings.Join(review.BCC, ", "), 512),
+		sanitizeCell(review.Subject, 998),
+		sanitizeCell(string(review.BodyFormat), 16),
+		review.BodyBytes,
+		sanitizeCell(review.BodySHA256, 64),
+		sanitizeTerminalText(review.BodyPreview),
+	)
+	if err != nil {
+		return err
+	}
+	for _, attachment := range review.Attachments {
+		if _, err := fmt.Fprintf(
+			writer,
+			"Attachment: %s (%s, %d bytes, inline=%t)\n",
+			sanitizeCell(attachment.Name, 255),
+			sanitizeCell(attachment.ContentType, 255),
+			attachment.Bytes,
+			attachment.Inline,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeMailContentReview(

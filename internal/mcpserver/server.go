@@ -57,6 +57,8 @@ type Backend interface {
 	CommitMailDraft(context.Context, string, domain.Caller) (application.MailDraftAccess, error)
 	SendMail(context.Context, application.MailSendInput, domain.Caller) (application.MailSendAccess, error)
 	CommitMailSend(context.Context, string, domain.Caller) (application.MailSendAccess, error)
+	SendMailDraft(context.Context, application.MailDraftSendInput, domain.Caller) (application.MailDraftSendAccess, error)
+	CommitMailSendDraft(context.Context, string, domain.Caller) (application.MailDraftSendAccess, error)
 	MoveMail(context.Context, application.MailMoveInput, domain.Caller) (application.MailMoveAccess, error)
 	CommitMailMove(context.Context, string, domain.Caller) (application.MailMoveAccess, error)
 	SetMailReadState(context.Context, application.MailReadStateInput, domain.Caller) (application.MailReadStateAccess, error)
@@ -230,6 +232,13 @@ type MailSendInput struct {
 	ReferenceMessageID string                    `json:"referenceMessageId,omitempty" jsonschema:"Exact source message ID for reply or forward"`
 	ReferenceChangeKey string                    `json:"referenceChangeKey,omitempty" jsonschema:"Exact source change key for reply or forward"`
 	Attachments        []MailFileAttachmentInput `json:"attachments,omitempty" jsonschema:"Bounded file attachments to send"`
+}
+
+// MailDraftSendInput selects one immutable saved draft version for review.
+type MailDraftSendInput struct {
+	Account        string `json:"account,omitempty" jsonschema:"Configured account alias; omit to use default_account"`
+	DraftID        string `json:"draftId" jsonschema:"Exact saved draft ID returned by mail_create_draft or mail_list"`
+	DraftChangeKey string `json:"draftChangeKey" jsonschema:"Exact saved draft change key returned with the draft ID"`
 }
 
 // CalendarFolderListInput selects one bounded selectable-calendar page.
@@ -1166,6 +1175,48 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input ApprovalInput) (*mcp.CallToolResult, application.MailSendAccess, error) {
 		access, err := backend.CommitMailSend(ctx, input.Token, caller)
+		return nil, access, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "mail_send_draft",
+		Title:       "Review one saved draft send",
+		Description: "Read one exact saved draft version and return a caller-bound mandatory send preview covering recipients, bounded body preview and hash, and attachments. This tool never sends mail.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Review one saved draft send",
+			ReadOnlyHint:    false,
+			DestructiveHint: &nonDestructive,
+			OpenWorldHint:   &openWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "private-untrusted-sensitive",
+			"io.github.nkiyohara.corresync/effect":              "external_write",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailDraftSendInput) (*mcp.CallToolResult, application.MailDraftSendAccess, error) {
+		account, err := backend.ResolveAccount(input.Account)
+		if err != nil {
+			return nil, application.MailDraftSendAccess{}, err
+		}
+		access, err := backend.SendMailDraft(ctx, application.MailDraftSendInput{
+			Account: account, DraftID: input.DraftID, DraftChangeKey: input.DraftChangeKey,
+		}, caller)
+		return nil, access, err
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "mail_send_draft_commit",
+		Title:       "Send one reviewed saved draft",
+		Description: "Consume one caller-bound preview and submit that exact saved draft version once. Stale versions fail closed and the request is never retried.",
+		Annotations: &mcp.ToolAnnotations{
+			Title:           "Send one reviewed saved draft",
+			ReadOnlyHint:    false,
+			DestructiveHint: &nonDestructive,
+			OpenWorldHint:   &openWorld,
+		},
+		Meta: mcp.Meta{
+			"io.github.nkiyohara.corresync/data-classification": "private-untrusted-sensitive",
+			"io.github.nkiyohara.corresync/effect":              "external_write",
+		},
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, input ApprovalInput) (*mcp.CallToolResult, application.MailDraftSendAccess, error) {
+		access, err := backend.CommitMailSendDraft(ctx, input.Token, caller)
 		return nil, access, err
 	})
 	mcp.AddTool(server, &mcp.Tool{

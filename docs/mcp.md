@@ -114,7 +114,7 @@ policy.
 
 ## Tool catalog
 
-The server exposes 43 narrow tools.
+The server exposes 45 narrow tools.
 
 Accounts and local monitoring:
 
@@ -146,6 +146,7 @@ Mail writes:
 
 - `mail_create_draft`, `mail_create_draft_commit`;
 - `mail_send`, `mail_send_commit`;
+- `mail_send_draft`, `mail_send_draft_commit`;
 - `mail_move`, `mail_move_commit`;
 - `mail_set_read_state`, `mail_set_read_state_commit`;
 - `mail_delete`, `mail_delete_commit`.

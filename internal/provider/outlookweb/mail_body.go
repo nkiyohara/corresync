@@ -31,9 +31,14 @@ type getItemResponseMessage struct {
 }
 
 type getItemMessage struct {
-	ItemID      itemID               `json:"ItemId"`
-	Body        bodyContent          `json:"Body"`
-	Attachments []mailAttachmentItem `json:"Attachments"`
+	ItemID        itemID               `json:"ItemId"`
+	Subject       string               `json:"Subject"`
+	Body          bodyContent          `json:"Body"`
+	ToRecipients  []recipient          `json:"ToRecipients"`
+	CCRecipients  []recipient          `json:"CcRecipients"`
+	BCCRecipients []recipient          `json:"BccRecipients"`
+	Attachments   []mailAttachmentItem `json:"Attachments"`
+	IsDraft       bool                 `json:"IsDraft"`
 }
 
 type mailAttachmentItem struct {

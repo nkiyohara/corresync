@@ -61,6 +61,7 @@ the fuller local discovery command. See
 | Retrieve attachment | `corr mail attachment` | `mail_get_attachment` + optional commit | One bounded file |
 | Save draft | `corr mail draft` | `mail_create_draft` + optional commit | Save-only; never sends |
 | Send/reply/forward | `corr mail send` | `mail_send` + `mail_send_commit` | Exact preview and commit |
+| Send saved draft | `corr mail send-draft` | `mail_send_draft` + `mail_send_draft_commit` | Exact provider draft ID and version |
 | Move | `corr mail move` | `mail_move` + optional commit | Exact source version where provider supports it |
 | Read/unread state | `corr mail mark` | `mail_set_read_state` + optional commit | Reviewed versioned update |
 | Permanent delete | `corr mail delete` | `mail_delete` + `mail_delete_commit` | Destructive approval |
@@ -84,19 +85,26 @@ Provider differences remain visible:
   revalidate the exact reviewed source before invoking actions that expose no
   atomic source ETag precondition. Permanent deletion uses Graph's explicit
   `permanentDelete` action after revalidation. Successful asynchronous sends
-  may return no sent-item identity;
+  may return no sent-item identity. Sending an existing saved draft is
+  unavailable because Graph cannot make its change key an atomic precondition
+  of the send action;
 - JMAP exposes incremental state and strong state preconditions where the
   server supports them; a missing Submission capability blocks send while
   save-only drafts and mail reads remain available, and a read-only account
-  reports every write unavailable;
+  reports every write unavailable. Its submission state is separate from the
+  reviewed email state, so exact-version saved-draft send is unavailable;
 - IMAP/SMTP saves accepted submissions to the discovered Sent mailbox and
   returns the appended message identity. It fails before SMTP when no Sent
   mailbox exists. Message move uses native MOVE or a targeted UIDPLUS
   copy/delete/UID-EXPUNGE fallback; permanent delete requires UIDPLUS. Any
   failure after APPEND, STORE, COPY, MOVE, or deleted marking requires remote
-  reconciliation;
+  reconciliation. Exact saved-draft send additionally requires observed
+  Drafts and Sent mailboxes plus UIDPLUS: it submits the immutable reviewed UID
+  bytes once, confirms the Sent copy, and removes only that draft UID;
 - Outlook Web supports explicit shared/delegated mailbox routing only when the
-  signed-in user already has that permission.
+  signed-in user already has that permission. Its exact saved-draft send binds
+  both ItemId and ChangeKey to Exchange SendItem, which performs the native
+  Drafts-to-Sent transition.
 
 ## Calendar
 

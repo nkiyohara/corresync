@@ -82,6 +82,8 @@ type fakeBackend struct {
 	draftAccess          application.MailDraftAccess
 	sendInput            application.MailSendInput
 	sendAccess           application.MailSendAccess
+	sendDraftInput       application.MailDraftSendInput
+	sendDraftAccess      application.MailDraftSendAccess
 	moveInput            application.MailMoveInput
 	moveAccess           application.MailMoveAccess
 	readStateInput       application.MailReadStateInput
@@ -470,6 +472,26 @@ func (backend *fakeBackend) CommitMailSend(
 	return backend.sendAccess, backend.err
 }
 
+func (backend *fakeBackend) SendMailDraft(
+	_ context.Context,
+	input application.MailDraftSendInput,
+	caller domain.Caller,
+) (application.MailDraftSendAccess, error) {
+	backend.sendDraftInput = input
+	backend.caller = caller
+	return backend.sendDraftAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitMailSendDraft(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MailDraftSendAccess, error) {
+	backend.approvalToken = token
+	backend.caller = caller
+	return backend.sendDraftAccess, backend.err
+}
+
 func (backend *fakeBackend) MoveMail(
 	_ context.Context,
 	input application.MailMoveInput,
@@ -557,7 +579,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 43 || mailTool == nil {
+	if len(tools.Tools) != 45 || mailTool == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
@@ -1281,6 +1303,49 @@ func TestMailSendToolsRequireSeparateExternalCommit(t *testing.T) {
 	})
 	if err != nil || result.IsError || backend.approvalToken != "opv1_synthetic" {
 		t.Fatalf("mail_send_commit failed: result=%+v token=%q error=%v", result, backend.approvalToken, err)
+	}
+}
+
+func TestMailSendDraftToolsBindExactIdentityAndSeparateCommit(t *testing.T) {
+	t.Parallel()
+	backend := &fakeBackend{sendDraftAccess: application.MailDraftSendAccess{
+		Status: "approval_required",
+	}}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientSession := connectTestClient(t, server)
+	tools, err := clientSession.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"mail_send_draft", "mail_send_draft_commit"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil || tool.Annotations.ReadOnlyHint ||
+			tool.Annotations.DestructiveHint == nil || *tool.Annotations.DestructiveHint {
+			t.Fatalf("unsafe saved draft send tool %q: %+v", name, tool)
+		}
+	}
+	result, err := clientSession.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "mail_send_draft",
+		Arguments: map[string]any{
+			"draftId": "draft-1", "draftChangeKey": "change-1",
+		},
+	})
+	if err != nil || result.IsError || backend.sendDraftInput.Account != "work" ||
+		backend.sendDraftInput.DraftID != "draft-1" ||
+		backend.sendDraftInput.DraftChangeKey != "change-1" {
+		t.Fatalf("mail_send_draft failed: result=%+v input=%+v error=%v", result, backend.sendDraftInput, err)
+	}
+	result, err = clientSession.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "mail_send_draft_commit",
+		Arguments: map[string]any{
+			"token": "opv1_synthetic", // gitleaks:allow -- synthetic fixture
+		},
+	})
+	if err != nil || result.IsError || backend.approvalToken != "opv1_synthetic" {
+		t.Fatalf("mail_send_draft_commit failed: result=%+v token=%q error=%v", result, backend.approvalToken, err)
 	}
 }
 

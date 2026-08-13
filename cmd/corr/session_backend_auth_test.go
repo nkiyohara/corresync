@@ -268,9 +268,10 @@ func TestJMAPCapabilityReportPreservesReadAccessAndNamesWriteDegradation(
 		capabilities.AttachmentWrites {
 		t.Fatalf("capabilities = %+v", capabilities)
 	}
-	if len(degradations) != 2 ||
-		degradations[0].Feature != "mail.write" ||
-		degradations[1].Feature != "mail.send" {
+	if len(degradations) != 3 ||
+		degradations[0].Feature != "mail.send_draft" ||
+		degradations[1].Feature != "mail.write" ||
+		degradations[2].Feature != "mail.send" {
 		t.Fatalf("degradations = %+v", degradations)
 	}
 }
@@ -737,6 +738,7 @@ func TestMergeSessionAccountsPreservesServiceSpecificCapabilities(t *testing.T) 
 			mail: mail,
 			capabilities: domain.Capabilities{
 				Mail: true, Folders: true, AttachmentReads: true,
+				DraftSend: true,
 			},
 			captured: time.Unix(1, 0),
 		},
@@ -751,8 +753,18 @@ func TestMergeSessionAccountsPreservesServiceSpecificCapabilities(t *testing.T) 
 	if merged.mail != mail || merged.calendar != calendar ||
 		!merged.capabilities.Mail || !merged.capabilities.Calendar ||
 		!merged.capabilities.Folders || !merged.capabilities.AttachmentReads ||
+		!merged.capabilities.DraftSend ||
 		!merged.captured.Equal(time.Unix(2, 0)) {
 		t.Fatalf("mergeSessionAccounts() = %#v", merged)
+	}
+}
+
+func TestOutlookWebCapabilitiesAdvertiseExactSavedDraftSendForMail(t *testing.T) {
+	t.Parallel()
+	configuration := config.OutlookDefault()
+	capabilities := outlookWebCapabilities(configuration.Accounts["work"])
+	if !capabilities.Mail || !capabilities.DraftSend {
+		t.Fatalf("outlookWebCapabilities() = %#v", capabilities)
 	}
 }
 

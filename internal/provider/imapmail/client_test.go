@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
 	"slices"
 	"strconv"
 	"strings"
@@ -129,6 +130,10 @@ type standardsFixture struct {
 }
 
 func newStandardsFixture(t *testing.T) standardsFixture {
+	return newStandardsFixtureWithUIDPlus(t, false)
+}
+
+func newStandardsFixtureWithUIDPlus(t *testing.T, uidPlus bool) standardsFixture {
 	t.Helper()
 	serverTLS, clientTLS := syntheticTLS(t)
 
@@ -151,6 +156,9 @@ func newStandardsFixture(t *testing.T) standardsFixture {
 		t.Fatal(err)
 	}
 	imapService := imapserver.New(imapBackend)
+	if uidPlus {
+		imapService.Enable(syntheticUIDPlusExtension{})
+	}
 	imapService.EnableAuth(
 		xoauth2Mechanism,
 		func(connection imapserver.Conn) sasl.Server {
@@ -210,6 +218,87 @@ func newStandardsFixture(t *testing.T) standardsFixture {
 			)
 		},
 	}
+}
+
+type syntheticUIDPlusExtension struct{}
+
+func (syntheticUIDPlusExtension) Capabilities(imapserver.Conn) []string {
+	return []string{"UIDPLUS"}
+}
+
+func (syntheticUIDPlusExtension) Command(name string) imapserver.HandlerFactory {
+	if name != "EXPUNGE" {
+		return nil
+	}
+	return func() imapserver.Handler { return new(syntheticUIDExpunge) }
+}
+
+type syntheticUIDExpunge struct {
+	set *imap.SeqSet
+}
+
+func (command *syntheticUIDExpunge) Parse(fields []interface{}) error {
+	if len(fields) == 0 {
+		return nil
+	}
+	if len(fields) != 1 {
+		return errors.New("synthetic UID EXPUNGE has an invalid argument count")
+	}
+	raw, ok := fields[0].(string)
+	if !ok {
+		return errors.New("synthetic UID EXPUNGE has an invalid sequence set")
+	}
+	set, err := imap.ParseSeqSet(raw)
+	if err != nil {
+		return err
+	}
+	command.set = set
+	return nil
+}
+
+func (command *syntheticUIDExpunge) Handle(connection imapserver.Conn) error {
+	if command.set != nil {
+		return errors.New("synthetic sequence set requires UID EXPUNGE")
+	}
+	if connection.Context().Mailbox == nil {
+		return errors.New("no synthetic mailbox is selected")
+	}
+	return connection.Context().Mailbox.Expunge()
+}
+
+func (command *syntheticUIDExpunge) UidHandle(connection imapserver.Conn) error {
+	mailbox := connection.Context().Mailbox
+	if mailbox == nil || command.set == nil {
+		return errors.New("synthetic UID EXPUNGE lacks a selected target")
+	}
+	criteria := imap.NewSearchCriteria()
+	criteria.WithFlags = []string{imap.DeletedFlag}
+	deleted, err := mailbox.SearchMessages(true, criteria)
+	if err != nil {
+		return err
+	}
+	preserved := new(imap.SeqSet)
+	for _, uid := range deleted {
+		if !command.set.Contains(uid) {
+			preserved.AddNum(uid)
+		}
+	}
+	if len(preserved.Set) != 0 {
+		if err := mailbox.UpdateMessagesFlags(
+			true, preserved, imap.RemoveFlags, []string{imap.DeletedFlag},
+		); err != nil {
+			return err
+		}
+	}
+	if err := mailbox.Expunge(); err != nil {
+		return err
+	}
+	if len(preserved.Set) != 0 {
+		return mailbox.UpdateMessagesFlags(
+			true, preserved, imap.AddFlags, []string{imap.DeletedFlag},
+		)
+	}
+	return nil
 }
 
 type syntheticXOAuth2Server struct {
@@ -361,6 +450,133 @@ func TestClientConfirmsSMTPStoredSentCopyWithoutAppendingDuplicate(t *testing.T)
 		page.Messages[0].ID != sent.ID ||
 		page.Messages[0].Subject != "Server-stored submission" {
 		t.Fatalf("server-stored Sent page = %#v, result = %#v", page, sent)
+	}
+}
+
+func TestClientSendsAndRemovesOneExactSavedDraft(t *testing.T) {
+	fixture := newStandardsFixtureWithUIDPlus(t, true)
+	client, err := New(t.Context(), Options{
+		IMAP: fixture.imap, SMTP: fixture.smtp,
+		Username: "username", Sender: "reader@example.invalid",
+		Password: []byte("password"), TLSConfig: fixture.tls,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	observed := client.ObservedCapabilities()
+	if !observed.UIDPlus || !observed.Drafts || !observed.Sent {
+		t.Fatalf("observed capabilities = %#v", observed)
+	}
+	draft, err := client.CreateMailDraft(t.Context(), application.MailDraftInput{
+		Account: "work",
+		To:      []string{"to@example.invalid"},
+		CC:      []string{"cc@example.invalid"},
+		BCC:     []string{"bcc@example.invalid"},
+		Subject: "Reviewed saved draft",
+		Body:    "Send these exact saved bytes.",
+		Attachments: []application.MailFileAttachment{{
+			Name: "fixture.txt", ContentType: "text/plain", Content: []byte("fixture"),
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := application.MailDraftSendInput{
+		Account: "work", DraftID: draft.ID, DraftChangeKey: draft.ChangeKey,
+	}
+	snapshot, err := client.GetMailDraftSnapshot(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshot.Validate(input, application.MaxMailRecipients); err != nil {
+		t.Fatalf("snapshot validation = %v; snapshot=%+v", err, snapshot)
+	}
+	if !slices.Equal(snapshot.To, []string{"to@example.invalid"}) ||
+		!slices.Equal(snapshot.CC, []string{"cc@example.invalid"}) ||
+		!slices.Equal(snapshot.BCC, []string{"bcc@example.invalid"}) ||
+		snapshot.Subject != "Reviewed saved draft" || len(snapshot.Attachments) != 1 {
+		t.Fatalf("snapshot = %+v", snapshot)
+	}
+	sent, err := client.SendMailDraft(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sent.ID == "" || sent.ChangeKey == "" {
+		t.Fatalf("sent result = %+v", sent)
+	}
+	drafts, err := client.ListMessages(t.Context(), application.MailListInput{
+		Folder: application.MailFolder{Kind: application.MailFolderDistinguished, ID: "drafts"},
+		Limit:  25,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(drafts.Messages) != 0 {
+		t.Fatalf("Drafts after send = %+v", drafts)
+	}
+	sentPage, err := client.ListMessages(t.Context(), application.MailListInput{
+		Folder: application.MailFolder{Kind: application.MailFolderDistinguished, ID: "sentitems"},
+		Limit:  25,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sentPage.Messages) != 1 || sentPage.Messages[0].ID != sent.ID {
+		t.Fatalf("Sent after send = %+v; result=%+v", sentPage, sent)
+	}
+	fixture.out.mu.Lock()
+	defer fixture.out.mu.Unlock()
+	if len(fixture.out.messages) != 1 || len(fixture.out.recipients) != 1 ||
+		!slices.Equal(fixture.out.recipients[0], []string{
+			"to@example.invalid", "cc@example.invalid", "bcc@example.invalid",
+		}) || bytes.Contains(fixture.out.messages[0], []byte("\r\nBcc:")) ||
+		!bytes.Contains(fixture.out.messages[0], []byte("Reviewed saved draft")) ||
+		!bytes.Contains(fixture.out.messages[0], []byte("fixture.txt")) {
+		t.Fatalf(
+			"SMTP capture messages=%q recipients=%#v",
+			fixture.out.messages,
+			fixture.out.recipients,
+		)
+	}
+}
+
+func TestClientRejectsExactDraftSendWithoutSafeRemovalBeforeSMTP(t *testing.T) {
+	fixture := newStandardsFixture(t)
+	client, err := New(t.Context(), Options{
+		IMAP: fixture.imap, SMTP: fixture.smtp,
+		Username: "username", Sender: "reader@example.invalid",
+		Password: []byte("password"), TLSConfig: fixture.tls,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	input := application.MailDraftSendInput{
+		Account: "work", DraftID: "not-read", DraftChangeKey: "not-read",
+	}
+	_, err = client.GetMailDraftSnapshot(t.Context(), input)
+	if !errors.Is(err, application.ErrExactDraftSendUnavailable) {
+		t.Fatalf("GetMailDraftSnapshot() error = %v", err)
+	}
+	_, err = client.SendMailDraft(t.Context(), input)
+	if !errors.Is(err, application.ErrExactDraftSendUnavailable) {
+		t.Fatalf("SendMailDraft() error = %v", err)
+	}
+	fixture.out.mu.Lock()
+	defer fixture.out.mu.Unlock()
+	if len(fixture.out.messages) != 0 {
+		t.Fatalf("SMTP was attempted before capability rejection: %q", fixture.out.messages)
+	}
+}
+
+func TestDraftHeaderAddressesRejectDuplicateRecipientFields(t *testing.T) {
+	t.Parallel()
+	_, err := draftHeaderAddresses(mail.Header{
+		"To": []string{"first@example.invalid", "second@example.invalid"},
+	}, "To")
+	if err == nil {
+		t.Fatal("draftHeaderAddresses() accepted duplicate To headers")
 	}
 }
 
@@ -721,7 +937,7 @@ func TestBuildMessageRejectsInjectedReferenceHeaders(t *testing.T) {
 			InReplyTo: malicious,
 			References: "<parent@example.invalid> " +
 				malicious,
-		})
+		}, false)
 		if err == nil {
 			t.Fatalf("malicious message ID %q was accepted", malicious)
 		}
