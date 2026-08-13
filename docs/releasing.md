@@ -53,13 +53,15 @@ The expected release inventory is:
 - six OS/architecture archives and one tagged source archive;
 - six native Linux packages;
 - one platform-universal MCPB containing the six verified primary binaries;
+- one MCP Registry `server.json` bound to the MCPB's exact version and SHA-256;
 - SPDX JSON and CycloneDX JSON SBOMs for every archive, package, and MCPB;
 - one SHA-256 checksum manifest;
 - license and third-party license material;
 - README, changelog, security policy, installation/MCP guides, and migration
   guide;
-- `corr(1)`, Bash/Zsh/Fish completion, Agent Skill, plugin manifests, and
-  marketplace catalogs;
+- `corr(1)`, Bash/Zsh/Fish completion, Agent Skill, generated Codex/OpenAI and
+  Claude/Copilot/VS Code plugins, Gemini extension, Kiro Power, config-only
+  integration metadata, and marketplace catalogs;
 - source-building Homebrew plus Scoop and WinGet manifests.
 
 During the finite v0.8–v0.9 command transition, binary archives and packages
@@ -67,11 +69,15 @@ also contain `corresync`, built from exactly the same package, source commit,
 version metadata, and flags as `corr`. There is no separate compatibility
 manual or completion.
 
-The verifier rejects missing/extra inventory, unsafe archive paths, wrong
+The release hook renders every integration package from the canonical bundle
+specification using the exact stable or preview tag. Checked-in manifests are
+reviewable source snapshots, not the release version input. The verifier
+rejects missing/extra inventory, unsafe archive paths, wrong
 binary names, MCPB path or launcher drift, a bundled binary that differs from
-its verified release input, asset names GitHub could rewrite, mismatched
-versions, non-reproducible metadata, missing licenses, incomplete SBOMs, and
-stale documentation/package payloads.
+its verified release input, a registry manifest not bound to that MCPB hash,
+asset names GitHub could rewrite, mismatched versions, non-reproducible
+metadata, missing licenses, incomplete SBOMs, and stale
+documentation/package payloads.
 
 ## Publish a version
 

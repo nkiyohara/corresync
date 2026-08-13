@@ -124,10 +124,13 @@ instead of replacing the managed executable.
 
 Every archive includes the license, security policy, changelog, essential
 guides, `corr(1)`, Bash/Zsh/Fish completion, plugin metadata, the Agent Skill,
-and required third-party licenses. The MCPB contains the exact same six primary
-release binaries, chooses only the current OS/architecture from a fixed local
-launcher, and includes the project and third-party licenses. Each archive,
-Linux package, and MCPB has SPDX JSON and CycloneDX JSON SBOMs.
+Gemini CLI extension, Kiro Power, config-only integration metadata, and
+required third-party licenses. Native agent packages are thin and invoke the
+installed `corr`; they contain no account, credential, or mailbox data. The
+MCPB is visibly separate and self-contained: it contains the exact same six
+primary release binaries, chooses only the current OS/architecture from a fixed
+local launcher, and includes the project and third-party licenses. Each
+archive, Linux package, and MCPB has SPDX JSON and CycloneDX JSON SBOMs.
 
 ## Claude Desktop MCP Bundle
 

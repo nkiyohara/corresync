@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "corresync": {
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "command": "corr"
+    }
+  }
+}

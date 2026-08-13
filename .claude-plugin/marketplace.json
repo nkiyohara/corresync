@@ -1,25 +1,30 @@
 {
+  "description": "Natural-language discovery for the guarded local Corresync MCP server.",
   "name": "corresync",
   "owner": {
     "name": "Corresync contributors"
   },
-  "description": "Natural-language discovery for the guarded local Corresync MCP server.",
-  "version": "0.7.0",
   "plugins": [
     {
-      "name": "corresync",
-      "displayName": "Corresync — Mail & Calendar",
-      "source": "./plugins/corresync",
-      "description": "Recognize mail and calendar requests and route them to Corresync.",
-      "version": "0.7.0",
       "author": {
         "name": "Corresync contributors"
       },
-      "homepage": "https://corresync.org/",
-      "repository": "https://github.com/nkiyohara/corresync",
-      "license": "Apache-2.0",
       "category": "productivity",
-      "tags": ["outlook", "email", "calendar", "mcp"]
+      "description": "Recognize mail and calendar requests and route them to Corresync.",
+      "displayName": "Corresync — Mail \u0026 Calendar",
+      "homepage": "https://corresync.org/",
+      "license": "Apache-2.0",
+      "name": "corresync",
+      "repository": "https://github.com/nkiyohara/corresync",
+      "source": "./plugins/corresync",
+      "tags": [
+        "outlook",
+        "email",
+        "calendar",
+        "mcp"
+      ],
+      "version": "0.8.6-rc.6"
     }
-  ]
+  ],
+  "version": "0.8.6-rc.6"
 }

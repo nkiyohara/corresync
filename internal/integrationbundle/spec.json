@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "sourceVersion": "0.8.6-rc.6",
+  "id": "corresync",
+  "registryName": "io.github.nkiyohara/corresync",
+  "displayName": "Corresync — Mail & Calendar",
+  "title": "Corresync",
+  "description": "Local-first MCP for provider-neutral mail and calendars with isolated accounts and guarded writes.",
+  "shortDescription": "Use guarded local mail and calendar tools",
+  "longDescription": "Corresync brings isolated Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts into one guarded local MCP server. Gmail and Google Calendar code is included but disabled pending production OAuth approval. Corresync runs on your device over stdio, keeps authentication in an explicit local browser or approved credential store, and requires preview-before-commit writes.",
+  "author": "Corresync contributors",
+  "repository": "https://github.com/nkiyohara/corresync",
+  "repositoryGit": "https://github.com/nkiyohara/corresync.git",
+  "homepage": "https://corresync.org/",
+  "documentation": "https://github.com/nkiyohara/corresync/blob/main/docs/mcp.md",
+  "privacy": "https://corresync.org/privacy.html",
+  "support": "https://github.com/nkiyohara/corresync/issues",
+  "license": "Apache-2.0",
+  "category": "Productivity",
+  "brandColor": "#3F7AD6",
+  "keywords": [
+    "email",
+    "calendar",
+    "gmail",
+    "outlook",
+    "mcp",
+    "local-first",
+    "privacy"
+  ],
+  "launch": {
+    "command": "corr",
+    "args": ["mcp", "serve"],
+    "transport": "stdio"
+  },
+  "requirements": [
+    "Install the matching Corresync CLI release and make corr available on PATH.",
+    "Configure and authenticate each account explicitly in a local terminal before use."
+  ],
+  "effects": {
+    "readsPrivateData": true,
+    "writesRequirePreviewCommit": true,
+    "autoApproval": false,
+    "networkScope": "Only providers explicitly configured and authenticated by the signed-in user.",
+    "secretPolicy": "The bundle contains no account, credential, token, cookie, or private configuration data."
+  },
+  "surfaces": [
+    {
+      "id": "codex",
+      "package": "plugin",
+      "mode": "thin",
+      "skill": true,
+      "localMcp": true,
+      "limitation": "Local Codex sessions only; hosted ChatGPT cannot reach this stdio server."
+    },
+    {
+      "id": "claude-code",
+      "package": "shared-claude-plugin",
+      "mode": "thin",
+      "skill": true,
+      "localMcp": true,
+      "limitation": "Claude Code, GitHub Copilot CLI, and VS Code must run where corr is installed."
+    },
+    {
+      "id": "gemini-cli",
+      "package": "extension",
+      "mode": "thin",
+      "skill": true,
+      "localMcp": true,
+      "limitation": "Local Gemini CLI only; the extension does not bundle corr."
+    },
+    {
+      "id": "kiro",
+      "package": "power",
+      "mode": "thin",
+      "skill": true,
+      "localMcp": true,
+      "limitation": "Local Kiro IDE only; Kiro Web and remote sandboxes are unsupported."
+    },
+    {
+      "id": "claude-desktop",
+      "package": "mcpb",
+      "mode": "self-contained",
+      "skill": false,
+      "localMcp": true,
+      "limitation": "The MCPB contains release binaries but never contains configured accounts or authentication state."
+    }
+  ],
+  "configOnlyHosts": [
+    "cursor",
+    "windsurf",
+    "opencode",
+    "cline",
+    "roo-code",
+    "zed",
+    "goose",
+    "qwen-code",
+    "qoder",
+    "kimi-code"
+  ]
+}

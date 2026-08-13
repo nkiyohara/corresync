@@ -6,6 +6,15 @@ before:
   hooks:
     - go mod vendor
     - >-
+      go run ./tools/integrationbundle
+      --output-root .release/integrationbundle
+      --clean-output
+      --version {{ .Version }}
+    - >-
+      go run ./tools/normalizefiles
+      --root .release/integrationbundle
+      --time {{ .CommitDate }}
+    - >-
       go-licenses check ./cmd/corr
       --ignore github.com/nkiyohara/corresync
     - >-
@@ -114,19 +123,83 @@ archives:
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: plugins/corresync/README.md
+      - src: .release/integrationbundle/plugins/corresync/README.md
+        dst: plugins/corresync/README.md
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: plugins/corresync/**/*
+      - src: .release/integrationbundle/plugins/corresync/.mcp.json
+        dst: plugins/corresync/.mcp.json
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: .agents/plugins/marketplace.json
+      - src: .release/integrationbundle/plugins/corresync/.claude-plugin/plugin.json
+        dst: plugins/corresync/.claude-plugin/plugin.json
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: .claude-plugin/marketplace.json
+      - src: .release/integrationbundle/plugins/corresync/.codex-plugin/plugin.json
+        dst: plugins/corresync/.codex-plugin/plugin.json
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/plugins/corresync/assets/icon.svg
+        dst: plugins/corresync/assets/icon.svg
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/plugins/corresync/skills/corresync/SKILL.md
+        dst: plugins/corresync/skills/corresync/SKILL.md
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/plugins/corresync/skills/corresync/agents/openai.yaml
+        dst: plugins/corresync/skills/corresync/agents/openai.yaml
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/.agents/plugins/marketplace.json
+        dst: .agents/plugins/marketplace.json
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/.claude-plugin/marketplace.json
+        dst: .claude-plugin/marketplace.json
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/integrations/config-hosts.json
+        dst: integrations/config-hosts.json
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/integrations/gemini-cli/corresync/gemini-extension.json
+        dst: integrations/gemini-cli/corresync/gemini-extension.json
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/integrations/gemini-cli/corresync/skills/corresync/SKILL.md
+        dst: integrations/gemini-cli/corresync/skills/corresync/SKILL.md
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/integrations/kiro/corresync/POWER.md
+        dst: integrations/kiro/corresync/POWER.md
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/integrations/kiro/corresync/mcp.json
+        dst: integrations/kiro/corresync/mcp.json
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/integrations/kiro/corresync/steering/corresync.md
+        dst: integrations/kiro/corresync/steering/corresync.md
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/docs/generated/integration-bundles.md
+        dst: docs/generated/integration-bundles.md
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
@@ -212,18 +285,24 @@ nfpms:
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: plugins/corresync/
+      - src: .release/integrationbundle/plugins/corresync/
         dst: /usr/share/corresync/plugins/corresync
         type: tree
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: .agents/plugins/marketplace.json
+      - src: .release/integrationbundle/integrations/
+        dst: /usr/share/corresync/integrations
+        type: tree
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/.agents/plugins/marketplace.json
         dst: /usr/share/corresync/.agents/plugins/marketplace.json
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: .claude-plugin/marketplace.json
+      - src: .release/integrationbundle/.claude-plugin/marketplace.json
         dst: /usr/share/corresync/.claude-plugin/marketplace.json
         file_info:
           mode: 0644

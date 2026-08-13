@@ -4,6 +4,9 @@ set: [errexit, nounset, pipefail]
 
 vars:
   BINARY: bin/corr
+  CLAUDE_CODE_VERSION: 2.1.224
+  SKILLS_REF_SOURCE: >-
+    git+https://github.com/agentskills/agentskills.git@69ef37e9424c0a7ea9dd2293b559e43ec8176379#subdirectory=skills-ref
 
 tasks:
   default:
@@ -44,7 +47,7 @@ tasks:
   docs:
     desc: Lint Markdown documentation
     cmds:
-      - markdownlint-cli2 "**/*.md" "#.git" "#.release" "#vendor"
+      - markdownlint-cli2 "**/*.md" "#.git" "#.release" "#dist" "#vendor"
 
   site:
     desc: Verify Pages metadata, structured data, links, assets, and sitemap
@@ -65,14 +68,20 @@ tasks:
       - node --test web/discovery-worker/test/*.test.mjs site/check.test.cjs
 
   integrations:generate:
-    desc: Generate the agent-host support matrix
+    desc: Generate agent-host metadata and native integration bundles
     cmds:
       - go run ./tools/agenthostcatalog
+      - go run ./tools/integrationbundle
 
   integrations:check:
-    desc: Verify the declarative agent-host catalog and generated support matrix
+    desc: Verify agent-host metadata, native bundles, and the portable Skill
     cmds:
       - go run ./tools/agenthostcatalog --check
+      - go run ./tools/integrationbundle --check
+      - uvx --from '{{.SKILLS_REF_SOURCE}}' skills-ref validate plugins/corresync/skills/corresync
+      - >-
+        npx --yes @anthropic-ai/claude-code@{{.CLAUDE_CODE_VERSION}}
+        plugin validate plugins/corresync --strict
 
   vet:
     desc: Run the Go static analyzer

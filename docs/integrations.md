@@ -54,6 +54,20 @@ CI fails if it drifts.
 
 [Generated agent-host catalog](generated/agent-hosts.md)
 
+Native package identity, the shared local stdio launch contract, thin versus
+self-contained distribution, and config-only metadata are generated from a
+separate reviewed bundle specification:
+
+[Generated integration bundles](generated/integration-bundles.md)
+
+`internal/integrationbundle/spec.json` is canonical public metadata. The
+Codex/OpenAI and Claude/Copilot/VS Code manifests, `.mcp.json`, Gemini
+extension, Kiro Power, config-only host metadata, and this matrix are generated
+source snapshots. The Agent Skill remains the canonical workflow guidance.
+Release builds render the exact tag version into a fresh staging tree; the
+platform-universal MCPB and release `server.json` registry manifest use the
+same identity and version source.
+
 Existing MCP setup remains backward compatible:
 
 ```console

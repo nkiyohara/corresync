@@ -103,22 +103,36 @@ compatibility follow the
 
 ## Agent Skill and plugins
 
-The repository ships a portable Agent Skill at
-`plugins/corresync/skills/corresync`, plus Codex and Claude Code plugin
-manifests.
+The repository ships one portable Agent Skill and generated, combined local
+MCP + Skill packages:
 
-Codex can install it from the repository using `$skill-installer`. Claude Code
-can install the plugin:
+- a Codex/OpenAI plugin at `plugins/corresync`;
+- the same tree in Claude Code's plugin format, also consumable by GitHub
+  Copilot CLI and VS Code where their documented compatibility applies;
+- a Gemini CLI extension under `integrations/gemini-cli`;
+- a Kiro Power under `integrations/kiro`;
+- neutral config/Skill metadata for config-only lifecycle adapters.
+
+Claude Code can install the shared plugin from this repository:
 
 ```console
 claude plugin marketplace add nkiyohara/corresync
 claude plugin install corresync@corresync
 ```
 
-Other compatible clients may install the reviewed Skill directory according to
-their own documentation. Restart the client afterward. The Skill improves
-task discovery and workflow guidance; it cannot weaken Corresync's server-side
-policy.
+The thin packages declare `corr mcp serve` over stdio, so a separate MCP
+registration is unnecessary when a host installs the complete native package.
+They require the matching CLI on `PATH`; they do not bundle an executable,
+account, credential, or private configuration. Config-only setups can continue
+to use `corr mcp setup HOST`. Restart the client afterward.
+
+These packages support local sessions only. They do not claim that hosted
+ChatGPT, Kiro Web, or a remote sandbox can reach local Corresync state. The
+Skill improves task discovery and workflow guidance but cannot weaken
+server-enforced authentication or preview/commit policy.
+
+The generated package and limitation matrix is in
+[Integration bundles](generated/integration-bundles.md).
 
 ## Tool catalog
 

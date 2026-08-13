@@ -4,6 +4,7 @@ package main
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
@@ -20,12 +21,15 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/nkiyohara/corresync/internal/integrationbundle"
 )
 
 const (
 	expectedArchives   = 6
 	expectedBinaries   = 12
 	expectedMCPBundles = 1
+	expectedRegistries = 1
 	expectedPackages   = 6
 	expectedSBOMs      = 28
 	expectedSources    = 1
@@ -35,6 +39,10 @@ const (
 
 var mcpbNamePattern = regexp.MustCompile(
 	`^corresync_([0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?)\.mcpb$`,
+)
+
+var archiveNamePattern = regexp.MustCompile(
+	`^corresync_([0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?)_(?:darwin|linux|windows)_(?:amd64|arm64)\.(?:tar\.gz|zip)$`,
 )
 
 type artifact struct {
@@ -69,6 +77,13 @@ type mcpbManifest struct {
 	Compatibility struct {
 		Platforms []string `json:"platforms"`
 	} `json:"compatibility"`
+}
+
+type registryManifest struct {
+	Version  string `json:"version"`
+	Packages []struct {
+		FileSHA256 string `json:"fileSha256"`
+	} `json:"packages"`
 }
 
 type scoopManifest struct {
@@ -167,6 +182,7 @@ func verifyChecksums(dist string) (map[string]string, error) {
 	}
 	expectedChecksums := expectedArchives +
 		expectedMCPBundles +
+		expectedRegistries +
 		expectedPackages +
 		expectedSBOMs +
 		expectedSources
@@ -229,6 +245,16 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 			); err != nil {
 				return err
 			}
+		case "Registry Manifest":
+			if item.Name != "server.json" {
+				return fmt.Errorf("registry manifest name is %q, want server.json", item.Name)
+			}
+			if hashes[item.Name] == "" {
+				return fmt.Errorf("registry manifest %q is absent from checksums", item.Name)
+			}
+			if err := verifyRegistryManifest(filepath.Join(dist, item.Name), hashes); err != nil {
+				return err
+			}
 		case "Linux Package":
 			extension := filepath.Ext(item.Name)
 			packageFormats[extension]++
@@ -258,14 +284,15 @@ func verifyInventory(dist string, artifacts []artifact, hashes map[string]string
 	}
 
 	wantCounts := map[string]int{
-		"Archive":       expectedArchives,
-		"Binary":        expectedBinaries,
-		"Checksum":      1,
-		"Linux Package": expectedPackages,
-		"MCP Bundle":    expectedMCPBundles,
-		"Metadata":      1,
-		"SBOM":          expectedSBOMs,
-		"Source":        expectedSources,
+		"Archive":           expectedArchives,
+		"Binary":            expectedBinaries,
+		"Checksum":          1,
+		"Linux Package":     expectedPackages,
+		"MCP Bundle":        expectedMCPBundles,
+		"Metadata":          1,
+		"Registry Manifest": expectedRegistries,
+		"SBOM":              expectedSBOMs,
+		"Source":            expectedSources,
 	}
 	for kind, want := range wantCounts {
 		if counts[kind] != want {
@@ -403,6 +430,7 @@ func packageMissingFiles(extra map[string]any) []string {
 		"/usr/share/doc/corresync/CHANGELOG.md":                 false,
 		"/usr/share/doc/corresync/third_party_licenses":         false,
 		"/usr/share/corresync/plugins/corresync":                false,
+		"/usr/share/corresync/integrations":                     false,
 		"/usr/share/corresync/.agents/plugins/marketplace.json": false,
 		"/usr/share/corresync/.claude-plugin/marketplace.json":  false,
 	}
@@ -542,6 +570,11 @@ func verifyCanonicalTimestamp(value any) error {
 }
 
 func verifyArchive(path, goos string) error {
+	match := archiveNamePattern.FindStringSubmatch(filepath.Base(path))
+	if len(match) != 2 {
+		return fmt.Errorf("archive name %q does not contain one SemVer version", filepath.Base(path))
+	}
+	version := match[1]
 	want := []string{
 		".agents/plugins/marketplace.json",
 		".claude-plugin/marketplace.json",
@@ -554,9 +587,17 @@ func verifyArchive(path, goos string) error {
 		"completions/corr.fish",
 		"docs/install.md",
 		"docs/mcp.md",
+		"docs/generated/integration-bundles.md",
+		"integrations/config-hosts.json",
+		"integrations/gemini-cli/corresync/gemini-extension.json",
+		"integrations/gemini-cli/corresync/skills/corresync/SKILL.md",
+		"integrations/kiro/corresync/POWER.md",
+		"integrations/kiro/corresync/mcp.json",
+		"integrations/kiro/corresync/steering/corresync.md",
 		"manpages/corr.1",
 		"plugins/corresync/.claude-plugin/plugin.json",
 		"plugins/corresync/.codex-plugin/plugin.json",
+		"plugins/corresync/.mcp.json",
 		"plugins/corresync/README.md",
 		"plugins/corresync/assets/icon.svg",
 		"plugins/corresync/skills/corresync/SKILL.md",
@@ -567,10 +608,10 @@ func verifyArchive(path, goos string) error {
 	}
 	if goos == "windows" {
 		want = append(want, "corr.exe", "corresync.exe")
-		return verifyZip(path, want)
+		return verifyZip(path, want, version)
 	}
 	want = append(want, "corr", "corresync")
-	return verifyTarGzip(path, want)
+	return verifyTarGzip(path, want, version)
 }
 
 func verifyMCPBundle(bundlePath string, binaryHashes map[string]string) error {
@@ -674,6 +715,27 @@ func verifyMCPBundle(bundlePath string, binaryHashes map[string]string) error {
 	}
 	if err := verifyMCPBManifest(manifestData, match[1]); err != nil {
 		return fmt.Errorf("MCP bundle %q: %w", name, err)
+	}
+	return nil
+}
+
+func verifyRegistryManifest(path string, hashes map[string]string) error {
+	data, err := readLocalFile(path)
+	if err != nil {
+		return fmt.Errorf("read MCP registry manifest: %w", err)
+	}
+	if err := integrationbundle.ValidateRegistryManifest(data); err != nil {
+		return fmt.Errorf("validate MCP registry manifest: %w", err)
+	}
+	var document registryManifest
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(&document); err != nil {
+		return fmt.Errorf("decode MCP registry manifest: %w", err)
+	}
+	item := document.Packages[0]
+	bundleName := "corresync_" + document.Version + ".mcpb"
+	if item.FileSHA256 != hashes[bundleName] {
+		return errors.New("MCP registry package does not bind the release MCPB over stdio")
 	}
 	return nil
 }
@@ -807,20 +869,31 @@ func equalStringLists(left, right []string) bool {
 	return slices.Equal(left, right)
 }
 
-func verifyZip(path string, want []string) error {
+func verifyZip(path string, want []string, version string) error {
 	archive, err := zip.OpenReader(path)
 	if err != nil {
 		return fmt.Errorf("open zip %q: %w", filepath.Base(path), err)
 	}
 	defer func() { _ = archive.Close() }()
 	names := make([]string, 0, len(archive.File))
+	versioned := make(map[string][]byte)
 	for _, file := range archive.File {
 		names = append(names, file.Name)
+		if isVersionedIntegration(file.Name) {
+			data, readErr := readZipEntry(file)
+			if readErr != nil {
+				return fmt.Errorf("read versioned integration %q: %w", file.Name, readErr)
+			}
+			versioned[file.Name] = data
+		}
+	}
+	if err := verifyIntegrationVersions(versioned, version); err != nil {
+		return fmt.Errorf("archive %q: %w", filepath.Base(path), err)
 	}
 	return requireReleaseFiles(filepath.Base(path), names, want)
 }
 
-func verifyTarGzip(path string, want []string) error {
+func verifyTarGzip(path string, want []string, version string) error {
 	file, err := openLocalFile(path)
 	if err != nil {
 		return fmt.Errorf("open tarball %q: %w", filepath.Base(path), err)
@@ -833,6 +906,7 @@ func verifyTarGzip(path string, want []string) error {
 	defer func() { _ = gzipReader.Close() }()
 	tarReader := tar.NewReader(gzipReader)
 	var names []string
+	versioned := make(map[string][]byte)
 	for {
 		header, err := tarReader.Next()
 		if errors.Is(err, io.EOF) {
@@ -842,8 +916,82 @@ func verifyTarGzip(path string, want []string) error {
 			return fmt.Errorf("read tarball %q: %w", filepath.Base(path), err)
 		}
 		names = append(names, header.Name)
+		if isVersionedIntegration(header.Name) {
+			const maximum = 256 * 1024
+			if header.Size < 0 || header.Size > maximum {
+				return fmt.Errorf("versioned integration %q exceeds %d bytes", header.Name, maximum)
+			}
+			data, readErr := io.ReadAll(io.LimitReader(tarReader, maximum+1))
+			if readErr != nil {
+				return fmt.Errorf("read versioned integration %q: %w", header.Name, readErr)
+			}
+			if int64(len(data)) != header.Size {
+				return fmt.Errorf("versioned integration %q size is %d, want %d", header.Name, len(data), header.Size)
+			}
+			versioned[header.Name] = data
+		}
+	}
+	if err := verifyIntegrationVersions(versioned, version); err != nil {
+		return fmt.Errorf("archive %q: %w", filepath.Base(path), err)
 	}
 	return requireReleaseFiles(filepath.Base(path), names, want)
+}
+
+func isVersionedIntegration(path string) bool {
+	switch path {
+	case ".claude-plugin/marketplace.json",
+		"docs/generated/integration-bundles.md",
+		"integrations/config-hosts.json",
+		"integrations/gemini-cli/corresync/gemini-extension.json",
+		"integrations/kiro/corresync/POWER.md",
+		"plugins/corresync/.claude-plugin/plugin.json",
+		"plugins/corresync/.codex-plugin/plugin.json":
+		return true
+	default:
+		return false
+	}
+}
+
+func verifyIntegrationVersions(files map[string][]byte, version string) error {
+	const claudeMarketplace = ".claude-plugin/marketplace.json"
+	for _, path := range []string{
+		claudeMarketplace,
+		"integrations/config-hosts.json",
+		"integrations/gemini-cli/corresync/gemini-extension.json",
+		"plugins/corresync/.claude-plugin/plugin.json",
+		"plugins/corresync/.codex-plugin/plugin.json",
+	} {
+		data := files[path]
+		if len(data) == 0 {
+			return fmt.Errorf("versioned integration %q is missing", path)
+		}
+		var document map[string]any
+		if err := json.Unmarshal(data, &document); err != nil {
+			return fmt.Errorf("decode versioned integration %q: %w", path, err)
+		}
+		if document["version"] != version {
+			return fmt.Errorf("integration %q version is %v, want %q", path, document["version"], version)
+		}
+		if path == claudeMarketplace {
+			plugins, ok := document["plugins"].([]any)
+			if !ok || len(plugins) != 1 {
+				return errors.New("claude marketplace must contain one plugin")
+			}
+			plugin, ok := plugins[0].(map[string]any)
+			if !ok || plugin["version"] != version {
+				return errors.New("claude marketplace plugin version does not match the release")
+			}
+		}
+	}
+	for path, marker := range map[string]string{
+		"docs/generated/integration-bundles.md": "Canonical source snapshot:\n\n`" + version + "`.",
+		"integrations/kiro/corresync/POWER.md":  "Version: " + version,
+	} {
+		if !bytes.Contains(files[path], []byte(marker)) {
+			return fmt.Errorf("integration %q does not contain release marker %q", path, marker)
+		}
+	}
+	return nil
 }
 
 func requireReleaseFiles(archive string, got, want []string) error {
@@ -991,7 +1139,11 @@ func verifySourceArchive(archivePath string) error {
 		"completions/_corr":                           false,
 		"completions/corr.fish":                       false,
 		"plugins/corresync/.codex-plugin/plugin.json": false,
+		"plugins/corresync/.mcp.json":                 false,
 		"plugins/corresync/skills/corresync/SKILL.md": false,
+		"integrations/config-hosts.json":              false,
+		"integrations/gemini-cli/corresync/gemini-extension.json": false,
+		"integrations/kiro/corresync/POWER.md":                    false,
 	}
 	var prefix string
 	tarReader := tar.NewReader(gzipReader)

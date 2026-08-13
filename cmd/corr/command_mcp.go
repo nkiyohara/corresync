@@ -14,6 +14,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/nkiyohara/corresync/internal/agenthost"
+	"github.com/nkiyohara/corresync/internal/integrationbundle"
 	"github.com/nkiyohara/corresync/internal/mcpserver"
 )
 
@@ -403,6 +404,7 @@ func resolveMCPClientConfig(app *runtime, name, executable string) (string, stri
 	if err != nil {
 		return "", "", nil, err
 	}
-	arguments := []string{"--config", configPath, "mcp", "serve"}
+	launch := integrationbundle.PortableLaunch()
+	arguments := append([]string{"--config", configPath}, launch.Args...)
 	return name, filepath.Clean(absoluteExecutable), arguments, nil
 }
