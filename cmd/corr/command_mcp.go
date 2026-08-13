@@ -13,6 +13,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/nkiyohara/corresync/internal/agenthost"
 	"github.com/nkiyohara/corresync/internal/mcpserver"
 )
 
@@ -221,9 +222,7 @@ func (command *mcpCodexSetupCommand) Run(app *runtime) error {
 	clientArguments := make([]string, 0, 5+len(arguments))
 	clientArguments = append(clientArguments, "mcp", "add", name, "--", executable)
 	clientArguments = append(clientArguments, arguments...)
-	return applyMCPSetup(app, mcpSetupClient{
-		Label: "Codex", Command: "codex", Verify: []string{"mcp", "get", name},
-	}, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDCodex, name, clientArguments, command.DryRun)
 }
 
 func (command *mcpClaudeCodeSetupCommand) Run(app *runtime) error {
@@ -234,9 +233,7 @@ func (command *mcpClaudeCodeSetupCommand) Run(app *runtime) error {
 	clientArguments := make([]string, 0, 7+len(arguments))
 	clientArguments = append(clientArguments, "mcp", "add", "--scope", command.Scope, name, "--", executable)
 	clientArguments = append(clientArguments, arguments...)
-	return applyMCPSetup(app, mcpSetupClient{
-		Label: "Claude Code", Command: "claude", Verify: []string{"mcp", "get", name},
-	}, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDClaudeCode, name, clientArguments, command.DryRun)
 }
 
 func (command *mcpGitHubCopilotSetupCommand) Run(app *runtime) error {
@@ -253,9 +250,7 @@ func (command *mcpGitHubCopilotSetupCommand) Run(app *runtime) error {
 		"--", executable,
 	)
 	clientArguments = append(clientArguments, arguments...)
-	return applyMCPSetup(app, mcpSetupClient{
-		Label: "GitHub Copilot CLI", Command: "copilot", Verify: []string{"mcp", "get", name},
-	}, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDGitHubCopilot, name, clientArguments, command.DryRun)
 }
 
 func (command *mcpGeminiCLISetupCommand) Run(app *runtime) error {
@@ -272,9 +267,7 @@ func (command *mcpGeminiCLISetupCommand) Run(app *runtime) error {
 		name, executable, "--",
 	)
 	clientArguments = append(clientArguments, arguments...)
-	return applyMCPSetup(app, mcpSetupClient{
-		Label: "Gemini CLI", Command: "gemini", Verify: []string{"mcp", "list"},
-	}, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDGeminiCLI, name, clientArguments, command.DryRun)
 }
 
 func (command *mcpQwenCodeSetupCommand) Run(app *runtime) error {
@@ -289,9 +282,7 @@ func (command *mcpQwenCodeSetupCommand) Run(app *runtime) error {
 		name, executable,
 	)
 	clientArguments = append(clientArguments, arguments...)
-	return applyMCPSetup(app, mcpSetupClient{
-		Label: "Qwen Code", Command: "qwen", Verify: []string{"mcp", "list"},
-	}, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDQwenCode, name, clientArguments, command.DryRun)
 }
 
 func (command *mcpQoderSetupCommand) Run(app *runtime) error {
@@ -302,9 +293,7 @@ func (command *mcpQoderSetupCommand) Run(app *runtime) error {
 	clientArguments := make([]string, 0, 7+len(arguments))
 	clientArguments = append(clientArguments, "mcp", "add", "-s", command.Scope, name, "--", executable)
 	clientArguments = append(clientArguments, arguments...)
-	return applyMCPSetup(app, mcpSetupClient{
-		Label: "Qoder", Command: "qodercli", Verify: []string{"mcp", "list"},
-	}, name, clientArguments, command.DryRun)
+	return applyCatalogMCPSetup(app, agenthost.IDQoder, name, clientArguments, command.DryRun)
 }
 
 func resolveMCPSetup(app *runtime, name, executable string) (string, string, []string, error) {
@@ -338,6 +327,26 @@ type mcpSetupClient struct {
 	Label   string
 	Command string
 	Verify  []string
+}
+
+func applyCatalogMCPSetup(
+	app *runtime,
+	hostID agenthost.ID,
+	name string,
+	arguments []string,
+	dryRun bool,
+) error {
+	host, ok := app.agentHosts.Lookup(string(hostID))
+	if !ok {
+		return fmt.Errorf("agent-host catalog is missing %q", hostID)
+	}
+	command, verify, ok := host.OfficialCLI(name)
+	if !ok {
+		return fmt.Errorf("agent host %q has no verified setup adapter", hostID)
+	}
+	return applyMCPSetup(app, mcpSetupClient{
+		Label: host.DisplayName, Command: command, Verify: verify,
+	}, name, arguments, dryRun)
 }
 
 func applyMCPSetup(app *runtime, client mcpSetupClient, name string, arguments []string, dryRun bool) error {

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/accountstore"
+	"github.com/nkiyohara/corresync/internal/agenthost"
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/buildinfo"
@@ -82,6 +83,8 @@ type runtime struct {
 	interactiveStdout func() bool
 	lookupEnv         func(string) (string, bool)
 	accountDiscoverer application.AccountDiscoverer
+	agentHosts        agenthost.Catalog
+	detectAgentHosts  func(context.Context, agenthost.Request) (agenthost.Report, error)
 	migrationOnce     sync.Once
 	migrationErr      error
 }
@@ -92,6 +95,7 @@ func newRuntime(
 	stdout, stderr io.Writer,
 	info buildinfo.Info,
 ) *runtime {
+	agentHosts := agenthost.DefaultCatalog()
 	app := &runtime{
 		context:    ctx,
 		configPath: configPath,
@@ -134,6 +138,21 @@ func newRuntime(
 		processID:         os.Getpid(),
 		lookupEnv:         os.LookupEnv,
 		accountDiscoverer: discovery.New(discovery.Options{}),
+		agentHosts:        agentHosts,
+	}
+	var detectorOnce sync.Once
+	var agentHostDetector *agenthost.Detector
+	var detectorErr error
+	app.detectAgentHosts = func(ctx context.Context, request agenthost.Request) (agenthost.Report, error) {
+		detectorOnce.Do(func() {
+			agentHostDetector, detectorErr = agenthost.NewDetector(agentHosts, agenthost.Options{
+				GOOS: info.OS, GOARCH: info.Arch, LookupEnv: app.lookupEnv,
+			})
+		})
+		if detectorErr != nil {
+			return agenthost.Report{}, fmt.Errorf("initialize local agent-host detection: %w", detectorErr)
+		}
+		return agentHostDetector.Detect(ctx, request)
 	}
 	app.checkUpdate = func(ctx context.Context) (updatecheck.Result, error) {
 		channel, err := app.updateChannel(ctx)

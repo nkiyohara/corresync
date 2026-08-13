@@ -5,6 +5,19 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Local agent-host catalog and detection
+
+- Add `corr integrations detect/list/show` with stable JSON, a typed catalog,
+  and content-free local/SSH/WSL evidence. Detection is read-only, bounded,
+  symlink-aware, cross-platform, and never executes an agent or reads its
+  configuration or conversations.
+- Distinguish installation evidence, connection inspection, support maturity,
+  MCP/Skill/native-package capabilities, and selected-but-missing state. Render
+  the technical support matrix from the same catalog and fail CI on drift.
+- Route existing Codex, Claude Code, GitHub Copilot CLI, Gemini CLI, Qwen Code,
+  and Qoder setup labels, official commands, adapter IDs, and verification argv
+  through the catalog without changing their command contracts.
+
 ### iCloud guided onboarding
 
 - Add a first-class `corr setup` preset that composes iCloud Mail and Calendar

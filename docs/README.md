@@ -13,6 +13,7 @@ installed binary, its matching release notes remain authoritative.
 | Understand browser, OAuth, keyring, or helper sign-in | [Authentication](authentication.md) |
 | Use terminal commands | [CLI guide](cli.md) |
 | Connect Codex, Claude Code, Copilot, or another MCP client | [MCP integration](mcp.md) |
+| Detect local agent hosts and compare integration surfaces | [Agent-host integrations](integrations.md) |
 | Compare exact provider actions and limits | [Feature matrix](features.md) |
 | Check what is synthetic versus live-observed | [Compatibility evidence](compatibility.md) |
 

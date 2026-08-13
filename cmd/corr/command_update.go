@@ -267,7 +267,7 @@ func shouldHandleAutomaticUpdate(arguments []string) bool {
 	}
 	command := rootCommand(arguments)
 	switch command {
-	case "", "completion", "config", "daemon", "doctor", "feedback", "mcp", "update":
+	case "", "completion", "config", "daemon", "doctor", "feedback", "integrations", "mcp", "update":
 		return false
 	default:
 		return !completionEnvironmentActive()

@@ -49,6 +49,11 @@ not appear in an already-running client session.
 
 ## Supported clients
 
+The complete generated surface and packaging matrix lives under
+[local agent-host integrations](integrations.md). `corr integrations detect`
+can identify several installed hosts without executing them or changing their
+configuration. Detection does not imply connection or support.
+
 <!-- markdownlint-disable MD013 -->
 | Client | Register | Verify |
 | --- | --- | --- |
@@ -62,6 +67,8 @@ not appear in an already-running client session.
 <!-- markdownlint-enable MD013 -->
 
 Setup resolves the running `corr` executable and config file to absolute paths.
+The existing setup commands take their client identity, display name, official
+executable, and verification command from the same typed agent-host catalog.
 The default client-side server name is `corresync`; override it with `--name`
 only when needed. Claude Code and Qoder support local/project/user scopes;
 Gemini CLI and Qwen Code support project/user scopes.

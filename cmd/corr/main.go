@@ -21,27 +21,28 @@ import (
 )
 
 type cli struct {
-	ConfigPath  string            `name:"config" type:"path" env:"CORRESYNC_CONFIG" help:"Path to config.toml."`
-	VersionFlag kong.VersionFlag  `name:"version" short:"V" help:"Print version information and quit."`
-	Version     versionCommand    `cmd:"" help:"Print version and build information."`
-	Setup       setupCommand      `cmd:"" help:"Discover and add an account without authenticating."`
-	Settings    settingsCommand   `cmd:"" help:"Change account names and everyday settings interactively."`
-	Config      configCommand     `cmd:"" help:"Inspect and script advanced configuration."`
-	Account     accountCommand    `cmd:"" help:"Discover and manage isolated accounts."`
-	Doctor      doctorCommand     `cmd:"" help:"Diagnose local setup and opt-in provider compatibility."`
-	Import      importCommand     `cmd:"" help:"Scan local exports into private read-only staging."`
-	Auth        authCommand       `cmd:"" help:"Inspect and manage interactive sessions."`
-	Login       loginCommand      `cmd:"" hidden:"" help:"Open the interactive provider sign-in."`
-	Mail        mailCommand       `cmd:"" help:"Read and manage mail."`
-	Calendar    calendarCommand   `cmd:"" help:"Read and manage calendar events."`
-	Agenda      agendaCommand     `cmd:"" help:"Read a normalized cross-account agenda."`
-	Monitor     monitorCommand    `cmd:"" help:"Configure account-scoped opt-in monitoring."`
-	Events      eventsCommand     `cmd:"" help:"Inspect and acknowledge the durable local event queue."`
-	Daemon      daemonCommand     `cmd:"" help:"Run and inspect the local session owner."`
-	MCP         mcpCommand        `cmd:"" help:"Expose guarded mail and calendar tools over MCP."`
-	Update      updateCommand     `cmd:"" help:"Install verified updates or show the package-manager command."`
-	Completion  completionCommand `cmd:"" help:"Generate or install shell completion."`
-	Feedback    feedbackCommand   `cmd:"" help:"Review privacy-preserving local diagnostics and choose any external action."`
+	ConfigPath   string              `name:"config" type:"path" env:"CORRESYNC_CONFIG" help:"Path to config.toml."`
+	VersionFlag  kong.VersionFlag    `name:"version" short:"V" help:"Print version information and quit."`
+	Version      versionCommand      `cmd:"" help:"Print version and build information."`
+	Setup        setupCommand        `cmd:"" help:"Discover and add an account without authenticating."`
+	Settings     settingsCommand     `cmd:"" help:"Change account names and everyday settings interactively."`
+	Config       configCommand       `cmd:"" help:"Inspect and script advanced configuration."`
+	Account      accountCommand      `cmd:"" help:"Discover and manage isolated accounts."`
+	Doctor       doctorCommand       `cmd:"" help:"Diagnose local setup and opt-in provider compatibility."`
+	Import       importCommand       `cmd:"" help:"Scan local exports into private read-only staging."`
+	Auth         authCommand         `cmd:"" help:"Inspect and manage interactive sessions."`
+	Login        loginCommand        `cmd:"" hidden:"" help:"Open the interactive provider sign-in."`
+	Mail         mailCommand         `cmd:"" help:"Read and manage mail."`
+	Calendar     calendarCommand     `cmd:"" help:"Read and manage calendar events."`
+	Agenda       agendaCommand       `cmd:"" help:"Read a normalized cross-account agenda."`
+	Monitor      monitorCommand      `cmd:"" help:"Configure account-scoped opt-in monitoring."`
+	Events       eventsCommand       `cmd:"" help:"Inspect and acknowledge the durable local event queue."`
+	Daemon       daemonCommand       `cmd:"" help:"Run and inspect the local session owner."`
+	Integrations integrationsCommand `cmd:"" help:"Detect and inspect local AI-agent hosts without changing them."`
+	MCP          mcpCommand          `cmd:"" help:"Expose guarded mail and calendar tools over MCP."`
+	Update       updateCommand       `cmd:"" help:"Install verified updates or show the package-manager command."`
+	Completion   completionCommand   `cmd:"" help:"Generate or install shell completion."`
+	Feedback     feedbackCommand     `cmd:"" help:"Review privacy-preserving local diagnostics and choose any external action."`
 }
 
 type versionCommand struct {

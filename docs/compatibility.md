@@ -25,6 +25,7 @@ authorized live observations.
 | Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
 | Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
 | Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
+| Local agent-host detection | Catalog validation; Unix/Windows/macOS path, manager, app, symlink, cache, timeout, cancellation, and secret-free JSON fixtures | Not run | Deterministic only; live-unobserved |
 | MCP clients | Native setup-plan and schema tests | Historical Codex/Claude notes, not commit-bound | Deterministic only; live-unobserved |
 | Distribution | Archive/package/SBOM/inventory verification in candidate and tag workflows | Tagged release workflow and published assets provide release-bound evidence | Provider/platform observations remain separate |
 <!-- markdownlint-enable MD013 -->

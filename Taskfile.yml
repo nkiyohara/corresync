@@ -64,6 +64,16 @@ tasks:
       - node --check site/check.js
       - node --test web/discovery-worker/test/*.test.mjs site/check.test.cjs
 
+  integrations:generate:
+    desc: Generate the agent-host support matrix
+    cmds:
+      - go run ./tools/agenthostcatalog
+
+  integrations:check:
+    desc: Verify the declarative agent-host catalog and generated support matrix
+    cmds:
+      - go run ./tools/agenthostcatalog --check
+
   vet:
     desc: Run the Go static analyzer
     cmds:
@@ -142,6 +152,7 @@ tasks:
       - task: docs
       - task: site
       - task: discovery:check
+      - task: integrations:check
       - task: vet
       - task: lint
       - task: test
