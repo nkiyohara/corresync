@@ -6,14 +6,14 @@
     <title>支援的郵件與行事曆服務 — Corresync</title>
     <meta
       name="description"
-      content="比較 Outlook、Microsoft 365、JMAP、IMAP/SMTP 和 CalDAV 的 Corresync 連線方式。Gmail 與 Google 行事曆等待 OAuth 審核。"
+      content="比較 Outlook、Microsoft 365、iCloud 郵件與行事曆、JMAP、IMAP/SMTP 和 CalDAV 的連線方式。Gmail 正等待 OAuth 審核。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="支援的郵件與行事曆服務 — Corresync">
     <meta
       property="og:description"
-      content="只用信箱網域檢查可用路徑、設定要求和明確限制。"
+      content="查看 iCloud 等目前可用路徑、設定要求，以及仍在等待審核的 Google 支援。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -30,7 +30,7 @@
     <meta name="twitter:title" content="支援的郵件與行事曆服務 — Corresync">
     <meta
       name="twitter:description"
-      content="查看目前可用路徑與等待審核的 Google 支援。"
+      content="查看 Outlook、iCloud、標準協定與等待審核的 Google 支援。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
@@ -217,6 +217,64 @@
               </div>
             </dl>
             <p class="route-foot">Graph 僅在明確選擇或已有授權時提供。</p>
+          </article>
+        </div>
+      </section>
+      <section id="icloud" aria-labelledby="icloud-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Apple iCloud</p>
+          <h2 id="icloud-title">在同一套引導中設定 iCloud 郵件與行事曆。</h2>
+          <p>
+            <code>corr setup</code>會辨識 Apple
+            公布的信箱位址類型，以及具備完整且已驗證服務記錄的 iCloud
+            自訂網域。它使用 Apple 官方 IMAP、SMTP 和 CalDAV
+            端點，並在新增帳號前顯示所有登入名稱與連線路徑供你確認。
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card accent-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">iC</span><div>
+                <p class="chip">現已支援 · 引導預設</p>
+                <h3>iCloud 郵件與行事曆</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>郵件</dt>
+                <dd>透過 IMAP 讀取和整理，透過 SMTP 撰寫和傳送</dd>
+              </div>
+              <div>
+                <dt>行事曆</dt>
+                <dd>透過 CalDAV 探索和讀取行事曆，並執行需確認的寫入</dd>
+              </div>
+              <div>
+                <dt>登入</dt>
+                <dd>在作業系統認證資料介面中直接輸入 Apple App 專用密碼</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              Corresync
+              只向系統提示介面傳遞固定服務名稱和經過確認的參照，絕不讀取密碼。系統會分別顯示郵件和行事曆最近一次認證狀態，且不讀取郵件內文或行程內容。
+            </p>
+          </article>
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">2F</span><div>
+                <p class="chip">Apple 帳號要求</p>
+                <h3>雙重認證</h3>
+              </div>
+            </header>
+            <p>
+              先啟用雙重認證，再到 Apple 帳號頁面建立 App
+              專用密碼。只有在經過確認的本機帳號新增完成後，而且你明確選擇開啟時，引導程式才會前往該頁面。
+            </p>
+            <p class="route-foot">
+              請參閱 Apple 官方的<a href="https://support.apple.com/zh-tw/102525"
+              >iCloud 郵件設定</a>和<a href="https://support.apple.com/zh-tw/102654"
+              >App
+                專用密碼說明</a>。此預設已通過合成契約測試；在記錄明確選擇加入的實機觀察前，仍標記為尚未實機觀察。
+            </p>
           </article>
         </div>
       </section>

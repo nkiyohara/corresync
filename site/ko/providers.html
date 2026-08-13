@@ -6,14 +6,14 @@
     <title>지원하는 메일·캘린더 서비스 — Corresync</title>
     <meta
       name="description"
-      content="Outlook, Microsoft 365, JMAP, IMAP/SMTP, CalDAV 연결 방식을 비교하고 도메인만으로 내 메일의 지원 여부를 확인하세요. Gmail은 OAuth 승인 대기 중입니다."
+      content="Outlook, Microsoft 365, iCloud Mail·캘린더, JMAP, IMAP/SMTP, CalDAV 연결 방식을 비교하세요. Gmail은 OAuth 승인 대기 중입니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="지원하는 메일·캘린더 서비스 — Corresync">
     <meta
       property="og:description"
-      content="공개 도메인 정보로 가능한 경로, 설정 요건, 명확한 한계를 확인합니다."
+      content="iCloud를 포함해 지금 사용할 수 있는 경로와 설정 요건, 승인 대기 중인 Google 지원을 확인합니다."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ko_KR">
@@ -30,7 +30,7 @@
     <meta name="twitter:title" content="Corresync 지원 서비스">
     <meta
       name="twitter:description"
-      content="지금 쓸 수 있는 경로와 승인 대기 중인 Google 지원을 확인하세요."
+      content="Outlook, iCloud, 표준 프로토콜과 승인 대기 중인 Google 지원을 확인하세요."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 로고와 영문 제품 소개">
@@ -230,6 +230,71 @@
             <p class="route-foot">
               Graph는 명시적으로 선택하거나 이미 권한을 부여한 경우에만
               사용합니다.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section id="icloud" aria-labelledby="icloud-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Apple iCloud</p>
+          <h2 id="icloud-title">
+            하나의 안내 흐름에서 iCloud Mail과 캘린더를 설정하세요.
+          </h2>
+          <p>
+            <code>corr setup</code>은 Apple이 문서화한 주소 계열과 서비스 레코드가
+            모두 검증된 iCloud 사용자 도메인을 인식합니다. Apple 공식 IMAP, SMTP,
+            CalDAV 엔드포인트를 제안하고 계정을 추가하기 전에 모든 로그인
+            이름과 경로를 검토할 수 있게 합니다.
+          </p>
+        </div>
+        <div class="route-grid two">
+          <article class="route-card accent-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">iC</span><div>
+                <p class="chip">현재 사용 가능 · 안내 프리셋</p>
+                <h3>iCloud Mail + 캘린더</h3>
+              </div>
+            </header>
+            <dl>
+              <div>
+                <dt>메일</dt>
+                <dd>IMAP 읽기와 정리, SMTP 작성과 전송</dd>
+              </div>
+              <div>
+                <dt>캘린더</dt>
+                <dd>CalDAV 캘린더 탐색과 읽기, 승인 후 쓰기</dd>
+              </div>
+              <div>
+                <dt>로그인</dt>
+                <dd>Apple 앱 암호를 운영체제 자격 증명 화면에 직접 입력</dd>
+              </div>
+            </dl>
+            <p class="route-foot">
+              Corresync는 고정된 서비스 이름과 검토한 참조만 시스템 화면에
+              전달하며 암호를 읽지 않습니다. Mail과 캘린더의 마지막 인증
+              상태는 메시지 본문이나 일정 내용을 읽지 않고 각각
+              표시됩니다.
+            </p>
+          </article>
+          <article class="route-card">
+            <header>
+              <span class="route-icon" aria-hidden="true">2F</span><div>
+                <p class="chip">Apple 계정 요구 사항</p>
+                <h3>이중 인증</h3>
+              </div>
+            </header>
+            <p>
+              이중 인증을 켠 뒤 Apple 계정 페이지에서 앱 암호를 만드세요.
+              안내 흐름은 검토한 로컬 계정을 추가한 후 사용자가 명시적으로
+              선택한 경우에만 그 페이지를 엽니다.
+            </p>
+            <p class="route-foot">
+              Apple 공식 <a href="https://support.apple.com/ko-kr/102525"
+              >iCloud Mail 설정</a>과
+              <a href="https://support.apple.com/ko-kr/102654">앱 암호 안내</a>를
+              확인하세요. 이 프리셋은 합성 계약 테스트를 통과했으며,
+              명시적으로 동의한 실제 환경 관찰이 기록되기 전까지는 실제
+              환경 미관찰 상태입니다.
             </p>
           </article>
         </div>

@@ -20,6 +20,13 @@ Mail and calendar are selected independently. For example, one account may use
 IMAP/SMTP for mail and CalDAV for calendar. `pop3` is reserved without a route
 builder and cannot be selected.
 
+iCloud onboarding composes `imap-smtp` and `caldav` into one reviewed account.
+It uses the documented iCloud Mail address families or a complete Apple SRV
+signal set, one shared external credential handle by default, and an explicit
+OS-owned app-specific-password enrollment prompt. The underlying route status,
+capabilities, and failures remain independent; this is a preset, not a new
+provider adapter or capability claim.
+
 “Implemented” means the typed route and synthetic contracts ship in v0.8. It is
 not a universal provider-compatibility claim. See
 [compatibility evidence](compatibility.md) before connecting a live account.

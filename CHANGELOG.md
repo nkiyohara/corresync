@@ -5,6 +5,22 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### iCloud guided onboarding
+
+- Add a first-class `corr setup` preset that composes iCloud Mail and Calendar
+  over the provider-neutral IMAP/SMTP and CalDAV routes. Detection uses Apple's
+  documented address families or the complete verified Apple service-record
+  set for a custom iCloud domain; it never relies on a display-name or suffix
+  guess.
+- Keep the app-specific password outside the Corresync process by handing the
+  reviewed credential reference to an operating-system-owned secure prompt.
+  Add a content-free status check that reports Mail and Calendar's last
+  authenticated TLS/authorization state independently without reading folder,
+  message, event, contact, or attachment metadata.
+- Publish natural iCloud setup and provider guidance in English, Japanese,
+  Simplified Chinese, Traditional Chinese, and Korean, with refreshed search
+  descriptions and sitemap dates.
+
 ### Localized Pages
 
 - Publish complete English, Japanese, Simplified Chinese, Traditional Chinese,

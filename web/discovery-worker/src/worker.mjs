@@ -253,6 +253,9 @@ function classify(domain, observations, unavailable) {
       addEvidence(evidence, `srv_${key}`, "A standards service record was published");
     }
   }
+  if (hasAppleICloudServiceSet(observations)) {
+    addScore(scores, "apple-icloud", 100);
+  }
 
   const grouped = groupedScores(scores);
   const standardsCount = Object.values(standards).filter(Boolean).length;
@@ -332,6 +335,16 @@ function classificationFor(group, variant, score, conflict) {
       summary: "Use the published standards route with a credential you explicitly keep in the OS keyring or an approved helper.",
     };
   }
+  if (group === "apple") {
+    return {
+      family: "apple", displayName: "Apple iCloud",
+      variant,
+      confidence: score >= 90 ? "high" : "medium",
+      status: score >= 90 ? "verified" : "likely",
+      conflict: false,
+      summary: "Public records match the available guided iCloud Mail and Calendar preset.",
+    };
+  }
   return {
     family: group,
     displayName: displayNameForGroup(group),
@@ -380,8 +393,19 @@ function routesFor(primary, standards, groups) {
         : ["Production OAuth approval is pending.", "A separate reviewed release must enable the route."],
     ));
   }
+  if (wanted.has("apple")) {
+    routes.push(route(
+      "apple-icloud", "iCloud Mail and Calendar", "available",
+      "IMAP reads and organization with SMTP composition and sending",
+      "CalDAV calendar reads and reviewed writes",
+      "external_credential",
+      "Apple app-specific password entered directly into the OS credential store.",
+      ["Enable Apple Account two-factor authentication and create an app-specific password."],
+      ["The guided preset is synthetic-contract covered and remains live-unobserved."],
+    ));
+  }
   if (wanted.has("standards") || groups.length > 0 ||
-    (primary !== "google" && hasStandards)) {
+    (primary !== "google" && primary !== "apple" && hasStandards)) {
     if (standards.jmap) {
       routes.push(route(
         "jmap", "JMAP", "additional_setup", "Typed JMAP mail operations", "Not provided by this route",
@@ -467,7 +491,9 @@ function groupedScores(scores) {
   for (const [family, score] of scores) {
     const group = family.startsWith("microsoft-")
       ? "microsoft"
-      : family.startsWith("google-") ? "google" : family;
+      : family.startsWith("google-")
+        ? "google"
+        : family === "apple-icloud" ? "apple" : family;
     grouped.set(group, (grouped.get(group) || 0) + score);
   }
   return grouped;
@@ -484,6 +510,7 @@ function strongestVariant(scores, group) {
 function displayNameForGroup(group) {
   if (group === "microsoft") return "Microsoft 365 / Outlook";
   if (group === "google") return "Google Gmail / Workspace";
+  if (group === "apple") return "Apple iCloud";
   return group;
 }
 
@@ -497,6 +524,20 @@ function hasSRV(values) {
     const fields = data.trim().split(/\s+/);
     return fields.length === 4 && fields.slice(0, 3).every(value => /^\d+$/.test(value)) &&
       trimDNSName(fields[3]) !== "";
+  });
+}
+
+function hasAppleICloudServiceSet(observations) {
+  return hasSRVTarget(observations.get("imaps"), 993, "imap.mail.me.com") &&
+    hasSRVTarget(observations.get("submission"), 587, "smtp.mail.me.com") &&
+    hasSRVTarget(observations.get("caldavs"), 443, "caldav.icloud.com");
+}
+
+function hasSRVTarget(values, port, target) {
+  return (values || []).some(data => {
+    const fields = data.trim().split(/\s+/);
+    return fields.length === 4 && fields.slice(0, 3).every(value => /^\d+$/.test(value)) &&
+      Number(fields[2]) === port && trimDNSName(fields[3]) === target;
   });
 }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,7 +139,7 @@ func TestGuidedSetupConfiguresStandardsRoutesByExternalHandles(t *testing.T) {
 			"standards-calendar",
 			"y",
 			"y",
-			"3",
+			"4",
 			"3",
 		}, "\n")+"\n",
 	)
@@ -156,6 +157,188 @@ func TestGuidedSetupConfiguresStandardsRoutesByExternalHandles(t *testing.T) {
 		account.Mail.IMAPSMTP.Credential.Key != "standards-mail" ||
 		account.Calendar.CalDAV.Credential.Key != "standards-calendar" {
 		t.Fatalf("standards account = %+v", account)
+	}
+}
+
+func TestGuidedSetupAddsICloudMailAndCalendarWithOneExternalCredential(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	discoverer := &accountDiscovererStub{observation: application.AccountDiscoveryObservation{
+		Candidates: []application.ProviderCandidate{
+			{
+				Provider: domain.ProviderIMAPSMTP, Confidence: 98,
+				Authentication: application.DiscoveryExternalCredential,
+				Endpoints: []application.DiscoveredEndpoint{
+					{Kind: "imap", Value: "imap.mail.me.com:993"},
+					{Kind: "smtp", Value: "smtp.mail.me.com:587"},
+				},
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "known_domain", Detail: "icloud.com",
+				}},
+			},
+			{
+				Provider: domain.ProviderCalDAV, Confidence: 98,
+				Authentication: application.DiscoveryExternalCredential,
+				Endpoints: []application.DiscoveredEndpoint{{
+					Kind: "caldav", Value: "https://caldav.icloud.com:443/",
+				}},
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "known_domain", Detail: "icloud.com",
+				}},
+			},
+		},
+	}}
+	app, stdout := guidedSetupRuntime(
+		t,
+		path,
+		discoverer,
+		strings.Join([]string{
+			"reader@icloud.com",
+			"1",
+			"icloud-personal",
+			"reader@icloud.com",
+			"1",
+			"icloud-personal-shared",
+			"y",
+			"y",
+			"2",
+			"6",
+			"3",
+		}, "\n")+"\n",
+	)
+	var commandName string
+	var commandArguments []string
+	app.runCommand = func(
+		_ context.Context,
+		_, _ io.Writer,
+		name string,
+		arguments ...string,
+	) error {
+		commandName = name
+		commandArguments = append([]string(nil), arguments...)
+		return nil
+	}
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configured, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configured.Accounts["icloud-personal"]
+	if account.Mail == nil || account.Mail.IMAPSMTP == nil ||
+		account.Calendar == nil || account.Calendar.CalDAV == nil {
+		t.Fatalf("iCloud account = %+v", account)
+	}
+	mail := account.Mail.IMAPSMTP
+	calendar := account.Calendar.CalDAV
+	if mail.IMAP.Host != "imap.mail.me.com" || mail.IMAP.Port != 993 ||
+		mail.IMAP.Mode != config.TLSImplicit ||
+		mail.SMTP.Host != "smtp.mail.me.com" || mail.SMTP.Port != 587 ||
+		mail.SMTP.Mode != config.TLSStartTLS ||
+		mail.Username != "reader@icloud.com" ||
+		calendar.Endpoint != "https://caldav.icloud.com:443/" ||
+		calendar.Username != "reader@icloud.com" {
+		t.Fatalf("iCloud routes = mail %+v, calendar %+v", mail, calendar)
+	}
+	if mail.Credential != calendar.Credential ||
+		mail.Credential.Backend != config.CredentialOSKeyring ||
+		mail.Credential.Key != "icloud-personal-shared" ||
+		!mail.Credential.Consent {
+		t.Fatalf("iCloud credential references = %+v, %+v", mail.Credential, calendar.Credential)
+	}
+	if commandName != "secret-tool" ||
+		strings.Join(commandArguments, " ") !=
+			"store --label=Corresync iCloud service corresync username icloud-personal-shared" {
+		t.Fatalf("OS credential command = %q %#v", commandName, commandArguments)
+	}
+	for _, expected := range []string{
+		"iCloud Mail + Calendar",
+		"two-factor authentication",
+		"Mail identity",
+		"Calendar identity",
+		"OS-owned store completed the prompt",
+	} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("iCloud onboarding output missing %q: %q", expected, stdout.String())
+		}
+	}
+}
+
+func TestICloudPresetRequiresKnownAddressOrCompleteSRVEvidence(t *testing.T) {
+	t.Parallel()
+	mail := &application.ProviderCandidate{
+		Provider: domain.ProviderIMAPSMTP,
+		Endpoints: []application.DiscoveredEndpoint{
+			{Kind: "imap", Value: "imap.mail.me.com:993"},
+			{Kind: "smtp", Value: "smtp.mail.me.com:587"},
+		},
+		Evidence: []application.DiscoveryEvidence{{Source: "manual", Detail: "test"}},
+	}
+	calendar := &application.ProviderCandidate{
+		Provider: domain.ProviderCalDAV,
+		Endpoints: []application.DiscoveredEndpoint{{
+			Kind: "caldav", Value: "https://caldav.icloud.com:443/",
+		}},
+		Evidence: []application.DiscoveryEvidence{{Source: "manual", Detail: "test"}},
+	}
+	plan := newOnboardingRoutePlan(mail, calendar)
+	if isICloudOnboardingPlan(application.AccountDiscoveryResult{
+		Domain: "example.invalid",
+	}, plan) {
+		t.Fatal("arbitrary custom domain was classified from unverified evidence")
+	}
+	mail.Evidence = []application.DiscoveryEvidence{
+		{Source: "srv_imaps", Detail: "example.invalid"},
+		{Source: "srv_submission", Detail: "example.invalid"},
+	}
+	calendar.Evidence = []application.DiscoveryEvidence{{
+		Source: "srv_caldavs", Detail: "example.invalid",
+	}}
+	if !isICloudOnboardingPlan(application.AccountDiscoveryResult{
+		Domain: "example.invalid",
+	}, plan) {
+		t.Fatal("complete Apple SRV evidence was not recognized")
+	}
+}
+
+func TestICloudCredentialEnrollmentUsesOnlyOSOwnedPrompts(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		goos string
+		name string
+		args string
+	}{
+		{
+			goos: "darwin", name: "/usr/bin/security",
+			args: "add-generic-password -U -s corresync -a private-handle -l Corresync iCloud -w",
+		},
+		{
+			goos: "linux", name: "secret-tool",
+			args: "store --label=Corresync iCloud service corresync username private-handle",
+		},
+		{
+			goos: "windows", name: "cmdkey.exe",
+			args: "/generic:corresync:private-handle /user:private-handle",
+		},
+	} {
+		t.Run(test.goos, func(t *testing.T) {
+			t.Parallel()
+			name, arguments, err := iCloudCredentialEnrollmentCommand(
+				test.goos,
+				"private-handle",
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if name != test.name || strings.Join(arguments, " ") != test.args {
+				t.Fatalf("command = %q %q", name, strings.Join(arguments, " "))
+			}
+			if strings.Contains(strings.Join(arguments, " "), "example-app-password") {
+				t.Fatal("credential value entered the process arguments")
+			}
+		})
 	}
 }
 

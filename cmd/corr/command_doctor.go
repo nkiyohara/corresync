@@ -19,9 +19,10 @@ import (
 )
 
 type doctorCommand struct {
-	Account string `help:"Configured account alias; defaults to default_account."`
-	Online  bool   `help:"Validate live contracts through an already authenticated session."`
-	JSON    bool   `help:"Write a content-free machine-readable report."`
+	Account        string `help:"Configured account alias; defaults to default_account."`
+	Online         bool   `help:"Validate live contracts through an already authenticated session."`
+	ConnectionOnly bool   `help:"With --online, report last-authenticated route connectivity without reading remote item metadata."`
+	JSON           bool   `help:"Write a content-free machine-readable report."`
 }
 
 type doctorReport struct {
@@ -41,6 +42,9 @@ type doctorCheck struct {
 const browserProbeTimeout = 20 * time.Second
 
 func (command *doctorCommand) Run(app *runtime) error {
+	if command.ConnectionOnly && !command.Online {
+		return errors.New("--connection-only requires --online")
+	}
 	report := doctorReport{
 		Healthy: true,
 		Online:  command.Online,
@@ -132,7 +136,8 @@ func (command *doctorCommand) Run(app *runtime) error {
 	)
 
 	sessions, err := client.SessionStatus(app.context, app.caller())
-	authenticated := err == nil && authenticatedSession(sessions, accountID)
+	session, authenticated := authenticatedAccountSession(sessions, accountID)
+	authenticated = err == nil && authenticated
 	if err != nil || !authenticated {
 		detail := doctorError(err)
 		if err == nil {
@@ -157,6 +162,13 @@ func (command *doctorCommand) Run(app *runtime) error {
 		return command.finish(app, report)
 	}
 	report.add("session", "pass", "selected provider routes authenticated in daemon memory")
+	if command.ConnectionOnly {
+		command.addContentFreeConnectionChecks(configured, session, &report)
+		if err := client.Close(); err != nil {
+			report.add("daemon_close", "fail", doctorError(err))
+		}
+		return command.finish(app, report)
+	}
 
 	if configured.Mail == nil {
 		report.add("folder_contract", "skip", "the account has no mail route")
@@ -273,16 +285,81 @@ func (command *doctorCommand) addOAuthScopes(
 	)
 }
 
-func authenticatedSession(
+func authenticatedAccountSession(
 	sessions daemonapi.SessionStatusResult,
 	account domain.AccountID,
-) bool {
+) (application.SessionStatus, bool) {
 	for _, session := range sessions.Accounts {
 		if session.Account == account {
-			return session.Authenticated
+			return session, session.Authenticated
 		}
 	}
-	return false
+	return application.SessionStatus{}, false
+}
+
+func (command *doctorCommand) addContentFreeConnectionChecks(
+	configured config.Account,
+	session application.SessionStatus,
+	report *doctorReport,
+) {
+	capabilities := session.Capabilities
+	switch {
+	case configured.Mail == nil:
+		report.add("mail_connection", "skip", "the account has no mail route")
+	case capabilities == nil || !capabilities.Mail:
+		report.add(
+			"mail_connection",
+			"fail",
+			"the authenticated session did not confirm the configured mail capability",
+		)
+	default:
+		report.add(
+			"mail_connection",
+			"pass",
+			connectionConfirmationDetail(
+				session.CapturedAt,
+				"mail",
+				"message, folder, or attachment",
+			),
+		)
+	}
+	switch {
+	case configured.Calendar == nil:
+		report.add("calendar_connection", "skip", "the account has no calendar route")
+	case capabilities == nil || !capabilities.Calendar:
+		report.add(
+			"calendar_connection",
+			"fail",
+			"the authenticated session did not confirm the configured calendar capability",
+		)
+	default:
+		report.add(
+			"calendar_connection",
+			"pass",
+			connectionConfirmationDetail(
+				session.CapturedAt,
+				"calendar",
+				"event, contact, or attachment",
+			),
+		)
+	}
+}
+
+func connectionConfirmationDetail(
+	capturedAt *time.Time,
+	service string,
+	omittedMetadata string,
+) string {
+	when := "during the active authentication session"
+	if capturedAt != nil {
+		when = "at " + capturedAt.UTC().Format(time.RFC3339)
+	}
+	return fmt.Sprintf(
+		"the %s route established TLS and authorization %s; this status check read no %s metadata",
+		service,
+		when,
+		omittedMetadata,
+	)
 }
 
 func (command *doctorCommand) addDaemonStatus(

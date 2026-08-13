@@ -277,7 +277,37 @@ func addKnownDomainCandidates(collector *candidateCollector, domainName string) 
 		})
 	case familyGoogleConsumer:
 		addGoogleCandidate(collector, 98, "known_domain", domainName)
+	case familyAppleICloud:
+		addICloudCandidates(collector, 98, "known_domain", domainName)
 	}
+}
+
+func addICloudCandidates(
+	collector *candidateCollector,
+	confidence int,
+	source string,
+	detail string,
+) {
+	evidence := application.DiscoveryEvidence{Source: source, Detail: detail}
+	for _, endpoint := range []application.DiscoveredEndpoint{
+		{Kind: "imap", Value: "imap.mail.me.com:993"},
+		{Kind: "smtp", Value: "smtp.mail.me.com:587"},
+	} {
+		collector.add(candidateInput{
+			provider: domain.ProviderIMAPSMTP, confidence: confidence,
+			authentication: application.DiscoveryExternalCredential,
+			endpoint:       endpoint,
+			evidence:       evidence,
+		})
+	}
+	collector.add(candidateInput{
+		provider: domain.ProviderCalDAV, confidence: confidence,
+		authentication: application.DiscoveryExternalCredential,
+		endpoint: application.DiscoveredEndpoint{
+			Kind: "caldav", Value: "https://caldav.icloud.com:443/",
+		},
+		evidence: evidence,
+	})
 }
 
 func addMXCandidates(collector *candidateCollector, records []*net.MX) {

@@ -21,6 +21,7 @@ const (
 	familyMicrosoft365      = "microsoft-365"
 	familyGoogleConsumer    = "google-consumer"
 	familyGoogleWorkspace   = "google-workspace"
+	familyAppleICloud       = "apple-icloud"
 )
 
 var signalFamilies = []SignalFamily{
@@ -40,6 +41,10 @@ var signalFamilies = []SignalFamily{
 	{
 		ID: familyGoogleWorkspace, DisplayName: "Google Workspace",
 		MailExchangeSuffixes: []string{"aspmx.l.google.com", "google.com"},
+	},
+	{
+		ID: familyAppleICloud, DisplayName: "Apple iCloud",
+		KnownDomains: []string{"icloud.com", "mac.com", "me.com"},
 	},
 }
 
