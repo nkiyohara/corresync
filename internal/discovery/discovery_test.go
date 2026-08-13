@@ -147,6 +147,45 @@ func TestDiscoverConstructsCredentialFreeCalDAVSRVURL(t *testing.T) {
 	}
 }
 
+func TestDiscoverConstructsCredentialFreeJMAPSRVSessionURL(t *testing.T) {
+	t.Parallel()
+	discoverer := New(Options{
+		Resolver: resolverStub{
+			mxErr: errors.New("offline"),
+			srv: map[string][]*net.SRV{
+				"jmap": {{Target: "JMAP.example.test.", Port: 443}},
+			},
+			srvErr: map[string]error{
+				"imaps": errors.New("offline"), "submission": errors.New("offline"),
+				"caldavs": errors.New("offline"),
+			},
+		},
+		Prober: proberStub{errors: map[string]error{
+			"https://example.test/.well-known/jmap":   errors.New("offline"),
+			"https://example.test/.well-known/caldav": errors.New("offline"),
+		}},
+	})
+	observation, err := discoverer.Discover(t.Context(), "reader@example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(observation.Candidates) != 1 {
+		t.Fatalf("candidates = %#v", observation.Candidates)
+	}
+	candidate := observation.Candidates[0]
+	if candidate.Provider != domain.ProviderJMAP ||
+		candidate.Authentication != application.DiscoveryExternalCredential ||
+		!candidate.RequiresExplicitSelection ||
+		len(candidate.Endpoints) != 1 ||
+		candidate.Endpoints[0] != (application.DiscoveredEndpoint{
+			Kind: "jmap", Value: "https://jmap.example.test:443/.well-known/jmap",
+		}) ||
+		len(candidate.Evidence) != 1 ||
+		candidate.Evidence[0].Source != "srv_jmap" {
+		t.Fatalf("JMAP candidate = %#v", candidate)
+	}
+}
+
 func TestDiscoverRejectsInvalidSRVEndpoints(t *testing.T) {
 	t.Parallel()
 	for _, test := range []struct {
