@@ -100,7 +100,7 @@ func TestIntegrationsSetupAppliesAndVerifiesIndependentHosts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(data, []byte(executable)) {
+	if !integrationConfigUsesExecutable(data, executable) {
 		t.Fatalf("Cursor config = %s", data)
 	}
 }
@@ -230,7 +230,7 @@ func TestIntegrationsSetupContinuesAfterHostFailureAndRerunResumes(t *testing.T)
 	}
 	cursorPath := filepath.Join(filepath.Dir(filepath.Dir(configPath)), "..", ".cursor", "mcp.json")
 	cursorPath = filepath.Clean(cursorPath)
-	if data, readErr := os.ReadFile(cursorPath); readErr != nil || !bytes.Contains(data, []byte(executable)) {
+	if data, readErr := os.ReadFile(cursorPath); readErr != nil || !integrationConfigUsesExecutable(data, executable) {
 		t.Fatalf("later Cursor host was not applied: %s, error %v", data, readErr)
 	}
 	if !strings.Contains(stdout.String(), "failed_previous_state_preserved") ||
@@ -259,6 +259,22 @@ func TestSkippedIntegrationPlansHaveExplicitPerHostResults(t *testing.T) {
 		results[1].Status != integrationlifecycle.ResultBlocked {
 		t.Fatalf("results = %+v", results)
 	}
+}
+
+func integrationConfigUsesExecutable(data []byte, executable string) bool {
+	var document struct {
+		Servers map[string]struct {
+			Command string `json:"command"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(data, &document); err != nil {
+		return false
+	}
+	command := document.Servers["corresync"].Command
+	if runtimepkg.GOOS == "windows" {
+		return strings.EqualFold(filepath.Clean(command), filepath.Clean(executable))
+	}
+	return filepath.Clean(command) == filepath.Clean(executable)
 }
 
 func TestVerifyIntegrationExecutableResolvesSymlinkAndRejectsUnsafeMode(t *testing.T) {

@@ -237,9 +237,7 @@ func TestEngineAppliesAndVerifiesMCPWithNativeSkillPackage(t *testing.T) {
 	absentMCP := Execution{Started: true, ExitCode: 1, Output: []byte("not found")}
 	absentPackage := Execution{Started: true, Output: []byte(`{"installed":[]}`)}
 	absentSource := Execution{Started: true, Output: []byte(`{"marketplaces":[]}`)}
-	healthyMCP := Execution{Started: true, Output: []byte(
-		"corresync\n command: /opt/corresync/bin/corr\n args: --config /home/test/.config/corresync/config.toml mcp serve\n",
-	)}
+	healthyMCP := Execution{Started: true, Output: healthyCommandOutput(request)}
 	healthyPackage := Execution{Started: true, Output: []byte(
 		`{"installed":[{"pluginId":"corresync@corresync-local","version":"1.2.3","enabled":true}]}`,
 	)}

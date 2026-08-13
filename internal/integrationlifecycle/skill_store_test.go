@@ -12,7 +12,7 @@ import (
 func skillRequest(host agenthost.ID, scope agenthost.Scope, environment Environment) Request {
 	request := Request{
 		Operation: OperationSetup, Host: host, Scope: scope, ServerName: "corresync",
-		Executable: "/opt/corresync/bin/corr", Arguments: []string{"mcp", "serve"},
+		Executable: testAbsolutePath("bin", "corr"), Arguments: []string{"mcp", "serve"},
 	}
 	if scope != agenthost.ScopeUser {
 		request.ProjectDirectory = environment.HomeDirectory

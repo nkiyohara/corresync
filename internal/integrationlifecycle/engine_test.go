@@ -2,9 +2,11 @@ package integrationlifecycle
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/agenthost"
@@ -31,15 +33,29 @@ func (executor *scriptedExecutor) Run(_ context.Context, command Command, limit 
 func lifecycleRequest(operation Operation) Request {
 	return Request{
 		Operation: operation, Host: agenthost.IDCodex, Scope: agenthost.ScopeUser,
-		ServerName: "corresync", Executable: "/opt/corresync/bin/corr",
-		Arguments: []string{"--config", "/home/test/.config/corresync/config.toml", "mcp", "serve"},
+		ServerName: "corresync", Executable: testAbsolutePath("bin", "corr"),
+		Arguments: []string{"--config", testAbsolutePath("config", "config.toml"), "mcp", "serve"},
 	}
+}
+
+func healthyCommandOutput(request Request) []byte {
+	return []byte(fmt.Sprintf(
+		"corresync\n command: %s\n args: %s\n",
+		request.Executable,
+		strings.Join(request.Arguments, " "),
+	))
 }
 
 func TestPlanBindsInspectionAndUsesRemoveThenAddForStalePath(t *testing.T) {
 	t.Parallel()
+	staleExecutable := testAbsolutePath("old", "corr")
+	staleConfig := testAbsolutePath("old", "config.toml")
 	executor := &scriptedExecutor{executions: []Execution{{
-		Started: true, Output: []byte("corresync\n command: /old/bin/corr\n args: --config /old/config.toml mcp serve\n"),
+		Started: true, Output: []byte(fmt.Sprintf(
+			"corresync\n command: %s\n args: --config %s mcp serve\n",
+			staleExecutable,
+			staleConfig,
+		)),
 	}}}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Executor: executor}
 	plan, err := engine.Plan(t.Context(), lifecycleRequest(OperationSetup))
@@ -61,7 +77,10 @@ func TestPlanBindsInspectionAndUsesRemoveThenAddForStalePath(t *testing.T) {
 func TestPlanBlocksNameConflictWithoutRemoval(t *testing.T) {
 	t.Parallel()
 	executor := &scriptedExecutor{executions: []Execution{{
-		Started: true, Output: []byte("corresync\n command: /usr/bin/other-server\n enabled: false\n"),
+		Started: true, Output: []byte(fmt.Sprintf(
+			"corresync\n command: %s\n enabled: false\n",
+			testAbsolutePath("other", "server"),
+		)),
 	}}}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Executor: executor}
 	plan, err := engine.Plan(t.Context(), lifecycleRequest(OperationRemove))
@@ -105,7 +124,7 @@ func TestUnsafePortableSkillPathBecomesBlockedHostState(t *testing.T) {
 	}
 	request := Request{
 		Operation: OperationSetup, Host: agenthost.IDVSCode, Scope: agenthost.ScopeUser,
-		ServerName: "corresync", Executable: "/opt/corresync/bin/corr",
+		ServerName: "corresync", Executable: testAbsolutePath("bin", "corr"),
 		Arguments: []string{"mcp", "serve"},
 	}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Environment: environment}
@@ -125,7 +144,10 @@ func TestApplyFailsClosedWhenStateChangesAfterPreview(t *testing.T) {
 	absent := Execution{Started: true, ExitCode: 1, Output: []byte("not found")}
 	executor := &scriptedExecutor{executions: []Execution{
 		absent,
-		{Started: true, Output: []byte("corresync\n command: /usr/bin/other-server\n")},
+		{Started: true, Output: []byte(fmt.Sprintf(
+			"corresync\n command: %s\n",
+			testAbsolutePath("other", "server"),
+		))},
 	}}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Executor: executor}
 	plan, err := engine.Plan(t.Context(), request)
@@ -144,7 +166,7 @@ func TestApplyFailsClosedWhenStateChangesAfterPreview(t *testing.T) {
 func TestApplyRechecksNoopPlanAfterPreview(t *testing.T) {
 	t.Parallel()
 	request := lifecycleRequest(OperationSetup)
-	healthy := Execution{Started: true, Output: []byte("corresync\n command: /opt/corresync/bin/corr\n args: --config /home/test/.config/corresync/config.toml mcp serve\n")}
+	healthy := Execution{Started: true, Output: healthyCommandOutput(request)}
 	absent := Execution{Started: true, ExitCode: 1, Output: []byte("not found")}
 	executor := &scriptedExecutor{executions: []Execution{healthy, absent}}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Executor: executor}
@@ -168,7 +190,7 @@ func TestApplyReportsIndependentReloadAfterVerification(t *testing.T) {
 	t.Parallel()
 	request := lifecycleRequest(OperationSetup)
 	absent := Execution{Started: true, ExitCode: 1, Output: []byte("not found")}
-	healthy := Execution{Started: true, Output: []byte("corresync\n command: /opt/corresync/bin/corr\n args: --config /home/test/.config/corresync/config.toml mcp serve\n")}
+	healthy := Execution{Started: true, Output: healthyCommandOutput(request)}
 	executor := &scriptedExecutor{executions: []Execution{absent, absent, {Started: true}, healthy}}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Executor: executor}
 	plan, err := engine.Plan(t.Context(), request)
@@ -230,7 +252,12 @@ func TestListInspectionDoesNotCombineDifferentHostRecords(t *testing.T) {
 	request := lifecycleRequest(OperationSetup)
 	inspection := classifyCommandInspection(request, Execution{
 		Started: true,
-		Output:  []byte("corresync /usr/bin/other-server\nother /opt/corresync/bin/corr --config /home/test/.config/corresync/config.toml mcp serve\n"),
+		Output: []byte(fmt.Sprintf(
+			"corresync %s\nother %s %s\n",
+			testAbsolutePath("other", "server"),
+			request.Executable,
+			strings.Join(request.Arguments, " "),
+		)),
 	}, true)
 	if inspection.State == StateHealthy {
 		t.Fatalf("inspection combined separate records: %+v", inspection)
@@ -242,7 +269,12 @@ func TestListInspectionParsesOneExactJSONEntry(t *testing.T) {
 	request := lifecycleRequest(OperationSetup)
 	inspection := classifyCommandInspection(request, Execution{
 		Started: true,
-		Output:  []byte(`{"mcpServers":{"other":{"command":"/usr/bin/other"},"corresync":{"command":"/opt/corresync/bin/corr","args":["--config","/home/test/.config/corresync/config.toml","mcp","serve"],"disabledTools":[]}}}`),
+		Output: []byte(fmt.Sprintf(
+			`{"mcpServers":{"other":{"command":%q},"corresync":{"command":%q,"args":["--config",%q,"mcp","serve"],"disabledTools":[]}}}`,
+			testAbsolutePath("other", "server"),
+			request.Executable,
+			request.Arguments[1],
+		)),
 	}, true)
 	if inspection.State != StateHealthy {
 		t.Fatalf("inspection = %+v", inspection)
@@ -255,7 +287,10 @@ func TestListInspectionAcceptsShellEscapedArgument(t *testing.T) {
 	request.Arguments[1] = "/Users/test/Library/Application Support/corresync/config.toml"
 	inspection := classifyCommandInspection(request, Execution{
 		Started: true,
-		Output:  []byte("corresync /opt/corresync/bin/corr --config /Users/test/Library/Application\\ Support/corresync/config.toml mcp serve\n"),
+		Output: []byte(fmt.Sprintf(
+			"corresync %s --config /Users/test/Library/Application\\ Support/corresync/config.toml mcp serve\n",
+			request.Executable,
+		)),
 	}, true)
 	if inspection.State != StateHealthy {
 		t.Fatalf("inspection = %+v", inspection)

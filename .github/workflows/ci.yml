@@ -135,8 +135,27 @@ jobs:
           go-version: "1.26.x"
           cache: true
 
-      - name: Test Windows integration paths
-        run: go test -shuffle=on ./internal/integrationlifecycle ./cmd/corr
+      - name: Test Windows lifecycle package
+        run: go test -shuffle=on ./internal/integrationlifecycle
+
+      - name: Test Windows integration CLI
+        shell: pwsh
+        run: |
+          $required = @(
+            "TestIntegrationsSetupAppliesAndVerifiesIndependentHosts"
+            "TestIntegrationsYesReturnsErrorForBlockedHost"
+          )
+          $available = @(go test ./cmd/corr -list '^TestIntegrations')
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          foreach ($name in $required) {
+            if ($available -notcontains $name) {
+              throw "required Windows integration test is missing: $name"
+            }
+          }
+          go test -shuffle=on ./cmd/corr -run '^TestIntegrations(SetupAppliesAndVerifiesIndependentHosts|YesReturnsErrorForBlockedHost)$'
+          exit $LASTEXITCODE
 
       - name: Lint PowerShell installer
         shell: pwsh

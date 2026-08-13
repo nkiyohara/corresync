@@ -10,9 +10,11 @@ import (
 
 func TestRenderConfigUsesSecretFreeLifecycleLaunch(t *testing.T) {
 	t.Parallel()
+	executable := testAbsolutePath("bin", "corr")
+	configPath := testAbsolutePath("config", "config.toml")
 	data, err := RenderConfig(
-		agenthost.IDKimiCode, "corresync", "/opt/corresync/bin/corr",
-		[]string{"--config", "/home/person/.config/corresync/config.toml", "mcp", "serve"},
+		agenthost.IDKimiCode, "corresync", executable,
+		[]string{"--config", configPath, "mcp", "serve"},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -22,7 +24,7 @@ func TestRenderConfigUsesSecretFreeLifecycleLaunch(t *testing.T) {
 		t.Fatal(err)
 	}
 	server := document.Servers["corresync"]
-	if server.Command != "/opt/corresync/bin/corr" || server.Enabled == nil || !*server.Enabled {
+	if server.Command != executable || server.Enabled == nil || !*server.Enabled {
 		t.Fatalf("server = %+v", server)
 	}
 	for _, forbidden := range []string{"token", "secret", "password", "autoApprove", "yolo"} {

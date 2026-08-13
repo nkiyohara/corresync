@@ -404,10 +404,20 @@ func writePackageFile(root, relative string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600)
+	// #nosec G304 -- path is constrained to the private staging root above.
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := file.Write(data); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	return errors.Join(file.Sync(), file.Close())
 }
 
 func syncPackageTree(root string) error {
+	// writePackageFile syncs every staged file on its writable handle. This
+	// pass anchors the finished tree, rejects swaps, and syncs directories.
 	rootHandle, err := os.OpenRoot(root)
 	if err != nil {
 		return err
@@ -417,10 +427,7 @@ func syncPackageTree(root string) error {
 		if walkErr != nil {
 			return walkErr
 		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return errors.New("managed package staging contains a symlink")
-		}
-		if entry.IsDir() {
+		if path == root {
 			directories = append(directories, path)
 			return nil
 		}
@@ -428,12 +435,22 @@ func syncPackageTree(root string) error {
 		if err != nil {
 			return err
 		}
-		file, err := rootHandle.Open(relative)
+		pathInfo, err := entry.Info()
 		if err != nil {
 			return err
 		}
-		err = file.Sync()
-		return errors.Join(err, file.Close())
+		anchoredInfo, err := rootHandle.Lstat(relative)
+		if err != nil || !os.SameFile(pathInfo, anchoredInfo) || anchoredInfo.Mode()&os.ModeSymlink != 0 {
+			return errors.Join(err, errors.New("managed package staging changed while syncing"))
+		}
+		if anchoredInfo.IsDir() {
+			directories = append(directories, path)
+			return nil
+		}
+		if !anchoredInfo.Mode().IsRegular() {
+			return errors.Join(err, errors.New("managed package staging contains an unsafe file"))
+		}
+		return nil
 	})
 	if err := errors.Join(walkErr, rootHandle.Close()); err != nil {
 		return err

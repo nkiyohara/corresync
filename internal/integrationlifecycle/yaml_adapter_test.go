@@ -12,7 +12,7 @@ import (
 func gooseRequest(environment Environment, operation Operation) Request {
 	return Request{
 		Operation: operation, Host: agenthost.IDGoose, Scope: agenthost.ScopeUser,
-		ServerName: "corresync", Executable: "/opt/corresync/bin/corr",
+		ServerName: "corresync", Executable: testAbsolutePath("bin", "corr"),
 		Arguments: []string{"--config", filepath.Join(environment.HomeDirectory, ".config", "corresync", "config.toml"), "mcp", "serve"},
 	}
 }
@@ -51,7 +51,7 @@ extensions:
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"# provider choice belongs to the user", "filesystem:", "# keep this extension", "corresync:", "cmd: /opt/corresync/bin/corr", "enabled: true"} {
+	for _, want := range []string{"# provider choice belongs to the user", "filesystem:", "# keep this extension", "corresync:", request.Executable, "enabled: true"} {
 		if !strings.Contains(string(updated), want) {
 			t.Errorf("updated YAML does not contain %q:\n%s", want, updated)
 		}

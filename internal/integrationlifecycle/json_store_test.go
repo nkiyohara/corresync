@@ -23,7 +23,7 @@ func fileEngine(t *testing.T) (Engine, Environment) {
 func cursorRequest(environment Environment, operation Operation) Request {
 	return Request{
 		Operation: operation, Host: agenthost.IDCursor, Scope: agenthost.ScopeUser,
-		ServerName: "corresync", Executable: "/opt/corresync/bin/corr",
+		ServerName: "corresync", Executable: testAbsolutePath("bin", "corr"),
 		Arguments: []string{"--config", filepath.Join(environment.HomeDirectory, ".config", "corresync", "config.toml"), "mcp", "serve"},
 	}
 }
@@ -351,7 +351,7 @@ func TestJSONAdaptersCoverDocumentedPhaseBPathsAndShapes(t *testing.T) {
 			}
 			request := Request{
 				Operation: OperationSetup, Host: fixture.host, Scope: fixture.scope,
-				ServerName: "corresync", Executable: "/opt/corresync/bin/corr",
+				ServerName: "corresync", Executable: testAbsolutePath("bin", "corr"),
 				Arguments: []string{"--config", filepath.Join(environment.ConfigDirectory, "corresync", "config.toml"), "mcp", "serve"},
 			}
 			if fixture.scope != agenthost.ScopeUser {
