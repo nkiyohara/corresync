@@ -332,6 +332,18 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.CommitMailSend(ctx, input.Token, request.Caller)
+	case MethodMailSendDraft:
+		var input application.MailDraftSendInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		return server.backend.SendMailDraft(ctx, input, request.Caller)
+	case MethodMailCommitSendDraft:
+		var input ApprovalInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		return server.backend.CommitMailSendDraft(ctx, input.Token, request.Caller)
 	case MethodMailMove:
 		var input application.MailMoveInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {

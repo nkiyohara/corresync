@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 20
+	ProtocolVersion   = 21
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -49,6 +49,8 @@ const (
 	MethodMailCommitDraft      Method = "mail.commit_draft"
 	MethodMailSend             Method = "mail.send"
 	MethodMailCommitSend       Method = "mail.commit_send"
+	MethodMailSendDraft        Method = "mail.send_draft"
+	MethodMailCommitSendDraft  Method = "mail.commit_send_draft"
 	MethodMailMove             Method = "mail.move"
 	MethodMailCommitMove       Method = "mail.commit_move"
 	MethodMailReadState        Method = "mail.set_read_state"
@@ -321,6 +323,8 @@ type Backend interface {
 	CommitMailDraft(context.Context, string, domain.Caller) (application.MailDraftAccess, error)
 	SendMail(context.Context, application.MailSendInput, domain.Caller) (application.MailSendAccess, error)
 	CommitMailSend(context.Context, string, domain.Caller) (application.MailSendAccess, error)
+	SendMailDraft(context.Context, application.MailDraftSendInput, domain.Caller) (application.MailDraftSendAccess, error)
+	CommitMailSendDraft(context.Context, string, domain.Caller) (application.MailDraftSendAccess, error)
 	MoveMail(context.Context, application.MailMoveInput, domain.Caller) (application.MailMoveAccess, error)
 	CommitMailMove(context.Context, string, domain.Caller) (application.MailMoveAccess, error)
 	SetMailReadState(context.Context, application.MailReadStateInput, domain.Caller) (application.MailReadStateAccess, error)
@@ -357,6 +361,7 @@ func (method Method) valid() bool {
 	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
 		MethodMailGetAttachment, MethodMailCommitAttachment,
 		MethodMailCreateDraft, MethodMailCommitDraft, MethodMailSend, MethodMailCommitSend,
+		MethodMailSendDraft, MethodMailCommitSendDraft,
 		MethodMailMove, MethodMailCommitMove,
 		MethodMailReadState, MethodMailCommitState,
 		MethodMailDelete, MethodMailCommitDelete,

@@ -392,6 +392,16 @@ func (client *Client) CommitMailSend(ctx context.Context, token string, caller d
 	return result, client.call(ctx, MethodMailCommitSend, caller, ApprovalInput{Token: token}, &result)
 }
 
+func (client *Client) SendMailDraft(ctx context.Context, input application.MailDraftSendInput, caller domain.Caller) (application.MailDraftSendAccess, error) {
+	var result application.MailDraftSendAccess
+	return result, client.call(ctx, MethodMailSendDraft, caller, input, &result)
+}
+
+func (client *Client) CommitMailSendDraft(ctx context.Context, token string, caller domain.Caller) (application.MailDraftSendAccess, error) {
+	var result application.MailDraftSendAccess
+	return result, client.call(ctx, MethodMailCommitSendDraft, caller, ApprovalInput{Token: token}, &result)
+}
+
 func (client *Client) MoveMail(ctx context.Context, input application.MailMoveInput, caller domain.Caller) (application.MailMoveAccess, error) {
 	var result application.MailMoveAccess
 	return result, client.call(ctx, MethodMailMove, caller, input, &result)

@@ -50,7 +50,9 @@ application output is private and may contain them.
 
 Authenticated status reports normalized capabilities such as mail, calendar,
 folders, labels, online meeting kind, incremental sync, and attachment
-read/write. A false value means unavailable or not confirmed. Provider
+read/write. `draftSend` reports whether the authenticated account can bind an
+existing saved draft's exact provider version through submission and targeted
+cleanup. A false value means unavailable or not confirmed. Provider
 degradations contain a bounded feature code, reason, and `lossy` flag.
 
 ## Account lifecycle
@@ -90,7 +92,8 @@ bounded body result with attachment metadata. Attachment access similarly
 returns a review or one bounded base64 payload when JSON output is explicitly
 selected.
 
-Draft, send, move, state, and delete results are access envelopes:
+Draft, send, saved-draft send, move, state, and delete results are access
+envelopes:
 
 ```json
 {
@@ -105,7 +108,11 @@ Draft, send, move, state, and delete results are access envelopes:
 
 After commit, the same result type contains the created/moved/updated/deleted
 outcome. Approval tokens are secrets: never log, persist, or share them.
-Reviews contain normalized fields and content digests, not raw body text.
+Reviews contain normalized fields, a bounded body preview, and content digests,
+never attachment bytes or an unbounded body. Saved-draft send reviews
+additionally contain the opaque draft ID and change key, recipients, and
+attachment metadata. The provider version precondition binds the exact body
+and attachment content.
 
 Cross-account mail search returns globally paged projected messages plus
 per-account statuses/failures. It is read-only.

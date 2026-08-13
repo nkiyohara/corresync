@@ -23,6 +23,7 @@ type Capabilities struct {
 	SharedCalendars  bool   `json:"sharedCalendars"`
 	AttachmentReads  bool   `json:"attachmentReads"`
 	AttachmentWrites bool   `json:"attachmentWrites"`
+	DraftSend        bool   `json:"draftSend"`
 }
 
 // Validate rejects provider-defined open-ended values from the stable contract.

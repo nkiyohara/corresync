@@ -31,6 +31,7 @@ type fakeBackend struct {
 	attachmentInput     application.MailAttachmentInput
 	draftInput          application.MailDraftInput
 	sendInput           application.MailSendInput
+	sendDraftInput      application.MailDraftSendInput
 	moveInput           application.MailMoveInput
 	stateInput          application.MailReadStateInput
 	deleteInput         application.MailDeleteInput
@@ -220,6 +221,14 @@ func (backend *fakeBackend) SendMail(_ context.Context, input application.MailSe
 func (backend *fakeBackend) CommitMailSend(_ context.Context, token string, caller domain.Caller) (application.MailSendAccess, error) {
 	backend.commitToken, backend.caller = token, caller
 	return application.MailSendAccess{Status: "sent", Sent: &application.MailSendResult{}}, nil
+}
+func (backend *fakeBackend) SendMailDraft(_ context.Context, input application.MailDraftSendInput, caller domain.Caller) (application.MailDraftSendAccess, error) {
+	backend.sendDraftInput, backend.caller = input, caller
+	return application.MailDraftSendAccess{Status: "approval_required"}, nil
+}
+func (backend *fakeBackend) CommitMailSendDraft(_ context.Context, token string, caller domain.Caller) (application.MailDraftSendAccess, error) {
+	backend.commitToken, backend.caller = token, caller
+	return application.MailDraftSendAccess{Status: "sent", Sent: &application.MailSendResult{}}, nil
 }
 func (backend *fakeBackend) MoveMail(_ context.Context, input application.MailMoveInput, caller domain.Caller) (application.MailMoveAccess, error) {
 	backend.moveInput, backend.caller = input, caller
@@ -592,6 +601,18 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	send, err = client.CommitMailSend(t.Context(), "opv1_send", caller)
 	if err != nil || send.Status != "sent" || send.Sent == nil || backend.commitToken != "opv1_send" {
 		t.Fatalf("CommitMailSend() = %+v, %v; token=%q", send, err, backend.commitToken)
+	}
+	savedDraft, err := client.SendMailDraft(t.Context(), application.MailDraftSendInput{
+		Account: testAccountID, DraftID: "draft-1", DraftChangeKey: "change-1",
+	}, caller)
+	if err != nil || savedDraft.Status != "approval_required" ||
+		backend.sendDraftInput.DraftID != "draft-1" {
+		t.Fatalf("SendMailDraft() = %+v, %v; input=%+v", savedDraft, err, backend.sendDraftInput)
+	}
+	savedDraft, err = client.CommitMailSendDraft(t.Context(), "opv1_send_draft", caller)
+	if err != nil || savedDraft.Status != "sent" || savedDraft.Sent == nil ||
+		backend.commitToken != "opv1_send_draft" {
+		t.Fatalf("CommitMailSendDraft() = %+v, %v; token=%q", savedDraft, err, backend.commitToken)
 	}
 	moved, err = client.CommitMailMove(t.Context(), "opv1_move", caller)
 	if err != nil || moved.Moved == nil || backend.commitToken != "opv1_move" {

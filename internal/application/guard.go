@@ -75,6 +75,44 @@ func (guard *Guard) Prepare(
 	}
 }
 
+// requirePreviewPreparation checks that policy permits constructing a
+// content-derived preview before an adapter performs the read needed to build
+// its exact payload. It records that content-free decision but never issues an
+// approval token. Allowed callers must still pass Prepare with the final
+// immutable operation.
+func (guard *Guard) requirePreviewPreparation(
+	ctx context.Context,
+	operation domain.Operation,
+	caller domain.Caller,
+) error {
+	if err := caller.Validate(); err != nil {
+		return fmt.Errorf("validate caller: %w", err)
+	}
+	decision := guard.rules.Evaluate(operation)
+	switch decision.Verdict {
+	case policy.VerdictPreview:
+		if err := guard.audit.Record(ctx, AuditEvent{
+			Phase: AuditPhasePrepared, Outcome: AuditOutcomePreview,
+			Reason: decision.Reason, Caller: caller, Operation: operation.View(),
+		}); err != nil {
+			return fmt.Errorf("record preview preparation: %w", err)
+		}
+		return nil
+	case policy.VerdictDeny:
+		if err := guard.audit.Record(ctx, AuditEvent{
+			Phase: AuditPhasePrepared, Outcome: AuditOutcomeDenied,
+			Reason: decision.Reason, Caller: caller, Operation: operation.View(),
+		}); err != nil {
+			return fmt.Errorf("record policy decision: %w", err)
+		}
+		return fmt.Errorf("%w: %s", ErrDenied, decision.Reason)
+	case policy.VerdictAllow:
+		return errors.New("policy attempted to bypass mandatory preview preparation")
+	default:
+		return errors.New("policy returned an unknown preview preparation verdict")
+	}
+}
+
 // Commit consumes an exact, single-use preview token.
 func (guard *Guard) Commit(
 	ctx context.Context,

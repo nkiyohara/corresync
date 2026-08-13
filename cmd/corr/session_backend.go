@@ -1208,6 +1208,66 @@ func (backend *sessionBackend) CommitMailSend(
 	return access, nil
 }
 
+func (backend *sessionBackend) SendMailDraft(
+	ctx context.Context,
+	input application.MailDraftSendInput,
+	caller domain.Caller,
+) (application.MailDraftSendAccess, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.MailDraftSendAccess{}, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+
+	services, err := backend.accountServices(ctx, input.Account, caller)
+	if err != nil {
+		return application.MailDraftSendAccess{}, err
+	}
+	defer services.usage.end()
+	mail, err := services.mailService()
+	if err != nil {
+		return application.MailDraftSendAccess{}, err
+	}
+	access, err := mail.SendDraft(ctx, input, caller)
+	if err == nil && access.Preview != nil {
+		backend.rememberPreview(access.Preview.Token, input.Account, access.Preview.ExpiresAt)
+	}
+	return access, err
+}
+
+func (backend *sessionBackend) CommitMailSendDraft(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MailDraftSendAccess, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.MailDraftSendAccess{}, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+
+	account, exists := backend.accountForPreview(token)
+	if !exists {
+		return application.MailDraftSendAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	if account.mail == nil {
+		return application.MailDraftSendAccess{}, errors.New("invalid or expired approval token")
+	}
+	access, err := account.mail.CommitSendDraft(ctx, token, caller)
+	if err != nil {
+		return application.MailDraftSendAccess{}, err
+	}
+	backend.forgetPreview(token)
+	return access, nil
+}
+
 func (backend *sessionBackend) MoveMail(
 	ctx context.Context,
 	input application.MailMoveInput,
@@ -2047,7 +2107,11 @@ func jmapCapabilityReport(
 		Mail: true, Folders: true, AttachmentReads: true,
 		AttachmentWrites: !observed.ReadOnly, IncrementalSync: true,
 	}
-	degradations := make([]domain.Degradation, 0, 2)
+	degradations := make([]domain.Degradation, 0, 3)
+	degradations = append(degradations, domain.Degradation{
+		Feature: "mail.send_draft",
+		Reason:  "JMAP EmailSubmission cannot atomically require the reviewed Email state; exact-version saved-draft send is unavailable",
+	})
 	if observed.ReadOnly {
 		degradations = append(degradations, domain.Degradation{
 			Feature: "mail.write",
@@ -2124,6 +2188,7 @@ func (backend *sessionBackend) imapAccount(
 		},
 	}
 	observed := client.ObservedCapabilities()
+	result.capabilities.DraftSend = observed.Drafts && observed.Sent && observed.UIDPlus
 	if !observed.Move && !observed.UIDPlus {
 		result.degradations = append(result.degradations, domain.Degradation{
 			Feature: "mail.move",
@@ -2140,6 +2205,12 @@ func (backend *sessionBackend) imapAccount(
 		result.degradations = append(result.degradations, domain.Degradation{
 			Feature: "mail.send",
 			Reason:  "the authenticated IMAP account exposes no Sent mailbox; SMTP submission fails closed before sending",
+		})
+	}
+	if !result.capabilities.DraftSend {
+		result.degradations = append(result.degradations, domain.Degradation{
+			Feature: "mail.send_draft",
+			Reason:  "exact saved-draft send requires observed Drafts and Sent mailboxes plus UIDPLUS for targeted cleanup",
 		})
 	}
 	return result, nil
@@ -2291,6 +2362,10 @@ func (backend *sessionBackend) googleAccount(
 		result.degradations = append(
 			result.degradations,
 			domain.Degradation{
+				Feature: "mail.send_draft",
+				Reason:  "the Gmail draft send action exposes no atomic reviewed-version precondition; exact-version saved-draft send is unavailable",
+			},
+			domain.Degradation{
 				Feature: "mail.delete",
 				Reason:  "the approved gmail.modify design does not permit immediate permanent deletion; move the message to Trash instead",
 			},
@@ -2399,6 +2474,10 @@ func (backend *sessionBackend) graphAPIAccount(
 	if mailEnabled {
 		result.degradations = append(
 			result.degradations,
+			domain.Degradation{
+				Feature: "mail.send_draft",
+				Reason:  "Graph draft send exposes no atomic changeKey precondition; exact-version saved-draft send is unavailable",
+			},
 			domain.Degradation{
 				Feature: "mail.search",
 				Reason:  "Microsoft Graph search syntax differs from Outlook AQS",
@@ -2742,6 +2821,7 @@ func mergeSessionAccounts(
 			SharedCalendars:  left.capabilities.SharedCalendars || right.capabilities.SharedCalendars,
 			AttachmentReads:  left.capabilities.AttachmentReads || right.capabilities.AttachmentReads,
 			AttachmentWrites: left.capabilities.AttachmentWrites || right.capabilities.AttachmentWrites,
+			DraftSend:        left.capabilities.DraftSend || right.capabilities.DraftSend,
 		},
 		degradations: append(
 			append(
@@ -2778,6 +2858,7 @@ func outlookWebCapabilities(account config.Account) domain.Capabilities {
 	capabilities.SharedMailboxes = capabilities.Mail
 	capabilities.AttachmentReads = capabilities.Mail
 	capabilities.AttachmentWrites = capabilities.Mail
+	capabilities.DraftSend = capabilities.Mail
 	if capabilities.Calendar {
 		capabilities.OnlineMeeting = "teams"
 	}

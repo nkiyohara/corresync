@@ -29,7 +29,7 @@ func (client *Client) CreateMailDraft(
 	if err != nil {
 		return application.MailDraft{}, err
 	}
-	raw, messageID, err := client.buildMessage(composition)
+	raw, messageID, err := client.buildMessage(composition, true)
 	if err != nil {
 		return application.MailDraft{}, err
 	}
@@ -64,7 +64,7 @@ func (client *Client) SendMail(
 	if err != nil {
 		return application.MailSendResult{}, err
 	}
-	raw, messageID, err := client.buildMessage(composition)
+	raw, messageID, err := client.buildMessage(composition, false)
 	if err != nil {
 		return application.MailSendResult{}, err
 	}
@@ -77,7 +77,19 @@ func (client *Client) SendMail(
 		append([]string(nil), composition.To...),
 		composition.CC...,
 	), composition.BCC...)
-	err = client.withSMTP(ctx, func(connection *smtp.Client) error {
+	err = client.submitMessage(ctx, recipients, raw)
+	if err != nil {
+		return application.MailSendResult{}, err
+	}
+	return client.storeSentMessage(ctx, raw, messageID)
+}
+
+func (client *Client) submitMessage(
+	ctx context.Context,
+	recipients []string,
+	raw []byte,
+) error {
+	return client.withSMTP(ctx, func(connection *smtp.Client) error {
 		if err := connection.Mail(client.sender, nil); err != nil {
 			return err
 		}
@@ -99,13 +111,18 @@ func (client *Client) SendMail(
 		}
 		return nil
 	})
-	if err != nil {
-		return application.MailSendResult{}, err
-	}
+}
+
+func (client *Client) storeSentMessage(
+	ctx context.Context,
+	raw []byte,
+	messageID string,
+) (application.MailSendResult, error) {
 	sentFolder := application.MailFolder{
 		Kind: application.MailFolderDistinguished, ID: "sentitems",
 	}
 	var id, changeKey string
+	var err error
 	if client.smtpStoresSent {
 		id, changeKey, err = client.findMessage(
 			ctx,
@@ -386,8 +403,16 @@ func (client *Client) DeleteMail(
 	if err != nil {
 		return err
 	}
+	return client.deleteExactMessage(ctx, reference, input.ChangeKey)
+}
+
+func (client *Client) deleteExactMessage(
+	ctx context.Context,
+	reference messageReference,
+	changeKey string,
+) error {
 	return client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		if _, err := requireState(connection, reference, input.ChangeKey); err != nil {
+		if _, err := requireState(connection, reference, changeKey); err != nil {
 			return err
 		}
 		supported, err := connection.Support("UIDPLUS")
@@ -636,6 +661,7 @@ func imapAddressesExcluding(
 
 func (client *Client) buildMessage(
 	composition mailComposition,
+	includeBCC bool,
 ) ([]byte, string, error) {
 	if composition.InReplyTo != "" {
 		normalized, err := normalizeMessageID(composition.InReplyTo)
@@ -667,6 +693,9 @@ func (client *Client) buildMessage(
 		"Message-Id":   []string{messageID},
 		"MIME-Version": []string{"1.0"},
 	}
+	if includeBCC && len(composition.BCC) != 0 {
+		headers.Set("Bcc", strings.Join(composition.BCC, ", "))
+	}
 	if composition.InReplyTo != "" {
 		headers.Set("In-Reply-To", composition.InReplyTo)
 	}
@@ -674,7 +703,7 @@ func (client *Client) buildMessage(
 		headers.Set("References", composition.References)
 	}
 	for _, name := range []string{
-		"From", "To", "Cc", "Subject", "Date", "Message-Id",
+		"From", "To", "Cc", "Bcc", "Subject", "Date", "Message-Id",
 		"In-Reply-To", "References", "MIME-Version",
 	} {
 		if value := headers.Get(name); value != "" {

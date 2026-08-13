@@ -235,6 +235,19 @@ printf 'Synthetic body.\n' | \
     --subject 'Send example' \
     --body-file - \
     --approve
+
+# Preview one existing saved draft without reconstructing it
+corr mail send-draft \
+  --account work \
+  --draft-id opaque-draft-id \
+  --draft-change-key opaque-change-key
+
+# Send only that reviewed provider version
+corr mail send-draft \
+  --account work \
+  --draft-id opaque-draft-id \
+  --draft-change-key opaque-change-key \
+  --approve
 ```
 
 Compose supports new, reply, reply-all, and forward modes; text or HTML; and
@@ -243,7 +256,11 @@ version, recipients, subject, body format/size/digest, and attachment
 size/digest. It does not print the body.
 
 A draft always uses save-only semantics. Every external send requires exact
-commit. Changing any input after preview invalidates the approval.
+commit. Changing any input after preview invalidates the approval. Existing-
+draft send is advertised per authenticated account: Outlook Web uses the exact
+Exchange ItemId and ChangeKey; IMAP/SMTP requires immutable UID content,
+Drafts and Sent mailboxes, and UIDPLUS targeted cleanup. Routes without an
+atomic reviewed-version precondition report an explicit degradation.
 
 ## Mail organization
 

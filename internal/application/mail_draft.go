@@ -320,12 +320,7 @@ func validateMailAddress(value string) error {
 
 // Review summarizes content while binding the full body through SHA-256.
 func (input MailDraftInput) Review() MailReview {
-	preview := input.Body
-	if utf8.RuneCountInString(preview) > mailDraftPreviewRunes {
-		runes := []rune(preview)
-		preview = string(runes[:mailDraftPreviewRunes-1]) + "…"
-	}
-	digest := sha256.Sum256([]byte(input.Body))
+	preview, bodySHA256 := reviewMailBody(input.Body)
 	attachments := make([]MailAttachmentReview, 0, len(input.Attachments))
 	for _, attachment := range input.Attachments {
 		attachmentDigest := sha256.Sum256(attachment.Content)
@@ -337,11 +332,21 @@ func (input MailDraftInput) Review() MailReview {
 	return MailReview{
 		To: append([]string(nil), input.To...), CC: append([]string(nil), input.CC...),
 		BCC: append([]string(nil), input.BCC...), Subject: input.Subject,
-		BodyPreview: preview, BodyBytes: len(input.Body), BodySHA256: hex.EncodeToString(digest[:]),
+		BodyPreview: preview, BodyBytes: len(input.Body), BodySHA256: bodySHA256,
 		BodyFormat: input.EffectiveBodyFormat(), ComposeMode: input.EffectiveComposeMode(),
 		ReferenceMessageID: input.ReferenceMessageID, ReferenceChangeKey: input.ReferenceChangeKey,
 		Attachments: attachments,
 	}
+}
+
+func reviewMailBody(body string) (string, string) {
+	preview := body
+	if utf8.RuneCountInString(preview) > mailDraftPreviewRunes {
+		runes := []rune(preview)
+		preview = string(runes[:mailDraftPreviewRunes-1]) + "…"
+	}
+	digest := sha256.Sum256([]byte(body))
+	return preview, hex.EncodeToString(digest[:])
 }
 
 // EffectiveComposeMode applies the backward-compatible new-message default.
