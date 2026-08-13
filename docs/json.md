@@ -184,6 +184,25 @@ agent conversations.
 Connection is `not_inspected` during read-only detection. A detected executable
 must never be interpreted as a connected or supported integration.
 
+`integrations plan --json` and mutation commands with `--json` emit a
+preview-only object with `schemaVersion` and one typed plan per selected host.
+A plan binds the operation, host, scope, server name, request digest, previous
+inspection, exact components, executable-plus-argv or file/package actions,
+verification, recovery/removal steps, and reload requirement. Commands can
+include a reviewed working directory; they are never shell strings. Absolute
+paths and fingerprints make these private local diagnostics.
+
+Inspection states are `absent`, `healthy`, `disabled`, `stale_path`,
+`version_drift`, `name_conflict`, `malformed`, `unreadable`, and
+`adapter_unavailable`. Terminal application reports per-host results as
+`applied_and_verified`, `applied_reload_required`, `already_current`,
+`already_absent`, `skipped_by_user`, `blocked_before_change`,
+`failed_previous_state_preserved`, or `failed_after_change`. JSON never prompts
+or applies a lifecycle plan; `--json --yes` is invalid.
+
+`integrations doctor --json` returns the same fixed inspection shape without
+mutating or reading agent conversations, credentials, mail, or calendar data.
+
 ## Auth, daemon, config, doctor, version, and update
 
 - `auth status --json`: content-free account lifecycle, capability, and

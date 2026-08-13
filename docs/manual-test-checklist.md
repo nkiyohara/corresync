@@ -322,6 +322,27 @@ output. Repeat from local, SSH, or WSL contexts in scope for the observation;
 the reported context must match. Detection must not change any host config,
 start an agent process, read an agent conversation, or contact the network.
 
+With a synthetic account configured, preview two installed hosts before
+changing them:
+
+```console
+corr integrations plan codex cursor
+corr integrations setup codex cursor
+corr integrations doctor
+corr integrations repair codex
+corr integrations remove codex cursor
+```
+
+Confirm the grouped preview shows exact executable/argv or file/package
+targets, asks once before mutation, and reports each host independently. Repeat
+with `--json` and verify no mutation occurs; `--json --yes` must fail. Introduce
+one stale absolute `corr` path, one disabled managed entry, and one unrelated
+same-name entry. Repair only the stale/disabled Corresync-owned state and block
+the conflict. Make the second host fail and verify the first remains healthy;
+rerun and confirm only the incomplete host changes. Inspect recovery copies,
+private user modes, reload guidance, and exact removal without opening any mail
+or calendar data.
+
 ## 9. Read-only MCP
 
 Inspect before registering:
