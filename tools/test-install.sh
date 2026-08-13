@@ -70,7 +70,7 @@ if [ "\${1:-}" = "version" ] && [ "\${2:-}" = "--json" ]; then
   "version": "9.8.7",
   "commit": "0123456789abcdef0123456789abcdef01234567",
   "buildDate": "2026-07-29T00:00:00Z",
-  "goVersion": "go1.26.5",
+  "goVersion": "go1.26.6",
   "os": "${test_operating_system}",
   "arch": "${test_architecture}"
 }
