@@ -139,6 +139,11 @@ gateway or tenant administration service.
   conflicts, and compare the post-preview fingerprint before changing only the
   exact Corresync entry. Use a private same-filesystem temporary file, sync,
   atomic replacement, and one bounded permission-preserving recovery copy.
+- On Windows, rely on the signed-in user's inherited filesystem ACLs rather
+  than synthesized Unix owner/mode bits, reject all reparse points including
+  directory junctions, and treat directory-sync durability as unavailable.
+  Re-inspect actual state through `doctor` after a crash, require the previewed
+  `repair` flow for any new write, and retain the bounded recovery copy.
 - Stage native packages only from the installed, reviewed bundle tree into a
   private Corresync-owned directory. Strip the package's duplicate MCP
   declaration so the separately previewed absolute executable/config launch

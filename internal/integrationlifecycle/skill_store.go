@@ -132,7 +132,7 @@ func (SkillStore) Inspect(descriptor skillDescriptor) (ComponentInspection, erro
 		component.Detail = "The portable Skill directory is unreadable."
 		return component, nil //nolint:nilerr // Filesystem failures are represented by the typed component state.
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
+	if !info.IsDir() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
 		component.State = StateNameConflict
 		component.Detail = "The portable Skill name belongs to an unmanaged directory."
 		return component, nil
@@ -267,7 +267,7 @@ func validateSkillTarget(descriptor skillDescriptor) error {
 	}
 	for directory := filepath.Dir(descriptor.targetRoot); ; directory = filepath.Dir(directory) {
 		info, statErr := os.Lstat(directory)
-		if statErr == nil && (!info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(info) || WritableByOtherUsers(info)) {
+		if statErr == nil && (!info.IsDir() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) || WritableByOtherUsers(info)) {
 			return fmt.Errorf("portable Skill parent has an unsafe type, owner, or mode: %s", directory)
 		}
 		if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
@@ -282,7 +282,7 @@ func validateSkillTarget(descriptor skillDescriptor) error {
 
 func readSkillTree(root string) (marker, skill []byte, fingerprint string, err error) {
 	rootInfo, err := os.Lstat(root)
-	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 ||
+	if err != nil || !rootInfo.IsDir() || IsSymlinkOrReparsePoint(rootInfo) ||
 		!ownedByCurrentUser(rootInfo) || WritableByOtherUsers(rootInfo) {
 		return nil, nil, "", errors.Join(err, errors.New("portable Skill root is unsafe"))
 	}
@@ -303,7 +303,7 @@ func readSkillTree(root string) (marker, skill []byte, fingerprint string, err e
 			return errors.New("portable Skill directory contains an unexpected file")
 		}
 		info, statErr := entry.Info()
-		if statErr != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 ||
+		if statErr != nil || !info.Mode().IsRegular() || IsSymlinkOrReparsePoint(info) ||
 			!ownedByCurrentUser(info) || WritableByOtherUsers(info) || info.Size() > maximumPackageFileSize {
 			return errors.New("portable Skill directory contains an unsafe file")
 		}

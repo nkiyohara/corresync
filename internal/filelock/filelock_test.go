@@ -59,9 +59,7 @@ func TestAcquireSidecarPreservesExistingDirectoryMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o755 {
-		t.Fatalf("directory mode = %o", info.Mode().Perm())
-	}
+	assertDirectoryMode(t, info, 0o755)
 }
 
 func TestAcquireRejectsSymlinkLockPath(t *testing.T) {

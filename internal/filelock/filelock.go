@@ -45,7 +45,7 @@ func acquire(ctx context.Context, path string, protectDirectory bool) (*Lock, er
 		}
 	}
 	directoryInfo, err := os.Lstat(directory)
-	if err != nil || !directoryInfo.IsDir() || directoryInfo.Mode()&os.ModeSymlink != 0 {
+	if err != nil || !directoryInfo.IsDir() || isLinkLike(directoryInfo) {
 		if err != nil {
 			return nil, fmt.Errorf("inspect lock directory: %w", err)
 		}
@@ -66,7 +66,7 @@ func acquire(ctx context.Context, path string, protectDirectory bool) (*Lock, er
 	name := filepath.Base(path)
 	var expected os.FileInfo
 	if info, err := root.Lstat(name); err == nil {
-		if !info.Mode().IsRegular() {
+		if !info.Mode().IsRegular() || isLinkLike(info) {
 			_ = root.Close()
 			return nil, errors.New("lock path exists and is not a regular file")
 		}
@@ -83,7 +83,8 @@ func acquire(ctx context.Context, path string, protectDirectory bool) (*Lock, er
 	}
 	opened, err := file.Stat()
 	current, currentErr := root.Lstat(name)
-	if err != nil || currentErr != nil || !opened.Mode().IsRegular() || !current.Mode().IsRegular() ||
+	if err != nil || currentErr != nil || !opened.Mode().IsRegular() || isLinkLike(opened) ||
+		!current.Mode().IsRegular() || isLinkLike(current) ||
 		!os.SameFile(current, opened) || expected != nil && !os.SameFile(expected, opened) {
 		_ = errors.Join(file.Close(), root.Close())
 		if err != nil {

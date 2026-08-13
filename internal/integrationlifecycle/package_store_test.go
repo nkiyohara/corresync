@@ -95,9 +95,10 @@ func TestPackageStoreStagesUpdatesAndRemovesOnlyManagedTree(t *testing.T) {
 		t.Fatalf("staged manifest = %s, error %v", manifest, err)
 	}
 	markerInfo, err := os.Stat(filepath.Join(descriptor.targetRoot, packageMarkerName))
-	if err != nil || markerInfo.Mode().Perm() != 0o600 {
+	if err != nil {
 		t.Fatalf("marker mode = %v, error %v", markerInfo, err)
 	}
+	assertPermissionBits(t, markerInfo, 0o600)
 
 	if err := store.Stage(t.Context(), descriptor, descriptor.sourceFingerprint, fingerprint); err != nil {
 		t.Fatal(err)

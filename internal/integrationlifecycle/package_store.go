@@ -131,7 +131,7 @@ func validateBundleRoot(root string) error {
 		return errors.New("integration bundle root must be clean and absolute")
 	}
 	info, err := os.Lstat(root)
-	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 ||
+	if err != nil || !info.IsDir() || IsSymlinkOrReparsePoint(info) ||
 		!OwnedByCurrentUserOrRoot(info) || WritableByOtherUsers(info) {
 		return errors.Join(err, errors.New("integration bundle root has an unsafe type, owner, or mode"))
 	}
@@ -171,7 +171,7 @@ func readPackageSource(root, relative string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 ||
+	if !info.Mode().IsRegular() || IsSymlinkOrReparsePoint(info) ||
 		!OwnedByCurrentUserOrRoot(info) || WritableByOtherUsers(info) ||
 		info.Size() > maximumPackageFileSize {
 		return nil, errors.New("integration package source is not a bounded regular file")
@@ -181,7 +181,7 @@ func readPackageSource(root, relative string) ([]byte, error) {
 		if statErr != nil {
 			return nil, statErr
 		}
-		if !parent.IsDir() || parent.Mode()&os.ModeSymlink != 0 ||
+		if !parent.IsDir() || IsSymlinkOrReparsePoint(parent) ||
 			!OwnedByCurrentUserOrRoot(parent) || WritableByOtherUsers(parent) {
 			return nil, errors.New("integration package source has an unsafe parent directory")
 		}
@@ -242,7 +242,7 @@ func (PackageStore) InspectTarget(descriptor packageDescriptor) (State, string, 
 	if err != nil {
 		return StateUnreadable, "", "", err
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
+	if !info.IsDir() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
 		return StateNameConflict, "", "", errors.New("managed integration package target is not Corresync-owned")
 	}
 	data, err := readPackageMarker(descriptor.targetRoot)
@@ -440,7 +440,7 @@ func syncPackageTree(root string) error {
 			return err
 		}
 		anchoredInfo, err := rootHandle.Lstat(relative)
-		if err != nil || !os.SameFile(pathInfo, anchoredInfo) || anchoredInfo.Mode()&os.ModeSymlink != 0 {
+		if err != nil || !os.SameFile(pathInfo, anchoredInfo) || IsSymlinkOrReparsePoint(anchoredInfo) {
 			return errors.Join(err, errors.New("managed package staging changed while syncing"))
 		}
 		if anchoredInfo.IsDir() {
@@ -469,7 +469,7 @@ func requireManagedPackage(descriptor packageDescriptor, root string) error {
 	if err != nil {
 		return err
 	}
-	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
+	if !info.IsDir() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
 		return errors.New("package target is not a current-user directory")
 	}
 	data, err := readPackageMarker(root)
@@ -512,7 +512,7 @@ func packageTreeFingerprint(descriptor packageDescriptor, marker []byte) (string
 		relative = filepath.ToSlash(relative)
 		if entry.IsDir() {
 			info, statErr := entry.Info()
-			if statErr != nil || !expectedDirectories[relative] || info.Mode()&os.ModeSymlink != 0 ||
+			if statErr != nil || !expectedDirectories[relative] || IsSymlinkOrReparsePoint(info) ||
 				!ownedByCurrentUser(info) || WritableByOtherUsers(info) {
 				return errors.New("managed package tree contains an unsafe or unexpected directory")
 			}
@@ -525,7 +525,7 @@ func packageTreeFingerprint(descriptor packageDescriptor, marker []byte) (string
 		if err != nil {
 			return err
 		}
-		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(info) ||
+		if !info.Mode().IsRegular() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) ||
 			WritableByOtherUsers(info) || info.Size() > maximumPackageFileSize {
 			return errors.New("managed package tree contains an unsafe file")
 		}
@@ -595,7 +595,7 @@ func validateManagedPackageTarget(descriptor packageDescriptor) error {
 		}
 	}
 	if info, err := os.Lstat(descriptor.configurationRoot); err == nil {
-		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
+		if !info.IsDir() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
 			return errors.New("managed integration package configuration root has an unsafe type, owner, or mode")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -609,7 +609,7 @@ func validateManagedPackageTarget(descriptor packageDescriptor) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
+		if !info.IsDir() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
 			return fmt.Errorf("managed integration package parent has an unsafe type, owner, or mode: %s", directory)
 		}
 	}
@@ -622,7 +622,7 @@ func readPackageMarker(root string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(info) ||
+	if !info.Mode().IsRegular() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) ||
 		WritableByOtherUsers(info) || info.Size() > maximumPackageFileSize {
 		return nil, errors.New("managed integration package marker is unsafe")
 	}

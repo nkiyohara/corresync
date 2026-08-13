@@ -299,7 +299,7 @@ func validateTargetParents(path string, request Request, environment Environment
 		return errors.New("integration configuration root must be absolute")
 	}
 	if info, err := os.Lstat(root); err == nil {
-		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 || !ownedByCurrentUser(info) ||
+		if !info.IsDir() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) ||
 			WritableByOtherUsers(info) {
 			return fmt.Errorf("integration configuration root has an unsafe type, owner, or mode: %s", root)
 		}
@@ -314,7 +314,7 @@ func validateTargetParents(path string, request Request, environment Environment
 	for directory := filepath.Dir(path); directory != root; directory = filepath.Dir(directory) {
 		info, err := os.Lstat(directory)
 		if err == nil {
-			if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() || !ownedByCurrentUser(info) ||
+			if IsSymlinkOrReparsePoint(info) || !info.IsDir() || !ownedByCurrentUser(info) ||
 				WritableByOtherUsers(info) {
 				return fmt.Errorf("host configuration parent has an unsafe type, owner, or mode: %s", directory)
 			}
@@ -332,7 +332,7 @@ func writeAtomicPrivate(path string, data []byte, mode os.FileMode) error {
 		return err
 	}
 	if info, err := os.Lstat(path); err == nil {
-		if !info.Mode().IsRegular() || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
+		if !info.Mode().IsRegular() || IsSymlinkOrReparsePoint(info) || !ownedByCurrentUser(info) || WritableByOtherUsers(info) {
 			return errors.New("target exists with an unsafe file type, owner, or mode")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {

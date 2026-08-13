@@ -14,6 +14,12 @@ func ownedByCurrentUser(info os.FileInfo) bool {
 	return ok && stat.Uid == uint32(os.Getuid())
 }
 
+// IsSymlinkOrReparsePoint reports link-like filesystem objects that must not
+// participate in a reviewed lifecycle path.
+func IsSymlinkOrReparsePoint(info os.FileInfo) bool {
+	return info.Mode()&os.ModeSymlink != 0
+}
+
 // WritableByOtherUsers reports whether Unix group or other permission bits
 // allow a different user to replace or modify a reviewed path component.
 func WritableByOtherUsers(info os.FileInfo) bool {

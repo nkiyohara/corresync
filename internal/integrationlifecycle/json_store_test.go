@@ -53,9 +53,7 @@ func TestJSONAdapterSetupIsAtomicPrivateAndIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("mode = %o", info.Mode().Perm())
-	}
+	assertPermissionBits(t, info, 0o600)
 	second, err := engine.Plan(t.Context(), request)
 	if err != nil {
 		t.Fatal(err)
@@ -87,9 +85,7 @@ func TestJSONAdapterPreservesExistingHostDirectoryMode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o755 {
-		t.Fatalf("host directory mode = %o", info.Mode().Perm())
-	}
+	assertPermissionBits(t, info, 0o755)
 }
 
 func TestJSONAdapterRepairPreservesUnrelatedStateAndRecoveryCopy(t *testing.T) {
@@ -191,6 +187,7 @@ func TestJSONAdapterRemoveDeletesOnlyOwnedEntry(t *testing.T) {
 
 func TestJSONAdapterRefusesUnsafeRecoveryFileWithoutChangingTarget(t *testing.T) {
 	t.Parallel()
+	requirePermissionBits(t)
 	engine, environment := fileEngine(t)
 	request := cursorRequest(environment, OperationRepair)
 	path := filepath.Join(environment.HomeDirectory, ".cursor", "mcp.json")
@@ -261,6 +258,9 @@ func TestJSONAdapterFailsClosedOnConflictMalformedModeAndSymlink(t *testing.T) {
 	for _, fixture := range fixtures {
 		t.Run(fixture.name, func(t *testing.T) {
 			t.Parallel()
+			if fixture.name == "unsafe mode" {
+				requirePermissionBits(t)
+			}
 			engine, environment := fileEngine(t)
 			request := cursorRequest(environment, OperationSetup)
 			path := filepath.Join(environment.HomeDirectory, ".cursor", "mcp.json")

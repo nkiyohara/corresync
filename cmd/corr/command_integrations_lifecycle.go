@@ -363,7 +363,7 @@ func findIntegrationBundleDirectory(executable string) (string, error) {
 			"integrations/gemini-cli/corresync/gemini-extension.json",
 		} {
 			info, statErr := os.Lstat(filepath.Join(candidate, filepath.FromSlash(relative)))
-			if statErr != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			if statErr != nil || !info.Mode().IsRegular() || integrationlifecycle.IsSymlinkOrReparsePoint(info) {
 				valid = false
 				break
 			}
@@ -399,7 +399,7 @@ func verifyIntegrationExecutable(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("inspect Corresync executable %s: %w", resolved, err)
 	}
-	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+	if !info.Mode().IsRegular() || integrationlifecycle.IsSymlinkOrReparsePoint(info) {
 		return "", fmt.Errorf("configured executable is not a regular file: %s", resolved)
 	}
 	if !integrationlifecycle.OwnedByCurrentUserOrRoot(info) {
@@ -417,7 +417,7 @@ func verifyIntegrationExecutableParents(path string) error {
 		if err != nil {
 			return fmt.Errorf("inspect Corresync executable parent %s: %w", directory, err)
 		}
-		if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		if !info.IsDir() || integrationlifecycle.IsSymlinkOrReparsePoint(info) {
 			return fmt.Errorf("corresync executable parent has an unsafe type: %s", directory)
 		}
 		if !integrationlifecycle.OwnedByCurrentUserOrRoot(info) {

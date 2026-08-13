@@ -135,8 +135,8 @@ jobs:
           go-version: "1.26.x"
           cache: true
 
-      - name: Test Windows lifecycle package
-        run: go test -shuffle=on ./internal/integrationlifecycle
+      - name: Test Windows lifecycle packages
+        run: go test -shuffle=on ./internal/filelock ./internal/integrationlifecycle
 
       - name: Test Windows integration CLI
         shell: pwsh

@@ -158,6 +158,13 @@ a private same-filesystem temporary file, sync and atomic replacement, and one
 permission-preserving `.corresync.bak` recovery copy. No adapter writes a
 credential, secret, environment token, or host-level auto-approval rule.
 
+On Windows, lifecycle paths inherit the signed-in user's filesystem ACLs;
+Go's synthesized Unix owner and mode bits are not treated as ACL evidence.
+Corresync still rejects every reparse point (including directory junctions),
+unsafe file types, and post-preview changes. Directory metadata cannot be
+flushed portably on Windows; after a crash, `doctor` and `repair` re-inspect
+the actual state, and the bounded managed recovery copy remains available.
+
 Absolute evidence locations can identify a local username or installation
 layout. They are suitable for private local diagnostics and structured setup,
 not for public issue reports. JSON contains no environment values, file

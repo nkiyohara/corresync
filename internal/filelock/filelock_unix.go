@@ -20,6 +20,10 @@ func tryLock(file *os.File) (bool, error) {
 	return false, err
 }
 
+func isLinkLike(info os.FileInfo) bool {
+	return info.Mode()&os.ModeSymlink != 0
+}
+
 func unlock(file *os.File) error {
 	return unix.Flock(int(file.Fd()), unix.LOCK_UN)
 }
