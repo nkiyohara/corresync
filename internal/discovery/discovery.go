@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	defaultTimeout = 8 * time.Second
-	maxRedirects   = 4
+	defaultTimeout          = 8 * time.Second
+	maxRedirects            = 4
+	maxSRVRecordsPerService = 4
 )
 
 // Resolver is the credential-free DNS surface used during discovery.
@@ -123,23 +124,29 @@ func (discoverer *Discoverer) Discover(
 			}
 			diagnostics = append(diagnostics, diagnostic(source, "observed", domainName))
 			slices.SortFunc(records, compareSRV)
+			accepted := 0
 			for _, record := range records {
-				target := strings.TrimSuffix(strings.ToLower(record.Target), ".")
-				if target == "" || record.Port == 0 {
+				endpoint, valid := discoveredSRVEndpoint(
+					query.kind,
+					record.Target,
+					record.Port,
+				)
+				if !valid {
 					continue
 				}
+				accepted++
 				collector.add(candidateInput{
 					provider: query.provider, confidence: 80, authentication: query.auth,
 					explicit: true,
-					endpoint: application.DiscoveredEndpoint{
-						Kind:  query.kind,
-						Value: net.JoinHostPort(target, strconv.Itoa(int(record.Port))),
-					},
+					endpoint: endpoint,
 					evidence: application.DiscoveryEvidence{
 						Source: source,
 						Detail: domainName,
 					},
 				})
+				if accepted == maxSRVRecordsPerService {
+					break
+				}
 			}
 		case ctx.Err() != nil:
 			return application.AccountDiscoveryObservation{}, ctx.Err()
@@ -343,6 +350,51 @@ func compareSRV(left, right *net.SRV) int {
 		return compared
 	}
 	return int(left.Port) - int(right.Port)
+}
+
+func discoveredSRVEndpoint(
+	kind string,
+	target string,
+	port uint16,
+) (application.DiscoveredEndpoint, bool) {
+	host, valid := normalizeSRVTarget(target)
+	if !valid || port == 0 {
+		return application.DiscoveredEndpoint{}, false
+	}
+	hostPort := net.JoinHostPort(host, strconv.Itoa(int(port)))
+	value := hostPort
+	if kind == "caldav" {
+		value = (&url.URL{
+			Scheme: "https",
+			Host:   hostPort,
+			Path:   "/",
+		}).String()
+	}
+	return application.DiscoveredEndpoint{Kind: kind, Value: value}, true
+}
+
+func normalizeSRVTarget(target string) (string, bool) {
+	host := strings.TrimSuffix(target, ".")
+	if host == "" || strings.TrimSpace(host) != host || len(host) > 253 {
+		return "", false
+	}
+	host = strings.ToLower(host)
+	if net.ParseIP(host) != nil {
+		return "", false
+	}
+	for _, label := range strings.Split(host, ".") {
+		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return "", false
+		}
+		for _, character := range label {
+			if character != '-' &&
+				(character < 'a' || character > 'z') &&
+				(character < '0' || character > '9') {
+				return "", false
+			}
+		}
+	}
+	return host, true
 }
 
 func classifyLookupError(err error) string {

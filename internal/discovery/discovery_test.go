@@ -98,8 +98,133 @@ func TestDiscoverCombinesCredentialFreeEvidence(t *testing.T) {
 	if len(caldav.Endpoints) != 2 {
 		t.Fatalf("CalDAV candidate did not merge SRV and well-known: %#v", caldav)
 	}
+	if caldav.Endpoints[0] != (application.DiscoveredEndpoint{
+		Kind: "caldav", Value: "https://calendar.example.test:443/",
+	}) {
+		t.Fatalf("CalDAV SRV endpoint = %#v", caldav.Endpoints[0])
+	}
 	if len(observation.Diagnostics) == 0 {
 		t.Fatal("discovery omitted diagnostics")
+	}
+}
+
+func TestDiscoverConstructsCredentialFreeCalDAVSRVURL(t *testing.T) {
+	t.Parallel()
+	discoverer := New(Options{
+		Resolver: resolverStub{
+			mxErr: errors.New("offline"),
+			srv: map[string][]*net.SRV{
+				"caldavs": {{Target: "CalDAV.iCloud.com.", Port: 443}},
+			},
+			srvErr: map[string]error{
+				"imaps": errors.New("offline"), "submission": errors.New("offline"),
+				"jmap": errors.New("offline"),
+			},
+		},
+		Prober: proberStub{errors: map[string]error{
+			"https://example.test/.well-known/jmap":   errors.New("offline"),
+			"https://example.test/.well-known/caldav": errors.New("offline"),
+		}},
+	})
+	observation, err := discoverer.Discover(t.Context(), "reader@example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(observation.Candidates) != 1 {
+		t.Fatalf("candidates = %#v", observation.Candidates)
+	}
+	candidate := observation.Candidates[0]
+	if candidate.Provider != domain.ProviderCalDAV ||
+		candidate.Authentication != application.DiscoveryExternalCredential ||
+		!candidate.RequiresExplicitSelection ||
+		len(candidate.Endpoints) != 1 ||
+		candidate.Endpoints[0] != (application.DiscoveredEndpoint{
+			Kind: "caldav", Value: "https://caldav.icloud.com:443/",
+		}) ||
+		len(candidate.Evidence) != 1 ||
+		candidate.Evidence[0].Source != "srv_caldavs" {
+		t.Fatalf("CalDAV candidate = %#v", candidate)
+	}
+}
+
+func TestDiscoverRejectsInvalidSRVEndpoints(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name   string
+		target string
+		port   uint16
+	}{
+		{name: "service unavailable", target: ".", port: 443},
+		{name: "empty target", port: 443},
+		{name: "empty label", target: "caldav..example.test.", port: 443},
+		{name: "leading hyphen", target: "-caldav.example.test.", port: 443},
+		{name: "ambiguous delimiter", target: "caldav.example.test:443.", port: 443},
+		{name: "IP literal", target: "127.0.0.1.", port: 443},
+		{name: "zero port", target: "caldav.example.test.", port: 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			discoverer := New(Options{
+				Resolver: resolverStub{
+					mxErr: errors.New("offline"),
+					srv: map[string][]*net.SRV{
+						"caldavs": {{Target: test.target, Port: test.port}},
+					},
+					srvErr: map[string]error{
+						"imaps": errors.New("offline"), "submission": errors.New("offline"),
+						"jmap": errors.New("offline"),
+					},
+				},
+				Prober: proberStub{errors: map[string]error{
+					"https://example.test/.well-known/jmap":   errors.New("offline"),
+					"https://example.test/.well-known/caldav": errors.New("offline"),
+				}},
+			})
+			observation, err := discoverer.Discover(t.Context(), "reader@example.test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(observation.Candidates) != 0 {
+				t.Fatalf("invalid SRV target produced candidates = %#v", observation.Candidates)
+			}
+		})
+	}
+}
+
+func TestDiscoverBoundsSRVEndpointsPerService(t *testing.T) {
+	t.Parallel()
+	discoverer := New(Options{
+		Resolver: resolverStub{
+			mxErr: errors.New("offline"),
+			srv: map[string][]*net.SRV{
+				"caldavs": {
+					{Target: "a.example.test.", Port: 443},
+					{Target: "b.example.test.", Port: 443},
+					{Target: "c.example.test.", Port: 443},
+					{Target: "d.example.test.", Port: 443},
+					{Target: "e.example.test.", Port: 443},
+				},
+			},
+			srvErr: map[string]error{
+				"imaps": errors.New("offline"), "submission": errors.New("offline"),
+				"jmap": errors.New("offline"),
+			},
+		},
+		Prober: proberStub{errors: map[string]error{
+			"https://example.test/.well-known/jmap":   errors.New("offline"),
+			"https://example.test/.well-known/caldav": errors.New("offline"),
+		}},
+	})
+	observation, err := discoverer.Discover(t.Context(), "reader@example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(observation.Candidates) != 1 ||
+		len(observation.Candidates[0].Endpoints) != maxSRVRecordsPerService {
+		t.Fatalf("bounded candidates = %#v", observation.Candidates)
+	}
+	if endpoint := observation.Candidates[0].Endpoints[3].Value; endpoint != "https://d.example.test:443/" {
+		t.Fatalf("last deterministic endpoint = %q", endpoint)
 	}
 }
 

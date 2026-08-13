@@ -423,6 +423,81 @@ func TestAccountAddPersistsMixedIMAPAndCalDAVRoutes(t *testing.T) {
 	}
 }
 
+func TestAccountAddUsesDiscoveredCalDAVSRVEndpoint(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{{
+				Provider:                  domain.ProviderCalDAV,
+				Confidence:                80,
+				Authentication:            application.DiscoveryExternalCredential,
+				RequiresExplicitSelection: true,
+				Endpoints: []application.DiscoveredEndpoint{{
+					Kind: "caldav", Value: "https://caldav.icloud.com:443/",
+				}},
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "srv_caldavs", Detail: "example.test",
+				}},
+			}},
+		},
+	}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address:                   "reader@example.test",
+		Alias:                     "calendar",
+		MailProvider:              "none",
+		CalendarProvider:          string(domain.ProviderCalDAV),
+		CalendarCredentialBackend: "os-keyring",
+		CalendarCredentialKey:     "icloud-calendar",
+		ApproveCalendarCredential: true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["calendar"]
+	if account.Mail != nil || account.Calendar == nil || account.Calendar.CalDAV == nil ||
+		account.Calendar.CalDAV.Endpoint != "https://caldav.icloud.com:443/" {
+		t.Fatalf("persisted CalDAV route = %#v", account)
+	}
+	if !strings.Contains(stdout.String(), "https://caldav.icloud.com:443/") ||
+		!strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("account output = %q", stdout.String())
+	}
+}
+
+func TestCandidateHTTPSEndpointRejectsUnsafeOrMalformedValues(t *testing.T) {
+	t.Parallel()
+	for _, value := range []string{
+		"http://calendar.example.test/",
+		"https://",
+		"https://user:secret@calendar.example.test/",
+		"https://calendar.example.test:0/",
+		"https://calendar.example.test:/",
+		"https://calendar.example.test:65536/",
+		"https://calendar.example.test/?candidate=untrusted",
+		"https://calendar.example.test/?",
+		"https://calendar.example.test/#fragment",
+	} {
+		candidate := application.ProviderCandidate{
+			Endpoints: []application.DiscoveredEndpoint{{Kind: "caldav", Value: value}},
+		}
+		if endpoint := candidateHTTPSEndpoint(candidate, "caldav"); endpoint != "" {
+			t.Errorf("candidateHTTPSEndpoint(%q) = %q", value, endpoint)
+		}
+	}
+	valid := application.ProviderCandidate{
+		Endpoints: []application.DiscoveredEndpoint{{
+			Kind: "caldav", Value: "https://calendar.example.test/.well-known/caldav",
+		}},
+	}
+	if endpoint := candidateHTTPSEndpoint(valid, "caldav"); endpoint != "https://calendar.example.test/.well-known/caldav" {
+		t.Errorf("valid well-known endpoint = %q", endpoint)
+	}
+}
+
 func TestAccountAddRejectsExplicitGoogleWhileOAuthApprovalIsPending(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{

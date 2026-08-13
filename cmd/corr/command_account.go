@@ -993,9 +993,22 @@ func candidateHTTPSEndpoint(
 	kind string,
 ) string {
 	for _, endpoint := range candidate.Endpoints {
-		if endpoint.Kind == kind && strings.HasPrefix(endpoint.Value, "https://") {
-			return endpoint.Value
+		if endpoint.Kind != kind {
+			continue
 		}
+		parsed, err := url.Parse(endpoint.Value)
+		if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" ||
+			parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery ||
+			parsed.Fragment != "" || strings.HasSuffix(parsed.Host, ":") {
+			continue
+		}
+		if port := parsed.Port(); port != "" {
+			value, err := strconv.ParseUint(port, 10, 16)
+			if err != nil || value == 0 {
+				continue
+			}
+		}
+		return parsed.String()
 	}
 	return ""
 }
