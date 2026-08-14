@@ -28,7 +28,7 @@ authorized live observations.
 | iCloud guided IMAP/SMTP + CalDAV preset | Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts | Not run | Deterministic only; live-unobserved |
 | Cross-account search and agenda | Isolation, ordering, bounds, partial-failure tests | Not run | Deterministic only |
 | Canonical task model, CLI, MCP, IPC, and cross-account projection | Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests | Not run | Implemented; Microsoft Graph adapter enabled separately |
-| Provider-neutral messaging model, schema, and release gate | Shared synthetic fixtures; account/workspace/actor isolation, bounds, and preview/commit tests | Not run | Included but disabled; provider adapters and surface evidence incomplete |
+| Provider-neutral messaging model, Teams Graph/Web adapters, schema, and release gate | Shared synthetic fixtures; account/workspace/actor isolation, Graph/Web parity, semantic DOM bounds, cursor binding, malformed result, and preview/commit tests | Not run | Included but disabled; Teams Graph/Web live and surface evidence incomplete |
 | Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
 | Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
 | Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |

@@ -16,12 +16,13 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/provider/teamscontract"
 )
 
 var syntheticGraphScopes = []string{
 	"User.Read", "Chat.ReadWrite", "Team.ReadBasic.All", "Channel.ReadBasic.All",
 	"ChannelMessage.Read.All", "ChatMessage.Send", "ChannelMessage.Send",
-	"ChannelMessage.ReadWrite", "Chat.Create", "Channel.Create",
+	"ChannelMessage.ReadWrite",
 	"ChatMember.ReadWrite", "ChannelMember.ReadWrite.All",
 }
 
@@ -74,9 +75,12 @@ func TestTeamsGraphReadsBindChatsChannelsBodiesAndSearch(t *testing.T) {
 	defer func() { _ = client.Close() }()
 
 	capabilities := client.MessageCapabilities()
+	if capabilities != teamscontract.FullCohort(false) {
+		t.Fatalf("Teams Graph parity cohort = %+v", capabilities)
+	}
 	if !capabilities.ListConversations || !capabilities.History || !capabilities.Search ||
 		!capabilities.Send || !capabilities.Edit || !capabilities.Delete ||
-		!capabilities.Reactions || !capabilities.CreateConversation || !capabilities.Membership ||
+		!capabilities.Reactions || capabilities.CreateConversation || !capabilities.Membership ||
 		capabilities.IncrementalSync || capabilities.AttachmentReads || capabilities.AttachmentWrites {
 		t.Fatalf("Teams Graph capabilities = %+v", capabilities)
 	}
@@ -269,6 +273,9 @@ func TestTeamsGraphWritesRevalidateAndPreserveUnknownOutcomes(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("DeleteMessage() error = %v", err)
 	}
+	// Exercise the dormant Graph translator without changing the released
+	// Graph/Web intersection, which disables standalone creation.
+	client.capabilities.CreateConversation = true
 	createdChat, err := client.CreateConversation(t.Context(), application.ConversationCreateInput{
 		MessageWriteRoute: route, Kind: application.ConversationDirect,
 		Visibility: application.ConversationVisibilityPrivate,

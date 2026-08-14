@@ -10,6 +10,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/provider/restapi"
+	"github.com/nkiyohara/corresync/internal/provider/teamscontract"
 )
 
 type graphWriteBody struct {
@@ -38,6 +39,9 @@ func (client *Client) SendMessage(
 	}
 	if len(input.Attachments) != 0 {
 		return application.Message{}, errors.New("the Teams Graph attachment writes are not enabled")
+	}
+	if err := teamscontract.ValidateWriteContent(input.Content); err != nil {
+		return application.Message{}, err
 	}
 	locator, err := decodeGraphConversationID(input.ConversationID)
 	if err != nil {
@@ -90,6 +94,9 @@ func (client *Client) EditMessage(
 	input application.MessageEditInput,
 ) (application.Message, error) {
 	if err := client.requireCapability(client.capabilities.Edit, "message edit"); err != nil {
+		return application.Message{}, err
+	}
+	if err := teamscontract.ValidateWriteContent(input.Content); err != nil {
 		return application.Message{}, err
 	}
 	locator, source, err := client.requireGraphMessageVersion(
@@ -166,6 +173,9 @@ func (client *Client) SetMessageReaction(
 	input application.MessageReactionInput,
 ) (application.MessageReaction, error) {
 	if err := client.requireCapability(client.capabilities.Reactions, "message reactions"); err != nil {
+		return application.MessageReaction{}, err
+	}
+	if err := teamscontract.ValidateReaction(input.Reaction); err != nil {
 		return application.MessageReaction{}, err
 	}
 	locator, _, err := client.requireGraphMessageVersion(

@@ -77,6 +77,12 @@ The released Teams capability manifest is the intersection proven by both
 routes. Graph and Teams Web must pass the same conformance suite and separate
 revision-bound live observations. If either route lacks one cohort operation,
 that operation is unavailable on both routes; there is no route fallback.
+The initial intersection does not expose standalone conversation creation:
+Teams Web keeps a newly addressed chat as a draft until its first message is
+sent, while the closed creation use case has no hidden initial-message side
+effect. Graph's broader chat-creation operation therefore remains dormant too.
+Channel-creation translation may be tested independently, but it does not
+widen the released capability.
 
 Slack uses only supported Slack APIs. The selected workspace, installation,
 token actor, granted scopes, channel membership, retention, distribution
@@ -136,6 +142,7 @@ does not become a support claim; unobserved remains unobserved.
 
 - [Microsoft Graph Teams API overview](https://learn.microsoft.com/graph/api/resources/teams-api-overview)
 - [Microsoft Graph chat message resource](https://learn.microsoft.com/graph/api/resources/chatmessage)
+- [Microsoft Teams chat and channel deep links](https://learn.microsoft.com/microsoftteams/platform/concepts/build-and-test/deep-link-teams)
 - [Slack Web API methods](https://docs.slack.dev/reference/methods/)
 - [Slack conversations history](https://docs.slack.dev/reference/methods/conversations.history/)
 - [Mattermost API documentation](https://developers.mattermost.com/api-documentation/)

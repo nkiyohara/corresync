@@ -1,17 +1,10 @@
 package teamsgraph
 
 import (
-	"encoding/base64"
 	"errors"
 	"net/url"
-	"strings"
-)
 
-const (
-	chatLocatorPrefix      = "tgh1_"
-	channelLocatorPrefix   = "tgc1_"
-	teamContainerPrefix    = "tgt1_"
-	locatorComponentJoiner = "."
+	"github.com/nkiyohara/corresync/internal/provider/teamscontract"
 )
 
 type graphConversationLocator struct {
@@ -23,70 +16,29 @@ type graphConversationLocator struct {
 func (locator graphConversationLocator) isChat() bool { return locator.ChatID != "" }
 
 func encodeGraphChatID(id string) (string, error) {
-	if !validGraphOpaque(id) {
-		return "", errors.New("the Microsoft Graph chat ID is malformed")
-	}
-	return chatLocatorPrefix + base64.RawURLEncoding.EncodeToString([]byte(id)), nil
+	return teamscontract.EncodeChatID(id)
 }
 
 func encodeGraphTeamID(id string) (string, error) {
-	if !validGraphOpaque(id) {
-		return "", errors.New("the Microsoft Graph team ID is malformed")
-	}
-	return teamContainerPrefix + base64.RawURLEncoding.EncodeToString([]byte(id)), nil
+	return teamscontract.EncodeTeamID(id)
 }
 
 func encodeGraphChannelID(teamID, channelID string) (string, error) {
-	if !validGraphOpaque(teamID) || !validGraphOpaque(channelID) {
-		return "", errors.New("the Microsoft Graph channel identity is malformed")
-	}
-	return channelLocatorPrefix + base64.RawURLEncoding.EncodeToString([]byte(teamID)) +
-		locatorComponentJoiner + base64.RawURLEncoding.EncodeToString([]byte(channelID)), nil
+	return teamscontract.EncodeChannelID(teamID, channelID)
 }
 
 func decodeGraphConversationID(value string) (graphConversationLocator, error) {
-	if raw, found := strings.CutPrefix(value, chatLocatorPrefix); found {
-		id, err := decodeGraphLocatorPart(raw)
-		if err != nil {
-			return graphConversationLocator{}, errors.New("the Teams Graph chat locator is malformed")
-		}
-		return graphConversationLocator{ChatID: id}, nil
+	locator, err := teamscontract.DecodeConversationID(value)
+	if err != nil {
+		return graphConversationLocator{}, err
 	}
-	raw, found := strings.CutPrefix(value, channelLocatorPrefix)
-	if !found {
-		return graphConversationLocator{}, errors.New("the Teams Graph conversation locator is malformed")
-	}
-	team, channel, found := strings.Cut(raw, locatorComponentJoiner)
-	if !found || strings.Contains(channel, locatorComponentJoiner) {
-		return graphConversationLocator{}, errors.New("the Teams Graph channel locator is malformed")
-	}
-	teamID, teamErr := decodeGraphLocatorPart(team)
-	channelID, channelErr := decodeGraphLocatorPart(channel)
-	if teamErr != nil || channelErr != nil {
-		return graphConversationLocator{}, errors.New("the Teams Graph channel locator is malformed")
-	}
-	return graphConversationLocator{TeamID: teamID, ChannelID: channelID}, nil
+	return graphConversationLocator{
+		ChatID: locator.ChatID, TeamID: locator.TeamID, ChannelID: locator.ChannelID,
+	}, nil
 }
 
 func decodeGraphTeamID(value string) (string, error) {
-	raw, found := strings.CutPrefix(value, teamContainerPrefix)
-	if !found {
-		return "", errors.New("the Teams Graph team container is malformed")
-	}
-	id, err := decodeGraphLocatorPart(raw)
-	if err != nil {
-		return "", errors.New("the Teams Graph team container is malformed")
-	}
-	return id, nil
-}
-
-func decodeGraphLocatorPart(value string) (string, error) {
-	decoded, err := base64.RawURLEncoding.DecodeString(value)
-	if err != nil || !validGraphOpaque(string(decoded)) ||
-		base64.RawURLEncoding.EncodeToString(decoded) != value {
-		return "", errors.New("the Teams Graph locator component is malformed")
-	}
-	return string(decoded), nil
+	return teamscontract.DecodeTeamID(value)
 }
 
 func (locator graphConversationLocator) collectionResource(threadRootID string) (string, error) {

@@ -41,6 +41,7 @@ type Browser struct {
 	sessions        *session.Manager
 	allowedOrigins  map[string]struct{}
 	interactionMu   sync.Mutex
+	teamsState      *teamsBrowserState
 	closeOnce       sync.Once
 	closeErr        error
 }

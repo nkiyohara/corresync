@@ -16,6 +16,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/provider/restapi"
+	"github.com/nkiyohara/corresync/internal/provider/teamscontract"
 )
 
 const (
@@ -143,7 +144,7 @@ func (client *Client) observeCapabilities(scopes map[string]struct{}) {
 	read := hasAny("Chat.Read", "Chat.ReadWrite") &&
 		has("Team.ReadBasic.All", "Channel.ReadBasic.All", "ChannelMessage.Read.All")
 	write := !client.readOnly
-	client.capabilities = application.MessageCapabilities{
+	observed := application.MessageCapabilities{
 		ListConversations: read,
 		History:           read,
 		SensitiveRead:     read,
@@ -174,11 +175,13 @@ func (client *Client) observeCapabilities(scopes map[string]struct{}) {
 		),
 		ActorMode: application.MessageActorDelegatedUser,
 	}
+	client.capabilities = teamscontract.Intersect(observed, client.readOnly)
 	client.degradations = []domain.Degradation{
 		{Feature: "messages.incremental_sync", Reason: "Microsoft Graph does not expose one delegated, relay-free delta contract spanning chats, channels, replies, edits, and deletions"},
 		{Feature: "messages.attachment_read", Reason: "Teams file attachments remain references in SharePoint or OneDrive and are not exposed until a separately bounded drive contract is proven"},
 		{Feature: "messages.attachment_write", Reason: "Teams file upload is a multi-resource operation and remains disabled until its ambiguous outcome contract is proven"},
 		{Feature: "messages.concurrency", Reason: "Teams message writes expose no atomic version precondition; Corresync revalidates the selected item immediately before mutation"},
+		{Feature: "messages.create_conversation", Reason: "Teams Web keeps a new chat as a draft until its first send, so the Graph/Web parity cohort disables standalone creation on both routes"},
 	}
 	if !read {
 		client.degradations = append(client.degradations, domain.Degradation{
