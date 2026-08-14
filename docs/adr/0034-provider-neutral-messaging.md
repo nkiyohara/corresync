@@ -98,6 +98,18 @@ streams. WebSocket events invalidate account-local state; REST snapshots
 recover ordering gaps. Credentials and authorization challenges never enter
 logs, audit, fixtures, or model-visible output.
 
+The initial Mattermost adapter resolves the selected DNS name before applying
+authorization, rejects any mixed or special-use answer set, and pins the
+validated addresses for the transport lifetime. It disables proxies,
+redirects, and response compression. Capabilities are derived from the
+authenticated actor's returned system, team, and channel role definitions;
+missing or inaccessible role evidence narrows the route. Event streaming is
+opened only by an explicit caller, carries no message content into canonical
+state, deduplicates ordered sequence numbers, and turns reconnects, gaps, and
+overflow into bounded REST snapshot resets. File upload plus post creation and
+username-addressed mentions cannot preserve one atomic ID-bound review, so
+attachment sends and mention writes fail closed in this cohort.
+
 ### Monitoring and release gates
 
 Message synchronization is not notification consent. Monitoring, local

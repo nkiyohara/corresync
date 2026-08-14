@@ -28,7 +28,7 @@ authorized live observations.
 | iCloud guided IMAP/SMTP + CalDAV preset | Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts | Not run | Deterministic only; live-unobserved |
 | Cross-account search and agenda | Isolation, ordering, bounds, partial-failure tests | Not run | Deterministic only |
 | Canonical task model, CLI, MCP, IPC, and cross-account projection | Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests | Not run | Implemented; Microsoft Graph adapter enabled separately |
-| Provider-neutral messaging model, Teams Graph/Web adapters, schema, and release gate | Shared synthetic fixtures; account/workspace/actor isolation, Graph/Web parity, semantic DOM bounds, cursor binding, malformed result, and preview/commit tests | Not run | Included but disabled; Teams Graph/Web live and surface evidence incomplete |
+| Provider-neutral messaging model, Teams Graph/Web, Slack API, and Mattermost REST/WebSocket adapters, schema, and release gate | Shared synthetic fixtures; account/workspace/actor isolation, Graph/Web parity, role/scope capability observation, semantic DOM bounds, SSRF/DNS pinning, redirect/compression/event bounds, cursor binding, malformed result, and preview/commit tests | Not run | Included but disabled; provider live and surface evidence incomplete |
 | Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
 | Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
 | Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
@@ -74,6 +74,21 @@ evidence.
   Microsoft To Do are implemented with service-derived scopes and a BYO public
   OAuth client. Global, GCC High, and DoD use closed endpoint/authority pairs;
   China rejects To Do before OAuth. The route has no recorded live observation.
+- `slack`: supported Web API translation is implemented with exact workspace
+  and actor confirmation, observed installation scopes, bounded cursors and
+  file reads, rate-limit preservation, and outcome-unknown writes. Attachment
+  writes remain unavailable because upload and message creation are not one
+  atomic reviewed commit. The route is release-disabled and live-unobserved.
+- `mattermost`: supported v4 REST translation and an explicitly opened,
+  content-free WebSocket invalidation stream are implemented for one selected
+  public HTTPS origin and team. DNS answers are validated and pinned before
+  authorization; redirects, private/special destinations, compressed
+  responses, oversized content, replay, sequence gaps, and event floods fail
+  safely. Capabilities come from the actor's returned system, team, and channel
+  role definitions. REST sync uses reset snapshots, and WebSocket events only
+  request an earlier snapshot. Attachment sends and ID-bound mention writes
+  remain unavailable because the provider contracts cannot preserve one atomic
+  reviewed payload. The route is release-disabled and live-unobserved.
 - `todoist`: task lists, typed task CRUD/state, plan-sensitive metadata,
   reminders, exact provider recurrence, and sync-token changes are implemented
   through a BYO public client and PKCE. The API v1 route has synthetic evidence

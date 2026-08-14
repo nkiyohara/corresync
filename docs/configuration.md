@@ -242,8 +242,11 @@ origin = "https://teams.microsoft.com"
 ```
 
 Slack pins either its commercial or government API base. Mattermost accepts
-one exact credential-free HTTPS origin; its runtime additionally enforces the
-release's DNS/IP, TLS, redirect, and response bounds.
+one exact credential-free HTTPS DNS origin. Before applying authorization, its
+runtime requires a bounded all-public DNS answer set and pins those addresses
+for the transport lifetime. It uses normal TLS verification and rejects IP
+literals, proxies, redirects, mixed/private/special answers, compressed
+responses, and bounded-body violations.
 
 ```toml
 [accounts.slack.messages]
