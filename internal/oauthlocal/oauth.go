@@ -22,6 +22,7 @@ import (
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 
+	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/filelock"
@@ -276,6 +277,35 @@ type authorization struct {
 	source oauth2.TokenSource
 }
 
+type classifyingTokenSource struct {
+	source oauth2.TokenSource
+}
+
+func (source classifyingTokenSource) Token() (*oauth2.Token, error) {
+	token, err := source.source.Token()
+	if err == nil {
+		return token, nil
+	}
+	var retrieval *oauth2.RetrieveError
+	if errors.As(err, &retrieval) {
+		switch retrieval.ErrorCode {
+		case "invalid_grant", "invalid_token", "unauthorized_client":
+			return nil, application.NewProviderAuthenticationFailure(
+				application.AuthenticationReasonGrantRevoked,
+				err,
+			)
+		}
+		if retrieval.Response != nil &&
+			retrieval.Response.StatusCode == http.StatusUnauthorized {
+			return nil, application.NewProviderAuthenticationFailure(
+				application.AuthenticationReasonCredentialRejected,
+				err,
+			)
+		}
+	}
+	return nil, err
+}
+
 func (authorization *authorization) HTTPClient() *http.Client {
 	return authorization.http
 }
@@ -332,7 +362,7 @@ func (manager *Manager) Authorize(
 		ctx: baseContext, manager: manager, route: route,
 		provider: persistedProvider,
 	}
-	reused := oauth2.ReuseTokenSource(&grant.Token, persisting)
+	reused := classifyingTokenSource{source: oauth2.ReuseTokenSource(&grant.Token, persisting)}
 	return &authorization{
 		http: oauth2.NewClient(baseContext, reused), source: reused,
 	}, nil

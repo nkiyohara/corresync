@@ -98,10 +98,24 @@ func TestProjectionAccountsExposeOnlyContentFreePerServiceStatus(t *testing.T) {
 		},
 	}
 	workID := configuration.Accounts["work"].ID
+	mailLease := &sessionLease{
+		services:     sessionServiceMail,
+		capabilities: domain.Capabilities{Mail: true},
+		usage:        newAccountUsage(),
+	}
+	calendarLease := &sessionLease{
+		services:     sessionServiceCalendar,
+		capabilities: domain.Capabilities{Calendar: true},
+		usage:        newAccountUsage(),
+	}
 	backend := &sessionBackend{
 		configuration: configuration,
 		accounts: map[domain.AccountID]sessionAccount{
 			workID: {
+				mail:          new(application.MailService),
+				calendar:      new(application.CalendarService),
+				mailLease:     mailLease,
+				calendarLease: calendarLease,
 				capabilities: domain.Capabilities{
 					Mail: true, Calendar: true,
 				},
@@ -214,7 +228,10 @@ func TestSessionBackendOnlyResolvesJMAPCredentialForExplicitCLILogin(t *testing.
 		},
 		Limit: 25,
 	}, mcpCaller)
-	if err == nil || !strings.Contains(err.Error(), "corr auth login") {
+	action, actionRequired := application.AuthenticationActionFromError(err)
+	if !actionRequired || action.Alias != "work" ||
+		action.Service != application.AuthenticationServiceMail ||
+		action.Provider != domain.ProviderJMAP {
 		t.Fatalf("ListMail() error = %v", err)
 	}
 	if keyringReads != 0 || factoryCalls != 0 {
@@ -338,7 +355,10 @@ func TestSessionBackendOnlyResolvesCalDAVCredentialForExplicitCLILogin(t *testin
 		Start: "2026-07-28T00:00:00Z",
 		End:   "2026-07-29T00:00:00Z",
 	}, mcpCaller)
-	if err == nil || !strings.Contains(err.Error(), "corr auth login") {
+	action, actionRequired := application.AuthenticationActionFromError(err)
+	if !actionRequired || action.Alias != "work" ||
+		action.Service != application.AuthenticationServiceCalendar ||
+		action.Provider != domain.ProviderCalDAV {
 		t.Fatalf("ListCalendar() error = %v", err)
 	}
 	if keyringReads != 0 || factoryCalls != 0 {
@@ -440,7 +460,7 @@ func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
 		},
 		Limit: 25,
 	}, mcpCaller)
-	if err == nil || !strings.Contains(err.Error(), "corr auth login") {
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
 		t.Fatalf("ListMail() error = %v", err)
 	}
 	if manager.calls != 0 || factoryCalls != 0 {

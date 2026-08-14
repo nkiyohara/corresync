@@ -63,8 +63,63 @@ func (*adapterTestBackend) SessionStatus(
 			Account: adapterTestAccountID, Alias: "work",
 			Provider:     domain.ProviderMicrosoftOWA,
 			MailProvider: domain.ProviderMicrosoftOWA, State: "signed_out",
+			Services: testAuthenticationStatuses(
+				adapterTestAccountID,
+				"work",
+				domain.ProviderMicrosoftOWA,
+				"",
+				"",
+				false,
+			),
 		}},
 	}, nil
+}
+
+func testAuthenticationStatuses(
+	account domain.AccountID,
+	alias string,
+	mailProvider domain.ProviderID,
+	calendarProvider domain.ProviderID,
+	taskProvider domain.ProviderID,
+	authenticated bool,
+) application.ServiceAuthenticationStatuses {
+	var statuses application.ServiceAuthenticationStatuses
+	for _, route := range []struct {
+		service  application.AuthenticationService
+		provider domain.ProviderID
+	}{
+		{application.AuthenticationServiceMail, mailProvider},
+		{application.AuthenticationServiceCalendar, calendarProvider},
+		{application.AuthenticationServiceTasks, taskProvider},
+	} {
+		if route.provider == "" {
+			continue
+		}
+		status := application.ServiceAuthenticationStatus{
+			Service: route.service, Provider: route.provider,
+			State: application.AuthenticationStateAuthenticated,
+		}
+		if !authenticated {
+			status.State = application.AuthenticationStateSignedOut
+			status.Reason = application.AuthenticationReasonNeverAuthenticated
+			action, err := application.NewAuthenticationActionRequired(
+				status.State,
+				status.Reason,
+				account,
+				alias,
+				route.service,
+				route.provider,
+			)
+			if err != nil {
+				panic(err)
+			}
+			status.Action = &action
+		}
+		if err := statuses.Set(status); err != nil {
+			panic(err)
+		}
+	}
+	return statuses
 }
 func (*adapterTestBackend) Login(_ context.Context, account domain.AccountID, _ domain.Caller) (daemonapi.LoginResult, error) {
 	return daemonapi.LoginResult{

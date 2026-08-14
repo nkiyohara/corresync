@@ -205,7 +205,14 @@ func (client *Client) fetchSession(
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
-		return sessionDocument{}, fmt.Errorf("JMAP session returned HTTP %d", response.StatusCode)
+		statusErr := fmt.Errorf("JMAP session returned HTTP %d", response.StatusCode)
+		if response.StatusCode == http.StatusUnauthorized {
+			return sessionDocument{}, application.NewProviderAuthenticationFailure(
+				application.AuthenticationReasonCredentialRejected,
+				statusErr,
+			)
+		}
+		return sessionDocument{}, statusErr
 	}
 	var document sessionDocument
 	if err := decodeBoundedJSON(response.Body, maximumSessionBytes, &document); err != nil {
@@ -314,6 +321,12 @@ func (client *Client) callWithEffect(
 			method,
 			response.StatusCode,
 		)
+		if response.StatusCode == http.StatusUnauthorized {
+			return application.NewProviderAuthenticationFailure(
+				application.AuthenticationReasonCredentialRejected,
+				statusErr,
+			)
+		}
 		if write &&
 			(response.StatusCode >= http.StatusInternalServerError ||
 				response.StatusCode >= http.StatusOK &&
@@ -438,6 +451,12 @@ func (client *Client) upload(
 			"JMAP upload returned HTTP %d",
 			response.StatusCode,
 		)
+		if response.StatusCode == http.StatusUnauthorized {
+			return blobUpload{}, application.NewProviderAuthenticationFailure(
+				application.AuthenticationReasonCredentialRejected,
+				statusErr,
+			)
+		}
 		if response.StatusCode >= http.StatusInternalServerError ||
 			response.StatusCode >= http.StatusOK &&
 				response.StatusCode < http.StatusMultipleChoices {
@@ -504,7 +523,14 @@ func (client *Client) download(
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
-		return nil, fmt.Errorf("JMAP download returned HTTP %d", response.StatusCode)
+		statusErr := fmt.Errorf("JMAP download returned HTTP %d", response.StatusCode)
+		if response.StatusCode == http.StatusUnauthorized {
+			return nil, application.NewProviderAuthenticationFailure(
+				application.AuthenticationReasonCredentialRejected,
+				statusErr,
+			)
+		}
+		return nil, statusErr
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil {

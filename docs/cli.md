@@ -174,7 +174,17 @@ closes the entire local session owner.
 interactive TTY. The staged `google` route is disabled pending production OAuth
 approval and stops before sign-in or network access. After a separate activation
 release it will use normal-browser OAuth and pinned Gmail/Calendar APIs; it will
-never automate Google sign-in. `auth status` is content-free.
+never automate Google sign-in. `auth status` is content-free and prints the
+mail, calendar, and task state separately. A signed-out or expired route shows
+the exact local `corr auth login --account ALIAS` action; the command does not
+run that action automatically.
+
+When a read reports `authentication_required`, `authentication_pending`, or
+`reauthentication_required`, finish the human-owned login, verify the same
+account/service with `corr auth status`, and retry that read once. Do not switch
+accounts or providers silently. Never replay a send, move, delete, event/task
+change, or another consequential write after login; create a fresh preview and
+obtain fresh approval.
 
 `doctor` validates local config, starts and closes a blank sandboxed Chromium
 target when the selected route needs a browser, checks IPC, daemon state, and

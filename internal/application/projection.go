@@ -25,27 +25,29 @@ const (
 // isolated account. It contains no credentials, profile, cursor, or rate-limit
 // state.
 type ProjectionAccount struct {
-	Account              domain.AccountID     `json:"account"`
-	Alias                string               `json:"alias"`
-	MailProvider         domain.ProviderID    `json:"mailProvider,omitempty"`
-	CalendarProvider     domain.ProviderID    `json:"calendarProvider,omitempty"`
-	TaskProvider         domain.ProviderID    `json:"taskProvider,omitempty"`
-	Authenticated        bool                 `json:"authenticated"`
-	Capabilities         *domain.Capabilities `json:"capabilities,omitempty"`
-	MailDegradations     []domain.Degradation `json:"mailDegradations,omitempty"`
-	CalendarDegradations []domain.Degradation `json:"calendarDegradations,omitempty"`
-	TaskDegradations     []domain.Degradation `json:"taskDegradations,omitempty"`
+	Account              domain.AccountID              `json:"account"`
+	Alias                string                        `json:"alias"`
+	MailProvider         domain.ProviderID             `json:"mailProvider,omitempty"`
+	CalendarProvider     domain.ProviderID             `json:"calendarProvider,omitempty"`
+	TaskProvider         domain.ProviderID             `json:"taskProvider,omitempty"`
+	Authenticated        bool                          `json:"authenticated"`
+	Services             ServiceAuthenticationStatuses `json:"services"`
+	Capabilities         *domain.Capabilities          `json:"capabilities,omitempty"`
+	MailDegradations     []domain.Degradation          `json:"mailDegradations,omitempty"`
+	CalendarDegradations []domain.Degradation          `json:"calendarDegradations,omitempty"`
+	TaskDegradations     []domain.Degradation          `json:"taskDegradations,omitempty"`
 }
 
 // ProjectionFailure is an explicit, content-free per-account failure. Raw
 // provider errors are deliberately absent from the stable projection schema.
 type ProjectionFailure struct {
-	Account  domain.AccountID  `json:"account"`
-	Alias    string            `json:"alias"`
-	Provider domain.ProviderID `json:"provider"`
-	Service  string            `json:"service"`
-	Code     string            `json:"code"`
-	Reason   string            `json:"reason"`
+	Account        domain.AccountID              `json:"account"`
+	Alias          string                        `json:"alias"`
+	Provider       domain.ProviderID             `json:"provider"`
+	Service        string                        `json:"service"`
+	Code           string                        `json:"code"`
+	Reason         string                        `json:"reason"`
+	Authentication *AuthenticationActionRequired `json:"authentication,omitempty"`
 }
 
 // ProjectionAccountStatus reports whether one isolated account contributed a
@@ -149,6 +151,35 @@ func (account ProjectionAccount) Validate() error {
 			}
 		}
 	}
+	serviceStatuses := account.Services.Values()
+	if len(serviceStatuses) == 0 {
+		return errors.New("projection account has no service authentication status")
+	}
+	if (account.MailProvider != "") != (account.Services.Mail != nil) ||
+		(account.CalendarProvider != "") != (account.Services.Calendar != nil) ||
+		(account.TaskProvider != "") != (account.Services.Tasks != nil) {
+		return errors.New("projection account service authentication statuses do not match its routes")
+	}
+	authenticatedServices := 0
+	for _, status := range serviceStatuses {
+		if err := status.Validate(account.Account, account.Alias); err != nil {
+			return err
+		}
+		if configuredServiceProviderForProjection(account, status.Service) !=
+			status.Provider {
+			return errors.New(
+				"projection authentication status provider does not match its route",
+			)
+		}
+		if status.State == AuthenticationStateAuthenticated {
+			authenticatedServices++
+		}
+	}
+	if account.Authenticated != (authenticatedServices > 0) {
+		return errors.New(
+			"projection account compatibility authentication state is inconsistent",
+		)
+	}
 	if account.Authenticated {
 		if account.Capabilities == nil {
 			return errors.New(
@@ -158,9 +189,9 @@ func (account ProjectionAccount) Validate() error {
 		if err := account.Capabilities.Validate(); err != nil {
 			return err
 		}
-		if (account.MailProvider != "" && !account.Capabilities.Mail) ||
-			(account.CalendarProvider != "" && !account.Capabilities.Calendar) ||
-			(account.TaskProvider != "" && !account.Capabilities.Tasks) {
+		if account.ServiceAuthenticated(projectionServiceMail) != account.Capabilities.Mail ||
+			account.ServiceAuthenticated(projectionServiceCalendar) != account.Capabilities.Calendar ||
+			account.ServiceAuthenticated(projectionServiceTasks) != account.Capabilities.Tasks {
 			return errors.New(
 				"projection account capability snapshot does not match its routes",
 			)
@@ -190,6 +221,35 @@ func (account ProjectionAccount) Validate() error {
 		}
 	}
 	return nil
+}
+
+func configuredServiceProviderForProjection(
+	account ProjectionAccount,
+	service AuthenticationService,
+) domain.ProviderID {
+	switch service {
+	case AuthenticationServiceMail:
+		return account.MailProvider
+	case AuthenticationServiceCalendar:
+		return account.CalendarProvider
+	case AuthenticationServiceTasks:
+		return account.TaskProvider
+	default:
+		return ""
+	}
+}
+
+func (account ProjectionAccount) ServiceAuthenticated(service string) bool {
+	var status *ServiceAuthenticationStatus
+	switch service {
+	case projectionServiceMail:
+		status = account.Services.Mail
+	case projectionServiceCalendar:
+		status = account.Services.Calendar
+	case projectionServiceTasks:
+		status = account.Services.Tasks
+	}
+	return status != nil && status.State == AuthenticationStateAuthenticated
 }
 
 func newProjectionStatus(
@@ -237,11 +297,64 @@ func projectionUnavailableStatus(
 	account ProjectionAccount,
 	service string,
 ) ProjectionAccountStatus {
+	authentication := accountAuthenticationStatus(account, service)
+	if authentication != nil && authentication.Action != nil {
+		action := *authentication.Action
+		return failProjectionAuthenticationStatus(
+			newProjectionStatus(account, service),
+			action,
+		)
+	}
 	return failProjectionStatus(
 		newProjectionStatus(account, service),
 		"not_authenticated",
 		"the account is not authenticated; sign in explicitly and rerun the projection",
 	)
+}
+
+func accountAuthenticationStatus(
+	account ProjectionAccount,
+	service string,
+) *ServiceAuthenticationStatus {
+	switch service {
+	case projectionServiceMail:
+		return account.Services.Mail
+	case projectionServiceCalendar:
+		return account.Services.Calendar
+	case projectionServiceTasks:
+		return account.Services.Tasks
+	default:
+		return nil
+	}
+}
+
+func failProjectionAuthenticationStatus(
+	status ProjectionAccountStatus,
+	action AuthenticationActionRequired,
+) ProjectionAccountStatus {
+	status.Complete = false
+	status.Exhausted = false
+	status.Failure = &ProjectionFailure{
+		Account:        status.Account,
+		Alias:          status.Alias,
+		Provider:       status.Provider,
+		Service:        status.Service,
+		Code:           string(action.Code),
+		Reason:         string(action.Reason),
+		Authentication: &action,
+	}
+	return status
+}
+
+func failProjectionCallStatus(
+	status ProjectionAccountStatus,
+	callErr error,
+	reason string,
+) ProjectionAccountStatus {
+	if action, ok := AuthenticationActionFromError(callErr); ok {
+		return failProjectionAuthenticationStatus(status, action)
+	}
+	return failProjectionStatus(status, "provider_error", reason)
 }
 
 func validateProjectionStatus(status ProjectionAccountStatus) error {
@@ -301,6 +414,26 @@ func validateProjectionFailure(
 	}
 	switch failure.Code {
 	case "not_authenticated", "provider_error", "invalid_result":
+		if failure.Authentication != nil {
+			return errors.New("non-authentication projection failure includes an authentication action")
+		}
+	case string(AuthenticationCodeRequired),
+		string(AuthenticationCodePending),
+		string(AuthenticationCodeReauthenticationNeed):
+		if failure.Authentication == nil {
+			return errors.New("authentication projection failure omits its action")
+		}
+		if err := failure.Authentication.Validate(); err != nil {
+			return err
+		}
+		if failure.Authentication.Account != failure.Account ||
+			failure.Authentication.Alias != failure.Alias ||
+			failure.Authentication.Provider != failure.Provider ||
+			string(failure.Authentication.Service) != failure.Service ||
+			string(failure.Authentication.Code) != failure.Code ||
+			string(failure.Authentication.Reason) != failure.Reason {
+			return errors.New("projection authentication action does not match its failure")
+		}
 	default:
 		return errors.New("projection failure code is invalid")
 	}

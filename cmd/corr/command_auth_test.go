@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
@@ -29,6 +30,14 @@ func TestSessionBackendReportsContentFreeAccountState(t *testing.T) {
 	t.Parallel()
 
 	capturedAt := time.Unix(42, 0).UTC()
+	mailLease := &sessionLease{
+		services: sessionServiceMail, captured: capturedAt,
+		capabilities: domain.Capabilities{Mail: true}, usage: newAccountUsage(),
+	}
+	calendarLease := &sessionLease{
+		services: sessionServiceCalendar, captured: capturedAt,
+		capabilities: domain.Capabilities{Calendar: true}, usage: newAccountUsage(),
+	}
 	backend := &sessionBackend{
 		configuration: config.Config{
 			Accounts: map[string]config.Account{
@@ -46,7 +55,12 @@ func TestSessionBackendReportsContentFreeAccountState(t *testing.T) {
 			},
 		},
 		accounts: map[domain.AccountID]sessionAccount{
-			"acc_00000000000000000000000000000001": {captured: capturedAt},
+			"acc_00000000000000000000000000000001": {
+				mail: new(application.MailService), calendar: new(application.CalendarService),
+				mailLease: mailLease, calendarLease: calendarLease,
+				captured:     capturedAt,
+				capabilities: domain.Capabilities{Mail: true, Calendar: true},
+			},
 		},
 		terminalAccounts: map[domain.AccountID]string{
 			"acc_00000000000000000000000000000003": "tls1_synthetic",
@@ -66,6 +80,10 @@ func TestSessionBackendReportsContentFreeAccountState(t *testing.T) {
 		result.Accounts[2].Provider != domain.ProviderIMAPSMTP ||
 		result.Accounts[2].MailProvider != domain.ProviderIMAPSMTP ||
 		result.Accounts[2].CalendarProvider != domain.ProviderCalDAV ||
+		result.Accounts[2].Services.Mail == nil ||
+		result.Accounts[2].Services.Mail.State != application.AuthenticationStateAuthenticated ||
+		result.Accounts[2].Services.Calendar == nil ||
+		result.Accounts[2].Services.Calendar.State != application.AuthenticationStateAuthenticated ||
 		result.Accounts[2].CapturedAt == nil ||
 		!result.Accounts[2].CapturedAt.Equal(capturedAt) {
 		t.Fatalf("SessionStatus() = %+v", result)
@@ -237,31 +255,49 @@ func TestSessionBackendLogoutIsolatesAccountsAndIsIdempotent(t *testing.T) {
 	)
 	workCloser := &logoutTestCloser{}
 	personalCloser := &logoutTestCloser{}
+	workLease := &sessionLease{
+		services: sessionServiceMail, closers: []sessionCloser{workCloser},
+		captured:     time.Unix(1, 0).UTC(),
+		capabilities: domain.Capabilities{Mail: true}, usage: newAccountUsage(),
+	}
+	personalLease := &sessionLease{
+		services: sessionServiceMail, closers: []sessionCloser{personalCloser},
+		captured:     time.Unix(2, 0).UTC(),
+		capabilities: domain.Capabilities{Mail: true}, usage: newAccountUsage(),
+	}
 	backend := &sessionBackend{
 		configuration: config.Config{
 			Accounts: map[string]config.Account{
-				"work":     {ID: workID},
-				"personal": {ID: personalID},
+				"work": {
+					ID:   workID,
+					Mail: &config.MailRoute{Provider: domain.ProviderJMAP},
+				},
+				"personal": {
+					ID:   personalID,
+					Mail: &config.MailRoute{Provider: domain.ProviderJMAP},
+				},
 			},
 		},
 		accounts: map[domain.AccountID]sessionAccount{
 			workID: {
-				closers:  []sessionCloser{workCloser},
-				captured: time.Unix(1, 0).UTC(),
-				usage:    newAccountUsage(),
+				mail: new(application.MailService), mailLease: workLease,
+				captured:     time.Unix(1, 0).UTC(),
+				capabilities: domain.Capabilities{Mail: true},
 			},
 			personalID: {
-				closers:  []sessionCloser{personalCloser},
-				captured: time.Unix(2, 0).UTC(),
-				usage:    newAccountUsage(),
+				mail: new(application.MailService), mailLease: personalLease,
+				captured:     time.Unix(2, 0).UTC(),
+				capabilities: domain.Capabilities{Mail: true},
 			},
 		},
 		previews: map[string]sessionPreview{
 			"work-preview": {
-				account: workID, expiresAt: time.Now().Add(time.Minute),
+				account: workID, service: application.AuthenticationServiceMail,
+				expiresAt: time.Now().Add(time.Minute),
 			},
 			"personal-preview": {
-				account: personalID, expiresAt: time.Now().Add(time.Minute),
+				account: personalID, service: application.AuthenticationServiceMail,
+				expiresAt: time.Now().Add(time.Minute),
 			},
 		},
 	}

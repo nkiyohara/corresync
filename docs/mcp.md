@@ -126,6 +126,26 @@ authentication stays browser- or credential-owner-controlled outside MCP, and
 MCP cannot initiate it. These omissions are deliberate and must not be inferred
 from an advertised SDK capability.
 
+### Authentication recovery
+
+An ordinary tool never starts login, reads a keyring, or accepts a credential.
+When the requested service is signed out or a live adapter is definitively
+rejected, the tool returns `isError: true`, the version-1 authentication action
+as `structuredContent`, and the same complete JSON object as text fallback.
+Cross-account projections retain that object in the failed account member and
+mark the aggregate incomplete.
+
+Preserve the requested account and service. Check `account_status` once if
+needed, ask once before running the exact local argv action, and wait for the
+human-owned browser, terminal, MFA, or credential UI. Never ask for a password,
+app-specific password, OTP, cookie, or token in chat. After status confirms the
+same service, retry the same read once. Do not silently substitute another
+account, provider, browser workflow, direct API, mail client, or search result.
+A write is never replayed after authentication; obtain a new preview and fresh
+approval. Decline, cancellation, failure, or a host without terminal access
+leaves the action as an explicit blocker, and alternatives require the user's
+choice.
+
 Tool/resource names, schemas, annotations, deprecations, and negotiated
 compatibility follow the
 [public and local versioning policy](adr/0020-public-and-local-versioning.md).

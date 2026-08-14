@@ -21,11 +21,38 @@ import (
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 
+	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/rollout"
 )
+
+type tokenSourceFunc func() (*oauth2.Token, error)
+
+func (source tokenSourceFunc) Token() (*oauth2.Token, error) {
+	return source()
+}
+
+func TestClassifyingTokenSourceMapsRevokedGrantWithoutLeakingProviderBody(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	source := classifyingTokenSource{source: tokenSourceFunc(func() (*oauth2.Token, error) {
+		return nil, &oauth2.RetrieveError{
+			Response:  &http.Response{StatusCode: http.StatusBadRequest},
+			Body:      []byte(`{"error":"invalid_grant","private":"secret detail"}`),
+			ErrorCode: "invalid_grant",
+		}
+	})}
+	_, err := source.Token()
+	reason, ok := application.ProviderAuthenticationReason(err)
+	if !ok || reason != application.AuthenticationReasonGrantRevoked ||
+		strings.Contains(err.Error(), "secret detail") {
+		t.Fatalf("Token() error = %v, reason = %q", err, reason)
+	}
+}
 
 func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	t.Parallel()

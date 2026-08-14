@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 22
+	ProtocolVersion   = 23
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"

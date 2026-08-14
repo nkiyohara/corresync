@@ -166,7 +166,9 @@ func TestMailProjectionHasStablePaginationProvenanceAndPartialFailure(t *testing
 	}
 	if first.Complete || len(first.Failures) != 1 ||
 		first.Failures[0].Alias != "offline" ||
-		first.Failures[0].Code != "not_authenticated" {
+		first.Failures[0].Code != string(AuthenticationCodeRequired) ||
+		first.Failures[0].Authentication == nil ||
+		first.Failures[0].Authentication.Alias != "offline" {
 		t.Fatalf("partial failure is not explicit: %+v", first)
 	}
 	if aliases := projectionStatusAliases(first.Accounts); !slices.Equal(
@@ -347,6 +349,57 @@ func TestMailProjectionKeepsShortGoogleWebSnapshot(t *testing.T) {
 	}
 }
 
+func TestProjectionPreservesLiveAuthenticationAction(t *testing.T) {
+	t.Parallel()
+
+	action, err := NewAuthenticationActionRequired(
+		AuthenticationStateReauthenticationNeeded,
+		AuthenticationReasonSessionExpired,
+		projectionAlpha,
+		"alpha",
+		AuthenticationServiceMail,
+		domain.ProviderMicrosoftOWA,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := &projectionReaderStub{
+		accounts: []ProjectionAccount{
+			projectionAccount(
+				projectionAlpha,
+				"alpha",
+				domain.ProviderMicrosoftOWA,
+				"",
+				true,
+			),
+		},
+		mailErrors: map[domain.AccountID]error{
+			projectionAlpha: NewAuthenticationActionError(action),
+		},
+	}
+	service, err := NewProjectionService(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.SearchAllMail(
+		t.Context(),
+		MailProjectionInput{
+			Folder: MailFolder{Kind: MailFolderDistinguished, ID: "inbox"},
+			Query:  "synthetic", Limit: 25, TimeZone: "UTC",
+		},
+		domain.Caller{Surface: "mcp", Instance: "session-1"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Complete || len(page.Failures) != 1 ||
+		page.Failures[0].Authentication == nil ||
+		page.Failures[0].Code != string(AuthenticationCodeReauthenticationNeed) ||
+		page.Failures[0].Reason != string(AuthenticationReasonSessionExpired) {
+		t.Fatalf("projection failure = %+v", page.Failures)
+	}
+}
+
 func TestProjectionInputsRejectAccountSpecificOrUnboundedReads(t *testing.T) {
 	t.Parallel()
 	mail := MailProjectionInput{
@@ -481,6 +534,16 @@ func projectionAccount(
 		MailProvider: mail, CalendarProvider: calendar,
 		Authenticated: authenticated,
 	}
+	if mail != "" {
+		result.Services.Mail = projectionAuthenticationStatus(
+			account, alias, AuthenticationServiceMail, mail, authenticated,
+		)
+	}
+	if calendar != "" {
+		result.Services.Calendar = projectionAuthenticationStatus(
+			account, alias, AuthenticationServiceCalendar, calendar, authenticated,
+		)
+	}
 	if authenticated {
 		result.Capabilities = &domain.Capabilities{
 			Mail: mail != "", Calendar: calendar != "",
@@ -503,10 +566,44 @@ func projectionTaskAccount(
 	result := ProjectionAccount{
 		Account: account, Alias: alias, TaskProvider: provider, Authenticated: authenticated,
 	}
+	result.Services.Tasks = projectionAuthenticationStatus(
+		account, alias, AuthenticationServiceTasks, provider, authenticated,
+	)
 	if authenticated {
 		result.Capabilities = &domain.Capabilities{Tasks: true}
 	}
 	return result
+}
+
+func projectionAuthenticationStatus(
+	account domain.AccountID,
+	alias string,
+	service AuthenticationService,
+	provider domain.ProviderID,
+	authenticated bool,
+) *ServiceAuthenticationStatus {
+	status := &ServiceAuthenticationStatus{
+		Service: service, Provider: provider,
+		State: AuthenticationStateAuthenticated,
+	}
+	if authenticated {
+		return status
+	}
+	status.State = AuthenticationStateSignedOut
+	status.Reason = AuthenticationReasonNeverAuthenticated
+	action, err := NewAuthenticationActionRequired(
+		status.State,
+		status.Reason,
+		account,
+		alias,
+		service,
+		provider,
+	)
+	if err != nil {
+		panic(err)
+	}
+	status.Action = &action
+	return status
 }
 
 func projectionTask(

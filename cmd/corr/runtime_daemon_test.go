@@ -792,6 +792,14 @@ func startLifecycleTestDaemon(
 					Provider:     domain.ProviderMicrosoftOWA,
 					MailProvider: domain.ProviderMicrosoftOWA,
 					State:        "signed_out",
+					Services: testAuthenticationStatuses(
+						adapterTestAccountID,
+						"work",
+						domain.ProviderMicrosoftOWA,
+						"",
+						"",
+						false,
+					),
 				}}
 				if defaultAccount == "" {
 					accounts = []daemonapi.SessionStatus{}

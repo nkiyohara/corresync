@@ -114,12 +114,19 @@ Within a major release:
 - array ordering changes only when documented as unordered;
 - an error does not become an empty or partial success.
 
-The current stable CLI error contract is the exit-status class and the absence
+The general stable CLI error contract is the exit-status class and the absence
 of a success JSON value. Human error prose on stderr is not a parseable API.
-Any future JSON error envelope must have its own schema version and stable
-bounded code before scripts are told to consume it. Raw provider errors,
-response bodies, queries, paths, tokens, or mailbox values never become error
-compatibility fields.
+Authentication action-required failures are the first bounded exception. They
+use contract version `1`, stable codes, content-free account/service routing
+metadata, executable-plus-argv recovery, and an explicit no-automatic-retry
+policy. The JSON error string is a complete legacy fallback; MCP additionally
+carries the same object as structured error content. Provider response text
+and authentication material never enter this contract. Adding a field follows
+the public JSON rules; changing the meaning of an existing field, code, or
+retry policy is breaking. Any other future JSON error envelope requires its
+own schema version and stable bounded code before scripts are told to consume
+it. Raw provider errors, response bodies, queries, paths, tokens, or mailbox
+values never become error compatibility fields.
 
 ### MCP tools and resources
 
@@ -189,6 +196,11 @@ Daemon IPC is authenticated private local IPC, not a remotely supported API.
 Every envelope carries one exact integer protocol version. Any method,
 request/response shape, bound, or semantic change increments it, including an
 otherwise additive method.
+
+The per-service authentication status and action-required response shape raise
+the private daemon protocol from 22 to 23. Older owners are replaced through
+the existing authenticated mismatch path; no read, write, approval, or login
+is translated or replayed during replacement.
 
 Client and daemon versions must match before an application operation. On a
 proved mismatch, only the content-free status inspection and graceful shutdown
