@@ -21,7 +21,7 @@ func TestTaskRouteActivationFailsBeforeAuthenticationWithoutAdapter(t *testing.T
 	configuration := config.Default()
 	configuration.DefaultAccount = "tasks"
 	configuration.Accounts["tasks"] = config.Account{
-		ID: accountID, Tasks: &config.TaskRoute{Provider: domain.ProviderTodoist},
+		ID: accountID, Tasks: &config.TaskRoute{Provider: domain.ProviderTickTick},
 	}
 	backend := &sessionBackend{
 		configuration:    configuration,
@@ -29,7 +29,7 @@ func TestTaskRouteActivationFailsBeforeAuthenticationWithoutAdapter(t *testing.T
 		terminalAccounts: make(map[domain.AccountID]string),
 	}
 	_, err := backend.activateAccount(t.Context(), accountID)
-	if err == nil || !strings.Contains(err.Error(), "task provider \"todoist\" is not available") {
+	if err == nil || !strings.Contains(err.Error(), "task provider \"ticktick\" is not available") {
 		t.Fatalf("activateAccount() error = %v", err)
 	}
 	if len(backend.accounts) != 0 {
@@ -47,11 +47,11 @@ func TestInactiveTaskRouteDoesNotDisableAnotherService(t *testing.T) {
 				Origin: "https://outlook.example.invalid",
 			},
 		},
-		Tasks: &config.TaskRoute{Provider: domain.ProviderTodoist},
+		Tasks: &config.TaskRoute{Provider: domain.ProviderTickTick},
 	}
 	degradation, err := inactiveTaskRoute(configured)
 	if err != nil || degradation == nil || degradation.Feature != "tasks.route" ||
-		degradation.Lossy || !strings.Contains(degradation.Reason, "todoist") {
+		degradation.Lossy || !strings.Contains(degradation.Reason, "ticktick") {
 		t.Fatalf("inactiveTaskRoute() = %+v, %v", degradation, err)
 	}
 	if degradation, err := inactiveTaskRoute(config.Account{}); err != nil || degradation != nil {
@@ -125,6 +125,86 @@ func TestMicrosoftTodoTaskOnlyRouteActivatesWithIndependentScope(t *testing.T) {
 	account := backend.accounts[accountID]
 	if account.tasks == nil || !account.capabilities.Tasks || !account.capabilities.IncrementalSync {
 		t.Fatalf("task-only session = %+v", account.capabilities)
+	}
+}
+
+func TestTodoistTaskOnlyRouteActivatesWithObservedIdentityAndPlan(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch {
+		case request.Method == http.MethodPost && request.URL.Path == "/api/v1/sync":
+			if err := request.ParseForm(); err != nil {
+				t.Error(err)
+				http.Error(writer, "bad form", http.StatusBadRequest)
+				return
+			}
+			if request.Form.Get("sync_token") != "*" ||
+				!strings.Contains(request.Form.Get("resource_types"), `"user_plan_limits"`) {
+				t.Errorf("Todoist identity probe = %#v", request.Form)
+			}
+			_, _ = writer.Write([]byte(`{
+				"user":{"id":"user1","email":"reader@example.test"},
+				"user_plan_limits":{"current":{"plan_name":"beginner","deadlines":false,"labels":true,"reminders":false}}
+			}`))
+		case request.Method == http.MethodGet && request.URL.Path == "/api/v1/projects":
+			_, _ = writer.Write([]byte(`{"results":[{"id":"project1","name":"Inbox","inbox_project":true}],"next_cursor":null}`))
+		default:
+			http.Error(writer, "unexpected route", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	const accountID domain.AccountID = "acc_00000000000000000000000000000029"
+	configuration := config.Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = config.Account{
+		ID: accountID, Address: "reader@example.test",
+		Tasks: &config.TaskRoute{
+			Provider: domain.ProviderTodoist,
+			Todoist: &config.TodoistTaskRoute{OAuth: config.OAuthRoute{
+				APIBase: server.URL + "/api/v1", ClientID: "synthetic-task-client",
+				RedirectURI: "http://127.0.0.1:43123/callback",
+				Authorization: config.CredentialRef{
+					Backend: config.CredentialOSKeyring, Key: "task-grant", Consent: true,
+				},
+			}},
+		},
+	}
+	manager := &oauthManagerStub{client: server.Client()}
+	lifecycle, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	backend := &sessionBackend{
+		configuration:  configuration,
+		guard:          daemonMCPGuard(t, policy.DefaultRules(), &daemonMCPAudit{}),
+		oauth:          manager,
+		accounts:       make(map[domain.AccountID]sessionAccount),
+		previews:       make(map[string]sessionPreview),
+		lifecycle:      lifecycle,
+		cancel:         cancel,
+		monitorStarted: make(map[domain.AccountID]bool),
+		monitorCancel:  make(map[domain.AccountID]context.CancelFunc),
+		monitorDone:    make(map[domain.AccountID]chan struct{}),
+	}
+	caller := domain.Caller{Surface: "cli", Instance: "todoist-task-only-test"}
+	if _, err := backend.Login(t.Context(), accountID, caller); err != nil {
+		t.Fatal(err)
+	}
+	if manager.calls != 1 || manager.provider.ID != domain.ProviderTodoist ||
+		len(manager.provider.Scopes) != 2 ||
+		!slices.Contains(manager.provider.Scopes, "data:read_write") ||
+		!slices.Contains(manager.provider.Scopes, "data:delete") ||
+		manager.provider.ScopeSeparator != "," {
+		t.Fatalf("Todoist OAuth profile = %+v calls=%d", manager.provider, manager.calls)
+	}
+	page, err := backend.ListTaskLists(t.Context(), application.TaskListInput{
+		Account: accountID, Limit: 10,
+	}, caller)
+	if err != nil || len(page.Lists) != 1 || !page.Lists[0].Default {
+		t.Fatalf("ListTaskLists() = %+v, %v", page, err)
+	}
+	account := backend.accounts[accountID]
+	if account.tasks == nil || !account.capabilities.Tasks || !account.capabilities.IncrementalSync {
+		t.Fatalf("Todoist session = %+v", account.capabilities)
 	}
 }
 

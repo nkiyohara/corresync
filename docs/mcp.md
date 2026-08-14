@@ -229,8 +229,9 @@ Task writes:
 Task content and linked sources are private untrusted provider data. Every task
 write has a separate prepare and commit tool; deletion is destructive. Cursors
 are bound to one provider/account/list/mode and are never write authority. The
-explicit Microsoft Graph route supports Microsoft To Do; other configured task
-routes remain staged and fail without authentication or provider access. See
+explicit Microsoft Graph route supports Microsoft To Do, and the explicit
+Todoist public-client route supports Todoist. Other configured task routes
+remain staged and fail without authentication or provider access. See
 [tasks.md](tasks.md).
 
 `calendar_create.onlineMeeting` requests the selected account route's observed

@@ -129,3 +129,42 @@ func TestOAuthConsentsMergeOnlyAnExplicitlySharedGraphGrant(t *testing.T) {
 		t.Fatalf("canonical Global consent routes = %+v, %v", routes, err)
 	}
 }
+
+func TestOAuthConsentKeepsTodoistGrantIndependentAndReadOnly(t *testing.T) {
+	t.Parallel()
+	account := config.Account{
+		Address: "reader@example.test",
+		Tasks: &config.TaskRoute{
+			Provider: domain.ProviderTodoist,
+			Todoist: &config.TodoistTaskRoute{
+				ReadOnly: true,
+				OAuth: config.OAuthRoute{
+					APIBase:     "https://api.todoist.com/api/v1",
+					ClientID:    "synthetic-public-client",
+					RedirectURI: "http://127.0.0.1:43123/callback",
+					Authorization: config.CredentialRef{
+						Backend: config.CredentialOSKeyring,
+						Key:     "todoist-tasks",
+						Consent: true,
+					},
+				},
+			},
+		},
+	}
+	routes, err := accountOAuthConsents(account)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(routes) != 1 || routes[0].provider != domain.ProviderTodoist ||
+		routes[0].services.Mail || routes[0].services.Calendar ||
+		!routes[0].services.Tasks || routes[0].services.TaskWrite {
+		t.Fatalf("Todoist consent routes = %+v", routes)
+	}
+	provider, err := oauthlocal.ProviderFor(routes[0].provider, routes[0].services)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(provider.Scopes, []string{"data:read"}) || provider.ScopeSeparator != "," {
+		t.Fatalf("Todoist consent profile = %+v", provider)
+	}
+}

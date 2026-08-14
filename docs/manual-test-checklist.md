@@ -290,6 +290,24 @@ Set `CORRESYNC_LIVE_MICROSOFT_CLOUD` to `gcc-high` or `dod` when required;
 omission means `global`. Do not add this command to CI or copy its environment,
 terminal output, account data, list names, task fields, or cursors into evidence.
 
+Todoist has a separate build-tagged, explicit read-only observation. It requests
+only `data:read`, verifies the delegated address and current plan, and performs
+bounded project/task reads without logging their content:
+
+```console
+CORRESYNC_LIVE_CONFIRM=todoist-read-only \
+CORRESYNC_LIVE_TODOIST_ADDRESS=reader@example.invalid \
+CORRESYNC_LIVE_TODOIST_CLIENT_ID=registered-public-client \
+CORRESYNC_LIVE_TODOIST_REDIRECT_URI=http://127.0.0.1:53684/callback \
+CORRESYNC_LIVE_TODOIST_AUTHORIZATION_KEY=live-todoist-test \
+mise exec -- go test -tags live ./internal/provider/todoist \
+  -run '^TestLiveTodoistReadOnly$'
+```
+
+Apply the same no-CI, no-content, and commit-bound evidence rules as the
+Microsoft To Do harness. Register the exact fixed port shown in
+`CORRESYNC_LIVE_TODOIST_REDIRECT_URI`; the Todoist route rejects port `0`.
+
 ## 7. Read-only CLI
 
 Keep output on the test machine:

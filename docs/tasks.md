@@ -3,9 +3,10 @@
 Corresync models To Do items and reminders without pretending every provider
 has the same feature set. The canonical contract gives every adapter one target
 and one safety model. A configured task route is not by itself a capability
-claim. Microsoft To Do via an explicitly authorized Microsoft Graph route is
-implemented against synthetic contracts; the other task routes remain
-unavailable until their dependent provider issues are implemented and tested.
+claim. Microsoft To Do and Todoist, each through an explicitly authorized
+OAuth route, are implemented against synthetic contracts; the other task
+routes remain unavailable until their dependent provider issues are
+implemented and tested.
 
 A staged task route never disables an implemented mail or calendar route on the
 same account: those services may sign in while task status reports an explicit
@@ -100,7 +101,7 @@ deterministic adapter contracts but no commit-bound live observation.
 | --- | --- | --- | --- | --- | --- | --- |
 | `microsoft-graph` | synthetic; read-only or CRUD/state | one absolute reminder; portable recurrence plus exact provider-rule preservation | checklist, categories, typed linked sources; no assignments | zoned datetime; Windows names canonicalized through pinned CLDR | delta with safe reset | [#108](https://github.com/nkiyohara/corresync/issues/108) |
 | `microsoft-web-tasks` | phased target; delete requires ambiguity evidence | observe | modern To Do fields limited | observe | bounded polling | [#109](https://github.com/nkiyohara/corresync/issues/109) |
-| `todoist` | target | target, plan-sensitive | subtasks, labels, assignees target | floating/zoned target | sync cursor; webhook optional | [#110](https://github.com/nkiyohara/corresync/issues/110) |
+| `todoist` | synthetic; read-only or CRUD/state | relative/absolute reminders; exact provider recurrence; plan-sensitive | subtasks, labels, one assignee; sections/duration/comments degraded | date/floating/zoned schedule plus date-only deadline | bounded sync token; no webhook | [#110](https://github.com/nkiyohara/corresync/issues/110) |
 | `caldav` | target with ETag | VTODO recurrence/alarm target | RELATED-TO and categories target; assignment observe | date and datetime round trip target | sync token or polling | [#111](https://github.com/nkiyohara/corresync/issues/111) |
 | `google-tasks` | target with ETag and assigned-task restrictions | recurrence/reminder limited | subtasks, ordering, source links target; labels limited | due is date-only; time loss must be reviewed | bounded `updatedMin` polling | [#112](https://github.com/nkiyohara/corresync/issues/112) |
 | `apple-reminders` | target after explicit full Reminders permission | recurrence and alarms target | URL target; hierarchy/labels observe | EventKit components require exact mapping | local notification then bounded refetch | [#113](https://github.com/nkiyohara/corresync/issues/113) |
@@ -162,6 +163,40 @@ Global, GCC High, and DoD endpoint/authority pairs are closed configuration
 choices. Microsoft Graph operated by 21Vianet is rejected before OAuth because
 the To Do APIs are unavailable there. All current evidence is synthetic and
 the opt-in live harness never logs list names, titles, notes, or cursor values.
+
+## Todoist
+
+The `todoist` route is independently authorized with a BYO public client, PKCE,
+and a browser-owned loopback callback. A read-only route requests `data:read`;
+a writable route requests `data:read_write,data:delete`. No client secret,
+personal API token, hosted relay, provider discovery, or arbitrary API host is
+accepted. Login checks the delegated email and reads
+`user_plan_limits.current` before exposing plan-sensitive labels, reminders,
+and deadlines. Refresh-token rotation is serialized across local processes and
+the replacement grant is saved before the lock is released.
+
+Todoist `due` maps to canonical `start`; Todoist `deadline` maps to canonical
+`due`. Scheduling supports date-only, floating, and IANA-zoned values. Recurrence
+round-trips only as an exact read-derived Todoist rule, priorities are mapped
+without reversing their meaning, and assignment is checked against the exact
+project before submission. Canonical `low` priority has no exact Todoist value
+and is rejected.
+
+Sections, duration, comments, location reminders, and occurrence-only recurring
+completion are explicit degradations. `complete` archives the selected
+repeating task instead of silently returning its next active occurrence. Search
+is unavailable. Direct list/get reads cover active tasks because API v1 has no
+completed-task get-by-ID operation; Corresync does not disguise a bounded
+completion-date window as complete archive access. Provider versions are
+revalidated immediately before a write, but optimistic concurrency remains
+false because Todoist does not document an atomic version precondition.
+
+REST reads and `/sync` commands resolve to the same canonical model. Command
+UUIDs and temporary-ID mappings are checked before any follow-up read; partial
+command batches and post-write read failures return `write outcome unknown`.
+The compressed sync cursor is account/list scoped, keeps enough membership to
+detect moves and deletes, drains pending pages before advancing the provider
+token, and fails closed at the canonical cursor bound. Webhooks are not needed.
 
 ## Reads, writes, and sync
 

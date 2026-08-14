@@ -31,6 +31,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
 	"github.com/nkiyohara/corresync/internal/provider/outlookweb"
+	"github.com/nkiyohara/corresync/internal/provider/todoist"
 	"github.com/nkiyohara/corresync/internal/rollout"
 	"github.com/nkiyohara/corresync/internal/session"
 )
@@ -167,6 +168,7 @@ type sessionBackend struct {
 	newCalDAV     func(context.Context, caldavprovider.Options) (*caldavprovider.Client, error)
 	newGoogle     func(context.Context, googleapi.Options) (*googleapi.Client, error)
 	newGraph      func(context.Context, graphapi.Options) (*graphapi.Client, error)
+	newTodoist    func(context.Context, todoist.Options) (*todoist.Client, error)
 	monitorStore  *eventqueue.Store
 	monitor       *application.MonitorService
 	monitorEngine *application.MonitorEngine
@@ -247,6 +249,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		newCalDAV:        caldavprovider.New,
 		newGoogle:        googleapi.New,
 		newGraph:         graphapi.New,
+		newTodoist:       todoist.New,
 		monitorStore:     eventqueue.New(),
 		accounts:         make(map[domain.AccountID]sessionAccount),
 		previews:         make(map[string]sessionPreview),
@@ -2173,6 +2176,10 @@ func inactiveTaskRoute(configured config.Account) (*domain.Degradation, error) {
 		configured.Tasks.MicrosoftGraph != nil {
 		return nil, nil
 	}
+	if configured.Tasks.Provider == domain.ProviderTodoist &&
+		configured.Tasks.Todoist != nil {
+		return nil, nil
+	}
 	if configured.Mail == nil && configured.Calendar == nil {
 		return nil, fmt.Errorf(
 			"configured task provider %q is not available in this build",
@@ -2860,6 +2867,67 @@ func (backend *sessionBackend) graphAPIAccount(
 	return result, nil
 }
 
+func (backend *sessionBackend) todoistAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	if configured.Tasks == nil || configured.Tasks.Provider != domain.ProviderTodoist ||
+		configured.Tasks.Todoist == nil {
+		return sessionAccount{}, errors.New("the Todoist task route settings are missing")
+	}
+	selected := configured.Tasks.Todoist
+	provider, err := oauthlocal.ProviderFor(
+		domain.ProviderTodoist,
+		oauthlocal.Services{Tasks: true, TaskWrite: !selected.ReadOnly},
+	)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	manager := backend.oauth
+	if manager == nil {
+		manager, err = oauthlocal.New(oauthlocal.Options{
+			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
+		})
+		if err != nil {
+			return sessionAccount{}, err
+		}
+	}
+	authorization, err := manager.Authorize(ctx, selected.OAuth.Client(), provider)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	factory := backend.newTodoist
+	if factory == nil {
+		factory = todoist.New
+	}
+	client, err := factory(ctx, todoist.Options{
+		APIBase: selected.OAuth.APIBase, Address: configured.Address,
+		ReadOnly: selected.ReadOnly, HTTP: authorization.HTTPClient(),
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	tasks, err := application.NewTaskService(
+		backend.guard,
+		client,
+		application.TaskOptions{
+			Capabilities: client.TaskCapabilities(),
+			Degradations: client.TaskDegradations(),
+			Provenance: domain.Provenance{
+				AccountID: configured.ID, Provider: domain.ProviderTodoist,
+			},
+		},
+	)
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, client.Close())
+	}
+	return sessionAccount{
+		closers: []sessionCloser{client}, tasks: tasks,
+		captured:     time.Now().UTC(),
+		capabilities: domain.Capabilities{Tasks: true, IncrementalSync: true},
+	}, nil
+}
+
 type graphServiceSelection struct {
 	route                 config.OAuthRoute
 	mail, calendar, tasks bool
@@ -2995,6 +3063,13 @@ func (backend *sessionBackend) nonOutlookAccount(
 			)
 		}
 		combined = mergeSessionAccounts(combined, graph)
+	}
+	if configured.Tasks != nil && configured.Tasks.Provider == domain.ProviderTodoist {
+		tasks, err := backend.todoistAccount(ctx, configured)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
+		}
+		combined = mergeSessionAccounts(combined, tasks)
 	}
 	if configured.Mail != nil {
 		var mail sessionAccount

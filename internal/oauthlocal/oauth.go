@@ -5,12 +5,15 @@ package oauthlocal
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -21,7 +24,9 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/filelock"
 	"github.com/nkiyohara/corresync/internal/microsoftcloud"
+	"github.com/nkiyohara/corresync/internal/paths"
 	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
@@ -31,6 +36,7 @@ const (
 	maximumClientSecret   = 4 << 10
 	authorizationTimeout  = 5 * time.Minute
 	defaultRequestTimeout = 30 * time.Second
+	refreshLockTimeout    = 30 * time.Second
 )
 
 var errStoredGrantMismatch = errors.New("stored OAuth grant needs fresh authorization")
@@ -43,6 +49,9 @@ type Provider struct {
 	TokenURL   string
 	Scopes     []string
 	AuthParams map[string]string
+	// ScopeSeparator overrides oauth2's space-separated authorization query.
+	// Stored grants retain the individual scope strings.
+	ScopeSeparator string
 }
 
 // Services is the exact service set selected for one public-client grant.
@@ -104,13 +113,30 @@ func ProviderFor(
 			}
 			result.Scopes = append(result.Scopes, scope)
 		}
+	case domain.ProviderTodoist:
+		if services.Mail || services.Calendar || services.MicrosoftCloud != "" {
+			return Provider{}, errors.New("todoist OAuth profile has invalid service options")
+		}
+		scope := "data:read"
+		if services.TaskWrite {
+			scope = "data:read_write"
+		}
+		result = Provider{ // #nosec G101 -- fixed public OAuth endpoints and scope names, not credentials.
+			ID:             provider,
+			AuthURL:        "https://app.todoist.com/oauth/authorize",
+			TokenURL:       "https://api.todoist.com/oauth/access_token",
+			Scopes:         []string{scope},
+			ScopeSeparator: ",",
+		}
+		if services.TaskWrite {
+			result.Scopes = append(result.Scopes, "data:delete")
+		}
 	case domain.ProviderMicrosoftOWA,
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
 		domain.ProviderGoogleWeb,
 		domain.ProviderMicrosoftTasks,
-		domain.ProviderTodoist,
 		domain.ProviderGoogleTasks,
 		domain.ProviderAppleReminders,
 		domain.ProviderTickTick,
@@ -172,6 +198,9 @@ type Options struct {
 	Open               browserOpener
 	BeforeOpen         func(Provider)
 	GoogleClientSecret string
+	// LockDir permits deterministic tests. Production defaults to a private
+	// application-state directory and contains only hashed grant handles.
+	LockDir string
 }
 
 // Manager loads, refreshes, and explicitly creates account-scoped grants.
@@ -182,6 +211,7 @@ type Manager struct {
 	open         browserOpener
 	beforeOpen   func(Provider)
 	googleSecret string
+	lockDir      string
 }
 
 // New creates a manager without touching the keyring or network.
@@ -193,6 +223,17 @@ func New(options Options) (*Manager, error) {
 	client, err := secureHTTPClient(options.HTTP)
 	if err != nil {
 		return nil, err
+	}
+	lockDir := options.LockDir
+	if lockDir == "" {
+		stateDir, stateErr := paths.StateDir()
+		if stateErr != nil {
+			return nil, stateErr
+		}
+		lockDir = filepath.Join(stateDir, "oauth-locks")
+	}
+	if !filepath.IsAbs(lockDir) || filepath.Clean(lockDir) != lockDir {
+		return nil, errors.New("OAuth lock directory must be clean and absolute")
 	}
 	get := options.Get
 	if get == nil {
@@ -210,6 +251,7 @@ func New(options Options) (*Manager, error) {
 		http: client, get: get, set: set, open: open,
 		beforeOpen:   options.BeforeOpen,
 		googleSecret: options.GoogleClientSecret,
+		lockDir:      lockDir,
 	}, nil
 }
 
@@ -276,7 +318,6 @@ func (manager *Manager) Authorize(
 	if err != nil {
 		return nil, err
 	}
-	oauthConfig := oauthConfig(route, provider, manager.googleSecret)
 	// Authorization obeys the interactive login context above. The resulting
 	// token source must outlive that one RPC so later account-scoped requests
 	// can refresh without inheriting an already-cancelled context.
@@ -285,12 +326,11 @@ func (manager *Manager) Authorize(
 		oauth2.HTTPClient,
 		manager.http,
 	)
-	source := oauthConfig.TokenSource(baseContext, &grant.Token)
 	persistedProvider := provider
 	persistedProvider.Scopes = append([]string(nil), grant.Scopes...)
 	persisting := &persistingTokenSource{
-		source: source, manager: manager, route: route,
-		provider: persistedProvider, current: grant.Token,
+		ctx: baseContext, manager: manager, route: route,
+		provider: persistedProvider,
 	}
 	reused := oauth2.ReuseTokenSource(&grant.Token, persisting)
 	return &authorization{
@@ -390,29 +430,53 @@ func oauthConfig(
 
 type persistingTokenSource struct {
 	mu       sync.Mutex
-	source   oauth2.TokenSource
+	ctx      context.Context
 	manager  *Manager
 	route    config.OAuthClient
 	provider Provider
-	current  oauth2.Token
 }
 
 func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
 	source.mu.Lock()
 	defer source.mu.Unlock()
-	token, err := source.source.Token()
+	lockContext, cancel := context.WithTimeout(source.ctx, refreshLockTimeout)
+	defer cancel()
+	lock, err := filelock.Acquire(
+		lockContext,
+		source.manager.refreshLockPath(source.route),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("acquire OAuth refresh lock: %w", err)
+	}
+	defer func() { _ = lock.Close() }()
+
+	latest, err := source.manager.load(source.route, source.provider)
+	if err != nil {
+		return nil, fmt.Errorf("reload OAuth grant before refresh: %w", err)
+	}
+	if latest.Token.Valid() {
+		return &latest.Token, nil
+	}
+	configuration := oauthConfig(
+		source.route,
+		source.provider,
+		source.manager.googleSecret,
+	)
+	token, err := configuration.TokenSource(source.ctx, &latest.Token).Token()
 	if err != nil {
 		return nil, err
 	}
-	if token.AccessToken != source.current.AccessToken ||
-		token.RefreshToken != source.current.RefreshToken ||
-		!token.Expiry.Equal(source.current.Expiry) {
-		if err := source.manager.save(source.route, source.provider, *token); err != nil {
-			return nil, fmt.Errorf("persist refreshed OAuth grant: %w", err)
-		}
-		source.current = *token
+	if err := source.manager.save(source.route, source.provider, *token); err != nil {
+		return nil, fmt.Errorf("persist refreshed OAuth grant: %w", err)
 	}
 	return token, nil
+}
+
+func (manager *Manager) refreshLockPath(route config.OAuthClient) string {
+	digest := sha256.Sum256([]byte(
+		keyringService + "\x00" + route.Authorization.Key,
+	))
+	return filepath.Join(manager.lockDir, hex.EncodeToString(digest[:])+".lock")
 }
 
 func (manager *Manager) save(

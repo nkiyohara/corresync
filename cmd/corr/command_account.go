@@ -58,7 +58,7 @@ type accountAddCommand struct {
 	CalendarOAuthRedirectURI  string `name:"calendar-oauth-redirect-uri" help:"Calendar loopback redirect; defaults to --oauth-redirect-uri."`
 	CalendarAuthorizationKey  string `name:"calendar-authorization-key" help:"Calendar OAuth grant key; defaults to --authorization-key."`
 	ApproveCalendarOAuth      bool   `name:"approve-calendar-oauth" help:"Confirm a distinct calendar OAuth authorization."`
-	TaskAPIBase               string `name:"task-api-base" help:"Microsoft To Do Graph API base; must match --microsoft-cloud."`
+	TaskAPIBase               string `name:"task-api-base" help:"Pinned task API base override."`
 	TaskOAuthClientID         string `name:"task-oauth-client-id" help:"Task BYO OAuth public-client ID; defaults to --oauth-client-id."`
 	TaskOAuthRedirectURI      string `name:"task-oauth-redirect-uri" help:"Task loopback redirect; defaults to --oauth-redirect-uri."`
 	TaskAuthorizationKey      string `name:"task-authorization-key" help:"Independent OS-keyring grant handle for tasks; defaults to --authorization-key."`
@@ -464,15 +464,8 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 	}
 	provider := domain.ProviderID(command.TaskProvider)
 	result := &application.AccountTaskRouteInput{Provider: provider}
-	if provider != domain.ProviderMicrosoftGraph {
+	if provider != domain.ProviderMicrosoftGraph && provider != domain.ProviderTodoist {
 		return result, nil
-	}
-	cloud, err := microsoftcloud.Resolve(microsoftcloud.ID(command.MicrosoftCloud))
-	if err != nil {
-		return nil, err
-	}
-	if !cloud.TasksAvailable {
-		return nil, errors.New("the Microsoft To Do API is unavailable in Microsoft Graph China operated by 21Vianet")
 	}
 	clientID := command.TaskOAuthClientID
 	if clientID == "" {
@@ -487,9 +480,37 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 		authorizationKey = command.AuthorizationKey
 	}
 	if clientID == "" || redirectURI == "" || authorizationKey == "" || !command.ApproveTaskOAuth {
+		if provider == domain.ProviderTodoist {
+			return nil, errors.New(
+				"todoist tasks require a BYO public-client ID, loopback redirect, keyring handle, and --approve-task-oauth",
+			)
+		}
 		return nil, errors.New(
 			"microsoft-graph tasks require task OAuth flags or shared public-client defaults, plus --approve-task-oauth",
 		)
+	}
+	if provider == domain.ProviderTodoist {
+		apiBase := command.TaskAPIBase
+		if apiBase == "" {
+			apiBase = "https://api.todoist.com/api/v1"
+		}
+		result.Todoist = &application.AccountTodoistTaskInput{
+			ReadOnly: command.TaskReadOnly,
+			OAuth: application.AccountOAuthInput{
+				APIBase: apiBase, ClientID: clientID, RedirectURI: redirectURI,
+				Authorization: application.AccountCredentialInput{
+					Backend: "os-keyring", Key: authorizationKey, Consent: true,
+				},
+			},
+		}
+		return result, nil
+	}
+	cloud, err := microsoftcloud.Resolve(microsoftcloud.ID(command.MicrosoftCloud))
+	if err != nil {
+		return nil, err
+	}
+	if !cloud.TasksAvailable {
+		return nil, errors.New("the Microsoft To Do API is unavailable in Microsoft Graph China operated by 21Vianet")
 	}
 	apiBase := command.TaskAPIBase
 	if apiBase == "" {

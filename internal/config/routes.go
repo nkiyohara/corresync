@@ -125,6 +125,13 @@ type MicrosoftGraphTaskRoute struct {
 	ReadOnly bool       `json:"readOnly,omitempty" toml:"read_only,omitempty"`
 }
 
+// TodoistTaskRoute binds the fixed Todoist API to a BYO public OAuth client.
+// The route can never represent a client secret or personal API token.
+type TodoistTaskRoute struct {
+	OAuth    OAuthRoute `json:"oauth" toml:"oauth"`
+	ReadOnly bool       `json:"readOnly,omitempty" toml:"read_only,omitempty"`
+}
+
 // Client returns the secret-free public-client portion of an API route.
 func (route OAuthRoute) Client() OAuthClient {
 	return OAuthClient{
@@ -166,6 +173,7 @@ type CalendarRoute struct {
 type TaskRoute struct {
 	Provider       domain.ProviderID        `json:"provider" toml:"provider"`
 	MicrosoftGraph *MicrosoftGraphTaskRoute `json:"microsoftGraph,omitempty" toml:"microsoft_graph,omitempty"`
+	Todoist        *TodoistTaskRoute        `json:"todoist,omitempty" toml:"todoist,omitempty"`
 }
 
 func (account Account) validate() error {
@@ -186,8 +194,9 @@ func (account Account) validate() error {
 		if err := account.Tasks.validate(); err != nil {
 			return fmt.Errorf("tasks: %w", err)
 		}
-		if account.Tasks.Provider == domain.ProviderMicrosoftGraph && account.Address == "" {
-			return errors.New("a Microsoft Graph task route requires the account email address")
+		if (account.Tasks.Provider == domain.ProviderMicrosoftGraph ||
+			account.Tasks.Provider == domain.ProviderTodoist) && account.Address == "" {
+			return errors.New("an OAuth task route requires the account email address")
 		}
 	}
 	if err := validateOAuthGrantSharing(account); err != nil {
@@ -259,6 +268,11 @@ func validateOAuthGrantSharing(account Account) error {
 		route := account.Tasks.MicrosoftGraph.OAuth
 		add(domain.ProviderMicrosoftGraph, route.Client(), route.MicrosoftCloud)
 	}
+	if account.Tasks != nil && account.Tasks.Provider == domain.ProviderTodoist &&
+		account.Tasks.Todoist != nil {
+		route := account.Tasks.Todoist.OAuth
+		add(domain.ProviderTodoist, route.Client(), "")
+	}
 	for left := range bindings {
 		for right := left + 1; right < len(bindings); right++ {
 			if bindings[left].authorization.Backend == bindings[right].authorization.Backend &&
@@ -286,7 +300,7 @@ func (route TaskRoute) validate() error {
 	}
 	switch route.Provider {
 	case domain.ProviderMicrosoftGraph:
-		if route.MicrosoftGraph == nil {
+		if route.MicrosoftGraph == nil || route.Todoist != nil {
 			return errors.New("microsoft-graph tasks require independent OAuth settings")
 		}
 		if err := route.MicrosoftGraph.OAuth.validateFor(domain.ProviderMicrosoftGraph); err != nil {
@@ -300,8 +314,12 @@ func (route TaskRoute) validate() error {
 			return errors.New("the Microsoft To Do API is unavailable in the selected Microsoft cloud")
 		}
 		return nil
+	case domain.ProviderTodoist:
+		if route.Todoist == nil || route.MicrosoftGraph != nil {
+			return errors.New("todoist tasks require independent OAuth settings")
+		}
+		return route.Todoist.OAuth.validateFor(domain.ProviderTodoist)
 	case domain.ProviderMicrosoftTasks,
-		domain.ProviderTodoist,
 		domain.ProviderCalDAV,
 		domain.ProviderGoogleTasks,
 		domain.ProviderAppleReminders,
@@ -309,8 +327,8 @@ func (route TaskRoute) validate() error {
 		domain.ProviderAnyDoMCP,
 		domain.ProviderThings,
 		domain.ProviderOmniFocus:
-		if route.MicrosoftGraph != nil {
-			return errors.New("non-Graph task route cannot contain Microsoft Graph settings")
+		if route.MicrosoftGraph != nil || route.Todoist != nil {
+			return errors.New("task route contains settings for another provider")
 		}
 		return nil
 	case domain.ProviderMicrosoftOWA,
@@ -561,13 +579,21 @@ func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
 		if err := microsoftcloud.ValidateAPIBase(route.MicrosoftCloud, route.APIBase); err != nil {
 			return err
 		}
+	case domain.ProviderTodoist:
+		if route.MicrosoftCloud != "" || parsed.Host != "api.todoist.com" ||
+			parsed.RawQuery != "" || parsed.EscapedPath() != "/api/v1" {
+			return errors.New("todoist API base must be https://api.todoist.com/api/v1")
+		}
+		redirect, _ := url.Parse(route.RedirectURI)
+		if redirect.Port() == "0" {
+			return errors.New("todoist OAuth requires the fixed loopback port registered for the public client")
+		}
 	case domain.ProviderMicrosoftOWA,
 		domain.ProviderGoogleWeb,
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
 		domain.ProviderMicrosoftTasks,
-		domain.ProviderTodoist,
 		domain.ProviderGoogleTasks,
 		domain.ProviderAppleReminders,
 		domain.ProviderTickTick,

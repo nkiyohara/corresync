@@ -77,7 +77,7 @@ Google Workspace administrators can restrict third-party OAuth and API access.
 A rejected or unapproved route fails clearly and never
 falls through to a password or another provider.
 
-## Google and Microsoft Graph OAuth
+## Google, Microsoft Graph, and Todoist OAuth
 
 These routes require an explicitly configured public OAuth client and a
 registered loopback redirect:
@@ -96,7 +96,7 @@ ephemeral port. The same in-product notice links the public
 provider page can open. Corresync does not support a generic confidential
 client, device-code unattended flow, password grant, or broad tenant
 credential. The bounded Google Desktop client credential above is the sole
-provider-specific exception; Microsoft Graph remains secret-free.
+provider-specific exception; Microsoft Graph and Todoist remain secret-free.
 
 The resulting grant is stored by the operating-system keyring under the
 configured local reference. The TOML contains only that reference and the
@@ -115,6 +115,17 @@ reused only when its recorded scopes cover the complete selected service set;
 otherwise login starts fresh interactive authorization. Global, GCC High, and
 DoD derive fixed API/authority pairs from `microsoft_cloud`. China task routes
 fail before keyring or browser access because the To Do API is unavailable.
+
+Todoist requests `data:read` for a read-only route or
+`data:read_write,data:delete` for a writable route. Its authorization and token
+endpoints and API base are fixed. Current dynamic-registration and Client ID
+Metadata documentation does not establish Corresync's production HTTP
+`127.0.0.1` callback as a supported registered redirect, so setup requires an
+explicit public client ID and never creates a hosted relay. Todoist rotates
+refresh tokens; Corresync serializes refresh by grant across local processes,
+reloads after taking the lock, and persists the replacement before release.
+The configured loopback port must be the fixed port registered for that client;
+the Todoist route does not substitute an ephemeral port.
 
 Use only an application registration and account you are authorized to use.
 

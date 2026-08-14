@@ -48,6 +48,9 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 	if route.Provider == domain.ProviderMicrosoftGraph && route.MicrosoftGraph != nil {
 		return oauthRouteView(route.Provider, &route.MicrosoftGraph.OAuth)
 	}
+	if route.Provider == domain.ProviderTodoist && route.Todoist != nil {
+		return oauthRouteView(route.Provider, &route.Todoist.OAuth)
+	}
 	return application.TaskRouteView(route.Provider)
 }
 
@@ -160,6 +163,15 @@ func taskRouteConfig(
 			OAuth: *oauth, ReadOnly: route.MicrosoftGraph.ReadOnly,
 		}
 	}
+	if route.Todoist != nil {
+		oauth, err := oauthRouteConfig(&route.Todoist.OAuth)
+		if err != nil {
+			return nil, err
+		}
+		result.Todoist = &config.TodoistTaskRoute{
+			OAuth: *oauth, ReadOnly: route.Todoist.ReadOnly,
+		}
+	}
 	return result, nil
 }
 
@@ -226,6 +238,12 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 		references = append(
 			references,
 			account.Tasks.MicrosoftGraph.OAuth.Authorization,
+		)
+	}
+	if account.Tasks != nil && account.Tasks.Todoist != nil {
+		references = append(
+			references,
+			account.Tasks.Todoist.OAuth.Authorization,
 		)
 	}
 	return references
@@ -790,6 +808,9 @@ func accountOAuthAuthorizationKeys(account config.Account) []string {
 	}
 	if account.Tasks != nil && account.Tasks.MicrosoftGraph != nil {
 		keys = append(keys, account.Tasks.MicrosoftGraph.OAuth.Authorization.Key)
+	}
+	if account.Tasks != nil && account.Tasks.Todoist != nil {
+		keys = append(keys, account.Tasks.Todoist.OAuth.Authorization.Key)
 	}
 	slices.Sort(keys)
 	return slices.Compact(keys)

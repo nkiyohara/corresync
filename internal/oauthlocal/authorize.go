@@ -129,10 +129,7 @@ func (manager *Manager) authorize(
 	defer func() { _ = server.Close() }()
 
 	oauthConfig := oauthConfig(flowRoute, provider, manager.googleSecret)
-	options := []oauth2.AuthCodeOption{oauth2.S256ChallengeOption(verifier)}
-	for name, value := range provider.AuthParams {
-		options = append(options, oauth2.SetAuthURLParam(name, value))
-	}
+	options := authorizationOptions(provider, verifier)
 	authorizationURL := oauthConfig.AuthCodeURL(state, options...)
 	if manager.beforeOpen != nil {
 		manager.beforeOpen(provider)
@@ -175,6 +172,19 @@ func (manager *Manager) authorize(
 		Scopes:      append([]string(nil), provider.Scopes...),
 		Token:       *token,
 	}, nil
+}
+
+func authorizationOptions(provider Provider, verifier string) []oauth2.AuthCodeOption {
+	options := []oauth2.AuthCodeOption{oauth2.S256ChallengeOption(verifier)}
+	if provider.ScopeSeparator != "" {
+		options = append(options, oauth2.SetAuthURLParam(
+			"scope", strings.Join(provider.Scopes, provider.ScopeSeparator),
+		))
+	}
+	for name, value := range provider.AuthParams {
+		options = append(options, oauth2.SetAuthURLParam(name, value))
+	}
+	return options
 }
 
 func randomURLValue(size int) (string, error) {
