@@ -2,6 +2,9 @@
 
 - Status: accepted
 - Date: 2026-08-03
+- Amended: 2026-08-14 by
+  [ADR 0033](0033-cli-mcp-product-focus.md) to distinguish bounded prompts from
+  a persistent TUI
 
 ## Context
 
@@ -42,9 +45,10 @@ have a dedicated lifecycle contract.
 ## Consequences
 
 CLI and MCP now agree on values, validation, automatic dependencies, and error
-messages. Interactive use is discoverable without making scripts depend on a
-TUI, and screen readers retain a stable prompt mode. MCP can help with settings
-without gaining an unreviewed configuration-write primitive.
+messages. The bounded interactive CLI prompt keeps everyday use discoverable
+without making scripts depend on a terminal form, and screen readers retain a
+stable line-oriented mode. MCP can help with settings without gaining an
+unreviewed configuration-write primitive.
 
 Huh adds Bubble Tea and Bubbles as terminal-only dependencies. The application
 service and MCP adapter do not depend on terminal packages, and the form's
