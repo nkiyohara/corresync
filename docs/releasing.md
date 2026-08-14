@@ -4,6 +4,41 @@ Corresync releases are rehearsed, inventory-checked, and signed before
 publication. A tag does not turn deterministic provider coverage into live
 compatibility evidence.
 
+## Release lines
+
+`main` is the integration branch for the next minor release. While v0.9 is in
+development, `release/0.8` is the protected maintenance branch for v0.8 stable
+and preview releases. Short-lived feature branches target `main`; only bug,
+security, compatibility, documentation, and release-engineering fixes for
+already shipped behavior target `release/0.8`.
+
+This is a finite transition, not a second long-term support line. Publish v0.8
+releases from the maintenance branch while v0.9 develops concurrently on
+`main`. Once v0.9.0 is published as stable, freeze `release/0.8`, stop routine
+v0.8 releases, and update `SECURITY.md` so users are directed to v0.9. All new
+development and releases then continue from `main` on the v0.9 line. The
+release workflow enforces this cutoff: after the stable `v0.9.0` tag exists, it
+rejects every new `v0.8.*` tag. Release lines earlier than v0.8 are closed.
+
+Develop a fix against the oldest affected supported line. After it is reviewed
+and merged there, forward-port the exact change to `main` through a separate
+pull request, normally with `git cherry-pick -x`. Never merge `main` into a
+maintenance branch, and do not add a new command, MCP tool, schema, provider,
+or capability to v0.8.
+
+The release workflow binds each tag to its protected source branch:
+
+| Tag line | Required source branch |
+| --- | --- |
+| `v0.8.*` | `release/0.8` |
+| `v0.9.*` and later | `main` |
+
+Tags are immutable. A maintenance release is therefore built from the exact
+reviewed maintenance commit without pulling unfinished next-minor work into the
+binary. Public Pages continue to deploy from `main`; any unreleased feature on
+the site must be explicitly described as upcoming and must not be presented as
+stable or live-observed.
+
 ## Before the release
 
 Confirm that:
@@ -82,11 +117,12 @@ documentation/package payloads.
 
 ## Publish a version
 
-1. Merge the narrow, reviewed change through the protected default branch.
-2. Confirm the matching `main` CI run is green.
+1. Merge the narrow, reviewed change through the protected source branch for
+   the intended release line.
+2. Confirm the matching source-branch CI run is green.
 3. Repeat the local clean-checkout rehearsal.
 4. Create an annotated stable tag `vX.Y.Z`, or a preview tag
-   `vX.Y.Z-{alpha,beta,rc}.N`, at that exact `main` commit.
+   `vX.Y.Z-{alpha,beta,rc}.N`, at that exact source-branch commit.
 5. Push only the tag.
 6. Monitor release verification, MCP Registry publication, and package-catalog
    jobs.
@@ -95,15 +131,15 @@ documentation/package payloads.
 8. Confirm the release is not advertised beyond its recorded compatibility
    evidence.
 
-The workflow rejects a tag that is not reachable from `main` or does not match
-one of those two channel formats. GoReleaser creates
-a draft, injects the version/commit/source date, builds with `CGO_ENABLED=0` and
-`-trimpath`, then an isolated macOS keychain Developer ID-signs all four Darwin
-executables with hardened runtime and secure timestamp. Apple notarization must
-accept those exact binaries before the Darwin archives are repacked. The MCPB,
-Darwin SBOMs, catalogs, and checksum inventory are then rebuilt from the signed
-inputs. The release gate verifies archives, packages, the MCPB, catalogs,
-licenses, checksums, and SBOMs before publication.
+The workflow rejects a tag that is not reachable from the branch assigned to
+its release line or does not match one of those two channel formats. GoReleaser
+creates a draft, injects the version/commit/source date, builds with
+`CGO_ENABLED=0` and `-trimpath`, then an isolated macOS keychain Developer
+ID-signs all four Darwin executables with hardened runtime and secure timestamp.
+Apple notarization must accept those exact binaries before the Darwin archives
+are repacked. The MCPB, Darwin SBOMs, catalogs, and checksum inventory are then
+rebuilt from the signed inputs. The release gate verifies archives, packages,
+the MCPB, catalogs, licenses, checksums, and SBOMs before publication.
 
 Stable and preview releases pass the same archive, license, SBOM, macOS
 signing/notarization, checksum, and provenance gates. Only the verified

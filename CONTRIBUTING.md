@@ -79,6 +79,26 @@ file. Run `mise exec -- task format` to apply the same formatters explicitly or
 Run the complete command before committing. Live mailbox tests are deliberately
 absent from it.
 
+## Branch and release lines
+
+Base ordinary feature work and changes for the next minor release on `main`.
+Keep branches short-lived and target their pull requests back to `main`.
+
+The protected `release/0.8` branch accepts only fixes for behavior already
+shipped in v0.8: bugs, security and compatibility corrections, documentation,
+and release engineering. It does not accept new commands, MCP tools, schemas,
+providers, or capabilities. Develop a fix on the oldest affected supported
+line, then forward-port it to `main` in a separate pull request with preserved
+commit provenance. Never merge `main` into `release/0.8`.
+
+This parallel period ends with the stable v0.9.0 release. At that point,
+`release/0.8` is frozen, the supported-version policy directs users to v0.9,
+and all ordinary development and publication continue on the v0.9 line from
+`main`.
+
+See [the release guide](docs/releasing.md#release-lines) for the tag-to-branch
+mapping and publication procedure.
+
 ## Make a focused change
 
 - Keep commits narrow and use a
