@@ -19,8 +19,7 @@
     "defaultPrompt": [
       "Check all my inboxes and summarize what needs attention.",
       "Show my calendars for today.",
-      "Show my open tasks across configured accounts.",
-      "Find the latest email about this project across my accounts."
+      "Show my open tasks across configured accounts."
     ],
     "developerName": "Corresync contributors",
     "displayName": "Corresync — Mail, Calendar \u0026 Tasks",
@@ -45,5 +44,5 @@
   "name": "corresync",
   "repository": "https://github.com/nkiyohara/corresync",
   "skills": "./skills/",
-  "version": "0.8.6-rc.6"
+  "version": "0.8.6-rc.7"
 }

@@ -87,9 +87,10 @@ offer recovery, not permission to authenticate automatically.
 - Monitoring setup, runner/egress consent, queue purge, authentication, import
   reads, updates, and feedback actions are CLI-only. Do not simulate them with
   other tools.
-- Task-provider routes are contract-only until their individual adapters ship.
-  If a task tool reports an unavailable route, describe that state plainly and
-  do not substitute a similarly branded mail or calendar route.
+- Microsoft To Do through an explicit Graph route, Todoist, TickTick, and
+  CalDAV VTODO have shipped task adapters. If a task tool reports an unavailable
+  route or account-specific degradation, describe that state plainly and do
+  not substitute a similarly branded mail or calendar route.
 
 ## Produce useful summaries
 

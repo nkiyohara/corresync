@@ -25,7 +25,7 @@ func TestSpecification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spec.SourceVersion != "0.8.6-rc.6" {
+	if spec.SourceVersion != "0.8.6-rc.7" {
 		t.Fatalf("source version = %q", spec.SourceVersion)
 	}
 	if spec.Effects.AutoApproval {
@@ -76,6 +76,24 @@ func TestRenderIsDeterministicAndVersioned(t *testing.T) {
 	assertOutputContains(t, first, "docs/generated/integration-bundles.md", "hosted ChatGPT")
 	assertOutputContains(t, first, "docs/generated/publication-channels.md", "`1.2.3-rc.4`")
 	assertOutputContains(t, first, "docs/generated/publication-channels.md", "`not-listed`")
+}
+
+func TestCodexManifestStarterPromptsMeetDirectoryLimits(t *testing.T) {
+	t.Parallel()
+	manifest := codexManifest(MustLoad(), "1.2.3")
+	pluginInterface, ok := manifest["interface"].(map[string]any)
+	if !ok {
+		t.Fatal("Codex manifest interface is missing")
+	}
+	prompts, ok := pluginInterface["defaultPrompt"].([]string)
+	if !ok || len(prompts) == 0 || len(prompts) > 3 {
+		t.Fatalf("Codex starter prompts = %#v, want one to three", pluginInterface["defaultPrompt"])
+	}
+	for index, prompt := range prompts {
+		if strings.TrimSpace(prompt) == "" || utf8.RuneCountInString(prompt) > 128 {
+			t.Fatalf("Codex starter prompt %d is empty or exceeds 128 characters", index)
+		}
+	}
 }
 
 func TestPublicationSnapshotSeparatesSourceAndExternalVersions(t *testing.T) {

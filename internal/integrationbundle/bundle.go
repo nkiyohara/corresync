@@ -553,7 +553,6 @@ func codexManifest(spec Spec, version string) map[string]any {
 				"Check all my inboxes and summarize what needs attention.",
 				"Show my calendars for today.",
 				"Show my open tasks across configured accounts.",
-				"Find the latest email about this project across my accounts.",
 			},
 		},
 	}
