@@ -588,6 +588,7 @@ func verifyArchive(path, goos string) error {
 		"docs/install.md",
 		"docs/mcp.md",
 		"docs/generated/integration-bundles.md",
+		"docs/generated/publication-channels.md",
 		"integrations/config-hosts.json",
 		"integrations/gemini-cli/corresync/gemini-extension.json",
 		"integrations/gemini-cli/corresync/skills/corresync/SKILL.md",
@@ -941,6 +942,7 @@ func isVersionedIntegration(path string) bool {
 	switch path {
 	case ".claude-plugin/marketplace.json",
 		"docs/generated/integration-bundles.md",
+		"docs/generated/publication-channels.md",
 		"integrations/config-hosts.json",
 		"integrations/gemini-cli/corresync/gemini-extension.json",
 		"integrations/kiro/corresync/POWER.md",
@@ -984,8 +986,9 @@ func verifyIntegrationVersions(files map[string][]byte, version string) error {
 		}
 	}
 	for path, marker := range map[string]string{
-		"docs/generated/integration-bundles.md": "Canonical source snapshot:\n\n`" + version + "`.",
-		"integrations/kiro/corresync/POWER.md":  "Version: " + version,
+		"docs/generated/integration-bundles.md":  "Canonical source snapshot:\n\n`" + version + "`.",
+		"docs/generated/publication-channels.md": "Canonical source snapshot: `" + version + "`.",
+		"integrations/kiro/corresync/POWER.md":   "Version: " + version,
 	} {
 		if !bytes.Contains(files[path], []byte(marker)) {
 			return fmt.Errorf("integration %q does not contain release marker %q", path, marker)

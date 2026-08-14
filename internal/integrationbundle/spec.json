@@ -5,7 +5,7 @@
   "registryName": "io.github.nkiyohara/corresync",
   "displayName": "Corresync — Mail, Calendar & Tasks",
   "title": "Corresync",
-  "description": "Local-first MCP for provider-neutral mail, calendars, and tasks with isolated accounts and guarded writes.",
+  "description": "Local-first mail, calendar, and task MCP with isolated accounts and guarded writes.",
   "shortDescription": "Use guarded local mail, calendar, and task tools",
   "longDescription": "Corresync brings isolated mail, calendar, and task routes into one guarded local MCP server. Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV routes are included; Gmail and Google Calendar remain disabled pending production OAuth approval, and task-provider routes remain unavailable until their individual contracts ship. Corresync runs on your device over stdio, keeps authentication in an explicit local browser or approved credential store, and requires preview-before-commit writes.",
   "author": "Corresync contributors",

@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 var testSkill = []byte(`---
@@ -29,6 +30,9 @@ func TestSpecification(t *testing.T) {
 	}
 	if spec.Effects.AutoApproval {
 		t.Fatal("automatic approval must remain disabled")
+	}
+	if utf8.RuneCountInString(spec.Description) > 100 {
+		t.Fatalf("registry description has %d characters", utf8.RuneCountInString(spec.Description))
 	}
 	if len(spec.PublicationChannels) != 13 {
 		t.Fatalf("publication channels = %d, want 13", len(spec.PublicationChannels))

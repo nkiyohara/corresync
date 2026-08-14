@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -184,6 +185,9 @@ func (spec Spec) Validate() error {
 	}
 	if spec.ID != "corresync" || !idPattern.MatchString(spec.ID) || spec.RegistryName != "io.github.nkiyohara/corresync" {
 		return errors.New("stable product and registry IDs changed")
+	}
+	if utf8.RuneCountInString(spec.Description) > 100 {
+		return errors.New("registry description exceeds the 100-character publication limit")
 	}
 	for name, value := range map[string]string{
 		"repository": spec.Repository, "repositoryGit": spec.RepositoryGit,
