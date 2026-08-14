@@ -15,6 +15,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 const (
@@ -358,14 +359,28 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 		return nil, err
 	}
 
+	title := "Corresync — Mail, Calendar & Tasks"
+	instructions := serverInstructions
+	messagingEnabled := rollout.MessagingCatalogEnabled()
+	var messages MessagingBackend
+	if messagingEnabled {
+		var ok bool
+		messages, ok = backend.(MessagingBackend)
+		if !ok {
+			return nil, errors.New("release-enabled messaging requires a messaging backend")
+		}
+		title = "Corresync — Mail, Calendar, Tasks & Messaging"
+		instructions += messagingServerInstructions
+	}
+
 	server := mcp.NewServer(
 		&mcp.Implementation{
 			Name:       Name,
-			Title:      "Corresync — Mail, Calendar & Tasks",
+			Title:      title,
 			Version:    options.Version,
 			WebsiteURL: "https://github.com/nkiyohara/corresync",
 		},
-		&mcp.ServerOptions{Instructions: serverInstructions},
+		&mcp.ServerOptions{Instructions: instructions},
 	)
 	server.AddReceivingMiddleware(authenticationActionMiddleware)
 	readOnly := true
@@ -1493,6 +1508,9 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 		return nil, access, err
 	})
 	addTaskTools(server, backend, caller, readOnly, nonDestructive, destructive, openWorld)
+	if messagingEnabled {
+		addMessagingSurface(server, messages, caller)
+	}
 	return server, nil
 }
 

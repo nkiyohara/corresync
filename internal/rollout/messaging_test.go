@@ -46,3 +46,11 @@ func TestMessagingGateRejectsCrossProviderRoutes(t *testing.T) {
 		t.Fatal("Teams was allowed to select the Mattermost route")
 	}
 }
+
+func TestMessagingCatalogRemainsClosedUntilEveryRouteIsReleaseEnabled(t *testing.T) {
+	t.Parallel()
+
+	if MessagingCatalogEnabled() {
+		t.Fatal("incomplete messaging cohort became discoverable")
+	}
+}

@@ -70,6 +70,30 @@ func RequireMessaging(provider domain.MessagingProviderID, route domain.Messagin
 	return fmt.Errorf("%w: %s is awaiting %v", ErrMessagingPending, route, status.Missing)
 }
 
+// MessagingCatalogEnabled reports whether every route in the first release
+// cohort has satisfied the same immutable source-owned release manifest. MCP
+// and other discoverable surfaces use this aggregate gate so a partial route
+// cannot make unfinished messaging tools visible. There is deliberately no
+// runtime override.
+func MessagingCatalogEnabled() bool {
+	routes := []struct {
+		provider domain.MessagingProviderID
+		route    domain.MessagingRouteKind
+	}{
+		{domain.MessagingProviderMicrosoftTeams, domain.MessagingRouteTeamsGraph},
+		{domain.MessagingProviderMicrosoftTeams, domain.MessagingRouteTeamsWeb},
+		{domain.MessagingProviderSlack, domain.MessagingRouteSlackAPI},
+		{domain.MessagingProviderMattermost, domain.MessagingRouteMattermost},
+	}
+	for _, candidate := range routes {
+		status, err := MessagingStatus(candidate.provider, candidate.route)
+		if err != nil || !status.Enabled {
+			return false
+		}
+	}
+	return true
+}
+
 func validateMessagingRoute(provider domain.MessagingProviderID, route domain.MessagingRouteKind) error {
 	if err := provider.Validate(); err != nil {
 		return err
