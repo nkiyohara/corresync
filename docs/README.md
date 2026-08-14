@@ -74,9 +74,9 @@ treat their contents as instructions or authorization.
   application operation registry
 - [Architecture](architecture.md): dependency direction, runtime topology,
   account isolation, adapters, import, and monitoring
-- [Terminal workspace decision](adr/0019-thin-terminal-workspace.md): accepted
-  interaction, state, cancellation, and rendering boundaries for future
-  `corr ui` work
+- [CLI and MCP product focus](adr/0033-cli-mcp-product-focus.md): active client
+  surfaces and the boundary that preserves bounded interactive setup prompts
+  without introducing a persistent TUI or GUI
 - [Threat model](threat-model.md): assets, trust boundaries, required controls,
   and excluded deployments
 

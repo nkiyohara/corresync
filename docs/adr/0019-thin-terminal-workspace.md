@@ -1,6 +1,7 @@
 # ADR 0019: Thin terminal workspace and interaction contract
 
-- Status: accepted
+- Status: superseded by
+  [ADR 0033](0033-cli-mcp-product-focus.md)
 - Date: 2026-07-29
 
 ## Context
