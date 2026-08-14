@@ -882,6 +882,7 @@ func runSettingsMultiSelect[T comparable](
 	title string,
 	description string,
 	options []huh.Option[T],
+	validators ...func([]T) error,
 ) ([]T, bool, error) {
 	if !strings.Contains(strings.ToLower(description), "esc") {
 		description += " Esc cancels."
@@ -889,13 +890,17 @@ func runSettingsMultiSelect[T comparable](
 	values := make([]T, 0, len(options))
 	restoreFallback := prepareAccessibleFieldFallback(app, "0\n")
 	defer restoreFallback()
-	form := settingsForm(app, huh.NewMultiSelect[T]().
+	field := huh.NewMultiSelect[T]().
 		Title(title).
 		Description(description).
 		Options(options...).
 		Value(&values).
 		Height(min(14, len(options)+2)).
-		Filterable(len(options) > 8))
+		Filterable(len(options) > 8)
+	if len(validators) > 0 && validators[0] != nil {
+		field.Validate(validators[0])
+	}
+	form := settingsForm(app, field)
 	if err := form.RunWithContext(app.context); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
 			return nil, false, nil
