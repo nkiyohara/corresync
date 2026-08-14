@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="{{.Language}}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{.Title}}</title>
+    <meta name="description" content="{{.Description}}">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="{{.Title}}">
+    <meta property="og:description" content="{{.Description}}">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="{{.OGLocale}}">
+    {{range .OGAlternates}}<meta property="og:locale:alternate" content="{{.}}">
+    {{end}}<meta property="og:url" content="{{.Canonical}}">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="{{.ImageAlt}}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{.Title}}">
+    <meta name="twitter:description" content="{{.Description}}">
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta name="twitter:image:alt" content="{{.ImageAlt}}">
+    <link rel="canonical" href="{{.Canonical}}">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/integrations.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/integrations.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/integrations.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/integrations.html">
+    <link rel="icon" href="{{.AssetPrefix}}favicon.ico" sizes="any">
+    <link rel="icon" href="{{.AssetPrefix}}favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="{{.AssetPrefix}}favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="{{.AssetPrefix}}apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="{{.AssetPrefix}}site.webmanifest">
+    <link rel="stylesheet" href="{{.AssetPrefix}}styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">{{.Skip}}</a>
+    <div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="{{.HomeAria}}">
+        <img class="brand-mark" src="{{.AssetPrefix}}corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <div class="header-navs">
+        <nav class="site-nav" aria-label="{{.PrimaryAria}}">
+          <a href="./">{{.NavHome}}</a>
+          <a href="getting-started.html">{{.NavStart}}</a>
+          <a href="providers.html">{{.NavProviders}}</a>
+          <a href="features.html">{{.NavFeatures}}</a>
+          <a href="integrations.html" aria-current="page">{{.NavIntegrations}}</a>
+          <a href="safety.html">{{.NavSafety}}</a>
+        </nav>
+        <nav class="language-nav" aria-label="{{.LanguageAria}}">
+          {{range .LanguageLinks}}<a href="{{.HREF}}" lang="{{.Language}}" hreflang="{{.Language}}"{{if .Current}} aria-current="page"{{end}}>{{.Label}}</a>{{end}}
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>{{.HeroEyebrow}}</p>
+        <h1 id="page-title">{{.HeroLead}} <em>{{.HeroEmphasis}}</em></h1>
+        <p class="lede">{{.HeroLede}}</p>
+        <div class="actions">
+          <a class="button primary" href="getting-started.html">{{.HeroStart}}</a>
+          <a class="button secondary" href="#matrix">{{.HeroRead}}</a>
+        </div>
+      </section>
+
+      <section class="publication-snapshot" aria-labelledby="snapshot-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>{{.SnapshotEyebrow}}</p>
+          <h2 id="snapshot-title">{{.SnapshotTitle}}</h2>
+          <p>{{.SnapshotCopy}}</p>
+        </div>
+        <dl class="version-strip">
+          <div><dt>{{.SourceLabel}}</dt><dd><code>{{.SourceVersion}}</code></dd></div>
+          <div><dt>{{.StableLabel}}</dt><dd><code>{{.StableVersion}}</code></dd></div>
+          <div><dt>{{.RegistryLabel}}</dt><dd><code>{{.RegistryVersion}}</code></dd></div>
+        </dl>
+      </section>
+
+      <section id="matrix" class="publication-matrix" aria-labelledby="matrix-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>{{.MatrixEyebrow}}</p>
+          <h2 id="matrix-title">{{.MatrixTitle}}</h2>
+          <p>{{.MatrixCopy}}</p>
+        </div>
+        <div class="legal-table-wrap publication-table-wrap">
+          <table class="legal-table publication-table">
+            <thead><tr>
+              <th scope="col">{{.ColumnChannel}}</th>
+              <th scope="col">{{.ColumnPackage}}</th>
+              <th scope="col">{{.ColumnSurface}}</th>
+              <th scope="col">{{.ColumnState}}</th>
+              <th scope="col">{{.ColumnVersion}}</th>
+              <th scope="col">{{.ColumnPath}}</th>
+              <th scope="col">{{.ColumnEvidence}}</th>
+            </tr></thead>
+            <tbody>{{range .Channels}}
+              <tr>
+                <td><strong>{{.Name}}</strong></td>
+                <td>{{.Package}}</td>
+                <td>{{.Surfaces}}</td>
+                <td><span class="publication-state {{.StateClass}}">{{.State}}</span></td>
+                <td><code>{{.Version}}</code></td>
+                <td>{{.PublishPath}}</td>
+                <td><a href="{{.Verification}}">{{$.EvidenceLabel}}<span aria-hidden="true"> ↗</span></a></td>
+              </tr>{{end}}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tinted-section publication-meanings" aria-labelledby="meaning-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>{{.MeaningEyebrow}}</p>
+          <h2 id="meaning-title">{{.MeaningTitle}}</h2>
+        </div>
+        <div class="benefit-grid publication-card-grid">
+          <article class="benefit-card featured"><span class="publication-state published">{{.PublishedTitle}}</span><h3>{{.PublishedTitle}}</h3><p>{{.PublishedCopy}}</p></article>
+          <article class="benefit-card"><span class="publication-state source_available">{{.SourceTitle}}</span><h3>{{.SourceTitle}}</h3><p>{{.SourceCopy}}</p></article>
+          <article class="benefit-card"><span class="publication-state not_listed">{{.NotListedTitle}}</span><h3>{{.NotListedTitle}}</h3><p>{{.NotListedCopy}}</p></article>
+        </div>
+      </section>
+
+      <section class="honest-edges publication-boundary" aria-labelledby="boundary-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>{{.BoundaryEyebrow}}</p>
+          <h2 id="boundary-title">{{.BoundaryTitle}}</h2>
+        </div>
+        <div><p>{{.BoundaryCopy}}</p><p class="fine-print">{{.BoundaryDetail}}</p></div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="integrations-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>{{.CTAeyebrow}}</p>
+        <h2 id="integrations-cta-title">{{.CTATitle}}</h2>
+        <p>{{.CTACopy}}</p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">{{.CTAStart}}</a>
+          <a class="button secondary" href="providers.html">{{.CTAProviders}}</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img class="brand-mark" src="{{.AssetPrefix}}corresync-mark.svg" alt="" width="64" height="64"><span class="brand-name">corresync</span></a>
+      <p>{{.FooterCopy}}</p>
+      <nav aria-label="{{.FooterAria}}">
+        <a href="getting-started.html">{{.NavStart}}</a><a href="providers.html">{{.NavProviders}}</a><a href="features.html">{{.NavFeatures}}</a><a href="integrations.html">{{.NavIntegrations}}</a><a href="safety.html">{{.NavSafety}}</a><a href="privacy.html">{{.FooterPrivacy}}</a><a href="terms.html">{{.FooterTerms}}</a><a href="https://github.com/nkiyohara/corresync">{{.FooterSource}}</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new">{{.FooterSecurity}}</a><a href="https://github.com/nkiyohara/corresync/releases">{{.FooterReleases}}</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE">Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

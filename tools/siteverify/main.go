@@ -30,6 +30,7 @@ var pageFiles = []string{
 	"getting-started.html",
 	"providers.html",
 	"features.html",
+	"integrations.html",
 	"safety.html",
 	"privacy.html",
 	"terms.html",

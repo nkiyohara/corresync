@@ -31,6 +31,7 @@ func TestVerifyIntegrationVersions(t *testing.T) {
 		"plugins/corresync/.claude-plugin/plugin.json":            versionedJSON(nil),
 		"plugins/corresync/.codex-plugin/plugin.json":             versionedJSON(nil),
 		"docs/generated/integration-bundles.md":                   []byte("Canonical source snapshot:\n\n`" + version + "`."),
+		"docs/generated/publication-channels.md":                  []byte("Canonical source snapshot: `" + version + "`."),
 		"integrations/kiro/corresync/POWER.md":                    []byte("Version: " + version),
 	}
 	if err := verifyIntegrationVersions(files, version); err != nil {

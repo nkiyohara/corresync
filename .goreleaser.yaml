@@ -203,6 +203,11 @@ archives:
         info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
+      - src: .release/integrationbundle/docs/generated/publication-channels.md
+        dst: docs/generated/publication-channels.md
+        info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
       - src: completions/corr.bash
         info:
           mode: 0644

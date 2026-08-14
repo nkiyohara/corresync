@@ -261,6 +261,146 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  publish-mcp-registry:
+    name: Publish and verify MCP Registry record
+    if: ${{ !contains(github.ref_name, '-') }}
+    needs: sign-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # Download only the now-public immutable release assets.
+      id-token: write # Exchange GitHub OIDC for the MCP Registry namespace token.
+    steps:
+      - name: Check out the exact stable tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.x"
+          cache: false
+
+      - name: Install locked cosign
+        uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+        with:
+          version: 2026.7.7
+          experimental: true
+          install_args: cosign
+          cache: false
+
+      - name: Download exact assets from the public stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          release="$(
+            gh release view "$GITHUB_REF_NAME" \
+              --json isDraft,isPrerelease,tagName,url
+          )"
+          jq -e \
+            --arg tag "$GITHUB_REF_NAME" \
+            '.tagName == $tag and (.isDraft | not) and (.isPrerelease | not)' \
+            <<<"$release"
+
+          mkdir assets
+          gh release download "$GITHUB_REF_NAME" \
+            --dir assets \
+            --pattern checksums.txt \
+            --pattern checksums.txt.sigstore.json \
+            --pattern server.json \
+            --pattern "corresync_${version}.mcpb" \
+            --pattern "corresync_${version}.mcpb.spdx.json" \
+            --pattern "corresync_${version}.mcpb.cdx.json"
+          test "$(find assets -maxdepth 1 -type f | wc -l)" -eq 6
+          test -z "$(find assets -mindepth 1 -maxdepth 1 ! -type f -print -quit)"
+
+      - name: Verify the signed checksum inventory
+        run: |
+          cosign verify-blob \
+            --bundle assets/checksums.txt.sigstore.json \
+            --certificate-identity \
+              "https://github.com/nkiyohara/corresync/.github/workflows/release.yml@refs/tags/$GITHUB_REF_NAME" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            assets/checksums.txt
+
+      - name: Verify the registry manifest, MCPB, and both MCPB SBOMs
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/registrypublication" ./tools/registrypublication
+          "$RUNNER_TEMP/registrypublication" \
+            --assets assets \
+            --tag "$GITHUB_REF_NAME"
+
+      - name: Install pinned MCP Registry publisher
+        run: |
+          publisher_archive="$RUNNER_TEMP/mcp-publisher_linux_amd64.tar.gz"
+          publisher_root="$RUNNER_TEMP/mcp-publisher"
+          curl \
+            --proto '=https' \
+            --tlsv1.2 \
+            --location \
+            --proto-redir '=https' \
+            --max-redirs 3 \
+            --connect-timeout 10 \
+            --max-time 60 \
+            --fail-with-body \
+            --silent \
+            --show-error \
+            --output "$publisher_archive" \
+            'https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz'
+          printf '%s  %s\n' \
+            'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc' \
+            "$publisher_archive" | sha256sum --check --strict
+          mkdir "$publisher_root"
+          tar -xzf "$publisher_archive" -C "$publisher_root" mcp-publisher
+          install -m 0755 "$publisher_root/mcp-publisher" "$RUNNER_TEMP/mcp-publisher-bin"
+          "$RUNNER_TEMP/mcp-publisher-bin" --version 2>&1 |
+            grep -F 'mcp-publisher 1.8.1'
+
+      - name: Validate the exact downloaded registry manifest
+        run: >-
+          "$RUNNER_TEMP/mcp-publisher-bin"
+          validate assets/server.json
+
+      - name: Check whether the immutable version already exists
+        id: registry_version
+        run: |
+          state="$(
+            "$RUNNER_TEMP/registrypublication" \
+              --assets assets \
+              --tag "$GITHUB_REF_NAME" \
+              --check-existing
+          )"
+          case "$state" in
+            present|absent) ;;
+            *) echo "Unexpected registry state: $state" >&2; exit 1 ;;
+          esac
+          echo "state=$state" >>"$GITHUB_OUTPUT"
+
+      - name: Authenticate with GitHub OIDC and publish
+        if: steps.registry_version.outputs.state == 'absent'
+        run: |
+          "$RUNNER_TEMP/mcp-publisher-bin" login github-oidc
+          "$RUNNER_TEMP/mcp-publisher-bin" publish assets/server.json
+
+      - name: Post-verify the production registry and write evidence
+        run: |
+          "$RUNNER_TEMP/registrypublication" \
+            --assets assets \
+            --tag "$GITHUB_REF_NAME" \
+            --commit "$GITHUB_SHA" \
+            --evidence evidence/mcp-registry-publication.json \
+            --timeout 3m
+
+      - name: Preserve content-free publication evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mcp-registry-publication-${{ github.ref_name }}
+          path: evidence/mcp-registry-publication.json
+          if-no-files-found: error
+          retention-days: 90
+
   publish-owned-catalogs:
     name: Publish Homebrew and Scoop catalogs
     if: ${{ !contains(github.ref_name, '-') }}

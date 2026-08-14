@@ -61,7 +61,8 @@ The expected release inventory is:
   guide;
 - `corr(1)`, Bash/Zsh/Fish completion, Agent Skill, generated Codex/OpenAI and
   Claude/Copilot/VS Code plugins, Gemini extension, Kiro Power, config-only
-  integration metadata, and marketplace catalogs;
+  integration metadata, generated publication-channel matrix, and marketplace
+  catalogs;
 - source-building Homebrew plus Scoop and WinGet manifests.
 
 During the finite v0.8–v0.9 command transition, binary archives and packages
@@ -87,7 +88,8 @@ documentation/package payloads.
 4. Create an annotated stable tag `vX.Y.Z`, or a preview tag
    `vX.Y.Z-{alpha,beta,rc}.N`, at that exact `main` commit.
 5. Push only the tag.
-6. Monitor release verification and package-catalog jobs.
+6. Monitor release verification, MCP Registry publication, and package-catalog
+   jobs.
 7. Download the published assets and independently verify checksum and
    Sigstore provenance using [install.md](install.md).
 8. Confirm the release is not advertised beyond its recorded compatibility
@@ -123,6 +125,43 @@ assets, logs, caches, or local environment files. The release job imports them
 only after source verification and deletes its temporary keychain even on
 failure. Rotate notarization credentials independently where possible; verify a
 replacement release path before revoking the prior Developer ID certificate.
+
+## Official MCP Registry
+
+Only a stable `vX.Y.Z` tag can publish to the official MCP Registry. Preview
+and RC releases still build and verify `server.json` and the MCPB, but the
+publication job is absent from their execution path. This keeps immutable
+stable directory versions free of preview entries.
+
+After `sign-release` makes the GitHub release public, the Registry job:
+
+1. downloads `server.json`, the MCPB, both MCPB SBOMs, `checksums.txt`, and its
+   Sigstore bundle from that public release;
+2. verifies the checksum signature against the exact release workflow and tag
+   identity, then checks every downloaded publication input against the signed
+   inventory;
+3. validates the exact downloaded `server.json` with the pinned
+   `mcp-publisher` `v1.8.1`; its Linux archive is pinned by SHA-256 as well as
+   version;
+4. checks the immutable version endpoint first, so a retry skips an identical
+   record but fails closed if an existing record differs;
+5. when absent, exchanges GitHub Actions OIDC for the
+   `io.github.nkiyohara/*` namespace authorization and publishes without a
+   stored Registry token;
+6. polls the fixed production Registry endpoint until the name, version,
+   repository, MCPB URL and hash, `active` status, and `isLatest` flag exactly
+   match the verified release;
+7. uploads `mcp-registry-publication.json`, containing only the source commit,
+   tag, target, public URLs, artifact hashes, status, and timestamps.
+
+The job never rebuilds or replaces a release artifact. If publication or
+post-verification fails, rerun only that failed job: it re-downloads and
+re-verifies the same public assets. A pre-existing exact version is treated as
+an idempotent retry; any immutable-version mismatch stops without publishing.
+The generated [publication matrix](generated/publication-channels.md) remains
+the canonical checklist for directory owners, supported local surfaces,
+publication methods, visible versions, verification links, and reload
+behavior. A source package is not an upstream marketplace listing.
 
 ## Package catalogs
 

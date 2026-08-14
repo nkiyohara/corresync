@@ -8,7 +8,10 @@ on:
       - "web/discovery-worker/**"
       - "internal/discovery/catalog.go"
       - "internal/rollout/google.go"
+      - "internal/integrationbundle/**"
       - "tools/discoverycatalog/**"
+      - "tools/integrationbundle/**"
+      - "tools/publicationsite/**"
       - "tools/siteverify/**"
       - ".github/workflows/pages.yml"
   pull_request:
@@ -18,7 +21,10 @@ on:
       - "web/discovery-worker/**"
       - "internal/discovery/catalog.go"
       - "internal/rollout/google.go"
+      - "internal/integrationbundle/**"
       - "tools/discoverycatalog/**"
+      - "tools/integrationbundle/**"
+      - "tools/publicationsite/**"
       - "tools/siteverify/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
@@ -57,6 +63,7 @@ jobs:
           test -s site/index.html
           test -s site/getting-started.html
           test -s site/features.html
+          test -s site/integrations.html
           test -s site/providers.html
           test -s site/safety.html
           test -s site/privacy.html
@@ -78,7 +85,7 @@ jobs:
           test -s site/social-card.png
           test -s site/robots.txt
           test -s site/sitemap.xml
-          for page in index getting-started features providers safety privacy terms; do
+          for page in index getting-started features integrations providers safety privacy terms; do
             grep -Fq '<html lang="en">' "site/${page}.html"
             grep -Fq '<link rel="canonical"' "site/${page}.html"
             grep -Fq 'corresync-mark.svg' "site/${page}.html"
@@ -97,7 +104,7 @@ jobs:
           for locale_and_lang in ja:ja zh-cn:zh-Hans zh-tw:zh-Hant ko:ko; do
             locale="${locale_and_lang%%:*}"
             lang="${locale_and_lang#*:}"
-            for page in index getting-started features providers safety privacy terms; do
+            for page in index getting-started features integrations providers safety privacy terms; do
               localized="site/${locale}/${page}.html"
               test -s "${localized}"
               grep -Fq "<html lang=\"${lang}\">" "${localized}"
@@ -109,6 +116,7 @@ jobs:
           grep -Fq 'https://corresync.org/' site/index.html
           grep -Fq 'https://corresync.org/getting-started.html' site/getting-started.html
           grep -Fq 'https://corresync.org/features.html' site/features.html
+          grep -Fq 'https://corresync.org/integrations.html' site/integrations.html
           grep -Fq 'https://corresync.org/providers.html' site/providers.html
           grep -Fq 'https://corresync.org/safety.html' site/safety.html
           grep -Fq 'https://corresync.org/privacy.html' site/privacy.html
@@ -133,6 +141,7 @@ jobs:
           grep -Fq 'https://corresync.org/' site/sitemap.xml
           grep -Fq 'https://corresync.org/getting-started.html' site/sitemap.xml
           grep -Fq 'https://corresync.org/features.html' site/sitemap.xml
+          grep -Fq 'https://corresync.org/integrations.html' site/sitemap.xml
           grep -Fq 'https://corresync.org/providers.html' site/sitemap.xml
           grep -Fq 'https://corresync.org/safety.html' site/sitemap.xml
           grep -Fq 'https://corresync.org/privacy.html' site/sitemap.xml
@@ -150,6 +159,8 @@ jobs:
           node --test web/discovery-worker/test/*.test.mjs site/check.test.cjs
           test -z "$(find site -type l -print -quit)"
           go run ./tools/discoverycatalog --check
+          go run ./tools/integrationbundle --check
+          go run ./tools/publicationsite --check
           go run ./tools/siteverify
 
       - name: Configure GitHub Pages
