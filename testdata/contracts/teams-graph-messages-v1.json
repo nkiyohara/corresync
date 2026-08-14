@@ -1,0 +1,24 @@
+{
+  "value": [
+    {
+      "id": "message-synthetic",
+      "etag": "etag-synthetic-1",
+      "messageType": "message",
+      "createdDateTime": "2026-08-14T12:00:00Z",
+      "lastModifiedDateTime": "2026-08-14T12:01:00Z",
+      "summary": "Synthetic message summary",
+      "chatId": "chat-synthetic",
+      "from": {
+        "user": {
+          "id": "user-synthetic",
+          "displayName": "Synthetic Teams User"
+        }
+      },
+      "body": {
+        "contentType": "html",
+        "content": "<p>Synthetic secret body</p>"
+      },
+      "attachments": []
+    }
+  ]
+}

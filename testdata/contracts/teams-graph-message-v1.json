@@ -1,0 +1,54 @@
+{
+  "id": "message-synthetic",
+  "etag": "etag-synthetic-1",
+  "messageType": "message",
+  "createdDateTime": "2026-08-14T12:00:00Z",
+  "lastModifiedDateTime": "2026-08-14T12:01:00Z",
+  "lastEditedDateTime": "2026-08-14T12:01:00Z",
+  "summary": "Synthetic message summary",
+  "chatId": "chat-synthetic",
+  "webUrl": "https://teams.microsoft.com/l/message/synthetic",
+  "from": {
+    "user": {
+      "id": "user-synthetic",
+      "displayName": "Synthetic Teams User",
+      "tenantId": "workspace-synthetic"
+    }
+  },
+  "body": {
+    "contentType": "html",
+    "content": "<p>Synthetic secret body <a href=\"https://example.invalid/reference\">reference</a></p>"
+  },
+  "mentions": [
+    {
+      "id": 0,
+      "mentionText": "Synthetic Recipient",
+      "mentioned": {
+        "user": {
+          "id": "recipient-synthetic",
+          "displayName": "Synthetic Recipient"
+        }
+      }
+    }
+  ],
+  "reactions": [
+    {
+      "reactionType": "like",
+      "createdDateTime": "2026-08-14T12:01:00Z",
+      "user": {
+        "user": {
+          "id": "user-synthetic",
+          "displayName": "Synthetic Teams User"
+        }
+      }
+    }
+  ],
+  "attachments": [
+    {
+      "id": "attachment-synthetic",
+      "contentType": "reference",
+      "contentUrl": "https://example.invalid/file",
+      "name": "synthetic.txt"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "value": [
+    {
+      "id": "chat-synthetic",
+      "topic": "Synthetic planning",
+      "chatType": "group",
+      "createdDateTime": "2026-08-14T12:00:00Z",
+      "lastUpdatedDateTime": "2026-08-14T12:02:00Z"
+    }
+  ]
+}
