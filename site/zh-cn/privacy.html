@@ -142,8 +142,8 @@
               的密码或令牌由钥匙串或明确批准的凭据助手持有，配置只保存外部引用。
             </p>
             <p>
-              Gmail 与 Google 日历代码已包含在 RC 中，但生产环境 OAuth
-              获批前整条 Google
+              Gmail、Google 日历和 Google Tasks 代码已包含在 RC 中，但生产环境
+              OAuth 获批前整条 Google
               路径保持关闭。账号添加、浏览器授权、权限请求、钥匙串读取和
               Google API
               流量都无法启动。以下说明只适用于将来经另一次独立审阅后启用的版本。
@@ -185,12 +185,25 @@
                       链接。
                     </td>
                   </tr>
+                  <tr>
+                    <td>
+                      <code>https://www.googleapis.com/auth/tasks.readonly</code><br>
+                      或 <code>https://www.googleapis.com/auth/tasks</code>
+                    </td>
+                    <td>
+                      任务列表名称与
+                      ID，以及任务标题、备注、状态、仅日期的截止时间、完成状态、层级、排序、分配信息和来源链接。
+                    </td>
+                    <td>
+                      只读路径仅列出和读取任务。可写路径会在预览并批准后创建、更新、完成、重新打开、移动或删除任务，并在写入前执行已分配任务的限制。
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
             <p>
               Google
-              数据只用于你明确调用或配置的邮件、日历、监控和自动化功能。Corresync
+              数据只用于你明确调用或配置的邮件、日历、任务、监控和自动化功能。Corresync
               不访问联系人、云端硬盘、密码、浏览器
               Cookie、广告画像或非公开 API。
             </p>

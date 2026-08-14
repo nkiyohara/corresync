@@ -72,19 +72,20 @@ and unshared Corresync-owned OAuth grant state. External standards credentials
 remain in their keyring/helper. Removing the default account requires
 `--new-default`.
 
-## Schema v7
+## Schema v8
 
-Schema v7 adds a typed CalDAV VTODO payload to the existing optional task
-route. Existing v6 files preserve every route and credential consent exactly;
-the migration adds no VTODO route or new authority. Schema v6 introduced the
-task route, and existing v5 files still migrate with no task route,
+Schema v8 adds a typed, independent Google Tasks OAuth payload without enabling
+the approval-gated route. Existing v7 files preserve every route and credential
+consent exactly; migration cannot add or authorize Google Tasks. Schema v7
+added the CalDAV VTODO payload, schema v6 introduced the task route, and
+existing v5 files still migrate with no task route,
 authorization, or capability. Schema v5 added the signed-release channel and
 existing older files retain their check and automatic-install consent. A freshly
 initialized provider-neutral configuration contains no account and has an
 empty `default_account`. The first account added becomes the default:
 
 ```toml
-version = 7
+version = 8
 default_account = ""
 
 [policy]
@@ -109,7 +110,7 @@ auto_submit = false
 A configured Outlook Web account then looks like:
 
 ```toml
-version = 7
+version = 8
 default_account = "work"
 
 [accounts.work]
@@ -174,7 +175,8 @@ Supported route payloads are:
 | tasks | `microsoft-graph` | `tasks.microsoft_graph` and `tasks.microsoft_graph.oauth` |
 | tasks | `todoist` | `tasks.todoist` and `tasks.todoist.oauth` |
 | tasks | `caldav` | `tasks.caldav` |
-| tasks | `microsoft-web-tasks`, `google-tasks`, `apple-reminders`, `ticktick`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
+| tasks | `google-tasks` | `tasks.google_tasks` and `tasks.google_tasks.oauth`; approval-gated |
+| tasks | `microsoft-web-tasks`, `apple-reminders`, `ticktick`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
 <!-- markdownlint-enable MD013 -->
 
 The payload must match the provider exactly. The staged Google mail-and-calendar
@@ -279,6 +281,36 @@ selected external credential owner. VEVENT and VTODO discovery, sessions,
 capabilities, cursors, and writes remain separate. Remaining task providers
 are unavailable and have no arbitrary options map or credential value. See the
 [task contract](tasks.md).
+
+Schema v8 also defines the future Google Tasks route shape:
+
+```toml
+[accounts.google-tasks]
+id = "acc_0000000000000000000000000000000c"
+address = "reader@example.invalid"
+
+[accounts.google-tasks.tasks]
+provider = "google-tasks"
+
+[accounts.google-tasks.tasks.google_tasks]
+read_only = true
+
+[accounts.google-tasks.tasks.google_tasks.oauth]
+api_base = "https://tasks.googleapis.com"
+client_id = "synthetic.apps.googleusercontent.com"
+redirect_uri = "http://127.0.0.1:0/oauth/callback"
+
+[accounts.google-tasks.tasks.google_tasks.oauth.authorization]
+backend = "os-keyring"
+key = "tasks-google"
+consent = true
+```
+
+This is a schema example, not an available setup path. While production Google
+OAuth approval is pending, the CLI refuses to save or activate it before
+browser, keyring, OAuth, or API access. The route requests exactly one task
+scope and cannot reuse a Gmail/Calendar authorization handle. A separate
+reviewed release must enable it after approval and opt-in live evidence.
 
 Prefer the lifecycle command over hand editing:
 
@@ -425,9 +457,10 @@ in the authorization URL or OS-keyring grant. Use only a client registration
 you are authorized to operate.
 
 The normal system browser owns Google sign-in. Gmail then uses the pinned Gmail
-API with `gmail.modify`; Calendar uses the pinned Google Calendar API. The
-adapter never calls Gmail's immediate permanent-delete method. Passwords, app
-passwords, cookies, and custom Google hosts are not accepted by the route.
+API with `gmail.modify`; Calendar uses the pinned Google Calendar API; Google
+Tasks uses a separate task-only grant and the pinned Tasks API. The Gmail
+adapter never calls the immediate permanent-delete method. Passwords, app
+passwords, cookies, and custom Google hosts are not accepted by any route.
 
 Microsoft Graph and hybrid accounts can use distinct OAuth providers and
 grants. Prefix calendar settings with `calendar-` and task settings with

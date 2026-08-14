@@ -20,6 +20,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
 	"github.com/nkiyohara/corresync/internal/provider/googleapi"
+	"github.com/nkiyohara/corresync/internal/provider/googletasks"
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
@@ -577,6 +578,62 @@ func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
 	}
 	if manager.calls != 0 || factoryCalls != 0 {
 		t.Fatalf("pending Google touched OAuth or API: manager=%d factory=%d", manager.calls, factoryCalls)
+	}
+}
+
+func TestSessionBackendNeverAuthorizesPendingGoogleTaskRoute(t *testing.T) {
+	t.Parallel()
+
+	const accountID domain.AccountID = "acc_00000000000000000000000000000112"
+	configuration := config.OutlookDefault()
+	configuration.Accounts["tasks"] = config.Account{
+		ID: accountID, Address: "reader@example.test",
+		Tasks: &config.TaskRoute{
+			Provider: domain.ProviderGoogleTasks,
+			GoogleTasks: &config.GoogleTaskRoute{
+				OAuth: config.OAuthRoute{
+					APIBase:     "https://tasks.googleapis.com",
+					ClientID:    "synthetic.apps.googleusercontent.com",
+					RedirectURI: "http://127.0.0.1:53682/oauth/callback",
+					Authorization: config.CredentialRef{
+						Backend: config.CredentialOSKeyring,
+						Key:     "google-tasks", Consent: true,
+					},
+				},
+			},
+		},
+	}
+	manager := &oauthManagerStub{client: http.DefaultClient}
+	factoryCalls := 0
+	backend := &sessionBackend{
+		configuration: configuration,
+		guard:         daemonMCPGuard(t, policy.DefaultRules(), &daemonMCPAudit{}),
+		oauth:         manager,
+		accounts:      make(map[domain.AccountID]sessionAccount),
+		previews:      make(map[string]sessionPreview),
+		newGoogleTasks: func(context.Context, googletasks.Options) (*googletasks.Client, error) {
+			factoryCalls++
+			return nil, errors.New("pending Google Tasks route reached its adapter")
+		},
+	}
+	mcpCaller := domain.Caller{Surface: "mcp", Instance: "synthetic-client"}
+	cliCaller := domain.Caller{Surface: "cli", Instance: "synthetic-process"}
+	_, err := backend.ListTaskLists(t.Context(), application.TaskListInput{
+		Account: accountID, Limit: 25,
+	}, mcpCaller)
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		t.Fatalf("ListTaskLists() error = %v", err)
+	}
+	if _, err := backend.Login(t.Context(), accountID, mcpCaller); err == nil {
+		t.Fatal("MCP Login() unexpectedly authorized Google Tasks")
+	}
+	if _, err := backend.Login(t.Context(), accountID, cliCaller); !errors.Is(
+		err, rollout.ErrGoogleOAuthPending,
+	) {
+		t.Fatalf("CLI Login() error = %v", err)
+	}
+	if manager.calls != 0 || factoryCalls != 0 {
+		t.Fatalf("pending Google Tasks touched OAuth or API: manager=%d factory=%d", manager.calls, factoryCalls)
 	}
 }
 

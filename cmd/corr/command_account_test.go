@@ -697,6 +697,40 @@ func TestAccountAddPersistsTaskOnlyTodoistPublicClientWithoutDiscovery(t *testin
 	}
 }
 
+func TestAccountAddRejectsGoogleTasksWhileApprovalIsPending(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.test", Alias: "tasks",
+		TaskProvider:         string(domain.ProviderGoogleTasks),
+		TaskOAuthClientID:    "synthetic.apps.googleusercontent.com",
+		TaskOAuthRedirectURI: "http://127.0.0.1:53684/oauth/callback",
+		TaskAuthorizationKey: "google-tasks",
+		ApproveTaskOAuth:     true,
+	}
+	err := command.Run(app)
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		t.Fatalf("account add error = %v", err)
+	}
+	if discoverer.address != "" {
+		t.Fatalf("pending Google Tasks route started discovery for %q", discoverer.address)
+	}
+	configuration, loadErr := config.Load(path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if _, exists := configuration.Accounts["tasks"]; exists || stdout.Len() != 0 {
+		t.Fatalf("pending Google Tasks route changed state: %#v, %q", configuration, stdout.String())
+	}
+	for _, expected := range []string{
+		"Google Tasks was selected", "awaiting approval", "no Google sign-in was started",
+	} {
+		if !strings.Contains(err.Error(), expected) {
+			t.Fatalf("pending Google Tasks error missing %q: %v", expected, err)
+		}
+	}
+}
+
 func TestAccountAddPersistsTaskOnlyCalDAVRouteWithoutDiscovery(t *testing.T) {
 	discoverer := &accountDiscovererStub{}
 	app, path, stdout := newAccountCommandRuntime(t, discoverer)

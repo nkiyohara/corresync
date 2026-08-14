@@ -6,14 +6,14 @@
     <title>Email, calendar, and task providers — Corresync</title>
     <meta
       name="description"
-      content="Compare Corresync routes for Outlook, Microsoft 365, Todoist, iCloud Mail and Calendar, JMAP, IMAP/SMTP, and CalDAV VTODO tasks. Gmail is coming soon pending OAuth approval."
+      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Email, calendar, and task providers — Corresync">
     <meta
       property="og:description"
-      content="Compare Corresync routes for Outlook, Microsoft 365, Todoist, iCloud Mail and Calendar, JMAP, IMAP/SMTP, and CalDAV VTODO tasks. Gmail is coming soon pending OAuth approval."
+      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -34,7 +34,7 @@
     <meta name="twitter:title" content="Email, calendar, and task providers — Corresync">
     <meta
       name="twitter:description"
-      content="Compare Corresync routes for Outlook, Microsoft 365, Todoist, iCloud Mail and Calendar, JMAP, IMAP/SMTP, and CalDAV VTODO tasks. Gmail is coming soon pending OAuth approval."
+      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -163,8 +163,8 @@
           <strong>v0.8 evidence: deterministic and route-specific.</strong>
           <p>
             All available and staged routes below have synthetic provider-contract and application
-            coverage. The new Gmail API route is disabled and live-unobserved; an older observation
-            covers only the retired IMAP/SMTP transport.
+            coverage. The staged Google API routes are disabled and live-unobserved; an older
+            observation covers only the retired Gmail IMAP/SMTP transport.
           </p>
         </div>
         <a href="features.html#evidence">How evidence works<span aria-hidden="true"> →</span></a>
@@ -303,12 +303,12 @@
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google routes</p>
-          <h2 id="google-title">Gmail and Google Calendar are coming soon.</h2>
+          <h2 id="google-title">Gmail, Google Calendar, and Google Tasks are coming soon.</h2>
           <p>
-            The Gmail and Calendar API integration is included in RC builds and covered by synthetic
-            contracts. Production OAuth stays disabled until Google approves it, so no Google
-            sign-in, scope request, keyring access, or API traffic starts. For now, use Google’s
-            official Workspace MCP servers with your agent.
+            The integrations are included in RC builds and covered by synthetic contracts.
+            Production OAuth stays disabled until Google approves it, so no Google sign-in, scope
+            request, keyring access, or API traffic starts. Outlook, Microsoft 365, Todoist, iCloud,
+            JMAP, IMAP/SMTP, and CalDAV routes remain available now.
           </p>
         </div>
         <div class="route-grid two">
@@ -333,6 +333,10 @@
                 <dd>Selectable calendars and Google Meet when the calendar advertises it</dd>
               </div>
               <div>
+                <dt>Tasks</dt>
+                <dd>Date-only due dates, subtasks, ordering, source links, and safe polling</dd>
+              </div>
+              <div>
                 <dt>Sign-in</dt>
                 <dd>
                   Not active in this RC; after approval, normal-browser OAuth with an account-scoped
@@ -342,7 +346,7 @@
             </dl>
             <p class="route-foot">
               When a separate reviewed release enables the route after approval, the normal browser
-              will own OAuth and Gmail, Calendar, and Meet will use pinned Google APIs.
+              will own OAuth and Gmail, Calendar, Meet, and Tasks will use pinned Google APIs.
             </p>
           </article>
           <article class="route-card">

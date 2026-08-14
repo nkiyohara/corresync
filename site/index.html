@@ -10,7 +10,7 @@
     <title>Corresync — one local MCP server for all your email and calendars</title>
     <meta
       name="description"
-      content="Local MCP server and CLI for Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV. Gmail and Google Calendar are coming soon after OAuth approval."
+      content="Local MCP server and CLI for Outlook, Microsoft 365, JMAP, IMAP/SMTP, CalDAV, and tasks. Gmail, Google Calendar, and Google Tasks are coming soon."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -20,7 +20,7 @@
     >
     <meta
       property="og:description"
-      content="Local MCP server and CLI for Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV. Gmail and Google Calendar are coming soon after OAuth approval."
+      content="Local MCP server and CLI for Outlook, Microsoft 365, JMAP, IMAP/SMTP, CalDAV, and tasks. Gmail, Google Calendar, and Google Tasks are coming soon."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -44,7 +44,7 @@
     >
     <meta
       name="twitter:description"
-      content="Local MCP server and CLI for Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV. Gmail and Google Calendar are coming soon after OAuth approval."
+      content="Local MCP server and CLI for Outlook, Microsoft 365, JMAP, IMAP/SMTP, CalDAV, and tasks. Gmail, Google Calendar, and Google Tasks are coming soon."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -82,7 +82,7 @@
           "programmingLanguage": "Go",
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
-          "description": "A local-first, provider-neutral MCP server and CLI for isolated Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV accounts, with Gmail and Google Calendar coming soon after OAuth approval."
+          "description": "A local-first, provider-neutral MCP server and CLI for isolated mail, calendar, and task accounts, with Gmail, Google Calendar, and Google Tasks coming soon after OAuth approval."
         }
       ]
     }
@@ -132,8 +132,9 @@
           </p>
           <p class="hero-providers">
             <strong>Available now:</strong> Outlook Web · Microsoft Graph · JMAP · IMAP/SMTP ·
-            CalDAV. <strong>Coming soon:</strong> Gmail and Google Calendar, pending Google OAuth
-            approval. Capabilities and administrator requirements are explicit per account —
+            CalDAV. <strong>Coming soon:</strong> Gmail, Google Calendar, and Google Tasks, pending
+            Google OAuth approval. Capabilities and administrator requirements are explicit per
+            account —
             <a href="providers.html">compare the routes</a>.
           </p>
           <div class="actions">
@@ -227,9 +228,10 @@
           <p class="eyebrow"><span aria-hidden="true"></span>Your data, explained</p>
           <h2 id="policy-callout-title">Google support is built—and waiting for approval.</h2>
           <p>
-            Gmail and Google Calendar code is included in the RC, but production OAuth is disabled:
-            no Google sign-in, keyring access, scope request, or API traffic starts. After approval,
-            a separate reviewed release will enable direct, local, purpose-bound access.
+            Gmail, Google Calendar, and Google Tasks code is included in the RC, but production
+            OAuth is disabled: no Google sign-in, keyring access, scope request, or API traffic
+            starts. After approval, a separate reviewed release will enable direct, local,
+            purpose-bound access.
           </p>
         </div>
         <div class="actions">
@@ -517,9 +519,9 @@ payload is approved.</span></code></pre>
         </div>
         <ul>
           <li>
-            <strong>Gmail and Google Calendar are coming soon.</strong> The code is in the RC, but
-            production OAuth stays disabled until Google approves it. No Google sign-in starts; use
-            Google’s official Workspace MCP servers in the meantime.
+            <strong>Gmail, Google Calendar, and Google Tasks are coming soon.</strong> The code is
+            in the RC, but production OAuth stays disabled until Google approves it. No Google
+            sign-in starts; use Google’s official Workspace MCP servers in the meantime.
           </li>
           <li>
             <strong>Microsoft Graph is bring-your-own OAuth.</strong> Corresync does not operate a

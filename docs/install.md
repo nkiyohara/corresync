@@ -297,11 +297,12 @@ corr account add reader@example.invalid --help
 
 Discovery is credential-free. Review its candidates and choose one explicitly.
 Microsoft Graph requires a registered public OAuth client and an OS-keyring
-authorization handle. The Gmail and Google Calendar route is included but
-disabled in RC builds while production OAuth approval is pending, so Google
-account addition and sign-in stop before any credential or network access.
-After a separate activation release, Gmail and Calendar will use pinned Google
-APIs. Workspace administrators may still require approval or block access. A
+authorization handle. The Gmail, Google Calendar, and independent Google Tasks
+routes are included but disabled in RC builds while production OAuth approval
+is pending, so Google account addition and sign-in stop before any credential
+or network access. After a separate activation release, all three will use
+pinned Google APIs. Workspace administrators may still require approval or
+block access. A
 generated Google Desktop client may also require its client credential in the
 local `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` process environment; never put it in
 configuration or command arguments. JMAP, IMAP/SMTP, and CalDAV use an

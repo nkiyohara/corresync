@@ -9,7 +9,7 @@ not available through a raw protocol escape hatch.
 | Provider ID | Mail | Calendar | Tasks | Authentication | v0.8 evidence |
 | --- | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | — | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
-| `google` (coming soon) | Gmail API; no permanent delete | Selectable Google calendars and Google Meet when advertised | — | Included but disabled until production OAuth approval; no sign-in starts | Synthetic API/application contracts; live-unobserved |
+| `google` / `google-tasks` (coming soon) | Gmail API; no permanent delete | Selectable Google calendars and Google Meet when advertised | Google Tasks with an independent task-only grant | Included but disabled until production OAuth approval; no sign-in starts | Synthetic API/application contracts; live-unobserved |
 | `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Microsoft To Do | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `todoist` | — | — | Todoist | Explicit BYO public OAuth client with PKCE; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `jmap` | Mail | — | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
@@ -20,8 +20,8 @@ not available through a raw protocol escape hatch.
 Task routes use a separate provider selection described in the
 [task contract](tasks.md). Microsoft To Do is active only through the explicit
 `microsoft-graph` task route, and Todoist through the explicit `todoist` route.
-Other configured task routes remain unavailable until their dependent provider
-issue ships.
+Google Tasks is implemented behind the disabled approval gate. Other configured
+task routes remain unavailable until their dependent provider issue ships.
 
 Mail and calendar are selected independently. For example, one account may use
 IMAP/SMTP for mail and CalDAV for calendar. `pop3` is reserved without a route
@@ -53,7 +53,8 @@ selected as a fallback.
 Google evidence identifies the staged `google` route but cannot select or add
 it while production OAuth approval is pending. The CLI explains that Gmail was
 found, no sign-in started, and support is coming soon. When separately
-activated after approval, the route pins the Gmail and Calendar API base.
+activated after approval, the routes pin the Gmail, Calendar, and Tasks API
+bases; Google Tasks uses an independent task-only grant.
 Workspace policy may still require administrator approval or block API access;
 Corresync never silently falls back to another route.
 
@@ -195,7 +196,10 @@ implements VTODO list/read/search, ETag-bound CRUD/state writes, RELATED-TO
 parents, categories, alarms, date/floating/zoned time, recurrence, and RFC 6578
 sync-token reset. Unknown iCalendar properties stay attached to the exact
 object during updates and are reported as degradations. Other task providers
-remain unavailable.
+remain unavailable. Google Tasks implements task-list discovery, task CRUD/state,
+subtasks, ordering, date-only due values, output-only source links, exact ETag
+conditions, and bounded deletion-aware polling, but the route is unreachable
+until a separate post-approval release enables it.
 
 ## Accounts and projections
 

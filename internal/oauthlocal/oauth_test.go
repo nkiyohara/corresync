@@ -317,6 +317,31 @@ func TestGoogleOAuthProfileIsPresentButApprovalGated(t *testing.T) {
 	}
 }
 
+func TestGoogleTaskOAuthProfileIsIndependentAndApprovalGated(t *testing.T) {
+	t.Parallel()
+
+	_, err := ProviderFor(domain.ProviderGoogleTasks, Services{Tasks: true})
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		t.Fatalf("ProviderFor() error = %v", err)
+	}
+	read := googleTaskProviderProfile(false)
+	write := googleTaskProviderProfile(true)
+	if !slices.Equal(read.Scopes, []string{
+		"email", "openid", "https://www.googleapis.com/auth/tasks.readonly",
+	}) || !slices.Equal(write.Scopes, []string{
+		"email", "openid", "https://www.googleapis.com/auth/tasks",
+	}) {
+		t.Fatalf("Google Tasks scopes: read=%#v write=%#v", read.Scopes, write.Scopes)
+	}
+	for _, profile := range []Provider{read, write} {
+		for _, scope := range profile.Scopes {
+			if strings.Contains(scope, "gmail") || strings.Contains(scope, "calendar") {
+				t.Fatalf("Google Tasks profile broadened another service: %#v", profile.Scopes)
+			}
+		}
+	}
+}
+
 func TestGoogleDesktopClientCredentialDoesNotCrossIntoGraph(t *testing.T) {
 	t.Parallel()
 

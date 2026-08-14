@@ -156,6 +156,13 @@ type AccountTodoistTaskInput struct {
 	ReadOnly bool              `json:"readOnly,omitempty"`
 }
 
+// AccountGoogleTaskInput selects an independent Google Tasks desktop grant.
+// The release-owned approval gate remains authoritative over reachability.
+type AccountGoogleTaskInput struct {
+	OAuth    AccountOAuthInput `json:"oauth"`
+	ReadOnly bool              `json:"readOnly,omitempty"`
+}
+
 // AccountWebInput identifies a provider-owned interactive browser origin.
 type AccountWebInput struct {
 	Origin string `json:"origin"`
@@ -189,6 +196,7 @@ type AccountTaskRouteInput struct {
 	MicrosoftGraph *AccountMicrosoftTaskInput `json:"microsoftGraph,omitempty"`
 	Todoist        *AccountTodoistTaskInput   `json:"todoist,omitempty"`
 	CalDAV         *AccountCalDAVTaskInput    `json:"caldav,omitempty"`
+	GoogleTasks    *AccountGoogleTaskInput    `json:"googleTasks,omitempty"`
 }
 
 // AccountAddInput explicitly selects service routes to persist. Discovery
@@ -477,7 +485,8 @@ func (service *AccountService) reviewAdd(
 			return "", AccountCatalog{}, fmt.Errorf("task route: %w", err)
 		}
 		if (input.Tasks.Provider == domain.ProviderMicrosoftGraph ||
-			input.Tasks.Provider == domain.ProviderTodoist) && normalizedAddress == "" {
+			input.Tasks.Provider == domain.ProviderTodoist ||
+			input.Tasks.Provider == domain.ProviderGoogleTasks) && normalizedAddress == "" {
 			return "", AccountCatalog{}, errors.New(
 				"an OAuth task route requires an account address",
 			)
@@ -571,6 +580,11 @@ func validateAccountOAuthGrantSharing(input AccountAddInput) error {
 		input.Tasks.Todoist != nil {
 		route := input.Tasks.Todoist.OAuth
 		add(domain.ProviderTodoist, route.ClientID, route.RedirectURI, route.Authorization, "")
+	}
+	if input.Tasks != nil && input.Tasks.Provider == domain.ProviderGoogleTasks &&
+		input.Tasks.GoogleTasks != nil {
+		route := input.Tasks.GoogleTasks.OAuth
+		add(domain.ProviderGoogleTasks, route.ClientID, route.RedirectURI, route.Authorization, "")
 	}
 	for left := range bindings {
 		for right := left + 1; right < len(bindings); right++ {
@@ -668,6 +682,14 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 	if input.Tasks != nil && input.Tasks.Provider == domain.ProviderTodoist &&
 		input.Tasks.Todoist != nil {
 		credential := input.Tasks.Todoist.OAuth.Authorization
+		reviews = append(reviews, AccountCredentialReview{
+			Service: "tasks", Provider: input.Tasks.Provider,
+			Backend: credential.Backend, Key: credential.Key,
+		})
+	}
+	if input.Tasks != nil && input.Tasks.Provider == domain.ProviderGoogleTasks &&
+		input.Tasks.GoogleTasks != nil {
+		credential := input.Tasks.GoogleTasks.OAuth.Authorization
 		reviews = append(reviews, AccountCredentialReview{
 			Service: "tasks", Provider: input.Tasks.Provider,
 			Backend: credential.Backend, Key: credential.Key,
@@ -786,7 +808,8 @@ func accountUsesOAuth(account AccountView) bool {
 			continue
 		}
 		switch route.Provider {
-		case domain.ProviderGoogle, domain.ProviderMicrosoftGraph, domain.ProviderTodoist:
+		case domain.ProviderGoogle, domain.ProviderMicrosoftGraph,
+			domain.ProviderTodoist, domain.ProviderGoogleTasks:
 			return true
 		case
 			domain.ProviderMicrosoftOWA,
@@ -795,7 +818,6 @@ func accountUsesOAuth(account AccountView) bool {
 			domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV,
 			domain.ProviderMicrosoftTasks,
-			domain.ProviderGoogleTasks,
 			domain.ProviderAppleReminders,
 			domain.ProviderTickTick,
 			domain.ProviderAnyDoMCP,
@@ -1181,7 +1203,8 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 		if _, available := service.taskAvailable[route.Provider]; !available {
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
 		}
-		if route.MicrosoftGraph == nil || route.Todoist != nil || route.CalDAV != nil {
+		if route.MicrosoftGraph == nil || route.Todoist != nil || route.CalDAV != nil ||
+			route.GoogleTasks != nil {
 			return errors.New("microsoft-graph tasks require independent OAuth settings")
 		}
 		if err := validateOAuthInput(domain.ProviderMicrosoftGraph, route.MicrosoftGraph.OAuth); err != nil {
@@ -1199,7 +1222,8 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 		if _, available := service.taskAvailable[route.Provider]; !available {
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
 		}
-		if route.Todoist == nil || route.MicrosoftGraph != nil || route.CalDAV != nil {
+		if route.Todoist == nil || route.MicrosoftGraph != nil || route.CalDAV != nil ||
+			route.GoogleTasks != nil {
 			return errors.New("todoist tasks require independent OAuth settings")
 		}
 		return validateOAuthInput(domain.ProviderTodoist, route.Todoist.OAuth)
@@ -1207,12 +1231,21 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 		if _, available := service.taskAvailable[route.Provider]; !available {
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
 		}
-		if route.CalDAV == nil || route.MicrosoftGraph != nil || route.Todoist != nil {
+		if route.CalDAV == nil || route.MicrosoftGraph != nil || route.Todoist != nil ||
+			route.GoogleTasks != nil {
 			return errors.New("caldav tasks require CalDAV VTODO settings")
 		}
 		return validateCalDAVTaskInput(*route.CalDAV)
+	case domain.ProviderGoogleTasks:
+		if _, available := service.taskAvailable[route.Provider]; !available {
+			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
+		}
+		if route.GoogleTasks == nil || route.MicrosoftGraph != nil || route.Todoist != nil ||
+			route.CalDAV != nil {
+			return errors.New("google-tasks requires independent OAuth settings")
+		}
+		return validateOAuthInput(domain.ProviderGoogleTasks, route.GoogleTasks.OAuth)
 	case domain.ProviderMicrosoftTasks,
-		domain.ProviderGoogleTasks,
 		domain.ProviderAppleReminders,
 		domain.ProviderTickTick,
 		domain.ProviderAnyDoMCP,
@@ -1221,7 +1254,8 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 		if _, available := service.taskAvailable[route.Provider]; !available {
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
 		}
-		if route.MicrosoftGraph != nil || route.Todoist != nil || route.CalDAV != nil {
+		if route.MicrosoftGraph != nil || route.Todoist != nil || route.CalDAV != nil ||
+			route.GoogleTasks != nil {
 			return errors.New("task route contains settings for another provider")
 		}
 		return nil
@@ -1254,6 +1288,11 @@ func validateOAuthInput(
 			apiBase.EscapedPath() != "" && apiBase.EscapedPath() != "/" {
 			return errors.New("google API base must be https://www.googleapis.com")
 		}
+	case domain.ProviderGoogleTasks:
+		if route.MicrosoftCloud != "" || apiBase.Host != "tasks.googleapis.com" ||
+			apiBase.RawQuery != "" || apiBase.EscapedPath() != "" && apiBase.EscapedPath() != "/" {
+			return errors.New("google Tasks API base must be https://tasks.googleapis.com")
+		}
 	case domain.ProviderMicrosoftGraph:
 		if err := microsoftcloud.ValidateAPIBase(route.MicrosoftCloud, route.APIBase); err != nil {
 			return err
@@ -1269,7 +1308,6 @@ func validateOAuthInput(
 		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
 		domain.ProviderMicrosoftTasks,
-		domain.ProviderGoogleTasks,
 		domain.ProviderAppleReminders,
 		domain.ProviderTickTick,
 		domain.ProviderAnyDoMCP,
@@ -1495,6 +1533,9 @@ func taskRouteInputView(route *AccountTaskRouteInput) *AccountRouteView {
 				Consented: route.CalDAV.Credential.Consent,
 			},
 		}
+	}
+	if route.Provider == domain.ProviderGoogleTasks && route.GoogleTasks != nil {
+		return oauthRouteView(route.Provider, &route.GoogleTasks.OAuth)
 	}
 	return TaskRouteView(route.Provider)
 }
@@ -1755,6 +1796,10 @@ func cloneTaskRoute(route *AccountTaskRouteInput) *AccountTaskRouteInput {
 	if route.CalDAV != nil {
 		value := *route.CalDAV
 		cloned.CalDAV = &value
+	}
+	if route.GoogleTasks != nil {
+		value := *route.GoogleTasks
+		cloned.GoogleTasks = &value
 	}
 	return &cloned
 }

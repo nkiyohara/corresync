@@ -6,7 +6,7 @@
     <title>지원하는 메일·캘린더·할 일 서비스 — Corresync</title>
     <meta
       name="description"
-      content="Outlook, Microsoft 365, Todoist, iCloud Mail·캘린더, JMAP, IMAP/SMTP, CalDAV 캘린더와 VTODO 할 일을 비교하세요. Gmail은 OAuth 승인 대기 중입니다."
+      content="Outlook, Microsoft 365, Todoist, iCloud, JMAP, IMAP/SMTP, CalDAV 지원을 비교하세요. Gmail, Google 캘린더, Google Tasks는 곧 지원됩니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -305,12 +305,13 @@
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google 경로</p>
-          <h2 id="google-title">Gmail과 Google 캘린더는 곧 지원됩니다.</h2>
+          <h2 id="google-title">Gmail, Google 캘린더, Google Tasks는 곧 지원됩니다.</h2>
           <p>
-            Gmail 및 Calendar API 통합은 RC에 포함되어 합성 계약 테스트를
-            통과했습니다. 하지만 Google 승인 전에는 운영 환경 OAuth가 완전히
-            꺼져 있어 로그인, 권한 요청, 키체인 접근, API 트래픽이 시작되지
-            않습니다. 그동안은 Google 공식 Workspace MCP를 사용할 수 있습니다.
+            관련 코드는 RC에 포함되어 합성 계약 테스트를 통과했습니다.
+            하지만 Google 승인 전에는 운영 환경 OAuth가 완전히 꺼져 있어
+            로그인, 권한 요청, 키체인 접근, API 트래픽이 시작되지 않습니다.
+            Outlook, Microsoft 365, Todoist, iCloud, JMAP, IMAP/SMTP, CalDAV는 지금 사용할 수
+            있습니다.
           </p>
         </div>
         <div class="route-grid two">
@@ -332,6 +333,12 @@
               <div>
                 <dt>캘린더</dt>
                 <dd>캘린더 선택과 지원 시 Google Meet 생성</dd>
+              </div>
+              <div>
+                <dt>할 일</dt>
+                <dd>
+                  날짜형 마감일, 하위 할 일, 순서, 출처 링크, 안전한 폴링
+                </dd>
               </div>
               <div>
                 <dt>로그인</dt>

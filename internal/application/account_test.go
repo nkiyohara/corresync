@@ -439,6 +439,49 @@ func TestAccountServiceBindsGoogleMailUsernameToAccountAddress(t *testing.T) {
 	}
 }
 
+func TestAccountServiceAcceptsOnlyTypedGoogleTaskRouteWhenAvailable(t *testing.T) {
+	t.Parallel()
+	service, err := NewAccountService(
+		&accountRepositoryStub{},
+		&accountPurgerStub{},
+		nil,
+		[]domain.ProviderID{domain.ProviderGoogleTasks},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := AccountAddInput{
+		Alias: "tasks", Address: "reader@example.test",
+		Tasks: &AccountTaskRouteInput{
+			Provider: domain.ProviderGoogleTasks,
+			GoogleTasks: &AccountGoogleTaskInput{
+				ReadOnly: true,
+				OAuth: AccountOAuthInput{
+					APIBase:     "https://tasks.googleapis.com",
+					ClientID:    "synthetic.apps.googleusercontent.com",
+					RedirectURI: "http://127.0.0.1:43123/callback",
+					Authorization: AccountCredentialInput{
+						Backend: "os-keyring", Key: "google-tasks", Consent: true,
+					},
+				},
+			},
+		},
+	}
+	review, err := service.ReviewAdd(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.TaskProvider != domain.ProviderGoogleTasks || len(review.Credentials) != 1 ||
+		review.Credentials[0].Key != "google-tasks" {
+		t.Fatalf("Google Tasks review = %+v", review)
+	}
+	input.Tasks.GoogleTasks.OAuth.APIBase = "https://www.googleapis.com"
+	if _, err := service.ReviewAdd(t.Context(), input); err == nil ||
+		!strings.Contains(err.Error(), "tasks.googleapis.com") {
+		t.Fatalf("unpinned Google Tasks review error = %v", err)
+	}
+}
+
 func TestAccountLifecycleReviewsNeverMutateRepositoryOrState(t *testing.T) {
 	t.Parallel()
 	work := accountFixture("work", "acc_00000000000000000000000000000001", true)

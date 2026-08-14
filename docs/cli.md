@@ -147,6 +147,16 @@ corr account add \
   --task-username reader@example.invalid \
   --task-credential-key tasks-caldav \
   --approve-task-credential
+
+# Coming soon: Google Tasks uses a separate task-only OAuth grant
+corr account add reader@example.invalid \
+  --alias google-tasks \
+  --task-provider google-tasks \
+  --task-oauth-client-id synthetic-public-client \
+  --task-oauth-redirect-uri http://127.0.0.1:0/callback \
+  --task-authorization-key tasks-google \
+  --approve-task-oauth \
+  --task-read-only
 ```
 
 Mail and calendar providers are independent. Calendar-specific OAuth flags
@@ -156,12 +166,13 @@ alias for `--mail-provider`. No account command accepts a password or token.
 Approved removal discloses and purges account-local state plus an unshared
 Corresync-owned OAuth grant; it never deletes an external standards credential.
 
-The Google example documents the future route shape. In this RC it returns an
+The Google examples document future route shapes. In this RC each returns an
 approval-pending message, persists nothing, and starts no browser, keyring, or
 Google API work. Outlook Web, Graph, JMAP, IMAP/SMTP, and CalDAV routes remain
 available as described above. The Microsoft To Do and Todoist task-only
-examples are active with synthetic contract evidence; the other task provider
-IDs remain unavailable.
+examples are active with synthetic contract evidence. Google Tasks has synthetic
+contract evidence but remains approval-gated; the other task provider IDs remain
+unavailable.
 
 ## Authentication and doctor
 

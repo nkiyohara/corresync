@@ -84,6 +84,15 @@ func ProviderFor(
 			return Provider{}, rollout.ErrGoogleOAuthPending
 		}
 		result = googleProviderProfile(services.Mail, services.Calendar)
+	case domain.ProviderGoogleTasks:
+		if services.Mail || services.Calendar || !services.Tasks ||
+			services.MicrosoftCloud != "" {
+			return Provider{}, errors.New("google Tasks OAuth profile has invalid service options")
+		}
+		if !rollout.GoogleOAuthApproved {
+			return Provider{}, rollout.ErrGoogleOAuthPending
+		}
+		result = googleTaskProviderProfile(services.TaskWrite)
 	case domain.ProviderMicrosoftGraph:
 		cloud, err := microsoftcloud.Resolve(services.MicrosoftCloud)
 		if err != nil {
@@ -138,7 +147,6 @@ func ProviderFor(
 		domain.ProviderCalDAV,
 		domain.ProviderGoogleWeb,
 		domain.ProviderMicrosoftTasks,
-		domain.ProviderGoogleTasks,
 		domain.ProviderAppleReminders,
 		domain.ProviderTickTick,
 		domain.ProviderAnyDoMCP,
@@ -185,6 +193,24 @@ func googleProviderProfile(mailEnabled, calendarEnabled bool) Provider {
 	slices.Sort(result.Scopes)
 	result.Scopes = slices.Compact(result.Scopes)
 	return result
+}
+
+func googleTaskProviderProfile(write bool) Provider {
+	scope := "https://www.googleapis.com/auth/tasks.readonly"
+	if write {
+		scope = "https://www.googleapis.com/auth/tasks"
+	}
+	return Provider{ // #nosec G101 -- fixed public OAuth endpoints and scope URLs, not credentials.
+		ID:       domain.ProviderGoogleTasks,
+		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL: "https://oauth2.googleapis.com/token",
+		Scopes:   []string{"email", "openid", scope},
+		AuthParams: map[string]string{
+			"access_type": "offline",
+			"hl":          "en",
+			"prompt":      "consent",
+		},
+	}
 }
 
 type keyringGetter func(service, key string) (string, error)
@@ -331,7 +357,8 @@ func (manager *Manager) Authorize(
 	route config.OAuthClient,
 	provider Provider,
 ) (Authorization, error) {
-	if provider.ID == domain.ProviderGoogle && manager.googleSecret == "" {
+	if (provider.ID == domain.ProviderGoogle || provider.ID == domain.ProviderGoogleTasks) &&
+		manager.googleSecret == "" {
 		return nil, errors.New(
 			"google desktop OAuth requires CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET",
 		)
@@ -452,7 +479,7 @@ func oauthConfig(
 			AuthStyle: oauth2.AuthStyleInParams,
 		},
 	}
-	if provider.ID == domain.ProviderGoogle {
+	if provider.ID == domain.ProviderGoogle || provider.ID == domain.ProviderGoogleTasks {
 		result.ClientSecret = googleClientSecret
 	}
 	return result

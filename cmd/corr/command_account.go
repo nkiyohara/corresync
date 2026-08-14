@@ -63,7 +63,7 @@ type accountAddCommand struct {
 	TaskOAuthRedirectURI      string `name:"task-oauth-redirect-uri" help:"Task loopback redirect; defaults to --oauth-redirect-uri."`
 	TaskAuthorizationKey      string `name:"task-authorization-key" help:"Independent OS-keyring grant handle for tasks; defaults to --authorization-key."`
 	ApproveTaskOAuth          bool   `name:"approve-task-oauth" help:"Confirm the task OAuth grant and its task-only scope."`
-	TaskReadOnly              bool   `name:"task-read-only" help:"Request Tasks.Read instead of Tasks.ReadWrite."`
+	TaskReadOnly              bool   `name:"task-read-only" help:"Request the selected provider's read-only task scope."`
 	TaskCalDAVEndpoint        string `name:"task-caldav-endpoint" help:"CalDAV HTTPS discovery endpoint for VTODO tasks; defaults to --caldav-endpoint."`
 	TaskListPath              string `name:"task-list-path" help:"Optional absolute CalDAV VTODO collection path."`
 	TaskUsername              string `name:"task-username" help:"CalDAV task login identity; defaults to calendar, mail, or account identity."`
@@ -291,6 +291,10 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		)
 	}
 	if command.TaskProvider != "" && command.TaskProvider != "none" {
+		if domain.ProviderID(command.TaskProvider) == domain.ProviderGoogleTasks &&
+			!rollout.GoogleOAuthApproved {
+			return googleOAuthPendingError("Google Tasks was selected.")
+		}
 		if err := accounts.ValidateTaskProviderSelection(domain.ProviderID(command.TaskProvider)); err != nil {
 			return err
 		}
@@ -504,7 +508,8 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 		}
 		return result, nil
 	}
-	if provider != domain.ProviderMicrosoftGraph && provider != domain.ProviderTodoist {
+	if provider != domain.ProviderMicrosoftGraph && provider != domain.ProviderTodoist &&
+		provider != domain.ProviderGoogleTasks {
 		return result, nil
 	}
 	clientID := command.TaskOAuthClientID
@@ -525,6 +530,11 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 				"todoist tasks require a BYO public-client ID, loopback redirect, keyring handle, and --approve-task-oauth",
 			)
 		}
+		if provider == domain.ProviderGoogleTasks {
+			return nil, errors.New(
+				"google-tasks requires a BYO desktop client ID, loopback redirect, independent keyring handle, and --approve-task-oauth",
+			)
+		}
 		return nil, errors.New(
 			"microsoft-graph tasks require task OAuth flags or shared public-client defaults, plus --approve-task-oauth",
 		)
@@ -535,6 +545,22 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 			apiBase = "https://api.todoist.com/api/v1"
 		}
 		result.Todoist = &application.AccountTodoistTaskInput{
+			ReadOnly: command.TaskReadOnly,
+			OAuth: application.AccountOAuthInput{
+				APIBase: apiBase, ClientID: clientID, RedirectURI: redirectURI,
+				Authorization: application.AccountCredentialInput{
+					Backend: "os-keyring", Key: authorizationKey, Consent: true,
+				},
+			},
+		}
+		return result, nil
+	}
+	if provider == domain.ProviderGoogleTasks {
+		apiBase := command.TaskAPIBase
+		if apiBase == "" {
+			apiBase = "https://tasks.googleapis.com"
+		}
+		result.GoogleTasks = &application.AccountGoogleTaskInput{
 			ReadOnly: command.TaskReadOnly,
 			OAuth: application.AccountOAuthInput{
 				APIBase: apiBase, ClientID: clientID, RedirectURI: redirectURI,

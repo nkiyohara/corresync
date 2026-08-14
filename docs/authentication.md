@@ -55,18 +55,19 @@ visible browser. Do not use the relay to bypass organization policy.
 
 ## Google
 
-The Gmail and Google Calendar integration is included in RC builds but disabled
-while Corresync's production OAuth application awaits Google approval. Gmail
-discovery explains that support is coming soon. Explicit account addition,
-existing configurations, migrated grants, and mixed-provider accounts all stop
-before a browser opens, the keyring is read, or Google traffic is sent.
+The Gmail, Google Calendar, and Google Tasks integrations are included in RC
+builds but disabled while Corresync's production OAuth application awaits
+Google approval. Gmail discovery explains that support is coming soon. Explicit
+account addition, existing configurations, migrated grants, and mixed-provider
+accounts all stop before a browser opens, the keyring is read, or Google traffic
+is sent.
 
 After approval, activation will be a separate reviewed release. The normal
 system browser will own authorization; Corresync will never automate the
-sign-in page. Gmail will use the pinned Gmail API and Google Calendar/Meet will
-use the Calendar API with the account-scoped OS-keyring grant. No Gmail
-password, app password, cookie, configurable Google host, or unattended login
-is accepted.
+sign-in page. Gmail will use the pinned Gmail API, Google Calendar/Meet will use
+the Calendar API, and Google Tasks will use the Tasks API with an account-scoped
+OS-keyring grant. No Google password, app password, cookie, configurable host,
+or unattended login is accepted.
 
 Google's generated Desktop client may require its client credential at the
 token endpoint. Provide `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` only in the
@@ -107,6 +108,12 @@ only the provider-documented
 `https://www.googleapis.com/auth/gmail.modify` scope. The pending RC does not
 construct or display that scope through a production command and cannot begin
 authorization.
+
+Google Tasks uses a separate provider identity and authorization handle. It
+requests `openid`, `email`, and exactly `tasks.readonly` or `tasks`; it never
+reuses or expands the Gmail/Calendar grant. The verified OpenID email must
+match the configured account. While the shared release gate is closed, task
+setup and activation fail before any grant, keyring, browser, or API access.
 
 Microsoft To Do requests `Tasks.Read` for a read-only route or
 `Tasks.ReadWrite` for a writable route. The separate task approval is required

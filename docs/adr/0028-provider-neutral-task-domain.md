@@ -33,6 +33,10 @@ adapter session, capability observation, cursor, and application service
 remain independent even when they use the same server and external credential
 handle.
 
+Configuration schema v8 adds the independent, approval-gated
+`tasks.google_tasks` payload. Migration from v7 preserves every existing route
+and consent and cannot select or authorize Google Tasks. See ADR 0031.
+
 The canonical model contains task lists and versioned tasks with bounded title
 and notes, status, priority, parent, ordering, checklist, assignee, labels,
 links, reminders, recurrence, and completion time. Date-only, floating local

@@ -6,7 +6,7 @@
     <title>支持的邮件、日历与任务服务 — Corresync</title>
     <meta
       name="description"
-      content="比较 Outlook、Microsoft 365、Todoist、iCloud 邮件与日历、JMAP、IMAP/SMTP，以及 CalDAV 日历和 VTODO 任务。Gmail 正在等待 OAuth 审批。"
+      content="比较 Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP 和 CalDAV 支持。Gmail、Google 日历与 Google Tasks 即将上线。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -159,7 +159,7 @@
         <span class="status-dot" aria-hidden="true"></span><div>
           <strong>v0.8 证据是确定且按路径区分的。</strong><p>
             下列可用或准备中的路径都有合成 provider contract 与 application
-            测试。新 Gmail API 路径处于关闭状态，尚未实时观测。
+            测试。准备中的 Google API 路径处于关闭状态，尚未实时观测。
           </p>
         </div><a href="features.html#evidence">证据如何解读<span aria-hidden="true">
             →</span></a>
@@ -285,11 +285,13 @@
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google 路径</p>
-          <h2 id="google-title">Gmail 和 Google 日历即将上线。</h2>
+          <h2 id="google-title">Gmail、Google 日历和 Google Tasks 即将上线。</h2>
           <p>
-            Gmail 与 Calendar API 集成已包含在 RC 并通过合成契约测试。Google
-            批准前，生产环境 OAuth 完全关闭，因此不会启动登录、scope
-            申请、钥匙串访问或 API 流量。暂时可使用 Google 官方 Workspace MCP。
+            相关代码已包含在 RC 中，并通过合成契约测试。Google
+            批准前，生产环境 OAuth
+            完全关闭，因此不会启动登录、申请权限、访问钥匙串或产生 API
+            流量。Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP 和 CalDAV
+            目前均可使用。
           </p>
         </div>
         <div class="route-grid two">
@@ -311,6 +313,10 @@
               <div>
                 <dt>日历</dt>
                 <dd>选择日历，并在支持时创建 Google Meet</dd>
+              </div>
+              <div>
+                <dt>任务</dt>
+                <dd>仅日期的截止时间、子任务、排序、来源链接和安全轮询</dd>
               </div>
               <div>
                 <dt>登录</dt>

@@ -51,6 +51,9 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 	if route.Provider == domain.ProviderTodoist && route.Todoist != nil {
 		return oauthRouteView(route.Provider, &route.Todoist.OAuth)
 	}
+	if route.Provider == domain.ProviderGoogleTasks && route.GoogleTasks != nil {
+		return oauthRouteView(route.Provider, &route.GoogleTasks.OAuth)
+	}
 	if route.Provider == domain.ProviderCalDAV && route.CalDAV != nil {
 		endpoints := []application.DiscoveredEndpoint{{
 			Kind: "endpoint", Value: route.CalDAV.Endpoint,
@@ -200,6 +203,15 @@ func taskRouteConfig(
 			},
 		}
 	}
+	if route.GoogleTasks != nil {
+		oauth, err := oauthRouteConfig(&route.GoogleTasks.OAuth)
+		if err != nil {
+			return nil, err
+		}
+		result.GoogleTasks = &config.GoogleTaskRoute{
+			OAuth: *oauth, ReadOnly: route.GoogleTasks.ReadOnly,
+		}
+	}
 	return result, nil
 }
 
@@ -272,6 +284,12 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 		references = append(
 			references,
 			account.Tasks.Todoist.OAuth.Authorization,
+		)
+	}
+	if account.Tasks != nil && account.Tasks.GoogleTasks != nil {
+		references = append(
+			references,
+			account.Tasks.GoogleTasks.OAuth.Authorization,
 		)
 	}
 	if account.Tasks != nil && account.Tasks.CalDAV != nil {
@@ -842,6 +860,9 @@ func accountOAuthAuthorizationKeys(account config.Account) []string {
 	}
 	if account.Tasks != nil && account.Tasks.Todoist != nil {
 		keys = append(keys, account.Tasks.Todoist.OAuth.Authorization.Key)
+	}
+	if account.Tasks != nil && account.Tasks.GoogleTasks != nil {
+		keys = append(keys, account.Tasks.GoogleTasks.OAuth.Authorization.Key)
 	}
 	slices.Sort(keys)
 	return slices.Compact(keys)

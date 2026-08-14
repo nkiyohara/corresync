@@ -82,11 +82,11 @@ management are not exposed.
 
 ## Google
 
-The Gmail and Google Calendar adapters ship behind a release-owned approval
-gate. While it is false, account selection, explicit addition, session
-activation, and OAuth profile creation independently fail before browser,
-keyring, grant, or network access. The gate has no environment, configuration,
-CLI, MCP, or BYO-client override.
+The Gmail, Google Calendar, and Google Tasks adapters ship behind a
+release-owned approval gate. While it is false, account selection, explicit
+addition, session activation, and OAuth profile creation independently fail
+before browser, keyring, grant, or network access. The gate has no environment,
+configuration, CLI, MCP, or BYO-client override.
 
 After a separate post-approval release enables the route, Gmail uses the pinned
 Gmail API with `gmail.modify`. Reads, MIME traversal, pagination, identifiers,
@@ -101,6 +101,13 @@ Google Calendar is a bounded REST adapter sharing the same OAuth grant.
 When the authenticated primary calendar advertises `hangoutsMeet`, a reviewed
 provider-native online-meeting request uses a unique conference request ID and
 returns only that event's Meet link.
+
+Google Tasks uses a separate task-only provider route and authorization handle
+with exactly `tasks.readonly` or `tasks` plus verified OpenID identity. Its
+bounded REST adapter exposes the shared task-list discovery and task CRUD/state
+ports, date-only due values, ETag conditions, subtasks, ordering, output-only
+source links, and deletion-aware `updatedMin` polling. The approval gate stops
+the route before OAuth or provider traffic in every RC.
 
 ## Microsoft Graph
 

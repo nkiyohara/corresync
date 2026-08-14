@@ -6,7 +6,7 @@
     <title>Corresync — メールとカレンダーを、ひとつのローカルMCPへ</title>
     <meta
       name="description"
-      content="Outlook、Microsoft 365、JMAP、IMAP/SMTP、CalDAVをひとつにつなぐ、ローカルファーストのMCPサーバーとCLI。GmailとGoogleカレンダーはOAuth承認待ちです。"
+      content="Outlook、Microsoft 365、JMAP、IMAP/SMTP、CalDAV、タスクをつなぐローカルファーストMCPサーバーとCLI。Gmail、Googleカレンダー、Google Tasksは近日対応です。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -136,8 +136,9 @@
           <p class="hero-providers">
             <strong>現在利用可能：</strong>Outlook Web · Microsoft Graph · JMAP ·
             IMAP/SMTP · CalDAV。<strong
-            >近日対応：</strong>GmailとGoogleカレンダー（Google OAuth承認待ち）。
-            アカウントごとの対応範囲や管理者要件は、<a href="providers.html"
+            >近日対応：</strong>Gmail、Googleカレンダー、Google Tasks（Google
+            OAuth承認待ち）。 アカウントごとの対応範囲や管理者要件は、<a
+              href="providers.html"
             >対応サービス一覧</a>で確認できます。
           </p>
           <div class="actions">
@@ -242,7 +243,8 @@
             実装は済んでいます。いまは承認待ちです。
           </h2>
           <p>
-            GmailとGoogleカレンダーのコードはRCに含まれていますが、本番OAuthは無効です。
+            Gmail、Googleカレンダー、Google
+            TasksのコードはRCに含まれていますが、本番OAuthは無効です。
             Googleへのサインイン、キーチェーン参照、スコープ要求、API通信はいずれも始まりません。
             承認後、別のレビュー済みリリースで初めて有効化します。
           </p>
@@ -543,8 +545,8 @@ corr auth login --account personal</code></pre>
         </div>
         <ul>
           <li>
-            <strong
-            >GmailとGoogleカレンダーは承認待ちです。</strong>コードはRCに含まれますが、本番OAuthは無効です。
+            <strong>Gmail、Googleカレンダー、Google
+              Tasksは承認待ちです。</strong>コードはRCに含まれますが、本番OAuthは無効です。
           </li>
           <li>
             <strong>Microsoft

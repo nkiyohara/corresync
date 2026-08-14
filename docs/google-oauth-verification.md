@@ -16,8 +16,9 @@ assessment; the Google verification team makes those decisions.
 | Google Auth Platform branding | Configured; External / Testing |
 | Gmail API | Enabled |
 | Google Calendar API | Enabled |
+| Google Tasks API | Required before activation; release gate closed |
 | Desktop OAuth client | Created as `Corresync desktop` |
-| Data access scopes | Registered exactly as listed below |
+| Data access scopes | Mail/calendar registered; tasks need review |
 | Authorized domain and public URLs | Configured and live on `corresync.org` |
 | Synthetic test account | Prior route observed; Gmail API not observed live |
 | Google verification submission | Submitted; approval pending |
@@ -82,7 +83,9 @@ In project `strong-surfer-504009-i0`:
 
 1. Enable **Gmail API** for the staged native Gmail API adapter.
 2. Enable **Google Calendar API**.
-3. Do not enable unrelated Workspace APIs for future use.
+3. Enable **Google Tasks API** only as part of the reviewed task-scope approval
+   update.
+4. Do not enable unrelated Workspace APIs for future use.
 
 Google may require acceptance of current API terms in the Cloud Console. The
 project maintainer must review and accept those terms as the authorized project
@@ -145,7 +148,7 @@ after a replacement has completed an end-to-end token exchange.
 
 ## Register the exact data-access scopes
 
-Register only these three scopes:
+The current Gmail/Calendar submission uses only these three scopes:
 
 ```text
 https://www.googleapis.com/auth/gmail.modify
@@ -158,6 +161,19 @@ Corresync derives the requested set from the enabled services:
 - mail only requests `https://www.googleapis.com/auth/gmail.modify`;
 - calendar only requests the two Calendar scopes; and
 - mail plus calendar requests all three in one account-scoped grant.
+
+The independent Google Tasks route additionally derives exactly one of these
+task scopes and never appends it to the Gmail/Calendar grant:
+
+```text
+https://www.googleapis.com/auth/tasks.readonly
+https://www.googleapis.com/auth/tasks
+```
+
+Register and obtain any required review for both task choices before a release
+can enable read-only or writable Google Tasks. Coordinate that scope change
+with the pending submission; do not change the release gate merely because the
+API or scope appears in Cloud Console.
 
 While approval is pending, no production command constructs, displays, or
 requests these Google scopes. After the separate activation release, discovery,
@@ -198,6 +214,16 @@ Use the following factual descriptions, adjusting only for form length:
 > event property. The scope is not used for Contacts, Drive, tenant
 > administration, chat, recordings, or unattended meeting management.
 
+#### `tasks.readonly` and `tasks`
+
+> Corresync uses a separate task-only grant to list task lists and read the
+> signed-in user's tasks. A writable route can, after an exact preview and
+> separate approval, create, update, complete, reopen, move, or delete a task.
+> Data can include titles, notes, status, date-only due values, completion,
+> hierarchy, ordering, assignment metadata, and output-only source links. The
+> writable scope is requested only for a route explicitly configured for
+> writes; it is never added to a Gmail or Calendar grant.
+
 These descriptions must continue to match `internal/oauthlocal.ProviderFor`,
 the adapter surface, the public Privacy Policy, and the verification demo.
 Changing a requested scope or use requires a policy and product review before
@@ -213,9 +239,9 @@ submission must answer the restricted-data questions precisely:
   remote MCP endpoint, analytics collector, or telemetry backend.
 - OAuth grants are stored in the user's OS keyring. Configuration holds only an
   opaque handle and public-client metadata.
-- Gmail and Calendar traffic goes directly from the local process to Google's
-  fixed HTTPS APIs.
-- There is no general persistent Gmail or Calendar content cache.
+- Gmail, Calendar, and Tasks traffic goes directly from the local process to
+  Google's fixed HTTPS APIs.
+- There is no general persistent Gmail, Calendar, or Tasks content cache.
 - Content-free audit records retain only bounded operation/security fields and
   opaque account and target/provider identifiers; they exclude addresses,
   recipients, subjects, bodies, attachment names, event text, queries,
@@ -247,7 +273,7 @@ address bar visible. Show:
 2. account configuration for Google mail and calendar with no credential value
    visible in configuration, commands, or output;
 3. `corr auth login --account TEST_ALIAS`;
-4. the exact three scopes printed before browser launch;
+4. the exact service-derived scopes printed before browser launch;
 5. the Google account chooser and consent screen identifying `Corresync`;
 6. successful return through the loopback callback;
 7. a Gmail label list, bounded search, one selected message read, draft/send
@@ -280,12 +306,15 @@ Do not submit until every item is true:
       while the verification meta tag remains live.
 - [ ] Branding, icon, user support email, developer contact, External audience,
       and authorized domain are complete.
-- [ ] Gmail API and Google Calendar API are enabled; no unrelated API is enabled
-      for this integration.
+- [ ] Gmail API and Google Calendar API are enabled; if Google Tasks is included
+      in the reviewed submission, Google Tasks API is enabled too. No unrelated
+      API is enabled for this integration.
 - [ ] One Desktop app client exists; its generated client credential is injected
       only into the local process, excluded from the recording and public
       artifacts, and not persisted by Corresync.
-- [ ] The three scopes above—and no others—are registered.
+- [ ] The three Gmail/Calendar scopes above—and no others for those services—are
+      registered. Before task activation, both documented task scope choices
+      are registered and covered by the applicable review.
 - [ ] Scope justifications match the current code and Privacy Policy.
 - [ ] The local-only restricted-data architecture is answered accurately.
 - [ ] A synthetic end-to-end demo video covers authorization and each requested

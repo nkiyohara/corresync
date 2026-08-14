@@ -15,7 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CurrentVersion = 7
+const CurrentVersion = 8
 
 const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
