@@ -6,14 +6,14 @@
     <title>Corresync 隱私政策 — 本機優先的郵件與行事曆處理</title>
     <meta
       name="description"
-      content="瞭解 Corresync 如何處理信箱、行事曆、登入認證資料、本機資料，以及只查詢信箱網域的相容性檢查工具。"
+      content="瞭解 Corresync 如何處理信箱、行事曆、待辦事項、OAuth 登入認證資料、本機資料，以及只查詢信箱網域的相容性檢查工具。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Corresync 隱私政策">
     <meta
       property="og:description"
-      content="郵件與行事曆直接在你的裝置和所選服務之間流轉。"
+      content="郵件、行事曆與待辦事項直接在你的裝置和所選服務之間流轉。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -30,7 +30,7 @@
     <meta name="twitter:title" content="Corresync 隱私政策">
     <meta
       name="twitter:description"
-      content="本機優先的郵件、行事曆與認證資料處理說明。"
+      content="本機優先的郵件、行事曆、待辦事項與認證資料處理說明。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
@@ -215,9 +215,11 @@
               使用相同的型別化操作和策略檢查。讀取儘量從後設資料開始；傳送郵件、邀請參與者等重要寫入先顯示精確預覽，再要求一份與呼叫方、帳號、目標和內容繫結的短時單次核准。系統不會悄悄切換到另一條服務路徑，也不會在結果未知時自動重試寫入。
             </p>
             <p>
-              Microsoft OAuth 使用系統瀏覽器；Outlook Web
+              Microsoft、Todoist 和 TickTick OAuth 使用系統瀏覽器；Outlook Web
               使用專用可見瀏覽器設定；開放標準路徑只連線你選擇的有效 TLS
-              端點。專案不接收密碼、OAuth 授權、郵件、附件或行事曆內文。
+              端點。待辦標題、備註、日期、重複規則與檢查清單等內容，只會在你的裝置與所選服務供應商之間按需處理。TickTick
+              用戶端密鑰只在登入需要新的授權碼交換時從核准的認證資料儲存區讀取；重用有效授權時不會讀取，也不會寫入設定或
+              OAuth 授權。
             </p>
           </section>
           <section id="storage" aria-labelledby="storage-title">
@@ -230,8 +232,9 @@
                 和網站資料留在專用本機設定中。
               </li>
               <li>
-                <strong>設定：</strong>帳號位址、本機別名、所選路徑、公開 OAuth
-                用戶端 ID、迴環重定向和鑰匙圈控制代碼，不包含機密資訊。
+                <strong>設定：</strong>帳號位址、本機別名、所選路徑、OAuth
+                用戶端
+                ID、迴環重定向和已同意的認證資料控制代碼，不包含用戶端密鑰或權杖。
               </li>
               <li>
                 <strong

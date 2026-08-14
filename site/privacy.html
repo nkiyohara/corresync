@@ -6,7 +6,7 @@
     <title>Corresync Privacy Policy — local-first provider data handling</title>
     <meta
       name="description"
-      content="How Corresync handles mail, calendar, credentials, local storage, and the optional domain-only provider checker across Google, Microsoft, JMAP, IMAP/SMTP, and CalDAV."
+      content="How Corresync handles mail, calendars, tasks, OAuth credentials, local storage, and its domain-only provider checker across Google, Microsoft, Todoist, TickTick, JMAP, IMAP/SMTP, and CalDAV."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="How Corresync handles mail, calendar, credentials, local storage, and the optional domain-only provider checker across Google, Microsoft, JMAP, IMAP/SMTP, and CalDAV."
+      content="How Corresync handles mail, calendars, tasks, OAuth credentials, local storage, and its domain-only provider checker across Google, Microsoft, Todoist, TickTick, JMAP, IMAP/SMTP, and CalDAV."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -40,7 +40,7 @@
     >
     <meta
       name="twitter:description"
-      content="How Corresync handles mail, calendar, credentials, local storage, and the optional domain-only provider checker across Google, Microsoft, JMAP, IMAP/SMTP, and CalDAV."
+      content="How Corresync handles mail, calendars, tasks, OAuth credentials, local storage, and its domain-only provider checker across Google, Microsoft, Todoist, TickTick, JMAP, IMAP/SMTP, and CalDAV."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -294,13 +294,15 @@
                     <td>
                       Delegated OAuth scopes <code>offline_access</code> and
                       <code>User.Read</code>, plus <code>Mail.ReadWrite</code> and
-                      <code>Mail.Send</code> for mail or <code>Calendars.ReadWrite</code> for
-                      calendar, only when that service is enabled.
+                      <code>Mail.Send</code> for mail, <code>Calendars.ReadWrite</code> for
+                      calendar, or <code>Tasks.Read</code>/<code>Tasks.ReadWrite</code> for
+                      Microsoft To Do, only when that service is enabled.
                     </td>
                     <td>
                       Confirm the signed-in account; read and organize mail, drafts, attachments,
                       and sent messages; send mail; and list, read, create, update, or cancel
-                      selected events, including supported Teams meeting properties.
+                      selected events, including supported Teams meeting properties; or list, read,
+                      and perform reviewed writes and delta sync for Microsoft To Do.
                     </td>
                   </tr>
                   <tr>
@@ -326,14 +328,43 @@
                     </td>
                   </tr>
                   <tr>
-                    <td>CalDAV</td>
+                    <td>Todoist</td>
                     <td>
-                      The configured CalDAV collections, calendar metadata, events, attendees,
-                      recurrence, reminders, ETags, and scheduling capabilities.
+                      A separately selected public OAuth client requests
+                      <code>data:read</code>, or <code>data:read_write</code> and
+                      <code>data:delete</code>. Corresync processes the task projects, content,
+                      scheduling, metadata, plan limits, and sync state needed for your request.
                     </td>
                     <td>
-                      Discover and select calendars, list and read events, and create, update, or
-                      cancel events with conditional writes and scheduling only when supported.
+                      List and read tasks, or perform previewed task writes, state changes, and
+                      bounded synchronization when the signed-in account exposes them.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>TickTick</td>
+                    <td>
+                      A separately selected confidential OAuth client requests
+                      <code>tasks:read</code> or <code>tasks:write</code>. Its client secret remains
+                      behind an approved external credential handle; Corresync processes task
+                      projects, content, dates, recurrence, checklists, labels, assignment, and
+                      bounded polling state.
+                    </td>
+                    <td>
+                      List, search, and read tasks, or perform previewed create, update, complete,
+                      and delete operations. Unsupported reopen and reminder changes stay
+                      unavailable.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>CalDAV</td>
+                    <td>
+                      The configured CalDAV calendar and VTODO collections, events, tasks,
+                      attendees, recurrence, reminders, ETags, and scheduling capabilities.
+                    </td>
+                    <td>
+                      Discover calendars and task lists; read events and tasks; and perform
+                      conditional, previewed writes only where the selected collection supports
+                      them.
                     </td>
                   </tr>
                   <tr>
@@ -394,9 +425,9 @@
             <h2 id="storage-title">What remains on your device</h2>
             <ul>
               <li>
-                <strong>OAuth grant:</strong> access and refresh tokens are stored under an opaque
-                account-specific handle in your operating system keyring, not in Corresync
-                configuration.
+                <strong>OAuth grant:</strong> access tokens and, where the provider issues one,
+                refresh tokens are stored under an opaque account-specific handle in your operating
+                system keyring, not in Corresync configuration.
               </li>
               <li>
                 <strong>Browser-owned session:</strong> a web route can retain cookies, session
@@ -411,7 +442,15 @@
               </li>
               <li>
                 <strong>Configuration:</strong> your account address, local alias, enabled routes,
-                public OAuth client identifier, loopback redirect, and keyring handle.
+                OAuth client identifier, loopback redirect, and consented credential handles. It
+                cannot contain a client secret or token.
+              </li>
+              <li>
+                <strong>TickTick client credential:</strong> the client secret is resolved from your
+                approved OS credential store or helper only when login requires a new authorization
+                code exchange. Reusing a valid grant does not open that secret store. Mutable owner
+                buffers are overwritten after the exchange, and the value is not stored in
+                configuration, the OAuth grant, audit, feedback, MCP output, or browser URLs.
               </li>
               <li>
                 <strong>Google Desktop client credential:</strong> when Google requires this value

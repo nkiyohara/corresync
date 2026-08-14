@@ -6,7 +6,7 @@
     <title>支援的郵件、行事曆與待辦事項服務 — Corresync</title>
     <meta
       name="description"
-      content="比較 Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP 與 CalDAV 支援。Gmail、Google 行事曆和 Google Tasks 即將推出。"
+      content="比較 Outlook、Microsoft 365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 與 CalDAV 支援。Gmail、Google 行事曆和 Google Tasks 即將推出。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="查看 iCloud、Todoist 與 CalDAV VTODO 等目前可用路徑，以及仍在等待審核的 Google 支援。"
+      content="查看 Todoist、TickTick、iCloud 與 CalDAV VTODO 等目前可用路徑，以及仍在等待審核的 Google 支援。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -36,7 +36,7 @@
     >
     <meta
       name="twitter:description"
-      content="查看 Outlook、iCloud、標準協定與等待審核的 Google 支援。"
+      content="查看 Outlook、Todoist、TickTick、iCloud、標準協定與等待審核的 Google 支援。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
@@ -292,8 +292,8 @@
             相關程式碼已包含在 RC 中，並通過合成契約測試。Google
             通過審核前，正式環境 OAuth
             完全關閉，因此不會啟動登入、要求權限、存取鑰匙圈或產生 API
-            流量。Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP 與 CalDAV
-            目前皆可使用。
+            流量。Outlook、Microsoft 365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 與
+            CalDAV 目前皆可使用。
           </p>
         </div>
         <div class="route-grid two">
@@ -357,6 +357,61 @@
               請參閱 Google 官方<a
                 href="https://developers.google.com/workspace/guides/configure-mcp-servers"
               >設定指南</a>。
+            </p>
+          </article>
+        </div>
+      </section>
+      <section id="tasks" aria-labelledby="tasks-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>待辦事項路徑</p>
+          <h2 id="tasks-title">連接你原本就在使用的待辦服務。</h2>
+          <p>
+            待辦事項可獨立於郵件和行事曆選擇。每個帳號的授權、功能、同步游標與確認後寫入都彼此隔離。
+          </p>
+        </div>
+        <div class="route-grid three">
+          <article class="route-card" id="microsoft-todo">
+            <header>
+              <span class="route-icon" aria-hidden="true">To</span><div>
+                <p class="chip">目前可用 · 明確 OAuth</p>
+                <h3>Microsoft To Do</h3>
+              </div>
+            </header>
+            <p>
+              支援待辦清單、建立與更新、完成與重新開啟、刪除、重複規則、檢查清單、分類，以及有上限的
+              Graph 差異同步。
+            </p>
+            <p class="route-foot">
+              使用你有權註冊並選擇的 Microsoft Graph 公開用戶端。
+            </p>
+          </article>
+          <article class="route-card" id="todoist">
+            <header>
+              <span class="route-icon" aria-hidden="true">Td</span><div>
+                <p class="chip">目前可用 · 明確 OAuth</p>
+                <h3>Todoist</h3>
+              </div>
+            </header>
+            <p>
+              支援專案、待辦寫入與狀態、提醒、重複規則、子任務、標籤、負責人、精確的日期時間語意，以及有上限的同步。
+            </p>
+            <p class="route-foot">
+              使用具備 PKCE 的公開 OAuth 用戶端；方案限制會如實顯示。
+            </p>
+          </article>
+          <article class="route-card accent-card" id="ticktick">
+            <header>
+              <span class="route-icon" aria-hidden="true">Ti</span><div>
+                <p class="chip">目前可用 · 明確 OAuth</p>
+                <h3>TickTick</h3>
+              </div>
+            </header>
+            <p>
+              支援專案與收集箱、搜尋、建立、更新、完成、刪除、重複規則、檢查清單、標籤、單一負責人、排序及有上限的輪詢。
+            </p>
+            <p class="route-foot">
+              使用你自行註冊、採用用戶端密鑰的 OAuth
+              應用程式。密鑰留在核准的認證資料儲存區；不會宣稱支援重新開啟或替換提醒。
             </p>
           </article>
         </div>
