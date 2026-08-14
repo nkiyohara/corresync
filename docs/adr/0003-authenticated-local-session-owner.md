@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-17
-- Amended: 2026-08-03
+- Amended: 2026-08-14
 
 ## Context
 
@@ -82,6 +82,10 @@ Protocol version 18 adds the provider-neutral online-meeting creation field and
 provider-bound review result without reinterpreting the v0.7 Teams-only field.
 Protocol version 19 adds a CLI-only, account-targeted logout method that closes
 one account's in-memory sessions without stopping or exposing the session owner.
+Protocol versions 20 and 21 add the integration and settings lifecycle methods.
+Protocol version 22 adds closed task list/read/search/sync and mandatory-preview
+create/update/complete/reopen/delete methods. It does not add a generic task or
+provider action.
 
 Before a client reads the rotating bearer, it authenticates the endpoint
 itself. On Unix it opens the runtime directory without following symlinks,

@@ -18,6 +18,7 @@ const (
 const (
 	projectionServiceMail     = "mail"
 	projectionServiceCalendar = "calendar"
+	projectionServiceTasks    = "tasks"
 )
 
 // ProjectionAccount is content-free routing and capability metadata for one
@@ -28,10 +29,12 @@ type ProjectionAccount struct {
 	Alias                string               `json:"alias"`
 	MailProvider         domain.ProviderID    `json:"mailProvider,omitempty"`
 	CalendarProvider     domain.ProviderID    `json:"calendarProvider,omitempty"`
+	TaskProvider         domain.ProviderID    `json:"taskProvider,omitempty"`
 	Authenticated        bool                 `json:"authenticated"`
 	Capabilities         *domain.Capabilities `json:"capabilities,omitempty"`
 	MailDegradations     []domain.Degradation `json:"mailDegradations,omitempty"`
 	CalendarDegradations []domain.Degradation `json:"calendarDegradations,omitempty"`
+	TaskDegradations     []domain.Degradation `json:"taskDegradations,omitempty"`
 }
 
 // ProjectionFailure is an explicit, content-free per-account failure. Raw
@@ -75,6 +78,7 @@ type ProjectionReader interface {
 		CalendarListInput,
 		domain.Caller,
 	) (CalendarPage, error)
+	ListTasks(context.Context, TaskReadInput, domain.Caller) (TaskPage, error)
 }
 
 // ProjectionService provides read-only views without constructing merged
@@ -131,12 +135,13 @@ func (account ProjectionAccount) Validate() error {
 	if err := domain.AccountAlias(account.Alias).Validate(); err != nil {
 		return err
 	}
-	if account.MailProvider == "" && account.CalendarProvider == "" {
+	if account.MailProvider == "" && account.CalendarProvider == "" && account.TaskProvider == "" {
 		return errors.New("projection account has no service route")
 	}
 	for _, provider := range []domain.ProviderID{
 		account.MailProvider,
 		account.CalendarProvider,
+		account.TaskProvider,
 	} {
 		if provider != "" {
 			if err := provider.Validate(); err != nil {
@@ -154,25 +159,29 @@ func (account ProjectionAccount) Validate() error {
 			return err
 		}
 		if (account.MailProvider != "" && !account.Capabilities.Mail) ||
-			(account.CalendarProvider != "" && !account.Capabilities.Calendar) {
+			(account.CalendarProvider != "" && !account.Capabilities.Calendar) ||
+			(account.TaskProvider != "" && !account.Capabilities.Tasks) {
 			return errors.New(
 				"projection account capability snapshot does not match its routes",
 			)
 		}
 	} else if account.Capabilities != nil ||
 		len(account.MailDegradations) != 0 ||
-		len(account.CalendarDegradations) != 0 {
+		len(account.CalendarDegradations) != 0 ||
+		len(account.TaskDegradations) != 0 {
 		return errors.New(
 			"inactive projection account exposes runtime capability state",
 		)
 	}
 	if len(account.MailDegradations) > 32 ||
-		len(account.CalendarDegradations) > 32 {
+		len(account.CalendarDegradations) > 32 ||
+		len(account.TaskDegradations) > 32 {
 		return errors.New("projection account has unbounded degradations")
 	}
 	for _, values := range [][]domain.Degradation{
 		account.MailDegradations,
 		account.CalendarDegradations,
+		account.TaskDegradations,
 	} {
 		for _, degradation := range values {
 			if err := degradation.Validate(); err != nil {
@@ -189,9 +198,13 @@ func newProjectionStatus(
 ) ProjectionAccountStatus {
 	provider := account.MailProvider
 	degradations := account.MailDegradations
-	if service == projectionServiceCalendar {
+	switch service {
+	case projectionServiceCalendar:
 		provider = account.CalendarProvider
 		degradations = account.CalendarDegradations
+	case projectionServiceTasks:
+		provider = account.TaskProvider
+		degradations = account.TaskDegradations
 	}
 	var capabilities *domain.Capabilities
 	if account.Capabilities != nil {
@@ -242,7 +255,8 @@ func validateProjectionStatus(status ProjectionAccountStatus) error {
 		return err
 	}
 	if status.Service != projectionServiceMail &&
-		status.Service != projectionServiceCalendar {
+		status.Service != projectionServiceCalendar &&
+		status.Service != projectionServiceTasks {
 		return errors.New("projection account service is invalid")
 	}
 	if status.FetchedItems < 0 || status.FetchedItems > 5000 {

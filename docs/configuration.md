@@ -63,16 +63,17 @@ and unshared Corresync-owned OAuth grant state. External standards credentials
 remain in their keyring/helper. Removing the default account requires
 `--new-default`.
 
-## Schema v5
+## Schema v6
 
-Schema v5 adds an explicit signed-release channel to the provider-neutral
-schema introduced in v4. Existing v4 files migrate to `stable` without
-changing check or automatic-install consent. A freshly
+Schema v6 adds an optional explicit task route to the provider-neutral schema.
+Existing v5 files migrate with no task route, authorization, or capability.
+Schema v5 added the signed-release channel and existing older files retain
+their check and automatic-install consent. A freshly
 initialized provider-neutral configuration contains no account and has an
 empty `default_account`. The first account added becomes the default:
 
 ```toml
-version = 5
+version = 6
 default_account = ""
 
 [policy]
@@ -97,7 +98,7 @@ auto_submit = false
 A configured Outlook Web account then looks like:
 
 ```toml
-version = 5
+version = 6
 default_account = "work"
 
 [accounts.work]
@@ -144,7 +145,8 @@ them.
 
 ## Per-service routes
 
-Each account may have mail, calendar, or both. Supported route payloads are:
+Each account may have mail, calendar, tasks, or any explicit combination.
+Supported route payloads are:
 
 <!-- markdownlint-disable MD013 -->
 | Service | Provider | Nested table |
@@ -158,6 +160,7 @@ Each account may have mail, calendar, or both. Supported route payloads are:
 | calendar | `google` | `calendar.google` |
 | calendar | `microsoft-graph` | `calendar.microsoft_graph` |
 | calendar | `caldav` | `calendar.caldav` |
+| tasks | `microsoft-web-tasks`, `microsoft-graph`, `todoist`, `caldav`, `google-tasks`, `apple-reminders`, `ticktick`, `anydo-mcp`, `things`, `omnifocus` | provider only in the v6 foundation |
 <!-- markdownlint-enable MD013 -->
 
 The payload must match the provider exactly. The staged Google mail-and-calendar
@@ -167,6 +170,20 @@ migrated schema-v3 account with deliberately distinct Google clients remains
 valid configuration but cannot activate before approval.
 Graph mail and calendar may share one identical API route. An independent
 IMAP/SMTP mail route can be paired with a CalDAV calendar route.
+
+The v6 task route is a closed, secret-free provider selection:
+
+```toml
+[accounts.tasks.tasks]
+provider = "todoist"
+```
+
+This foundation does not activate a task provider. Account views report the
+route unavailable. A task-only route fails before authentication or provider
+access; when mail or calendar is also configured, those implemented routes can
+still sign in while tasks remain an explicit degradation. Provider-specific
+task settings will be added as closed schema fields by those issues; there is
+no arbitrary options map or credential value. See the [task contract](tasks.md).
 
 Use `corr account add` for these combinations; it validates endpoint
 discovery, explicit provider selection, required consent bits, and route

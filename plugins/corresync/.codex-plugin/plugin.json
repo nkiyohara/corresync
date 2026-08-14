@@ -3,13 +3,14 @@
     "name": "Corresync contributors",
     "url": "https://github.com/nkiyohara/corresync"
   },
-  "description": "Makes guarded local mail and calendar tools discoverable from natural-language requests.",
+  "description": "Makes guarded local mail, calendar, and task tools discoverable from natural-language requests.",
   "homepage": "https://corresync.org/",
   "interface": {
     "brandColor": "#3F7AD6",
     "capabilities": [
       "Multi-account mail",
       "Multi-account calendar",
+      "Multi-account tasks",
       "Reviewed writes",
       "Local monitoring"
     ],
@@ -18,18 +19,21 @@
     "defaultPrompt": [
       "Check all my inboxes and summarize what needs attention.",
       "Show my calendars for today.",
+      "Show my open tasks across configured accounts.",
       "Find the latest email about this project across my accounts."
     ],
     "developerName": "Corresync contributors",
-    "displayName": "Corresync — Mail \u0026 Calendar",
+    "displayName": "Corresync — Mail, Calendar \u0026 Tasks",
     "logo": "./assets/icon.svg",
-    "longDescription": "For local Codex sessions, recognizes inbox, email, calendar, schedule, and meeting requests and routes them to the guarded local Corresync MCP server. Hosted ChatGPT cannot reach this local stdio integration.",
-    "shortDescription": "Use guarded local mail and calendar tools",
+    "longDescription": "For local Codex sessions, recognizes inbox, email, calendar, schedule, meeting, reminder, and task requests and routes them to the guarded local Corresync MCP server. Hosted ChatGPT cannot reach this local stdio integration.",
+    "shortDescription": "Use guarded local mail, calendar, and task tools",
     "websiteURL": "https://corresync.org/"
   },
   "keywords": [
     "email",
     "calendar",
+    "tasks",
+    "todo",
     "gmail",
     "outlook",
     "mcp",

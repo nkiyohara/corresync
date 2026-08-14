@@ -2,11 +2,13 @@
   "author": {
     "name": "Corresync contributors"
   },
-  "description": "Makes guarded local mail and calendar tools discoverable from natural-language requests.",
+  "description": "Makes guarded local mail, calendar, and task tools discoverable from natural-language requests.",
   "homepage": "https://corresync.org/",
   "keywords": [
     "email",
     "calendar",
+    "tasks",
+    "todo",
     "gmail",
     "outlook",
     "mcp",

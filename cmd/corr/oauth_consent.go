@@ -59,7 +59,11 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
 			domain.ProviderJMAP, domain.ProviderIMAPSMTP,
-			domain.ProviderCalDAV, domain.ProviderPOP3:
+			domain.ProviderCalDAV, domain.ProviderPOP3,
+			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+			domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+			domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+			domain.ProviderThings, domain.ProviderOmniFocus:
 		}
 	}
 	if account.Calendar != nil {
@@ -76,7 +80,11 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
 			domain.ProviderJMAP, domain.ProviderIMAPSMTP,
-			domain.ProviderCalDAV, domain.ProviderPOP3:
+			domain.ProviderCalDAV, domain.ProviderPOP3,
+			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+			domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+			domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+			domain.ProviderThings, domain.ProviderOmniFocus:
 		}
 	}
 	for _, route := range routes {

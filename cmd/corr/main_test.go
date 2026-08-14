@@ -20,7 +20,7 @@ func TestRunShowsHelpWithoutArguments(t *testing.T) {
 	if code := run(context.Background(), nil, &stdout, &stderr); code != 0 {
 		t.Fatalf("run() code = %d, stderr = %q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Local-first, guarded mail and calendar") {
+	if !strings.Contains(stdout.String(), "Local-first, guarded mail, calendar, and tasks") {
 		t.Fatalf("help output did not contain description: %q", stdout.String())
 	}
 }

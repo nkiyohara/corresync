@@ -76,9 +76,10 @@ type Report struct {
 
 // PrivacyStatement documents exactly what producing the report did.
 type PrivacyStatement struct {
-	Generation      string `json:"generation"`
-	AutomaticUpload bool   `json:"automatic_upload"`
-	ContentIncluded bool   `json:"mail_or_calendar_content_included"`
+	Generation          string `json:"generation"`
+	AutomaticUpload     bool   `json:"automatic_upload"`
+	ContentIncluded     bool   `json:"mail_or_calendar_content_included"`
+	TaskContentIncluded bool   `json:"task_content_included"`
 }
 
 // SectionValue reports one bounded scalar collection result.
@@ -296,7 +297,7 @@ func allowedReason(reason string) bool {
 
 func allowedCapability(capability string) bool {
 	switch capability {
-	case "calendar", "mail":
+	case "calendar", "mail", "tasks":
 		return true
 	default:
 		return false
@@ -314,8 +315,9 @@ func allowedInstallMethod(method string) bool {
 
 func allowedProvider(provider string) bool {
 	switch provider {
-	case "caldav", "google", "google-web", "imap-smtp", "jmap", "microsoft-graph",
-		"microsoft-owa":
+	case "anydo-mcp", "apple-reminders", "caldav", "google", "google-tasks",
+		"google-web", "imap-smtp", "jmap", "microsoft-graph", "microsoft-owa",
+		"microsoft-web-tasks", "omnifocus", "things", "ticktick", "todoist":
 		return true
 	default:
 		return false

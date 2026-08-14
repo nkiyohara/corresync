@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.nkiyohara/corresync",
   "title": "Corresync",
-  "description": "Local-first MCP for provider-neutral mail and calendars with isolated accounts and guarded writes.",
+  "description": "Local-first MCP for provider-neutral mail, calendars, and tasks with isolated accounts and guarded writes.",
   "version": "0.8.3",
   "repository": {
     "url": "https://github.com/nkiyohara/corresync",

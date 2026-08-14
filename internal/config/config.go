@@ -15,7 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CurrentVersion = 5
+const CurrentVersion = 6
 
 const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
@@ -40,6 +40,7 @@ type Account struct {
 	Address  string           `json:"address,omitempty" toml:"address,omitempty"`
 	Mail     *MailRoute       `json:"mail,omitempty" toml:"mail,omitempty"`
 	Calendar *CalendarRoute   `json:"calendar,omitempty" toml:"calendar,omitempty"`
+	Tasks    *TaskRoute       `json:"tasks,omitempty" toml:"tasks,omitempty"`
 	Monitor  *Monitor         `json:"monitor,omitempty" toml:"monitor,omitempty"`
 }
 

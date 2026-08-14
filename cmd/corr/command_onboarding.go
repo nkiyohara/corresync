@@ -257,7 +257,11 @@ func onboardingRoutePlans(
 			plans = append(plans, newOnboardingRoutePlan(&copy, nil))
 		case domain.ProviderCalDAV:
 			plans = append(plans, newOnboardingRoutePlan(nil, &copy))
-		case domain.ProviderGoogleWeb, domain.ProviderPOP3:
+		case domain.ProviderGoogleWeb, domain.ProviderPOP3,
+			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+			domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+			domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+			domain.ProviderThings, domain.ProviderOmniFocus:
 		}
 	}
 	return plans
@@ -523,7 +527,11 @@ func configureOnboardingRoutes(
 			return accountAddCommand{}, false, googleOAuthPendingError(
 				"Gmail or Google Calendar was selected.",
 			)
-		case domain.ProviderGoogleWeb, domain.ProviderPOP3:
+		case domain.ProviderGoogleWeb, domain.ProviderPOP3,
+			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+			domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+			domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+			domain.ProviderThings, domain.ProviderOmniFocus:
 			return accountAddCommand{}, false, fmt.Errorf(
 				"provider %q is not available for guided setup",
 				provider,
@@ -1178,7 +1186,11 @@ func accountAuthenticationKind(
 		case domain.ProviderGoogle, domain.ProviderMicrosoftGraph:
 			return application.DiscoveryExplicitOAuth
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
-			domain.ProviderPOP3:
+			domain.ProviderPOP3, domain.ProviderMicrosoftTasks,
+			domain.ProviderTodoist, domain.ProviderGoogleTasks,
+			domain.ProviderAppleReminders, domain.ProviderTickTick,
+			domain.ProviderAnyDoMCP, domain.ProviderThings,
+			domain.ProviderOmniFocus:
 		}
 	}
 	return application.DiscoveryBrowserFirstParty
@@ -1211,6 +1223,22 @@ func providerDisplayName(provider domain.ProviderID) string {
 		return "Google Web"
 	case domain.ProviderPOP3:
 		return "POP3"
+	case domain.ProviderMicrosoftTasks:
+		return "Microsoft To Do (web)"
+	case domain.ProviderTodoist:
+		return "Todoist"
+	case domain.ProviderGoogleTasks:
+		return "Google Tasks"
+	case domain.ProviderAppleReminders:
+		return "Apple Reminders"
+	case domain.ProviderTickTick:
+		return "TickTick"
+	case domain.ProviderAnyDoMCP:
+		return "Any.do MCP"
+	case domain.ProviderThings:
+		return "Things"
+	case domain.ProviderOmniFocus:
+		return "OmniFocus"
 	default:
 		return string(provider)
 	}

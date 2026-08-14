@@ -210,11 +210,22 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 				return errors.New("daemon returned an invalid calendar session provider")
 			}
 		}
-		if account.MailProvider == "" && account.CalendarProvider == "" {
+		if account.TaskProvider != "" {
+			if err := account.TaskProvider.Validate(); err != nil {
+				return errors.New("daemon returned an invalid task session provider")
+			}
+		}
+		if account.MailProvider == "" && account.CalendarProvider == "" && account.TaskProvider == "" {
 			return errors.New("daemon returned a session without a provider route")
 		}
-		if account.Provider != account.MailProvider &&
-			(account.MailProvider != "" || account.Provider != account.CalendarProvider) {
+		expectedProvider := account.MailProvider
+		if expectedProvider == "" {
+			expectedProvider = account.CalendarProvider
+		}
+		if expectedProvider == "" {
+			expectedProvider = account.TaskProvider
+		}
+		if account.Provider != expectedProvider {
 			return errors.New("daemon returned an inconsistent primary session provider")
 		}
 		if _, exists := seen[account.Account]; exists {
@@ -509,6 +520,175 @@ func (client *Client) CancelCalendar(ctx context.Context, input application.Cale
 func (client *Client) CommitCalendarCancel(ctx context.Context, token string, caller domain.Caller) (application.CalendarCancelAccess, error) {
 	var result application.CalendarCancelAccess
 	return result, client.call(ctx, MethodCalendarCommitCancel, caller, ApprovalInput{Token: token}, &result)
+}
+
+func (client *Client) ListTaskLists(
+	ctx context.Context,
+	input application.TaskListInput,
+	caller domain.Caller,
+) (application.TaskListPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskListPage{}, err
+	}
+	var result application.TaskListPage
+	return result, client.call(ctx, MethodTaskLists, caller, input, &result)
+}
+
+func (client *Client) ListTasks(
+	ctx context.Context,
+	input application.TaskReadInput,
+	caller domain.Caller,
+) (application.TaskPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskPage{}, err
+	}
+	var result application.TaskPage
+	return result, client.call(ctx, MethodTaskList, caller, input, &result)
+}
+
+func (client *Client) ListAllTasks(
+	ctx context.Context,
+	input application.TaskProjectionInput,
+	caller domain.Caller,
+) (application.TaskProjectionPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskProjectionPage{}, err
+	}
+	var result application.TaskProjectionPage
+	if err := client.call(ctx, MethodTaskListAll, caller, input, &result); err != nil {
+		return application.TaskProjectionPage{}, err
+	}
+	if err := result.Validate(); err != nil {
+		return application.TaskProjectionPage{}, fmt.Errorf("validate daemon task projection: %w", err)
+	}
+	return result, nil
+}
+
+func (client *Client) GetTask(
+	ctx context.Context,
+	input application.TaskGetInput,
+	caller domain.Caller,
+) (application.Task, error) {
+	if err := input.Validate(); err != nil {
+		return application.Task{}, err
+	}
+	var result application.Task
+	return result, client.call(ctx, MethodTaskGet, caller, input, &result)
+}
+
+func (client *Client) SearchTasks(
+	ctx context.Context,
+	input application.TaskSearchInput,
+	caller domain.Caller,
+) (application.TaskPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskPage{}, err
+	}
+	var result application.TaskPage
+	return result, client.call(ctx, MethodTaskSearch, caller, input, &result)
+}
+
+func (client *Client) SyncTasks(
+	ctx context.Context,
+	input application.TaskSyncInput,
+	caller domain.Caller,
+) (application.TaskChangePage, error) {
+	if err := input.ValidateRoute(); err != nil {
+		return application.TaskChangePage{}, err
+	}
+	var result application.TaskChangePage
+	return result, client.call(ctx, MethodTaskSync, caller, input, &result)
+}
+
+func (client *Client) CreateTask(
+	ctx context.Context,
+	input application.TaskCreateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskWriteAccess{}, err
+	}
+	var result application.TaskWriteAccess
+	return result, client.call(ctx, MethodTaskCreate, caller, input, &result)
+}
+
+func (client *Client) CommitTaskCreate(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return client.commitTask(ctx, MethodTaskCommitCreate, token, caller)
+}
+
+func (client *Client) UpdateTask(
+	ctx context.Context,
+	input application.TaskUpdateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskWriteAccess{}, err
+	}
+	var result application.TaskWriteAccess
+	return result, client.call(ctx, MethodTaskUpdate, caller, input, &result)
+}
+
+func (client *Client) CommitTaskUpdate(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return client.commitTask(ctx, MethodTaskCommitUpdate, token, caller)
+}
+
+func (client *Client) CompleteTask(
+	ctx context.Context,
+	input application.TaskStateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	return client.prepareTaskState(ctx, MethodTaskComplete, input, caller)
+}
+
+func (client *Client) CommitTaskComplete(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return client.commitTask(ctx, MethodTaskCommitComplete, token, caller)
+}
+
+func (client *Client) ReopenTask(
+	ctx context.Context,
+	input application.TaskStateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	return client.prepareTaskState(ctx, MethodTaskReopen, input, caller)
+}
+
+func (client *Client) CommitTaskReopen(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return client.commitTask(ctx, MethodTaskCommitReopen, token, caller)
+}
+
+func (client *Client) DeleteTask(
+	ctx context.Context,
+	input application.TaskDeleteInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	return client.prepareTaskState(ctx, MethodTaskDelete, input, caller)
+}
+
+func (client *Client) CommitTaskDelete(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return client.commitTask(ctx, MethodTaskCommitDelete, token, caller)
+}
+
+func (client *Client) prepareTaskState(
+	ctx context.Context,
+	method Method,
+	input application.TaskStateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskWriteAccess{}, err
+	}
+	var result application.TaskWriteAccess
+	return result, client.call(ctx, method, caller, input, &result)
+}
+
+func (client *Client) commitTask(
+	ctx context.Context,
+	method Method,
+	token string,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	var result application.TaskWriteAccess
+	return result, client.call(ctx, method, caller, ApprovalInput{Token: token}, &result)
 }
 
 func (client *Client) call(ctx context.Context, method Method, caller domain.Caller, input, output any) error {

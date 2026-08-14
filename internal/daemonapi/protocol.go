@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 21
+	ProtocolVersion   = 22
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -66,6 +66,22 @@ const (
 	MethodCalendarCommitUpdate Method = "calendar.commit_update"
 	MethodCalendarCancel       Method = "calendar.cancel"
 	MethodCalendarCommitCancel Method = "calendar.commit_cancel"
+	MethodTaskLists            Method = "tasks.lists"
+	MethodTaskList             Method = "tasks.list"
+	MethodTaskListAll          Method = "tasks.list.all"
+	MethodTaskGet              Method = "tasks.get"
+	MethodTaskSearch           Method = "tasks.search"
+	MethodTaskSync             Method = "tasks.sync"
+	MethodTaskCreate           Method = "tasks.create"
+	MethodTaskCommitCreate     Method = "tasks.commit_create"
+	MethodTaskUpdate           Method = "tasks.update"
+	MethodTaskCommitUpdate     Method = "tasks.commit_update"
+	MethodTaskComplete         Method = "tasks.complete"
+	MethodTaskCommitComplete   Method = "tasks.commit_complete"
+	MethodTaskReopen           Method = "tasks.reopen"
+	MethodTaskCommitReopen     Method = "tasks.commit_reopen"
+	MethodTaskDelete           Method = "tasks.delete"
+	MethodTaskCommitDelete     Method = "tasks.commit_delete"
 	MethodMonitorStatus        Method = "monitor.status"
 	MethodEventsList           Method = "events.list"
 	MethodEventAcknowledge     Method = "events.acknowledge"
@@ -356,6 +372,27 @@ type MonitoringBackend interface {
 	AcknowledgeMonitorEvent(context.Context, application.MonitorAcknowledgeInput, domain.Caller) (application.MonitorEvent, error)
 }
 
+// TaskBackend is the optional canonical task extension. Every write remains a
+// paired prepare/commit method; there is no generic provider action.
+type TaskBackend interface {
+	ListTaskLists(context.Context, application.TaskListInput, domain.Caller) (application.TaskListPage, error)
+	ListTasks(context.Context, application.TaskReadInput, domain.Caller) (application.TaskPage, error)
+	ListAllTasks(context.Context, application.TaskProjectionInput, domain.Caller) (application.TaskProjectionPage, error)
+	GetTask(context.Context, application.TaskGetInput, domain.Caller) (application.Task, error)
+	SearchTasks(context.Context, application.TaskSearchInput, domain.Caller) (application.TaskPage, error)
+	SyncTasks(context.Context, application.TaskSyncInput, domain.Caller) (application.TaskChangePage, error)
+	CreateTask(context.Context, application.TaskCreateInput, domain.Caller) (application.TaskWriteAccess, error)
+	CommitTaskCreate(context.Context, string, domain.Caller) (application.TaskWriteAccess, error)
+	UpdateTask(context.Context, application.TaskUpdateInput, domain.Caller) (application.TaskWriteAccess, error)
+	CommitTaskUpdate(context.Context, string, domain.Caller) (application.TaskWriteAccess, error)
+	CompleteTask(context.Context, application.TaskStateInput, domain.Caller) (application.TaskWriteAccess, error)
+	CommitTaskComplete(context.Context, string, domain.Caller) (application.TaskWriteAccess, error)
+	ReopenTask(context.Context, application.TaskStateInput, domain.Caller) (application.TaskWriteAccess, error)
+	CommitTaskReopen(context.Context, string, domain.Caller) (application.TaskWriteAccess, error)
+	DeleteTask(context.Context, application.TaskDeleteInput, domain.Caller) (application.TaskWriteAccess, error)
+	CommitTaskDelete(context.Context, string, domain.Caller) (application.TaskWriteAccess, error)
+}
+
 func (method Method) valid() bool {
 	switch method {
 	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
@@ -368,6 +405,13 @@ func (method Method) valid() bool {
 		MethodCalendarFolders, MethodCalendarList, MethodAgendaList, MethodCalendarCreate, MethodCalendarCommit,
 		MethodCalendarUpdate, MethodCalendarCommitUpdate,
 		MethodCalendarCancel, MethodCalendarCommitCancel,
+		MethodTaskLists, MethodTaskList, MethodTaskListAll, MethodTaskGet,
+		MethodTaskSearch, MethodTaskSync,
+		MethodTaskCreate, MethodTaskCommitCreate,
+		MethodTaskUpdate, MethodTaskCommitUpdate,
+		MethodTaskComplete, MethodTaskCommitComplete,
+		MethodTaskReopen, MethodTaskCommitReopen,
+		MethodTaskDelete, MethodTaskCommitDelete,
 		MethodMonitorStatus, MethodEventsList, MethodEventAcknowledge:
 		return true
 	default:

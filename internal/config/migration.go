@@ -18,6 +18,7 @@ const legacyVersion = 1
 const routeLegacyVersion = 2
 const googleAPILegacyVersion = 3
 const updateChannelLegacyVersion = 4
+const taskRouteLegacyVersion = 5
 
 type legacyConfig struct {
 	Version        int                      `toml:"version"`
@@ -67,13 +68,34 @@ type googleAPILegacyConfig struct {
 }
 
 type updateChannelLegacyConfig struct {
-	Version        int                        `toml:"version"`
-	DefaultAccount string                     `toml:"default_account"`
-	Accounts       map[string]Account         `toml:"accounts"`
-	Policy         Policy                     `toml:"policy"`
-	Browser        Browser                    `toml:"browser"`
-	Credentials    Credentials                `toml:"credentials,omitempty"`
-	Updates        updateChannelLegacyUpdates `toml:"updates"`
+	Version        int                               `toml:"version"`
+	DefaultAccount string                            `toml:"default_account"`
+	Accounts       map[string]taskRouteLegacyAccount `toml:"accounts"`
+	Policy         Policy                            `toml:"policy"`
+	Browser        Browser                           `toml:"browser"`
+	Credentials    Credentials                       `toml:"credentials,omitempty"`
+	Updates        updateChannelLegacyUpdates        `toml:"updates"`
+}
+
+// taskRouteLegacyAccount freezes the v5 account shape so a task route cannot
+// be smuggled into an older schema version and silently accepted.
+type taskRouteLegacyAccount struct {
+	ID       domain.AccountID `toml:"id"`
+	Address  string           `toml:"address,omitempty"`
+	Mail     *MailRoute       `toml:"mail,omitempty"`
+	Calendar *CalendarRoute   `toml:"calendar,omitempty"`
+	Monitor  *Monitor         `toml:"monitor,omitempty"`
+}
+
+type taskRouteLegacyConfig struct {
+	Version        int                               `toml:"version"`
+	DefaultAccount string                            `toml:"default_account"`
+	Accounts       map[string]taskRouteLegacyAccount `toml:"accounts"`
+	Policy         Policy                            `toml:"policy"`
+	Browser        Browser                           `toml:"browser"`
+	Credentials    Credentials                       `toml:"credentials,omitempty"`
+	Updates        Updates                           `toml:"updates"`
+	Feedback       Feedback                          `toml:"feedback"`
 }
 
 type updateChannelLegacyUpdates struct {
@@ -98,7 +120,8 @@ func MigrateV4(data []byte) (Config, error) {
 	}
 	configuration := Config{
 		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
-		Accounts: legacy.Accounts, Policy: legacy.Policy, Browser: legacy.Browser,
+		Accounts: migratePreTaskAccounts(legacy.Accounts),
+		Policy:   legacy.Policy, Browser: legacy.Browser,
 		Credentials: legacy.Credentials,
 		Updates: Updates{
 			Channel:                UpdateChannelStable,
@@ -110,6 +133,47 @@ func MigrateV4(data []byte) (Config, error) {
 		return Config{}, fmt.Errorf("validate migrated v4 config: %w", err)
 	}
 	return configuration, nil
+}
+
+// MigrateV5 adds an optional, explicit task route. Existing accounts receive
+// no route and therefore no task authorization, provider access, or capability.
+func MigrateV5(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var legacy taskRouteLegacyConfig
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&legacy); err != nil {
+		return Config{}, fmt.Errorf("decode v5 config: %w", err)
+	}
+	if legacy.Version != taskRouteLegacyVersion {
+		return Config{}, fmt.Errorf("task-route legacy config version must be %d", taskRouteLegacyVersion)
+	}
+	configuration := Config{
+		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
+		Accounts: migratePreTaskAccounts(legacy.Accounts),
+		Policy:   legacy.Policy, Browser: legacy.Browser,
+		Credentials: legacy.Credentials, Updates: legacy.Updates,
+		Feedback: legacy.Feedback,
+	}
+	if err := configuration.Validate(); err != nil {
+		return Config{}, fmt.Errorf("validate migrated v5 config: %w", err)
+	}
+	return configuration, nil
+}
+
+func migratePreTaskAccounts(
+	legacy map[string]taskRouteLegacyAccount,
+) map[string]Account {
+	accounts := make(map[string]Account, len(legacy))
+	for alias, account := range legacy {
+		accounts[alias] = Account{
+			ID: account.ID, Address: account.Address,
+			Mail: account.Mail, Calendar: account.Calendar, Monitor: account.Monitor,
+		}
+	}
+	return accounts
 }
 
 type googleAPILegacyAccount struct {

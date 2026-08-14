@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-07-28
+- Amended: 2026-08-14
 
 ## Context
 
@@ -36,24 +36,27 @@ caches, event queue, and audit context. Two accounts on the same provider and
 the same origin share none of it.
 
 Every result carries provenance: the account identifier, the provider, the
-mailbox or calendar identifier, and the provider's own object identity. Where a
-provider supplies a version or change key, the typed result continues to return
-it alongside the identity so a caller can act safely on a specific version.
-Provenance names one container, never both a mailbox and a calendar.
+mailbox, calendar, or task-list identifier, and the provider's own object
+identity. Where a provider supplies a version or change key, the typed result
+continues to return it alongside the identity so a caller can act safely on a
+specific version.
+Provenance names one container, never a mailbox, calendar, and task list
+together.
 
 Reads may aggregate across accounts. An aggregated inbox, search, or agenda is a
 projection over separate provider objects and never a writable merged store.
 Display time zones may be normalized, but an event's original time zone and
 floating-time semantics are preserved rather than rewritten.
 
-Writes are target-bound. Every mutation resolves exactly one account and exactly
-one mailbox or calendar before preview. A default account never resolves a
-mutation issued from an aggregated context; ambiguity fails closed. The target
-reference is part of the operation that the approval token binds, alongside the
-account, the caller, and the normalized payload, so a commit cannot be
-redirected to another account, another calendar, or a different object. Adding
-the target to that binding changes the operation digest and is therefore a
-versioned contract change, not a compatible addition. This extends
+Writes are target-bound. Every mutation resolves exactly one account and
+exactly one mailbox, calendar, or task list before preview. A default account
+never resolves a mutation issued from an aggregated context; ambiguity fails
+closed. The target reference is part of the operation that the approval token
+binds, alongside the account, the caller, and the normalized payload, so a
+commit cannot be redirected to another account, another calendar, or a
+different object. Adding the target to that binding changes the operation
+digest and is therefore a versioned contract change, not a compatible
+addition. This extends
 [ADR 0004](0004-preview-commit.md) rather than replacing it.
 
 Removing an account purges its session material, cursors, queued events, and
@@ -79,3 +82,7 @@ resources. The session owner already namespaces by configuration and state path
 under [ADR 0003](0003-authenticated-local-session-owner.md), and accounts become
 a second isolation boundary nested inside one owner rather than a reason to run
 several owners.
+
+[ADR 0028](0028-provider-neutral-task-domain.md) extends this boundary to task
+routes, provider versions, cursors, and provenance-only source links. Task
+projections remain read-only and task writes always name one list and object.

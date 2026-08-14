@@ -12,6 +12,7 @@ import (
 type Capabilities struct {
 	Mail             bool   `json:"mail"`
 	Calendar         bool   `json:"calendar"`
+	Tasks            bool   `json:"tasks"`
 	Folders          bool   `json:"folders"`
 	Labels           bool   `json:"labels"`
 	Push             bool   `json:"push"`
@@ -67,6 +68,7 @@ type Provenance struct {
 	Provider       ProviderID `json:"provider"`
 	MailboxID      string     `json:"mailboxId,omitempty"`
 	CalendarID     string     `json:"calendarId,omitempty"`
+	TaskListID     string     `json:"taskListId,omitempty"`
 	SourceObjectID string     `json:"sourceObjectId,omitempty"`
 }
 
@@ -78,12 +80,23 @@ func (provenance Provenance) Validate() error {
 	if err := provenance.Provider.Validate(); err != nil {
 		return err
 	}
-	if provenance.MailboxID != "" && provenance.CalendarID != "" {
-		return errors.New("provenance cannot name both a mailbox and calendar")
+	selectedContainers := 0
+	for _, value := range []string{
+		provenance.MailboxID,
+		provenance.CalendarID,
+		provenance.TaskListID,
+	} {
+		if value != "" {
+			selectedContainers++
+		}
+	}
+	if selectedContainers > 1 {
+		return errors.New("provenance cannot name more than one provider container")
 	}
 	for name, value := range map[string]string{
 		"mailbox ID":       provenance.MailboxID,
 		"calendar ID":      provenance.CalendarID,
+		"task list ID":     provenance.TaskListID,
 		"source object ID": provenance.SourceObjectID,
 	} {
 		if value != "" {

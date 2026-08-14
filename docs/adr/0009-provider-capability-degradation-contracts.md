@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-07-28
+- Amended: 2026-08-14
 
 ## Context
 
@@ -87,3 +87,8 @@ named, typed, fixtured, and either exposed or refused. Undocumented protocol
 behavior stays behind capability discovery rather than version assumptions,
 which is the same treatment Outlook Web already receives under
 [ADR 0002](0002-interactive-browser-session.md).
+
+[ADR 0028](0028-provider-neutral-task-domain.md) applies this decision to task
+fields, time kinds, sync modes, and write reviews. Task route degradations are
+visible before approval; an unsupported task field fails before provider
+access.

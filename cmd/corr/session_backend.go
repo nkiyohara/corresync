@@ -50,6 +50,7 @@ type sessionAccount struct {
 	closers      []sessionCloser
 	mail         *application.MailService
 	calendar     *application.CalendarService
+	tasks        *application.TaskService
 	captured     time.Time
 	capabilities domain.Capabilities
 	degradations []domain.Degradation
@@ -121,6 +122,13 @@ func (account sessionAccount) calendarService() (*application.CalendarService, e
 		return nil, errors.New("configured account has no calendar route")
 	}
 	return account.calendar, nil
+}
+
+func (account sessionAccount) taskService() (*application.TaskService, error) {
+	if account.tasks == nil {
+		return nil, errors.New("configured account has no active task route")
+	}
+	return account.tasks, nil
 }
 
 type sessionPreview struct {
@@ -376,6 +384,7 @@ func (backend *sessionBackend) ProjectionAccounts(
 			Account: configured.ID, Alias: alias,
 			MailProvider:     configured.MailProvider(),
 			CalendarProvider: configured.CalendarProvider(),
+			TaskProvider:     configured.TaskProvider(),
 		}
 		active, authenticated := backend.accounts[configured.ID]
 		if authenticated {
@@ -389,6 +398,10 @@ func (backend *sessionBackend) ProjectionAccounts(
 			account.CalendarDegradations = projectionDegradations(
 				active.degradations,
 				"calendar.",
+			)
+			account.TaskDegradations = projectionDegradations(
+				active.degradations,
+				"tasks.",
 			)
 		}
 		accounts = append(accounts, account)
@@ -466,6 +479,7 @@ func (backend *sessionBackend) SessionStatus(
 			Provider:         configured.PrimaryProvider(),
 			MailProvider:     configured.MailProvider(),
 			CalendarProvider: configured.CalendarProvider(),
+			TaskProvider:     configured.TaskProvider(),
 			State:            "signed_out",
 		}
 		if account, exists := backend.accounts[accountID]; exists {
@@ -1810,6 +1824,227 @@ func (backend *sessionBackend) CommitCalendarCancel(
 	return access, nil
 }
 
+func withTaskService[T any](
+	backend *sessionBackend,
+	ctx context.Context,
+	accountID domain.AccountID,
+	caller domain.Caller,
+	use func(*application.TaskService) (T, error),
+) (T, error) {
+	var zero T
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return zero, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+
+	account, err := backend.accountServices(ctx, accountID, caller)
+	if err != nil {
+		return zero, err
+	}
+	defer account.usage.end()
+	tasks, err := account.taskService()
+	if err != nil {
+		return zero, err
+	}
+	return use(tasks)
+}
+
+func (backend *sessionBackend) ListTaskLists(
+	ctx context.Context,
+	input application.TaskListInput,
+	caller domain.Caller,
+) (application.TaskListPage, error) {
+	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskListPage, error) {
+		return tasks.ListLists(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) ListTasks(
+	ctx context.Context,
+	input application.TaskReadInput,
+	caller domain.Caller,
+) (application.TaskPage, error) {
+	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskPage, error) {
+		return tasks.List(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) ListAllTasks(
+	ctx context.Context,
+	input application.TaskProjectionInput,
+	caller domain.Caller,
+) (application.TaskProjectionPage, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.TaskProjectionPage{}, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+	service, err := application.NewProjectionService(backend)
+	if err != nil {
+		return application.TaskProjectionPage{}, err
+	}
+	return service.ListAllTasks(ctx, input, caller)
+}
+
+func (backend *sessionBackend) GetTask(
+	ctx context.Context,
+	input application.TaskGetInput,
+	caller domain.Caller,
+) (application.Task, error) {
+	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.Task, error) {
+		return tasks.Get(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) SearchTasks(
+	ctx context.Context,
+	input application.TaskSearchInput,
+	caller domain.Caller,
+) (application.TaskPage, error) {
+	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskPage, error) {
+		return tasks.Search(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) SyncTasks(
+	ctx context.Context,
+	input application.TaskSyncInput,
+	caller domain.Caller,
+) (application.TaskChangePage, error) {
+	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskChangePage, error) {
+		return tasks.Sync(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) CreateTask(
+	ctx context.Context,
+	input application.TaskCreateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.Create(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) UpdateTask(
+	ctx context.Context,
+	input application.TaskUpdateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.Update(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) CompleteTask(
+	ctx context.Context,
+	input application.TaskStateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.Complete(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) ReopenTask(
+	ctx context.Context,
+	input application.TaskStateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.Reopen(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) DeleteTask(
+	ctx context.Context,
+	input application.TaskDeleteInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.Delete(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) prepareTaskWrite(
+	ctx context.Context,
+	accountID domain.AccountID,
+	caller domain.Caller,
+	prepare func(*application.TaskService) (application.TaskWriteAccess, error),
+) (application.TaskWriteAccess, error) {
+	access, err := withTaskService(backend, ctx, accountID, caller, prepare)
+	if err == nil && access.Preview != nil {
+		backend.rememberPreview(access.Preview.Token, accountID, access.Preview.ExpiresAt)
+	}
+	return access, err
+}
+
+func (backend *sessionBackend) CommitTaskCreate(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTaskWrite(token, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.CommitCreate(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitTaskUpdate(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTaskWrite(token, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.CommitUpdate(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitTaskComplete(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTaskWrite(token, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.CommitComplete(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitTaskReopen(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTaskWrite(token, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.CommitReopen(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitTaskDelete(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTaskWrite(token, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
+		return tasks.CommitDelete(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) commitTaskWrite(
+	token string,
+	commit func(*application.TaskService) (application.TaskWriteAccess, error),
+) (application.TaskWriteAccess, error) {
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return application.TaskWriteAccess{}, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+
+	account, exists := backend.accountForPreview(token)
+	if !exists || account.tasks == nil {
+		if exists {
+			account.usage.end()
+		}
+		return application.TaskWriteAccess{}, errors.New("invalid or expired approval token")
+	}
+	defer account.usage.end()
+	access, err := commit(account.tasks)
+	if err != nil {
+		return application.TaskWriteAccess{}, err
+	}
+	backend.forgetPreview(token)
+	return access, nil
+}
+
 func (backend *sessionBackend) accountServices(
 	_ context.Context,
 	accountID domain.AccountID,
@@ -1879,6 +2114,10 @@ func (backend *sessionBackend) activateAccount(
 	if hasGoogleRoute(configured) && !rollout.GoogleOAuthApproved {
 		return sessionAccount{}, rollout.ErrGoogleOAuthPending
 	}
+	taskDegradation, err := inactiveTaskRoute(configured)
+	if err != nil {
+		return sessionAccount{}, err
+	}
 	var services sessionAccount
 	if hasOutlookRoute(configured) {
 		var handle browserHandle
@@ -1903,6 +2142,9 @@ func (backend *sessionBackend) activateAccount(
 		return sessionAccount{}, errors.Join(err, closeSessionAccount(services))
 	}
 	services = mergeSessionAccounts(services, standards)
+	if taskDegradation != nil {
+		services.degradations = append(services.degradations, *taskDegradation)
+	}
 	services.usage = newAccountUsage()
 
 	backend.mu.Lock()
@@ -1917,6 +2159,28 @@ func (backend *sessionBackend) activateAccount(
 	// The monitor belongs to the daemon lifecycle, not this login request.
 	backend.startMonitorLocked(accountID, services) //nolint:contextcheck
 	return services, nil
+}
+
+// inactiveTaskRoute keeps a staged task selection from granting authority or
+// disabling an otherwise usable mail/calendar route. A task-only account still
+// fails before authentication because it has no active service in this build.
+func inactiveTaskRoute(configured config.Account) (*domain.Degradation, error) {
+	if configured.Tasks == nil {
+		return nil, nil
+	}
+	if configured.Mail == nil && configured.Calendar == nil {
+		return nil, fmt.Errorf(
+			"configured task provider %q is not available in this build",
+			configured.Tasks.Provider,
+		)
+	}
+	return &domain.Degradation{
+		Feature: "tasks.route",
+		Reason: fmt.Sprintf(
+			"configured task provider %q is not available in this build",
+			configured.Tasks.Provider,
+		),
+	}, nil
 }
 
 func (backend *sessionBackend) startMonitorLocked(
@@ -2661,6 +2925,14 @@ func (backend *sessionBackend) nonOutlookAccount(
 				)
 			}
 		case domain.ProviderCalDAV,
+			domain.ProviderMicrosoftTasks,
+			domain.ProviderTodoist,
+			domain.ProviderGoogleTasks,
+			domain.ProviderAppleReminders,
+			domain.ProviderTickTick,
+			domain.ProviderAnyDoMCP,
+			domain.ProviderThings,
+			domain.ProviderOmniFocus,
 			domain.ProviderPOP3:
 			err = fmt.Errorf(
 				"configured mail provider %q is not available in this build",
@@ -2699,6 +2971,14 @@ func (backend *sessionBackend) nonOutlookAccount(
 			}
 		case domain.ProviderJMAP,
 			domain.ProviderIMAPSMTP,
+			domain.ProviderMicrosoftTasks,
+			domain.ProviderTodoist,
+			domain.ProviderGoogleTasks,
+			domain.ProviderAppleReminders,
+			domain.ProviderTickTick,
+			domain.ProviderAnyDoMCP,
+			domain.ProviderThings,
+			domain.ProviderOmniFocus,
 			domain.ProviderPOP3:
 			err = fmt.Errorf(
 				"configured calendar provider %q is not available in this build",
@@ -2777,7 +3057,11 @@ func providerCalendarEffects(provider domain.ProviderID) application.CalendarEff
 			CancellationMode:        application.CalendarCancellationNoScheduling,
 			CancellationDisposition: application.CalendarDispositionCalendarObject,
 		}
-	case domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3:
+	case domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3,
+		domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+		domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+		domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+		domain.ProviderThings, domain.ProviderOmniFocus:
 		return application.CalendarEffects{}
 	default:
 		return application.CalendarEffects{}
@@ -2807,10 +3091,12 @@ func mergeSessionAccounts(
 		closers:  append(append([]sessionCloser(nil), left.closers...), right.closers...),
 		mail:     left.mail,
 		calendar: left.calendar,
+		tasks:    left.tasks,
 		captured: left.captured,
 		capabilities: domain.Capabilities{
 			Mail:             left.capabilities.Mail || right.capabilities.Mail,
 			Calendar:         left.capabilities.Calendar || right.capabilities.Calendar,
+			Tasks:            left.capabilities.Tasks || right.capabilities.Tasks,
 			Folders:          left.capabilities.Folders || right.capabilities.Folders,
 			Labels:           left.capabilities.Labels || right.capabilities.Labels,
 			Push:             left.capabilities.Push || right.capabilities.Push,
@@ -2836,6 +3122,9 @@ func mergeSessionAccounts(
 	}
 	if right.calendar != nil {
 		merged.calendar = right.calendar
+	}
+	if right.tasks != nil {
+		merged.tasks = right.tasks
 	}
 	if right.captured.After(merged.captured) {
 		merged.captured = right.captured

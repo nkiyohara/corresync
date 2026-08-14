@@ -183,6 +183,12 @@ func feedbackProviders(configuration config.Config) []feedback.Provider {
 			}
 			capabilities[string(provider)]["calendar"] = struct{}{}
 		}
+		if provider := account.TaskProvider(); provider != "" {
+			if capabilities[string(provider)] == nil {
+				capabilities[string(provider)] = make(map[string]struct{})
+			}
+			capabilities[string(provider)]["tasks"] = struct{}{}
+		}
 	}
 	providers := make([]feedback.Provider, 0, len(capabilities))
 	for provider, capabilitySet := range capabilities {

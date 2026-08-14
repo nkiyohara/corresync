@@ -13,8 +13,23 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
+	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/updatecheck"
 )
+
+func TestFeedbackProvidersIncludesOnlyAllowlistedTaskRouteMetadata(t *testing.T) {
+	t.Parallel()
+	configuration := config.Default()
+	configuration.Accounts["tasks"] = config.Account{
+		ID:    "acc_00000000000000000000000000000009",
+		Tasks: &config.TaskRoute{Provider: domain.ProviderTodoist},
+	}
+	providers := feedbackProviders(configuration)
+	if len(providers) != 1 || providers[0].ID != "todoist" ||
+		len(providers[0].Capabilities) != 1 || providers[0].Capabilities[0] != "tasks" {
+		t.Fatalf("feedback providers = %+v", providers)
+	}
+}
 
 func TestFeedbackPrintsCompleteReportBeforeOfferingActions(t *testing.T) {
 	t.Parallel()
@@ -32,6 +47,7 @@ func TestFeedbackPrintsCompleteReportBeforeOfferingActions(t *testing.T) {
 	for _, want := range []string{
 		`"automatic_upload": false`,
 		`"mail_or_calendar_content_included": false`,
+		`"task_content_included": false`,
 		`"id": "microsoft-owa"`,
 		"requires a GitHub account",
 	} {

@@ -30,13 +30,14 @@ type AccountRouteView struct {
 }
 
 // AccountView is the secret-free account lifecycle contract shared by CLI and
-// MCP. Mail and calendar routes may use different providers.
+// MCP. Mail, calendar, and task routes may use different providers.
 type AccountView struct {
 	ID        domain.AccountID  `json:"id"`
 	Alias     string            `json:"alias"`
 	Address   string            `json:"address,omitempty"`
 	Mail      *AccountRouteView `json:"mail,omitempty"`
 	Calendar  *AccountRouteView `json:"calendar,omitempty"`
+	Tasks     *AccountRouteView `json:"tasks,omitempty"`
 	IsDefault bool              `json:"isDefault"`
 }
 
@@ -154,13 +155,20 @@ type AccountCalendarRouteInput struct {
 	MicrosoftGraph *AccountOAuthInput      `json:"microsoftGraph,omitempty"`
 }
 
+// AccountTaskRouteInput is the closed task-provider selection. Adapter issues
+// may add typed, secret-free payloads; an arbitrary options map is forbidden.
+type AccountTaskRouteInput struct {
+	Provider domain.ProviderID `json:"provider"`
+}
+
 // AccountAddInput explicitly selects service routes to persist. Discovery
 // never writes configuration or starts authentication.
 type AccountAddInput struct {
 	Alias    string                     `json:"alias"`
-	Address  string                     `json:"address"`
+	Address  string                     `json:"address,omitempty"`
 	Mail     *AccountMailRouteInput     `json:"mail,omitempty"`
 	Calendar *AccountCalendarRouteInput `json:"calendar,omitempty"`
+	Tasks    *AccountTaskRouteInput     `json:"tasks,omitempty"`
 	Default  bool                       `json:"default"`
 }
 
@@ -172,6 +180,7 @@ type AccountRegistration struct {
 	Address   string                     `json:"-"`
 	Mail      *AccountMailRouteInput     `json:"-"`
 	Calendar  *AccountCalendarRouteInput `json:"-"`
+	Tasks     *AccountTaskRouteInput     `json:"-"`
 	IsDefault bool                       `json:"-"`
 }
 
@@ -197,8 +206,10 @@ type AccountChangeReview struct {
 	Address             string                    `json:"address,omitempty"`
 	MailProvider        domain.ProviderID         `json:"mailProvider,omitempty"`
 	CalendarProvider    domain.ProviderID         `json:"calendarProvider,omitempty"`
+	TaskProvider        domain.ProviderID         `json:"taskProvider,omitempty"`
 	Mail                *AccountRouteView         `json:"mail,omitempty"`
 	Calendar            *AccountRouteView         `json:"calendar,omitempty"`
+	Tasks               *AccountRouteView         `json:"tasks,omitempty"`
 	Credentials         []AccountCredentialReview `json:"credentials,omitempty"`
 	MakesDefault        bool                      `json:"makesDefault"`
 	ReplacementDefault  string                    `json:"replacementDefault,omitempty"`
@@ -238,10 +249,11 @@ type accountIDGenerator func() (domain.AccountID, error)
 
 // AccountService owns account lifecycle validation and isolation semantics.
 type AccountService struct {
-	repository AccountRepository
-	purger     AccountStatePurger
-	available  map[domain.ProviderID]struct{}
-	newID      accountIDGenerator
+	repository    AccountRepository
+	purger        AccountStatePurger
+	available     map[domain.ProviderID]struct{}
+	taskAvailable map[domain.ProviderID]struct{}
+	newID         accountIDGenerator
 }
 
 // NewAccountService creates the shared lifecycle use case.
@@ -249,6 +261,7 @@ func NewAccountService(
 	repository AccountRepository,
 	purger AccountStatePurger,
 	available []domain.ProviderID,
+	taskAvailable []domain.ProviderID,
 ) (*AccountService, error) {
 	if repository == nil {
 		return nil, errors.New("account repository is required")
@@ -256,19 +269,35 @@ func NewAccountService(
 	if purger == nil {
 		return nil, errors.New("account state purger is required")
 	}
+	providers, err := providerSet(available)
+	if err != nil {
+		return nil, err
+	}
+	taskProviders, err := providerSet(taskAvailable)
+	if err != nil {
+		return nil, err
+	}
+	return &AccountService{
+		repository:    repository,
+		purger:        purger,
+		available:     providers,
+		taskAvailable: taskProviders,
+		newID:         domain.NewAccountID,
+	}, nil
+}
+
+func providerSet(available []domain.ProviderID) (map[domain.ProviderID]struct{}, error) {
 	providers := make(map[domain.ProviderID]struct{}, len(available))
 	for _, provider := range available {
 		if err := provider.Validate(); err != nil {
 			return nil, err
 		}
+		if _, exists := providers[provider]; exists {
+			return nil, fmt.Errorf("provider %q is duplicated in route availability", provider)
+		}
 		providers[provider] = struct{}{}
 	}
-	return &AccountService{
-		repository: repository,
-		purger:     purger,
-		available:  providers,
-		newID:      domain.NewAccountID,
-	}, nil
+	return providers, nil
 }
 
 // List returns a stable alias-ordered account snapshot.
@@ -325,6 +354,7 @@ func (service *AccountService) Add(
 	registration := AccountRegistration{
 		ID: accountID, Alias: input.Alias, Address: normalizedAddress,
 		Mail: cloneMailRoute(input.Mail), Calendar: cloneCalendarRoute(input.Calendar),
+		Tasks:     cloneTaskRoute(input.Tasks),
 		IsDefault: input.Default || len(catalog.Accounts) == 0,
 	}
 	account := registration.view()
@@ -351,6 +381,7 @@ func (service *AccountService) ReviewAdd(
 	review := AccountChangeReview{
 		Action: "add", Alias: input.Alias, Address: address,
 		Mail: mailRouteView(input.Mail), Calendar: calendarRouteView(input.Calendar),
+		Tasks:          taskRouteInputView(input.Tasks),
 		Credentials:    accountCredentialReviews(input),
 		MakesDefault:   input.Default || len(catalog.Accounts) == 0,
 		Authentication: "explicit_cli_required",
@@ -360,6 +391,9 @@ func (service *AccountService) ReviewAdd(
 	}
 	if input.Calendar != nil {
 		review.CalendarProvider = input.Calendar.Provider
+	}
+	if input.Tasks != nil {
+		review.TaskProvider = input.Tasks.Provider
 	}
 	return review, nil
 }
@@ -371,13 +405,21 @@ func (service *AccountService) reviewAdd(
 	if err := domain.AccountAlias(input.Alias).Validate(); err != nil {
 		return "", AccountCatalog{}, err
 	}
-	normalizedAddress, _, err := normalizeDiscoveryAddress(input.Address)
-	if err != nil {
-		return "", AccountCatalog{}, err
-	}
-	if input.Mail == nil && input.Calendar == nil {
+	if input.Mail == nil && input.Calendar == nil && input.Tasks == nil {
 		return "", AccountCatalog{}, errors.New(
-			"at least one mail or calendar route is required",
+			"at least one mail, calendar, or task route is required",
+		)
+	}
+	normalizedAddress := ""
+	if input.Address != "" {
+		var err error
+		normalizedAddress, _, err = normalizeDiscoveryAddress(input.Address)
+		if err != nil {
+			return "", AccountCatalog{}, err
+		}
+	} else if input.Mail != nil || input.Calendar != nil {
+		return "", AccountCatalog{}, errors.New(
+			"mail and calendar routes require an account address",
 		)
 	}
 	if input.Mail != nil {
@@ -398,6 +440,11 @@ func (service *AccountService) reviewAdd(
 	if input.Calendar != nil {
 		if err := service.validateCalendarRoute(*input.Calendar); err != nil {
 			return "", AccountCatalog{}, fmt.Errorf("calendar route: %w", err)
+		}
+	}
+	if input.Tasks != nil {
+		if err := service.validateTaskRoute(*input.Tasks); err != nil {
+			return "", AccountCatalog{}, fmt.Errorf("task route: %w", err)
 		}
 	}
 	catalog, err := service.List(ctx)
@@ -457,7 +504,11 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 				credential = &input.Mail.MicrosoftGraph.Authorization
 			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
-			domain.ProviderCalDAV, domain.ProviderPOP3:
+			domain.ProviderCalDAV, domain.ProviderPOP3,
+			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+			domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+			domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+			domain.ProviderThings, domain.ProviderOmniFocus:
 		}
 		if credential != nil {
 			reviews = append(reviews, AccountCredentialReview{
@@ -482,7 +533,11 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 				credential = &input.Calendar.MicrosoftGraph.Authorization
 			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
-			domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3:
+			domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3,
+			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+			domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+			domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+			domain.ProviderThings, domain.ProviderOmniFocus:
 		}
 		if credential != nil {
 			reviews = append(reviews, AccountCredentialReview{
@@ -604,6 +659,14 @@ func accountUsesOAuth(account AccountView) bool {
 			domain.ProviderJMAP,
 			domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV,
+			domain.ProviderMicrosoftTasks,
+			domain.ProviderTodoist,
+			domain.ProviderGoogleTasks,
+			domain.ProviderAppleReminders,
+			domain.ProviderTickTick,
+			domain.ProviderAnyDoMCP,
+			domain.ProviderThings,
+			domain.ProviderOmniFocus,
 			domain.ProviderPOP3:
 		}
 	}
@@ -696,7 +759,7 @@ func validateAccountView(account AccountView) error {
 			return err
 		}
 	}
-	if account.Mail == nil && account.Calendar == nil {
+	if account.Mail == nil && account.Calendar == nil && account.Tasks == nil {
 		return errors.New("account has no service routes")
 	}
 	if account.Mail != nil {
@@ -709,6 +772,11 @@ func validateAccountView(account AccountView) error {
 			return fmt.Errorf("calendar route: %w", err)
 		}
 	}
+	if account.Tasks != nil {
+		if err := validateAccountRouteView(*account.Tasks); err != nil {
+			return fmt.Errorf("task route: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -717,6 +785,9 @@ func (service *AccountService) markRouteAvailability(account *AccountView) {
 		if route != nil {
 			_, route.Available = service.available[route.Provider]
 		}
+	}
+	if account.Tasks != nil {
+		_, account.Tasks.Available = service.taskAvailable[account.Tasks.Provider]
 	}
 }
 
@@ -728,6 +799,12 @@ func (service *AccountService) requireAvailable(provider domain.ProviderID) erro
 		return fmt.Errorf("provider %q is not available in this build", provider)
 	}
 	return nil
+}
+
+// ValidateTaskProviderSelection checks the closed, service-scoped build
+// catalog without authenticating, discovering an endpoint, or touching config.
+func (service *AccountService) ValidateTaskProviderSelection(provider domain.ProviderID) error {
+	return service.validateTaskRoute(AccountTaskRouteInput{Provider: provider})
 }
 
 func (service *AccountService) validateMailRoute(route AccountMailRouteInput) error {
@@ -792,6 +869,14 @@ func (service *AccountService) validateMailRoute(route AccountMailRouteInput) er
 		)
 	case
 		domain.ProviderCalDAV,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return fmt.Errorf("provider %q cannot supply a configured mail route", route.Provider)
 	default:
@@ -908,6 +993,14 @@ func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteI
 	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return fmt.Errorf(
 			"provider %q cannot supply a configured calendar route",
@@ -915,6 +1008,37 @@ func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteI
 		)
 	default:
 		return fmt.Errorf("unknown calendar provider %q", route.Provider)
+	}
+}
+
+func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) error {
+	if err := route.Provider.Validate(); err != nil {
+		return err
+	}
+	switch route.Provider {
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderCalDAV,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus:
+		if _, available := service.taskAvailable[route.Provider]; !available {
+			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
+		}
+		return nil
+	case domain.ProviderMicrosoftOWA,
+		domain.ProviderGoogle,
+		domain.ProviderGoogleWeb,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderPOP3:
+		return fmt.Errorf("provider %q cannot supply a task route", route.Provider)
+	default:
+		return fmt.Errorf("provider %q cannot supply a task route", route.Provider)
 	}
 }
 
@@ -944,6 +1068,14 @@ func validateOAuthInput(
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return fmt.Errorf("provider %q has no OAuth API base policy", provider)
 	default:
@@ -1101,8 +1233,27 @@ func (registration AccountRegistration) view() AccountView {
 	return AccountView{
 		ID: registration.ID, Alias: registration.Alias, Address: registration.Address,
 		Mail: mailRouteView(registration.Mail), Calendar: calendarRouteView(registration.Calendar),
+		Tasks:     taskRouteInputView(registration.Tasks),
 		IsDefault: registration.IsDefault,
 	}
+}
+
+// TaskRouteView returns the deliberately minimal, secret-free task route.
+// Provider adapters enrich capabilities only after an explicit sign-in.
+func TaskRouteView(provider domain.ProviderID) *AccountRouteView {
+	return &AccountRouteView{
+		Provider: provider,
+		Endpoints: []DiscoveredEndpoint{
+			{Kind: "configured", Value: "provider-specific"},
+		},
+	}
+}
+
+func taskRouteInputView(route *AccountTaskRouteInput) *AccountRouteView {
+	if route == nil {
+		return nil
+	}
+	return TaskRouteView(route.Provider)
 }
 
 func mailRouteView(route *AccountMailRouteInput) *AccountRouteView {
@@ -1171,6 +1322,14 @@ func mailRouteView(route *AccountMailRouteInput) *AccountRouteView {
 		return oauthRouteView(route.Provider, route.MicrosoftGraph)
 	case
 		domain.ProviderCalDAV,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return &AccountRouteView{Provider: route.Provider}
 	default:
@@ -1218,6 +1377,14 @@ func calendarRouteView(route *AccountCalendarRouteInput) *AccountRouteView {
 	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return &AccountRouteView{Provider: route.Provider}
 	default:
@@ -1326,6 +1493,14 @@ func cloneCalendarRoute(route *AccountCalendarRouteInput) *AccountCalendarRouteI
 		value := *route.MicrosoftGraph
 		cloned.MicrosoftGraph = &value
 	}
+	return &cloned
+}
+
+func cloneTaskRoute(route *AccountTaskRouteInput) *AccountTaskRouteInput {
+	if route == nil {
+		return nil
+	}
+	cloned := *route
 	return &cloned
 }
 

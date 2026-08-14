@@ -1,0 +1,107 @@
+{
+  "id": "task-synthetic-001",
+  "version": "version-synthetic-001",
+  "listId": "list-inbox",
+  "title": "Review the synthetic release checklist",
+  "notes": "Synthetic contract fixture. It contains no personal or provider data.",
+  "status": "needs_action",
+  "priority": "high",
+  "start": {
+    "kind": "date",
+    "value": "2026-08-13"
+  },
+  "due": {
+    "kind": "zoned_datetime",
+    "value": "2026-08-14T09:30:00+01:00",
+    "timeZone": "Europe/London"
+  },
+  "reminders": [
+    {
+      "kind": "relative_due",
+      "offsetMinutes": -30
+    }
+  ],
+  "recurrence": {
+    "frequency": "weekly",
+    "interval": 1,
+    "daysOfWeek": [
+      "friday"
+    ],
+    "count": 4
+  },
+  "checklist": [
+    {
+      "id": "check-tests",
+      "title": "Run synthetic contract tests",
+      "completed": false,
+      "order": "001"
+    }
+  ],
+  "assignees": [
+    {
+      "id": "principal-self",
+      "displayName": "Signed-in user",
+      "self": true
+    }
+  ],
+  "labels": [
+    "synthetic",
+    "release"
+  ],
+  "attachments": [
+    {
+      "name": "Fixture specification",
+      "url": "https://example.invalid/contracts/task-v1",
+      "contentType": "text/html"
+    }
+  ],
+  "sources": [
+    {
+      "kind": "mail",
+      "account": "acc_00000000000000000000000000000001",
+      "provider": "microsoft-owa",
+      "objectId": "message-synthetic-001",
+      "url": "https://example.invalid/mail/message-synthetic-001"
+    }
+  ],
+  "order": "001",
+  "capabilities": {
+    "read": true,
+    "crossListRead": true,
+    "search": true,
+    "create": true,
+    "update": true,
+    "complete": true,
+    "reopen": true,
+    "delete": true,
+    "optimisticConcurrency": true,
+    "reminders": true,
+    "recurrence": true,
+    "subtasks": true,
+    "checklist": true,
+    "assignments": true,
+    "labels": true,
+    "attachments": true,
+    "linkedSources": true,
+    "ordering": true,
+    "dateOnly": true,
+    "floatingDateTime": true,
+    "zonedDateTime": true,
+    "syncModes": [
+      "delta"
+    ]
+  },
+  "degradations": [
+    {
+      "feature": "priority_mapping",
+      "reason": "The synthetic provider has fewer priority levels.",
+      "lossy": true
+    }
+  ],
+  "provenance": {
+    "accountId": "acc_00000000000000000000000000000001",
+    "provider": "todoist",
+    "taskListId": "list-inbox",
+    "sourceObjectId": "task-synthetic-001"
+  }
+}

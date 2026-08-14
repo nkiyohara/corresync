@@ -79,6 +79,14 @@ func ProviderFor(
 		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
 		domain.ProviderGoogleWeb,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return Provider{}, fmt.Errorf("provider %q has no OAuth API profile", provider)
 	default:

@@ -35,11 +35,12 @@ type cli struct {
 	Mail         mailCommand         `cmd:"" help:"Read and manage mail."`
 	Calendar     calendarCommand     `cmd:"" help:"Read and manage calendar events."`
 	Agenda       agendaCommand       `cmd:"" help:"Read a normalized cross-account agenda."`
+	Tasks        tasksCommand        `cmd:"" help:"Read and manage provider-neutral tasks."`
 	Monitor      monitorCommand      `cmd:"" help:"Configure account-scoped opt-in monitoring."`
 	Events       eventsCommand       `cmd:"" help:"Inspect and acknowledge the durable local event queue."`
 	Daemon       daemonCommand       `cmd:"" help:"Run and inspect the local session owner."`
 	Integrations integrationsCommand `cmd:"" help:"Detect and safely manage local AI-agent integrations."`
-	MCP          mcpCommand          `cmd:"" help:"Expose guarded mail and calendar tools over MCP."`
+	MCP          mcpCommand          `cmd:"" help:"Expose guarded mail, calendar, and task tools over MCP."`
 	Update       updateCommand       `cmd:"" help:"Install verified updates or show the package-manager command."`
 	Completion   completionCommand   `cmd:"" help:"Generate or install shell completion."`
 	Feedback     feedbackCommand     `cmd:"" help:"Review privacy-preserving local diagnostics and choose any external action."`
@@ -93,7 +94,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 	parser, err := kong.New(
 		&commandLine,
 		kong.Name(commandName),
-		kong.Description("Local-first, guarded mail and calendar."),
+		kong.Description("Local-first, guarded mail, calendar, and tasks."),
 		kong.Help(compactHelpPrinter),
 		kong.Vars{"version": versionLine(info)},
 		kong.UsageOnError(),
