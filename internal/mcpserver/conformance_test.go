@@ -64,6 +64,16 @@ var expectedToolNames = []string{
 	"mail_set_read_state",
 	"mail_set_read_state_commit",
 	"monitor_status",
+	"saved_queries_list",
+	"saved_queries_purge",
+	"saved_queries_purge_commit",
+	"saved_query_delete",
+	"saved_query_delete_commit",
+	"saved_query_run",
+	"saved_query_save_calendar",
+	"saved_query_save_commit",
+	"saved_query_save_mail",
+	"saved_query_show",
 	"settings_show",
 	"settings_update",
 	"settings_update_commit",
@@ -92,16 +102,22 @@ var (
 		"mail_list_folders", "mail_get_body", "mail_get_body_commit", "mail_get_attachment",
 		"mail_get_attachment_commit", "mail_list", "mail_search", "mail_search_all", "task_lists",
 		"task_list", "task_list_all", "task_get", "task_search", "task_sync",
+		"saved_queries_list", "saved_query_show", "saved_query_run",
 	)
 	expectedDestructiveTools = stringSet(
 		"account_remove", "account_remove_commit", "calendar_cancel_commit",
 		"mail_delete", "mail_delete_commit", "task_delete", "task_delete_commit",
+		"saved_query_delete", "saved_query_delete_commit", "saved_queries_purge",
+		"saved_queries_purge_commit",
 	)
 	expectedClosedWorldTools = stringSet(
 		"account_list", "account_show", "account_status", "settings_show", "settings_update",
 		"settings_update_commit", "account_add", "account_add_commit", "account_rename",
 		"account_rename_commit", "account_remove", "account_remove_commit", "monitor_status",
-		"events_list", "event_acknowledge",
+		"events_list", "event_acknowledge", "saved_queries_list", "saved_query_show",
+		"saved_query_save_mail", "saved_query_save_calendar", "saved_query_save_commit",
+		"saved_query_delete", "saved_query_delete_commit", "saved_queries_purge",
+		"saved_queries_purge_commit",
 	)
 )
 

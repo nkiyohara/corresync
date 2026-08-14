@@ -176,6 +176,95 @@ func TestDaemonMCPAccountLifecycleUsesCallerBoundPreviewCommit(t *testing.T) {
 	}
 }
 
+func TestDaemonMCPSavedQueriesUseCallerAndRevisionBoundPreviewCommit(t *testing.T) {
+	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts[configuration.DefaultAccount].ID
+	recorder := &daemonMCPAudit{}
+	rules := policy.DefaultRules()
+	rules.PreviewReversibleWrites = true
+	backend := &daemonMCPBackend{
+		app: app, configuration: configuration, defaultAccount: account,
+		guard: daemonMCPGuard(t, rules, recorder),
+	}
+	caller := domain.Caller{Surface: "mcp", Instance: "saved-query-test"}
+	otherCaller := domain.Caller{Surface: "mcp", Instance: "saved-query-other"}
+	input := application.SavedQuerySaveInput{
+		Account: account, Name: "priority", Kind: application.SavedQueryMail,
+		Mail: &application.SavedMailQuery{
+			Folder: application.MailFolder{
+				Kind: application.MailFolderDistinguished, ID: "inbox",
+			},
+			Query: "is:unread", Limit: 25, TimeZone: "UTC",
+		},
+	}
+	preview, err := backend.PreviewSavedQuerySave(t.Context(), input, caller)
+	if err != nil || preview.Preview == nil || preview.Review == nil ||
+		preview.Status != "approval_required" {
+		t.Fatalf("saved query preview = %+v error = %v", preview, err)
+	}
+	if _, err := backend.CommitSavedQuerySave(
+		t.Context(), preview.Preview.Token, otherCaller,
+	); err == nil {
+		t.Fatal("saved query save accepted another caller's approval")
+	}
+	committed, err := backend.CommitSavedQuerySave(
+		t.Context(), preview.Preview.Token, caller,
+	)
+	if err != nil || committed.Query == nil || committed.Query.Name != "priority" {
+		t.Fatalf("saved query commit = %+v error = %v", committed, err)
+	}
+	if _, err := backend.CommitSavedQuerySave(
+		t.Context(), preview.Preview.Token, caller,
+	); err == nil {
+		t.Fatal("saved query save replayed an approval")
+	}
+
+	deletion, err := backend.PreviewSavedQueryDelete(
+		t.Context(),
+		application.SavedQueryDeleteInput{Account: account, Name: "priority"},
+		caller,
+	)
+	if err != nil || deletion.Preview == nil {
+		t.Fatalf("saved query delete preview = %+v error = %v", deletion, err)
+	}
+	input.Mail.Limit = 10
+	replacement, err := backend.PreviewSavedQuerySave(t.Context(), input, caller)
+	if err != nil || replacement.Preview == nil {
+		t.Fatalf("saved query replacement preview = %+v error = %v", replacement, err)
+	}
+	if _, err := backend.CommitSavedQuerySave(
+		t.Context(), replacement.Preview.Token, caller,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := backend.CommitSavedQueryDelete(
+		t.Context(), deletion.Preview.Token, caller,
+	); err == nil || !strings.Contains(err.Error(), "changed after review") {
+		t.Fatalf("stale saved query deletion error = %v", err)
+	}
+
+	purge, err := backend.PreviewSavedQueryPurge(
+		t.Context(), application.SavedQueryPurgeInput{Account: account}, caller,
+	)
+	if err != nil || purge.Preview == nil || purge.Review == nil ||
+		purge.Review.Definitions != 1 {
+		t.Fatalf("saved query purge preview = %+v error = %v", purge, err)
+	}
+	purged, err := backend.CommitSavedQueryPurge(
+		t.Context(), purge.Preview.Token, caller,
+	)
+	if err != nil || !purged.Purged || purged.Status != "completed" {
+		t.Fatalf("saved query purge = %+v error = %v", purged, err)
+	}
+	if len(recorder.events) < 4 {
+		t.Fatalf("saved query audit events = %+v", recorder.events)
+	}
+}
+
 func TestDaemonMCPSettingsUseCallerBoundStaleSafePreviewCommit(t *testing.T) {
 	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
 	configuration, err := config.Load(path)
