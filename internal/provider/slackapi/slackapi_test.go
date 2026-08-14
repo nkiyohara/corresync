@@ -163,6 +163,93 @@ func TestSlackIdentityScopeAndRateLimitFailuresStayContentFree(t *testing.T) {
 	})
 }
 
+func TestSlackFileOriginIsClosedAndProviderOwned(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		api  string
+		want string
+	}{
+		{api: "https://slack.com/api", want: "https://files.slack.com"},
+		{api: "https://slack-gov.com/api", want: "https://files.slack-gov.com"},
+	}
+	for _, test := range tests {
+		if got, err := FileOrigin(test.api); err != nil || got != test.want {
+			t.Errorf("FileOrigin(%q) = %q, %v", test.api, got, err)
+		}
+	}
+	for _, unsafe := range []string{
+		"https://slack.com.attacker.invalid/api",
+		"https://slack.com/api/",
+		"https://files.slack.com",
+	} {
+		if got, err := FileOrigin(unsafe); err == nil || got != "" {
+			t.Errorf("FileOrigin(%q) = %q, %v", unsafe, got, err)
+		}
+	}
+}
+
+func TestSlackAttachmentUsesDedicatedFileTransport(t *testing.T) {
+	apiCalls := 0
+	fileCalls := 0
+	apiHTTP := &http.Client{Transport: slackRoundTripperFunc(func(
+		request *http.Request,
+	) (*http.Response, error) {
+		apiCalls++
+		if request.URL.Host != "slack.com" ||
+			!strings.HasPrefix(request.URL.Path, "/api/") {
+			t.Fatalf("API transport received %s", request.URL)
+		}
+		body := `{"ok":true,"team_id":"TSYNTHETIC","user_id":"USYNTHETIC"}`
+		if request.URL.Path == "/api/conversations.history" {
+			body = `{"ok":true,"messages":[{"type":"message","text":"fixture","user":"USYNTHETIC","ts":"1723636800.000001","files":[{"id":"FSYNTHETIC","name":"synthetic.txt","mimetype":"text/plain","size":17,"mode":"hosted","file_access":"visible","url_private":"https://files.slack.com/files-pri/TSYNTHETIC-FSYNTHETIC/synthetic.txt"}]}]}`
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header: http.Header{
+				"X-Oauth-Scopes": {"channels:history,files:read"},
+			},
+			Body: io.NopCloser(strings.NewReader(body)),
+		}, nil
+	})}
+	filesHTTP := &http.Client{Transport: slackRoundTripperFunc(func(
+		request *http.Request,
+	) (*http.Response, error) {
+		fileCalls++
+		if request.URL.Host != "files.slack.com" ||
+			!strings.HasPrefix(request.URL.Path, "/files-pri/") {
+			t.Fatalf("file transport received %s", request.URL)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(strings.NewReader("synthetic fixture")),
+		}, nil
+	})}
+	client, err := New(t.Context(), Options{
+		APIBase: "https://slack.com/api", WorkspaceID: "TSYNTHETIC",
+		HTTP: apiHTTP, FilesHTTP: filesHTTP,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+	attachment, err := client.GetMessageAttachment(
+		t.Context(),
+		application.MessageAttachmentGetInput{
+			Account:     "acc_11111111111111111111111111111111",
+			WorkspaceID: "TSYNTHETIC", ConversationID: "CSYNTHETIC",
+			MessageID: "1723636800.000001", AttachmentID: "FSYNTHETIC",
+		},
+	)
+	if err != nil || string(attachment.Data) != "synthetic fixture" ||
+		apiCalls != 2 || fileCalls != 1 {
+		t.Fatalf(
+			"attachment = %+v error = %v API calls = %d file calls = %d",
+			attachment, err, apiCalls, fileCalls,
+		)
+	}
+}
+
 func TestSlackCursorDigestAndFileAuthorityAreClosed(t *testing.T) {
 	t.Parallel()
 
@@ -486,3 +573,11 @@ func decodeSlackRequest(t *testing.T, request *http.Request, destination any) {
 }
 
 var _ application.MessagingPort = (*Client)(nil)
+
+type slackRoundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (function slackRoundTripperFunc) RoundTrip(
+	request *http.Request,
+) (*http.Response, error) {
+	return function(request)
+}

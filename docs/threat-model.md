@@ -120,6 +120,10 @@ single-user tool, not a remote gateway or tenant administration service.
   authorization reference. Mattermost resolves and pins a bounded set of
   public DNS answers before the external bearer authorizer may touch a request;
   the adapter never accepts a token value or WebSocket auth challenge payload.
+- Slack private-file reads map the selected fixed API base to one fixed file
+  origin and use a separate exact-origin bearer capability. Redirects, query
+  credentials, arbitrary hosts, and non-private-file paths fail before the
+  authorization can leave its owner.
 - Guided OS-keyring enrollment invokes only the fixed platform credential tool
   with a bounded reviewed handle and no password argument. The child owns the
   TTY prompt; `corr` receives only its exit status. MCP, JSON, pipes, and

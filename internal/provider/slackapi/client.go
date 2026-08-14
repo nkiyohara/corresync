@@ -31,6 +31,10 @@ type Options struct {
 	WorkspaceID string
 	ReadOnly    bool
 	HTTP        *http.Client
+	// FilesHTTP owns authorization for Slack's distinct, fixed file origin.
+	// Synthetic tests may omit it when their API and file fixtures share one
+	// origin; production construction always supplies the separate client.
+	FilesHTTP *http.Client
 }
 
 // Client owns one authorized Slack Web API transport.
@@ -87,7 +91,11 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		return nil, err
 	}
 	parsedBase, _ := url.Parse(options.APIBase)
-	fileHTTP := *options.HTTP
+	filesHTTP := options.FilesHTTP
+	if filesHTTP == nil {
+		filesHTTP = options.HTTP
+	}
+	fileHTTP := *filesHTTP
 	if fileHTTP.Timeout == 0 {
 		fileHTTP.Timeout = 30 * time.Second
 	}
@@ -138,6 +146,20 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	client.observeCapabilities(scopes)
 	client.degradations = append(client.degradations, slackWarningDegradations(identity.slackEnvelope)...)
 	return client, nil
+}
+
+// FileOrigin returns the one official private-file origin paired with a
+// selectable Slack API base. Keeping the mapping in the adapter prevents an
+// arbitrary response URL from choosing where bearer authorization is sent.
+func FileOrigin(apiBase string) (string, error) {
+	switch apiBase {
+	case "https://slack.com/api":
+		return "https://files.slack.com", nil
+	case "https://slack-gov.com/api":
+		return "https://files.slack-gov.com", nil
+	default:
+		return "", errors.New("slack API base has no approved file origin")
+	}
 }
 
 func (client *Client) Close() error {

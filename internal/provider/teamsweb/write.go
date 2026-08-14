@@ -41,10 +41,10 @@ func (client *Client) SendMessage(
 	}
 	message, err := client.driver.TeamsSendMessage(ctx, input)
 	if err != nil {
-		return application.Message{}, writeUnknown("send Teams Web message", err)
+		return application.Message{}, writeUnknown("send Teams Web message")
 	}
 	if message.Summary.ConversationID != input.ConversationID || message.Summary.ID == "" {
-		return application.Message{}, writeUnknown("Teams Web returned a mismatched send result", nil)
+		return application.Message{}, writeUnknown("Teams Web returned a mismatched send result")
 	}
 	return message, nil
 }
@@ -76,10 +76,10 @@ func (client *Client) EditMessage(
 	}
 	message, err := client.driver.TeamsEditMessage(ctx, input)
 	if err != nil {
-		return application.Message{}, writeUnknown("edit Teams Web message", err)
+		return application.Message{}, writeUnknown("edit Teams Web message")
 	}
 	if message.Summary.ID != input.MessageID || message.Summary.ConversationID != input.ConversationID {
-		return application.Message{}, writeUnknown("Teams Web returned a mismatched edit result", nil)
+		return application.Message{}, writeUnknown("Teams Web returned a mismatched edit result")
 	}
 	return message, nil
 }
@@ -104,7 +104,7 @@ func (client *Client) DeleteMessage(ctx context.Context, input application.Messa
 		return errors.New("the Teams Web route can delete only the delegated actor's own message")
 	}
 	if err := client.driver.TeamsDeleteMessage(ctx, input); err != nil {
-		return writeUnknown("delete Teams Web message", err)
+		return writeUnknown("delete Teams Web message")
 	}
 	return nil
 }
@@ -132,10 +132,10 @@ func (client *Client) SetMessageReaction(
 	}
 	reaction, err := client.driver.TeamsSetReaction(ctx, input)
 	if err != nil {
-		return application.MessageReaction{}, writeUnknown("change Teams Web reaction", err)
+		return application.MessageReaction{}, writeUnknown("change Teams Web reaction")
 	}
 	if reaction.Name != input.Reaction || reaction.ReactedByActor == input.Remove {
-		return application.MessageReaction{}, writeUnknown("Teams Web returned a mismatched reaction result", nil)
+		return application.MessageReaction{}, writeUnknown("Teams Web returned a mismatched reaction result")
 	}
 	return reaction, nil
 }
@@ -160,11 +160,11 @@ func (client *Client) CreateConversation(
 	}
 	conversation, err := client.driver.TeamsCreateConversation(ctx, input)
 	if err != nil {
-		return application.Conversation{}, writeUnknown("create Teams Web conversation", err)
+		return application.Conversation{}, writeUnknown("create Teams Web conversation")
 	}
 	if conversation.ID == "" || conversation.Kind != input.Kind ||
 		validateConversationID(conversation.ID) != nil {
-		return application.Conversation{}, writeUnknown("Teams Web returned a mismatched conversation result", nil)
+		return application.Conversation{}, writeUnknown("Teams Web returned a mismatched conversation result")
 	}
 	return conversation, nil
 }
@@ -194,12 +194,12 @@ func (client *Client) ChangeConversationMembership(
 	}
 	result, err := client.driver.TeamsChangeMembership(ctx, input)
 	if err != nil {
-		return application.ConversationMembershipResult{}, writeUnknown("change Teams Web membership", err)
+		return application.ConversationMembershipResult{}, writeUnknown("change Teams Web membership")
 	}
 	if result.ConversationID != input.ConversationID || result.Action != input.Action ||
 		result.Member.ID != input.Member.ID || result.Version == "" ||
 		result.Version == input.Version {
-		return application.ConversationMembershipResult{}, writeUnknown("Teams Web returned a mismatched membership result", nil)
+		return application.ConversationMembershipResult{}, writeUnknown("Teams Web returned a mismatched membership result")
 	}
 	return result, nil
 }
@@ -226,9 +226,6 @@ func (client *Client) requireVersion(
 	return message, nil
 }
 
-func writeUnknown(operation string, err error) error {
-	if err == nil {
-		return fmt.Errorf("%w: %s", application.ErrWriteOutcomeUnknown, operation)
-	}
-	return errors.Join(application.ErrWriteOutcomeUnknown, fmt.Errorf("%s: %w", operation, err))
+func writeUnknown(operation string) error {
+	return fmt.Errorf("%w: %s", application.ErrWriteOutcomeUnknown, operation)
 }

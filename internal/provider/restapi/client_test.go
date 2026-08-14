@@ -82,7 +82,7 @@ func TestClientMarksAmbiguousWriteTransportFailure(t *testing.T) {
 			*http.Request,
 		) (*http.Response, error) {
 			calls.Add(1)
-			return nil, errors.New("synthetic transport failure")
+			return nil, errors.New("private synthetic transport failure")
 		})},
 	})
 	if err != nil {
@@ -99,7 +99,8 @@ func TestClientMarksAmbiguousWriteTransportFailure(t *testing.T) {
 		nil,
 		http.StatusCreated,
 	)
-	if !errors.Is(err, application.ErrWriteOutcomeUnknown) || calls.Load() != 1 {
+	if !errors.Is(err, application.ErrWriteOutcomeUnknown) || calls.Load() != 1 ||
+		strings.Contains(err.Error(), "private synthetic transport failure") {
 		t.Fatalf("write transport error = %v calls = %d", err, calls.Load())
 	}
 }
@@ -351,7 +352,11 @@ func TestClientMarksUnverifiableSuccessfulWriteResponseAsAmbiguous(
 			status: http.StatusOK,
 		},
 		{name: "unexpected success", status: http.StatusAccepted},
-		{name: "server failure", status: http.StatusServiceUnavailable},
+		{
+			name:   "server failure",
+			body:   `{"error":{"code":"private_provider_detail"}}`,
+			status: http.StatusServiceUnavailable,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -391,6 +396,9 @@ func TestClientMarksUnverifiableSuccessfulWriteResponseAsAmbiguous(
 			)
 			if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
 				t.Fatalf("write response error = %v", err)
+			}
+			if strings.Contains(err.Error(), "private_provider_detail") {
+				t.Fatalf("write response exposed provider detail: %v", err)
 			}
 		})
 	}

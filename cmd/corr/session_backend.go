@@ -3219,22 +3219,46 @@ func (backend *sessionBackend) slackMessagingAccount(
 	if err != nil {
 		return sessionAccount{}, err
 	}
+	fileOrigin, err := slackapi.FileOrigin(selected.APIBase)
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, secret.Close())
+	}
 	parsed, _ := url.Parse(selected.APIBase)
 	origin := (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host}).String()
 	authorizer, authorizerErr := credential.NewBearerAuthorizer(origin, secret)
+	fileAuthorizer, fileAuthorizerErr := credential.NewBearerAuthorizer(fileOrigin, secret)
 	closeSecretErr := secret.Close()
-	if authorizerErr != nil || closeSecretErr != nil {
-		return sessionAccount{}, errors.Join(authorizerErr, closeSecretErr)
+	if authorizerErr != nil || fileAuthorizerErr != nil || closeSecretErr != nil {
+		if authorizer != nil {
+			authorizerErr = errors.Join(authorizerErr, authorizer.Close())
+		}
+		if fileAuthorizer != nil {
+			fileAuthorizerErr = errors.Join(fileAuthorizerErr, fileAuthorizer.Close())
+		}
+		return sessionAccount{}, errors.Join(
+			authorizerErr, fileAuthorizerErr, closeSecretErr,
+		)
 	}
-	base := http.DefaultTransport.(*http.Transport).Clone()
-	base.Proxy = nil
-	base.DisableCompression = true
-	transport := &bearerTransport{base: base, authorizer: authorizer}
+	newTransport := func(authorizer *credential.BearerAuthorizer) *bearerTransport {
+		base := http.DefaultTransport.(*http.Transport).Clone()
+		base.Proxy = nil
+		base.DisableCompression = true
+		return &bearerTransport{base: base, authorizer: authorizer}
+	}
+	transport := newTransport(authorizer)
+	fileTransport := newTransport(fileAuthorizer)
 	httpClient := &http.Client{
 		Transport: transport,
 		Timeout:   30 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return errors.New("slack API redirects are not accepted")
+		},
+	}
+	fileHTTPClient := &http.Client{
+		Transport: fileTransport,
+		Timeout:   30 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return errors.New("slack file redirects are not accepted")
 		},
 	}
 	factory := backend.newSlack
@@ -3243,11 +3267,14 @@ func (backend *sessionBackend) slackMessagingAccount(
 	}
 	client, err := factory(ctx, slackapi.Options{
 		APIBase: selected.APIBase, WorkspaceID: selected.WorkspaceID,
-		ReadOnly: selected.ReadOnly, HTTP: httpClient,
+		ReadOnly: selected.ReadOnly, HTTP: httpClient, FilesHTTP: fileHTTPClient,
 	})
 	if err != nil {
 		transport.CloseIdleConnections()
-		return sessionAccount{}, errors.Join(err, authorizer.Close())
+		fileTransport.CloseIdleConnections()
+		return sessionAccount{}, errors.Join(
+			err, authorizer.Close(), fileAuthorizer.Close(),
+		)
 	}
 	return backend.messagingSessionAccount(
 		configured,
@@ -3257,6 +3284,7 @@ func (backend *sessionBackend) slackMessagingAccount(
 		client,
 		client,
 		authorizer,
+		fileAuthorizer,
 	)
 }
 

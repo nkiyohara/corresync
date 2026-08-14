@@ -88,7 +88,11 @@ Slack uses only supported Slack APIs. The selected workspace, installation,
 token actor, granted scopes, channel membership, retention, distribution
 status, and rate limits remain visible capability or degradation evidence.
 Corresync does not automate Slack administration, import browser sessions, use
-private APIs, impersonate another client, or operate as a self-bot.
+private APIs, impersonate another client, or operate as a self-bot. Private
+file reads accept only Slack's fixed `files.slack.com` or
+`files.slack-gov.com` origin paired with the selected API base. API and file
+requests receive separate exact-origin bearer capabilities; a provider-returned
+URL cannot choose an authorization destination.
 
 Mattermost uses one exact user-approved HTTPS origin. Configuration stores an
 external credential reference rather than a secret. Every connection rejects

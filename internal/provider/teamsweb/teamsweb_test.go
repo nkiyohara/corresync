@@ -221,11 +221,12 @@ func TestTeamsWebWritesRevalidateAndPreserveUnknownOutcome(t *testing.T) {
 		t.Fatalf("stale edit error = %v", err)
 	}
 	driver.message.Summary.Version = "twmv1_synthetic"
-	driver.writeErr = errors.New("synthetic browser disconnect")
+	driver.writeErr = errors.New("private synthetic browser disconnect")
 	if err := client.DeleteMessage(t.Context(), application.MessageDeleteInput{
 		MessageWriteRoute: route, ConversationID: driver.conversation.ID,
 		MessageID: driver.message.Summary.ID, Version: driver.message.Summary.Version,
-	}); !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+	}); !errors.Is(err, application.ErrWriteOutcomeUnknown) ||
+		strings.Contains(err.Error(), "private synthetic browser disconnect") {
 		t.Fatalf("delete error = %v", err)
 	}
 }

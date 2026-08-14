@@ -289,8 +289,10 @@ func (client *Client) doOnce(
 			_ = response.Body.Close()
 		}
 		if write {
-			return Result{}, fmt.Errorf("%w: execute API write: %w",
-				application.ErrWriteOutcomeUnknown, err)
+			return Result{}, fmt.Errorf(
+				"%w: API write transport failed after dispatch",
+				application.ErrWriteOutcomeUnknown,
+			)
 		}
 		if errors.Is(err, errRedirectRejected) || ctx.Err() != nil {
 			return Result{}, err
@@ -302,12 +304,13 @@ func (client *Client) doOnce(
 	)
 	closeErr := response.Body.Close()
 	if readErr != nil || closeErr != nil {
-		responseErr := errors.Join(readErr, closeErr)
 		if write {
-			return Result{}, fmt.Errorf("%w: read API write response: %w",
-				application.ErrWriteOutcomeUnknown, responseErr)
+			return Result{}, fmt.Errorf(
+				"%w: API write response could not be verified",
+				application.ErrWriteOutcomeUnknown,
+			)
 		}
-		return Result{}, &transientReadError{cause: responseErr}
+		return Result{}, &transientReadError{cause: errors.Join(readErr, closeErr)}
 	}
 	if len(content) > maximumResponseBytes {
 		if write {
@@ -353,7 +356,10 @@ func classifyResult(result Result, write bool, accepted ...int) (Result, error) 
 	if write &&
 		(result.Status >= http.StatusInternalServerError ||
 			result.Status >= http.StatusOK && result.Status < http.StatusMultipleChoices) {
-		return Result{}, fmt.Errorf("%w: %w", application.ErrWriteOutcomeUnknown, statusErr)
+		return Result{}, fmt.Errorf(
+			"%w: API write result could not be verified",
+			application.ErrWriteOutcomeUnknown,
+		)
 	}
 	return Result{}, statusErr
 }
