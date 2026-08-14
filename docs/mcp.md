@@ -114,7 +114,7 @@ legacy `initialize` / `notifications/initialized` handshake. The current
 compatibility floor is `2024-11-05`; `2025-03-26`, `2025-06-18`, and
 `2025-11-25` are also accepted. CI exercises the complete modern flow, the
 latest legacy flow, invalid modern metadata, unsupported-version errors, all
-61 tool schemas and structured results, both resource templates, and the real
+71 tool schemas and structured results, both resource templates, and the real
 `corr mcp serve` stdio process. Older accepted revisions remain compatibility
 paths rather than separate product surfaces.
 
@@ -190,7 +190,7 @@ aliases over the same reviewed command and rendering contracts.
 
 ## Tool catalog
 
-The server exposes 61 narrow tools.
+The server exposes 71 narrow tools.
 
 Accounts and local monitoring:
 
@@ -200,6 +200,22 @@ Accounts and local monitoring:
 - `account_rename`, `account_rename_commit`;
 - `account_remove`, `account_remove_commit`;
 - `monitor_status`, `events_list`, `event_acknowledge`.
+
+Private saved queries:
+
+- `saved_queries_list`, `saved_query_show`, `saved_query_run`;
+- `saved_query_save_mail`, `saved_query_save_calendar`,
+  `saved_query_save_commit`;
+- `saved_query_delete`, `saved_query_delete_commit`;
+- `saved_queries_purge`, `saved_queries_purge_commit`.
+
+List and show read only account-local definitions. Run performs one bounded
+live provider read and always exposes freshness and no-cache fields. Save,
+replace, delete, and purge share the CLI application service but MCP retains a
+caller-, account-, payload-, expiry-, and revision-bound preview/commit. Purge
+can recover a bounded malformed catalog without accepting a stale preview.
+Definitions and results are private untrusted data. They cannot enable
+monitoring, notifications, runners, authentication, or egress.
 
 Use `settings_show` before changing an everyday setting. `settings_update`
 returns the current value, proposed value, dependent changes, equivalent CLI

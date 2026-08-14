@@ -470,6 +470,40 @@ uses the documented bounded search endpoint, while CalDAV performs a bounded
 local search over its selected VTODO collections. Other task adapters remain
 unavailable until their provider issues ship. See [tasks.md](tasks.md).
 
+## Private saved queries
+
+Saved queries keep a bounded private definition for one exact account. They do
+not save message or event results and do not run in the background.
+
+```console
+# Review, then save the exact mail definition.
+corr queries save mail priority 'is:unread importance:high' --account work
+corr queries save mail priority 'is:unread importance:high' \
+  --account work --approve
+
+# A calendar window is relative to each run, not frozen at save time.
+corr queries save calendar next-week --account work \
+  --start-offset 0s --window 168h --time-zone Europe/London --approve
+
+corr queries list --account work
+corr queries show priority --account work
+corr queries run priority --account work --json
+```
+
+Every run calls the configured live mail or calendar route and reports
+`source: live_provider`, `fetchedAt`, `cached: false`, and `stale: false` in
+JSON. Provider unavailability is an error; an old page is never substituted.
+Mail syntax remains provider-native. Calendar definitions use one typed
+calendar plus a relative start and bounded window because Corresync does not
+invent a calendar text-search contract.
+
+Save and replacement show the complete definition before `--approve`. Delete
+is revision-bound, and `queries purge` binds approval to the exact catalog
+bytes so it can safely recover a bounded malformed catalog without deleting a
+newer replacement. Account removal deletes saved definitions with that
+account's state. Neither CLI nor MCP can turn a saved query into monitoring,
+notifications, runner execution, authentication, or egress.
+
 ## Read-only import staging
 
 ```console

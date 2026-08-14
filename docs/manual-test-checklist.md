@@ -346,7 +346,19 @@ corr calendar list --account ALIAS \
 corr tasks lists --account ALIAS --json
 corr tasks list --account ALIAS --list-id OPAQUE_LIST_ID --limit 5 --json
 corr tasks sync --account ALIAS --list-id OPAQUE_LIST_ID --json
+corr queries save mail synthetic 'subject:synthetic' --account ALIAS --json
+corr queries save mail synthetic 'subject:synthetic' \
+  --account ALIAS --approve --json
+corr queries list --account ALIAS --json
+corr queries run synthetic --account ALIAS --json
 ```
+
+Confirm the first save is only a review, the committed definition is isolated
+to `ALIAS`, and the run reports `source: live_provider`, an absolute
+`fetchedAt`, `cached: false`, and `stale: false`. Confirm no provider result is
+written under the account state root. Review and delete the definition; then
+repeat with a disposable malformed bounded catalog and verify `queries purge`
+rejects a changed revision but removes the exact approved corrupt file.
 
 Optionally test one explicit body and bounded attachment without copying IDs
 into the evidence memo. Verify list/search omit bodies/bytes and all terminal

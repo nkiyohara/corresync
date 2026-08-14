@@ -66,6 +66,14 @@ Discovery is read-only and credential-free. Adding a route never
 authenticates. The account receives a generated opaque ID, monitoring remains
 off, and login occurs only through `corr auth login --account ALIAS`.
 
+Saved mail and calendar queries are intentionally absent from `config.toml`.
+They are private account-local state under the opaque account state root, with
+owner-only permissions, a 64-definition and 256 KiB bound, strict decoding,
+atomic replacement, and revision-bound deletion. They never contain provider
+results or credentials. `corr queries purge --account ALIAS` is the explicit
+reviewed recovery path for a bounded malformed catalog. Removing the account
+purges the catalog with its other Corresync-owned state.
+
 Rename preserves the stable ID and every account-local state tree. Remove
 requires approval and deletes Corresync-owned profile, import, cursor, queue,
 and unshared Corresync-owned OAuth grant state. External standards credentials

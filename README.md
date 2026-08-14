@@ -48,6 +48,8 @@ contracts are implemented.
   identity or provider provenance.
 - Use one stable, provenance-preserving task model as provider adapters become
   available.
+- Save private account-local mail searches and relative calendar windows, then
+  run them live without creating a shadow mailbox or calendar cache.
 - Use the same typed operations from a human-friendly CLI, stable JSON, or an
   AI agent.
 - Keep sign-in in a visible browser, an explicit public-client OAuth flow, or

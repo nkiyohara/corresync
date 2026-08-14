@@ -252,6 +252,21 @@ embedding Outlook semantics in the application core. The effects value is
 validated when the account service is constructed and stays fixed for the
 preview/commit lifetime.
 
+## Private saved queries and live reads
+
+The saved-query application service stores only bounded mail-search or relative
+calendar-window definitions under one opaque account state root. It never
+stores provider results. CLI and MCP call that same service; MCP wraps local
+writes in the normal caller-bound preview/commit guard, while repository
+revisions prevent concurrent replacement, deletion, or purge after review.
+
+Execution delegates to the existing typed mail or calendar read port and
+returns explicit live provenance and fetch time with `cached` and `stale`
+false. No saved query starts a refresher, monitor, notification, runner,
+authentication flow, or egress. The no-content-cache decision and future-cache
+requirements are recorded in
+[ADR 0035](adr/0035-private-saved-queries-without-content-cache.md).
+
 ## Import staging
 
 Import is local read-only staging, not provider synchronization. Without

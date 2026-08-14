@@ -209,6 +209,11 @@ single-user tool, not a remote gateway or tenant administration service.
   attachments, imports, queues, runner input, and feedback records.
 - Bind task cursors to one provider, account, list, and advertised mode. Treat
   local notifications as invalidation only; refetch through bounded reads.
+- Treat saved query definitions as private untrusted state: isolate them by
+  opaque account ID, store no provider results or credentials, bind every
+  replacement/deletion/purge to the reviewed revision, and report every run as
+  a live non-cached read. Never let a definition enable monitoring, a runner,
+  notification delivery, authentication, or egress.
 - Bind messaging cursors and writes to one opaque account, route, workspace,
   actor, conversation, thread, and version. Treat Mattermost WebSocket payloads
   as content-free invalidations only; deduplicate bounded sequences and recover
