@@ -36,6 +36,7 @@ type cli struct {
 	Calendar     calendarCommand     `cmd:"" help:"Read and manage calendar events."`
 	Agenda       agendaCommand       `cmd:"" help:"Read a normalized cross-account agenda."`
 	Tasks        tasksCommand        `cmd:"" help:"Read and manage provider-neutral tasks."`
+	Queries      queriesCommand      `cmd:"" help:"Save and run private mail and calendar queries."`
 	Messages     messagesCommand     `cmd:"" hidden:"" help:"Read and manage provider-neutral messaging."`
 	Monitor      monitorCommand      `cmd:"" help:"Configure account-scoped opt-in monitoring."`
 	Events       eventsCommand       `cmd:"" help:"Inspect and acknowledge the durable local event queue."`
