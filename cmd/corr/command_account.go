@@ -37,11 +37,12 @@ type accountShowCommand struct {
 }
 
 type accountAddCommand struct {
-	Address                   string `arg:"" help:"Bare email address for the account."`
+	Address                   string `arg:"" optional:"" help:"Bare email address; task-only routes may omit it."`
 	Alias                     string `help:"Local alias; defaults to the address local part."`
 	Provider                  string `help:"Compatibility alias for --mail-provider."`
 	MailProvider              string `help:"Explicit mail provider override; use none for calendar-only."`
 	CalendarProvider          string `help:"Explicit calendar provider override; use none for mail-only."`
+	TaskProvider              string `help:"Explicit task provider override; use none to omit tasks."`
 	Origin                    string `help:"Outlook Web HTTPS origin override."`
 	Mailbox                   string `help:"Optional routed or sender mailbox identity."`
 	SessionURL                string `help:"JMAP HTTPS session resource."`
@@ -89,8 +90,9 @@ type accountRemoveCommand struct {
 }
 
 type accountAddResult struct {
-	Selected application.ProviderCandidate `json:"selected"`
-	Account  application.AccountView       `json:"account"`
+	Selected             *application.ProviderCandidate `json:"selected,omitempty"`
+	SelectedTaskProvider domain.ProviderID              `json:"selectedTaskProvider,omitempty"`
+	Account              application.AccountView        `json:"account"`
 }
 
 var errUnsupportedLegacyGoogleRoute = errors.New(
@@ -204,7 +206,7 @@ func (command *accountShowCommand) Run(app *runtime) error {
 	for _, service := range []struct {
 		name  string
 		route *application.AccountRouteView
-	}{{"Mail", account.Mail}, {"Calendar", account.Calendar}} {
+	}{{"Mail", account.Mail}, {"Calendar", account.Calendar}, {"Tasks", account.Tasks}} {
 		if service.route == nil {
 			continue
 		}
@@ -263,23 +265,36 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	result, err := discoverer.Discover(app.context, command.Address)
-	if err != nil {
-		return err
-	}
 	mailProvider, err := command.effectiveMailProvider()
 	if err != nil {
 		return err
 	}
 	if mailProvider == "none" &&
-		(command.CalendarProvider == "" || command.CalendarProvider == "none") {
+		(command.CalendarProvider == "" || command.CalendarProvider == "none") &&
+		(command.TaskProvider == "" || command.TaskProvider == "none") {
 		return errors.New(
-			"calendar-only account requires an explicit --calendar-provider",
+			"at least one mail, calendar, or task provider is required",
 		)
+	}
+	if command.TaskProvider != "" && command.TaskProvider != "none" {
+		if err := accounts.ValidateTaskProviderSelection(domain.ProviderID(command.TaskProvider)); err != nil {
+			return err
+		}
+	}
+	if mailProvider == "none" &&
+		(command.CalendarProvider == "" || command.CalendarProvider == "none") {
+		return command.addTaskOnly(app, accounts)
+	}
+	result, err := discoverer.Discover(app.context, command.Address)
+	if err != nil {
+		return err
 	}
 	selectionProvider := mailProvider
 	if selectionProvider == "none" {
 		selectionProvider = command.CalendarProvider
+	}
+	if selectionProvider == "" || selectionProvider == "none" {
+		selectionProvider = command.TaskProvider
 	}
 	var endpointOverride string
 	switch domain.ProviderID(selectionProvider) {
@@ -320,6 +335,15 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		if endpointOverride == "" {
 			endpointOverride = "https://mail.google.com"
 		}
+	case domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus:
+		return errors.New("a task provider cannot select a mail or calendar discovery route")
 	default:
 		endpointOverride = command.Origin
 	}
@@ -342,14 +366,20 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
+	var tasks *application.AccountTaskRouteInput
+	if command.TaskProvider != "" && command.TaskProvider != "none" {
+		tasks = &application.AccountTaskRouteInput{
+			Provider: domain.ProviderID(command.TaskProvider),
+		}
+	}
 	account, err := accounts.Add(app.context, application.AccountAddInput{
 		Alias: alias, Address: result.Address, Mail: mail, Calendar: calendar,
-		Default: command.Default,
+		Tasks: tasks, Default: command.Default,
 	})
 	if err != nil {
 		return err
 	}
-	output := accountAddResult{Selected: selected, Account: account}
+	output := accountAddResult{Selected: &selected, Account: account}
 	if command.JSON {
 		return writeJSON(app.stdout, output)
 	}
@@ -362,6 +392,47 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		"Confidence", selected.Confidence,
 		"Authentication", selected.Authentication,
 		"Endpoint", sanitizeCell(endpoint, 2048),
+		view.success(),
+		view.strong("Account "+sanitizeCell(account.Alias, 64)+" added; authentication has not started"),
+		view.command("Next: corr auth login --account "+shellSingleQuote(account.Alias)),
+	)
+	return err
+}
+
+func (command *accountAddCommand) addTaskOnly(
+	app *runtime,
+	accounts *application.AccountService,
+) error {
+	alias := command.Alias
+	if alias == "" {
+		if command.Address == "" {
+			return errors.New("task-only account without an address requires --alias")
+		}
+		separator := strings.LastIndexByte(command.Address, '@')
+		if separator < 1 {
+			return errors.New("task-only account address must be a bare email address")
+		}
+		alias = command.Address[:separator]
+	}
+	provider := domain.ProviderID(command.TaskProvider)
+	account, err := accounts.Add(app.context, application.AccountAddInput{
+		Alias: alias, Address: command.Address,
+		Tasks:   &application.AccountTaskRouteInput{Provider: provider},
+		Default: command.Default,
+	})
+	if err != nil {
+		return err
+	}
+	output := accountAddResult{SelectedTaskProvider: provider, Account: account}
+	if command.JSON {
+		return writeJSON(app.stdout, output)
+	}
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err = view.printf(
+		"%s  %s\n\n  %-14s %s\n  %-14s %s\n\n%s  %s\n   %s\n",
+		view.info(), view.strong("Selected task route"),
+		"Provider", provider,
+		"Discovery", "not needed for an explicit task route",
 		view.success(),
 		view.strong("Account "+sanitizeCell(account.Alias, 64)+" added; authentication has not started"),
 		view.command("Next: corr auth login --account "+shellSingleQuote(account.Alias)),
@@ -559,6 +630,18 @@ func (command accountAddCommand) routes(
 			"provider %q is not available in this build",
 			selected.Provider,
 		)
+	case domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus:
+		return nil, nil, "", fmt.Errorf(
+			"task provider %q cannot supply a discovered mail or calendar route",
+			selected.Provider,
+		)
 	case domain.ProviderPOP3:
 		return nil, nil, "", fmt.Errorf(
 			"provider %q has no account route builder",
@@ -701,6 +784,14 @@ func (command accountAddCommand) finishRoutes(
 	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return nil, nil, "", fmt.Errorf(
 			"provider %q cannot supply a configured calendar route",
@@ -1014,17 +1105,20 @@ func candidateHTTPSEndpoint(
 }
 
 func accountRouteLabel(account application.AccountView) string {
-	mail, calendar := "–", "–"
+	mail, calendar, tasks := "–", "–", "–"
 	if account.Mail != nil {
 		mail = string(account.Mail.Provider)
 	}
 	if account.Calendar != nil {
 		calendar = string(account.Calendar.Provider)
 	}
-	if mail == calendar {
+	if account.Tasks != nil {
+		tasks = string(account.Tasks.Provider)
+	}
+	if mail == calendar && calendar == tasks {
 		return mail
 	}
-	return "mail:" + mail + " · cal:" + calendar
+	return "mail:" + mail + " · cal:" + calendar + " · tasks:" + tasks
 }
 
 func yesNo(value bool) string {

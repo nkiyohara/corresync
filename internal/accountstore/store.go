@@ -34,10 +34,18 @@ func (store Store) ListAccounts(context.Context) (application.AccountCatalog, er
 			ID: account.ID, Alias: alias, Address: account.Address,
 			Mail:      mailRouteView(account.Mail),
 			Calendar:  calendarRouteView(account.Calendar),
+			Tasks:     taskRouteView(account.Tasks),
 			IsDefault: alias == configuration.DefaultAccount,
 		})
 	}
 	return application.AccountCatalog{Accounts: accounts}, nil
+}
+
+func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
+	if route == nil {
+		return nil
+	}
+	return application.TaskRouteView(route.Provider)
 }
 
 // ListCredentialBindings returns private handle ownership for application
@@ -99,9 +107,13 @@ func (store Store) AddAccount(
 		if err != nil {
 			return err
 		}
+		tasks, err := taskRouteConfig(account.Tasks)
+		if err != nil {
+			return err
+		}
 		candidate := config.Account{
 			ID: account.ID, Address: account.Address,
-			Mail: mail, Calendar: calendar,
+			Mail: mail, Calendar: calendar, Tasks: tasks,
 		}
 		for _, requested := range accountCredentialReferences(candidate) {
 			for alias, existing := range configuration.Accounts {
@@ -124,6 +136,18 @@ func (store Store) AddAccount(
 		}
 		return nil
 	})
+}
+
+func taskRouteConfig(
+	route *application.AccountTaskRouteInput,
+) (*config.TaskRoute, error) {
+	if route == nil {
+		return nil, nil
+	}
+	if err := route.Provider.Validate(); err != nil {
+		return nil, err
+	}
+	return &config.TaskRoute{Provider: route.Provider}, nil
 }
 
 func accountCredentialReferences(account config.Account) []config.CredentialRef {
@@ -150,7 +174,11 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 				)
 			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
-			domain.ProviderCalDAV, domain.ProviderPOP3:
+			domain.ProviderCalDAV, domain.ProviderPOP3,
+			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+			domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+			domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+			domain.ProviderThings, domain.ProviderOmniFocus:
 		}
 	}
 	if account.Calendar != nil {
@@ -174,7 +202,11 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 				)
 			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
-			domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3:
+			domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3,
+			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+			domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+			domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+			domain.ProviderThings, domain.ProviderOmniFocus:
 		}
 	}
 	return references
@@ -244,6 +276,14 @@ func mailRouteView(route *config.MailRoute) *application.AccountRouteView {
 		return oauthRouteView(route.Provider, route.MicrosoftGraph)
 	case
 		domain.ProviderCalDAV,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return &application.AccountRouteView{
 			Provider: route.Provider,
@@ -293,6 +333,14 @@ func calendarRouteView(route *config.CalendarRoute) *application.AccountRouteVie
 	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return &application.AccountRouteView{
 			Provider: route.Provider,
@@ -475,6 +523,14 @@ func mailRouteConfig(
 		}, nil
 	case
 		domain.ProviderCalDAV,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return nil, fmt.Errorf("mail provider %q is not accepted by account add", route.Provider)
 	default:
@@ -540,6 +596,14 @@ func calendarRouteConfig(
 	case
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return nil, fmt.Errorf(
 			"calendar provider %q is not accepted by account add",

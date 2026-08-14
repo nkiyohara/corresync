@@ -56,6 +56,9 @@ func Load(path string) (Config, error) {
 	if version == 4 {
 		return MigrateV4(data)
 	}
+	if version == 5 {
+		return MigrateV5(data)
+	}
 	return Parse(data)
 }
 

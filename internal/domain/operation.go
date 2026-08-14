@@ -9,7 +9,12 @@ import (
 	"regexp"
 )
 
-const maximumPayloadBytes = 4 << 20
+const (
+	maximumPayloadBytes = 4 << 20
+	// A composite target may contain two independently bounded 4096-byte
+	// provider IDs plus a four-digit length and separator.
+	maximumTargetIDBytes = 2*4096 + 5
+)
 
 var operationNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*$`)
 
@@ -30,6 +35,8 @@ type TargetKind string
 const (
 	TargetMailbox    TargetKind = "mailbox"
 	TargetCalendar   TargetKind = "calendar"
+	TargetTaskList   TargetKind = "task_list"
+	TargetTask       TargetKind = "task"
 	TargetLocalQueue TargetKind = "local_queue"
 )
 
@@ -41,12 +48,15 @@ type TargetRef struct {
 
 // Validate rejects open-ended or ambiguous target references.
 func (target TargetRef) Validate() error {
+	maximum := 4096
 	switch target.Kind {
-	case TargetMailbox, TargetCalendar, TargetLocalQueue:
+	case TargetTask:
+		maximum = maximumTargetIDBytes
+	case TargetMailbox, TargetCalendar, TargetTaskList, TargetLocalQueue:
 	default:
 		return fmt.Errorf("invalid target kind %q", target.Kind)
 	}
-	return validateIdentifier("target ID", target.ID, 4096)
+	return validateIdentifier("target ID", target.ID, maximum)
 }
 
 // OperationView is the non-secret metadata safe to return in a preview.

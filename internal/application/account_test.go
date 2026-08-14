@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/domain"
@@ -68,6 +69,7 @@ func TestAccountServiceAcceptsEmptyOnboardingCatalog(t *testing.T) {
 		repository,
 		&accountPurgerStub{},
 		[]domain.ProviderID{domain.ProviderGoogleWeb},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +80,55 @@ func TestAccountServiceAcceptsEmptyOnboardingCatalog(t *testing.T) {
 	}
 	if len(catalog.Accounts) != 0 {
 		t.Fatalf("List() = %+v, want empty onboarding catalog", catalog)
+	}
+}
+
+func TestAccountServiceAddsTaskOnlyRouteWithoutAddress(t *testing.T) {
+	t.Parallel()
+	repository := &accountRepositoryStub{}
+	service, err := NewAccountService(
+		repository,
+		&accountPurgerStub{},
+		nil,
+		[]domain.ProviderID{domain.ProviderTodoist},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.newID = func() (domain.AccountID, error) {
+		return "acc_00000000000000000000000000000009", nil
+	}
+	account, err := service.Add(t.Context(), AccountAddInput{
+		Alias: "tasks", Tasks: &AccountTaskRouteInput{Provider: domain.ProviderTodoist},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if account.Address != "" || account.Mail != nil || account.Calendar != nil ||
+		account.Tasks == nil || account.Tasks.Provider != domain.ProviderTodoist ||
+		!account.Tasks.Available || repository.added.Tasks == nil {
+		t.Fatalf("task-only account = %+v registration=%+v", account, repository.added)
+	}
+}
+
+func TestAccountServiceDoesNotInferTaskAvailabilityFromSharedProviderID(t *testing.T) {
+	t.Parallel()
+	service, err := NewAccountService(
+		&accountRepositoryStub{},
+		&accountPurgerStub{},
+		[]domain.ProviderID{domain.ProviderMicrosoftGraph, domain.ProviderCalDAV},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, provider := range []domain.ProviderID{domain.ProviderMicrosoftGraph, domain.ProviderCalDAV} {
+		_, err := service.ReviewAdd(t.Context(), AccountAddInput{
+			Alias: "tasks", Tasks: &AccountTaskRouteInput{Provider: provider},
+		})
+		if err == nil || !strings.Contains(err.Error(), "task provider") {
+			t.Fatalf("ReviewAdd(%q) error = %v", provider, err)
+		}
 	}
 }
 
@@ -120,6 +171,7 @@ func TestAccountServiceLifecyclePreservesStableIdentity(t *testing.T) {
 		repository,
 		purger,
 		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -187,6 +239,7 @@ func TestAccountServiceFailsClosed(t *testing.T) {
 		repository,
 		purger,
 		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -231,6 +284,7 @@ func TestAccountServiceBindsGoogleMailUsernameToAccountAddress(t *testing.T) {
 		&accountRepositoryStub{},
 		&accountPurgerStub{},
 		[]domain.ProviderID{domain.ProviderGoogle},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -274,6 +328,7 @@ func TestAccountLifecycleReviewsNeverMutateRepositoryOrState(t *testing.T) {
 			domain.ProviderMicrosoftOWA,
 			domain.ProviderMicrosoftGraph,
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -328,6 +383,7 @@ func TestAccountServiceAddsMixedStandardsRoutesWithoutExposingLookupKeys(t *test
 		repository,
 		&accountPurgerStub{},
 		[]domain.ProviderID{domain.ProviderIMAPSMTP, domain.ProviderCalDAV},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -395,6 +451,7 @@ func TestAccountAddReviewDisclosesAndExclusivelyBindsCredentialHandle(t *testing
 		repository,
 		&accountPurgerStub{},
 		[]domain.ProviderID{domain.ProviderJMAP},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

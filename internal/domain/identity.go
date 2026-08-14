@@ -67,6 +67,14 @@ const (
 	ProviderIMAPSMTP       ProviderID = "imap-smtp"
 	ProviderCalDAV         ProviderID = "caldav"
 	ProviderPOP3           ProviderID = "pop3"
+	ProviderMicrosoftTasks ProviderID = "microsoft-web-tasks"
+	ProviderTodoist        ProviderID = "todoist"
+	ProviderGoogleTasks    ProviderID = "google-tasks"
+	ProviderAppleReminders ProviderID = "apple-reminders"
+	ProviderTickTick       ProviderID = "ticktick"
+	ProviderAnyDoMCP       ProviderID = "anydo-mcp"
+	ProviderThings         ProviderID = "things"
+	ProviderOmniFocus      ProviderID = "omnifocus"
 )
 
 var providerIDPattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)

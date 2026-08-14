@@ -4,6 +4,8 @@ The Google transport and provider ID are amended by
 [ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md).
 Google's generated Desktop client credential is further amended by
 [ADR 0022](0022-google-desktop-client-credential.md).
+Task routes and configuration schema v6 are added by
+[ADR 0028](0028-provider-neutral-task-domain.md).
 
 - Status: accepted
 - Date: 2026-07-28

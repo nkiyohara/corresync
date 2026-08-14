@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-08-11
+- Amended: 2026-08-14
 
 ## Context
 
@@ -10,7 +10,7 @@ The project shipped as a single-provider Outlook Web bridge. Its safety model
 is deliberately narrow: one browser-owned session, one typed use-case core, and
 a server-enforced preview/commit boundary shared by CLI and MCP.
 
-Users hold more than one mail and calendar account, and the reason this project
+Users hold more than one mail, calendar, and task account, and the reason this project
 exists generalizes beyond Microsoft. Organizations frequently permit the
 first-party web client while blocking third-party API applications;
 universities, hosted providers, and self-hosted deployments expose standards
@@ -25,10 +25,11 @@ an intended product as though it already existed.
 ## Decision
 
 Adopt a provider-neutral product scope. Corresync is a local-first CLI and MCP
-server for mail and calendar accounts that the signed-in human already
+server for mail, calendar, and task accounts that the signed-in human already
 controls, with multiple accounts and multiple providers as first-class
-concerns. The name and its migration are decided in
-[ADR 0011](0011-coordinated-corresync-rename.md).
+concerns. The provider-neutral task domain is decided in
+[ADR 0028](0028-provider-neutral-task-domain.md). The name and its migration are
+decided in [ADR 0011](0011-coordinated-corresync-rename.md).
 
 One safety model covers every provider. The invariants that apply to Outlook
 Web today apply unchanged to every adapter added later: dependencies point
@@ -104,3 +105,8 @@ synthetic fixtures are not a runtime capability. Remaining route evidence is
 deterministic-only until separately recorded in
 [compatibility.md](../compatibility.md). This evidence difference is not a
 capability fallback.
+
+The canonical task application, CLI, JSON, daemon, and MCP contracts are
+implemented under ADR 0028. No task provider adapter is activated by that
+foundation; each route remains unavailable until its provider issue supplies
+synthetic contracts and the required explicit authorization boundary.

@@ -1,19 +1,20 @@
 # Threat model
 
-Corresync handles private mail/calendar data and the authority to act as an
+Corresync handles private mail/calendar/task data and the authority to act as an
 interactively authenticated user. It is a local single-user tool, not a remote
 gateway or tenant administration service.
 
 ## Assets
 
 - browser sessions, OAuth grants, and credential-helper results;
-- messages, attachments, recipients, events, attendees, and meeting links;
-- authority to send mail, change mailbox state, or alter meetings;
+- messages, attachments, recipients, events, attendees, meeting links, task
+  lists, reminders, notes, recurrence, and linked sources;
+- authority to send mail, change mailbox state, alter meetings, or mutate tasks;
 - stable account identities, provider cursors, import staging, event queues,
   monitor configuration, and local notification/runner destinations;
 - configuration, content-free audit records, approval tokens, daemon
   credentials, and privacy-preserving error records;
-- release artifacts, checksums, SBOMs, and update provenance.
+- release artifacts, checksums, SBOMs, and update provenance;
 - website-checker input domains, fixed resolver responses, and the integrity of
   public compatibility classifications.
 
@@ -22,8 +23,8 @@ gateway or tenant administration service.
 - providers and identity systems are external services;
 - MCP hosts, models, plugins, scripts, notification viewers, and local runners
   are untrusted callers;
-- mail, calendar, import, and event-queue values are attacker-controlled data
-  and may contain prompt injection;
+- mail, calendar, task, import, and event-queue values are attacker-controlled
+  data and may contain prompt injection;
 - another local user or a process outside the selected user boundary is
   untrusted;
 - imported files can be malformed, oversized, symlinked, replaced, or crafted
@@ -34,13 +35,15 @@ gateway or tenant administration service.
   secret owners; Corresync may pass a reviewed handle but must not proxy their
   secret input;
 - CI logs, fixtures, feedback reports, and public issues must be safe to
-  publish.
+  publish;
 - Agent-host executables, applications, and configuration footprints are
   external local state. Detection may reveal a private installation path but
   cannot execute an agent or read its configuration or conversations.
 - GitHub Pages, Cloudflare Workers, and Cloudflare's public DNS resolver are
   external infrastructure for the optional domain-only website checker;
-  ordinary connection metadata is visible to those operators.
+  ordinary connection metadata is visible to those operators;
+- an explicitly selected upstream task MCP is an external provider boundary,
+  never an extension of Corresync's trusted local MCP server.
 
 ## Public compatibility-checker controls
 
@@ -188,6 +191,16 @@ gateway or tenant administration service.
   broadcast write.
 - Bound recipients, attendees, query/results, time windows, bodies,
   attachments, imports, queues, runner input, and feedback records.
+- Bind task cursors to one provider, account, list, and advertised mode. Treat
+  local notifications as invalidation only; refetch through bounded reads.
+- Treat linked task sources as untrusted provenance, never authorization to
+  follow a URL or copy, move, or mirror an object. Reject self-loops before any
+  future workflow preview.
+- For an explicit upstream remote MCP provider, allow only reviewed typed task
+  tools and schemas, bound every response and timeout, send no unrelated
+  Corresync content, and never retry a side-effecting call automatically.
+- Keep browser-owned and local OS automation sessions in their established
+  owner/helper boundary. Never accept arbitrary script source from a caller.
 
 ## Monitoring and runner controls
 
@@ -219,7 +232,8 @@ gateway or tenant administration service.
 - Audit only operation/effect, time, caller, account/provider provenance,
   bounded result class, and policy reason.
 - Exclude authorization, addresses, subjects, bodies, attachment names, event
-  text, queries, credential references, runner arguments, and approval values.
+  text, task titles, notes, reminders, links, queries, task cursors, credential
+  references, runner arguments, and approval values.
 - Keep only one bounded, owner-only generalized last-error record; replacement
   is atomic and symlink-safe.
 - Build feedback from an allowlist. Raw errors, arguments, paths, identifiers,
@@ -256,10 +270,13 @@ gateway or tenant administration service.
 - automatic provider fallback or tenant-wide/delegated authorization;
 - generic provider actions or arbitrary protocol payloads;
 - Teams chat, channels, calls, recordings, or meeting lifecycle management;
-- remote MCP, hosted relay, multi-user daemon, or ambient network listener;
+- remote Corresync MCP transport, hosted relay, multi-user daemon, or ambient
+  network listener; an explicit allowlisted upstream provider adapter does not
+  expose Corresync remotely;
 - raw crash upload, automatic issue submission without explicit local consent,
   or a telemetry/reporting relay;
-- executing instructions found in messages, events, imports, or attachments.
+- executing instructions found in messages, events, tasks, imports, or
+  attachments;
 - turning the optional public compatibility checker into an arbitrary DNS/HTTP
   proxy, provider probe, authentication surface, account service, or telemetry
   endpoint.

@@ -10,7 +10,7 @@ import (
 
 // ErrWriteOutcomeUnknown means a remote write may have committed before its
 // response became unavailable. Callers must inspect remote state before retry.
-var ErrWriteOutcomeUnknown = errors.New("mailbox write outcome is unknown; inspect remote state before retrying")
+var ErrWriteOutcomeUnknown = errors.New("remote write outcome is unknown; inspect provider state before retrying")
 
 // AuditPhase describes where an operation crossed the application boundary.
 type AuditPhase string

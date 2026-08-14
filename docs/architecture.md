@@ -1,6 +1,6 @@
 # Architecture
 
-Corresync is a local-first multi-account mail/calendar application with two
+Corresync is a local-first multi-account mail/calendar/task application with two
 public transports and one authenticated local session owner.
 
 ```text
@@ -20,7 +20,8 @@ public transports and one authenticated local session owner.
        ├── Microsoft Graph OAuth adapter
        ├── JMAP adapter
        ├── IMAP/SMTP adapter
-       └── CalDAV adapter
+       ├── CalDAV adapter
+       └── explicit task adapters (independently gated)
 ```
 
 There is no remote MCP transport, TCP daemon listener, hosted relay, or
@@ -80,8 +81,8 @@ only one named registration or managed package, builds typed preview-bound
 plans, applies official executable-plus-argv commands or exact file merges,
 and verifies each host independently. Document adapters, native package
 staging, and portable Skill copies sit outside the application core. Provider
-credentials, account state, mail, calendar data, and agent conversations never
-enter this layer.
+credentials, account state, mail, calendar, task data, and agent conversations
+never enter this layer.
 
 ## Account identity and routes
 
@@ -92,15 +93,17 @@ An account has:
 - one stable opaque account ID;
 - an optional mail route;
 - an optional calendar route;
+- an optional task route;
 - account-local monitoring consent.
 
 The stable ID keys browser profiles, OAuth/keyring ownership, import staging,
 provider cursors, monitor queue/dedup state, provenance, and policy. Rename does
 not move or merge that state.
 
-Mail and calendar routes are independent tagged unions. The config validator
-requires exactly one matching payload for each selected provider. There is no
-ambient provider detection at operation time and no automatic Graph fallback.
+Mail, calendar, and task routes are independent tagged unions. The config
+validator requires exactly one matching payload for each selected provider.
+There is no ambient provider detection at operation time and no automatic Graph
+fallback.
 
 ## Discovery and account lifecycle
 
@@ -138,7 +141,9 @@ The session owner creates all authenticated provider clients:
   network access until approval; normal-browser OAuth and OS-keyring grant
   after activation;
 - Graph: interactive OAuth browser plus grant in OS keyring;
-- JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference.
+- JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference;
+- task providers: only the explicit browser, OAuth, standards, local OS, or
+  upstream MCP owner defined by that route; none is activated by schema alone.
 
 No application transport accepts a password. Client-secret configuration,
 unattended grants, TLS interception, and raw authorization injection are
@@ -188,10 +193,10 @@ Single-account reads resolve one account ID and one provider service. Returned
 objects carry provider/account provenance. Bodies and attachment bytes require
 explicit APIs separate from metadata listing.
 
-Cross-account mail search and agenda are application-level projections. They
-fan out to isolated services, normalize results, merge them deterministically,
-apply global pagination/bounds, and preserve per-account failures. They never
-share a provider client or create a broadcast write.
+Cross-account mail search, agenda, and tasks are application-level projections.
+They fan out to isolated services, normalize results, merge them
+deterministically, apply global pagination/bounds, and preserve per-account
+failures. They never share a provider client or create a broadcast write.
 
 ## Preview and commit
 
@@ -225,8 +230,13 @@ as:
 - operation error when safety cannot be preserved.
 
 This keeps one typed core without pretending every provider has identical
-atomic preconditions, search language, calendar selection, or meeting-link
-support.
+atomic preconditions, search language, calendar/task-list selection,
+task time kinds, recurrence, sync modes, or meeting-link support.
+
+The task contract adds closed per-route capabilities and bounded degradations
+to each task/list result and write review. A task cursor is scoped to provider,
+account, list, and sync mode. Linked mail/calendar/task sources preserve
+provenance only and cannot authorize a cross-provider action.
 
 The composition root also supplies a closed `CalendarEffects` value for each
 calendar adapter. Creation, update, and cancellation reviews therefore state
@@ -296,7 +306,7 @@ prefilled GitHub page occur only after report output and explicit CLI choice.
 
 The independent automatic path is default-off and interactive-CLI-only. It
 constructs a smaller closed schema with no config, provider, account, raw error,
-argument value, path, credential, mail, or calendar field, claims one
+argument value, path, credential, mail, calendar, or task field, claims one
 content-free build/error attempt marker, and passes the final body to the
 user-authenticated external `gh issue create` process. Corresync never handles
 the GitHub credential. MCP can observe but cannot change this consent.
@@ -305,8 +315,9 @@ the GitHub credential. MCP can observe but cannot change this consent.
 
 Audit events are content-free and effect-oriented. They record caller, account
 ID, provider, operation class, decision, bounded result state, and policy
-reason—never bodies, subjects, recipients, attendees, addresses, queries,
-tokens, credential references, runner arguments, or approval values.
+reason—never bodies, subjects, recipients, attendees, addresses, task content,
+queries, cursors, tokens, credential references, runner arguments, or approval
+values.
 
 Monitoring adds content-free detection/filter/queue/destination/field/result/
 acknowledgement transitions.

@@ -62,6 +62,29 @@ func TestStoreLifecyclePreservesStableID(t *testing.T) {
 	}
 }
 
+func TestListAccountsExposesConfiguredTaskRouteAsUnavailable(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = config.Account{
+		ID:    "acc_00000000000000000000000000000009",
+		Tasks: &config.TaskRoute{Provider: domain.ProviderTodoist},
+	}
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := (Store{ConfigPath: path}).ListAccounts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Accounts) != 1 || catalog.Accounts[0].Tasks == nil ||
+		catalog.Accounts[0].Tasks.Provider != domain.ProviderTodoist ||
+		catalog.Accounts[0].Tasks.Available {
+		t.Fatalf("task account view = %+v", catalog)
+	}
+}
+
 func TestRemoveAccountPinsReplacementDefaultByStableID(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.toml")

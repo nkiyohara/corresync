@@ -151,9 +151,16 @@ type CalendarRoute struct {
 	MicrosoftGraph *OAuthRoute       `json:"microsoftGraph,omitempty" toml:"microsoft_graph,omitempty"`
 }
 
+// TaskRoute selects one account-scoped task adapter. Provider-specific,
+// secret-free connection settings are added by each adapter issue; the
+// canonical contract deliberately cannot carry an arbitrary action or secret.
+type TaskRoute struct {
+	Provider domain.ProviderID `json:"provider" toml:"provider"`
+}
+
 func (account Account) validate() error {
-	if account.Mail == nil && account.Calendar == nil {
-		return errors.New("at least one mail or calendar route is required")
+	if account.Mail == nil && account.Calendar == nil && account.Tasks == nil {
+		return errors.New("at least one mail, calendar, or task route is required")
 	}
 	if account.Mail != nil {
 		if err := account.Mail.validate(); err != nil {
@@ -163,6 +170,11 @@ func (account Account) validate() error {
 	if account.Calendar != nil {
 		if err := account.Calendar.validate(); err != nil {
 			return fmt.Errorf("calendar: %w", err)
+		}
+	}
+	if account.Tasks != nil {
+		if err := account.Tasks.validate(); err != nil {
+			return fmt.Errorf("tasks: %w", err)
 		}
 	}
 	googleMail := account.Mail != nil &&
@@ -191,6 +203,34 @@ func (account Account) validate() error {
 		}
 	}
 	return nil
+}
+
+func (route TaskRoute) validate() error {
+	if err := route.Provider.Validate(); err != nil {
+		return err
+	}
+	switch route.Provider {
+	case domain.ProviderMicrosoftGraph,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderCalDAV,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus:
+		return nil
+	case domain.ProviderMicrosoftOWA,
+		domain.ProviderGoogle,
+		domain.ProviderGoogleWeb,
+		domain.ProviderJMAP,
+		domain.ProviderIMAPSMTP,
+		domain.ProviderPOP3:
+		return fmt.Errorf("provider %q cannot supply a task route", route.Provider)
+	default:
+		return fmt.Errorf("provider %q cannot supply a task route", route.Provider)
+	}
 }
 
 func (route MailRoute) validate() error {
@@ -235,7 +275,11 @@ func (route MailRoute) validate() error {
 			return errors.New("microsoft-graph requires microsoft_graph settings")
 		}
 		return route.MicrosoftGraph.validateFor(domain.ProviderMicrosoftGraph)
-	case domain.ProviderCalDAV, domain.ProviderPOP3:
+	case domain.ProviderCalDAV, domain.ProviderPOP3,
+		domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+		domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+		domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+		domain.ProviderThings, domain.ProviderOmniFocus:
 		return fmt.Errorf("provider %q cannot supply a mail route", route.Provider)
 	default:
 		return fmt.Errorf("provider %q cannot supply a mail route", route.Provider)
@@ -279,7 +323,11 @@ func (route CalendarRoute) validate() error {
 			return errors.New("microsoft-graph requires microsoft_graph settings")
 		}
 		return route.MicrosoftGraph.validateFor(domain.ProviderMicrosoftGraph)
-	case domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3:
+	case domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderPOP3,
+		domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
+		domain.ProviderGoogleTasks, domain.ProviderAppleReminders,
+		domain.ProviderTickTick, domain.ProviderAnyDoMCP,
+		domain.ProviderThings, domain.ProviderOmniFocus:
 		return fmt.Errorf("provider %q cannot supply a calendar route", route.Provider)
 	default:
 		return fmt.Errorf("provider %q cannot supply a calendar route", route.Provider)
@@ -426,6 +474,14 @@ func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
 		domain.ProviderCalDAV,
+		domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist,
+		domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders,
+		domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP,
+		domain.ProviderThings,
+		domain.ProviderOmniFocus,
 		domain.ProviderPOP3:
 		return fmt.Errorf("provider %q has no OAuth API base policy", provider)
 	default:
@@ -564,13 +620,24 @@ func (account Account) CalendarProvider() domain.ProviderID {
 	return account.Calendar.Provider
 }
 
-// PrimaryProvider preserves compact status output by preferring the mail route.
-// Callers that route operations must use MailProvider or CalendarProvider.
+// TaskProvider returns the selected task adapter, if any.
+func (account Account) TaskProvider() domain.ProviderID {
+	if account.Tasks == nil {
+		return ""
+	}
+	return account.Tasks.Provider
+}
+
+// PrimaryProvider preserves compact status output by preferring mail, then
+// calendar, then tasks. Callers routing operations must use the typed accessor.
 func (account Account) PrimaryProvider() domain.ProviderID {
 	if provider := account.MailProvider(); provider != "" {
 		return provider
 	}
-	return account.CalendarProvider()
+	if provider := account.CalendarProvider(); provider != "" {
+		return provider
+	}
+	return account.TaskProvider()
 }
 
 // OutlookWeb returns the shared browser settings when every configured route

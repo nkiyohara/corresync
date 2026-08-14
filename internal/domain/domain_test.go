@@ -134,6 +134,23 @@ func TestTargetedOperationDigestBindsExactTarget(t *testing.T) {
 	}
 }
 
+func TestTaskTargetHasASeparateCompositeBound(t *testing.T) {
+	t.Parallel()
+
+	if err := (TargetRef{
+		Kind: TargetTask,
+		ID:   strings.Repeat("x", maximumTargetIDBytes),
+	}).Validate(); err != nil {
+		t.Fatalf("maximum task target rejected: %v", err)
+	}
+	if err := (TargetRef{
+		Kind: TargetMailbox,
+		ID:   strings.Repeat("x", 4097),
+	}).Validate(); err == nil {
+		t.Fatal("task composite bound leaked into mailbox targets")
+	}
+}
+
 func TestGeneratedAccountIDsAreOpaqueAndUnique(t *testing.T) {
 	t.Parallel()
 

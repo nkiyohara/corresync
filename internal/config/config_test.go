@@ -75,6 +75,46 @@ func TestDefaultRoundTripIsProviderNeutral(t *testing.T) {
 	}
 }
 
+func TestTaskOnlyAccountRoundTripsWithExplicitProviderSelection(t *testing.T) {
+	t.Parallel()
+
+	configuration := Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = Account{
+		ID:    "acc_00000000000000000000000000000009",
+		Tasks: &TaskRoute{Provider: domain.ProviderTodoist},
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := Save(path, configuration); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	account := loaded.Accounts["tasks"]
+	if account.Mail != nil || account.Calendar != nil ||
+		account.TaskProvider() != domain.ProviderTodoist ||
+		account.PrimaryProvider() != domain.ProviderTodoist {
+		t.Fatalf("task-only account = %+v", account)
+	}
+}
+
+func TestTaskRouteRejectsNonTaskAndUnknownProviders(t *testing.T) {
+	t.Parallel()
+
+	for _, provider := range []domain.ProviderID{domain.ProviderJMAP, "synthetic-unknown"} {
+		configuration := Default()
+		configuration.DefaultAccount = "tasks"
+		configuration.Accounts["tasks"] = Account{
+			ID: "acc_00000000000000000000000000000009", Tasks: &TaskRoute{Provider: provider},
+		}
+		if err := configuration.Validate(); err == nil {
+			t.Fatalf("task provider %q unexpectedly validated", provider)
+		}
+	}
+}
+
 func TestAutomaticInstallRequiresAutomaticChecks(t *testing.T) {
 	t.Parallel()
 
@@ -589,6 +629,82 @@ auto_install = true
 	}
 	if !bytes.Equal(raw, v4) {
 		t.Fatal("read-only Load modified the v4 source")
+	}
+}
+
+func TestLoadMigratesV5WithoutSelectingTaskRoute(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	v5 := []byte(`
+version = 5
+default_account = "work"
+
+[accounts.work]
+id = "acc_00000000000000000000000000000001"
+address = "reader@example.invalid"
+
+[accounts.work.mail]
+provider = "microsoft-owa"
+
+[accounts.work.mail.outlook_web]
+origin = "https://outlook.example.invalid"
+
+[policy]
+mode = "guarded"
+max_recipients = 20
+max_attendees = 50
+
+[browser]
+login_timeout = "5m"
+
+[updates]
+channel = "preview"
+
+[feedback]
+auto_submit = true
+`)
+	if err := os.WriteFile(path, v5, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configuration.Accounts["work"]
+	if configuration.Version != CurrentVersion || account.Tasks != nil ||
+		configuration.Updates.Channel != UpdateChannelPreview ||
+		!configuration.Feedback.AutoSubmit {
+		t.Fatalf("migrated v5 config = %+v", configuration)
+	}
+	raw, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(raw, v5) {
+		t.Fatal("read-only Load modified the v5 source")
+	}
+}
+
+func TestOlderConfigCannotDeclareTaskRoute(t *testing.T) {
+	t.Parallel()
+	for _, version := range []int{4, 5} {
+		path := filepath.Join(t.TempDir(), fmt.Sprintf("v%d.toml", version))
+		data := []byte(fmt.Sprintf(`
+version = %d
+default_account = "tasks"
+
+[accounts.tasks]
+id = "acc_00000000000000000000000000000009"
+
+[accounts.tasks.tasks]
+provider = "todoist"
+`, version))
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "strict mode") {
+			t.Fatalf("Load(v%d with task route) error = %v", version, err)
+		}
 	}
 }
 

@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/domain"
@@ -22,6 +23,27 @@ type projectionReaderStub struct {
 	calendars     map[domain.AccountID][]CalendarEvent
 	calendarError map[domain.AccountID]error
 	mailCalls     []MailSearchInput
+	tasks         map[domain.AccountID][]Task
+	taskErrors    map[domain.AccountID]error
+	taskCalls     []TaskReadInput
+}
+
+func (reader *projectionReaderStub) ListTasks(
+	_ context.Context,
+	input TaskReadInput,
+	_ domain.Caller,
+) (TaskPage, error) {
+	reader.taskCalls = append(reader.taskCalls, input)
+	if err := reader.taskErrors[input.Account]; err != nil {
+		return TaskPage{}, err
+	}
+	tasks := reader.tasks[input.Account]
+	start := min(input.Offset, len(tasks))
+	end := min(start+input.Limit, len(tasks))
+	return TaskPage{
+		Tasks: append([]Task(nil), tasks[start:end]...), Offset: input.Offset,
+		Limit: input.Limit, HasMore: end < len(tasks),
+	}, nil
 }
 
 func (reader *projectionReaderStub) ProjectionAccounts(
@@ -349,6 +371,104 @@ func TestProjectionInputsRejectAccountSpecificOrUnboundedReads(t *testing.T) {
 	}
 }
 
+func TestTaskProjectionKeepsAccountsIsolatedAndOrdersDueValues(t *testing.T) {
+	t.Parallel()
+
+	reader := &projectionReaderStub{
+		accounts: []ProjectionAccount{
+			projectionTaskAccount(projectionZeta, "zeta", domain.ProviderTodoist, true),
+			projectionTaskAccount(projectionOffline, "offline", domain.ProviderGoogleTasks, false),
+			projectionTaskAccount(projectionAlpha, "alpha", domain.ProviderMicrosoftGraph, true),
+		},
+		tasks: map[domain.AccountID][]Task{
+			projectionAlpha: {
+				projectionTask(projectionAlpha, domain.ProviderMicrosoftGraph, "alpha-1", "2026-08-14"),
+			},
+			projectionZeta: {
+				projectionTask(projectionZeta, domain.ProviderTodoist, "zeta-1", "2026-08-13"),
+				projectionTask(projectionZeta, domain.ProviderTodoist, "zeta-2", ""),
+			},
+		},
+	}
+	service, err := NewProjectionService(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.ListAllTasks(t.Context(), TaskProjectionInput{Limit: 2},
+		domain.Caller{Surface: "cli", Instance: "process-1"})
+	if err != nil {
+		t.Fatalf("ListAllTasks() error = %v", err)
+	}
+	if page.Complete || len(page.Failures) != 1 || page.Failures[0].Alias != "offline" ||
+		len(page.Tasks) != 2 || page.Tasks[0].Task.ID != "zeta-1" ||
+		page.Tasks[1].Task.ID != "alpha-1" || !page.HasMore || page.NextOffset != 2 {
+		t.Fatalf("task projection = %+v", page)
+	}
+	for _, call := range reader.taskCalls {
+		if call.Account == "" || call.ListID != "" || call.Offset != 0 || call.Limit != 3 {
+			t.Fatalf("unscoped projection call = %+v", call)
+		}
+	}
+
+	wrongService := page
+	wrongService.Accounts = append([]ProjectionAccountStatus(nil), page.Accounts...)
+	wrongService.Accounts[0].Service = projectionServiceMail
+	if err := wrongService.Validate(); err == nil {
+		t.Fatal("task projection accepted a mail account status")
+	}
+	duplicate := page
+	duplicate.Limit = 3
+	duplicate.NextOffset = 3
+	duplicate.Tasks = []ProjectedTask{page.Tasks[0], page.Tasks[0], page.Tasks[1]}
+	if err := duplicate.Validate(); err == nil {
+		t.Fatal("task projection accepted a duplicate task identity")
+	}
+}
+
+func TestTaskProjectionDoesNotCoerceDistinctTimeSemantics(t *testing.T) {
+	t.Parallel()
+
+	date := &TaskTemporal{Kind: TaskTemporalDate, Value: "2030-01-01"}
+	floating := &TaskTemporal{Kind: TaskTemporalFloating, Value: "2020-01-01T00:00:00"}
+	zoned := &TaskTemporal{Kind: TaskTemporalZoned, Value: "2010-01-01T00:00:00Z", TimeZone: "UTC"}
+	if compareTaskTemporal(date, floating) >= 0 || compareTaskTemporal(floating, zoned) >= 0 ||
+		compareTaskTemporal(zoned, nil) >= 0 {
+		t.Fatal("task time kinds were compared as interchangeable absolute instants")
+	}
+}
+
+func TestTaskProjectionRejectsAnOversizedAccountWorkset(t *testing.T) {
+	t.Parallel()
+
+	tasks := []Task{
+		projectionTask(projectionAlpha, domain.ProviderTodoist, "task-1", "2026-08-13"),
+		projectionTask(projectionAlpha, domain.ProviderTodoist, "task-2", "2026-08-14"),
+		projectionTask(projectionAlpha, domain.ProviderTodoist, "task-3", "2026-08-15"),
+	}
+	for index := range tasks {
+		tasks[index].Notes = strings.Repeat("x", MaxTaskNotesBytes)
+	}
+	reader := &projectionReaderStub{
+		accounts: []ProjectionAccount{
+			projectionTaskAccount(projectionAlpha, "alpha", domain.ProviderTodoist, true),
+		},
+		tasks: map[domain.AccountID][]Task{projectionAlpha: tasks},
+	}
+	service, err := NewProjectionService(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := service.ListAllTasks(t.Context(), TaskProjectionInput{Limit: 3},
+		domain.Caller{Surface: "cli", Instance: "process-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Complete || len(page.Tasks) != 0 || len(page.Failures) != 1 ||
+		page.Failures[0].Code != "invalid_result" {
+		t.Fatalf("oversized projection source = %+v", page)
+	}
+}
+
 func projectionAccount(
 	account domain.AccountID,
 	alias string,
@@ -372,6 +492,37 @@ func projectionAccount(
 		}
 	}
 	return result
+}
+
+func projectionTaskAccount(
+	account domain.AccountID,
+	alias string,
+	provider domain.ProviderID,
+	authenticated bool,
+) ProjectionAccount {
+	result := ProjectionAccount{
+		Account: account, Alias: alias, TaskProvider: provider, Authenticated: authenticated,
+	}
+	if authenticated {
+		result.Capabilities = &domain.Capabilities{Tasks: true}
+	}
+	return result
+}
+
+func projectionTask(
+	account domain.AccountID,
+	provider domain.ProviderID,
+	id, due string,
+) Task {
+	task := validTask(id)
+	if due != "" {
+		task.Due = &TaskTemporal{Kind: TaskTemporalDate, Value: due}
+	}
+	task.Capabilities = testTaskCapabilities()
+	task.Provenance = domain.Provenance{
+		AccountID: account, Provider: provider, TaskListID: task.ListID, SourceObjectID: id,
+	}
+	return task
 }
 
 func projectionMail(

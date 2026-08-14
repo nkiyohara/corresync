@@ -15,6 +15,7 @@ type SessionStatus struct {
 	Provider         domain.ProviderID    `json:"provider"`
 	MailProvider     domain.ProviderID    `json:"mailProvider,omitempty"`
 	CalendarProvider domain.ProviderID    `json:"calendarProvider,omitempty"`
+	TaskProvider     domain.ProviderID    `json:"taskProvider,omitempty"`
 	State            string               `json:"state"`
 	Authenticated    bool                 `json:"authenticated"`
 	CapturedAt       *time.Time           `json:"capturedAt,omitempty"`
