@@ -251,7 +251,9 @@ write has a separate prepare and commit tool; deletion is destructive. Cursors
 are bound to one provider/account/list/mode and are never write authority. The
 explicit Microsoft Graph route supports Microsoft To Do, and the explicit
 Todoist public-client route supports Todoist. Other configured task routes
-remain staged and fail without authentication or provider access. See
+remain staged and fail without authentication or provider access. Google Tasks
+has a complete synthetic adapter but is one of those unreachable routes while
+production Google OAuth approval is pending. See
 [tasks.md](tasks.md).
 
 `calendar_create.onlineMeeting` requests the selected account route's observed

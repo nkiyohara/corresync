@@ -98,10 +98,12 @@ gateway or tenant administration service.
   Google's fixed TLS token endpoint.
 - The Outlook Web route uses visible interactive sign-in. OAuth routes use
   Authorization Code with PKCE for an explicitly selected public client.
-- The staged Google route is release-gated before browser, OAuth, keyring,
-  session, and network access until production approval. After activation it
-  pins the Google API base and cannot represent a password, app password,
-  alternate host, or arbitrary Google API transport.
+- The staged Google mail, calendar, and task routes are release-gated before
+  browser, OAuth, keyring, session, and network access until production
+  approval. After activation each route pins its API base and cannot represent
+  a password, app password, alternate host, or arbitrary Google API transport.
+  Google Tasks uses an independent task-only scope set and authorization
+  handle.
 - Standards credentials remain behind an OS-keyring entry or an explicitly
   approved helper reference.
 - Guided OS-keyring enrollment invokes only the fixed platform credential tool

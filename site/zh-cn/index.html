@@ -6,7 +6,7 @@
     <title>Corresync — 用一个本地 MCP 管理所有邮箱和日历</title>
     <meta
       name="description"
-      content="面向 Outlook、Microsoft 365、JMAP、IMAP/SMTP 和 CalDAV 的本地优先 MCP 服务器与 CLI。Gmail 和 Google 日历将在 OAuth 获批后上线。"
+      content="连接 Outlook、Microsoft 365、JMAP、IMAP/SMTP、CalDAV 与任务的本地优先 MCP 服务器和 CLI。Gmail、Google 日历与 Google Tasks 即将上线。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -124,8 +124,8 @@
           </p>
           <p class="hero-providers">
             <strong>现已支持：</strong>Outlook Web · Microsoft Graph · JMAP · IMAP/SMTP ·
-            CalDAV。<strong>即将支持：</strong>Gmail 和 Google 日历，等待 Google OAuth
-            审批。每个账号的能力与管理员要求都会明确展示——<a
+            CalDAV。<strong>即将支持：</strong>Gmail、Google 日历和 Google Tasks，等待
+            Google OAuth 审批。每个账号的能力与管理员要求都会明确展示——<a
               href="providers.html"
             >比较连接方式</a>。
           </p>
@@ -213,9 +213,9 @@
           <p class="eyebrow"><span aria-hidden="true"></span>Google 支持状态</p>
           <h2 id="policy-callout-title">代码已经就绪，目前只等审批。</h2>
           <p>
-            Gmail 和 Google 日历代码已经包含在 RC 中，但生产环境 OAuth
-            仍然关闭：不会启动 Google 登录、读取钥匙串、申请 OAuth 权限范围
-            或发送 API
+            Gmail、Google 日历和 Google Tasks 代码已经包含在 RC 中，但生产环境
+            OAuth 仍然关闭：不会启动 Google 登录、读取钥匙串、申请 OAuth
+            权限范围 或发送 API
             请求。获批后也必须通过另一次独立审阅的发布才能启用。
           </p>
         </div>
@@ -452,7 +452,7 @@ corr auth login --account personal</code></pre>
         </div>
         <ul>
           <li>
-            <strong>Gmail 和 Google 日历仍在等待审批。</strong>代码在 RC
+            <strong>Gmail、Google 日历和 Google Tasks 仍在等待审批。</strong>代码在 RC
             中，但生产环境 OAuth 保持关闭。
           </li>
           <li>

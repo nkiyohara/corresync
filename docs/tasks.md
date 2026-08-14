@@ -4,9 +4,11 @@ Corresync models To Do items and reminders without pretending every provider
 has the same feature set. The canonical contract gives every adapter one target
 and one safety model. A configured task route is not by itself a capability
 claim. Microsoft To Do, Todoist, and CalDAV VTODO are implemented against
-synthetic contracts through explicit OAuth or external-credential routes. The
-other task routes remain unavailable until their dependent provider issues are
-implemented and tested.
+synthetic contracts through explicit OAuth or external-credential routes.
+Google Tasks is also implemented against synthetic contracts, but remains
+unreachable behind the production Google OAuth approval gate. The other task
+routes remain unavailable until their dependent provider issues are implemented
+and tested.
 
 A staged task route never disables an implemented mail or calendar route on the
 same account: those services may sign in while task status reports an explicit
@@ -103,7 +105,7 @@ deterministic adapter contracts but no commit-bound live observation.
 | `microsoft-web-tasks` | phased target; delete requires ambiguity evidence | observe | modern To Do fields limited | observe | bounded polling | [#109](https://github.com/nkiyohara/corresync/issues/109) |
 | `todoist` | synthetic; read-only or CRUD/state | relative/absolute reminders; exact provider recurrence; plan-sensitive | subtasks, labels, one assignee; sections/duration/comments degraded | date/floating/zoned schedule plus date-only deadline | bounded sync token; no webhook | [#110](https://github.com/nkiyohara/corresync/issues/110) |
 | `caldav` | synthetic with strong ETag | VTODO recurrence and alarms | RELATED-TO parents and categories; assignment unavailable | date, floating, and zoned datetime | RFC 6578 sync token with reset | [#111](https://github.com/nkiyohara/corresync/issues/111) |
-| `google-tasks` | target with ETag and assigned-task restrictions | recurrence/reminder limited | subtasks, ordering, source links target; labels limited | due is date-only; time loss must be reviewed | bounded `updatedMin` polling | [#112](https://github.com/nkiyohara/corresync/issues/112) |
+| `google-tasks` | synthetic behind disabled approval gate; strong ETag and assigned-task restrictions | unavailable | subtasks, ordering, output-only source links; no labels | due is date-only | bounded `updatedMin` polling with reset | [#112](https://github.com/nkiyohara/corresync/issues/112) |
 | `apple-reminders` | target after explicit full Reminders permission | recurrence and alarms target | URL target; hierarchy/labels observe | EventKit components require exact mapping | local notification then bounded refetch | [#113](https://github.com/nkiyohara/corresync/issues/113) |
 | `ticktick` | documented Open API target | observe and report absent fields | subtasks target; other client-only fields limited | observe | bounded polling | [#114](https://github.com/nkiyohara/corresync/issues/114) |
 | `anydo-mcp` | allowlisted negotiated tools only | observe from reviewed schema | personal/workspace/calendar/grocery distinctions required | observe | upstream MCP; no implicit retry | [#115](https://github.com/nkiyohara/corresync/issues/115) |
@@ -228,6 +230,46 @@ every collection exposes it; an invalid token causes one bounded initial sync
 with `reset=true`. Servers without capability properties remain read-only
 rather than being mistaken for writable. All evidence is synthetic and the
 route remains live-unobserved.
+
+## Google Tasks
+
+The `google-tasks` route is a distinct task-only Google authorization. A
+read-only route requests `openid`, `email`, and `tasks.readonly`; a writable
+route substitutes exactly `tasks`. It never reuses or widens a Gmail or Google
+Calendar grant. The API base and OpenID identity endpoint are pinned, and login
+requires a verified email matching the configured account before a bounded
+task-list probe can expose capabilities.
+
+The adapter discovers task lists and implements task list/get, create, update,
+complete, reopen, delete, subtasks, and ordering through the shared typed task
+ports. Empty provider titles receive an explicit lossy local placeholder.
+Google source, Gmail, Chat, Docs, and web-view links are bounded HTTPS output
+data; they grant no authority to fetch or mutate the linked object. Search,
+priority, start values, reminders, recurrence, labels, checklists, assignment
+replacement, attachment replacement, and source replacement are rejected
+instead of approximated.
+
+Google stores only the due date and discards time information. Corresync
+therefore advertises only canonical `date` due values and rejects floating or
+zoned values before provider access. Assigned-task source metadata is
+read-only. In particular, deletion is rejected because the provider operation
+may also delete the originating task; the user must unassign it in its source
+surface instead.
+
+Every update, state change, move, and delete first reads the exact task ETag and
+submits the matching `If-Match` condition. A post-write read failure is an
+unknown outcome and is never retried. Polling requests completed, hidden,
+assigned, and deleted items with a bounded `updatedMin` watermark. Cursors bind
+the watermark, page token, and scan start to the normal provider/account/list
+envelope; one expired-token response starts a bounded reset without reusing the
+invalid token.
+
+Configuration schema v8 can represent this secret-free independent route, but
+the release-owned Google gate is still false. RC account setup, OAuth profile
+selection, browser launch, keyring access, session activation, and API traffic
+all stop before Google access. Enabling the route requires production OAuth
+approval, opt-in live evidence, and a separate reviewed release. Synthetic
+coverage is not an availability claim.
 
 ## Reads, writes, and sync
 

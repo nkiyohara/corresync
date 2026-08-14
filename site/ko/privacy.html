@@ -166,11 +166,11 @@
               저장합니다.
             </p>
             <p>
-              Gmail과 Google 캘린더 코드는 RC에 들어 있지만 운영 환경 OAuth 승인
-              전에는 Google 경로 전체가 꺼져 있습니다. 계정 추가, 브라우저
-              OAuth, 동의, 키체인 접근, Google API 트래픽을 시작할 수 없습니다.
-              아래 설명은 향후 별도로 검토한 릴리스가 경로를 활성화한
-              경우에만 적용됩니다.
+              Gmail, Google 캘린더, Google Tasks 코드는 RC에 들어 있지만 운영 환경
+              OAuth 승인 전에는 Google 경로 전체가 꺼져 있습니다. 계정 추가,
+              브라우저 OAuth, 동의, 키체인 접근, Google API 트래픽을 시작할 수
+              없습니다. 아래 설명은 향후 별도로 검토한 릴리스가 경로를
+              활성화한 경우에만 적용됩니다.
             </p>
             <div
               class="legal-table-wrap"
@@ -212,14 +212,30 @@
                       요청.
                     </td>
                   </tr>
+                  <tr>
+                    <td>
+                      <code>https://www.googleapis.com/auth/tasks.readonly</code><br>
+                      또는 <code>https://www.googleapis.com/auth/tasks</code>
+                    </td>
+                    <td>
+                      할 일 목록 이름과 ID, 제목, 메모, 상태, 날짜형 마감일,
+                      완료 상태, 계층, 순서, 할당 정보와 출처 링크.
+                    </td>
+                    <td>
+                      읽기 전용 경로는 할 일을 조회합니다. 쓰기 경로는
+                      미리보기와 승인 후 생성, 수정, 완료, 다시 열기, 이동,
+                      삭제를 수행하며 할당된 할 일 제한을 쓰기 전에
+                      적용합니다.
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
             <p>
               Google 데이터는 사용자가 명시적으로 실행하거나 설정한 메일,
-              캘린더, 모니터링과 자동화 기능에만 사용합니다. 연락처, Drive,
-              비밀번호, 브라우저 Cookie, 광고 프로필 또는 비공개 Google API에는
-              접근하지 않습니다.
+              캘린더, 할 일, 모니터링과 자동화 기능에만 사용합니다. 연락처,
+              Drive, 비밀번호, 브라우저 Cookie, 광고 프로필 또는 비공개 Google
+              API에는 접근하지 않습니다.
             </p>
           </section>
           <section id="processing" aria-labelledby="processing-title">

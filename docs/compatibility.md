@@ -9,13 +9,14 @@ authorized live observations.
 <!-- markdownlint-disable MD013 -->
 | Boundary | Deterministic evidence | Recorded live evidence | v0.8 status |
 | --- | --- | --- | --- |
-| CLI, stable JSON, configuration schema v7 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
+| CLI, stable JSON, configuration schema v8 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
 | Public domain-only compatibility checker | Browser privacy/source checks; DNS, CORS, bounds, redirect, failure, and SSRF fixtures | Not run | Deterministic only; no provider authentication |
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
 | Outlook Web mail/calendar | Synthetic typed wire contracts | Historical Microsoft 365 notes, not commit-bound | Deterministic only; live-unobserved |
 | Legacy Google Web adapter | Synthetic semantic-DOM contracts retained; runtime sign-in disabled before browser launch | Live sign-in rejected by Google on 2026-07-29 | Unsupported |
 | Approval-gated Gmail and Google Calendar APIs/Google Meet field | Synthetic REST, OAuth-gate, and application integration contracts | Prior [IMAP/SMTP observation](evidence/google-macos-arm64-2026-07-30.md) does not cover the new route | Included but disabled; deterministic only; live-unobserved |
+| Approval-gated Google Tasks API | Synthetic REST, identity, independent-scope, OAuth-gate, ETag, assigned-task, polling/reset, and application integration contracts | Not run | Included but disabled; deterministic only; live-unobserved |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | Microsoft Graph To Do | Synthetic OAuth, national-cloud, REST CRUD/delta, recurrence/time-zone, cursor-restart, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
 | Todoist tasks | Synthetic public-client OAuth, refresh rotation, API v1 REST/Sync CRUD, plan, time, temporary-ID, cursor/isolation, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
@@ -62,6 +63,11 @@ evidence.
   keyring, browser, or API access. The route has synthetic contracts only and
   remains live-unobserved. The linked macOS observation covers the retired
   IMAP/SMTP transport and is historical context only.
+- `google-tasks`: task-list discovery, typed task CRUD/state, subtasks,
+  ordering, output-only source links, date-only due values, ETag conditions,
+  and deletion-aware polling are implemented behind the same approval gate.
+  The route uses an independent task-only grant, stops before OAuth while the
+  gate is closed, and has synthetic evidence only.
 - `microsoft-graph`: mail, selectable calendars, typed Teams-link creation, and
   Microsoft To Do are implemented with service-derived scopes and a BYO public
   OAuth client. Global, GCC High, and DoD use closed endpoint/authority pairs;
@@ -79,9 +85,9 @@ evidence.
   and an external credential reference. It has synthetic coverage only and
   remains live-unobserved.
 - task routes: the canonical application, CLI, JSON, IPC, MCP, cursor, and
-  preview/commit contracts are implemented. Microsoft To Do, Todoist, and
-  CalDAV VTODO have deterministic provider contracts and remain
-  live-unobserved. The other
+  preview/commit contracts are implemented. Microsoft To Do, Todoist, CalDAV
+  VTODO, and the disabled Google Tasks route have deterministic provider
+  contracts and remain live-unobserved. The other
   provider rows in the [Task contract](tasks.md) remain development targets,
   not provider evidence.
 

@@ -16,7 +16,7 @@ public transports and one authenticated local session owner.
                   ▼
        config-scoped session owner
        ├── Outlook Web browser adapter
-       ├── approval-gated Gmail + Google Calendar API adapters
+       ├── approval-gated Gmail + Google Calendar + Google Tasks API adapters
        ├── Microsoft Graph OAuth adapter
        ├── JMAP adapter
        ├── IMAP/SMTP adapter
@@ -137,9 +137,9 @@ handle, which cannot be rebound from another account.
 The session owner creates all authenticated provider clients:
 
 - Outlook Web: dedicated browser profile and in-memory captured session;
-- Google: staged Gmail/Calendar API route, release-gated before OAuth and
-  network access until approval; normal-browser OAuth and OS-keyring grant
-  after activation;
+- Google: staged Gmail/Calendar and independent Google Tasks API routes,
+  release-gated before OAuth and network access until approval; normal-browser
+  OAuth and OS-keyring grants after activation;
 - Graph: interactive OAuth browser plus grant in OS keyring;
 - JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference; CalDAV
   VEVENT and VTODO routes own separate consent and sessions;

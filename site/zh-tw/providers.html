@@ -6,7 +6,7 @@
     <title>支援的郵件、行事曆與待辦事項服務 — Corresync</title>
     <meta
       name="description"
-      content="比較 Outlook、Microsoft 365、Todoist、iCloud 郵件與行事曆、JMAP、IMAP/SMTP，以及 CalDAV 行事曆和 VTODO 待辦事項。Gmail 正等待 OAuth 審核。"
+      content="比較 Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP 與 CalDAV 支援。Gmail、Google 行事曆和 Google Tasks 即將推出。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -287,12 +287,13 @@
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google 路徑</p>
-          <h2 id="google-title">Gmail 和 Google 行事曆即將上線。</h2>
+          <h2 id="google-title">Gmail、Google 行事曆和 Google Tasks 即將推出。</h2>
           <p>
-            Gmail 與 Calendar API 整合已包含在 RC 並透過合成契約測試。Google
-            通過審核前，正式環境 OAuth 完全關閉，因此不會啟動登入、要求
-            OAuth 權限範圍、存取鑰匙圈或產生 API 流量。暫時可使用 Google 官方
-            Workspace MCP。
+            相關程式碼已包含在 RC 中，並通過合成契約測試。Google
+            通過審核前，正式環境 OAuth
+            完全關閉，因此不會啟動登入、要求權限、存取鑰匙圈或產生 API
+            流量。Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP 與 CalDAV
+            目前皆可使用。
           </p>
         </div>
         <div class="route-grid two">
@@ -314,6 +315,10 @@
               <div>
                 <dt>行事曆</dt>
                 <dd>選擇行事曆，並在支援時建立 Google Meet</dd>
+              </div>
+              <div>
+                <dt>待辦事項</dt>
+                <dd>僅日期的截止日、子待辦、排序、來源連結與安全輪詢</dd>
               </div>
               <div>
                 <dt>登入</dt>

@@ -5,6 +5,21 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Approval-gated Google Tasks
+
+- Add a bounded Google Tasks adapter for task-list discovery, task CRUD/state,
+  ETag-conditional writes, subtasks, ordering, output-only source links, and
+  deletion-aware `updatedMin` polling. Due values remain date-only and assigned
+  task restrictions fail closed.
+- Introduce an independent task-only Google OAuth profile with exactly
+  `tasks.readonly` or `tasks`, verified account identity, and secret-free
+  configuration schema v8. Migration from v7 preserves every route and cannot
+  manufacture or smuggle a Google Tasks grant.
+- Keep account setup, OAuth, keyring access, sessions, and provider traffic
+  unreachable behind the existing production-approval gate. The code ships as
+  deterministic, live-unobserved RC scaffolding and is not advertised as
+  available.
+
 ### CalDAV VTODO tasks
 
 - Add an independent CalDAV task route with VTODO-only collection discovery,

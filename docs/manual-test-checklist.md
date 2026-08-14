@@ -268,9 +268,11 @@ evidence marker until a commit-bound record is reviewed.
 The Outlook-Web-only `--terminal` relay is optional, requires a real TTY, and
 must reject piped input. Do not record entered or rendered identity values.
 
-Record Google observations only through the current explicit `google` route:
-system-browser OAuth and the pinned Gmail and Calendar APIs. Workspace
-policy may require administrator approval or disable one of those services.
+Record mail/calendar Google observations only through the current explicit
+`google` route: system-browser OAuth and the pinned Gmail and Calendar APIs.
+Google Tasks uses the separate `google-tasks` route and task-only grant; do not
+substitute one route's result for evidence of the other. Workspace policy may
+require administrator approval or disable one of those services.
 
 For a source-checkout Microsoft To Do observation, the build-tagged harness is
 an additional explicit read-only path. It requests `Tasks.Read`, uses the OS

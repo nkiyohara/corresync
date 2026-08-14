@@ -172,11 +172,11 @@
               endpoint credentials.
             </p>
             <p>
-              Gmail and Google Calendar code is included in RC releases, but the entire Google route
-              is disabled while the production OAuth application awaits approval. Account addition,
-              browser OAuth, consent, keyring access, and Google API traffic cannot start. The
-              practices below describe the route that a separate reviewed release may enable only
-              after approval.
+              Gmail, Google Calendar, and Google Tasks code is included in RC releases, but every
+              Google route is disabled while the production OAuth application awaits approval.
+              Account addition, browser OAuth, consent, keyring access, and Google API traffic
+              cannot start. The practices below describe the route that a separate reviewed release
+              may enable only after approval.
             </p>
             <div
               class="legal-table-wrap"
@@ -227,14 +227,30 @@
                       a Google Meet link as a property of an event when Google supports it.
                     </td>
                   </tr>
+                  <tr>
+                    <td>
+                      <code>https://www.googleapis.com/auth/tasks.readonly</code><br>
+                      or <code>https://www.googleapis.com/auth/tasks</code>
+                    </td>
+                    <td>
+                      Task-list names and identifiers; task titles, notes, status, date-only due
+                      values, completion, hierarchy, ordering, assignment metadata, and source
+                      links.
+                    </td>
+                    <td>
+                      The read-only route lists and reads tasks. The writable route can create,
+                      update, complete, reopen, move, and delete tasks after Corresync preview and
+                      approval. Assigned-task restrictions are enforced before a write.
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
             <p>
-              Corresync uses Google data only to provide the user-facing mail, calendar, monitoring,
-              and automation features that you explicitly invoke or configure. It does not access
-              Google Contacts, Drive, advertising profiles, passwords, browser cookies, or
-              undocumented Google APIs.
+              Corresync uses Google data only to provide the user-facing mail, calendar, task,
+              monitoring, and automation features that you explicitly invoke or configure. It does
+              not access Google Contacts, Drive, advertising profiles, passwords, browser cookies,
+              or undocumented Google APIs.
             </p>
           </section>
 
@@ -353,9 +369,9 @@
               The Google route is currently stopped before authentication or network access. After
               approval and a separate release-gate change, it will open Google’s authorization
               page in your system browser using OAuth 2.0 with PKCE and a loopback redirect, then
-              connect directly from your device to Google’s fixed Gmail and Calendar API endpoints
-              over TLS. The project does not receive your password, OAuth grant, email, attachment,
-              or calendar content.
+              connect directly from your device to Google’s fixed Gmail, Calendar, and Tasks API
+              endpoints over TLS. The project does not receive your password, OAuth grant, email,
+              attachment, or calendar content.
             </p>
             <p>
               Microsoft Graph uses the same local public-client OAuth pattern against Microsoft’s

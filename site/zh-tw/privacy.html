@@ -141,8 +141,8 @@
               的密碼或權杖由鑰匙圈或明確核准的認證資料輔助程式持有，設定只儲存外部引用。
             </p>
             <p>
-              Gmail 與 Google 行事曆程式碼已包含在 RC 中，但正式環境 OAuth
-              通過審核前整條 Google
+              Gmail、Google 行事曆和 Google Tasks 程式碼已包含在 RC
+              中，但正式環境 OAuth 通過審核前整條 Google
               路徑保持關閉。帳號新增、瀏覽器授權、權限請求、鑰匙圈讀取和
               Google API
               流量都無法啟動。以下說明只適用於將來經另一次獨立審閱後啟用的版本。
@@ -184,12 +184,25 @@
                       連結。
                     </td>
                   </tr>
+                  <tr>
+                    <td>
+                      <code>https://www.googleapis.com/auth/tasks.readonly</code><br>
+                      或 <code>https://www.googleapis.com/auth/tasks</code>
+                    </td>
+                    <td>
+                      待辦清單名稱與
+                      ID，以及待辦標題、備註、狀態、僅日期的截止日、完成狀態、階層、排序、指派資訊和來源連結。
+                    </td>
+                    <td>
+                      唯讀路徑只列出和讀取待辦事項。可寫入路徑會在預覽並核准後建立、更新、完成、重新開啟、移動或刪除待辦事項，並在寫入前套用已指派待辦的限制。
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
             <p>
               Google
-              資料只用於你明確呼叫或設定的郵件、行事曆、監控和自動化功能。Corresync
+              資料只用於你明確呼叫或設定的郵件、行事曆、待辦事項、監控和自動化功能。Corresync
               不存取聯絡人、雲端硬碟、密碼、瀏覽器
               Cookie、廣告建立使用者輪廓或非公開 API。
             </p>

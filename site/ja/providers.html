@@ -6,7 +6,7 @@
     <title>対応メール・カレンダー・タスクサービス — Corresync</title>
     <meta
       name="description"
-      content="Outlook、Microsoft 365、Todoist、iCloudメール・カレンダー、JMAP、IMAP/SMTP、CalDAVの予定とVTODOタスクを比較。GmailはOAuth承認待ちです。"
+      content="Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP、CalDAVの対応状況を比較。Gmail、Googleカレンダー、Google Tasksは近日対応です。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -165,8 +165,8 @@
       <section class="evidence-banner" aria-label="対応根拠の状態">
         <span class="status-dot" aria-hidden="true"></span><div>
           <strong>v0.8の根拠は、決定的かつ経路別です。</strong><p>
-            以下の利用可能・準備中の経路には、合成データを使ったプロバイダー契約テストとアプリテストがあります。新しいGmail
-            API経路は無効で実環境未観測です。
+            以下の利用可能・準備中の経路には、合成データを使ったプロバイダー契約テストとアプリテストがあります。準備中のGoogle
+            API経路は無効で、実環境では未観測です。
           </p>
         </div><a href="features.html#evidence">根拠の読み方<span aria-hidden="true">
             →</span></a>
@@ -301,11 +301,12 @@
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Googleの経路</p>
-          <h2 id="google-title">GmailとGoogleカレンダーは近日対応です。</h2>
+          <h2 id="google-title">
+            Gmail、Googleカレンダー、Google Tasksは近日対応です。
+          </h2>
           <p>
-            Gmail・Calendar
-            API連携はRCに含まれ、合成契約テストでも検証済みです。ただしGoogleの承認までは本番OAuthを無効にしているため、サインイン、スコープ要求、キーチェーン参照、API通信は始まりません。当面はGoogle公式Workspace
-            MCPを利用できます。
+            各連携のコードはRCに含まれ、合成契約テストでも検証済みです。ただしGoogleの承認までは本番OAuthを無効にしているため、サインイン、スコープ要求、キーチェーン参照、API通信は始まりません。Outlook、Microsoft
+            365、Todoist、iCloud、JMAP、IMAP/SMTP、CalDAVは現在利用できます。
           </p>
         </div>
         <div class="route-grid two">
@@ -327,6 +328,12 @@
               <div>
                 <dt>カレンダー</dt>
                 <dd>カレンダー選択と、対応時のGoogle Meet</dd>
+              </div>
+              <div>
+                <dt>タスク</dt>
+                <dd>
+                  日付だけの期限、サブタスク、並び順、参照リンク、安全な差分確認
+                </dd>
               </div>
               <div>
                 <dt>サインイン</dt>
