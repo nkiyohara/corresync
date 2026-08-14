@@ -45,6 +45,9 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 	if route == nil {
 		return nil
 	}
+	if route.Provider == domain.ProviderMicrosoftGraph && route.MicrosoftGraph != nil {
+		return oauthRouteView(route.Provider, &route.MicrosoftGraph.OAuth)
+	}
 	return application.TaskRouteView(route.Provider)
 }
 
@@ -147,7 +150,17 @@ func taskRouteConfig(
 	if err := route.Provider.Validate(); err != nil {
 		return nil, err
 	}
-	return &config.TaskRoute{Provider: route.Provider}, nil
+	result := &config.TaskRoute{Provider: route.Provider}
+	if route.MicrosoftGraph != nil {
+		oauth, err := oauthRouteConfig(&route.MicrosoftGraph.OAuth)
+		if err != nil {
+			return nil, err
+		}
+		result.MicrosoftGraph = &config.MicrosoftGraphTaskRoute{
+			OAuth: *oauth, ReadOnly: route.MicrosoftGraph.ReadOnly,
+		}
+	}
+	return result, nil
 }
 
 func accountCredentialReferences(account config.Account) []config.CredentialRef {
@@ -208,6 +221,12 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 			domain.ProviderTickTick, domain.ProviderAnyDoMCP,
 			domain.ProviderThings, domain.ProviderOmniFocus:
 		}
+	}
+	if account.Tasks != nil && account.Tasks.MicrosoftGraph != nil {
+		references = append(
+			references,
+			account.Tasks.MicrosoftGraph.OAuth.Authorization,
+		)
 	}
 	return references
 }
@@ -624,7 +643,8 @@ func oauthRouteConfig(
 		return nil, errors.New("OAuth route settings are missing")
 	}
 	return &config.OAuthRoute{
-		APIBase: route.APIBase, ClientID: route.ClientID,
+		APIBase: route.APIBase, MicrosoftCloud: route.MicrosoftCloud,
+		ClientID:    route.ClientID,
 		RedirectURI: route.RedirectURI,
 		Authorization: config.CredentialRef{
 			Backend: config.CredentialBackend(route.Authorization.Backend),
@@ -749,7 +769,7 @@ func (store Store) PurgeAccountState(
 }
 
 func accountOAuthAuthorizationKeys(account config.Account) []string {
-	keys := make([]string, 0, 2)
+	keys := make([]string, 0, 3)
 	if account.Mail != nil {
 		if account.Mail.Google != nil {
 			keys = append(keys, account.Mail.Google.Authorization.Key)
@@ -767,6 +787,9 @@ func accountOAuthAuthorizationKeys(account config.Account) []string {
 				keys = append(keys, route.Authorization.Key)
 			}
 		}
+	}
+	if account.Tasks != nil && account.Tasks.MicrosoftGraph != nil {
+		keys = append(keys, account.Tasks.MicrosoftGraph.OAuth.Authorization.Key)
 	}
 	slices.Sort(keys)
 	return slices.Compact(keys)

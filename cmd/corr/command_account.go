@@ -10,6 +10,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
@@ -43,6 +44,7 @@ type accountAddCommand struct {
 	MailProvider              string `help:"Explicit mail provider override; use none for calendar-only."`
 	CalendarProvider          string `help:"Explicit calendar provider override; use none for mail-only."`
 	TaskProvider              string `help:"Explicit task provider override; use none to omit tasks."`
+	MicrosoftCloud            string `default:"global" enum:"global,gcc-high,dod,china" help:"Microsoft Graph deployment shared by selected Microsoft services."`
 	Origin                    string `help:"Outlook Web HTTPS origin override."`
 	Mailbox                   string `help:"Optional routed or sender mailbox identity."`
 	SessionURL                string `help:"JMAP HTTPS session resource."`
@@ -56,6 +58,12 @@ type accountAddCommand struct {
 	CalendarOAuthRedirectURI  string `name:"calendar-oauth-redirect-uri" help:"Calendar loopback redirect; defaults to --oauth-redirect-uri."`
 	CalendarAuthorizationKey  string `name:"calendar-authorization-key" help:"Calendar OAuth grant key; defaults to --authorization-key."`
 	ApproveCalendarOAuth      bool   `name:"approve-calendar-oauth" help:"Confirm a distinct calendar OAuth authorization."`
+	TaskAPIBase               string `name:"task-api-base" help:"Microsoft To Do Graph API base; must match --microsoft-cloud."`
+	TaskOAuthClientID         string `name:"task-oauth-client-id" help:"Task BYO OAuth public-client ID; defaults to --oauth-client-id."`
+	TaskOAuthRedirectURI      string `name:"task-oauth-redirect-uri" help:"Task loopback redirect; defaults to --oauth-redirect-uri."`
+	TaskAuthorizationKey      string `name:"task-authorization-key" help:"Independent OS-keyring grant handle for tasks; defaults to --authorization-key."`
+	ApproveTaskOAuth          bool   `name:"approve-task-oauth" help:"Confirm the task OAuth grant and its task-only scope."`
+	TaskReadOnly              bool   `name:"task-read-only" help:"Request Tasks.Read instead of Tasks.ReadWrite."`
 	Username                  string `help:"Mail login identity; defaults to the address and must match it for Google."`
 	CredentialBackend         string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
 	CredentialKey             string `help:"External standards credential lookup key."`
@@ -281,9 +289,11 @@ func (command *accountAddCommand) Run(app *runtime) error {
 			return err
 		}
 	}
-	if mailProvider == "none" &&
+	if (mailProvider == "" || mailProvider == "none") &&
 		(command.CalendarProvider == "" || command.CalendarProvider == "none") {
-		return command.addTaskOnly(app, accounts)
+		if command.TaskProvider != "" && command.TaskProvider != "none" {
+			return command.addTaskOnly(app, accounts)
+		}
 	}
 	result, err := discoverer.Discover(app.context, command.Address)
 	if err != nil {
@@ -324,7 +334,13 @@ func (command *accountAddCommand) Run(app *runtime) error {
 			endpointOverride = command.CalendarAPIBase
 		}
 		if endpointOverride == "" {
-			endpointOverride = "https://graph.microsoft.com/v1.0"
+			profile, profileErr := microsoftcloud.Resolve(
+				microsoftcloud.ID(command.MicrosoftCloud),
+			)
+			if profileErr != nil {
+				return profileErr
+			}
+			endpointOverride = profile.APIBase
 		}
 	case "",
 		domain.ProviderMicrosoftOWA,
@@ -366,11 +382,9 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	var tasks *application.AccountTaskRouteInput
-	if command.TaskProvider != "" && command.TaskProvider != "none" {
-		tasks = &application.AccountTaskRouteInput{
-			Provider: domain.ProviderID(command.TaskProvider),
-		}
+	tasks, err := command.taskRoute()
+	if err != nil {
+		return err
 	}
 	account, err := accounts.Add(app.context, application.AccountAddInput{
 		Alias: alias, Address: result.Address, Mail: mail, Calendar: calendar,
@@ -415,9 +429,13 @@ func (command *accountAddCommand) addTaskOnly(
 		alias = command.Address[:separator]
 	}
 	provider := domain.ProviderID(command.TaskProvider)
+	tasks, err := command.taskRoute()
+	if err != nil {
+		return err
+	}
 	account, err := accounts.Add(app.context, application.AccountAddInput{
 		Alias: alias, Address: command.Address,
-		Tasks:   &application.AccountTaskRouteInput{Provider: provider},
+		Tasks:   tasks,
 		Default: command.Default,
 	})
 	if err != nil {
@@ -438,6 +456,56 @@ func (command *accountAddCommand) addTaskOnly(
 		view.command("Next: corr auth login --account "+shellSingleQuote(account.Alias)),
 	)
 	return err
+}
+
+func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput, error) {
+	if command.TaskProvider == "" || command.TaskProvider == "none" {
+		return nil, nil
+	}
+	provider := domain.ProviderID(command.TaskProvider)
+	result := &application.AccountTaskRouteInput{Provider: provider}
+	if provider != domain.ProviderMicrosoftGraph {
+		return result, nil
+	}
+	cloud, err := microsoftcloud.Resolve(microsoftcloud.ID(command.MicrosoftCloud))
+	if err != nil {
+		return nil, err
+	}
+	if !cloud.TasksAvailable {
+		return nil, errors.New("the Microsoft To Do API is unavailable in Microsoft Graph China operated by 21Vianet")
+	}
+	clientID := command.TaskOAuthClientID
+	if clientID == "" {
+		clientID = command.OAuthClientID
+	}
+	redirectURI := command.TaskOAuthRedirectURI
+	if redirectURI == "" {
+		redirectURI = command.OAuthRedirectURI
+	}
+	authorizationKey := command.TaskAuthorizationKey
+	if authorizationKey == "" {
+		authorizationKey = command.AuthorizationKey
+	}
+	if clientID == "" || redirectURI == "" || authorizationKey == "" || !command.ApproveTaskOAuth {
+		return nil, errors.New(
+			"microsoft-graph tasks require task OAuth flags or shared public-client defaults, plus --approve-task-oauth",
+		)
+	}
+	apiBase := command.TaskAPIBase
+	if apiBase == "" {
+		apiBase = cloud.APIBase
+	}
+	result.MicrosoftGraph = &application.AccountMicrosoftTaskInput{
+		ReadOnly: command.TaskReadOnly,
+		OAuth: application.AccountOAuthInput{
+			APIBase: apiBase, MicrosoftCloud: cloud.ID,
+			ClientID: clientID, RedirectURI: redirectURI,
+			Authorization: application.AccountCredentialInput{
+				Backend: "os-keyring", Key: authorizationKey, Consent: true,
+			},
+		},
+	}
+	return result, nil
 }
 
 func (command accountAddCommand) effectiveMailProvider() (string, error) {
@@ -659,13 +727,16 @@ func (command accountAddCommand) oauthRoute(
 	calendar bool,
 ) (*application.AccountOAuthInput, error) {
 	apiBase := command.APIBase
+	explicitAPIBase := apiBase != ""
 	clientID := command.OAuthClientID
 	redirectURI := command.OAuthRedirectURI
 	authorizationKey := command.AuthorizationKey
 	approved := command.ApproveOAuth
+	cloudID := microsoftcloud.ID("")
 	if calendar {
 		if command.CalendarAPIBase != "" {
 			apiBase = command.CalendarAPIBase
+			explicitAPIBase = true
 		}
 		if command.CalendarOAuthClientID != "" {
 			clientID = command.CalendarOAuthClientID
@@ -683,6 +754,17 @@ func (command accountAddCommand) oauthRoute(
 	if apiBase == "" {
 		apiBase = candidateHTTPSEndpoint(selected, "api")
 	}
+	if provider == domain.ProviderMicrosoftGraph {
+		profile, err := microsoftcloud.Resolve(microsoftcloud.ID(command.MicrosoftCloud))
+		if err != nil {
+			return nil, err
+		}
+		cloudID = profile.ID
+		if !explicitAPIBase &&
+			(apiBase == "" || apiBase == "https://graph.microsoft.com/v1.0") {
+			apiBase = profile.APIBase
+		}
+	}
 	if apiBase == "" {
 		apiBase = defaultBase
 	}
@@ -699,7 +781,7 @@ func (command accountAddCommand) oauthRoute(
 		return nil, fmt.Errorf("%s requires %s", provider, flags)
 	}
 	return &application.AccountOAuthInput{
-		APIBase: apiBase, ClientID: clientID,
+		APIBase: apiBase, MicrosoftCloud: cloudID, ClientID: clientID,
 		RedirectURI: redirectURI,
 		Authorization: application.AccountCredentialInput{
 			Backend: "os-keyring", Key: authorizationKey, Consent: true,

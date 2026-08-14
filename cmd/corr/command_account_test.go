@@ -13,6 +13,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/paths"
 	"github.com/nkiyohara/corresync/internal/rollout"
 )
@@ -623,6 +624,126 @@ func TestAccountAddPersistsExplicitGraphPublicClientWithoutAuthorizing(t *testin
 	}
 	if !strings.Contains(stdout.String(), "authentication has not started") {
 		t.Fatalf("account output = %q", stdout.String())
+	}
+}
+
+func TestAccountAddPersistsTaskOnlyGraphGrantWithoutDiscoveryOrAuthentication(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.test", Alias: "tasks",
+		TaskProvider:         string(domain.ProviderMicrosoftGraph),
+		MicrosoftCloud:       string(microsoftcloud.GCCHigh),
+		TaskOAuthClientID:    "synthetic-task-client",
+		TaskOAuthRedirectURI: "http://127.0.0.1:53684/oauth/callback",
+		TaskAuthorizationKey: "graph-tasks",
+		ApproveTaskOAuth:     true,
+		TaskReadOnly:         true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	if discoverer.address != "" {
+		t.Fatalf("task-only route started discovery for %q", discoverer.address)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := configuration.Accounts["tasks"].Tasks
+	if route == nil || route.Provider != domain.ProviderMicrosoftGraph ||
+		route.MicrosoftGraph == nil || !route.MicrosoftGraph.ReadOnly ||
+		route.MicrosoftGraph.OAuth.MicrosoftCloud != microsoftcloud.GCCHigh ||
+		route.MicrosoftGraph.OAuth.APIBase != "https://graph.microsoft.us/v1.0" ||
+		route.MicrosoftGraph.OAuth.Authorization.Key != command.TaskAuthorizationKey {
+		t.Fatalf("task-only Graph route = %#v", route)
+	}
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("task-only output = %q", stdout.String())
+	}
+}
+
+func TestAccountAddRejectsExplicitGraphAPIBaseFromAnotherCloud(t *testing.T) {
+	discoverer := &accountDiscovererStub{
+		observation: application.AccountDiscoveryObservation{
+			Candidates: []application.ProviderCandidate{{
+				Provider: domain.ProviderMicrosoftGraph, Confidence: 90,
+				Authentication:            application.DiscoveryExplicitOAuth,
+				RequiresExplicitSelection: true,
+				Evidence: []application.DiscoveryEvidence{{
+					Source: "test", Detail: "synthetic",
+				}},
+			}},
+		},
+	}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.test", Alias: "cross-cloud",
+		Provider:         string(domain.ProviderMicrosoftGraph),
+		MicrosoftCloud:   string(microsoftcloud.GCCHigh),
+		APIBase:          "https://graph.microsoft.com/v1.0",
+		OAuthClientID:    "synthetic-public-client",
+		OAuthRedirectURI: "http://127.0.0.1:53683/oauth/callback",
+		AuthorizationKey: "graph-reader",
+		ApproveOAuth:     true,
+	}
+	err := command.Run(app)
+	if err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("cross-cloud account add error = %v", err)
+	}
+	configuration, loadErr := config.Load(path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if _, exists := configuration.Accounts["cross-cloud"]; exists || stdout.Len() != 0 {
+		t.Fatalf("cross-cloud route changed state: %#v, %q", configuration, stdout.String())
+	}
+}
+
+func TestAccountAddRequiresIndependentTaskOAuthApproval(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Alias: "tasks", TaskProvider: string(domain.ProviderMicrosoftGraph),
+		OAuthClientID:    "synthetic-shared-client",
+		OAuthRedirectURI: "http://127.0.0.1:53685/oauth/callback",
+		AuthorizationKey: "graph-shared",
+		ApproveOAuth:     true,
+		ApproveTaskOAuth: false,
+	}
+	err := command.Run(app)
+	if err == nil || !strings.Contains(err.Error(), "--approve-task-oauth") {
+		t.Fatalf("account add error = %v", err)
+	}
+	configuration, loadErr := config.Load(path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if _, exists := configuration.Accounts["tasks"]; exists || stdout.Len() != 0 {
+		t.Fatalf("unapproved task route changed state: %#v, %q", configuration, stdout.String())
+	}
+}
+
+func TestAccountAddRejectsMicrosoftTodoInChinaCloud(t *testing.T) {
+	app, path, stdout := newAccountCommandRuntime(t, &accountDiscovererStub{})
+	command := accountAddCommand{
+		Alias: "tasks", TaskProvider: string(domain.ProviderMicrosoftGraph),
+		MicrosoftCloud:       string(microsoftcloud.China),
+		TaskOAuthClientID:    "synthetic-task-client",
+		TaskOAuthRedirectURI: "http://127.0.0.1:53686/oauth/callback",
+		TaskAuthorizationKey: "graph-tasks",
+		ApproveTaskOAuth:     true,
+	}
+	err := command.Run(app)
+	if err == nil || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatalf("account add error = %v", err)
+	}
+	configuration, loadErr := config.Load(path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if _, exists := configuration.Accounts["tasks"]; exists || stdout.Len() != 0 {
+		t.Fatalf("China task route changed state: %#v, %q", configuration, stdout.String())
 	}
 }
 

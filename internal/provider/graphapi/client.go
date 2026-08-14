@@ -1,5 +1,5 @@
 // Package graphapi adapts an explicitly authorized delegated Microsoft Graph
-// account to Corresync's closed mail and calendar application ports.
+// account to Corresync's closed mail, calendar, and task application ports.
 package graphapi
 
 import (
@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/mail"
 	"net/url"
@@ -20,28 +21,35 @@ import (
 // Options selects services sharing one explicit Microsoft Graph public-client
 // grant.
 type Options struct {
-	APIBase  string
-	Address  string
-	Mail     bool
-	Calendar bool
-	HTTP     *http.Client
+	APIBase   string
+	Address   string
+	Mail      bool
+	Calendar  bool
+	Tasks     bool
+	TaskWrite bool
+	HTTP      *http.Client
 }
 
 // Client owns one authorized account-scoped Graph transport.
 type Client struct {
-	api      *restapi.Client
-	apiBase  *url.URL
-	userID   string
-	address  string
-	mail     bool
-	calendar bool
+	api       *restapi.Client
+	apiBase   *url.URL
+	userID    string
+	address   string
+	mail      bool
+	calendar  bool
+	tasks     bool
+	taskWrite bool
 }
 
 // New confirms only the explicitly selected delegated services. OAuth itself
 // remains owned by oauthlocal and cannot be started by this adapter.
 func New(ctx context.Context, options Options) (*Client, error) {
-	if !options.Mail && !options.Calendar {
-		return nil, errors.New("graph route requires mail or calendar")
+	if !options.Mail && !options.Calendar && !options.Tasks {
+		return nil, errors.New("graph route requires mail, calendar, or tasks")
+	}
+	if options.TaskWrite && !options.Tasks {
+		return nil, errors.New("graph task writes require the task service")
 	}
 	if options.Address != "" {
 		parsed, err := mail.ParseAddress(options.Address)
@@ -64,6 +72,7 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	client := &Client{
 		api: api, apiBase: apiBase, address: options.Address,
 		mail: options.Mail, calendar: options.Calendar,
+		tasks: options.Tasks, taskWrite: options.TaskWrite,
 	}
 	var identity struct {
 		ID                string `json:"id"`
@@ -93,8 +102,10 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	if address == "" {
 		address = identity.UserPrincipalName
 	}
-	if address == "" ||
-		options.Address != "" && !strings.EqualFold(options.Address, address) {
+	addressMatches := options.Address == "" ||
+		identity.Mail != "" && strings.EqualFold(options.Address, identity.Mail) ||
+		identity.UserPrincipalName != "" && strings.EqualFold(options.Address, identity.UserPrincipalName)
+	if address == "" || !addressMatches {
 		_ = api.Close()
 		return nil, errors.New("graph grant identity does not match the configured account")
 	}
@@ -144,6 +155,31 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		if !validGraphID(calendar.ID) || !calendar.CanEdit {
 			_ = api.Close()
 			return nil, errors.New("graph primary calendar is not editable")
+		}
+	}
+	if options.Tasks {
+		var lists struct {
+			Value []struct {
+				ID string `json:"id"`
+			} `json:"value"`
+		}
+		if _, err := api.DoJSON(
+			ctx,
+			http.MethodGet,
+			"me/todo/lists",
+			url.Values{"$select": {"id"}, "$top": {"1"}},
+			nil,
+			&lists,
+			false,
+			nil,
+			http.StatusOK,
+		); err != nil {
+			_ = api.Close()
+			return nil, fmt.Errorf("confirm Microsoft To Do: %w", err)
+		}
+		if len(lists.Value) > 1 || len(lists.Value) == 1 && !validGraphID(lists.Value[0].ID) {
+			_ = api.Close()
+			return nil, errors.New("graph returned an invalid To Do task-list probe")
 		}
 	}
 	return client, nil
@@ -243,9 +279,23 @@ func decodeReference(value, prefix string, target any) error {
 	if err != nil || len(decoded) > 8192 {
 		return errors.New("identifier is malformed")
 	}
-	decoder := json.NewDecoder(bytes.NewReader(decoded))
+	return decodeStrictJSON(decoded, target)
+}
+
+func decodeStrictJSON(encoded []byte, target any) error {
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
 	decoder.DisallowUnknownFields()
-	return decoder.Decode(target)
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("JSON value has trailing data")
+		}
+		return err
+	}
+	return nil
 }
 
 func validGraphID(value string) bool {

@@ -27,6 +27,27 @@ const (
 // ErrPrecondition indicates a server-enforced version condition failed.
 var ErrPrecondition = errors.New("API write precondition failed")
 
+// StatusError is a bounded, content-free HTTP failure. Provider adapters may
+// branch on a documented status such as an expired delta token without
+// parsing an error string or exposing a response body.
+type StatusError struct {
+	Status int
+	Code   string
+}
+
+func (failure *StatusError) Error() string {
+	if failure.Code != "" {
+		return fmt.Sprintf("API returned HTTP %d (%s)", failure.Status, failure.Code)
+	}
+	return fmt.Sprintf("API returned HTTP %d", failure.Status)
+}
+
+// IsStatus reports whether err contains the selected HTTP response status.
+func IsStatus(err error, status int) bool {
+	var failure *StatusError
+	return errors.As(err, &failure) && failure.Status == status
+}
+
 // Client owns one API origin and an already authorized HTTP client.
 type Client struct {
 	base *url.URL
@@ -240,9 +261,9 @@ func apiStatusError(status int, body []byte) error {
 	}
 	if code != "" && len(code) <= 128 &&
 		!strings.ContainsAny(code, "\r\n\x00") {
-		return fmt.Errorf("API returned HTTP %d (%s)", status, code)
+		return &StatusError{Status: status, Code: code}
 	}
-	return fmt.Errorf("API returned HTTP %d", status)
+	return &StatusError{Status: status}
 }
 
 // Close releases idle account-scoped network connections.

@@ -215,8 +215,9 @@ Pass criteria:
 Add only a route approved for the test. Use synthetic aliases and follow
 [configuration.md](configuration.md). For standards routes, preload a
 dedicated OS-keyring/helper reference out of band. For Google/Graph, use an
-authorized public OAuth registration and approve the displayed scopes. Never
-place a secret in a flag or config.
+authorized public OAuth registration and approve the displayed scopes. A Graph
+task route must show `Tasks.Read` or `Tasks.ReadWrite`, the selected Microsoft
+cloud, and its fixed API base. Never place a secret in a flag or config.
 
 ```console
 corr account list
@@ -231,7 +232,7 @@ Daemon status is content-free and reports protocol/version/config digest.
 
 ## 6. Authenticate and run bounded doctor
 
-This is the first mailbox/calendar access:
+This is the first mailbox/calendar/task access:
 
 ```console
 corr auth login --account ALIAS
@@ -250,7 +251,7 @@ Pass criteria:
 - online doctor reuses the existing session, shows configured OAuth scopes,
   performs bounded checks, and never opens another login/consent flow;
 - no secret or provider response body reaches stdout/logs;
-- no mailbox/calendar write occurs;
+- no provider write occurs;
 - unavailable behavior appears as a degradation, not a silent provider
   fallback.
 
@@ -271,6 +272,24 @@ Record Google observations only through the current explicit `google` route:
 system-browser OAuth and the pinned Gmail and Calendar APIs. Workspace
 policy may require administrator approval or disable one of those services.
 
+For a source-checkout Microsoft To Do observation, the build-tagged harness is
+an additional explicit read-only path. It requests `Tasks.Read`, uses the OS
+keyring, bounds list/task reads, and never logs task content:
+
+```console
+CORRESYNC_LIVE_CONFIRM=microsoft-todo-read-only \
+CORRESYNC_LIVE_MICROSOFT_ADDRESS=reader@example.invalid \
+CORRESYNC_LIVE_MICROSOFT_CLIENT_ID=registered-public-client \
+CORRESYNC_LIVE_MICROSOFT_REDIRECT_URI=http://127.0.0.1:0/callback \
+CORRESYNC_LIVE_MICROSOFT_AUTHORIZATION_KEY=live-task-test \
+mise exec -- go test -tags live ./internal/provider/graphapi \
+  -run '^TestLiveMicrosoftTodoReadOnly$'
+```
+
+Set `CORRESYNC_LIVE_MICROSOFT_CLOUD` to `gcc-high` or `dod` when required;
+omission means `global`. Do not add this command to CI or copy its environment,
+terminal output, account data, list names, task fields, or cursors into evidence.
+
 ## 7. Read-only CLI
 
 Keep output on the test machine:
@@ -284,6 +303,9 @@ corr calendar list --account ALIAS \
   --start 2026-07-28T09:00:00Z \
   --end 2026-07-28T10:00:00Z \
   --json
+corr tasks lists --account ALIAS --json
+corr tasks list --account ALIAS --list-id OPAQUE_LIST_ID --limit 5 --json
+corr tasks sync --account ALIAS --list-id OPAQUE_LIST_ID --json
 ```
 
 Optionally test one explicit body and bounded attachment without copying IDs
@@ -437,6 +459,8 @@ Test in increasing consequence:
 - `corr mail move` then reconcile both folders;
 - `corr mail send` to a recipient controlled by the tester;
 - `corr calendar create`, update with the refreshed version, then cancel.
+- `corr tasks create`, update, complete/reopen, then delete a disposable
+  synthetic task with each refreshed version.
 
 Do not add attendees in the first calendar test. A Teams or Google Meet link
 test is permitted only when the selected calendar reports capability and the

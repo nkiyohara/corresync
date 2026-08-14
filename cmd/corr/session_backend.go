@@ -22,6 +22,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/dispatch"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/eventqueue"
+	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
 	"github.com/nkiyohara/corresync/internal/paths"
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
@@ -2168,6 +2169,10 @@ func inactiveTaskRoute(configured config.Account) (*domain.Degradation, error) {
 	if configured.Tasks == nil {
 		return nil, nil
 	}
+	if configured.Tasks.Provider == domain.ProviderMicrosoftGraph &&
+		configured.Tasks.MicrosoftGraph != nil {
+		return nil, nil
+	}
 	if configured.Mail == nil && configured.Calendar == nil {
 		return nil, fmt.Errorf(
 			"configured task provider %q is not available in this build",
@@ -2556,8 +2561,7 @@ func (backend *sessionBackend) googleAccount(
 	calendarEnabled := calendarRoute != nil
 	provider, err := oauthlocal.ProviderFor(
 		domain.ProviderGoogle,
-		mailEnabled,
-		calendarEnabled,
+		oauthlocal.Services{Mail: mailEnabled, Calendar: calendarEnabled},
 	)
 	if err != nil {
 		return sessionAccount{}, err
@@ -2688,12 +2692,15 @@ func (backend *sessionBackend) graphAPIAccount(
 	ctx context.Context,
 	configured config.Account,
 	route config.OAuthRoute,
-	mailEnabled, calendarEnabled bool,
+	mailEnabled, calendarEnabled, tasksEnabled, taskWrite bool,
 ) (sessionAccount, error) {
 	provider, err := oauthlocal.ProviderFor(
 		domain.ProviderMicrosoftGraph,
-		mailEnabled,
-		calendarEnabled,
+		oauthlocal.Services{
+			Mail: mailEnabled, Calendar: calendarEnabled,
+			Tasks: tasksEnabled, TaskWrite: taskWrite,
+			MicrosoftCloud: route.MicrosoftCloud,
+		},
 	)
 	if err != nil {
 		return sessionAccount{}, err
@@ -2720,6 +2727,7 @@ func (backend *sessionBackend) graphAPIAccount(
 		APIBase: route.APIBase,
 		Address: configured.Address,
 		Mail:    mailEnabled, Calendar: calendarEnabled,
+		Tasks: tasksEnabled, TaskWrite: taskWrite,
 		HTTP: authorizedHTTP,
 	})
 	if err != nil {
@@ -2729,7 +2737,7 @@ func (backend *sessionBackend) graphAPIAccount(
 		closers:  []sessionCloser{client},
 		captured: time.Now().UTC(),
 		capabilities: domain.Capabilities{
-			Mail: mailEnabled, Calendar: calendarEnabled,
+			Mail: mailEnabled, Calendar: calendarEnabled, Tasks: tasksEnabled,
 			Folders:          mailEnabled,
 			AttachmentReads:  mailEnabled,
 			AttachmentWrites: mailEnabled,
@@ -2769,6 +2777,9 @@ func (backend *sessionBackend) graphAPIAccount(
 	if calendarEnabled {
 		result.capabilities.OnlineMeeting = "teams"
 	}
+	if tasksEnabled {
+		result.capabilities.IncrementalSync = true
+	}
 	if mailEnabled {
 		result.mail, err = application.NewMailService(
 			backend.guard,
@@ -2807,7 +2818,97 @@ func (backend *sessionBackend) graphAPIAccount(
 			return sessionAccount{}, errors.Join(err, client.Close())
 		}
 	}
+	if tasksEnabled {
+		taskDegradations := []domain.Degradation{
+			{
+				Feature: "tasks.linked_sources",
+				Reason:  "only typed Corresync linked resources are projected; unrelated provider links remain untouched",
+			},
+			{
+				Feature: "tasks.search",
+				Reason:  "Microsoft Graph To Do does not expose task search",
+			},
+		}
+		if taskWrite {
+			taskDegradations = append(taskDegradations,
+				domain.Degradation{
+					Feature: "tasks.concurrency",
+					Reason:  "To Do does not document an atomic If-Match contract; Corresync revalidates the exact ETag immediately before each core task write",
+				},
+				domain.Degradation{
+					Feature: "tasks.write_assembly",
+					Reason:  "checklist and linked-resource replacement uses bounded follow-up requests and reports partial outcomes as unknown",
+				},
+			)
+		}
+		result.tasks, err = application.NewTaskService(
+			backend.guard,
+			client,
+			application.TaskOptions{
+				Capabilities: client.TaskCapabilities(),
+				Degradations: taskDegradations,
+				Provenance: domain.Provenance{
+					AccountID: configured.ID,
+					Provider:  domain.ProviderMicrosoftGraph,
+				},
+			},
+		)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, client.Close())
+		}
+	}
 	return result, nil
+}
+
+type graphServiceSelection struct {
+	route                 config.OAuthRoute
+	mail, calendar, tasks bool
+	taskWrite             bool
+}
+
+func configuredGraphServices(account config.Account) ([]graphServiceSelection, error) {
+	selections := make([]graphServiceSelection, 0, 3)
+	add := func(route *config.OAuthRoute, mail, calendar, tasks, taskWrite bool) {
+		if route == nil {
+			return
+		}
+		for index := range selections {
+			selection := &selections[index]
+			if oauthRoutesEqual(selection.route, *route) {
+				selection.mail = selection.mail || mail
+				selection.calendar = selection.calendar || calendar
+				selection.tasks = selection.tasks || tasks
+				selection.taskWrite = selection.taskWrite || taskWrite
+				return
+			}
+		}
+		selections = append(selections, graphServiceSelection{
+			route: *route, mail: mail, calendar: calendar,
+			tasks: tasks, taskWrite: taskWrite,
+		})
+	}
+	if account.Mail != nil && account.Mail.Provider == domain.ProviderMicrosoftGraph {
+		if account.Mail.MicrosoftGraph == nil {
+			return nil, errors.New("microsoft Graph mail route settings are missing")
+		}
+		add(account.Mail.MicrosoftGraph, true, false, false, false)
+	}
+	if account.Calendar != nil && account.Calendar.Provider == domain.ProviderMicrosoftGraph {
+		if account.Calendar.MicrosoftGraph == nil {
+			return nil, errors.New("microsoft Graph calendar route settings are missing")
+		}
+		add(account.Calendar.MicrosoftGraph, false, true, false, false)
+	}
+	if account.Tasks != nil && account.Tasks.Provider == domain.ProviderMicrosoftGraph {
+		if account.Tasks.MicrosoftGraph == nil {
+			return nil, errors.New("the Microsoft To Do route settings are missing")
+		}
+		add(
+			&account.Tasks.MicrosoftGraph.OAuth,
+			false, false, true, !account.Tasks.MicrosoftGraph.ReadOnly,
+		)
+	}
+	return selections, nil
 }
 
 func (backend *sessionBackend) nonOutlookAccount(
@@ -2873,23 +2974,19 @@ func (backend *sessionBackend) nonOutlookAccount(
 			}
 		}
 	}
-	sharedGraph := configured.Mail != nil &&
-		configured.Mail.Provider == domain.ProviderMicrosoftGraph &&
-		configured.Mail.MicrosoftGraph != nil &&
-		configured.Calendar != nil &&
-		configured.Calendar.Provider == domain.ProviderMicrosoftGraph &&
-		configured.Calendar.MicrosoftGraph != nil &&
-		oauthRoutesEqual(
-			*configured.Mail.MicrosoftGraph,
-			*configured.Calendar.MicrosoftGraph,
-		)
-	if sharedGraph {
+	graphServices, err := configuredGraphServices(configured)
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
+	}
+	for _, selected := range graphServices {
 		graph, err := backend.graphAPIAccount(
 			ctx,
 			configured,
-			*configured.Mail.MicrosoftGraph,
-			true,
-			true,
+			selected.route,
+			selected.mail,
+			selected.calendar,
+			selected.tasks,
+			selected.taskWrite,
 		)
 		if err != nil {
 			return sessionAccount{}, errors.Join(
@@ -2915,14 +3012,6 @@ func (backend *sessionBackend) nonOutlookAccount(
 		case domain.ProviderMicrosoftGraph:
 			if configured.Mail.MicrosoftGraph == nil {
 				err = errors.New("microsoft Graph mail route settings are missing")
-			} else if !sharedGraph {
-				mail, err = backend.graphAPIAccount(
-					ctx,
-					configured,
-					*configured.Mail.MicrosoftGraph,
-					true,
-					false,
-				)
 			}
 		case domain.ProviderCalDAV,
 			domain.ProviderMicrosoftTasks,
@@ -2960,14 +3049,6 @@ func (backend *sessionBackend) nonOutlookAccount(
 		case domain.ProviderMicrosoftGraph:
 			if configured.Calendar.MicrosoftGraph == nil {
 				err = errors.New("microsoft Graph calendar route settings are missing")
-			} else if !sharedGraph {
-				calendar, err = backend.graphAPIAccount(
-					ctx,
-					configured,
-					*configured.Calendar.MicrosoftGraph,
-					false,
-					true,
-				)
 			}
 		case domain.ProviderJMAP,
 			domain.ProviderIMAPSMTP,
@@ -3000,6 +3081,7 @@ func (backend *sessionBackend) nonOutlookAccount(
 
 func oauthRoutesEqual(left, right config.OAuthRoute) bool {
 	return left.APIBase == right.APIBase &&
+		microsoftcloud.Equivalent(left.MicrosoftCloud, right.MicrosoftCloud) &&
 		oauthClientsEqual(left.Client(), right.Client())
 }
 

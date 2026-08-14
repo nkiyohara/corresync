@@ -169,7 +169,8 @@ Supported route payloads are:
 | calendar | `google` | `calendar.google` |
 | calendar | `microsoft-graph` | `calendar.microsoft_graph` |
 | calendar | `caldav` | `calendar.caldav` |
-| tasks | `microsoft-web-tasks`, `microsoft-graph`, `todoist`, `caldav`, `google-tasks`, `apple-reminders`, `ticktick`, `anydo-mcp`, `things`, `omnifocus` | provider only in the v6 foundation |
+| tasks | `microsoft-graph` | `tasks.microsoft_graph` and `tasks.microsoft_graph.oauth` |
+| tasks | `microsoft-web-tasks`, `todoist`, `caldav`, `google-tasks`, `apple-reminders`, `ticktick`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
 <!-- markdownlint-enable MD013 -->
 
 The payload must match the provider exactly. The staged Google mail-and-calendar
@@ -180,19 +181,64 @@ valid configuration but cannot activate before approval.
 Graph mail and calendar may share one identical API route. An independent
 IMAP/SMTP mail route can be paired with a CalDAV calendar route.
 
-The v6 task route is a closed, secret-free provider selection:
+The v6 task route remains closed and secret-free. An implemented Microsoft To
+Do task-only route looks like:
 
 ```toml
+[accounts.tasks]
+id = "acc_0123456789abcdef0123456789abcdef"
+address = "reader@example.invalid"
+
 [accounts.tasks.tasks]
-provider = "todoist"
+provider = "microsoft-graph"
+
+[accounts.tasks.tasks.microsoft_graph]
+read_only = true
+
+[accounts.tasks.tasks.microsoft_graph.oauth]
+api_base = "https://graph.microsoft.us/v1.0"
+microsoft_cloud = "gcc-high"
+client_id = "synthetic-public-client"
+redirect_uri = "http://127.0.0.1:0/callback"
+
+[accounts.tasks.tasks.microsoft_graph.oauth.authorization]
+backend = "os-keyring"
+key = "tasks-graph"
+consent = true
 ```
 
-This foundation does not activate a task provider. Account views report the
-route unavailable. A task-only route fails before authentication or provider
-access; when mail or calendar is also configured, those implemented routes can
-still sign in while tasks remain an explicit degradation. Provider-specific
-task settings will be added as closed schema fields by those issues; there is
-no arbitrary options map or credential value. See the [task contract](tasks.md).
+`address` is required for a Microsoft Graph task route and is checked against
+the delegated `/me` identity on every login. Setup still performs no provider
+discovery. `read_only = true` selects `Tasks.Read`; omission selects
+`Tasks.ReadWrite`.
+`microsoft_cloud` is `global`, `gcc-high`, or `dod`, and the exact API base must
+match that choice. `china` is a recognized deployment but To Do configuration
+is rejected because the API is unavailable there. The authority is derived
+from this closed pair and is not configurable. Other task providers remain
+unavailable and have no arbitrary options map or credential value. See the
+[task contract](tasks.md).
+
+Prefer the lifecycle command over hand editing:
+
+```console
+corr account add reader@example.invalid \
+  --alias tasks \
+  --task-provider microsoft-graph \
+  --microsoft-cloud gcc-high \
+  --task-oauth-client-id synthetic-public-client \
+  --task-oauth-redirect-uri http://127.0.0.1:0/callback \
+  --task-authorization-key tasks-graph \
+  --approve-task-oauth \
+  --task-read-only
+```
+
+Task OAuth flags may use the shared `--oauth-*` public-client values, but the
+separate `--approve-task-oauth` flag is always required. Reusing an exact Graph
+grant within one account combines only the explicitly selected services; a
+stored grant missing the newly reviewed scope is replaced through fresh
+interactive authorization. The legacy omitted cloud value and `global` mean
+the same deployment. One authorization handle cannot be reused for a different
+provider, public client, redirect, or Microsoft cloud.
 
 Use `corr account add` for these combinations; it validates endpoint
 discovery, explicit provider selection, required consent bits, and route
@@ -228,8 +274,8 @@ consent = true
 
 An account-add review shows the exact backend/key handles before approval.
 Corresync rejects a new account that attempts to reuse a handle already owned
-by another configured account; mail and calendar routes belonging to the same
-account may intentionally share one handle. Existing external credential
+by another configured account; mail, calendar, and task routes belonging to the
+same account may intentionally share one handle. Existing external credential
 records remain owned by their keyring or helper and are never copied into this
 file.
 
@@ -304,8 +350,9 @@ adapter never calls Gmail's immediate permanent-delete method. Passwords, app
 passwords, cookies, and custom Google hosts are not accepted by the route.
 
 Microsoft Graph and hybrid accounts can use distinct OAuth providers and
-grants. Prefix calendar settings with `calendar-`, for example
-`--calendar-oauth-client-id` and `--calendar-authorization-key`. A
+grants. Prefix calendar settings with `calendar-` and task settings with
+`task-`, for example `--calendar-oauth-client-id` and
+`--task-authorization-key`. A
 calendar-only account uses `--mail-provider none`; `--calendar-provider none`
 creates a mail-only account.
 

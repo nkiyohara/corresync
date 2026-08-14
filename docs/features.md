@@ -6,21 +6,20 @@ not available through a raw protocol escape hatch.
 ## Provider routes
 
 <!-- markdownlint-disable MD013 -->
-| Provider ID | Mail | Calendar | Authentication | v0.8 evidence |
-| --- | --- | --- | --- | --- |
-| `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
-| `google` (coming soon) | Gmail API; no permanent delete | Selectable Google calendars and Google Meet when advertised | Included but disabled until production OAuth approval; no sign-in starts | Synthetic API/application contracts; live-unobserved |
-| `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
-| `jmap` | Mail | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
-| `imap-smtp` | IMAP read/manage, SMTP draft/send | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts; live-unobserved |
-| `caldav` | — | Calendar | OS keyring or approved credential helper | Implemented; synthetic WebDAV/iCalendar contracts; live-unobserved |
+| Provider ID | Mail | Calendar | Tasks | Authentication | v0.8 evidence |
+| --- | --- | --- | --- | --- | --- |
+| `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | — | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
+| `google` (coming soon) | Gmail API; no permanent delete | Selectable Google calendars and Google Meet when advertised | — | Included but disabled until production OAuth approval; no sign-in starts | Synthetic API/application contracts; live-unobserved |
+| `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Microsoft To Do | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
+| `jmap` | Mail | — | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
+| `imap-smtp` | IMAP read/manage, SMTP draft/send | — | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts; live-unobserved |
+| `caldav` | — | Calendar | Reserved route only | OS keyring or approved credential helper | Calendar implemented; VTODO unavailable; live-unobserved |
 <!-- markdownlint-enable MD013 -->
 
 Task routes use a separate provider selection described in the
-[task contract](tasks.md). The canonical surfaces and synthetic conformance
-fixtures are implemented, but no task provider adapter is activated by this
-foundation. A configured task route is reported as unavailable until its
-dependent provider issue ships.
+[task contract](tasks.md). Microsoft To Do is active only through the explicit
+`microsoft-graph` task route. Other configured task routes remain unavailable
+until their dependent provider issue ships.
 
 Mail and calendar are selected independently. For example, one account may use
 IMAP/SMTP for mail and CalDAV for calendar. `pop3` is reserved without a route
@@ -182,7 +181,11 @@ outside scope.
 Unsupported fields fail before provider access. Representable loss appears in
 task results and the exact write review. Linked mail or event provenance is
 data only and does not create a copy, move, mirror, or generic work-item action.
-No task provider is enabled by the canonical-contract change alone.
+Microsoft To Do implements these surfaces except search, which is explicitly
+unavailable. It supports zoned times, one absolute reminder, recurrence,
+checklists, categories, typed linked sources, and delta cursors. Writes that
+assemble checklist or linked-resource changes report partial outcomes instead
+of retrying. Other task providers remain unavailable.
 
 ## Accounts and projections
 

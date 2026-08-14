@@ -8,8 +8,10 @@ an earlier build does not promote a current implementation to “observed.”
 
 The Google authorization and bounded read path has one commit-bound
 [macOS arm64 live observation](google-macos-arm64-2026-07-30.md). Google writes,
-all other provider routes, native-platform IPC implementations, and MCP clients
-remain **live-unobserved**.
+all other provider routes, including Microsoft Graph To Do, native-platform IPC
+implementations, and MCP clients remain **live-unobserved**. The build-tagged To
+Do harness is an opt-in procedure, not evidence until a content-free record is
+committed against the exact tested revision.
 
 Published distribution evidence remains bound to its exact tag and workflow;
 it does not promote provider or native-platform rows to live-observed.

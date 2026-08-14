@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 )
 
 // Credentials configures the one optional external helper. Secrets are read
@@ -110,10 +111,18 @@ func (route GoogleMailRoute) Client() OAuthClient {
 
 // OAuthRoute adds one pinned HTTPS API base to a public-client authorization.
 type OAuthRoute struct {
-	APIBase       string        `json:"apiBase" toml:"api_base"`
-	ClientID      string        `json:"clientId" toml:"client_id"`
-	RedirectURI   string        `json:"redirectUri" toml:"redirect_uri"`
-	Authorization CredentialRef `json:"authorization" toml:"authorization"`
+	APIBase        string            `json:"apiBase" toml:"api_base"`
+	MicrosoftCloud microsoftcloud.ID `json:"microsoftCloud,omitempty" toml:"microsoft_cloud,omitempty"`
+	ClientID       string            `json:"clientId" toml:"client_id"`
+	RedirectURI    string            `json:"redirectUri" toml:"redirect_uri"`
+	Authorization  CredentialRef     `json:"authorization" toml:"authorization"`
+}
+
+// MicrosoftGraphTaskRoute binds To Do to an independently consented Graph
+// public-client grant. ReadOnly selects Tasks.Read instead of Tasks.ReadWrite.
+type MicrosoftGraphTaskRoute struct {
+	OAuth    OAuthRoute `json:"oauth" toml:"oauth"`
+	ReadOnly bool       `json:"readOnly,omitempty" toml:"read_only,omitempty"`
 }
 
 // Client returns the secret-free public-client portion of an API route.
@@ -155,7 +164,8 @@ type CalendarRoute struct {
 // secret-free connection settings are added by each adapter issue; the
 // canonical contract deliberately cannot carry an arbitrary action or secret.
 type TaskRoute struct {
-	Provider domain.ProviderID `json:"provider" toml:"provider"`
+	Provider       domain.ProviderID        `json:"provider" toml:"provider"`
+	MicrosoftGraph *MicrosoftGraphTaskRoute `json:"microsoftGraph,omitempty" toml:"microsoft_graph,omitempty"`
 }
 
 func (account Account) validate() error {
@@ -176,6 +186,12 @@ func (account Account) validate() error {
 		if err := account.Tasks.validate(); err != nil {
 			return fmt.Errorf("tasks: %w", err)
 		}
+		if account.Tasks.Provider == domain.ProviderMicrosoftGraph && account.Address == "" {
+			return errors.New("a Microsoft Graph task route requires the account email address")
+		}
+	}
+	if err := validateOAuthGrantSharing(account); err != nil {
+		return err
 	}
 	googleMail := account.Mail != nil &&
 		account.Mail.Provider == domain.ProviderGoogle &&
@@ -205,13 +221,86 @@ func (account Account) validate() error {
 	return nil
 }
 
+type oauthGrantBinding struct {
+	provider      domain.ProviderID
+	clientID      string
+	redirectURI   string
+	authorization CredentialRef
+	cloud         microsoftcloud.ID
+}
+
+func validateOAuthGrantSharing(account Account) error {
+	bindings := make([]oauthGrantBinding, 0, 3)
+	add := func(provider domain.ProviderID, client OAuthClient, cloud microsoftcloud.ID) {
+		bindings = append(bindings, oauthGrantBinding{
+			provider: provider, clientID: client.ClientID,
+			redirectURI: client.RedirectURI, authorization: client.Authorization,
+			cloud: cloud,
+		})
+	}
+	if account.Mail != nil {
+		if account.Mail.Provider == domain.ProviderGoogle && account.Mail.Google != nil {
+			add(domain.ProviderGoogle, account.Mail.Google.Client(), "")
+		}
+		if account.Mail.Provider == domain.ProviderMicrosoftGraph && account.Mail.MicrosoftGraph != nil {
+			add(domain.ProviderMicrosoftGraph, account.Mail.MicrosoftGraph.Client(), account.Mail.MicrosoftGraph.MicrosoftCloud)
+		}
+	}
+	if account.Calendar != nil {
+		if account.Calendar.Provider == domain.ProviderGoogle && account.Calendar.Google != nil {
+			add(domain.ProviderGoogle, account.Calendar.Google.Client(), "")
+		}
+		if account.Calendar.Provider == domain.ProviderMicrosoftGraph && account.Calendar.MicrosoftGraph != nil {
+			add(domain.ProviderMicrosoftGraph, account.Calendar.MicrosoftGraph.Client(), account.Calendar.MicrosoftGraph.MicrosoftCloud)
+		}
+	}
+	if account.Tasks != nil && account.Tasks.Provider == domain.ProviderMicrosoftGraph &&
+		account.Tasks.MicrosoftGraph != nil {
+		route := account.Tasks.MicrosoftGraph.OAuth
+		add(domain.ProviderMicrosoftGraph, route.Client(), route.MicrosoftCloud)
+	}
+	for left := range bindings {
+		for right := left + 1; right < len(bindings); right++ {
+			if bindings[left].authorization.Backend == bindings[right].authorization.Backend &&
+				bindings[left].authorization.Key == bindings[right].authorization.Key &&
+				!sameOAuthGrant(bindings[left], bindings[right]) {
+				return errors.New("one OAuth authorization handle cannot identify different provider or public-client grants")
+			}
+		}
+	}
+	return nil
+}
+
+func sameOAuthGrant(left, right oauthGrantBinding) bool {
+	if left.provider != right.provider || left.clientID != right.clientID ||
+		left.redirectURI != right.redirectURI || left.authorization != right.authorization {
+		return false
+	}
+	return left.provider != domain.ProviderMicrosoftGraph ||
+		microsoftcloud.Equivalent(left.cloud, right.cloud)
+}
+
 func (route TaskRoute) validate() error {
 	if err := route.Provider.Validate(); err != nil {
 		return err
 	}
 	switch route.Provider {
-	case domain.ProviderMicrosoftGraph,
-		domain.ProviderMicrosoftTasks,
+	case domain.ProviderMicrosoftGraph:
+		if route.MicrosoftGraph == nil {
+			return errors.New("microsoft-graph tasks require independent OAuth settings")
+		}
+		if err := route.MicrosoftGraph.OAuth.validateFor(domain.ProviderMicrosoftGraph); err != nil {
+			return err
+		}
+		profile, err := microsoftcloud.Resolve(route.MicrosoftGraph.OAuth.MicrosoftCloud)
+		if err != nil {
+			return err
+		}
+		if !profile.TasksAvailable {
+			return errors.New("the Microsoft To Do API is unavailable in the selected Microsoft cloud")
+		}
+		return nil
+	case domain.ProviderMicrosoftTasks,
 		domain.ProviderTodoist,
 		domain.ProviderCalDAV,
 		domain.ProviderGoogleTasks,
@@ -220,6 +309,9 @@ func (route TaskRoute) validate() error {
 		domain.ProviderAnyDoMCP,
 		domain.ProviderThings,
 		domain.ProviderOmniFocus:
+		if route.MicrosoftGraph != nil {
+			return errors.New("non-Graph task route cannot contain Microsoft Graph settings")
+		}
 		return nil
 	case domain.ProviderMicrosoftOWA,
 		domain.ProviderGoogle,
@@ -458,16 +550,16 @@ func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
 	parsed, _ := url.Parse(route.APIBase)
 	switch provider {
 	case domain.ProviderGoogle:
+		if route.MicrosoftCloud != "" {
+			return errors.New("google OAuth route cannot select a Microsoft cloud")
+		}
 		if parsed.Host != "www.googleapis.com" || parsed.RawQuery != "" ||
 			parsed.EscapedPath() != "" && parsed.EscapedPath() != "/" {
 			return errors.New("google API base must be https://www.googleapis.com")
 		}
 	case domain.ProviderMicrosoftGraph:
-		if parsed.Host != "graph.microsoft.com" || parsed.RawQuery != "" ||
-			strings.TrimSuffix(parsed.EscapedPath(), "/") != "/v1.0" {
-			return errors.New(
-				"microsoft Graph API base must be https://graph.microsoft.com/v1.0",
-			)
+		if err := microsoftcloud.ValidateAPIBase(route.MicrosoftCloud, route.APIBase); err != nil {
+			return err
 		}
 	case domain.ProviderMicrosoftOWA,
 		domain.ProviderGoogleWeb,

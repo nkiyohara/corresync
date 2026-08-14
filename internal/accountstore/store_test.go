@@ -226,6 +226,12 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 			Provider:       domain.ProviderMicrosoftGraph,
 			MicrosoftGraph: graphRoute("shared"),
 		},
+		Tasks: &config.TaskRoute{
+			Provider: domain.ProviderMicrosoftGraph,
+			MicrosoftGraph: &config.MicrosoftGraphTaskRoute{
+				OAuth: *graphRoute("target-task"), ReadOnly: true,
+			},
+		},
 	}
 	configuration.Accounts["other"] = config.Account{
 		ID:      "acc_00000000000000000000000000000003",
@@ -249,7 +255,7 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 	if err := store.PurgeAccountState(t.Context(), targetID); err != nil {
 		t.Fatal(err)
 	}
-	if len(deleted) != 1 || deleted[0] != "target-only" {
+	if len(deleted) != 2 || deleted[0] != "target-only" || deleted[1] != "target-task" {
 		t.Fatalf("deleted OAuth keys = %#v", deleted)
 	}
 }

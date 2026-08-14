@@ -20,6 +20,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
@@ -269,7 +270,7 @@ func TestManagerRequiresBoundedGoogleDesktopClientCredential(t *testing.T) {
 func TestGoogleOAuthProfileIsPresentButApprovalGated(t *testing.T) {
 	t.Parallel()
 
-	_, err := ProviderFor(domain.ProviderGoogle, true, true)
+	_, err := ProviderFor(domain.ProviderGoogle, Services{Mail: true, Calendar: true})
 	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
 		t.Fatalf("ProviderFor() error = %v", err)
 	}
@@ -289,7 +290,7 @@ func TestGoogleOAuthProfileIsPresentButApprovalGated(t *testing.T) {
 func TestGoogleDesktopClientCredentialDoesNotCrossIntoGraph(t *testing.T) {
 	t.Parallel()
 
-	provider, err := ProviderFor(domain.ProviderMicrosoftGraph, true, true)
+	provider, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{Mail: true, Calendar: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,6 +300,38 @@ func TestGoogleDesktopClientCredentialDoesNotCrossIntoGraph(t *testing.T) {
 	}, provider, "synthetic-google-client-credential")
 	if oauth.ClientSecret != "" {
 		t.Fatal("Google desktop client credential crossed into Microsoft Graph")
+	}
+}
+
+func TestMicrosoftTodoScopesAndNationalCloudAuthorities(t *testing.T) {
+	t.Parallel()
+	read, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{
+		Tasks: true, MicrosoftCloud: microsoftcloud.GCCHigh,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(read.Scopes, "Tasks.Read") ||
+		slices.Contains(read.Scopes, "Tasks.ReadWrite") ||
+		slices.Contains(read.Scopes, "Mail.ReadWrite") ||
+		read.AuthURL != "https://login.microsoftonline.us/organizations/oauth2/v2.0/authorize" {
+		t.Fatalf("GCC High task read profile = %+v", read)
+	}
+	write, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{
+		Tasks: true, TaskWrite: true, MicrosoftCloud: microsoftcloud.DoD,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(write.Scopes, "Tasks.ReadWrite") ||
+		slices.Contains(write.Scopes, "Tasks.Read") ||
+		write.TokenURL != "https://login.microsoftonline.us/organizations/oauth2/v2.0/token" {
+		t.Fatalf("DoD task write profile = %+v", write)
+	}
+	if _, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{
+		Tasks: true, MicrosoftCloud: microsoftcloud.China,
+	}); err == nil || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatalf("China task profile error = %v", err)
 	}
 }
 

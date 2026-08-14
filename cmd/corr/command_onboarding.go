@@ -1249,6 +1249,9 @@ func accountAuthenticationKind(
 			domain.ProviderOmniFocus:
 		}
 	}
+	if account.Tasks != nil && account.Tasks.Provider == domain.ProviderMicrosoftGraph {
+		return application.DiscoveryExplicitOAuth
+	}
 	return application.DiscoveryBrowserFirstParty
 }
 
