@@ -564,9 +564,220 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 		return server.commitTask(request, func(backend TaskBackend, token string) (any, error) {
 			return backend.CommitTaskDelete(ctx, token, request.Caller)
 		})
+	case MethodMessageConversations:
+		var input application.ConversationListInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.ListConversations(ctx, input, request.Caller)
+	case MethodMessageList:
+		var input application.MessageListInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.ListMessages(ctx, input, request.Caller)
+	case MethodMessageSearch:
+		var input application.MessageSearchInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.SearchMessages(ctx, input, request.Caller)
+	case MethodMessageGet:
+		var input application.MessageGetInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.GetMessage(ctx, input, request.Caller)
+	case MethodMessageCommitGet:
+		return server.commitMessage(request, func(backend MessagingBackend, token string) (any, error) {
+			return backend.CommitGetMessage(ctx, token, request.Caller)
+		})
+	case MethodMessageAttachment:
+		var input application.MessageAttachmentGetInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.GetMessageAttachment(ctx, input, request.Caller)
+	case MethodMessageCommitAttach:
+		return server.commitMessage(request, func(backend MessagingBackend, token string) (any, error) {
+			return backend.CommitGetMessageAttachment(ctx, token, request.Caller)
+		})
+	case MethodMessageSync:
+		var input application.MessageSyncInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.ValidateRoute(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.SyncMessages(ctx, input, request.Caller)
+	case MethodMessageSend:
+		var input application.MessageSendInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.SendMessage(ctx, input, request.Caller)
+	case MethodMessageCommitSend:
+		return server.commitMessage(request, func(backend MessagingBackend, token string) (any, error) {
+			return backend.CommitSendMessage(ctx, token, request.Caller)
+		})
+	case MethodMessageEdit:
+		var input application.MessageEditInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.EditMessage(ctx, input, request.Caller)
+	case MethodMessageCommitEdit:
+		return server.commitMessage(request, func(backend MessagingBackend, token string) (any, error) {
+			return backend.CommitEditMessage(ctx, token, request.Caller)
+		})
+	case MethodMessageDelete:
+		var input application.MessageDeleteInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.DeleteMessage(ctx, input, request.Caller)
+	case MethodMessageCommitDelete:
+		return server.commitMessage(request, func(backend MessagingBackend, token string) (any, error) {
+			return backend.CommitDeleteMessage(ctx, token, request.Caller)
+		})
+	case MethodMessageReact:
+		var input application.MessageReactionInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.ReactToMessage(ctx, input, request.Caller)
+	case MethodMessageCommitReact:
+		return server.commitMessage(request, func(backend MessagingBackend, token string) (any, error) {
+			return backend.CommitMessageReaction(ctx, token, request.Caller)
+		})
+	case MethodConversationCreate:
+		var input application.ConversationCreateInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.CreateConversation(ctx, input, request.Caller)
+	case MethodConversationCommit:
+		return server.commitMessage(request, func(backend MessagingBackend, token string) (any, error) {
+			return backend.CommitCreateConversation(ctx, token, request.Caller)
+		})
+	case MethodMessageMembership:
+		var input application.ConversationMembershipInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, err := server.messagingBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.ChangeConversationMembership(ctx, input, request.Caller)
+	case MethodMessageCommitMember:
+		return server.commitMessage(request, func(backend MessagingBackend, token string) (any, error) {
+			return backend.CommitConversationMembership(ctx, token, request.Caller)
+		})
 	default:
 		return nil, errors.New("unknown daemon method")
 	}
+}
+
+func (server *Server) messagingBackend() (MessagingBackend, error) {
+	backend, supported := server.backend.(MessagingBackend)
+	if !supported {
+		return nil, errors.New("messaging is not supported by this session owner")
+	}
+	return backend, nil
+}
+
+func (server *Server) commitMessage(
+	request requestEnvelope,
+	commit func(MessagingBackend, string) (any, error),
+) (any, error) {
+	var input ApprovalInput
+	if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+		return nil, err
+	}
+	backend, err := server.messagingBackend()
+	if err != nil {
+		return nil, err
+	}
+	return commit(backend, input.Token)
 }
 
 func (server *Server) taskBackend() (TaskBackend, error) {

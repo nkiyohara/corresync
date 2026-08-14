@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 23
+	ProtocolVersion   = 24
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 16 << 20
 	contentType       = "application/json"
@@ -82,6 +82,26 @@ const (
 	MethodTaskCommitReopen     Method = "tasks.commit_reopen"
 	MethodTaskDelete           Method = "tasks.delete"
 	MethodTaskCommitDelete     Method = "tasks.commit_delete"
+	MethodMessageConversations Method = "messages.conversations"
+	MethodMessageList          Method = "messages.list"
+	MethodMessageSearch        Method = "messages.search"
+	MethodMessageGet           Method = "messages.get"
+	MethodMessageCommitGet     Method = "messages.commit_get"
+	MethodMessageAttachment    Method = "messages.attachment"
+	MethodMessageCommitAttach  Method = "messages.commit_attachment"
+	MethodMessageSync          Method = "messages.sync"
+	MethodMessageSend          Method = "messages.send"
+	MethodMessageCommitSend    Method = "messages.commit_send"
+	MethodMessageEdit          Method = "messages.edit"
+	MethodMessageCommitEdit    Method = "messages.commit_edit"
+	MethodMessageDelete        Method = "messages.delete"
+	MethodMessageCommitDelete  Method = "messages.commit_delete"
+	MethodMessageReact         Method = "messages.react"
+	MethodMessageCommitReact   Method = "messages.commit_react"
+	MethodConversationCreate   Method = "messages.conversation.create"
+	MethodConversationCommit   Method = "messages.conversation.commit_create"
+	MethodMessageMembership    Method = "messages.membership"
+	MethodMessageCommitMember  Method = "messages.commit_membership"
 	MethodMonitorStatus        Method = "monitor.status"
 	MethodEventsList           Method = "events.list"
 	MethodEventAcknowledge     Method = "events.acknowledge"
@@ -393,6 +413,32 @@ type TaskBackend interface {
 	CommitTaskDelete(context.Context, string, domain.Caller) (application.TaskWriteAccess, error)
 }
 
+// MessagingBackend is the optional provider-neutral messaging extension.
+// Sensitive reads and every write preserve their paired preview/commit method;
+// there is no provider action, URL, script, or arbitrary payload escape hatch.
+type MessagingBackend interface {
+	ListConversations(context.Context, application.ConversationListInput, domain.Caller) (application.ConversationPage, error)
+	ListMessages(context.Context, application.MessageListInput, domain.Caller) (application.MessagePage, error)
+	SearchMessages(context.Context, application.MessageSearchInput, domain.Caller) (application.MessagePage, error)
+	GetMessage(context.Context, application.MessageGetInput, domain.Caller) (application.MessageSensitiveAccess, error)
+	CommitGetMessage(context.Context, string, domain.Caller) (application.MessageSensitiveAccess, error)
+	GetMessageAttachment(context.Context, application.MessageAttachmentGetInput, domain.Caller) (application.MessageSensitiveAccess, error)
+	CommitGetMessageAttachment(context.Context, string, domain.Caller) (application.MessageSensitiveAccess, error)
+	SyncMessages(context.Context, application.MessageSyncInput, domain.Caller) (application.MessageChangePage, error)
+	SendMessage(context.Context, application.MessageSendInput, domain.Caller) (application.MessageWriteAccess, error)
+	CommitSendMessage(context.Context, string, domain.Caller) (application.MessageWriteAccess, error)
+	EditMessage(context.Context, application.MessageEditInput, domain.Caller) (application.MessageWriteAccess, error)
+	CommitEditMessage(context.Context, string, domain.Caller) (application.MessageWriteAccess, error)
+	DeleteMessage(context.Context, application.MessageDeleteInput, domain.Caller) (application.MessageWriteAccess, error)
+	CommitDeleteMessage(context.Context, string, domain.Caller) (application.MessageWriteAccess, error)
+	ReactToMessage(context.Context, application.MessageReactionInput, domain.Caller) (application.MessageWriteAccess, error)
+	CommitMessageReaction(context.Context, string, domain.Caller) (application.MessageWriteAccess, error)
+	CreateConversation(context.Context, application.ConversationCreateInput, domain.Caller) (application.MessageWriteAccess, error)
+	CommitCreateConversation(context.Context, string, domain.Caller) (application.MessageWriteAccess, error)
+	ChangeConversationMembership(context.Context, application.ConversationMembershipInput, domain.Caller) (application.MessageWriteAccess, error)
+	CommitConversationMembership(context.Context, string, domain.Caller) (application.MessageWriteAccess, error)
+}
+
 func (method Method) valid() bool {
 	switch method {
 	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
@@ -412,6 +458,15 @@ func (method Method) valid() bool {
 		MethodTaskComplete, MethodTaskCommitComplete,
 		MethodTaskReopen, MethodTaskCommitReopen,
 		MethodTaskDelete, MethodTaskCommitDelete,
+		MethodMessageConversations, MethodMessageList, MethodMessageSearch,
+		MethodMessageGet, MethodMessageCommitGet,
+		MethodMessageAttachment, MethodMessageCommitAttach, MethodMessageSync,
+		MethodMessageSend, MethodMessageCommitSend,
+		MethodMessageEdit, MethodMessageCommitEdit,
+		MethodMessageDelete, MethodMessageCommitDelete,
+		MethodMessageReact, MethodMessageCommitReact,
+		MethodConversationCreate, MethodConversationCommit,
+		MethodMessageMembership, MethodMessageCommitMember,
 		MethodMonitorStatus, MethodEventsList, MethodEventAcknowledge:
 		return true
 	default:

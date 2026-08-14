@@ -718,6 +718,206 @@ func (client *Client) CommitTaskDelete(ctx context.Context, token string, caller
 	return client.commitTask(ctx, MethodTaskCommitDelete, token, caller)
 }
 
+func (client *Client) ListConversations(
+	ctx context.Context,
+	input application.ConversationListInput,
+	caller domain.Caller,
+) (application.ConversationPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.ConversationPage{}, err
+	}
+	var result application.ConversationPage
+	return result, client.call(ctx, MethodMessageConversations, caller, input, &result)
+}
+
+func (client *Client) ListMessages(
+	ctx context.Context,
+	input application.MessageListInput,
+	caller domain.Caller,
+) (application.MessagePage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessagePage{}, err
+	}
+	var result application.MessagePage
+	return result, client.call(ctx, MethodMessageList, caller, input, &result)
+}
+
+func (client *Client) SearchMessages(
+	ctx context.Context,
+	input application.MessageSearchInput,
+	caller domain.Caller,
+) (application.MessagePage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessagePage{}, err
+	}
+	var result application.MessagePage
+	return result, client.call(ctx, MethodMessageSearch, caller, input, &result)
+}
+
+func (client *Client) GetMessage(
+	ctx context.Context,
+	input application.MessageGetInput,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageSensitiveAccess{}, err
+	}
+	var result application.MessageSensitiveAccess
+	return result, client.call(ctx, MethodMessageGet, caller, input, &result)
+}
+
+func (client *Client) CommitGetMessage(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	var result application.MessageSensitiveAccess
+	return result, client.call(ctx, MethodMessageCommitGet, caller, ApprovalInput{Token: token}, &result)
+}
+
+func (client *Client) GetMessageAttachment(
+	ctx context.Context,
+	input application.MessageAttachmentGetInput,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageSensitiveAccess{}, err
+	}
+	var result application.MessageSensitiveAccess
+	return result, client.call(ctx, MethodMessageAttachment, caller, input, &result)
+}
+
+func (client *Client) CommitGetMessageAttachment(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	var result application.MessageSensitiveAccess
+	return result, client.call(ctx, MethodMessageCommitAttach, caller, ApprovalInput{Token: token}, &result)
+}
+
+func (client *Client) SyncMessages(
+	ctx context.Context,
+	input application.MessageSyncInput,
+	caller domain.Caller,
+) (application.MessageChangePage, error) {
+	if err := input.ValidateRoute(); err != nil {
+		return application.MessageChangePage{}, err
+	}
+	var result application.MessageChangePage
+	return result, client.call(ctx, MethodMessageSync, caller, input, &result)
+}
+
+func (client *Client) SendMessage(
+	ctx context.Context,
+	input application.MessageSendInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageSend, input, caller)
+}
+
+func (client *Client) CommitSendMessage(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitSend, token, caller)
+}
+
+func (client *Client) EditMessage(
+	ctx context.Context,
+	input application.MessageEditInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageEdit, input, caller)
+}
+
+func (client *Client) CommitEditMessage(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitEdit, token, caller)
+}
+
+func (client *Client) DeleteMessage(
+	ctx context.Context,
+	input application.MessageDeleteInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageDelete, input, caller)
+}
+
+func (client *Client) CommitDeleteMessage(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitDelete, token, caller)
+}
+
+func (client *Client) ReactToMessage(
+	ctx context.Context,
+	input application.MessageReactionInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageReact, input, caller)
+}
+
+func (client *Client) CommitMessageReaction(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitReact, token, caller)
+}
+
+func (client *Client) CreateConversation(
+	ctx context.Context,
+	input application.ConversationCreateInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodConversationCreate, input, caller)
+}
+
+func (client *Client) CommitCreateConversation(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodConversationCommit, token, caller)
+}
+
+func (client *Client) ChangeConversationMembership(
+	ctx context.Context,
+	input application.ConversationMembershipInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageMembership, input, caller)
+}
+
+func (client *Client) CommitConversationMembership(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitMember, token, caller)
+}
+
+func (client *Client) prepareMessageWrite(
+	ctx context.Context,
+	method Method,
+	input any,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	var result application.MessageWriteAccess
+	return result, client.call(ctx, method, caller, input, &result)
+}
+
+func (client *Client) commitMessageWrite(
+	ctx context.Context,
+	method Method,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	var result application.MessageWriteAccess
+	return result, client.call(ctx, method, caller, ApprovalInput{Token: token}, &result)
+}
+
 func (client *Client) prepareTaskState(
 	ctx context.Context,
 	method Method,

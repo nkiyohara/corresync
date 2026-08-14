@@ -623,6 +623,21 @@ type MessageSyncInput struct {
 }
 
 func (input MessageSyncInput) Validate(provenance MessagingProvenance) error {
+	if err := input.ValidateRoute(); err != nil {
+		return err
+	}
+	if input.Cursor == nil {
+		return nil
+	}
+	if input.Cursor.Provider != provenance.Provider || input.Cursor.Route != provenance.Route {
+		return errors.New("message cursor does not match the selected route")
+	}
+	return nil
+}
+
+// ValidateRoute checks the provider-neutral cursor and account/container
+// binding before a daemon transport has access to provider provenance.
+func (input MessageSyncInput) ValidateRoute() error {
 	if err := validateMessagingReadRoute(input.Account, input.WorkspaceID, input.ConversationID, "", input.Limit); err != nil {
 		return err
 	}
@@ -632,10 +647,9 @@ func (input MessageSyncInput) Validate(provenance MessagingProvenance) error {
 	if err := input.Cursor.Validate(); err != nil {
 		return err
 	}
-	if input.Cursor.Account != input.Account || input.Cursor.Provider != provenance.Provider ||
-		input.Cursor.Route != provenance.Route || input.Cursor.WorkspaceID != input.WorkspaceID ||
+	if input.Cursor.Account != input.Account || input.Cursor.WorkspaceID != input.WorkspaceID ||
 		input.Cursor.ConversationID != input.ConversationID {
-		return errors.New("message cursor does not match the selected route")
+		return errors.New("message cursor does not match the selected account route")
 	}
 	return nil
 }
