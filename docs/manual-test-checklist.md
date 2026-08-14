@@ -333,6 +333,18 @@ corr integrations repair codex
 corr integrations remove codex cursor
 ```
 
+Run `corr setup` with no address from a normal TTY and again with
+`CORRESYNC_ACCESSIBLE=true`. Confirm that preflight reports the exact config,
+completion, account/session, detected-host, and inspectable connection state;
+existing accounts can continue directly to agent setup; agent selection is a
+true multi-select; and one confirmation follows the complete per-host preview.
+Repeat after one successful and one failed host and confirm the Ready / Needs
+attention / Optional later summary resumes only unfinished work. Test EOF,
+Escape, Ctrl-C/SIGINT, a daemon replacement, and a failed later host: none may
+approve a completion or integration change, erase an earlier account, or hide
+the exact direct recovery command. Non-TTY, piped, and JSON forms must refuse
+the guided flow while `corr setup ADDRESS` stays deterministic.
+
 Confirm the grouped preview shows exact executable/argv or file/package
 targets, asks once before mutation, and reports each host independently. Repeat
 with `--json` and verify no mutation occurs; `--json --yes` must fail. Introduce

@@ -264,11 +264,15 @@ corr setup
 corr auth status
 ```
 
-The wizard creates a provider-neutral local configuration, performs
-credential-free discovery, previews the route, and adds it only after
-confirmation. Sign-in and doctor are separate choices inside the flow. For a
+The wizard reports current local state, optionally installs shell completion,
+creates a provider-neutral local configuration, performs credential-free
+discovery, and adds a reviewed route only after confirmation. Sign-in and
+doctor remain separate account-scoped choices. It then supports multi-select
+agent setup through one preview and confirmation, verifies hosts independently,
+and groups remaining work as Ready, Needs attention, or Optional later. For a
 non-interactive script, use `corr setup ADDRESS --alias NAME`, followed by the
-explicit account-specific `corr auth login` and `corr doctor` commands.
+explicit account-specific `corr auth login`, `corr doctor`, and `corr
+integrations setup HOST --yes` commands.
 
 The browser owns sign-in, MFA, Conditional Access, and session cookies.
 Corresync never asks for a password or copies an authorization header into its

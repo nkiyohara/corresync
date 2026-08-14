@@ -219,15 +219,20 @@ normally and the new binary is active on the next `corr` start.
 corr setup
 ```
 
-The guided setup performs credential-free discovery, proposes an editable
-local name and default, previews the selected mail/calendar routes, and adds
-the account only after confirmation. Authentication or external-credential
-access is a separate choice after the account exists; the wizard then offers a
-bounded doctor check and multi-account continuation.
+The guided setup derives a resumable preflight from current local state,
+optionally installs shell completion at a displayed user-local path, and then
+performs credential-free account discovery. It previews the selected
+mail/calendar/task routes and adds an account only after confirmation.
+Authentication or external-credential access remains a separate choice. The
+same run can add more accounts, select several detected agent hosts, preview
+their independent local integration plans, apply only one confirmed plan, and
+verify each result. Re-running `corr setup` skips healthy work and offers the
+missing or repairable steps.
 
 Run `corr settings` to open the same account wizard; sign in to, rename,
 select, or remove accounts; and manage updates, safety, and browser sign-in
-from an arrow-key form. The
+from an arrow-key form. Its Setup guide entry resumes the complete coordinator
+instead of maintaining another implementation. The
 top-level Accounts category contains Add account and the configured account
 list; selecting an account opens only actions for that account. Removal
 previews the local data it deletes and asks for confirmation; removing the

@@ -8,7 +8,7 @@ The optional domain-only public projection is constrained separately by
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-08-13
+- Amended: 2026-08-14
 
 ## Context
 
@@ -36,10 +36,20 @@ requests or persists one and its configuration schema cannot represent one.
 
 A new configuration contains zero accounts, an empty default-account field,
 and no provider route. Configuration initialization never manufactures an
-Outlook placeholder or opens authentication. The user-first `corr setup
-ADDRESS` command creates that empty local state when necessary, performs the
-same credential-free discovery use case as `corr account discover`, and may
-add only a candidate that the automatic-selection rules below permit.
+Outlook placeholder or opens authentication. The user-first no-argument `corr
+setup` coordinator creates that empty local state when necessary and calls the
+same credential-free discovery and account use cases as the direct commands.
+It may add only a candidate that the automatic-selection rules below permit.
+`corr setup ADDRESS` remains the deterministic non-interactive account form.
+
+The coordinator derives progress from current local configuration, account and
+session status, user-local shell completion, agent-host detection, and the
+typed integration lifecycle rather than persisting a completed flag. Optional
+completion installation and agent-host configuration show their exact local
+targets, require separate human choices, and do not install an agent. A single
+review may cover several selected hosts, but application and verification stay
+independent so one failure neither rolls back nor hides another host. EOF,
+Escape, cancellation, and interruption never count as approval.
 
 Authentication remains a later, explicit, account-specific local CLI action.
 The first added account becomes the default; later additions cannot change the

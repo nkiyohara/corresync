@@ -128,6 +128,21 @@ func TestCompletionInstallRejectsSymlinkTarget(t *testing.T) {
 	}
 }
 
+func TestCompletionInspectionRejectsOversizedExistingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "completion")
+	if err := os.WriteFile(
+		path,
+		bytes.Repeat([]byte("x"), maximumCompletionFileBytes+1),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installCompletion(path, []byte("generated\n"), true); err == nil ||
+		!strings.Contains(err.Error(), "inspection limit") {
+		t.Fatalf("oversized completion error = %v", err)
+	}
+}
+
 func TestCompletionInstallRejectsRelativeBaseOverride(t *testing.T) {
 	lookup := func(name string) (string, bool) {
 		values := map[string]string{

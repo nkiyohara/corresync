@@ -5,6 +5,21 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Resumable guided setup
+
+- Make no-argument `corr setup` a current-state coordinator for optional
+  user-local shell completion, the existing multi-account registration and
+  authentication flow, detected agent selection, integration preview/apply,
+  per-host verification, and a Ready / Needs attention / Optional later
+  summary.
+- Keep `corr setup ADDRESS`, JSON, piped, and non-TTY use deterministic and
+  non-interactive. Re-running the guided flow skips configured accounts unless
+  the user chooses to add another, and EOF, Escape, or interruption never
+  approves a completion or agent-host change.
+- Reuse the Charm `huh` forms and the existing typed integration lifecycle;
+  setup does not install an agent, own provider logic, or introduce a second
+  configuration writer.
+
 ### Generated native agent integrations
 
 - Generate combined local MCP + Agent Skill packages for Codex/OpenAI, the

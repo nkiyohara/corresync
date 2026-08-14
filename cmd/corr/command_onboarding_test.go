@@ -12,12 +12,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nkiyohara/corresync/internal/agenthost"
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/integrationlifecycle"
 	"github.com/nkiyohara/corresync/internal/localipc"
 )
 
@@ -36,6 +38,22 @@ type sequenceOnboardingDiscoverer struct {
 	observations []application.AccountDiscoveryObservation
 	err          error
 	calls        int
+}
+
+type setupInputReader struct {
+	reader io.Reader
+	before func() error
+}
+
+func (reader *setupInputReader) Read(buffer []byte) (int, error) {
+	if reader.before != nil {
+		before := reader.before
+		reader.before = nil
+		if err := before(); err != nil {
+			return 0, err
+		}
+	}
+	return reader.reader.Read(buffer)
 }
 
 func (discoverer *sequenceOnboardingDiscoverer) Discover(
@@ -91,6 +109,310 @@ func TestGuidedSetupAddsReviewedOutlookAccountWithoutAuthentication(t *testing.T
 	} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("guided setup output missing %q: %q", expected, stdout.String())
+		}
+	}
+}
+
+func TestGuidedSetupResumesAtAgentSetupWithoutReaddingAnAccount(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
+		t.Fatal(err)
+	}
+	app, stdout := guidedSetupRuntime(
+		t,
+		path,
+		failingOnboardingDiscoverer{err: errors.New("discovery must not run")},
+		"1\n",
+	)
+	app.detectAgentHosts = func(context.Context, agenthost.Request) (agenthost.Report, error) {
+		return agenthost.Report{SchemaVersion: 1}, nil
+	}
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{
+		"Setup preflight",
+		"Continue setup",
+		"Setup summary",
+		"Account work",
+		"corr auth login --account 'work'",
+	} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("resumed setup output missing %q: %q", expected, stdout.String())
+		}
+	}
+}
+
+func TestGuidedSetupInterruptionNeverApprovesAResumedAction(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "config.toml")
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var stdout bytes.Buffer
+	app := newRuntime(ctx, path, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	app.stdin = strings.NewReader("1\n")
+	app.interactiveInput = func() bool { return true }
+	app.interactiveStdout = func() bool { return true }
+	app.lookupEnv = settingsTestEnvironment
+	app.detectAgentHosts = func(context.Context, agenthost.Request) (agenthost.Report, error) {
+		return agenthost.Report{SchemaVersion: 1}, nil
+	}
+	mutated := false
+	app.runIntegrationCommand = func(context.Context, io.Writer, io.Writer, string, ...string) error {
+		mutated = true
+		return nil
+	}
+
+	err := (&setupCommand{}).Run(app)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("interrupted setup error = %v", err)
+	}
+	if mutated {
+		t.Fatal("interrupted setup executed an integration action")
+	}
+	configured, loadErr := config.Load(path)
+	if loadErr != nil || len(configured.Accounts) != 1 || configured.DefaultAccount != "work" {
+		t.Fatalf("interrupted setup changed accounts: %+v, %v", configured, loadErr)
+	}
+}
+
+func TestGuidedSetupOffersIdempotentUserLocalCompletion(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "config.toml")
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
+		t.Fatal(err)
+	}
+	app, stdout := guidedSetupRuntime(
+		t,
+		path,
+		failingOnboardingDiscoverer{err: errors.New("discovery must not run")},
+		"y\n1\n",
+	)
+	app.lookupEnv = func(key string) (string, bool) {
+		switch key {
+		case "CORRESYNC_ACCESSIBLE":
+			return "true", true
+		case "SHELL":
+			return "/bin/bash", true
+		case "HOME":
+			return root, true
+		case "XDG_DATA_HOME":
+			return filepath.Join(root, "data"), true
+		default:
+			return "", false
+		}
+	}
+	app.detectAgentHosts = func(context.Context, agenthost.Request) (agenthost.Report, error) {
+		return agenthost.Report{SchemaVersion: 1}, nil
+	}
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	destination, err := completionInstallPath("bash", app.lookupEnv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(destination) // #nosec G304 -- destination is derived from this test's private root.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != completionScripts["bash"] ||
+		!strings.Contains(stdout.String(), "Remove that generated file to uninstall") ||
+		!strings.Contains(stdout.String(), "bash completion · installed") {
+		t.Fatalf("completion setup output = %q, contents = %q", stdout.String(), contents)
+	}
+}
+
+func TestGuidedSetupReturnsCompletionFailureAfterLaterCancellation(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "config.toml")
+	if err := config.Save(path, config.OutlookDefault()); err != nil {
+		t.Fatal(err)
+	}
+	blockedDataHome := filepath.Join(root, "data")
+	app, _ := guidedSetupRuntime(
+		t,
+		path,
+		failingOnboardingDiscoverer{err: errors.New("discovery must not run")},
+		"y\n",
+	)
+	app.lookupEnv = func(key string) (string, bool) {
+		switch key {
+		case "CORRESYNC_ACCESSIBLE":
+			return "true", true
+		case "SHELL":
+			return "/bin/bash", true
+		case "HOME":
+			return root, true
+		case "XDG_DATA_HOME":
+			return blockedDataHome, true
+		default:
+			return "", false
+		}
+	}
+	app.detectAgentHosts = func(context.Context, agenthost.Request) (agenthost.Report, error) {
+		return agenthost.Report{SchemaVersion: 1}, nil
+	}
+	app.stdin = &setupInputReader{
+		reader: app.stdin,
+		before: func() error {
+			return os.WriteFile(blockedDataHome, []byte("fixture"), 0o600)
+		},
+	}
+
+	err := (&setupCommand{}).Run(app)
+	if err == nil || !strings.Contains(err.Error(), "install bash completion") {
+		t.Fatalf("completion failure followed by EOF = %v", err)
+	}
+}
+
+func TestSetupSummaryFailsClosedForUnknownIntegrationResult(t *testing.T) {
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), "", &stdout, &bytes.Buffer{}, buildinfo.Current())
+	preflight := setupPreflight{sessions: map[string]application.SessionStatus{}}
+	err := writeSetupSummary(
+		app,
+		preflight,
+		setupIntegrationOutcome{selected: true, results: []integrationlifecycle.Result{{
+			Host: "synthetic", Status: "future_status",
+		}}},
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stdout.String(), "unknown integration result") ||
+		!strings.Contains(stdout.String(), "Needs attention") {
+		t.Fatalf("unknown integration result summary = %q", stdout.String())
+	}
+}
+
+func TestSetupPreflightInspectsOnlyHostsWithSetupAndInspection(t *testing.T) {
+	report := agenthost.Report{Hosts: []agenthost.Detection{
+		{
+			Host: agenthost.Host{
+				ID: "ready", Lifecycle: agenthost.Lifecycle{Setup: true, Inspect: true},
+			},
+			Status: agenthost.StatusConfirmed,
+		},
+		{
+			Host: agenthost.Host{
+				ID: "setup-only", Lifecycle: agenthost.Lifecycle{Setup: true},
+			},
+			Status: agenthost.StatusConfirmed,
+		},
+		{
+			Host: agenthost.Host{
+				ID: "inspect-only", Lifecycle: agenthost.Lifecycle{Inspect: true},
+			},
+			Status: agenthost.StatusConfirmed,
+		},
+	}}
+
+	if hosts := setupDetectedLifecycleHosts(report); !slices.Equal(hosts, []string{"ready"}) {
+		t.Fatalf("setup preflight lifecycle hosts = %v", hosts)
+	}
+}
+
+func TestGuidedSetupConnectsSelectedDetectedAgentThroughReviewedPlan(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(root, "state"))
+	path := filepath.Join(root, "config.toml")
+	discoverer := &accountDiscovererStub{observation: application.AccountDiscoveryObservation{
+		Candidates: []application.ProviderCandidate{{
+			Provider: domain.ProviderMicrosoftOWA, Confidence: 98,
+			Authentication: application.DiscoveryBrowserFirstParty,
+			Endpoints: []application.DiscoveredEndpoint{{
+				Kind: "origin", Value: "https://outlook.example.invalid",
+			}},
+			Evidence: []application.DiscoveryEvidence{{
+				Source: "test", Detail: "synthetic Outlook route",
+			}},
+		}},
+	}}
+	app, stdout := guidedSetupRuntime(
+		t,
+		path,
+		discoverer,
+		"reader@example.invalid\npersonal\ny\n4\n4\n3\n0\ny\n",
+	)
+	codex, ok := app.agentHosts.Lookup("codex")
+	if !ok {
+		t.Fatal("default agent-host catalog has no Codex entry")
+	}
+	app.detectAgentHosts = func(context.Context, agenthost.Request) (agenthost.Report, error) {
+		return agenthost.Report{
+			SchemaVersion: 1,
+			Hosts: []agenthost.Detection{{
+				Host: codex, Status: agenthost.StatusConfirmed,
+				ConnectionStatus: agenthost.ConnectionNotInspected,
+			}},
+		}, nil
+	}
+	app.userHomeDir = func() (string, error) { return root, nil }
+	app.userConfigDir = func() (string, error) { return filepath.Join(root, ".config"), nil }
+	app.workingDirectory = func() (string, error) { return root, nil }
+	app.integrationBundleDirectory = func(string) (string, error) { return "", nil }
+	registered := false
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	executable, err = filepath.EvalSymlinks(executable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.runIntegrationCommand = func(
+		_ context.Context,
+		output, _ io.Writer,
+		name string,
+		arguments ...string,
+	) error {
+		if name != "codex" || len(arguments) < 2 || arguments[0] != "mcp" {
+			return errors.New("unexpected integration command")
+		}
+		switch arguments[1] {
+		case "get":
+			if !registered {
+				return errors.New("not found")
+			}
+			_, _ = fmt.Fprintf(
+				output,
+				"corresync\n command: %s\n args: --config %s mcp serve\n",
+				executable,
+				path,
+			)
+			return nil
+		case "add":
+			registered = true
+			return nil
+		default:
+			return errors.New("unexpected integration operation")
+		}
+	}
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	if !registered {
+		t.Fatal("reviewed setup did not register the selected detected host")
+	}
+	for _, expected := range []string{
+		"Which agents do you use?",
+		"Integration plan",
+		"applied_reload_required",
+		"Setup summary",
+		"codex · open a new session or reload the host",
+	} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("agent setup output missing %q: %q", expected, stdout.String())
 		}
 	}
 }
@@ -582,7 +904,7 @@ func TestGuidedSetupRestartsAnExistingSessionOwnerAfterAccountCommit(t *testing.
 		t,
 		path,
 		discoverer,
-		"personal@example.invalid\npersonal\n1\ny\n4\n3\n",
+		"2\npersonal@example.invalid\npersonal\n1\ny\n4\n3\n",
 	)
 	app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
 	var replacement lifecycleTestDaemon
@@ -701,7 +1023,7 @@ func TestSettingsAccountAddUsesTheSharedRegistrationWizard(t *testing.T) {
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
 	app.stdin = strings.NewReader(
-		"1\n1\npersonal@example.invalid\npersonal\n1\ny\n4\n4\n7\n",
+		"1\n1\npersonal@example.invalid\npersonal\n1\ny\n4\n4\n8\n",
 	)
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }

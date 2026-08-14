@@ -183,20 +183,20 @@
             </div>
           </div>
           <div class="install-block">
-            <p class="os-label" id="install-connect">Next · add your account</p>
+            <p class="os-label" id="install-connect">Next · finish guided setup</p>
             <div class="cmd" data-copy data-copy-label="account setup command">
               <pre
                 tabindex="0"
                 role="region"
                 aria-labelledby="install-connect"
-              ><code>corr setup you@example.com --alias personal</code></pre>
+              ><code>corr setup</code></pre>
             </div>
           </div>
           <p class="install-note">
-            Replace the example address and alias. Setup performs credential-free discovery and
-            never opens a sign-in page. Then <a href="getting-started.html#connect"
-            >connect Codex, Claude Code, Copilot, Gemini CLI, or another MCP client</a>. Prefer to
-            read before you run? Review <a href="install.sh">install.sh</a> or
+            Setup resumes from current local state, discovers account routes without credentials,
+            and previews both account and agent-host changes before applying them. Sign-in remains a
+            separate choice. Prefer to read before you run? Review <a href="install.sh"
+            >install.sh</a> or
             <a href="install.ps1">install.ps1</a> first. Homebrew, Scoop, native Linux packages, and
             direct downloads are listed in
             <a href="getting-started.html#other-install-methods">getting started</a>.

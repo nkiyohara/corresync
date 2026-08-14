@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"io"
 
 	"github.com/nkiyohara/corresync/internal/config"
 )
@@ -83,8 +82,6 @@ func prepareAccessibleSettingsInput(app *runtime) func() {
 		return func() {}
 	}
 	originalInput := app.stdin
-	app.stdin = &settingsAccessibleReader{
-		reader: io.LimitReader(originalInput, maximumSettingsInputBytes+1),
-	}
+	app.stdin = newSettingsAccessibleReader(app.context, originalInput)
 	return func() { app.stdin = originalInput }
 }
