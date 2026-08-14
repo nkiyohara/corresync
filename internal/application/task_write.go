@@ -473,7 +473,7 @@ func (service *TaskService) finishWriteAudit(
 	caller domain.Caller,
 	callErr error,
 ) error {
-	outcome, reason := taskWriteAuditOutcome(callErr)
+	outcome, reason := writeAuditOutcome(callErr)
 	auditErr := service.guard.audit.Record(context.WithoutCancel(ctx), AuditEvent{
 		Phase: AuditPhaseExecuted, Outcome: outcome, Reason: reason,
 		Caller: caller, Operation: operation.View(),
@@ -770,7 +770,7 @@ func prefixRunes(value string, maximum int) string {
 	return string(runes[:maximum]) + "…"
 }
 
-func taskWriteAuditOutcome(callErr error) (AuditOutcome, string) {
+func writeAuditOutcome(callErr error) (AuditOutcome, string) {
 	if callErr == nil {
 		return AuditOutcomeSuccess, "completed"
 	}

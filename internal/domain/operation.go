@@ -33,11 +33,14 @@ type Operation struct {
 type TargetKind string
 
 const (
-	TargetMailbox    TargetKind = "mailbox"
-	TargetCalendar   TargetKind = "calendar"
-	TargetTaskList   TargetKind = "task_list"
-	TargetTask       TargetKind = "task"
-	TargetLocalQueue TargetKind = "local_queue"
+	TargetMailbox      TargetKind = "mailbox"
+	TargetCalendar     TargetKind = "calendar"
+	TargetTaskList     TargetKind = "task_list"
+	TargetTask         TargetKind = "task"
+	TargetWorkspace    TargetKind = "workspace"
+	TargetConversation TargetKind = "conversation"
+	TargetMessage      TargetKind = "message"
+	TargetLocalQueue   TargetKind = "local_queue"
 )
 
 // TargetRef is an immutable mutation-routing boundary.
@@ -50,9 +53,11 @@ type TargetRef struct {
 func (target TargetRef) Validate() error {
 	maximum := 4096
 	switch target.Kind {
-	case TargetTask:
+	case TargetTask, TargetConversation:
 		maximum = maximumTargetIDBytes
-	case TargetMailbox, TargetCalendar, TargetTaskList, TargetLocalQueue:
+	case TargetMessage:
+		maximum = 3*4096 + 16
+	case TargetMailbox, TargetCalendar, TargetTaskList, TargetWorkspace, TargetLocalQueue:
 	default:
 		return fmt.Errorf("invalid target kind %q", target.Kind)
 	}
