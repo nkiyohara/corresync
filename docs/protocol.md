@@ -24,6 +24,16 @@ Every provider adapter must:
 - expose only closed typed operations, never raw actions, URLs, headers,
   methods, MIME parts, Graph properties, JMAP method calls, or WebDAV bodies.
 
+The shared stateless API transport may repeat an idempotent read at most twice
+after its first attempt. It retries only transport/read failures and HTTP
+502/503/504, uses short bounded backoff, and opens a five-second circuit after
+the third failure. HTTP 429 is returned to the provider adapter without an
+automatic retry and opens an account-route-local throttle circuit for a
+bounded `Retry-After` interval. A consequential write always has one network
+attempt. Stateful JMAP, IMAP, SMTP, and WebDAV operations are not placed behind
+this generic replay policy; their protocol-specific state and partial-outcome
+rules remain authoritative.
+
 Discovery is a separate unauthenticated boundary. DNS and well-known metadata
 may suggest ranked routes, but discovery cannot read credentials, start OAuth,
 launch a login, create an account, or choose a provider silently.
@@ -64,10 +74,12 @@ The undocumented Outlook Web service is isolated in
 `internal/provider/outlookweb`. Requests target the configured HTTPS origin and
 the closed `/owa/service.svc?action=<registered-action>` registry.
 
-The browser authorizes a request only after exact-origin validation. Redirects
-are not followed. HTTP 401, 403, and login timeout become `session expired`.
-Only reads may retry; `Retry-After` is bounded. OWA actions retain their
-synthetic `__type` metadata and are normalized behind typed contracts.
+The browser authorizes a request only after exact-origin validation and while
+its owning context remains live. Redirects are not followed. Browser exit and
+authorization-observer loss require interaction again; HTTP 401, 403, and
+login timeout become `session expired`. Only reads may retry; `Retry-After` is
+bounded. OWA actions retain their synthetic `__type` metadata and are
+normalized behind typed contracts.
 
 The registry includes only the actions required for implemented folder, mail,
 attachment, calendar, and reviewed write operations. The typed `FindFolder`

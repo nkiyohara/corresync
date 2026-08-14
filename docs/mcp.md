@@ -146,6 +146,12 @@ approval. Decline, cancellation, failure, or a host without terminal access
 leaves the action as an explicit blocker, and alternatives require the user's
 choice.
 
+The current local provider flows do not have a reviewed URL broker, so MCP
+elicitation is intentionally not advertised or used for authentication. A
+client that supports elicitation receives the same exact action object as a
+legacy client; only a future separately reviewed broker may add a consented
+multi-round-trip enhancement without changing this baseline.
+
 Tool/resource names, schemas, annotations, deprecations, and negotiated
 compatibility follow the
 [public and local versioning policy](adr/0020-public-and-local-versioning.md).

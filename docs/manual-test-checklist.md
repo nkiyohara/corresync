@@ -255,6 +255,21 @@ Pass criteria:
 - unavailable behavior appears as a degradation, not a silent provider
   fallback.
 
+For an authorized browser-backed test account, close the browser after a
+successful login and attempt one read. The read must not use the last observed
+authorization snapshot or return an empty success. Status must immediately
+show `reauthentication_required` with `interaction_required` for only the
+affected service lease, while unrelated accounts and independently routed
+services remain active. Complete the exact local login action, verify status,
+and repeat that read once. Do not repeat a write or reuse an earlier approval.
+
+After an ordinary suspend/resume or short network interruption, retry only a
+read that failed visibly. A stateless API route may already have made its three
+bounded attempts; persistent failure must remain visible and local to that
+account/provider. Rate limiting must remain distinguishable from login, and a
+429 must not cause an automatic request loop. Do not manufacture a live outage
+or bypass provider controls to obtain this observation.
+
 For iCloud, create the app-specific password only on the fixed Apple Account
 page opened by an explicit guided action. Confirm that macOS Keychain, Linux
 Secret Service, or Windows Credential Manager owns the password prompt and that

@@ -210,6 +210,26 @@ resources once, and returns a versioned action naming the real account alias.
 An unknown write outcome is never relabeled as authentication failure and is
 never automatically replayed.
 
+Transient availability is separate from authentication. Stateless provider
+API reads may make three total attempts after transport/read failure or HTTP
+502/503/504, with short bounded backoff. Exhaustion opens a five-second circuit
+inside that account-owned provider client. HTTP 429 is not replayed: the
+provider's bounded rate-limit result remains visible and a local throttle
+circuit prevents a request loop for at least one second and at most five
+minutes. A success closes the circuit. No circuit, backoff, session, or rate
+state is shared with another account or route, and no consequential write is
+automatically repeated.
+
+Closing or losing a browser-owned Outlook Web session prevents further use of
+its last authorization snapshot. The next affected operation becomes
+`reauthentication_required` with reason `interaction_required`, invalidating
+only the services held by that lease. The gated Teams Web adapter applies the
+same rule to browser loss or semantic-DOM drift instead of returning an empty
+successful result. Stateful standards protocols fail visibly rather than
+receiving a generic replay whose session state cannot be proven. This lets a
+human repeat the same read after a network or sleep/wake interruption while
+keeping write reconciliation mandatory.
+
 `corr auth logout --account work` closes only that account's adapters, browser,
 pending login, previews, and monitor after its in-flight operations finish.
 Other accounts and the config-scoped daemon remain active. Repeating the command
