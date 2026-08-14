@@ -663,6 +663,40 @@ func TestAccountAddPersistsTaskOnlyGraphGrantWithoutDiscoveryOrAuthentication(t 
 	}
 }
 
+func TestAccountAddPersistsTaskOnlyTodoistPublicClientWithoutDiscovery(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.test", Alias: "tasks",
+		TaskProvider:         string(domain.ProviderTodoist),
+		TaskOAuthClientID:    "synthetic-todoist-client",
+		TaskOAuthRedirectURI: "http://127.0.0.1:53684/oauth/callback",
+		TaskAuthorizationKey: "todoist-tasks",
+		ApproveTaskOAuth:     true,
+		TaskReadOnly:         true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	if discoverer.address != "" {
+		t.Fatalf("task-only route started discovery for %q", discoverer.address)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := configuration.Accounts["tasks"].Tasks
+	if route == nil || route.Provider != domain.ProviderTodoist ||
+		route.Todoist == nil || !route.Todoist.ReadOnly ||
+		route.Todoist.OAuth.APIBase != "https://api.todoist.com/api/v1" ||
+		route.Todoist.OAuth.Authorization.Key != command.TaskAuthorizationKey {
+		t.Fatalf("task-only Todoist route = %#v", route)
+	}
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("task-only output = %q", stdout.String())
+	}
+}
+
 func TestAccountAddRejectsExplicitGraphAPIBaseFromAnotherCloud(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{

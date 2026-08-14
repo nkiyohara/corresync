@@ -115,18 +115,61 @@ func (client *Client) DoJSON(
 	if err != nil {
 		return Result{}, err
 	}
-	if responseBody != nil && len(result.Body) != 0 {
-		if err := json.Unmarshal(result.Body, responseBody); err != nil {
-			if write {
-				return Result{}, fmt.Errorf(
-					"%w: API write returned malformed JSON",
-					application.ErrWriteOutcomeUnknown,
-				)
-			}
-			return Result{}, errors.New("API returned malformed JSON")
-		}
+	if err := decodeJSONResult(result, responseBody, write); err != nil {
+		return Result{}, err
 	}
 	return result, nil
+}
+
+// DoForm executes one bounded application/x-www-form-urlencoded request and
+// decodes a bounded JSON response. It exists for provider APIs whose documented
+// write boundary is a form body (for example, a command batch) rather than a
+// JSON entity.
+func (client *Client) DoForm(
+	ctx context.Context,
+	method, resource string,
+	query, form url.Values,
+	responseBody any,
+	write bool,
+	headers http.Header,
+	accepted ...int,
+) (Result, error) {
+	encoded := form.Encode()
+	if len(encoded) > maximumRequestBytes {
+		return Result{}, errors.New("API form request exceeds the configured limit")
+	}
+	requestHeaders := headers.Clone()
+	if requestHeaders == nil {
+		requestHeaders = make(http.Header)
+	}
+	requestHeaders.Set("Content-Type", "application/x-www-form-urlencoded")
+	result, err := client.Do(
+		ctx, method, resource, query, strings.NewReader(encoded), write,
+		requestHeaders, accepted...,
+	)
+	if err != nil {
+		return Result{}, err
+	}
+	if err := decodeJSONResult(result, responseBody, write); err != nil {
+		return Result{}, err
+	}
+	return result, nil
+}
+
+func decodeJSONResult(result Result, destination any, write bool) error {
+	if destination == nil || len(result.Body) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(result.Body, destination); err != nil {
+		if write {
+			return fmt.Errorf(
+				"%w: API write returned malformed JSON",
+				application.ErrWriteOutcomeUnknown,
+			)
+		}
+		return errors.New("API returned malformed JSON")
+	}
+	return nil
 }
 
 // Do executes one bounded request. Transport failures for writes are reported

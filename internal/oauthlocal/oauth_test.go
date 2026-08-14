@@ -14,9 +14,12 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/zalando/go-keyring"
+	"golang.org/x/oauth2"
 
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
@@ -332,6 +335,161 @@ func TestMicrosoftTodoScopesAndNationalCloudAuthorities(t *testing.T) {
 		Tasks: true, MicrosoftCloud: microsoftcloud.China,
 	}); err == nil || !strings.Contains(err.Error(), "unavailable") {
 		t.Fatalf("China task profile error = %v", err)
+	}
+}
+
+func TestTodoistProfileUsesPublicClientPKCEAndCommaSeparatedScopes(t *testing.T) {
+	t.Parallel()
+	provider, err := ProviderFor(domain.ProviderTodoist, Services{
+		Tasks: true, TaskWrite: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.AuthURL != "https://app.todoist.com/oauth/authorize" ||
+		provider.TokenURL != "https://api.todoist.com/oauth/access_token" ||
+		provider.ScopeSeparator != "," ||
+		!slices.Equal(provider.Scopes, []string{"data:delete", "data:read_write"}) {
+		t.Fatalf("Todoist profile = %+v", provider)
+	}
+	route := config.OAuthClient{
+		ClientID: "public-client", RedirectURI: "http://127.0.0.1:8765/oauth/callback",
+		Authorization: config.CredentialRef{
+			Backend: config.CredentialOSKeyring, Key: "todoist", Consent: true,
+		},
+	}
+	configuration := oauthConfig(route, provider, "")
+	authorizationURL := configuration.AuthCodeURL(
+		"state", authorizationOptions(provider, "verifier")...,
+	)
+	parsed, err := url.Parse(authorizationURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Query().Get("scope") != "data:delete,data:read_write" ||
+		parsed.Query().Get("code_challenge_method") != "S256" ||
+		parsed.Query().Get("client_secret") != "" {
+		t.Fatalf("Todoist authorization query = %s", parsed.RawQuery)
+	}
+}
+
+func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
+	t.Parallel()
+	var mu sync.Mutex
+	refreshes := 0
+	tokenServer := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		if err := request.ParseForm(); err != nil {
+			t.Error(err)
+			http.Error(writer, "bad form", http.StatusBadRequest)
+			return
+		}
+		if request.Form.Get("refresh_token") != "refresh-1" ||
+			request.Form.Get("client_id") != "public-client" ||
+			request.Form.Get("client_secret") != "" {
+			t.Errorf("refresh form = %#v", request.Form)
+			http.Error(writer, "bad refresh", http.StatusBadRequest)
+			return
+		}
+		mu.Lock()
+		refreshes++
+		mu.Unlock()
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(writer,
+			`{"access_token":"access-2","refresh_token":"refresh-2",`+
+				`"token_type":"Bearer","expires_in":3600}`,
+		)
+	}))
+	defer tokenServer.Close()
+
+	provider := Provider{
+		ID: domain.ProviderTodoist, AuthURL: tokenServer.URL + "/authorize",
+		TokenURL: tokenServer.URL, Scopes: []string{"data:read_write"},
+	}
+	route := config.OAuthClient{
+		ClientID: "public-client", RedirectURI: "http://127.0.0.1:8765/oauth/callback",
+		Authorization: config.CredentialRef{
+			Backend: config.CredentialOSKeyring, Key: "rotating-grant", Consent: true,
+		},
+	}
+	initial, err := json.Marshal(storedGrant{
+		Version: 1, Provider: domain.ProviderTodoist,
+		ClientID: route.ClientID, RedirectURI: route.RedirectURI,
+		Scopes: provider.Scopes,
+		Token: oauth2.Token{
+			AccessToken: "access-1", RefreshToken: "refresh-1",
+			TokenType: "Bearer", Expiry: time.Now().Add(-time.Hour),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := string(initial)
+	get := func(service, key string) (string, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if service != keyringService || key != route.Authorization.Key {
+			t.Fatalf("keyring get = %q %q", service, key)
+		}
+		return stored, nil
+	}
+	set := func(service, key, value string) error {
+		mu.Lock()
+		defer mu.Unlock()
+		if service != keyringService || key != route.Authorization.Key {
+			t.Fatalf("keyring set = %q %q", service, key)
+		}
+		stored = value
+		return nil
+	}
+	lockDir := t.TempDir()
+	makeManager := func() *Manager {
+		manager, err := New(Options{
+			HTTP: tokenServer.Client(), Get: get, Set: set,
+			LockDir: lockDir,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return manager
+	}
+	first, err := makeManager().Authorize(t.Context(), route, provider)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Both managers intentionally load the expired, pre-rotation grant before
+	// either is allowed to refresh it.
+	second, err := makeManager().Authorize(t.Context(), route, provider)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wait sync.WaitGroup
+	wait.Add(2)
+	errorsFound := make(chan error, 2)
+	for _, authorization := range []Authorization{first, second} {
+		go func() {
+			defer wait.Done()
+			token, err := authorization.AccessToken(context.Background())
+			if err != nil {
+				errorsFound <- err
+				return
+			}
+			if string(token) != "access-2" {
+				errorsFound <- errors.New("unexpected refreshed access token")
+			}
+		}()
+	}
+	wait.Wait()
+	close(errorsFound)
+	for err := range errorsFound {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if refreshes != 1 || !strings.Contains(stored, `"refresh_token":"refresh-2"`) {
+		t.Fatalf("refreshes=%d stored=%s", refreshes, stored)
 	}
 }
 

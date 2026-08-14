@@ -91,7 +91,7 @@ func TestAccountServiceAddsTaskOnlyRouteWithoutAddress(t *testing.T) {
 		repository,
 		&accountPurgerStub{},
 		nil,
-		[]domain.ProviderID{domain.ProviderTodoist},
+		[]domain.ProviderID{domain.ProviderTickTick},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -100,13 +100,13 @@ func TestAccountServiceAddsTaskOnlyRouteWithoutAddress(t *testing.T) {
 		return "acc_00000000000000000000000000000009", nil
 	}
 	account, err := service.Add(t.Context(), AccountAddInput{
-		Alias: "tasks", Tasks: &AccountTaskRouteInput{Provider: domain.ProviderTodoist},
+		Alias: "tasks", Tasks: &AccountTaskRouteInput{Provider: domain.ProviderTickTick},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if account.Address != "" || account.Mail != nil || account.Calendar != nil ||
-		account.Tasks == nil || account.Tasks.Provider != domain.ProviderTodoist ||
+		account.Tasks == nil || account.Tasks.Provider != domain.ProviderTickTick ||
 		!account.Tasks.Available || repository.added.Tasks == nil {
 		t.Fatalf("task-only account = %+v registration=%+v", account, repository.added)
 	}
@@ -245,6 +245,14 @@ func accountFixture(alias, id string, isDefault bool) AccountView {
 			},
 		},
 		IsDefault: isDefault,
+	}
+}
+
+func TestAccountUsesOAuthIncludesTodoistTaskRoute(t *testing.T) {
+	t.Parallel()
+	account := AccountView{Tasks: &AccountRouteView{Provider: domain.ProviderTodoist}}
+	if !accountUsesOAuth(account) {
+		t.Fatal("Todoist task route did not disclose owned OAuth removal")
 	}
 }
 

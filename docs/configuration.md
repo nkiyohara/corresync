@@ -214,8 +214,39 @@ discovery. `read_only = true` selects `Tasks.Read`; omission selects
 `microsoft_cloud` is `global`, `gcc-high`, or `dod`, and the exact API base must
 match that choice. `china` is a recognized deployment but To Do configuration
 is rejected because the API is unavailable there. The authority is derived
-from this closed pair and is not configurable. Other task providers remain
-unavailable and have no arbitrary options map or credential value. See the
+from this closed pair and is not configurable.
+
+Todoist uses a separate closed public-client route:
+
+```toml
+[accounts.todoist]
+id = "acc_0000000000000000000000000000000a"
+address = "reader@example.invalid"
+
+[accounts.todoist.tasks]
+provider = "todoist"
+
+[accounts.todoist.tasks.todoist]
+read_only = true
+
+[accounts.todoist.tasks.todoist.oauth]
+api_base = "https://api.todoist.com/api/v1"
+client_id = "synthetic-public-client"
+redirect_uri = "http://127.0.0.1:53684/callback"
+
+[accounts.todoist.tasks.todoist.oauth.authorization]
+backend = "os-keyring"
+key = "tasks-todoist"
+consent = true
+```
+
+Its address is checked against the delegated Todoist identity at login.
+`read_only = true` selects `data:read`; omission selects
+`data:read_write,data:delete`. The API base is fixed. Configuration has no
+client-secret or personal-token field. The loopback port is also fixed and must
+exactly match the redirect registered for that public client; Todoist routes do
+not use the ephemeral `:0` convention. Remaining task providers are unavailable
+and have no arbitrary options map or credential value. See the
 [task contract](tasks.md).
 
 Prefer the lifecycle command over hand editing:
@@ -228,6 +259,15 @@ corr account add reader@example.invalid \
   --task-oauth-client-id synthetic-public-client \
   --task-oauth-redirect-uri http://127.0.0.1:0/callback \
   --task-authorization-key tasks-graph \
+  --approve-task-oauth \
+  --task-read-only
+
+corr account add reader@example.invalid \
+  --alias todoist \
+  --task-provider todoist \
+  --task-oauth-client-id synthetic-public-client \
+  --task-oauth-redirect-uri http://127.0.0.1:53684/callback \
+  --task-authorization-key tasks-todoist \
   --approve-task-oauth \
   --task-read-only
 ```

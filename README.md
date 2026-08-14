@@ -39,8 +39,9 @@
 one local
 [Model Context Protocol](https://modelcontextprotocol.io/) server.
 Gmail and Google Calendar support are coming soon after Google OAuth approval.
-The canonical task tools are included now; task-provider adapters arrive
-individually and remain unavailable until their contracts are implemented.
+The canonical task tools include explicit Microsoft To Do and Todoist routes;
+remaining task-provider adapters stay unavailable until their contracts are
+implemented.
 
 - Search mail and build one agenda across accounts without collapsing their
   identity or provider provenance.

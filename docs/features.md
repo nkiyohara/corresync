@@ -11,6 +11,7 @@ not available through a raw protocol escape hatch.
 | `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | — | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
 | `google` (coming soon) | Gmail API; no permanent delete | Selectable Google calendars and Google Meet when advertised | — | Included but disabled until production OAuth approval; no sign-in starts | Synthetic API/application contracts; live-unobserved |
 | `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Microsoft To Do | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
+| `todoist` | — | — | Todoist | Explicit BYO public OAuth client with PKCE; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `jmap` | Mail | — | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
 | `imap-smtp` | IMAP read/manage, SMTP draft/send | — | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts; live-unobserved |
 | `caldav` | — | Calendar | Reserved route only | OS keyring or approved credential helper | Calendar implemented; VTODO unavailable; live-unobserved |
@@ -18,8 +19,9 @@ not available through a raw protocol escape hatch.
 
 Task routes use a separate provider selection described in the
 [task contract](tasks.md). Microsoft To Do is active only through the explicit
-`microsoft-graph` task route. Other configured task routes remain unavailable
-until their dependent provider issue ships.
+`microsoft-graph` task route, and Todoist through the explicit `todoist` route.
+Other configured task routes remain unavailable until their dependent provider
+issue ships.
 
 Mail and calendar are selected independently. For example, one account may use
 IMAP/SMTP for mail and CalDAV for calendar. `pop3` is reserved without a route
@@ -185,7 +187,11 @@ Microsoft To Do implements these surfaces except search, which is explicitly
 unavailable. It supports zoned times, one absolute reminder, recurrence,
 checklists, categories, typed linked sources, and delta cursors. Writes that
 assemble checklist or linked-resource changes report partial outcomes instead
-of retrying. Other task providers remain unavailable.
+of retrying. Todoist implements the same task commands except search, with
+plan-observed labels/reminders/deadlines, subtasks, one assignee, exact provider
+recurrence, and bounded sync-token cursors. Its scheduling date and deadline
+remain distinct, and unmapped provider fields are visible degradations. Other
+task providers remain unavailable.
 
 ## Accounts and projections
 

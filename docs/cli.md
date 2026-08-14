@@ -127,6 +127,16 @@ corr account add reader@example.invalid \
   --task-authorization-key tasks-graph \
   --approve-task-oauth \
   --task-read-only
+
+# Todoist task-only route also uses explicit public-client OAuth
+corr account add reader@example.invalid \
+  --alias todoist \
+  --task-provider todoist \
+  --task-oauth-client-id synthetic-public-client \
+  --task-oauth-redirect-uri http://127.0.0.1:53684/callback \
+  --task-authorization-key tasks-todoist \
+  --approve-task-oauth \
+  --task-read-only
 ```
 
 Mail and calendar providers are independent. Calendar-specific OAuth flags
@@ -139,9 +149,9 @@ Corresync-owned OAuth grant; it never deletes an external standards credential.
 The Google example documents the future route shape. In this RC it returns an
 approval-pending message, persists nothing, and starts no browser, keyring, or
 Google API work. Outlook Web, Graph, JMAP, IMAP/SMTP, and CalDAV routes remain
-available as described above. The Microsoft To Do task-only example is active
-with synthetic contract evidence; the other task provider IDs remain
-unavailable.
+available as described above. The Microsoft To Do and Todoist task-only
+examples are active with synthetic contract evidence; the other task provider
+IDs remain unavailable.
 
 ## Authentication and doctor
 
@@ -409,8 +419,9 @@ and digest while the approval binds the complete content.
 
 Complete, reopen, and delete require the exact version returned by a read.
 Every task write previews; `--approve` commits only that single-use review.
-Microsoft To Do supports lists, list/get, sync, and the typed write commands;
-search returns an explicit unsupported error. Other task adapters remain
+Microsoft To Do and Todoist support lists, list/get, sync, and the typed write
+commands; Todoist applies its observed account-plan constraints. Search returns
+an explicit unsupported error on both routes. Other task adapters remain
 unavailable until their provider issues ship. See [tasks.md](tasks.md).
 
 ## Read-only import staging

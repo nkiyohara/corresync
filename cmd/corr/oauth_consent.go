@@ -119,6 +119,13 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 			MicrosoftCloud: account.Tasks.MicrosoftGraph.OAuth.MicrosoftCloud,
 		})
 	}
+	if account.Tasks != nil && account.Tasks.Provider == domain.ProviderTodoist &&
+		account.Tasks.Todoist != nil {
+		client := account.Tasks.Todoist.OAuth.Client()
+		add(account.Tasks.Provider, &client, oauthlocal.Services{
+			Tasks: true, TaskWrite: !account.Tasks.Todoist.ReadOnly,
+		})
+	}
 	for _, route := range routes {
 		if _, err := oauthlocal.ProviderFor(
 			route.provider,

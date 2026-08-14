@@ -18,6 +18,7 @@ authorized live observations.
 | Approval-gated Gmail and Google Calendar APIs/Google Meet field | Synthetic REST, OAuth-gate, and application integration contracts | Prior [IMAP/SMTP observation](evidence/google-macos-arm64-2026-07-30.md) does not cover the new route | Included but disabled; deterministic only; live-unobserved |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | Microsoft Graph To Do | Synthetic OAuth, national-cloud, REST CRUD/delta, recurrence/time-zone, cursor-restart, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
+| Todoist tasks | Synthetic public-client OAuth, refresh rotation, API v1 REST/Sync CRUD, plan, time, temporary-ID, cursor/isolation, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
 | IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
 | CalDAV calendar | Synthetic WebDAV/iCalendar/conditional-write contracts | Not run | Deterministic only |
@@ -64,6 +65,10 @@ evidence.
   Microsoft To Do are implemented with service-derived scopes and a BYO public
   OAuth client. Global, GCC High, and DoD use closed endpoint/authority pairs;
   China rejects To Do before OAuth. The route has no recorded live observation.
+- `todoist`: task lists, typed task CRUD/state, plan-sensitive metadata,
+  reminders, exact provider recurrence, and sync-token changes are implemented
+  through a BYO public client and PKCE. The API v1 route has synthetic evidence
+  only and no recorded live observation.
 - `jmap`, `imap-smtp`, and `caldav`: implemented against synthetic standards
   contracts, with server-specific behavior exposed through capabilities and
   degradations.
@@ -72,9 +77,10 @@ evidence.
   and an external credential reference. It has synthetic coverage only and
   remains live-unobserved.
 - task routes: the canonical application, CLI, JSON, IPC, MCP, cursor, and
-  preview/commit contracts are implemented. Microsoft To Do has deterministic
-  provider contracts and remains live-unobserved. The other rows in the
-  [Task contract](tasks.md) remain development targets, not provider evidence.
+  preview/commit contracts are implemented. Microsoft To Do and Todoist have
+  deterministic provider contracts and remain live-unobserved. The other
+  provider rows in the [Task contract](tasks.md) remain development targets,
+  not provider evidence.
 
 `pop3` is a reserved unavailable identifier. Its presence in discovery and
 config validation does not constitute an adapter claim.

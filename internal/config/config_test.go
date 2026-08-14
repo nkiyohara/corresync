@@ -83,7 +83,7 @@ func TestTaskOnlyAccountRoundTripsWithExplicitProviderSelection(t *testing.T) {
 	configuration.DefaultAccount = "tasks"
 	configuration.Accounts["tasks"] = Account{
 		ID:    "acc_00000000000000000000000000000009",
-		Tasks: &TaskRoute{Provider: domain.ProviderTodoist},
+		Tasks: &TaskRoute{Provider: domain.ProviderTickTick},
 	}
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := Save(path, configuration); err != nil {
@@ -95,8 +95,8 @@ func TestTaskOnlyAccountRoundTripsWithExplicitProviderSelection(t *testing.T) {
 	}
 	account := loaded.Accounts["tasks"]
 	if account.Mail != nil || account.Calendar != nil ||
-		account.TaskProvider() != domain.ProviderTodoist ||
-		account.PrimaryProvider() != domain.ProviderTodoist {
+		account.TaskProvider() != domain.ProviderTickTick ||
+		account.PrimaryProvider() != domain.ProviderTickTick {
 		t.Fatalf("task-only account = %+v", account)
 	}
 }
@@ -165,6 +165,90 @@ func TestMicrosoftTodoRouteRoundTripsAndRejectsCrossCloudEndpoints(t *testing.T)
 	bad.Accounts["tasks"] = account
 	if err := bad.Validate(); err == nil || !strings.Contains(err.Error(), "unavailable") {
 		t.Fatalf("China To Do route error = %v", err)
+	}
+}
+
+func TestTodoistRouteRoundTripsAsSecretFreePublicClient(t *testing.T) {
+	t.Parallel()
+	configuration := Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = Account{
+		ID:      "acc_00000000000000000000000000000009",
+		Address: "reader@example.test",
+		Tasks: &TaskRoute{
+			Provider: domain.ProviderTodoist,
+			Todoist: &TodoistTaskRoute{
+				ReadOnly: true,
+				OAuth: OAuthRoute{
+					APIBase:     "https://api.todoist.com/api/v1",
+					ClientID:    "synthetic-public-client",
+					RedirectURI: "http://127.0.0.1:43123/callback",
+					Authorization: CredentialRef{
+						Backend: CredentialOSKeyring, Key: "tasks-todoist", Consent: true,
+					},
+				},
+			},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := loaded.Accounts["tasks"].Tasks.Todoist
+	if got == nil || !got.ReadOnly ||
+		got.OAuth.APIBase != "https://api.todoist.com/api/v1" ||
+		got.OAuth.Authorization.Key != "tasks-todoist" {
+		t.Fatalf("Todoist route = %+v", got)
+	}
+	contents, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{"client_secret", "personal_token", "access_token", "refresh_token"} {
+		if strings.Contains(strings.ToLower(string(contents)), forbidden) {
+			t.Fatalf("Todoist route persisted forbidden field %q: %s", forbidden, contents)
+		}
+	}
+
+	bad := configuration
+	account := bad.Accounts["tasks"]
+	account.Tasks.Todoist.OAuth.APIBase = "https://api.example.invalid/api/v1"
+	bad.Accounts["tasks"] = account
+	if err := bad.Validate(); err == nil || !strings.Contains(err.Error(), "todoist API base") {
+		t.Fatalf("unpinned Todoist route error = %v", err)
+	}
+	account.Tasks.Todoist.OAuth.APIBase = "https://api.todoist.com/api/v1"
+	missingAddress := configuration.Accounts["tasks"]
+	missingAddress.Address = ""
+	if err := missingAddress.validate(); err == nil || !strings.Contains(err.Error(), "email address") {
+		t.Fatalf("addressless Todoist route error = %v", err)
+	}
+}
+
+func TestTodoistRouteRejectsAnEphemeralOAuthPort(t *testing.T) {
+	t.Parallel()
+	configuration := Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = Account{
+		ID:      "acc_00000000000000000000000000000009",
+		Address: "reader@example.test",
+		Tasks: &TaskRoute{
+			Provider: domain.ProviderTodoist,
+			Todoist: &TodoistTaskRoute{OAuth: OAuthRoute{
+				APIBase: "https://api.todoist.com/api/v1", ClientID: "synthetic-public-client",
+				RedirectURI: "http://127.0.0.1:0/callback",
+				Authorization: CredentialRef{
+					Backend: CredentialOSKeyring, Key: "tasks-todoist", Consent: true,
+				},
+			}},
+		},
+	}
+	if err := configuration.Validate(); err == nil || !strings.Contains(err.Error(), "fixed loopback port") {
+		t.Fatalf("Validate() error = %v", err)
 	}
 }
 
