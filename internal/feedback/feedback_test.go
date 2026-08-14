@@ -156,6 +156,7 @@ func TestGenerateIsDeterministicAndAllowlisted(t *testing.T) {
 		Providers: []Provider{
 			{ID: "microsoft-graph", Capabilities: []string{"mail", "calendar"}},
 			{ID: "google", Capabilities: []string{"calendar"}},
+			{ID: "todoist", Capabilities: []string{"tasks"}},
 		},
 		LastError: LastErrorStatus{
 			Status:  "ok",
@@ -179,8 +180,10 @@ func TestGenerateIsDeterministicAndAllowlisted(t *testing.T) {
 		`"generation": "local-only"`,
 		`"automatic_upload": false`,
 		`"mail_or_calendar_content_included": false`,
+		`"task_content_included": false`,
 		`"id": "google"`,
 		`"id": "microsoft-graph"`,
+		`"id": "todoist"`,
 	} {
 		if !bytes.Contains(first, []byte(want)) {
 			t.Fatalf("report is missing %q:\n%s", want, first)

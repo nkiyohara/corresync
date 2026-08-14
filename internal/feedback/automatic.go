@@ -35,6 +35,7 @@ type AutomaticPrivacyStatement struct {
 	ArgumentValuesIncluded bool   `json:"argument_values_included"`
 	AccountDataIncluded    bool   `json:"account_data_included"`
 	ContentIncluded        bool   `json:"mail_or_calendar_content_included"`
+	TaskContentIncluded    bool   `json:"task_content_included"`
 }
 
 // GenerateAutomatic builds the complete automatic issue payload from closed,
