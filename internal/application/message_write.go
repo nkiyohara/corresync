@@ -71,7 +71,7 @@ func (input MessageSendInput) Validate() error {
 			return err
 		}
 	}
-	if err := input.Content.Validate(); err != nil {
+	if err := input.Content.validate(len(input.Attachments) != 0); err != nil {
 		return err
 	}
 	if len(input.Mentions) > MaxMessageCollectionItems || len(input.Attachments) > MaxMessageCollectionItems {
@@ -98,6 +98,7 @@ func (input MessageSendInput) Validate() error {
 type MessageEditInput struct {
 	MessageWriteRoute
 	ConversationID string           `json:"conversationId"`
+	ThreadRootID   string           `json:"threadRootId,omitempty"`
 	MessageID      string           `json:"messageId"`
 	Version        string           `json:"version"`
 	Content        MessageContent   `json:"content"`
@@ -107,6 +108,11 @@ type MessageEditInput struct {
 func (input MessageEditInput) Validate() error {
 	if err := validateMessageWriteIdentity(input.MessageWriteRoute, input.ConversationID, input.MessageID, input.Version); err != nil {
 		return err
+	}
+	if input.ThreadRootID != "" {
+		if err := validateOpaqueValue("message thread root ID", input.ThreadRootID); err != nil {
+			return err
+		}
 	}
 	if err := input.Content.Validate(); err != nil {
 		return err
@@ -125,17 +131,25 @@ func (input MessageEditInput) Validate() error {
 type MessageDeleteInput struct {
 	MessageWriteRoute
 	ConversationID string `json:"conversationId"`
+	ThreadRootID   string `json:"threadRootId,omitempty"`
 	MessageID      string `json:"messageId"`
 	Version        string `json:"version"`
 }
 
 func (input MessageDeleteInput) Validate() error {
-	return validateMessageWriteIdentity(input.MessageWriteRoute, input.ConversationID, input.MessageID, input.Version)
+	if err := validateMessageWriteIdentity(input.MessageWriteRoute, input.ConversationID, input.MessageID, input.Version); err != nil {
+		return err
+	}
+	if input.ThreadRootID != "" {
+		return validateOpaqueValue("message thread root ID", input.ThreadRootID)
+	}
+	return nil
 }
 
 type MessageReactionInput struct {
 	MessageWriteRoute
 	ConversationID string `json:"conversationId"`
+	ThreadRootID   string `json:"threadRootId,omitempty"`
 	MessageID      string `json:"messageId"`
 	Version        string `json:"version"`
 	Reaction       string `json:"reaction"`
@@ -145,6 +159,11 @@ type MessageReactionInput struct {
 func (input MessageReactionInput) Validate() error {
 	if err := validateMessageWriteIdentity(input.MessageWriteRoute, input.ConversationID, input.MessageID, input.Version); err != nil {
 		return err
+	}
+	if input.ThreadRootID != "" {
+		if err := validateOpaqueValue("message thread root ID", input.ThreadRootID); err != nil {
+			return err
+		}
 	}
 	return (MessageReaction{Name: input.Reaction}).Validate()
 }
@@ -278,6 +297,7 @@ type MessageWriteReview struct {
 	Capabilities   MessageCapabilities          `json:"capabilities"`
 	Action         string                       `json:"action"`
 	ConversationID string                       `json:"conversationId,omitempty"`
+	ThreadRootID   string                       `json:"threadRootId,omitempty"`
 	MessageID      string                       `json:"messageId,omitempty"`
 	Version        string                       `json:"version,omitempty"`
 	ReplyToID      string                       `json:"replyToId,omitempty"`
@@ -323,6 +343,9 @@ type MessageWriter interface {
 func (service *MessagingService) Send(ctx context.Context, input MessageSendInput, caller domain.Caller) (MessageWriteAccess, error) {
 	if err := input.Validate(); err != nil {
 		return MessageWriteAccess{}, err
+	}
+	if len(input.Attachments) != 0 && !service.capabilities.AttachmentWrites {
+		return MessageWriteAccess{}, errors.New("the selected messaging route does not support attachment writes")
 	}
 	action := "send"
 	if input.ReplyToID != "" {
@@ -657,19 +680,20 @@ func (input MessageSendInput) review(action string) MessageWriteReview {
 func (input MessageEditInput) review() MessageWriteReview {
 	return MessageWriteReview{
 		Action: "edit", ConversationID: input.ConversationID, MessageID: input.MessageID,
-		Version: input.Version, Content: messageTextReview(input.Content),
+		ThreadRootID: input.ThreadRootID, Version: input.Version, Content: messageTextReview(input.Content),
 		Mentions: append([]MessageMention(nil), input.Mentions...),
 	}
 }
 
 func (input MessageDeleteInput) review() MessageWriteReview {
-	return MessageWriteReview{Action: "delete", ConversationID: input.ConversationID, MessageID: input.MessageID, Version: input.Version}
+	return MessageWriteReview{Action: "delete", ConversationID: input.ConversationID, ThreadRootID: input.ThreadRootID, MessageID: input.MessageID, Version: input.Version}
 }
 
 func (input MessageReactionInput) review() MessageWriteReview {
 	return MessageWriteReview{
 		Action: "react", ConversationID: input.ConversationID, MessageID: input.MessageID,
-		Version: input.Version, Reaction: input.Reaction, RemoveReaction: input.Remove,
+		ThreadRootID: input.ThreadRootID, Version: input.Version,
+		Reaction: input.Reaction, RemoveReaction: input.Remove,
 	}
 }
 

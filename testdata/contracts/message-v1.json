@@ -50,6 +50,7 @@
     {
       "name": "thumbsup",
       "count": 1,
+      "countKnown": true,
       "reactedByActor": true
     }
   ],

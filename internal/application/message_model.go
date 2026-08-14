@@ -144,8 +144,11 @@ func (capabilities MessageCapabilities) Validate() error {
 	if err := capabilities.ActorMode.Validate(); err != nil {
 		return err
 	}
-	if !capabilities.ListConversations || !capabilities.History {
-		return errors.New("messaging requires observed conversation-list and history capabilities")
+	if capabilities.SensitiveRead && !capabilities.History {
+		return errors.New("messaging sensitive reads require history")
+	}
+	if capabilities.IncrementalSync && !capabilities.History {
+		return errors.New("messaging incremental sync requires history")
 	}
 	if capabilities.Reply && !capabilities.Send {
 		return errors.New("messaging reply capability requires send")
@@ -268,10 +271,14 @@ type MessageContent struct {
 }
 
 func (content MessageContent) Validate() error {
+	return content.validate(false)
+}
+
+func (content MessageContent) validate(optional bool) error {
 	if err := content.Format.Validate(); err != nil {
 		return err
 	}
-	return validateMessageText("message content", content.Text, MaxMessageTextBytes, false)
+	return validateMessageText("message content", content.Text, MaxMessageTextBytes, optional)
 }
 
 type MessageMentionKind string
@@ -323,6 +330,7 @@ func (link MessageLink) Validate() error {
 type MessageReaction struct {
 	Name           string `json:"name"`
 	Count          int    `json:"count"`
+	CountKnown     bool   `json:"countKnown"`
 	ReactedByActor bool   `json:"reactedByActor"`
 }
 
@@ -332,6 +340,9 @@ func (reaction MessageReaction) Validate() error {
 	}
 	if reaction.Count < 0 || reaction.Count > 1_000_000 {
 		return errors.New("reaction count is out of bounds")
+	}
+	if !reaction.CountKnown && reaction.Count != 0 {
+		return errors.New("an unobserved reaction count must be zero")
 	}
 	return nil
 }
@@ -430,7 +441,7 @@ func (message Message) Validate() error {
 	if err := message.Summary.Validate(); err != nil {
 		return err
 	}
-	if err := message.Content.Validate(); err != nil {
+	if err := message.Content.validate(message.Summary.Deleted || len(message.Attachments) != 0); err != nil {
 		return err
 	}
 	if len(message.Links) > MaxMessageCollectionItems ||
@@ -501,12 +512,18 @@ type MessageGetInput struct {
 	Account        domain.AccountID `json:"account"`
 	WorkspaceID    string           `json:"workspaceId"`
 	ConversationID string           `json:"conversationId"`
+	ThreadRootID   string           `json:"threadRootId,omitempty"`
 	MessageID      string           `json:"messageId"`
 }
 
 func (input MessageGetInput) Validate() error {
 	if err := validateMessagingIdentity(input.Account, input.WorkspaceID, input.ConversationID); err != nil {
 		return err
+	}
+	if input.ThreadRootID != "" {
+		if err := validateOpaqueValue("message thread root ID", input.ThreadRootID); err != nil {
+			return err
+		}
 	}
 	return validateOpaqueValue("message ID", input.MessageID)
 }
@@ -610,13 +627,15 @@ type MessageAttachmentGetInput struct {
 	Account        domain.AccountID `json:"account"`
 	WorkspaceID    string           `json:"workspaceId"`
 	ConversationID string           `json:"conversationId"`
+	ThreadRootID   string           `json:"threadRootId,omitempty"`
 	MessageID      string           `json:"messageId"`
 	AttachmentID   string           `json:"attachmentId"`
 }
 
 func (input MessageAttachmentGetInput) Validate() error {
 	if err := (MessageGetInput{Account: input.Account, WorkspaceID: input.WorkspaceID,
-		ConversationID: input.ConversationID, MessageID: input.MessageID}).Validate(); err != nil {
+		ConversationID: input.ConversationID, ThreadRootID: input.ThreadRootID,
+		MessageID: input.MessageID}).Validate(); err != nil {
 		return err
 	}
 	return validateOpaqueValue("message attachment ID", input.AttachmentID)

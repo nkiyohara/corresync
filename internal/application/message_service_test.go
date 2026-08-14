@@ -369,6 +369,7 @@ func TestMessagingModelBoundsAndClosedValues(t *testing.T) {
 		(MessageContent{Format: "provider", Text: "body"}).Validate(),
 		(MessageContent{Format: MessageFormatPlain, Text: strings.Repeat("x", MaxMessageTextBytes+1)}).Validate(),
 		(MessageLink{URL: "javascript:alert(1)"}).Validate(),
+		(MessageReaction{Name: "thumbsup", Count: 1}).Validate(),
 		(MessageAttachmentUpload{Name: "fixture", Data: make([]byte, MaxMessageAttachmentBytes+1)}).Validate(),
 		(MessageCapabilities{ListConversations: true, History: true, Reply: true, ActorMode: MessageActorApp}).Validate(),
 		(ConversationCreateInput{MessageWriteRoute: validMessageWriteRoute(), Kind: ConversationMeeting,
@@ -378,6 +379,32 @@ func TestMessagingModelBoundsAndClosedValues(t *testing.T) {
 		if err == nil {
 			t.Fatalf("invalid messaging case %d unexpectedly succeeded", index)
 		}
+	}
+}
+
+func TestMessagingServiceAllowsExplicitlyDegradedReadCapabilities(t *testing.T) {
+	t.Parallel()
+
+	guard, _ := newTestGuard(t, policy.DefaultRules())
+	service, err := NewMessagingService(guard, &fakeMessagingPort{}, MessagingOptions{
+		Provenance: testMessageProvenance(),
+		Capabilities: MessageCapabilities{
+			ActorMode: MessageActorApp,
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewMessagingService() error = %v", err)
+	}
+	caller := domain.Caller{Surface: "cli", Instance: "process-1"}
+	if _, err := service.ListConversations(t.Context(), ConversationListInput{
+		Account: testMessageAccount, WorkspaceID: "workspace-1", Limit: 10,
+	}, caller); err == nil || !strings.Contains(err.Error(), "conversation listing") {
+		t.Fatalf("degraded conversation-list error = %v", err)
+	}
+	if _, err := service.ListMessages(t.Context(), MessageListInput{
+		Account: testMessageAccount, WorkspaceID: "workspace-1", ConversationID: "conversation-1", Limit: 10,
+	}, caller); err == nil || !strings.Contains(err.Error(), "message history") {
+		t.Fatalf("degraded history error = %v", err)
 	}
 }
 

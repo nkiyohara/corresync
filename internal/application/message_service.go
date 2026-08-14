@@ -96,6 +96,9 @@ func (service *MessagingService) ListConversations(
 	if err := service.validateRoute(input.Account, input.WorkspaceID); err != nil {
 		return ConversationPage{}, err
 	}
+	if !service.capabilities.ListConversations {
+		return ConversationPage{}, errors.New("the selected messaging route does not support conversation listing")
+	}
 	operation, err := domain.NewOperation("message.conversations", domain.EffectRead, input.Account, input)
 	if err != nil {
 		return ConversationPage{}, err
@@ -120,6 +123,9 @@ func (service *MessagingService) ListMessages(
 	}
 	if err := service.validateRoute(input.Account, input.WorkspaceID); err != nil {
 		return MessagePage{}, err
+	}
+	if !service.capabilities.History {
+		return MessagePage{}, errors.New("the selected messaging route does not support message history")
 	}
 	operation, err := domain.NewOperation("message.list", domain.EffectRead, input.Account, input)
 	if err != nil {
@@ -171,6 +177,7 @@ type MessageSensitiveReview struct {
 	Route          MessagingRouteKind         `json:"route"`
 	WorkspaceID    string                     `json:"workspaceId"`
 	ConversationID string                     `json:"conversationId"`
+	ThreadRootID   string                     `json:"threadRootId,omitempty"`
 	MessageID      string                     `json:"messageId"`
 	AttachmentID   string                     `json:"attachmentId,omitempty"`
 }
@@ -196,7 +203,7 @@ func (service *MessagingService) GetMessage(
 	}
 	return service.prepareSensitiveRead(ctx, "message.get", input.Account,
 		messageTarget(input.WorkspaceID, input.ConversationID, input.MessageID), input,
-		service.sensitiveReview(input.ConversationID, input.MessageID, ""), caller)
+		service.sensitiveReview(input.ConversationID, input.ThreadRootID, input.MessageID, ""), caller)
 }
 
 func (service *MessagingService) GetAttachment(
@@ -212,7 +219,7 @@ func (service *MessagingService) GetAttachment(
 	}
 	return service.prepareSensitiveRead(ctx, "message.get_attachment", input.Account,
 		messageTarget(input.WorkspaceID, input.ConversationID, input.MessageID), input,
-		service.sensitiveReview(input.ConversationID, input.MessageID, input.AttachmentID), caller)
+		service.sensitiveReview(input.ConversationID, input.ThreadRootID, input.MessageID, input.AttachmentID), caller)
 }
 
 func (service *MessagingService) prepareSensitiveRead(
@@ -258,7 +265,7 @@ func (service *MessagingService) CommitGetMessage(
 		return MessageSensitiveAccess{}, err
 	}
 	return service.executeSensitiveRead(ctx, operation, caller, input,
-		service.sensitiveReview(input.ConversationID, input.MessageID, ""))
+		service.sensitiveReview(input.ConversationID, input.ThreadRootID, input.MessageID, ""))
 }
 
 func (service *MessagingService) CommitGetAttachment(
@@ -272,7 +279,7 @@ func (service *MessagingService) CommitGetAttachment(
 		return MessageSensitiveAccess{}, err
 	}
 	return service.executeSensitiveRead(ctx, operation, caller, input,
-		service.sensitiveReview(input.ConversationID, input.MessageID, input.AttachmentID))
+		service.sensitiveReview(input.ConversationID, input.ThreadRootID, input.MessageID, input.AttachmentID))
 }
 
 func (service *MessagingService) committedSensitiveRead(
@@ -523,11 +530,12 @@ func (service *MessagingService) itemProvenance(conversationID, objectID string)
 	return provenance
 }
 
-func (service *MessagingService) sensitiveReview(conversationID, messageID, attachmentID string) MessageSensitiveReview {
+func (service *MessagingService) sensitiveReview(conversationID, threadRootID, messageID, attachmentID string) MessageSensitiveReview {
 	return MessageSensitiveReview{
 		Account: service.provenance.AccountID, Provider: service.provenance.Provider,
 		Route: service.provenance.Route, WorkspaceID: service.provenance.WorkspaceID,
-		ConversationID: conversationID, MessageID: messageID, AttachmentID: attachmentID,
+		ConversationID: conversationID, ThreadRootID: threadRootID,
+		MessageID: messageID, AttachmentID: attachmentID,
 	}
 }
 
