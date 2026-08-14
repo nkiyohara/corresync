@@ -1370,13 +1370,14 @@ func writeOnboardingAccountReview(
 ) error {
 	view := newConsoleView(app, app.stdout, true)
 	if _, err := view.printf(
-		"\n%s  %s\n\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %t\n",
+		"\n%s  %s\n\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %t\n",
 		view.info(),
 		view.strong("Review account before adding"),
 		"Local name", sanitizeCell(review.Alias, 64),
 		"Address", sanitizeCell(review.Address, 254),
 		"Mail", onboardingProviderValue(review.MailProvider),
 		"Calendar", onboardingProviderValue(review.CalendarProvider),
+		"Messages", onboardingMessagingProviderValue(review.MessagingProvider),
 		"Default", review.MakesDefault,
 	); err != nil {
 		return err
@@ -1421,6 +1422,15 @@ func writeOnboardingAccountReview(
 			return err
 		}
 	}
+	if review.Messages != nil {
+		if _, err := view.printf(
+			"  %-16s %s · %s\n  %-16s %s\n",
+			"Messaging route", review.Messages.Provider, review.Messages.Route,
+			"Workspace", sanitizeCell(review.Messages.WorkspaceID, 4096),
+		); err != nil {
+			return err
+		}
+	}
 	_, err := view.printf(
 		"\n   %s\n   %s\n   %s\n",
 		view.muted("No browser, credential value, provider API, or administrator flow has been opened."),
@@ -1435,6 +1445,13 @@ func onboardingProviderValue(provider domain.ProviderID) string {
 		return "not configured"
 	}
 	return providerDisplayName(provider)
+}
+
+func onboardingMessagingProviderValue(provider domain.MessagingProviderID) string {
+	if provider == "" {
+		return "not configured"
+	}
+	return string(provider)
 }
 
 func writeOnboardingAccountAdded(

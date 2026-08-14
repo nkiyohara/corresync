@@ -35,6 +35,7 @@ func (store Store) ListAccounts(context.Context) (application.AccountCatalog, er
 			Mail:      mailRouteView(account.Mail),
 			Calendar:  calendarRouteView(account.Calendar),
 			Tasks:     taskRouteView(account.Tasks),
+			Messages:  messagingRouteView(account.Messages),
 			IsDefault: alias == configuration.DefaultAccount,
 		})
 	}
@@ -86,6 +87,39 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 		}
 	}
 	return application.TaskRouteView(route.Provider)
+}
+
+func messagingRouteView(route *config.MessagingRoute) *application.AccountMessagingRouteView {
+	if route == nil {
+		return nil
+	}
+	view := &application.AccountMessagingRouteView{
+		Provider: route.Provider, Route: route.Kind(),
+	}
+	switch {
+	case route.TeamsGraph != nil:
+		view.WorkspaceID, view.ReadOnly = route.TeamsGraph.WorkspaceID, route.TeamsGraph.ReadOnly
+		view.Endpoints = []application.DiscoveredEndpoint{{Kind: "api", Value: route.TeamsGraph.OAuth.APIBase}}
+		view.Credential = credentialRefView(route.TeamsGraph.OAuth.Authorization)
+	case route.TeamsWeb != nil:
+		view.WorkspaceID, view.ReadOnly = route.TeamsWeb.WorkspaceID, route.TeamsWeb.ReadOnly
+		view.Endpoints = []application.DiscoveredEndpoint{{Kind: "origin", Value: route.TeamsWeb.Web.Origin}}
+	case route.Slack != nil:
+		view.WorkspaceID, view.ReadOnly = route.Slack.WorkspaceID, route.Slack.ReadOnly
+		view.Endpoints = []application.DiscoveredEndpoint{{Kind: "api", Value: route.Slack.APIBase}}
+		view.Credential = credentialRefView(route.Slack.Authorization)
+	case route.Mattermost != nil:
+		view.WorkspaceID, view.ReadOnly = route.Mattermost.WorkspaceID, route.Mattermost.ReadOnly
+		view.Endpoints = []application.DiscoveredEndpoint{{Kind: "origin", Value: route.Mattermost.Origin}}
+		view.Credential = credentialRefView(route.Mattermost.Authorization)
+	}
+	return view
+}
+
+func credentialRefView(reference config.CredentialRef) *application.AccountCredentialView {
+	return &application.AccountCredentialView{
+		Configured: true, Backend: string(reference.Backend), Consented: reference.Consent,
+	}
 }
 
 // ListCredentialBindings returns private handle ownership for application
@@ -151,9 +185,13 @@ func (store Store) AddAccount(
 		if err != nil {
 			return err
 		}
+		messages, err := messagingRouteConfig(account.Messages)
+		if err != nil {
+			return err
+		}
 		candidate := config.Account{
 			ID: account.ID, Address: account.Address,
-			Mail: mail, Calendar: calendar, Tasks: tasks,
+			Mail: mail, Calendar: calendar, Tasks: tasks, Messages: messages,
 		}
 		for _, requested := range accountCredentialReferences(candidate) {
 			for alias, existing := range configuration.Accounts {
@@ -176,6 +214,55 @@ func (store Store) AddAccount(
 		}
 		return nil
 	})
+}
+
+func messagingRouteConfig(
+	route *application.AccountMessagingRouteInput,
+) (*config.MessagingRoute, error) {
+	if route == nil {
+		return nil, nil
+	}
+	if err := route.Provider.Validate(); err != nil {
+		return nil, err
+	}
+	result := &config.MessagingRoute{Provider: route.Provider}
+	if route.TeamsGraph != nil {
+		oauth, err := oauthRouteConfig(&route.TeamsGraph.OAuth)
+		if err != nil {
+			return nil, err
+		}
+		result.TeamsGraph = &config.TeamsGraphMessagingRoute{
+			OAuth: *oauth, WorkspaceID: route.TeamsGraph.WorkspaceID,
+			ReadOnly: route.TeamsGraph.ReadOnly,
+		}
+	}
+	if route.TeamsWeb != nil {
+		result.TeamsWeb = &config.TeamsWebMessagingRoute{
+			Web:         config.WebRoute{Origin: route.TeamsWeb.Web.Origin},
+			WorkspaceID: route.TeamsWeb.WorkspaceID, ReadOnly: route.TeamsWeb.ReadOnly,
+		}
+	}
+	if route.Slack != nil {
+		result.Slack = &config.SlackMessagingRoute{
+			APIBase: route.Slack.APIBase, WorkspaceID: route.Slack.WorkspaceID,
+			Authorization: credentialRefConfig(route.Slack.Authorization),
+			ReadOnly:      route.Slack.ReadOnly,
+		}
+	}
+	if route.Mattermost != nil {
+		result.Mattermost = &config.MattermostMessagingRoute{
+			Origin: route.Mattermost.Origin, WorkspaceID: route.Mattermost.WorkspaceID,
+			Authorization: credentialRefConfig(route.Mattermost.Authorization),
+			ReadOnly:      route.Mattermost.ReadOnly,
+		}
+	}
+	return result, nil
+}
+
+func credentialRefConfig(input application.AccountCredentialInput) config.CredentialRef {
+	return config.CredentialRef{
+		Backend: config.CredentialBackend(input.Backend), Key: input.Key, Consent: input.Consent,
+	}
 }
 
 func taskRouteConfig(
@@ -334,6 +421,16 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 	}
 	if account.Tasks != nil && account.Tasks.CalDAV != nil {
 		references = append(references, account.Tasks.CalDAV.Credential)
+	}
+	if account.Messages != nil {
+		switch {
+		case account.Messages.TeamsGraph != nil:
+			references = append(references, account.Messages.TeamsGraph.OAuth.Authorization)
+		case account.Messages.Slack != nil:
+			references = append(references, account.Messages.Slack.Authorization)
+		case account.Messages.Mattermost != nil:
+			references = append(references, account.Messages.Mattermost.Authorization)
+		}
 	}
 	return references
 }
@@ -906,6 +1003,9 @@ func accountOAuthAuthorizationKeys(account config.Account) []string {
 	}
 	if account.Tasks != nil && account.Tasks.TickTick != nil {
 		keys = append(keys, account.Tasks.TickTick.OAuth.Authorization.Key)
+	}
+	if account.Messages != nil && account.Messages.TeamsGraph != nil {
+		keys = append(keys, account.Messages.TeamsGraph.OAuth.Authorization.Key)
 	}
 	slices.Sort(keys)
 	return slices.Compact(keys)

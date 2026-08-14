@@ -31,16 +31,30 @@ type AccountRouteView struct {
 	Credential *AccountCredentialView `json:"credential,omitempty"`
 }
 
+// AccountMessagingRouteView is the secret-free summary of an independently
+// selected messaging route. Provider and route stay distinct because Teams
+// Graph and Teams Web share one provider but never fall back to one another.
+type AccountMessagingRouteView struct {
+	Provider    domain.MessagingProviderID `json:"provider"`
+	Route       domain.MessagingRouteKind  `json:"route"`
+	Available   bool                       `json:"available"`
+	WorkspaceID string                     `json:"workspaceId"`
+	Endpoints   []DiscoveredEndpoint       `json:"endpoints"`
+	Credential  *AccountCredentialView     `json:"credential,omitempty"`
+	ReadOnly    bool                       `json:"readOnly"`
+}
+
 // AccountView is the secret-free account lifecycle contract shared by CLI and
-// MCP. Mail, calendar, and task routes may use different providers.
+// MCP. Every service route is independently selected.
 type AccountView struct {
-	ID        domain.AccountID  `json:"id"`
-	Alias     string            `json:"alias"`
-	Address   string            `json:"address,omitempty"`
-	Mail      *AccountRouteView `json:"mail,omitempty"`
-	Calendar  *AccountRouteView `json:"calendar,omitempty"`
-	Tasks     *AccountRouteView `json:"tasks,omitempty"`
-	IsDefault bool              `json:"isDefault"`
+	ID        domain.AccountID           `json:"id"`
+	Alias     string                     `json:"alias"`
+	Address   string                     `json:"address,omitempty"`
+	Mail      *AccountRouteView          `json:"mail,omitempty"`
+	Calendar  *AccountRouteView          `json:"calendar,omitempty"`
+	Tasks     *AccountRouteView          `json:"tasks,omitempty"`
+	Messages  *AccountMessagingRouteView `json:"messages,omitempty"`
+	IsDefault bool                       `json:"isDefault"`
 }
 
 // AccountCatalog is a deterministic snapshot of configured accounts.
@@ -60,10 +74,11 @@ type AccountCredentialInput struct {
 // an account-add approval. It appears only in the write review, never in
 // AccountView or other account reads.
 type AccountCredentialReview struct {
-	Service  string            `json:"service"`
-	Provider domain.ProviderID `json:"provider"`
-	Backend  string            `json:"backend"`
-	Key      string            `json:"key"`
+	Service           string                     `json:"service"`
+	Provider          domain.ProviderID          `json:"provider,omitempty"`
+	MessagingProvider domain.MessagingProviderID `json:"messagingProvider,omitempty"`
+	Backend           string                     `json:"backend"`
+	Key               string                     `json:"key"`
 }
 
 // AccountCredentialBinding is the private ownership projection used to reject
@@ -185,6 +200,57 @@ type AccountWebInput struct {
 	Origin string `json:"origin"`
 }
 
+type AccountTeamsGraphMessagingInput struct {
+	OAuth       AccountOAuthInput `json:"oauth"`
+	WorkspaceID string            `json:"workspaceId"`
+	ReadOnly    bool              `json:"readOnly,omitempty"`
+}
+
+type AccountTeamsWebMessagingInput struct {
+	Web         AccountWebInput `json:"web"`
+	WorkspaceID string          `json:"workspaceId"`
+	ReadOnly    bool            `json:"readOnly,omitempty"`
+}
+
+type AccountSlackMessagingInput struct {
+	APIBase       string                 `json:"apiBase"`
+	WorkspaceID   string                 `json:"workspaceId"`
+	Authorization AccountCredentialInput `json:"authorization"`
+	ReadOnly      bool                   `json:"readOnly,omitempty"`
+}
+
+type AccountMattermostMessagingInput struct {
+	Origin        string                 `json:"origin"`
+	WorkspaceID   string                 `json:"workspaceId"`
+	Authorization AccountCredentialInput `json:"authorization"`
+	ReadOnly      bool                   `json:"readOnly,omitempty"`
+}
+
+// AccountMessagingRouteInput is a closed service-scoped route. Exactly one
+// provider payload is accepted and no provider-specific property map exists.
+type AccountMessagingRouteInput struct {
+	Provider   domain.MessagingProviderID       `json:"provider"`
+	TeamsGraph *AccountTeamsGraphMessagingInput `json:"teamsGraph,omitempty"`
+	TeamsWeb   *AccountTeamsWebMessagingInput   `json:"teamsWeb,omitempty"`
+	Slack      *AccountSlackMessagingInput      `json:"slack,omitempty"`
+	Mattermost *AccountMattermostMessagingInput `json:"mattermost,omitempty"`
+}
+
+func (route AccountMessagingRouteInput) Kind() domain.MessagingRouteKind {
+	switch {
+	case route.TeamsGraph != nil:
+		return domain.MessagingRouteTeamsGraph
+	case route.TeamsWeb != nil:
+		return domain.MessagingRouteTeamsWeb
+	case route.Slack != nil:
+		return domain.MessagingRouteSlackAPI
+	case route.Mattermost != nil:
+		return domain.MessagingRouteMattermost
+	default:
+		return ""
+	}
+}
+
 // AccountMailRouteInput is a closed selection for shipped mail adapters.
 type AccountMailRouteInput struct {
 	Provider       domain.ProviderID       `json:"provider"`
@@ -220,24 +286,26 @@ type AccountTaskRouteInput struct {
 // AccountAddInput explicitly selects service routes to persist. Discovery
 // never writes configuration or starts authentication.
 type AccountAddInput struct {
-	Alias    string                     `json:"alias"`
-	Address  string                     `json:"address,omitempty"`
-	Mail     *AccountMailRouteInput     `json:"mail,omitempty"`
-	Calendar *AccountCalendarRouteInput `json:"calendar,omitempty"`
-	Tasks    *AccountTaskRouteInput     `json:"tasks,omitempty"`
-	Default  bool                       `json:"default"`
+	Alias    string                      `json:"alias"`
+	Address  string                      `json:"address,omitempty"`
+	Mail     *AccountMailRouteInput      `json:"mail,omitempty"`
+	Calendar *AccountCalendarRouteInput  `json:"calendar,omitempty"`
+	Tasks    *AccountTaskRouteInput      `json:"tasks,omitempty"`
+	Messages *AccountMessagingRouteInput `json:"messages,omitempty"`
+	Default  bool                        `json:"default"`
 }
 
 // AccountRegistration is the validated write contract passed only to the local
 // configuration repository. It is never serialized as an account read result.
 type AccountRegistration struct {
-	ID        domain.AccountID           `json:"-"`
-	Alias     string                     `json:"-"`
-	Address   string                     `json:"-"`
-	Mail      *AccountMailRouteInput     `json:"-"`
-	Calendar  *AccountCalendarRouteInput `json:"-"`
-	Tasks     *AccountTaskRouteInput     `json:"-"`
-	IsDefault bool                       `json:"-"`
+	ID        domain.AccountID            `json:"-"`
+	Alias     string                      `json:"-"`
+	Address   string                      `json:"-"`
+	Mail      *AccountMailRouteInput      `json:"-"`
+	Calendar  *AccountCalendarRouteInput  `json:"-"`
+	Tasks     *AccountTaskRouteInput      `json:"-"`
+	Messages  *AccountMessagingRouteInput `json:"-"`
+	IsDefault bool                        `json:"-"`
 }
 
 // AccountRenameInput changes only the human-facing alias.
@@ -255,25 +323,27 @@ type AccountRemoveInput struct {
 // AccountChangeReview is the bounded, secret-free account lifecycle summary
 // returned before an MCP configuration mutation.
 type AccountChangeReview struct {
-	Action              string                    `json:"action"`
-	Account             domain.AccountID          `json:"account,omitempty"`
-	Alias               string                    `json:"alias"`
-	NewAlias            string                    `json:"newAlias,omitempty"`
-	Address             string                    `json:"address,omitempty"`
-	MailProvider        domain.ProviderID         `json:"mailProvider,omitempty"`
-	CalendarProvider    domain.ProviderID         `json:"calendarProvider,omitempty"`
-	TaskProvider        domain.ProviderID         `json:"taskProvider,omitempty"`
-	Mail                *AccountRouteView         `json:"mail,omitempty"`
-	Calendar            *AccountRouteView         `json:"calendar,omitempty"`
-	Tasks               *AccountRouteView         `json:"tasks,omitempty"`
-	Credentials         []AccountCredentialReview `json:"credentials,omitempty"`
-	MakesDefault        bool                      `json:"makesDefault"`
-	ReplacementDefault  string                    `json:"replacementDefault,omitempty"`
-	ReplacementAccount  domain.AccountID          `json:"replacementAccount,omitempty"`
-	PurgesLocalState    bool                      `json:"purgesLocalState"`
-	MayDeleteOwnedOAuth bool                      `json:"mayDeleteOwnedOAuth"`
-	Authentication      string                    `json:"authentication,omitempty"`
-	RestartsSessions    bool                      `json:"restartsSessions"`
+	Action              string                     `json:"action"`
+	Account             domain.AccountID           `json:"account,omitempty"`
+	Alias               string                     `json:"alias"`
+	NewAlias            string                     `json:"newAlias,omitempty"`
+	Address             string                     `json:"address,omitempty"`
+	MailProvider        domain.ProviderID          `json:"mailProvider,omitempty"`
+	CalendarProvider    domain.ProviderID          `json:"calendarProvider,omitempty"`
+	TaskProvider        domain.ProviderID          `json:"taskProvider,omitempty"`
+	MessagingProvider   domain.MessagingProviderID `json:"messagingProvider,omitempty"`
+	Mail                *AccountRouteView          `json:"mail,omitempty"`
+	Calendar            *AccountRouteView          `json:"calendar,omitempty"`
+	Tasks               *AccountRouteView          `json:"tasks,omitempty"`
+	Messages            *AccountMessagingRouteView `json:"messages,omitempty"`
+	Credentials         []AccountCredentialReview  `json:"credentials,omitempty"`
+	MakesDefault        bool                       `json:"makesDefault"`
+	ReplacementDefault  string                     `json:"replacementDefault,omitempty"`
+	ReplacementAccount  domain.AccountID           `json:"replacementAccount,omitempty"`
+	PurgesLocalState    bool                       `json:"purgesLocalState"`
+	MayDeleteOwnedOAuth bool                       `json:"mayDeleteOwnedOAuth"`
+	Authentication      string                     `json:"authentication,omitempty"`
+	RestartsSessions    bool                       `json:"restartsSessions"`
 }
 
 // AccountChangeAccess is either an approval-bound preview or a completed
@@ -305,11 +375,12 @@ type accountIDGenerator func() (domain.AccountID, error)
 
 // AccountService owns account lifecycle validation and isolation semantics.
 type AccountService struct {
-	repository    AccountRepository
-	purger        AccountStatePurger
-	available     map[domain.ProviderID]struct{}
-	taskAvailable map[domain.ProviderID]struct{}
-	newID         accountIDGenerator
+	repository         AccountRepository
+	purger             AccountStatePurger
+	available          map[domain.ProviderID]struct{}
+	taskAvailable      map[domain.ProviderID]struct{}
+	messagingAvailable map[domain.MessagingRouteKind]struct{}
+	newID              accountIDGenerator
 }
 
 // NewAccountService creates the shared lifecycle use case.
@@ -318,6 +389,7 @@ func NewAccountService(
 	purger AccountStatePurger,
 	available []domain.ProviderID,
 	taskAvailable []domain.ProviderID,
+	messagingAvailable ...domain.MessagingRouteKind,
 ) (*AccountService, error) {
 	if repository == nil {
 		return nil, errors.New("account repository is required")
@@ -333,12 +405,21 @@ func NewAccountService(
 	if err != nil {
 		return nil, err
 	}
+	messagingRoutes := make(map[domain.MessagingRouteKind]struct{}, len(messagingAvailable))
+	for _, route := range messagingAvailable {
+		if err := route.Validate(); err != nil {
+			return nil, err
+		}
+		if _, exists := messagingRoutes[route]; exists {
+			return nil, fmt.Errorf("messaging route %q is duplicated in route availability", route)
+		}
+		messagingRoutes[route] = struct{}{}
+	}
 	return &AccountService{
-		repository:    repository,
-		purger:        purger,
-		available:     providers,
-		taskAvailable: taskProviders,
-		newID:         domain.NewAccountID,
+		repository: repository, purger: purger,
+		available: providers, taskAvailable: taskProviders,
+		messagingAvailable: messagingRoutes,
+		newID:              domain.NewAccountID,
 	}, nil
 }
 
@@ -410,7 +491,7 @@ func (service *AccountService) Add(
 	registration := AccountRegistration{
 		ID: accountID, Alias: input.Alias, Address: normalizedAddress,
 		Mail: cloneMailRoute(input.Mail), Calendar: cloneCalendarRoute(input.Calendar),
-		Tasks:     cloneTaskRoute(input.Tasks),
+		Tasks: cloneTaskRoute(input.Tasks), Messages: cloneMessagingRoute(input.Messages),
 		IsDefault: input.Default || len(catalog.Accounts) == 0,
 	}
 	account := registration.view()
@@ -437,7 +518,7 @@ func (service *AccountService) ReviewAdd(
 	review := AccountChangeReview{
 		Action: "add", Alias: input.Alias, Address: address,
 		Mail: mailRouteView(input.Mail), Calendar: calendarRouteView(input.Calendar),
-		Tasks:          taskRouteInputView(input.Tasks),
+		Tasks: taskRouteInputView(input.Tasks), Messages: messagingRouteInputView(input.Messages),
 		Credentials:    accountCredentialReviews(input),
 		MakesDefault:   input.Default || len(catalog.Accounts) == 0,
 		Authentication: "explicit_cli_required",
@@ -451,6 +532,9 @@ func (service *AccountService) ReviewAdd(
 	if input.Tasks != nil {
 		review.TaskProvider = input.Tasks.Provider
 	}
+	if input.Messages != nil {
+		review.MessagingProvider = input.Messages.Provider
+	}
 	return review, nil
 }
 
@@ -461,9 +545,9 @@ func (service *AccountService) reviewAdd(
 	if err := domain.AccountAlias(input.Alias).Validate(); err != nil {
 		return "", AccountCatalog{}, err
 	}
-	if input.Mail == nil && input.Calendar == nil && input.Tasks == nil {
+	if input.Mail == nil && input.Calendar == nil && input.Tasks == nil && input.Messages == nil {
 		return "", AccountCatalog{}, errors.New(
-			"at least one mail, calendar, or task route is required",
+			"at least one mail, calendar, task, or messaging route is required",
 		)
 	}
 	normalizedAddress := ""
@@ -508,6 +592,11 @@ func (service *AccountService) reviewAdd(
 			return "", AccountCatalog{}, errors.New(
 				"an OAuth task route requires an account address",
 			)
+		}
+	}
+	if input.Messages != nil {
+		if err := service.validateMessagingRoute(*input.Messages); err != nil {
+			return "", AccountCatalog{}, fmt.Errorf("messaging route: %w", err)
 		}
 	}
 	if err := validateAccountOAuthGrantSharing(input); err != nil {
@@ -611,6 +700,10 @@ func validateAccountOAuthGrantSharing(input AccountAddInput) error {
 		input.Tasks.TickTick != nil {
 		route := input.Tasks.TickTick.OAuth
 		add(domain.ProviderTickTick, route.ClientID, route.RedirectURI, route.Authorization, "")
+	}
+	if input.Messages != nil && input.Messages.TeamsGraph != nil {
+		route := input.Messages.TeamsGraph.OAuth
+		add(domain.ProviderMicrosoftGraph, route.ClientID, route.RedirectURI, route.Authorization, route.MicrosoftCloud)
 	}
 	for left := range bindings {
 		for right := left + 1; right < len(bindings); right++ {
@@ -740,6 +833,23 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 			Service: "tasks", Provider: input.Tasks.Provider,
 			Backend: credential.Backend, Key: credential.Key,
 		})
+	}
+	if input.Messages != nil {
+		var credential *AccountCredentialInput
+		switch {
+		case input.Messages.TeamsGraph != nil:
+			credential = &input.Messages.TeamsGraph.OAuth.Authorization
+		case input.Messages.Slack != nil:
+			credential = &input.Messages.Slack.Authorization
+		case input.Messages.Mattermost != nil:
+			credential = &input.Messages.Mattermost.Authorization
+		}
+		if credential != nil {
+			reviews = append(reviews, AccountCredentialReview{
+				Service: "messages", MessagingProvider: input.Messages.Provider,
+				Backend: credential.Backend, Key: credential.Key,
+			})
+		}
 	}
 	return reviews
 }
@@ -878,6 +988,9 @@ func accountUsesOAuth(account AccountView) bool {
 			domain.ProviderPOP3:
 		}
 	}
+	if account.Messages != nil && account.Messages.Route == domain.MessagingRouteTeamsGraph {
+		return true
+	}
 	return false
 }
 
@@ -967,7 +1080,7 @@ func validateAccountView(account AccountView) error {
 			return err
 		}
 	}
-	if account.Mail == nil && account.Calendar == nil && account.Tasks == nil {
+	if account.Mail == nil && account.Calendar == nil && account.Tasks == nil && account.Messages == nil {
 		return errors.New("account has no service routes")
 	}
 	if account.Mail != nil {
@@ -985,6 +1098,11 @@ func validateAccountView(account AccountView) error {
 			return fmt.Errorf("task route: %w", err)
 		}
 	}
+	if account.Messages != nil {
+		if err := validateAccountMessagingRouteView(*account.Messages); err != nil {
+			return fmt.Errorf("messaging route: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -996,6 +1114,9 @@ func (service *AccountService) markRouteAvailability(account *AccountView) {
 	}
 	if account.Tasks != nil {
 		_, account.Tasks.Available = service.taskAvailable[account.Tasks.Provider]
+	}
+	if account.Messages != nil {
+		_, account.Messages.Available = service.messagingAvailable[account.Messages.Route]
 	}
 }
 
@@ -1331,6 +1452,100 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 	}
 }
 
+func (service *AccountService) validateMessagingRoute(route AccountMessagingRouteInput) error {
+	if err := route.Provider.Validate(); err != nil {
+		return err
+	}
+	present := 0
+	for _, configured := range []bool{
+		route.TeamsGraph != nil, route.TeamsWeb != nil,
+		route.Slack != nil, route.Mattermost != nil,
+	} {
+		if configured {
+			present++
+		}
+	}
+	if present != 1 {
+		return errors.New("exactly one provider-specific messaging route is required")
+	}
+	kind := route.Kind()
+	if _, available := service.messagingAvailable[kind]; !available {
+		return fmt.Errorf("messaging route %q is not available in this build", kind)
+	}
+	switch route.Provider {
+	case domain.MessagingProviderMicrosoftTeams:
+		if (route.TeamsGraph == nil) == (route.TeamsWeb == nil) ||
+			route.Slack != nil || route.Mattermost != nil {
+			return errors.New("microsoft-teams requires exactly one Graph or Teams Web route")
+		}
+		if route.TeamsGraph != nil {
+			if err := validateOAuthInput(domain.ProviderMicrosoftGraph, route.TeamsGraph.OAuth); err != nil {
+				return err
+			}
+			return validateMessagingWorkspaceID(route.TeamsGraph.WorkspaceID)
+		}
+		if err := validateTeamsWebInput(route.TeamsWeb.Web); err != nil {
+			return err
+		}
+		return validateMessagingWorkspaceID(route.TeamsWeb.WorkspaceID)
+	case domain.MessagingProviderSlack:
+		if route.Slack == nil || route.TeamsGraph != nil || route.TeamsWeb != nil || route.Mattermost != nil {
+			return errors.New("slack requires Slack API settings")
+		}
+		if err := validateSlackAPIBase(route.Slack.APIBase); err != nil {
+			return err
+		}
+		if err := validateMessagingWorkspaceID(route.Slack.WorkspaceID); err != nil {
+			return err
+		}
+		return validateAccountCredential(route.Slack.Authorization)
+	case domain.MessagingProviderMattermost:
+		if route.Mattermost == nil || route.TeamsGraph != nil || route.TeamsWeb != nil || route.Slack != nil {
+			return errors.New("mattermost requires Mattermost API settings")
+		}
+		if err := validateAccountOrigin(route.Mattermost.Origin); err != nil {
+			return fmt.Errorf("mattermost origin: %w", err)
+		}
+		if err := validateMessagingWorkspaceID(route.Mattermost.WorkspaceID); err != nil {
+			return err
+		}
+		return validateAccountCredential(route.Mattermost.Authorization)
+	default:
+		return fmt.Errorf("provider %q cannot supply a messaging route", route.Provider)
+	}
+}
+
+func validateMessagingWorkspaceID(value string) error {
+	if value == "" || len(value) > 4096 || strings.TrimSpace(value) != value ||
+		strings.ContainsAny(value, "\r\n\x00") {
+		return errors.New("messaging workspace ID is malformed")
+	}
+	return nil
+}
+
+func validateTeamsWebInput(route AccountWebInput) error {
+	if err := validateAccountOrigin(route.Origin); err != nil {
+		return err
+	}
+	parsed, _ := url.Parse(route.Origin)
+	if parsed.Host != "teams.microsoft.com" {
+		return errors.New("teams web origin must be https://teams.microsoft.com")
+	}
+	return nil
+}
+
+func validateSlackAPIBase(raw string) error {
+	if err := validateAccountHTTPSURL("Slack API base", raw); err != nil {
+		return err
+	}
+	parsed, _ := url.Parse(raw)
+	if (parsed.Host != "slack.com" && parsed.Host != "slack-gov.com") ||
+		parsed.EscapedPath() != "/api" {
+		return errors.New("slack API base must be https://slack.com/api or https://slack-gov.com/api")
+	}
+	return nil
+}
+
 func validateOAuthInput(
 	provider domain.ProviderID,
 	route AccountOAuthInput,
@@ -1580,12 +1795,88 @@ func validateAccountRouteView(route AccountRouteView) error {
 	return nil
 }
 
+func validateAccountMessagingRouteView(route AccountMessagingRouteView) error {
+	if err := route.Provider.Validate(); err != nil {
+		return err
+	}
+	if err := route.Route.Validate(); err != nil {
+		return err
+	}
+	if err := validateMessagingWorkspaceID(route.WorkspaceID); err != nil {
+		return err
+	}
+	switch route.Provider {
+	case domain.MessagingProviderMicrosoftTeams:
+		if route.Route != domain.MessagingRouteTeamsGraph && route.Route != domain.MessagingRouteTeamsWeb {
+			return errors.New("provider microsoft-teams has an incompatible messaging route")
+		}
+	case domain.MessagingProviderSlack:
+		if route.Route != domain.MessagingRouteSlackAPI {
+			return errors.New("provider slack has an incompatible messaging route")
+		}
+	case domain.MessagingProviderMattermost:
+		if route.Route != domain.MessagingRouteMattermost {
+			return errors.New("provider mattermost has an incompatible messaging route")
+		}
+	}
+	if len(route.Endpoints) != 1 {
+		return errors.New("messaging route must expose one exact endpoint")
+	}
+	endpoint := route.Endpoints[0]
+	if endpoint.Kind == "" || len(endpoint.Kind) > 32 || endpoint.Value == "" ||
+		len(endpoint.Value) > 2048 || strings.ContainsAny(endpoint.Kind+endpoint.Value, "\r\n\x00") {
+		return errors.New("messaging route endpoint is malformed")
+	}
+	if route.Credential != nil {
+		switch route.Credential.Backend {
+		case "os-keyring", "helper":
+		default:
+			return errors.New("messaging credential backend is malformed")
+		}
+		if !route.Credential.Configured {
+			return errors.New("messaging credential summary is inconsistent")
+		}
+	}
+	return nil
+}
+
 func (registration AccountRegistration) view() AccountView {
 	return AccountView{
 		ID: registration.ID, Alias: registration.Alias, Address: registration.Address,
 		Mail: mailRouteView(registration.Mail), Calendar: calendarRouteView(registration.Calendar),
-		Tasks:     taskRouteInputView(registration.Tasks),
+		Tasks: taskRouteInputView(registration.Tasks), Messages: messagingRouteInputView(registration.Messages),
 		IsDefault: registration.IsDefault,
+	}
+}
+
+func messagingRouteInputView(route *AccountMessagingRouteInput) *AccountMessagingRouteView {
+	if route == nil {
+		return nil
+	}
+	view := &AccountMessagingRouteView{Provider: route.Provider, Route: route.Kind()}
+	switch {
+	case route.TeamsGraph != nil:
+		view.WorkspaceID, view.ReadOnly = route.TeamsGraph.WorkspaceID, route.TeamsGraph.ReadOnly
+		view.Endpoints = []DiscoveredEndpoint{{Kind: "api", Value: route.TeamsGraph.OAuth.APIBase}}
+		view.Credential = credentialInputView(route.TeamsGraph.OAuth.Authorization)
+	case route.TeamsWeb != nil:
+		view.WorkspaceID, view.ReadOnly = route.TeamsWeb.WorkspaceID, route.TeamsWeb.ReadOnly
+		view.Endpoints = []DiscoveredEndpoint{{Kind: "origin", Value: route.TeamsWeb.Web.Origin}}
+	case route.Slack != nil:
+		view.WorkspaceID, view.ReadOnly = route.Slack.WorkspaceID, route.Slack.ReadOnly
+		view.Endpoints = []DiscoveredEndpoint{{Kind: "api", Value: route.Slack.APIBase}}
+		view.Credential = credentialInputView(route.Slack.Authorization)
+	case route.Mattermost != nil:
+		view.WorkspaceID, view.ReadOnly = route.Mattermost.WorkspaceID, route.Mattermost.ReadOnly
+		view.Endpoints = []DiscoveredEndpoint{{Kind: "origin", Value: route.Mattermost.Origin}}
+		view.Credential = credentialInputView(route.Mattermost.Authorization)
+	}
+	return view
+}
+
+func credentialInputView(input AccountCredentialInput) *AccountCredentialView {
+	return &AccountCredentialView{
+		Configured: true, Backend: input.Backend, Consented: input.Consent,
 	}
 }
 
@@ -1902,6 +2193,30 @@ func cloneTaskRoute(route *AccountTaskRouteInput) *AccountTaskRouteInput {
 	if route.GoogleTasks != nil {
 		value := *route.GoogleTasks
 		cloned.GoogleTasks = &value
+	}
+	return &cloned
+}
+
+func cloneMessagingRoute(route *AccountMessagingRouteInput) *AccountMessagingRouteInput {
+	if route == nil {
+		return nil
+	}
+	cloned := *route
+	if route.TeamsGraph != nil {
+		value := *route.TeamsGraph
+		cloned.TeamsGraph = &value
+	}
+	if route.TeamsWeb != nil {
+		value := *route.TeamsWeb
+		cloned.TeamsWeb = &value
+	}
+	if route.Slack != nil {
+		value := *route.Slack
+		cloned.Slack = &value
+	}
+	if route.Mattermost != nil {
+		value := *route.Mattermost
+		cloned.Mattermost = &value
 	}
 	return &cloned
 }

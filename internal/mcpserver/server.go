@@ -119,6 +119,25 @@ type AccountStatusInput struct {
 	Account string `json:"account,omitempty" jsonschema:"Configured account alias or stable opaque ID; omit to return every account"`
 }
 
+// AccountAddInput is the release-stable account-add schema. The pending
+// messaging route remains absent until the immutable messaging catalog gate
+// opens, even though the inward application contract is already compiled.
+type AccountAddInput struct {
+	Alias    string                                 `json:"alias"`
+	Address  string                                 `json:"address,omitempty"`
+	Mail     *application.AccountMailRouteInput     `json:"mail,omitempty"`
+	Calendar *application.AccountCalendarRouteInput `json:"calendar,omitempty"`
+	Tasks    *application.AccountTaskRouteInput     `json:"tasks,omitempty"`
+	Default  bool                                   `json:"default"`
+}
+
+func (input AccountAddInput) applicationInput() application.AccountAddInput {
+	return application.AccountAddInput{
+		Alias: input.Alias, Address: input.Address, Mail: input.Mail,
+		Calendar: input.Calendar, Tasks: input.Tasks, Default: input.Default,
+	}
+}
+
 // MonitorStatusInput selects one account without changing its consent.
 type MonitorStatusInput struct {
 	Account string `json:"account,omitempty" jsonschema:"Configured account alias; omit to use default_account"`
@@ -529,7 +548,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 		result, err := backend.CommitSettingsUpdate(ctx, input.Token, caller)
 		return nil, result, err
 	})
-	mcp.AddTool(server, &mcp.Tool{
+	accountAddTool := &mcp.Tool{
 		Name:        "account_add",
 		Title:       "Preview adding an account route",
 		Description: "Validate one complete, explicit, secret-free mail/calendar/task route and return a caller-bound approval preview. No authentication, credential lookup, OAuth, browser, or configuration write occurs. The review states that a later explicit local CLI login is required. Commit restarts the local session owner so no route uses stale configuration.",
@@ -543,10 +562,19 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			"io.github.nkiyohara.corresync/data-classification": "private-account-metadata",
 			"io.github.nkiyohara.corresync/effect":              "reversible_write",
 		},
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, input application.AccountAddInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
-		result, err := backend.PreviewAccountAdd(ctx, input, caller)
-		return nil, result, err
-	})
+	}
+	if messagingEnabled {
+		accountAddTool.Description = "Validate one complete, explicit, secret-free service route and return a caller-bound approval preview. No authentication, credential lookup, OAuth, browser, or configuration write occurs. The review states that a later explicit local CLI login is required. Commit restarts the local session owner so no route uses stale configuration."
+		mcp.AddTool(server, accountAddTool, func(ctx context.Context, _ *mcp.CallToolRequest, input application.AccountAddInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
+			result, err := backend.PreviewAccountAdd(ctx, input, caller)
+			return nil, result, err
+		})
+	} else {
+		mcp.AddTool(server, accountAddTool, func(ctx context.Context, _ *mcp.CallToolRequest, input AccountAddInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
+			result, err := backend.PreviewAccountAdd(ctx, input.applicationInput(), caller)
+			return nil, result, err
+		})
+	}
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "account_add_commit",
 		Title:       "Commit an approved account addition",

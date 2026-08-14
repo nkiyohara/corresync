@@ -330,6 +330,33 @@ func TestToolResultsConformToAdvertisedOutputSchemas(t *testing.T) {
 	}
 }
 
+func TestPendingMessagingRouteIsAbsentFromStableAccountAddSchema(t *testing.T) {
+	t.Parallel()
+
+	server, err := New(&fakeBackend{}, Options{Version: "dev", Instance: "closed-messaging-schema"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed, err := connectTestClient(t, server).ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tool := range listed.Tools {
+		if tool.Name != "account_add" {
+			continue
+		}
+		encoded, err := json.Marshal(tool.InputSchema)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(encoded), `"messages"`) {
+			t.Fatalf("pending messaging route leaked into account_add schema: %s", encoded)
+		}
+		return
+	}
+	t.Fatal("account_add tool is missing")
+}
+
 func assertToolCatalog(t *testing.T, tools []*mcp.Tool) {
 	t.Helper()
 	gotNames := make([]string, 0, len(tools))

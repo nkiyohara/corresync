@@ -265,6 +265,30 @@ func (command *accountShowCommand) Run(app *runtime) error {
 			}
 		}
 	}
+	if account.Messages != nil {
+		if _, err := view.printf(
+			"\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s\n",
+			"Messages", account.Messages.Provider,
+			"Route", account.Messages.Route,
+			"Workspace", sanitizeCell(account.Messages.WorkspaceID, 4096),
+			"Available", yesNo(account.Messages.Available),
+		); err != nil {
+			return err
+		}
+		for _, endpoint := range account.Messages.Endpoints {
+			if _, err := view.printf("  %-10s %s\n", endpoint.Kind, sanitizeCell(endpoint.Value, 2048)); err != nil {
+				return err
+			}
+		}
+		if account.Messages.Credential != nil {
+			if _, err := view.printf(
+				"  %-10s %s · consent %s\n", "Credential",
+				account.Messages.Credential.Backend, yesNo(account.Messages.Credential.Consented),
+			); err != nil {
+				return err
+			}
+		}
+	}
 	_, err = view.printf(
 		"\n  %s\n",
 		view.command(
@@ -1310,7 +1334,7 @@ func candidateHTTPSEndpoint(
 }
 
 func accountRouteLabel(account application.AccountView) string {
-	mail, calendar, tasks := "–", "–", "–"
+	mail, calendar, tasks, messages := "–", "–", "–", "–"
 	if account.Mail != nil {
 		mail = string(account.Mail.Provider)
 	}
@@ -1320,10 +1344,13 @@ func accountRouteLabel(account application.AccountView) string {
 	if account.Tasks != nil {
 		tasks = string(account.Tasks.Provider)
 	}
-	if mail == calendar && calendar == tasks {
+	if account.Messages != nil {
+		messages = string(account.Messages.Provider)
+	}
+	if mail == calendar && calendar == tasks && tasks == messages {
 		return mail
 	}
-	return "mail:" + mail + " · cal:" + calendar + " · tasks:" + tasks
+	return "mail:" + mail + " · cal:" + calendar + " · tasks:" + tasks + " · msg:" + messages
 }
 
 func yesNo(value bool) string {

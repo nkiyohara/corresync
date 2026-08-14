@@ -112,6 +112,82 @@ func TestAccountServiceAddsTaskOnlyRouteWithoutAddress(t *testing.T) {
 	}
 }
 
+func TestAccountServiceKeepsPendingMessagingRoutesOutOfConfiguration(t *testing.T) {
+	t.Parallel()
+
+	repository := &accountRepositoryStub{}
+	service, err := NewAccountService(repository, &accountPurgerStub{}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.Add(t.Context(), AccountAddInput{
+		Alias: "teams", Address: "reader@example.invalid",
+		Messages: &AccountMessagingRouteInput{
+			Provider: domain.MessagingProviderMicrosoftTeams,
+			TeamsWeb: &AccountTeamsWebMessagingInput{
+				Web:         AccountWebInput{Origin: "https://teams.microsoft.com"},
+				WorkspaceID: "workspace-1",
+			},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "not available in this build") {
+		t.Fatalf("pending messaging route error = %v", err)
+	}
+	if repository.added.Messages != nil {
+		t.Fatalf("pending messaging route reached persistence: %+v", repository.added)
+	}
+}
+
+func TestAccountServiceReviewsAndAddsIndependentMessagingRoute(t *testing.T) {
+	t.Parallel()
+
+	repository := &accountRepositoryStub{}
+	service, err := NewAccountService(
+		repository, &accountPurgerStub{}, nil, nil,
+		domain.MessagingRouteTeamsGraph,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.newID = func() (domain.AccountID, error) {
+		return "acc_00000000000000000000000000000145", nil
+	}
+	input := AccountAddInput{
+		Alias: "teams",
+		Messages: &AccountMessagingRouteInput{
+			Provider: domain.MessagingProviderMicrosoftTeams,
+			TeamsGraph: &AccountTeamsGraphMessagingInput{
+				OAuth: AccountOAuthInput{
+					APIBase: "https://graph.microsoft.com/v1.0", MicrosoftCloud: microsoftcloud.Global,
+					ClientID: "synthetic-public-client", RedirectURI: "http://127.0.0.1:0/callback",
+					Authorization: AccountCredentialInput{
+						Backend: "os-keyring", Key: "teams-graph-grant", Consent: true,
+					},
+				},
+				WorkspaceID: "tenant-synthetic-1", ReadOnly: true,
+			},
+		},
+	}
+	review, err := service.ReviewAdd(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.MessagingProvider != domain.MessagingProviderMicrosoftTeams || review.Messages == nil ||
+		review.Messages.Route != domain.MessagingRouteTeamsGraph || len(review.Credentials) != 1 ||
+		review.Credentials[0].MessagingProvider != domain.MessagingProviderMicrosoftTeams {
+		t.Fatalf("messaging review = %+v", review)
+	}
+	account, err := service.Add(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if account.Messages == nil || !account.Messages.Available || account.Messages.WorkspaceID != "tenant-synthetic-1" ||
+		repository.added.Messages == nil || repository.added.Mail != nil || repository.added.Calendar != nil ||
+		repository.added.Tasks != nil {
+		t.Fatalf("messaging account = %+v registration = %+v", account, repository.added)
+	}
+}
+
 func TestAccountServiceReviewsTickTickGrantAndExternalClientSecretSeparately(t *testing.T) {
 	t.Parallel()
 	repository := &accountRepositoryStub{}

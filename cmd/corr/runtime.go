@@ -296,11 +296,21 @@ func (app *runtime) accountServices() (
 	if rollout.GoogleOAuthApproved {
 		taskAvailable = append(taskAvailable, domain.ProviderGoogleTasks)
 	}
+	var messagingAvailable []domain.MessagingRouteKind
+	if rollout.MessagingCatalogEnabled() {
+		messagingAvailable = []domain.MessagingRouteKind{
+			domain.MessagingRouteTeamsGraph,
+			domain.MessagingRouteTeamsWeb,
+			domain.MessagingRouteSlackAPI,
+			domain.MessagingRouteMattermost,
+		}
+	}
 	accounts, err := application.NewAccountService(
 		store,
 		store,
 		available,
 		taskAvailable,
+		messagingAvailable...,
 	)
 	if err != nil {
 		return nil, nil, err
