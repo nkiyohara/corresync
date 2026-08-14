@@ -235,6 +235,12 @@ func (client *Client) Do(
 			return result, nil
 		}
 	}
+	if response.StatusCode == http.StatusUnauthorized {
+		return Result{}, application.NewProviderAuthenticationFailure(
+			application.AuthenticationReasonCredentialRejected,
+			apiStatusError(response.StatusCode, content),
+		)
+	}
 	if response.StatusCode == http.StatusPreconditionFailed ||
 		response.StatusCode == http.StatusConflict {
 		return Result{}, ErrPrecondition

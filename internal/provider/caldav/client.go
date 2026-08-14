@@ -289,6 +289,14 @@ func (client *authorizedHTTPClient) Do(request *http.Request) (*http.Response, e
 	if err != nil {
 		return nil, err
 	}
+	if response.StatusCode == http.StatusUnauthorized {
+		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
+		_ = response.Body.Close()
+		return nil, application.NewProviderAuthenticationFailure(
+			application.AuthenticationReasonCredentialRejected,
+			errors.New("CalDAV server rejected authentication"),
+		)
+	}
 	if response.ContentLength > maximumCalDAVResponseBytes {
 		_ = response.Body.Close()
 		return nil, errors.New("CalDAV response exceeds the configured limit")
@@ -496,6 +504,9 @@ func (client *Client) conditionalRequestWithHeaders(
 	}
 	response, err := (*authorizedHTTPClient)(client).Do(request)
 	if err != nil {
+		if _, authenticationFailure := application.ProviderAuthenticationReason(err); authenticationFailure {
+			return "", err
+		}
 		return "", fmt.Errorf("%w: execute conditional CalDAV write: %w",
 			application.ErrWriteOutcomeUnknown, err)
 	}

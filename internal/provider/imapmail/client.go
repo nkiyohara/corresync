@@ -212,7 +212,7 @@ func (client *Client) withIMAP(
 	connection.ErrorLog = log.New(io.Discard, "", 0)
 	if err := client.authenticateIMAP(ctx, connection); err != nil {
 		_ = connection.Terminate()
-		return err
+		return classifyAuthenticationFailure(err)
 	}
 	operationErr := operation(connection)
 	logoutErr := connection.Logout()
@@ -253,11 +253,27 @@ func (client *Client) withSMTP(
 	connection.SubmissionTimeout = networkTimeout
 	if err := client.authenticateSMTP(ctx, connection); err != nil {
 		_ = connection.Close()
-		return err
+		return classifyAuthenticationFailure(err)
 	}
 	operationErr := operation(connection)
 	_ = connection.Quit()
 	return operationErr
+}
+
+func classifyAuthenticationFailure(err error) error {
+	if _, classified := application.ProviderAuthenticationReason(err); classified {
+		return err
+	}
+	var smtpFailure *smtp.SMTPError
+	if errors.As(err, &smtpFailure) &&
+		(smtpFailure.Code == 535 ||
+			smtpFailure.EnhancedCode == (smtp.EnhancedCode{5, 7, 8})) {
+		return application.NewProviderAuthenticationFailure(
+			application.AuthenticationReasonCredentialRejected,
+			err,
+		)
+	}
+	return err
 }
 
 func (client *Client) endpointTLS(serverName string) *tls.Config {

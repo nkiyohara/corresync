@@ -335,6 +335,7 @@ func TestCalDAVDistinguishesAmbiguousAndDefiniteWriteStatuses(t *testing.T) {
 		name        string
 		status      int
 		wantUnknown bool
+		wantAuth    bool
 		oversized   bool
 	}{
 		{
@@ -345,6 +346,10 @@ func TestCalDAVDistinguishesAmbiguousAndDefiniteWriteStatuses(t *testing.T) {
 		{
 			name:   "explicit rejection",
 			status: http.StatusBadRequest,
+		},
+		{
+			name: "authentication rejection", status: http.StatusUnauthorized,
+			wantAuth: true,
 		},
 		{
 			name:        "oversized success response",
@@ -401,6 +406,10 @@ func TestCalDAVDistinguishesAmbiguousAndDefiniteWriteStatuses(t *testing.T) {
 				errors.Is(err, application.ErrWriteOutcomeUnknown) !=
 					test.wantUnknown {
 				t.Fatalf("conditionalRequest() error = %v", err)
+			}
+			_, authenticationFailure := application.ProviderAuthenticationReason(err)
+			if authenticationFailure != test.wantAuth {
+				t.Fatalf("authentication classification = %t, error = %v", authenticationFailure, err)
 			}
 		})
 	}

@@ -100,6 +100,43 @@ func TestClientMarksAmbiguousWriteTransportFailure(t *testing.T) {
 	}
 }
 
+func TestClientClassifiesExplicitUnauthorizedResponse(t *testing.T) {
+	t.Parallel()
+	client, err := New(Options{
+		BaseURL: "https://api.example.invalid/v1",
+		HTTP: &http.Client{Transport: roundTripperFunc(func(
+			*http.Request,
+		) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusUnauthorized,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(
+					`{"error":{"code":"invalid_token","message":"private detail"}}`,
+				)),
+			}, nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.DoJSON(
+		t.Context(),
+		http.MethodGet,
+		"messages",
+		nil,
+		nil,
+		nil,
+		false,
+		nil,
+		http.StatusOK,
+	)
+	reason, ok := application.ProviderAuthenticationReason(err)
+	if !ok || reason != application.AuthenticationReasonCredentialRejected ||
+		strings.Contains(err.Error(), "private detail") {
+		t.Fatalf("unauthorized error = %v, reason = %q", err, reason)
+	}
+}
+
 func TestClientMarksUnverifiableSuccessfulWriteResponseAsAmbiguous(
 	t *testing.T,
 ) {

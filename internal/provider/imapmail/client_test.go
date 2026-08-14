@@ -1045,3 +1045,18 @@ func TestIMAPReplyTargetPrefersReplyToWithoutMixingFrom(t *testing.T) {
 		t.Fatal("malformed Reply-To was accepted")
 	}
 }
+
+func TestSMTPAuthenticationRejectionUsesSharedClassification(t *testing.T) {
+	t.Parallel()
+
+	err := classifyAuthenticationFailure(&smtp.SMTPError{
+		Code:         535,
+		EnhancedCode: smtp.EnhancedCode{5, 7, 8},
+		Message:      "synthetic private provider detail",
+	})
+	reason, ok := application.ProviderAuthenticationReason(err)
+	if !ok || reason != application.AuthenticationReasonCredentialRejected ||
+		strings.Contains(err.Error(), "private provider detail") {
+		t.Fatalf("classification = %q, error = %v", reason, err)
+	}
+}

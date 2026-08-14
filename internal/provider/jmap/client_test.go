@@ -31,6 +31,7 @@ type syntheticJMAP struct {
 	brokenWriteResponse bool
 	writeStatus         int
 	uploads             int
+	unauthorized        bool
 }
 
 func newSyntheticJMAP(t *testing.T) *syntheticJMAP {
@@ -103,6 +104,13 @@ func (fixture *syntheticJMAP) serveHTTP(writer http.ResponseWriter, request *htt
 }
 
 func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http.Request) {
+	fixture.mu.Lock()
+	unauthorized := fixture.unauthorized
+	fixture.mu.Unlock()
+	if unauthorized {
+		writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	var document requestDocument
 	if err := json.NewDecoder(request.Body).Decode(&document); err != nil {
 		fixture.t.Errorf("decode request: %v", err)
@@ -274,6 +282,36 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 	fixture.writeJSON(writer, map[string]any{
 		"methodResponses": []any{[]any{method, result, "c1"}},
 	})
+}
+
+func TestClientClassifiesRuntimeUnauthorizedResponse(t *testing.T) {
+	t.Parallel()
+
+	fixture := newSyntheticJMAP(t)
+	client, err := New(t.Context(), Options{
+		SessionURL: fixture.server.URL + "/session",
+		Username:   "reader@example.invalid",
+		Password:   []byte("synthetic-secret"),
+		Client:     fixture.server.Client(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	fixture.mu.Lock()
+	fixture.unauthorized = true
+	fixture.mu.Unlock()
+	_, err = client.ListMessages(t.Context(), application.MailListInput{
+		Folder: application.MailFolder{
+			Kind: application.MailFolderDistinguished,
+			ID:   "inbox",
+		},
+		Limit: 25,
+	})
+	reason, ok := application.ProviderAuthenticationReason(err)
+	if !ok || reason != application.AuthenticationReasonCredentialRejected {
+		t.Fatalf("ListMessages() error = %v, reason = %q", err, reason)
+	}
 }
 
 func (fixture *syntheticJMAP) writeJSON(writer http.ResponseWriter, value any) {
