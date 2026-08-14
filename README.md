@@ -39,9 +39,9 @@
 one local
 [Model Context Protocol](https://modelcontextprotocol.io/) server.
 Gmail and Google Calendar support are coming soon after Google OAuth approval.
-The canonical task tools include explicit Microsoft To Do and Todoist routes;
-remaining task-provider adapters stay unavailable until their contracts are
-implemented.
+The canonical task tools include explicit Microsoft To Do, Todoist, and CalDAV
+VTODO routes; remaining task-provider adapters stay unavailable until their
+contracts are implemented.
 
 - Search mail and build one agenda across accounts without collapsing their
   identity or provider provenance.
@@ -92,14 +92,15 @@ account can pair IMAP/SMTP mail with a CalDAV calendar; its task route remains a
 separate explicit choice.
 
 <!-- markdownlint-disable MD013 -->
-| Route | Mail | Calendar | Authentication |
-| --- | --- | --- | --- |
-| Outlook Web | Typed reads and writes | Selectable calendars; provider-supported Teams link | Dedicated visible browser profile |
-| Google (coming soon) | Gmail API reads and writes; no permanent delete | Selectable calendars; Google Meet when advertised | Included but disabled in RC builds while production OAuth approval is pending |
-| Microsoft Graph | Typed reads and writes | Selectable calendars; typed Teams-link creation | Your authorized public OAuth client; OS-keyring grant |
-| JMAP | Typed mail operations | — | OS keyring or approved credential helper |
-| IMAP / SMTP | IMAP read/manage and SMTP draft/send | — | OS keyring or approved credential helper |
-| CalDAV | — | Typed calendar operations and conditional scheduling | OS keyring or approved credential helper |
+| Route | Mail | Calendar | Tasks | Authentication |
+| --- | --- | --- | --- | --- |
+| Outlook Web | Typed reads and writes | Selectable calendars; provider-supported Teams link | — | Dedicated visible browser profile |
+| Google (coming soon) | Gmail API reads and writes; no permanent delete | Selectable calendars; Google Meet when advertised | — | Included but disabled in RC builds while production OAuth approval is pending |
+| Microsoft Graph | Typed reads and writes | Selectable calendars; typed Teams-link creation | Microsoft To Do | Your authorized public OAuth client; OS-keyring grant |
+| Todoist | — | — | Typed Todoist operations | Your authorized public OAuth client; OS-keyring grant |
+| JMAP | Typed mail operations | — | — | OS keyring or approved credential helper |
+| IMAP / SMTP | IMAP read/manage and SMTP draft/send | — | — | OS keyring or approved credential helper |
+| CalDAV | — | Typed calendar operations and conditional scheduling | VTODO lists, search, sync, and reviewed writes | OS keyring or approved credential helper |
 <!-- markdownlint-enable MD013 -->
 
 Discovery gathers DNS, well-known, and provider metadata without credentials.

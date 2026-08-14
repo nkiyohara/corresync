@@ -3,9 +3,9 @@
 Corresync models To Do items and reminders without pretending every provider
 has the same feature set. The canonical contract gives every adapter one target
 and one safety model. A configured task route is not by itself a capability
-claim. Microsoft To Do and Todoist, each through an explicitly authorized
-OAuth route, are implemented against synthetic contracts; the other task
-routes remain unavailable until their dependent provider issues are
+claim. Microsoft To Do, Todoist, and CalDAV VTODO are implemented against
+synthetic contracts through explicit OAuth or external-credential routes. The
+other task routes remain unavailable until their dependent provider issues are
 implemented and tested.
 
 A staged task route never disables an implemented mail or calendar route on the
@@ -102,7 +102,7 @@ deterministic adapter contracts but no commit-bound live observation.
 | `microsoft-graph` | synthetic; read-only or CRUD/state | one absolute reminder; portable recurrence plus exact provider-rule preservation | checklist, categories, typed linked sources; no assignments | zoned datetime; Windows names canonicalized through pinned CLDR | delta with safe reset | [#108](https://github.com/nkiyohara/corresync/issues/108) |
 | `microsoft-web-tasks` | phased target; delete requires ambiguity evidence | observe | modern To Do fields limited | observe | bounded polling | [#109](https://github.com/nkiyohara/corresync/issues/109) |
 | `todoist` | synthetic; read-only or CRUD/state | relative/absolute reminders; exact provider recurrence; plan-sensitive | subtasks, labels, one assignee; sections/duration/comments degraded | date/floating/zoned schedule plus date-only deadline | bounded sync token; no webhook | [#110](https://github.com/nkiyohara/corresync/issues/110) |
-| `caldav` | target with ETag | VTODO recurrence/alarm target | RELATED-TO and categories target; assignment observe | date and datetime round trip target | sync token or polling | [#111](https://github.com/nkiyohara/corresync/issues/111) |
+| `caldav` | synthetic with strong ETag | VTODO recurrence and alarms | RELATED-TO parents and categories; assignment unavailable | date, floating, and zoned datetime | RFC 6578 sync token with reset | [#111](https://github.com/nkiyohara/corresync/issues/111) |
 | `google-tasks` | target with ETag and assigned-task restrictions | recurrence/reminder limited | subtasks, ordering, source links target; labels limited | due is date-only; time loss must be reviewed | bounded `updatedMin` polling | [#112](https://github.com/nkiyohara/corresync/issues/112) |
 | `apple-reminders` | target after explicit full Reminders permission | recurrence and alarms target | URL target; hierarchy/labels observe | EventKit components require exact mapping | local notification then bounded refetch | [#113](https://github.com/nkiyohara/corresync/issues/113) |
 | `ticktick` | documented Open API target | observe and report absent fields | subtasks target; other client-only fields limited | observe | bounded polling | [#114](https://github.com/nkiyohara/corresync/issues/114) |
@@ -197,6 +197,37 @@ command batches and post-write read failures return `write outcome unknown`.
 The compressed sync cursor is account/list scoped, keeps enough membership to
 detect moves and deletes, drains pending pages before advancing the provider
 token, and fails closed at the canonical cursor bound. Webhooks are not needed.
+
+## CalDAV VTODO
+
+The `caldav` task route is independent from a CalDAV calendar route. Each has
+its own explicit external-credential consent and authenticated session; neither
+route infers the other from a principal or collection name. Discovery selects
+only collections whose supported component set admits VTODO. A server that
+omits the component-set property follows RFC 4791's all-components default.
+
+SUMMARY, DESCRIPTION, STATUS, COMPLETED, PRIORITY, DTSTART, DUE, RRULE,
+RELATED-TO parents, CATEGORIES, and DISPLAY VALARMs map to the canonical task
+model. Date-only, floating, and IANA-zoned datetime meanings remain distinct.
+RFC 5545 requires DTSTART and DUE to use compatible temporal forms with DUE
+later than DTSTART, and requires an absolute alarm trigger to be UTC. Corresync
+emits zoned absolute reminders as UTC and rejects floating absolute reminders
+or inconsistent temporal writes before provider access. A non-conforming
+remote combination remains readable with an explicit degradation and is
+preserved by an unrelated exact update.
+Unknown standard and extension properties are not flattened into a generic
+map: they stay on the fetched object during an exact update and produce a
+bounded degradation.
+
+Create uses `If-None-Match: *`; update, complete, reopen, and delete re-read the
+exact strong ETag and submit the matching conditional write. A post-submission
+transport failure or missing replacement ETag is an unknown outcome and is
+never retried. Writes are advertised only when every discovered VTODO
+collection exposes DAV write privilege. RFC 6578 sync is advertised only when
+every collection exposes it; an invalid token causes one bounded initial sync
+with `reset=true`. Servers without capability properties remain read-only
+rather than being mistaken for writable. All evidence is synthetic and the
+route remains live-unobserved.
 
 ## Reads, writes, and sync
 

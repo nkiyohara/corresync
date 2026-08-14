@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>支持的邮件与日历服务 — Corresync</title>
+    <title>支持的邮件、日历与任务服务 — Corresync</title>
     <meta
       name="description"
-      content="比较 Outlook、Microsoft 365、iCloud 邮件与日历、JMAP、IMAP/SMTP 和 CalDAV 的连接方式。Gmail 正在等待 OAuth 审批。"
+      content="比较 Outlook、Microsoft 365、Todoist、iCloud 邮件与日历、JMAP、IMAP/SMTP，以及 CalDAV 日历和 VTODO 任务。Gmail 正在等待 OAuth 审批。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="支持的邮件与日历服务 — Corresync">
+    <meta property="og:title" content="支持的邮件、日历与任务服务 — Corresync">
     <meta
       property="og:description"
-      content="查看 iCloud 等当前可用路径、设置要求，以及仍在等待审批的 Google 支持。"
+      content="查看 iCloud、Todoist 与 CalDAV VTODO 等当前可用路径，以及仍在等待审批的 Google 支持。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
@@ -27,7 +27,7 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Corresync 标志和英文产品简介">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="支持的邮件与日历服务 — Corresync">
+    <meta name="twitter:title" content="支持的邮件、日历与任务服务 — Corresync">
     <meta
       name="twitter:description"
       content="查看 Outlook、iCloud、标准协议与等待审批的 Google 支持。"
@@ -393,16 +393,17 @@
           <article class="route-card" id="caldav">
             <header>
               <span class="route-icon" aria-hidden="true">C</span><div>
-                <p class="chip">日历</p>
+                <p class="chip">日历 · 任务</p>
                 <h3>CalDAV</h3>
               </div>
             </header>
             <p>
-              日历发现、受限重复事件、创建、更新和取消，使用条件式
-              WebDAV/iCalendar 写入。
+              分别发现 VEVENT 日历与 VTODO
+              任务列表，提供受限读取、重复规则、
+              同步令牌，以及确认后的条件式 WebDAV/iCalendar 写入。
             </p>
             <p class="route-foot">
-              参与者调度要求已观测到 RFC 6638 与 schedule-tag 保护。
+              登录后会分别确认日历调度能力与任务能力。
             </p>
           </article>
         </div>

@@ -9,7 +9,7 @@ authorized live observations.
 <!-- markdownlint-disable MD013 -->
 | Boundary | Deterministic evidence | Recorded live evidence | v0.8 status |
 | --- | --- | --- | --- |
-| CLI, stable JSON, configuration schema v6 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
+| CLI, stable JSON, configuration schema v7 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
 | Public domain-only compatibility checker | Browser privacy/source checks; DNS, CORS, bounds, redirect, failure, and SSRF fixtures | Not run | Deterministic only; no provider authentication |
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
@@ -22,6 +22,7 @@ authorized live observations.
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
 | IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
 | CalDAV calendar | Synthetic WebDAV/iCalendar/conditional-write contracts | Not run | Deterministic only |
+| CalDAV VTODO tasks | Synthetic RFC 5545 mapping, WebDAV ETag writes, RFC 6578 sync/reset, account/session isolation, and extension-preservation contracts | Not run | Implemented; deterministic only; live-unobserved |
 | iCloud guided IMAP/SMTP + CalDAV preset | Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts | Not run | Deterministic only; live-unobserved |
 | Cross-account search and agenda | Isolation, ordering, bounds, partial-failure tests | Not run | Deterministic only |
 | Canonical task model, CLI, MCP, IPC, and cross-account projection | Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests | Not run | Implemented; Microsoft Graph adapter enabled separately |
@@ -71,14 +72,16 @@ evidence.
   only and no recorded live observation.
 - `jmap`, `imap-smtp`, and `caldav`: implemented against synthetic standards
   contracts, with server-specific behavior exposed through capabilities and
-  degradations.
+  degradations. CalDAV has independent VEVENT calendar and VTODO task routes;
+  VTODO remains live-unobserved on real servers.
 - `apple-icloud`: a guided discovery family, not a provider adapter. It composes
   the existing `imap-smtp` and `caldav` routes with Apple's published endpoints
   and an external credential reference. It has synthetic coverage only and
   remains live-unobserved.
 - task routes: the canonical application, CLI, JSON, IPC, MCP, cursor, and
-  preview/commit contracts are implemented. Microsoft To Do and Todoist have
-  deterministic provider contracts and remain live-unobserved. The other
+  preview/commit contracts are implemented. Microsoft To Do, Todoist, and
+  CalDAV VTODO have deterministic provider contracts and remain
+  live-unobserved. The other
   provider rows in the [Task contract](tasks.md) remain development targets,
   not provider evidence.
 

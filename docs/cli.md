@@ -137,6 +137,16 @@ corr account add reader@example.invalid \
   --task-authorization-key tasks-todoist \
   --approve-task-oauth \
   --task-read-only
+
+# CalDAV VTODO task-only route; no email address or discovery required
+corr account add \
+  --alias tasks \
+  --task-provider caldav \
+  --task-caldav-endpoint https://dav.example.invalid/ \
+  --task-list-path /dav/tasks/work/ \
+  --task-username reader@example.invalid \
+  --task-credential-key tasks-caldav \
+  --approve-task-credential
 ```
 
 Mail and calendar providers are independent. Calendar-specific OAuth flags
@@ -193,9 +203,10 @@ only an already authenticated session; it never starts login or OAuth. Run
 `auth login` first. The report includes the configured OAuth scope set and is
 never run by default tests.
 For standards routes, `--connection-only` reports when the active session last
-established TLS and authorization, with Mail/Calendar capability state shown
-separately. The status check makes no fresh authentication attempt and requests
-no folder, message, event, contact, or attachment metadata.
+established TLS and authorization, with Mail/Calendar/Tasks capability state
+shown separately. The status check makes no fresh authentication attempt and
+requests no folder, message, event, contact, task, task-list, or attachment
+metadata.
 
 ## Mail reads
 
@@ -429,10 +440,12 @@ and digest while the approval binds the complete content.
 
 Complete, reopen, and delete require the exact version returned by a read.
 Every task write previews; `--approve` commits only that single-use review.
-Microsoft To Do and Todoist support lists, list/get, sync, and the typed write
-commands; Todoist applies its observed account-plan constraints. Search returns
-an explicit unsupported error on both routes. Other task adapters remain
-unavailable until their provider issues ship. See [tasks.md](tasks.md).
+Microsoft To Do, Todoist, and CalDAV VTODO support lists, list/get, sync, and
+the typed write commands; Todoist applies its observed account-plan
+constraints. Search is unavailable for Microsoft To Do and Todoist, while the
+CalDAV route performs a bounded local search over its selected VTODO
+collections. Other task adapters remain unavailable until their provider
+issues ship. See [tasks.md](tasks.md).
 
 ## Read-only import staging
 

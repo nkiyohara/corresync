@@ -3,17 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>対応メール・カレンダーサービス — Corresync</title>
+    <title>対応メール・カレンダー・タスクサービス — Corresync</title>
     <meta
       name="description"
-      content="Outlook、Microsoft 365、iCloudメール・カレンダー、JMAP、IMAP/SMTP、CalDAVの対応経路を比較。GmailはOAuth承認待ちで近日対応です。"
+      content="Outlook、Microsoft 365、Todoist、iCloudメール・カレンダー、JMAP、IMAP/SMTP、CalDAVの予定とVTODOタスクを比較。GmailはOAuth承認待ちです。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="対応メール・カレンダーサービス — Corresync">
+    <meta
+      property="og:title"
+      content="対応メール・カレンダー・タスクサービス — Corresync"
+    >
     <meta
       property="og:description"
-      content="iCloudを含む現在利用可能な接続経路と、承認待ちのGoogle対応を確認できます。"
+      content="iCloudやCalDAV VTODOを含む現在利用可能なメール・カレンダー・タスクの接続経路と、承認待ちのGoogle対応を確認できます。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -33,11 +36,11 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta
       name="twitter:title"
-      content="対応メール・カレンダーサービス — Corresync"
+      content="対応メール・カレンダー・タスクサービス — Corresync"
     >
     <meta
       name="twitter:description"
-      content="Outlook、iCloud、標準プロトコルの対応状況と、承認待ちのGoogle経路を確認できます。"
+      content="Outlook、Todoist、iCloud、CalDAV VTODOの対応状況と、承認待ちのGoogle経路を確認できます。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -412,16 +415,15 @@
           <article class="route-card" id="caldav">
             <header>
               <span class="route-icon" aria-hidden="true">C</span><div>
-                <p class="chip">カレンダー</p>
+                <p class="chip">カレンダー・タスク</p>
                 <h3>CalDAV</h3>
               </div>
             </header>
             <p>
-              カレンダー検索、上限付きの繰り返し予定、作成、更新、キャンセルを条件付きWebDAV/iCalendar書き込みで扱います。
+              VEVENTカレンダーとVTODOタスクリストを分けて検出。件数を制限した読み取り、繰り返し、同期トークン、内容確認後の条件付き書き込みに対応します。
             </p>
             <p class="route-foot">
-              参加者を含む調整には、観測済みRFC
-              6638対応とschedule-tag保護が必要です。
+              予定調整とタスクの機能は、サインイン後にそれぞれ確認されます。
             </p>
           </article>
         </div>
