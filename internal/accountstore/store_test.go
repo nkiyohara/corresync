@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -69,7 +70,7 @@ func TestListAccountsExposesConfiguredTaskRouteAsUnavailable(t *testing.T) {
 	configuration.DefaultAccount = "tasks"
 	configuration.Accounts["tasks"] = config.Account{
 		ID:    "acc_00000000000000000000000000000009",
-		Tasks: &config.TaskRoute{Provider: domain.ProviderTickTick},
+		Tasks: &config.TaskRoute{Provider: domain.ProviderThings},
 	}
 	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)
@@ -79,7 +80,7 @@ func TestListAccountsExposesConfiguredTaskRouteAsUnavailable(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(catalog.Accounts) != 1 || catalog.Accounts[0].Tasks == nil ||
-		catalog.Accounts[0].Tasks.Provider != domain.ProviderTickTick ||
+		catalog.Accounts[0].Tasks.Provider != domain.ProviderThings ||
 		catalog.Accounts[0].Tasks.Available {
 		t.Fatalf("task account view = %+v", catalog)
 	}
@@ -262,6 +263,55 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 	}
 	if len(deleted) != 2 || deleted[0] != "target-only" || deleted[1] != "target-task" {
 		t.Fatalf("deleted OAuth keys = %#v", deleted)
+	}
+}
+
+func TestPurgeAccountStateNeverDeletesExternalTickTickClientSecret(t *testing.T) {
+	state := filepath.Join(t.TempDir(), "state")
+	t.Setenv("CORRESYNC_STATE_DIR", state)
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.Default()
+	const accountID domain.AccountID = "acc_00000000000000000000000000000002"
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = config.Account{
+		ID: accountID,
+		Tasks: &config.TaskRoute{
+			Provider: domain.ProviderTickTick,
+			TickTick: &config.TickTickTaskRoute{
+				OAuth: config.TickTickOAuthRoute{
+					APIBase:     "https://api.ticktick.com",
+					ClientID:    "synthetic-confidential-client",
+					RedirectURI: "http://127.0.0.1:43123/callback",
+					Authorization: config.CredentialRef{
+						Backend: config.CredentialOSKeyring,
+						Key:     "ticktick-grant",
+						Consent: true,
+					},
+					ClientSecret: config.CredentialRef{
+						Backend: config.CredentialHelper,
+						Key:     "externally-owned-client-secret",
+						Consent: true,
+					},
+				},
+			},
+		},
+	}
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	deleted := make([]string, 0, 1)
+	store := Store{
+		ConfigPath: path,
+		DeleteOAuthAuthorization: func(key string) error {
+			deleted = append(deleted, key)
+			return nil
+		},
+	}
+	if err := store.PurgeAccountState(t.Context(), accountID); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(deleted, []string{"ticktick-grant"}) {
+		t.Fatalf("deleted credential keys = %#v", deleted)
 	}
 }
 

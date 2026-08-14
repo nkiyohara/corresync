@@ -59,10 +59,13 @@ type accountAddCommand struct {
 	CalendarAuthorizationKey  string `name:"calendar-authorization-key" help:"Calendar OAuth grant key; defaults to --authorization-key."`
 	ApproveCalendarOAuth      bool   `name:"approve-calendar-oauth" help:"Confirm a distinct calendar OAuth authorization."`
 	TaskAPIBase               string `name:"task-api-base" help:"Pinned task API base override."`
-	TaskOAuthClientID         string `name:"task-oauth-client-id" help:"Task BYO OAuth public-client ID; defaults to --oauth-client-id."`
+	TaskOAuthClientID         string `name:"task-oauth-client-id" help:"Task BYO OAuth client ID; defaults to --oauth-client-id."`
 	TaskOAuthRedirectURI      string `name:"task-oauth-redirect-uri" help:"Task loopback redirect; defaults to --oauth-redirect-uri."`
 	TaskAuthorizationKey      string `name:"task-authorization-key" help:"Independent OS-keyring grant handle for tasks; defaults to --authorization-key."`
 	ApproveTaskOAuth          bool   `name:"approve-task-oauth" help:"Confirm the task OAuth grant and its task-only scope."`
+	TaskOAuthSecretBackend    string `name:"task-oauth-secret-backend" default:"os-keyring" enum:"os-keyring,helper" help:"External backend for a confidential task OAuth client secret."`
+	TaskOAuthSecretKey        string `name:"task-oauth-secret-key" help:"External lookup handle for a confidential task OAuth client secret."`
+	ApproveTaskOAuthSecret    bool   `name:"approve-task-oauth-secret" help:"Record explicit consent to resolve the confidential task OAuth client secret."`
 	TaskReadOnly              bool   `name:"task-read-only" help:"Request the selected provider's read-only task scope."`
 	TaskCalDAVEndpoint        string `name:"task-caldav-endpoint" help:"CalDAV HTTPS discovery endpoint for VTODO tasks; defaults to --caldav-endpoint."`
 	TaskListPath              string `name:"task-list-path" help:"Optional absolute CalDAV VTODO collection path."`
@@ -509,7 +512,7 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 		return result, nil
 	}
 	if provider != domain.ProviderMicrosoftGraph && provider != domain.ProviderTodoist &&
-		provider != domain.ProviderGoogleTasks {
+		provider != domain.ProviderGoogleTasks && provider != domain.ProviderTickTick {
 		return result, nil
 	}
 	clientID := command.TaskOAuthClientID
@@ -533,6 +536,11 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 		if provider == domain.ProviderGoogleTasks {
 			return nil, errors.New(
 				"google-tasks requires a BYO desktop client ID, loopback redirect, independent keyring handle, and --approve-task-oauth",
+			)
+		}
+		if provider == domain.ProviderTickTick {
+			return nil, errors.New(
+				"ticktick tasks require a BYO confidential-client ID, fixed loopback redirect, independent keyring grant handle, and --approve-task-oauth",
 			)
 		}
 		return nil, errors.New(
@@ -566,6 +574,34 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 				APIBase: apiBase, ClientID: clientID, RedirectURI: redirectURI,
 				Authorization: application.AccountCredentialInput{
 					Backend: "os-keyring", Key: authorizationKey, Consent: true,
+				},
+			},
+		}
+		return result, nil
+	}
+	if provider == domain.ProviderTickTick {
+		secretBackend := command.TaskOAuthSecretBackend
+		if secretBackend == "" {
+			secretBackend = command.CredentialBackend
+		}
+		if command.TaskOAuthSecretKey == "" || !command.ApproveTaskOAuthSecret {
+			return nil, errors.New(
+				"ticktick tasks require an external client-secret handle and --approve-task-oauth-secret",
+			)
+		}
+		apiBase := command.TaskAPIBase
+		if apiBase == "" {
+			apiBase = "https://api.ticktick.com"
+		}
+		result.TickTick = &application.AccountTickTickTaskInput{
+			ReadOnly: command.TaskReadOnly,
+			OAuth: application.AccountTickTickOAuthInput{
+				APIBase: apiBase, ClientID: clientID, RedirectURI: redirectURI,
+				Authorization: application.AccountCredentialInput{
+					Backend: "os-keyring", Key: authorizationKey, Consent: true,
+				},
+				ClientSecret: application.AccountCredentialInput{
+					Backend: secretBackend, Key: command.TaskOAuthSecretKey, Consent: true,
 				},
 			},
 		}

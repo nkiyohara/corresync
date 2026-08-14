@@ -168,3 +168,59 @@ func TestOAuthConsentKeepsTodoistGrantIndependentAndReadOnly(t *testing.T) {
 		t.Fatalf("Todoist consent profile = %+v", provider)
 	}
 }
+
+func TestOAuthConsentKeepsTickTickGrantIndependentAndLeastPrivilege(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		name     string
+		readOnly bool
+		scope    string
+	}{
+		{name: "read only", readOnly: true, scope: "tasks:read"},
+		{name: "read write", scope: "tasks:write"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			account := config.Account{
+				Tasks: &config.TaskRoute{
+					Provider: domain.ProviderTickTick,
+					TickTick: &config.TickTickTaskRoute{
+						ReadOnly: test.readOnly,
+						OAuth: config.TickTickOAuthRoute{
+							APIBase:     "https://api.ticktick.com",
+							ClientID:    "synthetic-confidential-client",
+							RedirectURI: "http://127.0.0.1:43123/callback",
+							Authorization: config.CredentialRef{
+								Backend: config.CredentialOSKeyring,
+								Key:     "ticktick-grant",
+								Consent: true,
+							},
+							ClientSecret: config.CredentialRef{
+								Backend: config.CredentialHelper,
+								Key:     "ticktick-client-secret",
+								Consent: true,
+							},
+						},
+					},
+				},
+			}
+			routes, err := accountOAuthConsents(account)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(routes) != 1 || routes[0].provider != domain.ProviderTickTick ||
+				routes[0].services.Mail || routes[0].services.Calendar ||
+				!routes[0].services.Tasks || routes[0].services.TaskWrite == test.readOnly {
+				t.Fatalf("TickTick consent routes = %+v", routes)
+			}
+			provider, err := oauthlocal.ProviderFor(routes[0].provider, routes[0].services)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(provider.Scopes, []string{test.scope}) ||
+				!provider.Confidential || !provider.ExchangeScope ||
+				!provider.DisablePKCE || !provider.DisableRefresh {
+				t.Fatalf("TickTick consent profile = %+v", provider)
+			}
+		})
+	}
+}

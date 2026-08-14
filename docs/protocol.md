@@ -204,6 +204,16 @@ object during an update and are surfaced as degradations; no generic property
 API is exposed. Servers that do not expose privilege or sync properties remain
 readable but advertise neither writes nor incremental sync.
 
+The explicit TickTick task route uses its fixed Open API and a separately
+consented confidential OAuth client. It maps projects and Inbox, task reads and
+search, create/update/complete/delete, recurrence, checklists, labels, ordering,
+one assignee, dates, and zoned times to the same task ports. It exposes neither
+provider project mutation nor arbitrary TickTick actions. Polling is a bounded
+full snapshot because the provider documents no delta token, webhook, or
+continuation beyond its 200-task result cap; an incomplete snapshot fails
+closed. Reopen, reminder replacement, atomic write preconditions, and remote
+identity confirmation remain explicit degradations.
+
 ## Compatibility workflow
 
 Deterministic tests use synthetic fixtures with no credentials or personal

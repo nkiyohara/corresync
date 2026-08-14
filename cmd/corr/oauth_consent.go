@@ -133,6 +133,13 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 			Tasks: true, TaskWrite: !account.Tasks.GoogleTasks.ReadOnly,
 		})
 	}
+	if account.Tasks != nil && account.Tasks.Provider == domain.ProviderTickTick &&
+		account.Tasks.TickTick != nil {
+		client := account.Tasks.TickTick.OAuth.Client()
+		add(account.Tasks.Provider, &client, oauthlocal.Services{
+			Tasks: true, TaskWrite: !account.Tasks.TickTick.ReadOnly,
+		})
+	}
 	for _, route := range routes {
 		if _, err := oauthlocal.ProviderFor(
 			route.provider,

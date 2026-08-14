@@ -138,6 +138,18 @@ corr account add reader@example.invalid \
   --approve-task-oauth \
   --task-read-only
 
+# TickTick task-only route uses a separate confidential-client secret handle
+corr account add \
+  --alias ticktick \
+  --task-provider ticktick \
+  --task-oauth-client-id synthetic-confidential-client \
+  --task-oauth-redirect-uri http://127.0.0.1:53685/callback \
+  --task-authorization-key tasks-ticktick-grant \
+  --task-oauth-secret-key tasks-ticktick-client-secret \
+  --approve-task-oauth \
+  --approve-task-oauth-secret \
+  --task-read-only
+
 # CalDAV VTODO task-only route; no email address or discovery required
 corr account add \
   --alias tasks \
@@ -169,10 +181,10 @@ Corresync-owned OAuth grant; it never deletes an external standards credential.
 The Google examples document future route shapes. In this RC each returns an
 approval-pending message, persists nothing, and starts no browser, keyring, or
 Google API work. Outlook Web, Graph, JMAP, IMAP/SMTP, and CalDAV routes remain
-available as described above. The Microsoft To Do and Todoist task-only
-examples are active with synthetic contract evidence. Google Tasks has synthetic
-contract evidence but remains approval-gated; the other task provider IDs remain
-unavailable.
+available as described above. The Microsoft To Do, Todoist, and TickTick
+task-only examples are active with synthetic contract evidence. Google Tasks
+has synthetic contract evidence but remains approval-gated; the other task
+provider IDs remain unavailable.
 
 ## Authentication and doctor
 
@@ -451,12 +463,12 @@ and digest while the approval binds the complete content.
 
 Complete, reopen, and delete require the exact version returned by a read.
 Every task write previews; `--approve` commits only that single-use review.
-Microsoft To Do, Todoist, and CalDAV VTODO support lists, list/get, sync, and
-the typed write commands; Todoist applies its observed account-plan
-constraints. Search is unavailable for Microsoft To Do and Todoist, while the
-CalDAV route performs a bounded local search over its selected VTODO
-collections. Other task adapters remain unavailable until their provider
-issues ship. See [tasks.md](tasks.md).
+Microsoft To Do, Todoist, TickTick, and CalDAV VTODO support lists, list/get,
+sync, and the typed write commands; Todoist applies its observed account-plan
+constraints. Search is unavailable for Microsoft To Do and Todoist. TickTick
+uses the documented bounded search endpoint, while CalDAV performs a bounded
+local search over its selected VTODO collections. Other task adapters remain
+unavailable until their provider issues ship. See [tasks.md](tasks.md).
 
 ## Read-only import staging
 

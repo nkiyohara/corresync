@@ -37,6 +37,15 @@ func (secret *Secret) String() string {
 	return string(secret.value)
 }
 
+// CopyBytes returns a mutable caller-owned copy. Callers must overwrite the
+// returned slice after the protocol client has consumed it.
+func (secret *Secret) CopyBytes() []byte {
+	if secret == nil {
+		return nil
+	}
+	return bytes.Clone(secret.value)
+}
+
 // Close overwrites the owned mutable storage.
 func (secret *Secret) Close() error {
 	if secret == nil {

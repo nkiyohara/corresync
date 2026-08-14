@@ -697,6 +697,63 @@ func TestAccountAddPersistsTaskOnlyTodoistPublicClientWithoutDiscovery(t *testin
 	}
 }
 
+func TestAccountAddPersistsTaskOnlyTickTickConfidentialReferences(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Alias:                  "ticktick",
+		TaskProvider:           string(domain.ProviderTickTick),
+		TaskOAuthClientID:      "synthetic-ticktick-client",
+		TaskOAuthRedirectURI:   "http://127.0.0.1:53684/oauth/callback",
+		TaskAuthorizationKey:   "ticktick-grant",
+		ApproveTaskOAuth:       true,
+		TaskOAuthSecretBackend: "helper",
+		TaskOAuthSecretKey:     "ticktick-client-secret",
+		ApproveTaskOAuthSecret: true,
+		TaskReadOnly:           true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	if discoverer.address != "" {
+		t.Fatalf("task-only route started discovery for %q", discoverer.address)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := configuration.Accounts["ticktick"].Tasks
+	if route == nil || route.Provider != domain.ProviderTickTick ||
+		route.TickTick == nil || !route.TickTick.ReadOnly ||
+		route.TickTick.OAuth.APIBase != "https://api.ticktick.com" ||
+		route.TickTick.OAuth.Authorization.Key != "ticktick-grant" ||
+		route.TickTick.OAuth.ClientSecret.Backend != config.CredentialHelper ||
+		route.TickTick.OAuth.ClientSecret.Key != "ticktick-client-secret" {
+		t.Fatalf("task-only TickTick route = %#v", route)
+	}
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("task-only output = %q", stdout.String())
+	}
+}
+
+func TestAccountAddRejectsTickTickWithoutExternalClientSecretConsent(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, _, _ := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Alias:                "ticktick",
+		TaskProvider:         string(domain.ProviderTickTick),
+		TaskOAuthClientID:    "synthetic-ticktick-client",
+		TaskOAuthRedirectURI: "http://127.0.0.1:53684/oauth/callback",
+		TaskAuthorizationKey: "ticktick-grant",
+		ApproveTaskOAuth:     true,
+		TaskOAuthSecretKey:   "ticktick-client-secret",
+	}
+	err := command.Run(app)
+	if err == nil || !strings.Contains(err.Error(), "--approve-task-oauth-secret") {
+		t.Fatalf("account add error = %v", err)
+	}
+}
+
 func TestAccountAddRejectsGoogleTasksWhileApprovalIsPending(t *testing.T) {
 	discoverer := &accountDiscovererStub{}
 	app, path, stdout := newAccountCommandRuntime(t, discoverer)

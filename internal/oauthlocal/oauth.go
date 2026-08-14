@@ -53,6 +53,14 @@ type Provider struct {
 	// ScopeSeparator overrides oauth2's space-separated authorization query.
 	// Stored grants retain the individual scope strings.
 	ScopeSeparator string
+	// Confidential selects HTTP Basic client authentication for the token
+	// exchange. ExchangeScope is set when that endpoint explicitly requires the
+	// reviewed scope. DisablePKCE and DisableRefresh are set only when the
+	// provider's primary contract does not document those mechanisms.
+	Confidential   bool
+	ExchangeScope  bool
+	DisablePKCE    bool
+	DisableRefresh bool
 }
 
 // Services is the exact service set selected for one public-client grant.
@@ -141,6 +149,23 @@ func ProviderFor(
 		if services.TaskWrite {
 			result.Scopes = append(result.Scopes, "data:delete")
 		}
+	case domain.ProviderTickTick:
+		if services.Mail || services.Calendar || !services.Tasks ||
+			services.MicrosoftCloud != "" {
+			return Provider{}, errors.New("ticktick OAuth profile has invalid service options")
+		}
+		scope := "tasks:read"
+		if services.TaskWrite {
+			scope = "tasks:write"
+		}
+		result = Provider{ // #nosec G101 -- fixed OAuth endpoints and scope names, not credentials.
+			ID:           provider,
+			AuthURL:      "https://ticktick.com/oauth/authorize",
+			TokenURL:     "https://ticktick.com/oauth/token",
+			Scopes:       []string{scope},
+			Confidential: true, ExchangeScope: true,
+			DisablePKCE: true, DisableRefresh: true,
+		}
 	case domain.ProviderMicrosoftOWA,
 		domain.ProviderJMAP,
 		domain.ProviderIMAPSMTP,
@@ -148,7 +173,6 @@ func ProviderFor(
 		domain.ProviderGoogleWeb,
 		domain.ProviderMicrosoftTasks,
 		domain.ProviderAppleReminders,
-		domain.ProviderTickTick,
 		domain.ProviderAnyDoMCP,
 		domain.ProviderThings,
 		domain.ProviderOmniFocus,
@@ -298,6 +322,11 @@ type Authorization interface {
 	AccessToken(context.Context) ([]byte, error)
 }
 
+// ClientCredentialResolver returns a newly allocated confidential-client
+// credential only when an authorization-code exchange is required. The OAuth
+// manager owns and overwrites the returned bytes.
+type ClientCredentialResolver func(context.Context) ([]byte, error)
+
 type authorization struct {
 	http   *http.Client
 	source oauth2.TokenSource
@@ -357,6 +386,9 @@ func (manager *Manager) Authorize(
 	route config.OAuthClient,
 	provider Provider,
 ) (Authorization, error) {
+	if provider.Confidential {
+		return nil, errors.New("confidential OAuth provider requires an external client credential")
+	}
 	if (provider.ID == domain.ProviderGoogle || provider.ID == domain.ProviderGoogleTasks) &&
 		manager.googleSecret == "" {
 		return nil, errors.New(
@@ -370,21 +402,102 @@ func (manager *Manager) Authorize(
 	grant, err := manager.load(route, provider)
 	if errors.Is(err, keyring.ErrNotFound) ||
 		errors.Is(err, errStoredGrantMismatch) {
-		grant, err = manager.authorize(ctx, route, provider)
+		grant, err = manager.authorize(
+			ctx, route, provider, manager.publicClientSecret(provider),
+		)
 	}
 	if err != nil {
 		return nil, err
 	}
-	// Authorization obeys the interactive login context above. The resulting
-	// token source must outlive that one RPC so later account-scoped requests
-	// can refresh without inheriting an already-cancelled context.
+	return manager.authorization(ctx, route, provider, grant), nil
+}
+
+func (manager *Manager) publicClientSecret(provider Provider) string {
+	if provider.ID == domain.ProviderGoogle || provider.ID == domain.ProviderGoogleTasks {
+		return manager.googleSecret
+	}
+	return ""
+}
+
+// AuthorizeConfidential loads an existing valid grant or starts a documented
+// confidential-client authorization. The transient client secret is used only
+// for the authorization-code exchange and is never persisted.
+func (manager *Manager) AuthorizeConfidential(
+	ctx context.Context,
+	route config.OAuthClient,
+	provider Provider,
+	resolve ClientCredentialResolver,
+) (Authorization, error) {
+	if !provider.Confidential || !provider.DisableRefresh {
+		return nil, errors.New("OAuth provider is not a supported non-refreshing confidential client")
+	}
+	if route.Authorization.Backend != config.CredentialOSKeyring ||
+		!route.Authorization.Consent {
+		return nil, errors.New("OAuth authorization handle is not explicitly consented")
+	}
+	grant, err := manager.load(route, provider)
+	if errors.Is(err, keyring.ErrNotFound) || errors.Is(err, errStoredGrantMismatch) {
+		if resolve == nil {
+			return nil, errors.New("OAuth confidential client credential resolver is unavailable")
+		}
+		clientSecret, resolveErr := resolve(ctx)
+		defer overwrite(clientSecret)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		if !validClientCredential(clientSecret) {
+			return nil, errors.New("OAuth confidential client credential is malformed")
+		}
+		grant, err = manager.authorize(ctx, route, provider, string(clientSecret))
+	}
+	if err != nil {
+		return nil, err
+	}
+	return manager.authorization(ctx, route, provider, grant), nil
+}
+
+func validClientCredential(value []byte) bool {
+	if len(value) == 0 || len(value) > maximumClientSecret {
+		return false
+	}
+	for _, character := range value {
+		if character == '\r' || character == '\n' || character == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func overwrite(value []byte) {
+	for index := range value {
+		value[index] = 0
+	}
+}
+
+func (manager *Manager) authorization(
+	ctx context.Context,
+	route config.OAuthClient,
+	provider Provider,
+	grant storedGrant,
+) Authorization {
+	persistedProvider := provider
+	persistedProvider.Scopes = append([]string(nil), grant.Scopes...)
+	if provider.DisableRefresh {
+		source := classifyingTokenSource{source: nonRefreshingTokenSource{token: grant.Token}}
+		baseContext := context.WithValue(
+			context.WithoutCancel(ctx), oauth2.HTTPClient, manager.http,
+		)
+		return &authorization{
+			http: oauth2.NewClient(baseContext, source), source: source,
+		}
+	}
+	// Refreshable authorization obeys the interactive login context above. The
+	// token source must outlive that one RPC without inheriting cancellation.
 	baseContext := context.WithValue(
 		context.WithoutCancel(ctx),
 		oauth2.HTTPClient,
 		manager.http,
 	)
-	persistedProvider := provider
-	persistedProvider.Scopes = append([]string(nil), grant.Scopes...)
 	persisting := &persistingTokenSource{
 		ctx: baseContext, manager: manager, route: route,
 		provider: persistedProvider,
@@ -392,7 +505,22 @@ func (manager *Manager) Authorize(
 	reused := classifyingTokenSource{source: oauth2.ReuseTokenSource(&grant.Token, persisting)}
 	return &authorization{
 		http: oauth2.NewClient(baseContext, reused), source: reused,
-	}, nil
+	}
+}
+
+type nonRefreshingTokenSource struct {
+	token oauth2.Token
+}
+
+func (source nonRefreshingTokenSource) Token() (*oauth2.Token, error) {
+	if !source.token.Valid() {
+		return nil, application.NewProviderAuthenticationFailure(
+			application.AuthenticationReasonSessionExpired,
+			errors.New("OAuth access token expired and the provider does not document refresh"),
+		)
+	}
+	copy := source.token
+	return &copy, nil
 }
 
 // Client is the compatibility projection used by HTTP API adapters.
@@ -469,18 +597,23 @@ func hasScopes(granted, required []string) bool {
 func oauthConfig(
 	route config.OAuthClient,
 	provider Provider,
-	googleClientSecret string,
+	clientSecret string,
 ) oauth2.Config {
+	authStyle := oauth2.AuthStyleInParams
+	if provider.Confidential {
+		authStyle = oauth2.AuthStyleInHeader
+	}
 	result := oauth2.Config{
 		ClientID: route.ClientID, RedirectURL: route.RedirectURI,
 		Scopes: append([]string(nil), provider.Scopes...),
 		Endpoint: oauth2.Endpoint{
 			AuthURL: provider.AuthURL, TokenURL: provider.TokenURL,
-			AuthStyle: oauth2.AuthStyleInParams,
+			AuthStyle: authStyle,
 		},
 	}
-	if provider.ID == domain.ProviderGoogle || provider.ID == domain.ProviderGoogleTasks {
-		result.ClientSecret = googleClientSecret
+	if provider.Confidential || provider.ID == domain.ProviderGoogle ||
+		provider.ID == domain.ProviderGoogleTasks {
+		result.ClientSecret = clientSecret
 	}
 	return result
 }
@@ -517,7 +650,7 @@ func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
 	configuration := oauthConfig(
 		source.route,
 		source.provider,
-		source.manager.googleSecret,
+		source.manager.publicClientSecret(source.provider),
 	)
 	token, err := configuration.TokenSource(source.ctx, &latest.Token).Token()
 	if err != nil {
@@ -541,6 +674,9 @@ func (manager *Manager) save(
 	provider Provider,
 	token oauth2.Token,
 ) error {
+	if provider.DisableRefresh {
+		token.RefreshToken = ""
+	}
 	grant := storedGrant{
 		Version: 1, Provider: provider.ID, ClientID: route.ClientID,
 		RedirectURI: route.RedirectURI,

@@ -31,6 +31,7 @@ func (manager *Manager) authorize(
 	ctx context.Context,
 	route config.OAuthClient,
 	provider Provider,
+	clientSecret string,
 ) (storedGrant, error) {
 	redirect, err := url.Parse(route.RedirectURI)
 	if err != nil || redirect.Scheme != "http" ||
@@ -128,7 +129,7 @@ func (manager *Manager) authorize(
 	}()
 	defer func() { _ = server.Close() }()
 
-	oauthConfig := oauthConfig(flowRoute, provider, manager.googleSecret)
+	oauthConfig := oauthConfig(flowRoute, provider, clientSecret)
 	options := authorizationOptions(provider, verifier)
 	authorizationURL := oauthConfig.AuthCodeURL(state, options...)
 	if manager.beforeOpen != nil {
@@ -152,16 +153,28 @@ func (manager *Manager) authorize(
 		return storedGrant{}, result.err
 	}
 	exchangeContext := context.WithValue(waitContext, oauth2.HTTPClient, manager.http)
-	token, err := oauthConfig.Exchange(
-		exchangeContext,
-		result.code,
-		oauth2.VerifierOption(verifier),
-	)
+	exchangeOptions := []oauth2.AuthCodeOption(nil)
+	if !provider.DisablePKCE {
+		exchangeOptions = append(exchangeOptions, oauth2.VerifierOption(verifier))
+	}
+	if provider.ExchangeScope {
+		separator := provider.ScopeSeparator
+		if separator == "" {
+			separator = " "
+		}
+		exchangeOptions = append(exchangeOptions, oauth2.SetAuthURLParam(
+			"scope", strings.Join(provider.Scopes, separator),
+		))
+	}
+	token, err := oauthConfig.Exchange(exchangeContext, result.code, exchangeOptions...)
 	if err != nil {
 		return storedGrant{}, fmt.Errorf("exchange OAuth authorization code: %w", err)
 	}
 	if token.AccessToken == "" {
 		return storedGrant{}, errors.New("OAuth token endpoint returned no access token")
+	}
+	if provider.DisableRefresh {
+		token.RefreshToken = ""
 	}
 	if err := manager.save(route, provider, *token); err != nil {
 		return storedGrant{}, fmt.Errorf("store OAuth grant: %w", err)
@@ -175,7 +188,10 @@ func (manager *Manager) authorize(
 }
 
 func authorizationOptions(provider Provider, verifier string) []oauth2.AuthCodeOption {
-	options := []oauth2.AuthCodeOption{oauth2.S256ChallengeOption(verifier)}
+	options := []oauth2.AuthCodeOption(nil)
+	if !provider.DisablePKCE {
+		options = append(options, oauth2.S256ChallengeOption(verifier))
+	}
 	if provider.ScopeSeparator != "" {
 		options = append(options, oauth2.SetAuthURLParam(
 			"scope", strings.Join(provider.Scopes, provider.ScopeSeparator),

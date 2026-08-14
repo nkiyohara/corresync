@@ -91,7 +91,7 @@ func TestAccountServiceAddsTaskOnlyRouteWithoutAddress(t *testing.T) {
 		repository,
 		&accountPurgerStub{},
 		nil,
-		[]domain.ProviderID{domain.ProviderTickTick},
+		[]domain.ProviderID{domain.ProviderThings},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -100,15 +100,86 @@ func TestAccountServiceAddsTaskOnlyRouteWithoutAddress(t *testing.T) {
 		return "acc_00000000000000000000000000000009", nil
 	}
 	account, err := service.Add(t.Context(), AccountAddInput{
-		Alias: "tasks", Tasks: &AccountTaskRouteInput{Provider: domain.ProviderTickTick},
+		Alias: "tasks", Tasks: &AccountTaskRouteInput{Provider: domain.ProviderThings},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if account.Address != "" || account.Mail != nil || account.Calendar != nil ||
-		account.Tasks == nil || account.Tasks.Provider != domain.ProviderTickTick ||
+		account.Tasks == nil || account.Tasks.Provider != domain.ProviderThings ||
 		!account.Tasks.Available || repository.added.Tasks == nil {
 		t.Fatalf("task-only account = %+v registration=%+v", account, repository.added)
+	}
+}
+
+func TestAccountServiceReviewsTickTickGrantAndExternalClientSecretSeparately(t *testing.T) {
+	t.Parallel()
+	repository := &accountRepositoryStub{}
+	service, err := NewAccountService(
+		repository,
+		&accountPurgerStub{},
+		nil,
+		[]domain.ProviderID{domain.ProviderTickTick},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.newID = func() (domain.AccountID, error) {
+		return "acc_00000000000000000000000000000114", nil
+	}
+	input := AccountAddInput{
+		Alias: "ticktick",
+		Tasks: &AccountTaskRouteInput{
+			Provider: domain.ProviderTickTick,
+			TickTick: &AccountTickTickTaskInput{
+				ReadOnly: true,
+				OAuth: AccountTickTickOAuthInput{
+					APIBase:     "https://api.ticktick.com",
+					ClientID:    "synthetic-confidential-client",
+					RedirectURI: "http://127.0.0.1:43123/callback",
+					Authorization: AccountCredentialInput{
+						Backend: "os-keyring", Key: "ticktick-grant", Consent: true,
+					},
+					ClientSecret: AccountCredentialInput{
+						Backend: "helper", Key: "ticktick-client-secret", Consent: true,
+					},
+				},
+			},
+		},
+	}
+	review, err := service.ReviewAdd(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.TaskProvider != domain.ProviderTickTick || len(review.Credentials) != 2 ||
+		review.Credentials[0].Key != "ticktick-grant" ||
+		review.Credentials[1].Key != "ticktick-client-secret" {
+		t.Fatalf("TickTick review = %+v", review)
+	}
+	account, err := service.Add(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if account.Address != "" || account.Tasks == nil ||
+		account.Tasks.Provider != domain.ProviderTickTick || !account.Tasks.Available ||
+		repository.added.Tasks == nil || repository.added.Tasks.TickTick == nil {
+		t.Fatalf("TickTick account = %+v registration=%+v", account, repository.added)
+	}
+	input.Tasks.TickTick.OAuth.RedirectURI = "http://127.0.0.1:00/callback"
+	if _, err := service.ReviewAdd(t.Context(), input); err == nil ||
+		!strings.Contains(err.Error(), "fixed loopback port") {
+		t.Fatalf("leading-zero ephemeral TickTick port error = %v", err)
+	}
+}
+
+func TestAccountServiceRejectsTickTickCredentialRoleReuse(t *testing.T) {
+	t.Parallel()
+	err := validateAccountTickTickCredentialIsolation([]AccountCredentialReview{
+		{Provider: domain.ProviderTickTick, Backend: "helper", Key: "shared"},
+		{Provider: domain.ProviderJMAP, Backend: "helper", Key: "shared"},
+	})
+	if err == nil || !strings.Contains(err.Error(), "must not be reused") {
+		t.Fatalf("TickTick credential role reuse error = %v", err)
 	}
 }
 

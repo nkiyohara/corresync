@@ -52,10 +52,18 @@ func TestResolverReadsExternalBackendsAndZerosOwnedBytes(t *testing.T) {
 		if resolveErr != nil || secret.String() != test.want {
 			t.Fatalf("Resolve() = %q, %v", secret.String(), resolveErr)
 		}
+		copied := secret.CopyBytes()
+		if string(copied) != test.want {
+			t.Fatalf("CopyBytes() = %q", copied)
+		}
 		owned := secret.value
 		if err := secret.Close(); err != nil {
 			t.Fatal(err)
 		}
+		if string(copied) != test.want {
+			t.Fatal("Close() modified the caller-owned copy")
+		}
+		clear(copied)
 		for _, value := range owned {
 			if value != 0 {
 				t.Fatal("Close() did not zero owned bytes")

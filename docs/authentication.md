@@ -78,7 +78,7 @@ Google Workspace administrators can restrict third-party OAuth and API access.
 A rejected or unapproved route fails clearly and never
 falls through to a password or another provider.
 
-## Google, Microsoft Graph, and Todoist OAuth
+## Google, Microsoft Graph, Todoist, and TickTick OAuth
 
 These routes require an explicitly configured public OAuth client and a
 registered loopback redirect:
@@ -96,8 +96,9 @@ ephemeral port. The same in-product notice links the public
 [Terms of Use](https://corresync.org/terms.html) before any
 provider page can open. Corresync does not support a generic confidential
 client, device-code unattended flow, password grant, or broad tenant
-credential. The bounded Google Desktop client credential above is the sole
-provider-specific exception; Microsoft Graph and Todoist remain secret-free.
+credential. Google Desktop OAuth and the closed TickTick route are the only
+provider-specific client-credential exceptions; Microsoft Graph and Todoist
+remain secret-free.
 
 The resulting grant is stored by the operating-system keyring under the
 configured local reference. The TOML contains only that reference and the
@@ -133,6 +134,17 @@ refresh tokens; Corresync serializes refresh by grant across local processes,
 reloads after taking the lock, and persists the replacement before release.
 The configured loopback port must be the fixed port registered for that client;
 the Todoist route does not substitute an ephemeral port.
+
+TickTick requests exactly `tasks:read` for a read-only route or `tasks:write`
+for a writable route. Its authorization and token endpoints and API base are
+fixed. The token exchange follows TickTick's documented confidential-client
+contract: the client ID and secret use HTTP Basic, the reviewed scope is sent
+again, and Corresync does not invent PKCE or refresh behavior. The client
+secret is resolved only from a separately consented OS-keyring/helper handle
+during explicit login and is never stored in configuration or the grant. Any
+unexpected refresh token is discarded, and expiry starts another interactive
+authorization. TickTick exposes no identity endpoint, so that limitation is
+reported and the dedicated account/grant/session boundary remains explicit.
 
 Use only an application registration and account you are authorized to use.
 

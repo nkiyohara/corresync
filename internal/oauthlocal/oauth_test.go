@@ -425,6 +425,198 @@ func TestTodoistProfileUsesPublicClientPKCEAndCommaSeparatedScopes(t *testing.T)
 	}
 }
 
+func TestTickTickUsesTransientBasicCredentialWithoutPKCEOrRefreshPersistence(t *testing.T) {
+	t.Parallel()
+	profile, err := ProviderFor(domain.ProviderTickTick, Services{Tasks: true, TaskWrite: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.AuthURL != "https://ticktick.com/oauth/authorize" ||
+		profile.TokenURL != "https://ticktick.com/oauth/token" ||
+		!profile.Confidential || !profile.ExchangeScope ||
+		!profile.DisablePKCE || !profile.DisableRefresh ||
+		!slices.Equal(profile.Scopes, []string{"tasks:write"}) {
+		t.Fatalf("TickTick profile = %+v", profile)
+	}
+
+	var stored string
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/token":
+			clientID, secret, ok := request.BasicAuth()
+			if err := request.ParseForm(); err != nil {
+				t.Error(err)
+				http.Error(writer, "bad form", http.StatusBadRequest)
+				return
+			}
+			if !ok || clientID != "ticktick-client" || secret != "transient-secret" ||
+				request.Form.Get("client_id") != "" || request.Form.Get("client_secret") != "" ||
+				request.Form.Get("code_verifier") != "" || request.Form.Get("scope") != "tasks:write" {
+				t.Errorf("TickTick token exchange auth=%t id=%q form=%#v", ok, clientID, request.Form)
+				http.Error(writer, "bad client auth", http.StatusBadRequest)
+				return
+			}
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(writer,
+				`{"access_token":"ticktick-access","refresh_token":"must-not-persist",`+
+					`"token_type":"Bearer","expires_in":3600}`,
+			)
+		case "/protected":
+			if request.Header.Get("Authorization") != "Bearer ticktick-access" {
+				http.Error(writer, "missing bearer", http.StatusUnauthorized)
+				return
+			}
+			_, _ = io.WriteString(writer, "ok")
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+	profile.AuthURL = server.URL + "/authorize"
+	profile.TokenURL = server.URL + "/token"
+	roots := x509.NewCertPool()
+	roots.AddCert(server.Certificate())
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig.RootCAs = roots
+	baseClient := &http.Client{Transport: transport}
+	route := config.OAuthClient{
+		ClientID: "ticktick-client", RedirectURI: "http://127.0.0.1:0/oauth/callback",
+		Authorization: config.CredentialRef{
+			Backend: config.CredentialOSKeyring, Key: "ticktick-grant", Consent: true,
+		},
+	}
+	manager, err := New(Options{
+		HTTP: baseClient, LockDir: t.TempDir(),
+		Get: func(_, _ string) (string, error) {
+			if stored == "" {
+				return "", keyring.ErrNotFound
+			}
+			return stored, nil
+		},
+		Set: func(_, _ string, value string) error {
+			stored = value
+			return nil
+		},
+		Open: func(ctx context.Context, target string) error {
+			parsed, err := url.Parse(target)
+			if err != nil {
+				return err
+			}
+			query := parsed.Query()
+			if query.Get("code_challenge") != "" || query.Get("code_challenge_method") != "" ||
+				query.Get("client_secret") != "" || query.Get("scope") != "tasks:write" {
+				t.Fatalf("TickTick authorization query = %s", parsed.RawQuery)
+			}
+			callback, err := url.Parse(query.Get("redirect_uri"))
+			if err != nil {
+				return err
+			}
+			values := callback.Query()
+			values.Set("state", query.Get("state"))
+			values.Set("code", "ticktick-code")
+			callback.RawQuery = values.Encode()
+			request, err := http.NewRequestWithContext(ctx, http.MethodGet, callback.String(), nil)
+			if err != nil {
+				return err
+			}
+			response, err := http.DefaultClient.Do(request)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = response.Body.Close() }()
+			_, _ = io.Copy(io.Discard, response.Body)
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientCredential := []byte("transient-secret")
+	authorization, err := manager.AuthorizeConfidential(
+		t.Context(), route, profile,
+		func(context.Context) ([]byte, error) { return clientCredential, nil },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(clientCredential, make([]byte, len(clientCredential))) {
+		t.Fatal("confidential OAuth client credential was not overwritten")
+	}
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/protected", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := authorization.HTTPClient().Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("protected status = %d", response.StatusCode)
+	}
+	if strings.Contains(stored, "transient-secret") || strings.Contains(stored, "must-not-persist") {
+		t.Fatalf("stored confidential grant retained a client credential or refresh token: %s", stored)
+	}
+	if _, err := manager.AuthorizeConfidential(
+		t.Context(), route, profile,
+		func(context.Context) ([]byte, error) {
+			t.Fatal("valid stored grant unexpectedly resolved the client credential")
+			return nil, errors.New("unexpected credential resolution")
+		},
+	); err != nil {
+		t.Fatalf("reuse stored confidential grant: %v", err)
+	}
+}
+
+func TestNonRefreshingOAuthExpiryRequiresInteractiveRecovery(t *testing.T) {
+	t.Parallel()
+	source := nonRefreshingTokenSource{token: oauth2.Token{
+		AccessToken: "expired", Expiry: time.Now().Add(-time.Minute),
+	}}
+	_, err := source.Token()
+	reason, ok := application.ProviderAuthenticationReason(err)
+	if !ok || reason != application.AuthenticationReasonSessionExpired {
+		t.Fatalf("expired non-refreshing token error = %v, reason = %q", err, reason)
+	}
+}
+
+func TestConfidentialOAuthOverwritesCredentialReturnedWithAnError(t *testing.T) {
+	t.Parallel()
+	manager, err := New(Options{Get: func(string, string) (string, error) {
+		return "", keyring.ErrNotFound
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := ProviderFor(
+		domain.ProviderTickTick,
+		Services{Tasks: true},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	credential := []byte("must-be-overwritten")
+	_, err = manager.AuthorizeConfidential(
+		t.Context(),
+		config.OAuthClient{
+			ClientID:    "synthetic-client",
+			RedirectURI: "http://127.0.0.1:53685/callback",
+			Authorization: config.CredentialRef{
+				Backend: config.CredentialOSKeyring,
+				Key:     "missing-confidential-grant",
+				Consent: true,
+			},
+		},
+		profile,
+		func(context.Context) ([]byte, error) {
+			return credential, errors.New("synthetic credential owner failure")
+		},
+	)
+	if err == nil || !slices.Equal(credential, make([]byte, len(credential))) {
+		t.Fatalf("AuthorizeConfidential() error = %v, credential = %q", err, credential)
+	}
+}
+
 func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 	t.Parallel()
 	var mu sync.Mutex
