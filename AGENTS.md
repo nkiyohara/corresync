@@ -2,21 +2,26 @@
 
 ## Scope
 
-Build Corresync, a local-first, provider-neutral mail and calendar CLI and MCP
-server for accounts the signed-in human already controls. Mail and calendar are
-in scope across providers, including a provider-native Teams or Google Meet
-join link provisioned as a property of one calendar event. See
+Build Corresync, a local-first, provider-neutral mail, calendar, task, and
+messaging CLI and MCP server for accounts the signed-in human already controls.
+Mail and calendar are in scope across providers, including a provider-native
+Teams or Google Meet join link provisioned as a property of one calendar event.
+Tasks and the evidence-gated messaging domain are defined in ADRs 0028 and
+0034. See
 [ADR 0008](docs/adr/0008-provider-neutral-product-scope.md) for the accepted
 scope and [ADR 0011](docs/adr/0011-coordinated-corresync-rename.md) for the
 rename.
 
-Scope is not capability. The latest stable v0.7 binary implements exactly one
-provider adapter, Outlook Web. Development-route claims require synthetic
-fixture contract tests and remain live-unobserved until a documented opt-in
-live observation exists.
+Scope is not capability. Development-route claims require synthetic fixture
+contract tests and remain live-unobserved until a documented opt-in live
+observation exists. A route that lacks the complete release evidence remains
+unreachable even when its adapter code is present.
 
-Teams chat, channels, calls, recordings, and meeting lifecycle management stay
-out of scope, exactly as decided in
+Teams calls, recordings, presence surveillance, and meeting lifecycle
+management stay out of scope. Provider-neutral chat and channel messaging is
+permitted only through the bounded contracts and immutable release gates in
+[ADR 0034](docs/adr/0034-provider-neutral-messaging.md); it does not broaden the
+calendar operation in
 [ADR 0005](docs/adr/0005-calendar-hosted-teams-links.md). Hosted relays,
 multi-user servers, unattended credential login, TLS interception, tenant-wide
 or administrative access, and any bypass of authentication, MFA, Conditional
