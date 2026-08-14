@@ -744,6 +744,36 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 	}
 }
 
+func TestValidateSessionStatusResultAcceptsMessagingOnlyRoute(t *testing.T) {
+	t.Parallel()
+	action, err := application.NewAuthenticationActionRequired(
+		application.AuthenticationStateSignedOut,
+		application.AuthenticationReasonNeverAuthenticated,
+		testAccountID,
+		"work",
+		application.AuthenticationServiceMessages,
+		domain.ProviderID(domain.MessagingProviderSlack),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := application.ServiceAuthenticationStatus{
+		Service:  application.AuthenticationServiceMessages,
+		Provider: domain.ProviderID(domain.MessagingProviderSlack),
+		State:    application.AuthenticationStateSignedOut,
+		Reason:   application.AuthenticationReasonNeverAuthenticated,
+		Action:   &action,
+	}
+	if err := validateSessionStatusResult(SessionStatusResult{Accounts: []SessionStatus{{
+		Account: testAccountID, Alias: "work",
+		MessagingProvider: domain.MessagingProviderSlack,
+		State:             "signed_out",
+		Services:          application.ServiceAuthenticationStatuses{Messages: &status},
+	}}}); err != nil {
+		t.Fatalf("validateSessionStatusResult() error = %v", err)
+	}
+}
+
 func testSessionAuthenticationStatuses(
 	account domain.AccountID,
 	alias string,

@@ -234,6 +234,8 @@ func configuredServiceProviderForProjection(
 		return account.CalendarProvider
 	case AuthenticationServiceTasks:
 		return account.TaskProvider
+	case AuthenticationServiceMessages:
+		return ""
 	default:
 		return ""
 	}

@@ -197,8 +197,10 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 		if err := domain.AccountAlias(account.Alias).Validate(); err != nil {
 			return errors.New("daemon returned an invalid session account alias")
 		}
-		if err := account.Provider.Validate(); err != nil {
-			return errors.New("daemon returned an invalid session provider")
+		if account.Provider != "" {
+			if err := account.Provider.Validate(); err != nil {
+				return errors.New("daemon returned an invalid session provider")
+			}
 		}
 		if account.MailProvider != "" {
 			if err := account.MailProvider.Validate(); err != nil {
@@ -215,7 +217,13 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 				return errors.New("daemon returned an invalid task session provider")
 			}
 		}
-		if account.MailProvider == "" && account.CalendarProvider == "" && account.TaskProvider == "" {
+		if account.MessagingProvider != "" {
+			if err := account.MessagingProvider.Validate(); err != nil {
+				return errors.New("daemon returned an invalid messaging session provider")
+			}
+		}
+		if account.MailProvider == "" && account.CalendarProvider == "" &&
+			account.TaskProvider == "" && account.MessagingProvider == "" {
 			return errors.New("daemon returned a session without a provider route")
 		}
 		expectedProvider := account.MailProvider
@@ -230,7 +238,8 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 		}
 		if (account.MailProvider != "") != (account.Services.Mail != nil) ||
 			(account.CalendarProvider != "") != (account.Services.Calendar != nil) ||
-			(account.TaskProvider != "") != (account.Services.Tasks != nil) {
+			(account.TaskProvider != "") != (account.Services.Tasks != nil) ||
+			(account.MessagingProvider != "") != (account.Services.Messages != nil) {
 			return errors.New("daemon returned inconsistent service authentication routes")
 		}
 		authenticatedServices := 0
@@ -247,6 +256,8 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 				provider = account.CalendarProvider
 			case application.AuthenticationServiceTasks:
 				provider = account.TaskProvider
+			case application.AuthenticationServiceMessages:
+				provider = domain.ProviderID(account.MessagingProvider)
 			}
 			if service.Provider != provider {
 				return errors.New("daemon returned an inconsistent service provider")
@@ -290,7 +301,9 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 				account.Capabilities.Calendar !=
 					(account.Services.Calendar != nil && account.Services.Calendar.State == application.AuthenticationStateAuthenticated) ||
 				account.Capabilities.Tasks !=
-					(account.Services.Tasks != nil && account.Services.Tasks.State == application.AuthenticationStateAuthenticated) {
+					(account.Services.Tasks != nil && account.Services.Tasks.State == application.AuthenticationStateAuthenticated) ||
+				account.Capabilities.Messages !=
+					(account.Services.Messages != nil && account.Services.Messages.State == application.AuthenticationStateAuthenticated) {
 				return errors.New("daemon returned capabilities inconsistent with service authentication")
 			}
 			if len(account.Degradations) > 32 {

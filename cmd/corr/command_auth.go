@@ -27,18 +27,19 @@ type authStatusReport struct {
 }
 
 type sessionStatusView struct {
-	Account          string                                    `json:"account"`
-	Alias            string                                    `json:"alias"`
-	Provider         string                                    `json:"provider"`
-	MailProvider     string                                    `json:"mailProvider,omitempty"`
-	CalendarProvider string                                    `json:"calendarProvider,omitempty"`
-	TaskProvider     string                                    `json:"taskProvider,omitempty"`
-	State            string                                    `json:"state"`
-	Authenticated    bool                                      `json:"authenticated"`
-	Services         application.ServiceAuthenticationStatuses `json:"services"`
-	CapturedAt       string                                    `json:"capturedAt,omitempty"`
-	Capabilities     *domain.Capabilities                      `json:"capabilities,omitempty"`
-	Degradations     []domain.Degradation                      `json:"degradations,omitempty"`
+	Account           string                                    `json:"account"`
+	Alias             string                                    `json:"alias"`
+	Provider          string                                    `json:"provider"`
+	MailProvider      string                                    `json:"mailProvider,omitempty"`
+	CalendarProvider  string                                    `json:"calendarProvider,omitempty"`
+	TaskProvider      string                                    `json:"taskProvider,omitempty"`
+	MessagingProvider string                                    `json:"messagingProvider,omitempty"`
+	State             string                                    `json:"state"`
+	Authenticated     bool                                      `json:"authenticated"`
+	Services          application.ServiceAuthenticationStatuses `json:"services"`
+	CapturedAt        string                                    `json:"capturedAt,omitempty"`
+	Capabilities      *domain.Capabilities                      `json:"capabilities,omitempty"`
+	Degradations      []domain.Degradation                      `json:"degradations,omitempty"`
 }
 
 func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
@@ -73,17 +74,18 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 			continue
 		}
 		item := sessionStatusView{
-			Account:          string(account.Account),
-			Alias:            account.Alias,
-			Provider:         string(account.Provider),
-			MailProvider:     string(account.MailProvider),
-			CalendarProvider: string(account.CalendarProvider),
-			TaskProvider:     string(account.TaskProvider),
-			State:            account.State,
-			Authenticated:    account.Authenticated,
-			Services:         account.Services,
-			Capabilities:     account.Capabilities,
-			Degradations:     account.Degradations,
+			Account:           string(account.Account),
+			Alias:             account.Alias,
+			Provider:          string(account.Provider),
+			MailProvider:      string(account.MailProvider),
+			CalendarProvider:  string(account.CalendarProvider),
+			TaskProvider:      string(account.TaskProvider),
+			MessagingProvider: string(account.MessagingProvider),
+			State:             account.State,
+			Authenticated:     account.Authenticated,
+			Services:          account.Services,
+			Capabilities:      account.Capabilities,
+			Degradations:      account.Degradations,
 		}
 		if account.CapturedAt != nil {
 			item.CapturedAt = account.CapturedAt.UTC().Format("2006-01-02T15:04:05Z")

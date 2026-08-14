@@ -70,6 +70,8 @@ type Services struct {
 	Calendar       bool
 	Tasks          bool
 	TaskWrite      bool
+	Messages       bool
+	MessageWrite   bool
 	MicrosoftCloud microsoftcloud.ID
 }
 
@@ -82,10 +84,14 @@ func ProviderFor(
 	if services.TaskWrite && !services.Tasks {
 		return Provider{}, errors.New("task write scope requires the task service")
 	}
+	if services.MessageWrite && !services.Messages {
+		return Provider{}, errors.New("messaging write scope requires the messaging service")
+	}
 	var result Provider
 	switch provider {
 	case domain.ProviderGoogle:
-		if services.Tasks || services.TaskWrite || services.MicrosoftCloud != "" {
+		if services.Tasks || services.TaskWrite || services.Messages || services.MessageWrite ||
+			services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("google OAuth profile has invalid service options")
 		}
 		if !rollout.GoogleOAuthApproved {
@@ -93,7 +99,8 @@ func ProviderFor(
 		}
 		result = googleProviderProfile(services.Mail, services.Calendar)
 	case domain.ProviderGoogleTasks:
-		if services.Mail || services.Calendar || !services.Tasks ||
+		if services.Mail || services.Calendar || services.Messages ||
+			services.MessageWrite || !services.Tasks ||
 			services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("google Tasks OAuth profile has invalid service options")
 		}
@@ -131,8 +138,28 @@ func ProviderFor(
 			}
 			result.Scopes = append(result.Scopes, scope)
 		}
+		if services.Messages {
+			result.Scopes = append(result.Scopes,
+				"Channel.ReadBasic.All",
+				"ChannelMessage.Read.All",
+				"Team.ReadBasic.All",
+			)
+			chatReadScope := "Chat.Read"
+			if services.MessageWrite {
+				chatReadScope = "Chat.ReadWrite"
+				result.Scopes = append(result.Scopes,
+					"ChannelMember.ReadWrite.All",
+					"ChannelMessage.ReadWrite",
+					"ChannelMessage.Send",
+					"ChatMember.ReadWrite",
+					"ChatMessage.Send",
+				)
+			}
+			result.Scopes = append(result.Scopes, chatReadScope)
+		}
 	case domain.ProviderTodoist:
-		if services.Mail || services.Calendar || services.MicrosoftCloud != "" {
+		if services.Mail || services.Calendar || services.Messages ||
+			services.MessageWrite || services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("todoist OAuth profile has invalid service options")
 		}
 		scope := "data:read"
@@ -150,7 +177,8 @@ func ProviderFor(
 			result.Scopes = append(result.Scopes, "data:delete")
 		}
 	case domain.ProviderTickTick:
-		if services.Mail || services.Calendar || !services.Tasks ||
+		if services.Mail || services.Calendar || services.Messages ||
+			services.MessageWrite || !services.Tasks ||
 			services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("ticktick OAuth profile has invalid service options")
 		}
@@ -181,8 +209,8 @@ func ProviderFor(
 	default:
 		return Provider{}, fmt.Errorf("unknown OAuth provider %q", provider)
 	}
-	if !services.Mail && !services.Calendar && !services.Tasks {
-		return Provider{}, errors.New("OAuth profile requires a mail, calendar, or task service")
+	if !services.Mail && !services.Calendar && !services.Tasks && !services.Messages {
+		return Provider{}, errors.New("OAuth profile requires a mail, calendar, task, or messaging service")
 	}
 	slices.Sort(result.Scopes)
 	result.Scopes = slices.Compact(result.Scopes)

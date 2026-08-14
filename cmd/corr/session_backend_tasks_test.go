@@ -323,6 +323,17 @@ func TestConfiguredGraphServicesMergeOnlyTheSameCanonicalGrant(t *testing.T) {
 		services[0].taskWrite {
 		t.Fatalf("canonical Global Graph services = %+v, %v", services, err)
 	}
+	account.Messages = &config.MessagingRoute{
+		Provider: domain.MessagingProviderMicrosoftTeams,
+		TeamsGraph: &config.TeamsGraphMessagingRoute{
+			OAuth: explicitGlobal, WorkspaceID: "tenant-synthetic",
+		},
+	}
+	services, err = configuredGraphServices(account)
+	if err != nil || len(services) != 1 || services[0].messaging == nil ||
+		services[0].messaging.WorkspaceID != "tenant-synthetic" {
+		t.Fatalf("shared Graph messaging services = %+v, %v", services, err)
+	}
 
 	distinct := explicitGlobal
 	distinct.Authorization.Key = "tasks"

@@ -390,6 +390,56 @@ func TestMicrosoftTodoScopesAndNationalCloudAuthorities(t *testing.T) {
 	}
 }
 
+func TestMicrosoftTeamsScopesStayWithinSelectedParityCohort(t *testing.T) {
+	t.Parallel()
+	read, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{
+		Messages: true, MicrosoftCloud: microsoftcloud.Global,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scope := range []string{
+		"Chat.Read", "Team.ReadBasic.All", "Channel.ReadBasic.All",
+		"ChannelMessage.Read.All", "User.Read",
+	} {
+		if !slices.Contains(read.Scopes, scope) {
+			t.Fatalf("Teams read profile omits %q: %#v", scope, read.Scopes)
+		}
+	}
+	for _, scope := range []string{
+		"Chat.ReadWrite", "ChatMessage.Send", "ChannelMessage.Send",
+		"Chat.Create", "Channel.Create", "Mail.ReadWrite", "Tasks.Read",
+	} {
+		if slices.Contains(read.Scopes, scope) {
+			t.Fatalf("Teams read profile unexpectedly includes %q: %#v", scope, read.Scopes)
+		}
+	}
+
+	write, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{
+		Messages: true, MessageWrite: true, MicrosoftCloud: microsoftcloud.Global,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scope := range []string{
+		"Chat.ReadWrite", "ChatMessage.Send", "ChannelMessage.Send",
+		"ChannelMessage.ReadWrite", "ChatMember.ReadWrite",
+		"ChannelMember.ReadWrite.All",
+	} {
+		if !slices.Contains(write.Scopes, scope) {
+			t.Fatalf("Teams write profile omits %q: %#v", scope, write.Scopes)
+		}
+	}
+	for _, scope := range []string{"Chat.Read", "Chat.Create", "Channel.Create"} {
+		if slices.Contains(write.Scopes, scope) {
+			t.Fatalf("Teams write profile unexpectedly includes %q: %#v", scope, write.Scopes)
+		}
+	}
+	if _, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{MessageWrite: true}); err == nil {
+		t.Fatal("message write profile accepted no messaging service")
+	}
+}
+
 func TestTodoistProfileUsesPublicClientPKCEAndCommaSeparatedScopes(t *testing.T) {
 	t.Parallel()
 	provider, err := ProviderFor(domain.ProviderTodoist, Services{

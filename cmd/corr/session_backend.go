@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"strings"
@@ -31,7 +33,11 @@ import (
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
+	"github.com/nkiyohara/corresync/internal/provider/mattermostapi"
 	"github.com/nkiyohara/corresync/internal/provider/outlookweb"
+	"github.com/nkiyohara/corresync/internal/provider/slackapi"
+	"github.com/nkiyohara/corresync/internal/provider/teamsgraph"
+	"github.com/nkiyohara/corresync/internal/provider/teamsweb"
 	"github.com/nkiyohara/corresync/internal/provider/ticktick"
 	"github.com/nkiyohara/corresync/internal/provider/todoist"
 	"github.com/nkiyohara/corresync/internal/rollout"
@@ -40,6 +46,29 @@ import (
 
 type sessionCloser interface {
 	Close() error
+}
+
+type bearerTransport struct {
+	base       *http.Transport
+	authorizer *credential.BearerAuthorizer
+}
+
+func (transport *bearerTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	if transport == nil || transport.base == nil || transport.authorizer == nil {
+		return nil, errors.New("bearer transport is unavailable")
+	}
+	copy := request.Clone(request.Context())
+	copy.Header = request.Header.Clone()
+	if err := transport.authorizer.Apply(copy); err != nil {
+		return nil, err
+	}
+	return transport.base.RoundTrip(copy)
+}
+
+func (transport *bearerTransport) CloseIdleConnections() {
+	if transport != nil && transport.base != nil {
+		transport.base.CloseIdleConnections()
+	}
 }
 
 type oauthClientManager interface {
@@ -61,9 +90,11 @@ type sessionAccount struct {
 	mail               *application.MailService
 	calendar           *application.CalendarService
 	tasks              *application.TaskService
+	messages           *application.MessagingService
 	mailLease          *sessionLease
 	calendarLease      *sessionLease
 	taskLease          *sessionLease
+	messageLease       *sessionLease
 	captured           time.Time
 	capabilities       domain.Capabilities
 	degradations       []domain.Degradation
@@ -79,6 +110,7 @@ const (
 	sessionServiceMail sessionServiceSet = 1 << iota
 	sessionServiceCalendar
 	sessionServiceTasks
+	sessionServiceMessages
 )
 
 type sessionLease struct {
@@ -103,6 +135,9 @@ func leasedSessionAccount(account sessionAccount) sessionAccount {
 	if account.tasks != nil {
 		services |= sessionServiceTasks
 	}
+	if account.messages != nil {
+		services |= sessionServiceMessages
+	}
 	if services == 0 {
 		return account
 	}
@@ -122,6 +157,9 @@ func leasedSessionAccount(account sessionAccount) sessionAccount {
 	}
 	if account.tasks != nil {
 		account.taskLease = lease
+	}
+	if account.messages != nil {
+		account.messageLease = lease
 	}
 	account.closers = nil
 	return account
@@ -153,6 +191,8 @@ func (account sessionAccount) lease(
 		return account.calendarLease
 	case application.AuthenticationServiceTasks:
 		return account.taskLease
+	case application.AuthenticationServiceMessages:
+		return account.messageLease
 	default:
 		return nil
 	}
@@ -168,6 +208,8 @@ func (account sessionAccount) serviceActive(
 		return account.calendar != nil && account.calendarLease != nil
 	case application.AuthenticationServiceTasks:
 		return account.tasks != nil && account.taskLease != nil
+	case application.AuthenticationServiceMessages:
+		return account.messages != nil && account.messageLease != nil
 	default:
 		return false
 	}
@@ -176,16 +218,18 @@ func (account sessionAccount) serviceActive(
 func (account sessionAccount) hasActiveService() bool {
 	return account.serviceActive(application.AuthenticationServiceMail) ||
 		account.serviceActive(application.AuthenticationServiceCalendar) ||
-		account.serviceActive(application.AuthenticationServiceTasks)
+		account.serviceActive(application.AuthenticationServiceTasks) ||
+		account.serviceActive(application.AuthenticationServiceMessages)
 }
 
 func (account sessionAccount) leases() []*sessionLease {
-	result := make([]*sessionLease, 0, 3)
-	seen := make(map[*sessionLease]struct{}, 3)
+	result := make([]*sessionLease, 0, 4)
+	seen := make(map[*sessionLease]struct{}, 4)
 	for _, lease := range []*sessionLease{
 		account.mailLease,
 		account.calendarLease,
 		account.taskLease,
+		account.messageLease,
 	} {
 		if lease == nil {
 			continue
@@ -240,6 +284,11 @@ func (account *sessionAccount) detachLease(lease *sessionLease) sessionServiceSe
 		account.tasks = nil
 		account.taskLease = nil
 		detached |= sessionServiceTasks
+	}
+	if account.messageLease == lease {
+		account.messages = nil
+		account.messageLease = nil
+		detached |= sessionServiceMessages
 	}
 	account.refreshSnapshot()
 	return detached
@@ -319,6 +368,13 @@ func (account sessionAccount) taskService() (*application.TaskService, error) {
 	return account.tasks, nil
 }
 
+func (account sessionAccount) messagingService() (*application.MessagingService, error) {
+	if account.messages == nil {
+		return nil, errors.New("configured account has no active messaging route")
+	}
+	return account.messages, nil
+}
+
 type sessionPreview struct {
 	account   domain.AccountID
 	service   application.AuthenticationService
@@ -359,6 +415,10 @@ type sessionBackend struct {
 	newGraph       func(context.Context, graphapi.Options) (*graphapi.Client, error)
 	newTodoist     func(context.Context, todoist.Options) (*todoist.Client, error)
 	newTickTick    func(context.Context, ticktick.Options) (*ticktick.Client, error)
+	newSlack       func(context.Context, slackapi.Options) (*slackapi.Client, error)
+	newTeamsGraph  func(context.Context, teamsgraph.Options) (*teamsgraph.Client, error)
+	newTeamsWeb    func(context.Context, teamsweb.Options) (*teamsweb.Client, error)
+	newMattermost  func(context.Context, mattermostapi.Options) (*mattermostapi.Client, error)
 	monitorStore   *eventqueue.Store
 	monitor        *application.MonitorService
 	monitorEngine  *application.MonitorEngine
@@ -501,7 +561,7 @@ func (backend *sessionBackend) ResolveAccount(reference string) (domain.AccountI
 func configuredAuthenticationServices(
 	account config.Account,
 ) []application.AuthenticationService {
-	services := make([]application.AuthenticationService, 0, 3)
+	services := make([]application.AuthenticationService, 0, 4)
 	if account.Mail != nil {
 		services = append(services, application.AuthenticationServiceMail)
 	}
@@ -510,6 +570,9 @@ func configuredAuthenticationServices(
 	}
 	if account.Tasks != nil {
 		services = append(services, application.AuthenticationServiceTasks)
+	}
+	if account.Messages != nil {
+		services = append(services, application.AuthenticationServiceMessages)
 	}
 	return services
 }
@@ -525,6 +588,8 @@ func configuredServiceProvider(
 		return account.CalendarProvider()
 	case application.AuthenticationServiceTasks:
 		return account.TaskProvider()
+	case application.AuthenticationServiceMessages:
+		return domain.ProviderID(account.MessagingProvider())
 	default:
 		return ""
 	}
@@ -562,6 +627,14 @@ func configuredServiceImplemented(
 		default:
 			return false
 		}
+	case application.AuthenticationServiceMessages:
+		if account.Messages == nil {
+			return false
+		}
+		return rollout.RequireMessaging(
+			account.Messages.Provider,
+			account.Messages.Kind(),
+		) == nil
 	default:
 		return false
 	}
@@ -577,6 +650,8 @@ func sessionServiceMask(
 		return sessionServiceCalendar
 	case application.AuthenticationServiceTasks:
 		return sessionServiceTasks
+	case application.AuthenticationServiceMessages:
+		return sessionServiceMessages
 	default:
 		return 0
 	}
@@ -691,6 +766,7 @@ func (backend *sessionBackend) clearAuthenticationReasonsLocked(
 		application.AuthenticationServiceMail,
 		application.AuthenticationServiceCalendar,
 		application.AuthenticationServiceTasks,
+		application.AuthenticationServiceMessages,
 	} {
 		if !account.serviceActive(service) {
 			continue
@@ -810,6 +886,9 @@ func (backend *sessionBackend) ProjectionAccounts(
 			TaskProvider:     configured.TaskProvider(),
 		}
 		for _, service := range configuredAuthenticationServices(configured) {
+			if service == application.AuthenticationServiceMessages {
+				continue
+			}
 			status, err := backend.serviceAuthenticationStatusLocked(
 				configured.ID,
 				alias,
@@ -911,13 +990,14 @@ func (backend *sessionBackend) SessionStatus(
 		configured := backend.configuration.Accounts[alias]
 		accountID := configured.ID
 		state := daemonapi.SessionStatus{
-			Account:          accountID,
-			Alias:            alias,
-			Provider:         configured.PrimaryProvider(),
-			MailProvider:     configured.MailProvider(),
-			CalendarProvider: configured.CalendarProvider(),
-			TaskProvider:     configured.TaskProvider(),
-			State:            "signed_out",
+			Account:           accountID,
+			Alias:             alias,
+			Provider:          configured.PrimaryProvider(),
+			MailProvider:      configured.MailProvider(),
+			CalendarProvider:  configured.CalendarProvider(),
+			TaskProvider:      configured.TaskProvider(),
+			MessagingProvider: configured.MessagingProvider(),
+			State:             "signed_out",
 		}
 		for _, service := range configuredAuthenticationServices(configured) {
 			serviceStatus, err := backend.serviceAuthenticationStatusLocked(
@@ -2335,6 +2415,342 @@ func (backend *sessionBackend) commitTaskWrite(
 	return access, nil
 }
 
+func (backend *sessionBackend) ListConversations(
+	ctx context.Context,
+	input application.ConversationListInput,
+	caller domain.Caller,
+) (application.ConversationPage, error) {
+	return withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.ConversationPage, error) {
+		return messages.ListConversations(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) ListMessages(
+	ctx context.Context,
+	input application.MessageListInput,
+	caller domain.Caller,
+) (application.MessagePage, error) {
+	return withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessagePage, error) {
+		return messages.ListMessages(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) SearchMessages(
+	ctx context.Context,
+	input application.MessageSearchInput,
+	caller domain.Caller,
+) (application.MessagePage, error) {
+	return withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessagePage, error) {
+		return messages.SearchMessages(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) GetMessage(
+	ctx context.Context,
+	input application.MessageGetInput,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	access, err := withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageSensitiveAccess, error) {
+		return messages.GetMessage(ctx, input, caller)
+	})
+	backend.rememberMessagePreview(input.Account, access.Preview)
+	return access, err
+}
+
+func (backend *sessionBackend) CommitGetMessage(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	return commitMessagingPreview(backend, token, func(messages *application.MessagingService) (application.MessageSensitiveAccess, error) {
+		return messages.CommitGetMessage(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) GetMessageAttachment(
+	ctx context.Context,
+	input application.MessageAttachmentGetInput,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	access, err := withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageSensitiveAccess, error) {
+		return messages.GetAttachment(ctx, input, caller)
+	})
+	backend.rememberMessagePreview(input.Account, access.Preview)
+	return access, err
+}
+
+func (backend *sessionBackend) CommitGetMessageAttachment(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	return commitMessagingPreview(backend, token, func(messages *application.MessagingService) (application.MessageSensitiveAccess, error) {
+		return messages.CommitGetAttachment(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) SyncMessages(
+	ctx context.Context,
+	input application.MessageSyncInput,
+	caller domain.Caller,
+) (application.MessageChangePage, error) {
+	return withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageChangePage, error) {
+		return messages.SyncMessages(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) SendMessage(
+	ctx context.Context,
+	input application.MessageSendInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.Send(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitSendMessage(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.commitMessageWrite(token, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.CommitSend(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) EditMessage(
+	ctx context.Context,
+	input application.MessageEditInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.Edit(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitEditMessage(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.commitMessageWrite(token, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.CommitEdit(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) DeleteMessage(
+	ctx context.Context,
+	input application.MessageDeleteInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.Delete(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitDeleteMessage(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.commitMessageWrite(token, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.CommitDelete(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) ReactToMessage(
+	ctx context.Context,
+	input application.MessageReactionInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.React(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitMessageReaction(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.commitMessageWrite(token, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.CommitReact(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) CreateConversation(
+	ctx context.Context,
+	input application.ConversationCreateInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.CreateConversation(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitCreateConversation(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.commitMessageWrite(token, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.CommitCreateConversation(ctx, token, caller)
+	})
+}
+
+func (backend *sessionBackend) ChangeConversationMembership(
+	ctx context.Context,
+	input application.ConversationMembershipInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.ChangeMembership(ctx, input, caller)
+	})
+}
+
+func (backend *sessionBackend) CommitConversationMembership(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.commitMessageWrite(token, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
+		return messages.CommitMembership(ctx, token, caller)
+	})
+}
+
+func withMessagingService[T any](
+	backend *sessionBackend,
+	ctx context.Context,
+	accountID domain.AccountID,
+	caller domain.Caller,
+	use func(*application.MessagingService) (T, error),
+) (T, error) {
+	var zero T
+	if err := backend.requireMessagingRoute(accountID); err != nil {
+		return zero, err
+	}
+	return withSessionService(
+		backend, ctx, accountID, caller,
+		application.AuthenticationServiceMessages,
+		func(account sessionAccount) (*application.MessagingService, error) {
+			return account.messagingService()
+		},
+		use,
+	)
+}
+
+func (backend *sessionBackend) requireMessagingRoute(accountID domain.AccountID) error {
+	backend.mu.Lock()
+	alias, configured, exists := backend.configuration.AccountByID(accountID)
+	backend.mu.Unlock()
+	if !exists {
+		return fmt.Errorf("account %q is not configured", accountID)
+	}
+	if configured.Messages == nil {
+		return fmt.Errorf("configured account %q has no messaging route", alias)
+	}
+	return rollout.RequireMessaging(configured.Messages.Provider, configured.Messages.Kind())
+}
+
+func (backend *sessionBackend) rememberMessagePreview(
+	accountID domain.AccountID,
+	preview *approval.Preview,
+) {
+	if preview == nil {
+		return
+	}
+	backend.rememberPreview(
+		preview.Token,
+		accountID,
+		application.AuthenticationServiceMessages,
+		preview.ExpiresAt,
+	)
+}
+
+func (backend *sessionBackend) prepareMessageWrite(
+	ctx context.Context,
+	accountID domain.AccountID,
+	caller domain.Caller,
+	prepare func(*application.MessagingService) (application.MessageWriteAccess, error),
+) (application.MessageWriteAccess, error) {
+	access, err := withMessagingService(backend, ctx, accountID, caller, prepare)
+	if err == nil {
+		backend.rememberMessagePreview(accountID, access.Preview)
+	}
+	return access, err
+}
+
+func commitMessagingPreview[T any](
+	backend *sessionBackend,
+	token string,
+	commit func(*application.MessagingService) (T, error),
+) (T, error) {
+	var zero T
+	if err := backend.requireAnyMessagingRoute(); err != nil {
+		return zero, err
+	}
+	backend.mu.Lock()
+	if backend.closed {
+		backend.mu.Unlock()
+		return zero, errors.New("session backend is closed")
+	}
+	backend.active.Add(1)
+	backend.mu.Unlock()
+	defer backend.active.Done()
+
+	account, preview, exists := backend.accountForPreview(token)
+	if !exists || preview.service != application.AuthenticationServiceMessages || account.messages == nil {
+		if exists {
+			account.usage.end()
+		}
+		return zero, errors.New("invalid or expired approval token")
+	}
+	if err := backend.requireMessagingRoute(preview.account); err != nil {
+		account.usage.end()
+		return zero, err
+	}
+	access, callErr := commit(account.messages)
+	access, err := finishSessionCall(backend, preview.account, account, access, callErr)
+	if err != nil {
+		return zero, err
+	}
+	backend.forgetPreview(token)
+	return access, nil
+}
+
+func (backend *sessionBackend) requireAnyMessagingRoute() error {
+	backend.mu.Lock()
+	aliases := make([]string, 0, len(backend.configuration.Accounts))
+	for alias := range backend.configuration.Accounts {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	routes := make([]config.MessagingRoute, 0, len(aliases))
+	for _, alias := range aliases {
+		if route := backend.configuration.Accounts[alias].Messages; route != nil {
+			routes = append(routes, *route)
+		}
+	}
+	backend.mu.Unlock()
+	if len(routes) == 0 {
+		return errors.New("no messaging route is configured")
+	}
+	for _, route := range routes {
+		if err := rollout.RequireMessaging(route.Provider, route.Kind()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (backend *sessionBackend) commitMessageWrite(
+	token string,
+	commit func(*application.MessagingService) (application.MessageWriteAccess, error),
+) (application.MessageWriteAccess, error) {
+	return commitMessagingPreview(backend, token, commit)
+}
+
 func (backend *sessionBackend) accountServices(
 	_ context.Context,
 	accountID domain.AccountID,
@@ -2572,6 +2988,10 @@ func (backend *sessionBackend) activateAccount(
 	if err != nil {
 		return sessionAccount{}, err
 	}
+	messagingDegradation, err := inactiveMessagingRoute(configured)
+	if err != nil {
+		return sessionAccount{}, err
+	}
 	var services sessionAccount
 	if hasOutlookRoute(configured) {
 		var handle browserHandle
@@ -2591,16 +3011,34 @@ func (backend *sessionBackend) activateAccount(
 		}
 		services = mergeSessionAccounts(services, web)
 	}
-	standards, err := backend.nonOutlookAccount(ctx, configured)
+	activeRoutes := configured
+	if messagingDegradation != nil {
+		activeRoutes.Messages = nil
+	}
+	standards, err := backend.nonOutlookAccount(ctx, activeRoutes)
 	if err != nil {
 		return sessionAccount{}, errors.Join(err, closeSessionAccount(services))
 	}
 	services = mergeSessionAccounts(services, standards)
+	if activeRoutes.Messages != nil && activeRoutes.Messages.TeamsWeb != nil {
+		teams, err := backend.teamsWebMessagingAccount(ctx, activeRoutes)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(services))
+		}
+		services = mergeSessionAccounts(services, teams)
+	}
 	if taskDegradation != nil {
 		services.degradations = append(services.degradations, *taskDegradation)
 		services.staticDegradations = append(
 			services.staticDegradations,
 			*taskDegradation,
+		)
+	}
+	if messagingDegradation != nil {
+		services.degradations = append(services.degradations, *messagingDegradation)
+		services.staticDegradations = append(
+			services.staticDegradations,
+			*messagingDegradation,
 		)
 	}
 
@@ -2698,6 +3136,229 @@ func inactiveTaskRoute(configured config.Account) (*domain.Degradation, error) {
 			configured.Tasks.Provider,
 		),
 	}, nil
+}
+
+// inactiveMessagingRoute keeps the complete v0.9 implementation dormant
+// until release-owned evidence is accepted. The check happens before browser
+// launch, credential resolution, OAuth, or provider traffic. A mixed account
+// retains its already released services with an explicit degradation; a
+// messaging-only account cannot be mistaken for an authenticated empty
+// session.
+func inactiveMessagingRoute(configured config.Account) (*domain.Degradation, error) {
+	if configured.Messages == nil {
+		return nil, nil
+	}
+	err := rollout.RequireMessaging(
+		configured.Messages.Provider,
+		configured.Messages.Kind(),
+	)
+	if err == nil {
+		return nil, nil
+	}
+	if configured.Mail == nil && configured.Calendar == nil && configured.Tasks == nil {
+		return nil, err
+	}
+	return &domain.Degradation{
+		Feature: "messages.route",
+		Reason:  "the configured messaging route is awaiting the v0.9 release evidence gate",
+	}, nil
+}
+
+type observedMessagingClient interface {
+	application.MessagingPort
+	MessageActor() application.MessageActor
+	MessageCapabilities() application.MessageCapabilities
+	MessageDegradations() []domain.Degradation
+}
+
+func (backend *sessionBackend) messagingSessionAccount(
+	configured config.Account,
+	provider domain.MessagingProviderID,
+	route domain.MessagingRouteKind,
+	workspaceID string,
+	client observedMessagingClient,
+	closers ...sessionCloser,
+) (sessionAccount, error) {
+	capabilities := client.MessageCapabilities()
+	messages, err := application.NewMessagingService(
+		backend.guard,
+		client,
+		application.MessagingOptions{
+			Provenance: application.MessagingProvenance{
+				AccountID: configured.ID, Provider: provider, Route: route,
+				WorkspaceID: workspaceID, Actor: client.MessageActor(),
+			},
+			Capabilities: capabilities,
+			Degradations: client.MessageDegradations(),
+		},
+	)
+	result := sessionAccount{
+		closers: closers, messages: messages, captured: time.Now().UTC(),
+		capabilities: domain.Capabilities{
+			Messages: true, IncrementalSync: capabilities.IncrementalSync,
+			AttachmentReads:  capabilities.AttachmentReads,
+			AttachmentWrites: capabilities.AttachmentWrites,
+		},
+		degradations: client.MessageDegradations(),
+	}
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, closeSessionAccount(result))
+	}
+	return leasedSessionAccount(result), nil
+}
+
+func (backend *sessionBackend) slackMessagingAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	if configured.Messages == nil || configured.Messages.Slack == nil {
+		return sessionAccount{}, errors.New("slack messaging route settings are missing")
+	}
+	selected := configured.Messages.Slack
+	secret, err := backend.credentials.Resolve(ctx, selected.Authorization)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	parsed, _ := url.Parse(selected.APIBase)
+	origin := (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host}).String()
+	authorizer, authorizerErr := credential.NewBearerAuthorizer(origin, secret)
+	closeSecretErr := secret.Close()
+	if authorizerErr != nil || closeSecretErr != nil {
+		return sessionAccount{}, errors.Join(authorizerErr, closeSecretErr)
+	}
+	base := http.DefaultTransport.(*http.Transport).Clone()
+	base.Proxy = nil
+	base.DisableCompression = true
+	transport := &bearerTransport{base: base, authorizer: authorizer}
+	httpClient := &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return errors.New("slack API redirects are not accepted")
+		},
+	}
+	factory := backend.newSlack
+	if factory == nil {
+		factory = slackapi.New
+	}
+	client, err := factory(ctx, slackapi.Options{
+		APIBase: selected.APIBase, WorkspaceID: selected.WorkspaceID,
+		ReadOnly: selected.ReadOnly, HTTP: httpClient,
+	})
+	if err != nil {
+		transport.CloseIdleConnections()
+		return sessionAccount{}, errors.Join(err, authorizer.Close())
+	}
+	return backend.messagingSessionAccount(
+		configured,
+		domain.MessagingProviderSlack,
+		domain.MessagingRouteSlackAPI,
+		selected.WorkspaceID,
+		client,
+		client,
+		authorizer,
+	)
+}
+
+func (backend *sessionBackend) mattermostMessagingAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	if configured.Messages == nil || configured.Messages.Mattermost == nil {
+		return sessionAccount{}, errors.New("mattermost messaging route settings are missing")
+	}
+	selected := configured.Messages.Mattermost
+	secret, err := backend.credentials.Resolve(ctx, selected.Authorization)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	authorizer, authorizerErr := credential.NewBearerAuthorizer(selected.Origin, secret)
+	closeSecretErr := secret.Close()
+	if authorizerErr != nil || closeSecretErr != nil {
+		return sessionAccount{}, errors.Join(authorizerErr, closeSecretErr)
+	}
+	factory := backend.newMattermost
+	if factory == nil {
+		factory = mattermostapi.New
+	}
+	client, err := factory(ctx, mattermostapi.Options{
+		Origin: selected.Origin, WorkspaceID: selected.WorkspaceID,
+		ReadOnly: selected.ReadOnly, Authorization: authorizer,
+	})
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, authorizer.Close())
+	}
+	return backend.messagingSessionAccount(
+		configured,
+		domain.MessagingProviderMattermost,
+		domain.MessagingRouteMattermost,
+		selected.WorkspaceID,
+		client,
+		client,
+	)
+}
+
+func (backend *sessionBackend) teamsWebMessagingAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	if configured.Messages == nil || configured.Messages.TeamsWeb == nil {
+		return sessionAccount{}, errors.New("teams Web messaging route settings are missing")
+	}
+	selected := configured.Messages.TeamsWeb
+	profileDirectory, err := paths.ProviderProfileDir(
+		configured.ID,
+		domain.ProviderID(domain.MessagingProviderMicrosoftTeams),
+	)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	if _, err := fmt.Fprintf(
+		backend.app.stderr,
+		"Opening Teams Web for account %q; complete sign-in in the browser.\n",
+		configured.ID,
+	); err != nil {
+		return sessionAccount{}, err
+	}
+	handle, err := backend.app.launch(ctx, browser.Options{
+		Origin: selected.Web.Origin, StartURL: strings.TrimRight(selected.Web.Origin, "/") + "/v2/",
+		ProfileDir: profileDirectory, Executable: backend.configuration.Browser.Executable,
+		BrowserOwnedOnly: true,
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	driver, supported := handle.(teamsweb.Driver)
+	if !supported {
+		return sessionAccount{}, errors.Join(
+			errors.New("the browser does not implement the closed Teams Web driver"),
+			handle.Close(),
+		)
+	}
+	waitContext, cancel := context.WithTimeout(
+		ctx,
+		time.Duration(backend.configuration.Browser.LoginTimeout),
+	)
+	defer cancel()
+	factory := backend.newTeamsWeb
+	if factory == nil {
+		factory = teamsweb.New
+	}
+	client, err := factory(waitContext, teamsweb.Options{
+		Origin: selected.Web.Origin, WorkspaceID: selected.WorkspaceID,
+		ReadOnly: selected.ReadOnly, Driver: driver,
+	})
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, handle.Close())
+	}
+	return backend.messagingSessionAccount(
+		configured,
+		domain.MessagingProviderMicrosoftTeams,
+		domain.MessagingRouteTeamsWeb,
+		selected.WorkspaceID,
+		client,
+		handle,
+	)
 }
 
 func (backend *sessionBackend) startMonitorLocked(
@@ -3310,12 +3971,15 @@ func (backend *sessionBackend) graphAPIAccount(
 	configured config.Account,
 	route config.OAuthRoute,
 	mailEnabled, calendarEnabled, tasksEnabled, taskWrite bool,
+	messaging *config.TeamsGraphMessagingRoute,
 ) (sessionAccount, error) {
 	provider, err := oauthlocal.ProviderFor(
 		domain.ProviderMicrosoftGraph,
 		oauthlocal.Services{
 			Mail: mailEnabled, Calendar: calendarEnabled,
 			Tasks: tasksEnabled, TaskWrite: taskWrite,
+			Messages:       messaging != nil,
+			MessageWrite:   messaging != nil && !messaging.ReadOnly,
 			MicrosoftCloud: route.MicrosoftCloud,
 		},
 	)
@@ -3336,22 +4000,7 @@ func (backend *sessionBackend) graphAPIAccount(
 		return sessionAccount{}, err
 	}
 	authorizedHTTP := authorization.HTTPClient()
-	factory := backend.newGraph
-	if factory == nil {
-		factory = graphapi.New
-	}
-	client, err := factory(ctx, graphapi.Options{
-		APIBase: route.APIBase,
-		Address: configured.Address,
-		Mail:    mailEnabled, Calendar: calendarEnabled,
-		Tasks: tasksEnabled, TaskWrite: taskWrite,
-		HTTP: authorizedHTTP,
-	})
-	if err != nil {
-		return sessionAccount{}, err
-	}
 	result := sessionAccount{
-		closers:  []sessionCloser{client},
 		captured: time.Now().UTC(),
 		capabilities: domain.Capabilities{
 			Mail: mailEnabled, Calendar: calendarEnabled, Tasks: tasksEnabled,
@@ -3359,6 +4008,24 @@ func (backend *sessionBackend) graphAPIAccount(
 			AttachmentReads:  mailEnabled,
 			AttachmentWrites: mailEnabled,
 		},
+	}
+	var client *graphapi.Client
+	if mailEnabled || calendarEnabled || tasksEnabled {
+		factory := backend.newGraph
+		if factory == nil {
+			factory = graphapi.New
+		}
+		client, err = factory(ctx, graphapi.Options{
+			APIBase: route.APIBase,
+			Address: configured.Address,
+			Mail:    mailEnabled, Calendar: calendarEnabled,
+			Tasks: tasksEnabled, TaskWrite: taskWrite,
+			HTTP: authorizedHTTP,
+		})
+		if err != nil {
+			return sessionAccount{}, err
+		}
+		result.closers = append(result.closers, client)
 	}
 	if mailEnabled {
 		result.degradations = append(
@@ -3411,7 +4078,7 @@ func (backend *sessionBackend) graphAPIAccount(
 			},
 		)
 		if err != nil {
-			return sessionAccount{}, errors.Join(err, client.Close())
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(result))
 		}
 	}
 	if calendarEnabled {
@@ -3432,7 +4099,7 @@ func (backend *sessionBackend) graphAPIAccount(
 			},
 		)
 		if err != nil {
-			return sessionAccount{}, errors.Join(err, client.Close())
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(result))
 		}
 	}
 	if tasksEnabled {
@@ -3471,10 +4138,37 @@ func (backend *sessionBackend) graphAPIAccount(
 			},
 		)
 		if err != nil {
-			return sessionAccount{}, errors.Join(err, client.Close())
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(result))
 		}
 	}
-	return leasedSessionAccount(result), nil
+	result = leasedSessionAccount(result)
+	if messaging == nil {
+		return result, nil
+	}
+	factory := backend.newTeamsGraph
+	if factory == nil {
+		factory = teamsgraph.New
+	}
+	messagingClient, err := factory(ctx, teamsgraph.Options{
+		APIBase: route.APIBase, WorkspaceID: messaging.WorkspaceID,
+		GrantedScopes: provider.Scopes, ReadOnly: messaging.ReadOnly,
+		HTTP: authorizedHTTP,
+	})
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, closeSessionAccount(result))
+	}
+	messagingAccount, err := backend.messagingSessionAccount(
+		configured,
+		domain.MessagingProviderMicrosoftTeams,
+		domain.MessagingRouteTeamsGraph,
+		messaging.WorkspaceID,
+		messagingClient,
+		messagingClient,
+	)
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, closeSessionAccount(result))
+	}
+	return mergeSessionAccounts(result, messagingAccount), nil
 }
 
 func (backend *sessionBackend) todoistAccount(
@@ -3681,11 +4375,16 @@ type graphServiceSelection struct {
 	route                 config.OAuthRoute
 	mail, calendar, tasks bool
 	taskWrite             bool
+	messaging             *config.TeamsGraphMessagingRoute
 }
 
 func configuredGraphServices(account config.Account) ([]graphServiceSelection, error) {
-	selections := make([]graphServiceSelection, 0, 3)
-	add := func(route *config.OAuthRoute, mail, calendar, tasks, taskWrite bool) {
+	selections := make([]graphServiceSelection, 0, 4)
+	add := func(
+		route *config.OAuthRoute,
+		mail, calendar, tasks, taskWrite bool,
+		messaging *config.TeamsGraphMessagingRoute,
+	) {
 		if route == nil {
 			return
 		}
@@ -3696,25 +4395,28 @@ func configuredGraphServices(account config.Account) ([]graphServiceSelection, e
 				selection.calendar = selection.calendar || calendar
 				selection.tasks = selection.tasks || tasks
 				selection.taskWrite = selection.taskWrite || taskWrite
+				if messaging != nil {
+					selection.messaging = messaging
+				}
 				return
 			}
 		}
 		selections = append(selections, graphServiceSelection{
 			route: *route, mail: mail, calendar: calendar,
-			tasks: tasks, taskWrite: taskWrite,
+			tasks: tasks, taskWrite: taskWrite, messaging: messaging,
 		})
 	}
 	if account.Mail != nil && account.Mail.Provider == domain.ProviderMicrosoftGraph {
 		if account.Mail.MicrosoftGraph == nil {
 			return nil, errors.New("microsoft Graph mail route settings are missing")
 		}
-		add(account.Mail.MicrosoftGraph, true, false, false, false)
+		add(account.Mail.MicrosoftGraph, true, false, false, false, nil)
 	}
 	if account.Calendar != nil && account.Calendar.Provider == domain.ProviderMicrosoftGraph {
 		if account.Calendar.MicrosoftGraph == nil {
 			return nil, errors.New("microsoft Graph calendar route settings are missing")
 		}
-		add(account.Calendar.MicrosoftGraph, false, true, false, false)
+		add(account.Calendar.MicrosoftGraph, false, true, false, false, nil)
 	}
 	if account.Tasks != nil && account.Tasks.Provider == domain.ProviderMicrosoftGraph {
 		if account.Tasks.MicrosoftGraph == nil {
@@ -3722,7 +4424,14 @@ func configuredGraphServices(account config.Account) ([]graphServiceSelection, e
 		}
 		add(
 			&account.Tasks.MicrosoftGraph.OAuth,
-			false, false, true, !account.Tasks.MicrosoftGraph.ReadOnly,
+			false, false, true, !account.Tasks.MicrosoftGraph.ReadOnly, nil,
+		)
+	}
+	if account.Messages != nil && account.Messages.TeamsGraph != nil {
+		add(
+			&account.Messages.TeamsGraph.OAuth,
+			false, false, false, false,
+			account.Messages.TeamsGraph,
 		)
 	}
 	return selections, nil
@@ -3804,6 +4513,7 @@ func (backend *sessionBackend) nonOutlookAccount(
 			selected.calendar,
 			selected.tasks,
 			selected.taskWrite,
+			selected.messaging,
 		)
 		if err != nil {
 			return sessionAccount{}, errors.Join(
@@ -3812,6 +4522,20 @@ func (backend *sessionBackend) nonOutlookAccount(
 			)
 		}
 		combined = mergeSessionAccounts(combined, graph)
+	}
+	if configured.Messages != nil && configured.Messages.Slack != nil {
+		messages, err := backend.slackMessagingAccount(ctx, configured)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
+		}
+		combined = mergeSessionAccounts(combined, messages)
+	}
+	if configured.Messages != nil && configured.Messages.Mattermost != nil {
+		messages, err := backend.mattermostMessagingAccount(ctx, configured)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
+		}
+		combined = mergeSessionAccounts(combined, messages)
 	}
 	if configured.Tasks != nil && configured.Tasks.Provider == domain.ProviderTodoist {
 		tasks, err := backend.todoistAccount(ctx, configured)
@@ -4019,9 +4743,11 @@ func mergeSessionAccounts(
 		mail:          left.mail,
 		calendar:      left.calendar,
 		tasks:         left.tasks,
+		messages:      left.messages,
 		mailLease:     left.mailLease,
 		calendarLease: left.calendarLease,
 		taskLease:     left.taskLease,
+		messageLease:  left.messageLease,
 		captured:      left.captured,
 		capabilities:  mergeCapabilities(left.capabilities, right.capabilities),
 		degradations: append(
@@ -4048,6 +4774,10 @@ func mergeSessionAccounts(
 		merged.tasks = right.tasks
 		merged.taskLease = right.taskLease
 	}
+	if right.messages != nil {
+		merged.messages = right.messages
+		merged.messageLease = right.messageLease
+	}
 	if right.captured.After(merged.captured) {
 		merged.captured = right.captured
 	}
@@ -4062,6 +4792,7 @@ func mergeCapabilities(
 		Mail:             left.Mail || right.Mail,
 		Calendar:         left.Calendar || right.Calendar,
 		Tasks:            left.Tasks || right.Tasks,
+		Messages:         left.Messages || right.Messages,
 		Folders:          left.Folders || right.Folders,
 		Labels:           left.Labels || right.Labels,
 		Push:             left.Push || right.Push,

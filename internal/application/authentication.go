@@ -17,13 +17,15 @@ const (
 	AuthenticationServiceMail     AuthenticationService = "mail"
 	AuthenticationServiceCalendar AuthenticationService = "calendar"
 	AuthenticationServiceTasks    AuthenticationService = "tasks"
+	AuthenticationServiceMessages AuthenticationService = "messages"
 )
 
 func (service AuthenticationService) Validate() error {
 	switch service {
 	case AuthenticationServiceMail,
 		AuthenticationServiceCalendar,
-		AuthenticationServiceTasks:
+		AuthenticationServiceTasks,
+		AuthenticationServiceMessages:
 		return nil
 	default:
 		return fmt.Errorf("invalid authentication service %q", service)
@@ -359,14 +361,16 @@ type ServiceAuthenticationStatuses struct {
 	Mail     *ServiceAuthenticationStatus `json:"mail,omitempty"`
 	Calendar *ServiceAuthenticationStatus `json:"calendar,omitempty"`
 	Tasks    *ServiceAuthenticationStatus `json:"tasks,omitempty"`
+	Messages *ServiceAuthenticationStatus `json:"messages,omitempty"`
 }
 
 func (statuses ServiceAuthenticationStatuses) Values() []ServiceAuthenticationStatus {
-	values := make([]ServiceAuthenticationStatus, 0, 3)
+	values := make([]ServiceAuthenticationStatus, 0, 4)
 	for _, status := range []*ServiceAuthenticationStatus{
 		statuses.Mail,
 		statuses.Calendar,
 		statuses.Tasks,
+		statuses.Messages,
 	} {
 		if status != nil {
 			values = append(values, *status)
@@ -389,6 +393,8 @@ func (statuses *ServiceAuthenticationStatuses) Set(
 		statuses.Calendar = &copy
 	case AuthenticationServiceTasks:
 		statuses.Tasks = &copy
+	case AuthenticationServiceMessages:
+		statuses.Messages = &copy
 	default:
 		return status.Service.Validate()
 	}

@@ -13,6 +13,7 @@ type Capabilities struct {
 	Mail             bool   `json:"mail"`
 	Calendar         bool   `json:"calendar"`
 	Tasks            bool   `json:"tasks"`
+	Messages         bool   `json:"messages"`
 	Folders          bool   `json:"folders"`
 	Labels           bool   `json:"labels"`
 	Push             bool   `json:"push"`
