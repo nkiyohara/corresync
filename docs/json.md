@@ -68,6 +68,52 @@ degradations contain a bounded feature code, reason, and `lossy` flag.
 
 It performs no authentication or configuration write.
 
+`auth status --json` and MCP `account_status` include fixed `services.mail`,
+`services.calendar`, and `services.tasks` members for configured routes. Each
+member contains `service`, `provider`, `state`, and, when inactive, `reason`
+plus `action`. States are `signed_out`, `authentication_pending`,
+`authenticated`, and `reauthentication_required`. The top-level `state`,
+`authenticated`, `capturedAt`, `capabilities`, and `degradations` remain derived
+compatibility fields; a partially active hybrid account is authenticated and
+its capabilities describe only active services.
+
+Authentication-blocked single-account calls and projection members use the
+same version-1 action:
+
+```json
+{
+  "version": "1",
+  "code": "reauthentication_required",
+  "account": "acc_0123456789abcdef0123456789abcdef",
+  "alias": "work",
+  "service": "mail",
+  "provider": "microsoft-owa",
+  "reason": "session_expired",
+  "nextAction": {
+    "kind": "local_interactive_login",
+    "command": {
+      "executable": "corr",
+      "args": ["auth", "login", "--account", "work"]
+    },
+    "requiresUserConsent": true,
+    "requiresHumanInteraction": true,
+    "secretsAllowedInMCP": false
+  },
+  "retry": {
+    "automatic": false,
+    "afterAction": "retry_same_read_once",
+    "alternativeRequiresUserChoice": true
+  }
+}
+```
+
+The other stable codes are `authentication_required` and
+`authentication_pending`. The command is executable-plus-argv, never shell
+text. The object contains only local routing metadata. Provider responses,
+addresses, credentials, factors, and remote identities are excluded. Unknown
+write outcome, permission denial, outage, throttling, and malformed
+configuration remain different failures.
+
 `corr setup ADDRESS --json` returns the same selected-candidate and account
 view as `account add --json`. It may first create an empty local configuration,
 but it never authenticates, resolves a credential, or starts a browser.

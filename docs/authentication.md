@@ -168,10 +168,23 @@ verification is never disabled.
 
 ## Session status and logout
 
-`corr auth status` is content-free. It reports configured alias, provider,
-authenticated/pending/signed-out state, captured time, normalized
-capabilities, and explicit degradations. It returns no address, endpoint,
-cookie, token, page content, or mailbox item.
+`corr auth status` is content-free. It reports each configured mail, calendar,
+and task route independently as `signed_out`, `authentication_pending`,
+`authenticated`, or `reauthentication_required`, with a bounded reason and an
+exact local recovery action when inactive. The older top-level state and
+`authenticated` boolean remain derived compatibility fields: they report an
+active account when at least one configured service is active. Captured time,
+normalized capabilities, and degradations describe only active service
+leases. Status performs no provider request or surprise login and returns no
+address, endpoint, cookie, token, page content, or mailbox item.
+
+A definitive runtime rejection invalidates the owning adapter lease before the
+operation returns. Services sharing that lease transition together; a hybrid
+service using another provider remains active. Corresync stops the affected
+mail monitor, removes affected previews, drains current users, closes owned
+resources once, and returns a versioned action naming the real account alias.
+An unknown write outcome is never relabeled as authentication failure and is
+never automatically replayed.
 
 `corr auth logout --account work` closes only that account's adapters, browser,
 pending login, previews, and monitor after its in-flight operations finish.
