@@ -135,42 +135,52 @@ func (command *integrationsDoctorCommand) Run(app *runtime) error {
 }
 
 func runIntegrationMutation(app *runtime, flags integrationMutationFlags, operation integrationlifecycle.Operation) error {
+	_, err := runIntegrationMutationWithResults(app, flags, operation)
+	return err
+}
+
+func runIntegrationMutationWithResults(
+	app *runtime,
+	flags integrationMutationFlags,
+	operation integrationlifecycle.Operation,
+) ([]integrationlifecycle.Result, error) {
 	if flags.JSON && flags.Yes {
-		return errors.New("--json is preview-only and cannot be combined with --yes")
+		return nil, errors.New("--json is preview-only and cannot be combined with --yes")
 	}
 	engine, requests, err := prepareIntegrationLifecycle(app, flags.integrationTargetFlags, operation, true)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	plans, err := planIntegrations(app.context, engine, requests)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if flags.JSON {
-		return writeJSON(app.stdout, integrationApplyReport{
+		return nil, writeJSON(app.stdout, integrationApplyReport{
 			SchemaVersion: integrationlifecycle.SchemaVersion, Plans: plans,
 		})
 	}
 	if err := writeIntegrationPlans(app, plans, true); err != nil {
-		return err
+		return nil, err
 	}
 	if !plansNeedMutation(plans) {
 		results := resultsForNoopPlans(plans)
 		if err := writeIntegrationResults(app, results); err != nil {
-			return err
+			return nil, err
 		}
-		return errors.Join(integrationResultErrors(results)...)
+		return results, errors.Join(integrationResultErrors(results)...)
 	}
 	if !flags.Yes {
-		if !app.interactiveInput() || !app.interactiveOutput() {
-			return errors.New("integration changes require an interactive confirmation or explicit --yes")
+		if !app.interactiveInput() || !app.interactiveStdout() {
+			return nil, errors.New("integration changes require an interactive confirmation or explicit --yes")
 		}
 		confirmed, confirmErr := confirmIntegrationPlans(app, operation, len(plans))
 		if confirmErr != nil {
-			return confirmErr
+			return nil, confirmErr
 		}
 		if !confirmed {
-			return writeIntegrationResults(app, resultsForSkippedPlans(plans))
+			results := resultsForSkippedPlans(plans)
+			return results, writeIntegrationResults(app, results)
 		}
 	}
 	results := make([]integrationlifecycle.Result, 0, len(plans))
@@ -185,9 +195,9 @@ func runIntegrationMutation(app *runtime, flags integrationMutationFlags, operat
 		}
 	}
 	if err := writeIntegrationResults(app, results); err != nil {
-		return err
+		return nil, err
 	}
-	return errors.Join(failures...)
+	return results, errors.Join(failures...)
 }
 
 func integrationResultErrors(results []integrationlifecycle.Result) []error {
@@ -564,6 +574,8 @@ func resultsForSkippedPlans(plans []integrationlifecycle.Plan) []integrationlife
 
 func confirmIntegrationPlans(app *runtime, operation integrationlifecycle.Operation, count int) (bool, error) {
 	confirmed := false
+	restoreFallback := prepareAccessibleFieldFallback(app, "n\n")
+	defer restoreFallback()
 	affirmative := "Apply changes"
 	if operation == integrationlifecycle.OperationRemove {
 		affirmative = "Remove integrations"
@@ -579,6 +591,9 @@ func confirmIntegrationPlans(app *runtime, operation integrationlifecycle.Operat
 			return false, nil
 		}
 		return false, fmt.Errorf("confirm integration changes: %w", err)
+	}
+	if err := app.context.Err(); err != nil {
+		return false, err
 	}
 	if settingsInputExhausted(app) {
 		return false, nil

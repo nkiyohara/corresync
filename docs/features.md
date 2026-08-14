@@ -39,9 +39,11 @@ not a universal provider-compatibility claim. See
 
 Discovery uses DNS and well-known metadata without credentials. It returns
 ranked evidence, confidence, required authentication, and availability; it
-never authenticates or silently adds an account. Interactive `corr setup` uses
-the same evidence, explains explicit route choices, previews the account, and
-adds it only after confirmation. `corr setup ADDRESS` remains deterministic
+never authenticates or silently adds an account. Interactive `corr setup`
+coordinates current local setup state, uses the same evidence, explains
+explicit route choices, previews the account, and adds it only after
+confirmation. It separately offers multi-account continuation and reviewed,
+independently verified agent-host integration. `corr setup ADDRESS` remains deterministic
 and may add only a safely auto-selectable first-party route. `corr account add`
 requires explicit provider selection whenever discovery is ambiguous.
 Microsoft domain or hosted-MX evidence offers both Outlook Web and Microsoft

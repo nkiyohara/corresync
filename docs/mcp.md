@@ -14,9 +14,12 @@ corr mcp setup codex
 
 The guided setup performs credential-free discovery, previews the route, adds
 it only after confirmation, and then separately offers authentication and a
-doctor check. MCP registration is refused until at least one account route is
-configured. Scripts can use the non-interactive `corr setup ADDRESS` and
-account-specific `corr auth login` form instead.
+doctor check. It detects supported local agent hosts, lets the user select
+several, shows their exact integration plans, asks once, and independently
+applies and verifies each host. MCP registration is refused until at least one
+account route is configured. Scripts can use the non-interactive `corr setup
+ADDRESS`, account-specific `corr auth login`, and explicit `corr integrations
+setup HOST --yes` forms instead.
 
 `corr mcp serve` itself can start against a freshly initialized, account-free
 configuration so MCP clients and registries can inspect the complete catalog

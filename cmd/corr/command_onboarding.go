@@ -40,29 +40,77 @@ type onboardingRegistration struct {
 	credential onboardingCredentialReference
 }
 
-func runGuidedAccountSetup(app *runtime, createdConfig bool) error {
-	if err := writeOnboardingWelcome(app); err != nil {
-		return err
+type onboardingAccountProgress struct {
+	added     int
+	proceed   bool
+	cancelled bool
+}
+
+func runOnboardingAccountPhase(
+	app *runtime,
+	createdConfig bool,
+) (onboardingAccountProgress, error) {
+	accounts, _, err := app.accountServices()
+	if err != nil {
+		return onboardingAccountProgress{}, err
+	}
+	catalog, err := accounts.List(app.context)
+	if err != nil {
+		return onboardingAccountProgress{}, err
 	}
 	added := 0
+	addAccount := len(catalog.Accounts) == 0
+	for !addAccount {
+		action, selected, selectErr := runSettingsSelect(
+			app,
+			"Continue setup",
+			"Existing accounts stay unchanged unless you explicitly add or manage one.",
+			[]huh.Option[string]{
+				huh.NewOption("Continue to agent setup", onboardingContinue).
+					Selected(settingsAccessible(app)),
+				huh.NewOption("Add another account", onboardingAdd),
+				huh.NewOption("Review configured accounts", onboardingReview),
+			},
+		)
+		if selectErr != nil {
+			return onboardingAccountProgress{}, selectErr
+		}
+		if !selected {
+			return onboardingAccountProgress{cancelled: true}, nil
+		}
+		switch action {
+		case onboardingContinue:
+			return onboardingAccountProgress{proceed: true}, nil
+		case onboardingAdd:
+			addAccount = true
+		case onboardingReview:
+			if err := (&accountListCommand{}).Run(app); err != nil {
+				return onboardingAccountProgress{}, err
+			}
+		}
+	}
+
 	for {
 		registration, completed, err := runAccountRegistrationWizard(app)
 		if err != nil {
 			if added > 0 {
-				return fmt.Errorf(
+				return onboardingAccountProgress{added: added}, fmt.Errorf(
 					"guided setup stopped after %d completed account(s); those accounts remain configured: %w",
 					added,
 					err,
 				)
 			}
-			return err
+			return onboardingAccountProgress{}, err
 		}
 		if !completed {
-			return writeOnboardingCancelled(app, added, createdConfig)
+			if err := writeOnboardingCancelled(app, added, createdConfig); err != nil {
+				return onboardingAccountProgress{added: added}, err
+			}
+			return onboardingAccountProgress{added: added, cancelled: true}, nil
 		}
 		added++
 		if err := runOnboardingAccountHandoff(app, registration); err != nil {
-			return fmt.Errorf(
+			return onboardingAccountProgress{added: added}, fmt.Errorf(
 				"account %q remains configured, but its post-add action failed: %w",
 				registration.account.Alias,
 				err,
@@ -82,15 +130,18 @@ func runGuidedAccountSetup(app *runtime, createdConfig bool) error {
 			)
 			if err != nil || !selected || action == onboardingContinue {
 				if err != nil {
-					return err
+					return onboardingAccountProgress{added: added}, err
 				}
-				return writeOnboardingNextSteps(app, added)
+				if !selected {
+					return onboardingAccountProgress{added: added, cancelled: true}, nil
+				}
+				return onboardingAccountProgress{added: added, proceed: true}, nil
 			}
 			if action == onboardingAdd {
 				break
 			}
 			if err := (&accountListCommand{}).Run(app); err != nil {
-				return err
+				return onboardingAccountProgress{added: added}, err
 			}
 		}
 	}
@@ -923,6 +974,8 @@ func runOnboardingConfirm(
 	negative string,
 ) (bool, error) {
 	confirmed := false
+	restoreFallback := prepareAccessibleFieldFallback(app, "n\n")
+	defer restoreFallback()
 	form := settingsForm(app, huh.NewConfirm().
 		Title(title).
 		Description(description+" Esc cancels.").
@@ -934,6 +987,9 @@ func runOnboardingConfirm(
 			return false, nil
 		}
 		return false, fmt.Errorf("run onboarding confirmation: %w", err)
+	}
+	if err := app.context.Err(); err != nil {
+		return false, err
 	}
 	if settingsInputExhausted(app) {
 		return false, nil
@@ -1402,19 +1458,6 @@ func writeOnboardingCancelled(
 	_, err := view.printf(
 		"\n%s  %s\n   %s\n",
 		view.info(), view.strong("Guided setup stopped"), view.muted(detail),
-	)
-	return err
-}
-
-func writeOnboardingNextSteps(app *runtime, added int) error {
-	view := newConsoleView(app, app.stdout, true)
-	_, err := view.printf(
-		"\n%s  %s\n   %s\n   %s\n   %s\n",
-		view.success(),
-		view.strong(fmt.Sprintf("Account setup complete · %d added", added)),
-		view.command("Connect an agent: corr mcp setup --help"),
-		view.command("Review accounts: corr account list"),
-		view.command("Resume safely at any time: corr setup"),
 	)
 	return err
 }

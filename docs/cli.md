@@ -29,14 +29,17 @@ corr config set policy.max_recipients 25
 corr config edit
 ```
 
-Interactive `corr setup` is the user-first path. It creates a provider-neutral
-configuration when absent, performs credential-free discovery, explains and
-previews selectable mail/calendar routes, and adds an account only after
-confirmation. Authentication and provider verification remain separate
-choices. `corr setup ADDRESS` keeps the deterministic, non-interactive contract
-for scripts; it never prompts or authenticates. `config init` is the lower-level
-alternative and creates a valid configuration with zero accounts and no
-selected provider.
+Interactive `corr setup` is the user-first coordinator. Its preflight derives
+progress from the current configuration, account/session state, shell
+completion, agent detection, and inspectable integration state. It can install
+completion at a displayed user-local path, add and authenticate several
+accounts through the shared credential-free wizard, select several agent hosts,
+and reuse the typed integration lifecycle for preview, one confirmation,
+independent apply, and verification. Re-running it skips healthy work and
+offers repairable or optional steps. `corr setup ADDRESS` keeps the
+deterministic, non-interactive account contract for scripts; it never prompts
+or authenticates. `config init` is the lower-level alternative and creates a
+valid configuration with zero accounts and no selected provider.
 
 Provider route changes belong to the account lifecycle:
 

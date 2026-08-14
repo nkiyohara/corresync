@@ -21,7 +21,7 @@ func TestSettingsRenamesAccountInteractively(t *testing.T) {
 	path := saveSettingsFixture(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n2\n3\noffice\n3\n7\n")
+	app.stdin = strings.NewReader("1\n2\n3\noffice\n3\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -53,7 +53,7 @@ func TestSettingsChangesEverydayConfiguration(t *testing.T) {
 			"2\n2\n2\n" +
 			"3\n2\n" +
 			"4\n10m\n" +
-			"7\n",
+			"8\n",
 	)
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
@@ -88,7 +88,7 @@ func TestSettingsEnablingAutomaticInstallAlsoEnablesChecks(t *testing.T) {
 
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("2\n3\n2\n7\n")
+	app.stdin = strings.NewReader("2\n3\n2\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -109,7 +109,7 @@ func TestSettingsEnablesAutomaticFeedbackOnlyAfterPublicConsent(t *testing.T) {
 	path := saveSettingsFixture(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("5\n2\ny\n7\n")
+	app.stdin = strings.NewReader("5\n2\ny\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -141,7 +141,7 @@ func TestSettingsRepromptsInvalidAliasAndLoginTimeout(t *testing.T) {
 	path := saveSettingsFixture(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n2\n3\n \noffice\n3\n4\nsoon\n10m\n7\n")
+	app.stdin = strings.NewReader("1\n2\n3\n \noffice\n3\n4\nsoon\n10m\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -191,7 +191,7 @@ func TestSettingsTopLevelUsesAccountCategory(t *testing.T) {
 	options := settingsMenuOptions(settings)
 	if !hasSettingsOption(options, settingsActionAccounts) ||
 		!hasSettingsOption(options, settingsActionFeedback) ||
-		hasSettingsOption(options, settingsActionSetup) ||
+		!hasSettingsOption(options, settingsActionSetup) ||
 		hasSettingsOption(options, settingsAccountPrefix+"work") {
 		t.Fatalf("top-level settings hierarchy = %+v", options)
 	}
@@ -201,7 +201,7 @@ func TestSettingsRemovesNonDefaultAccountAfterConfirmation(t *testing.T) {
 	path := saveSettingsFixtureWithSecondAccount(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n3\n5\ny\n3\n7\n")
+	app.stdin = strings.NewReader("1\n3\n5\ny\n3\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -227,7 +227,7 @@ func TestSettingsRequiresReplacementBeforeRemovingDefault(t *testing.T) {
 	path := saveSettingsFixtureWithSecondAccount(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n2\n4\n1\ny\n3\n7\n")
+	app.stdin = strings.NewReader("1\n2\n4\n1\ny\n3\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -252,7 +252,7 @@ func TestSettingsCancelsAccountRemovalByDefault(t *testing.T) {
 	path := saveSettingsFixtureWithSecondAccount(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n3\n5\nn\n4\n7\n")
+	app.stdin = strings.NewReader("1\n3\n5\nn\n4\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment

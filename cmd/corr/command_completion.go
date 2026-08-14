@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +20,8 @@ type completionInstallCommand struct {
 	Shell string
 	Force bool
 }
+
+const maximumCompletionFileBytes = 64 << 10
 
 var completionScripts = map[string]string{
 	"bash": `# bash completion for corr
@@ -154,7 +157,7 @@ func installCompletion(path string, contents []byte, force bool) (string, error)
 		if !info.Mode().IsRegular() {
 			return "", fmt.Errorf("completion target %q is not a regular file", path)
 		}
-		existing, readErr := os.ReadFile(path) // #nosec G304 -- user-selected completion target.
+		existing, readErr := readCompletionFile(path, info)
 		if readErr != nil {
 			return "", fmt.Errorf("read existing completion: %w", readErr)
 		}
@@ -225,6 +228,29 @@ func installCompletion(path string, contents []byte, force bool) (string, error)
 		_ = os.Remove(backupPath)
 	}
 	return "Installed", nil
+}
+
+func readCompletionFile(path string, expected os.FileInfo) ([]byte, error) {
+	file, err := os.Open(path) // #nosec G304 -- path is a reviewed user-local completion target.
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+	opened, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !opened.Mode().IsRegular() || !os.SameFile(expected, opened) {
+		return nil, errors.New("completion target changed while it was inspected")
+	}
+	contents, err := io.ReadAll(io.LimitReader(file, maximumCompletionFileBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(contents) > maximumCompletionFileBytes {
+		return nil, errors.New("completion target exceeds the inspection limit")
+	}
+	return contents, nil
 }
 
 func lookupCompletionEnv(

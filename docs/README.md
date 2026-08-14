@@ -38,11 +38,14 @@ corr mail folders --account personal
 corr calendar folders --account personal
 ```
 
-The guided setup begins from no selected provider, performs credential-free
-discovery, explains route choices, previews the account, and keeps sign-in or
-external-credential access as a separate explicit step. It also offers a doctor
-check and multi-account continuation. The same flow is available under
-`corr settings`. For Apple's documented iCloud address families—or a custom
+The guided setup reports current local state, optionally installs shell
+completion, performs credential-free discovery, explains route choices,
+previews the account, and keeps sign-in or external-credential access as a
+separate explicit step. It supports multiple accounts and multiple detected
+agent hosts, showing one integration preview before any host configuration is
+changed and verifying hosts independently afterward. Re-running it resumes at
+the missing step. The shared account flow is also available under `corr
+settings`. For Apple's documented iCloud address families—or a custom
 domain with the complete verified Apple service-record set—the wizard combines
 Mail and Calendar and hands app-specific-password enrollment to the operating
 system's own credential prompt. Corresync never reads that password.

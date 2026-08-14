@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,19 +27,124 @@ const (
 )
 
 type settingsAccessibleReader struct {
-	reader    io.Reader
-	exhausted bool
+	context    context.Context
+	reader     *bufio.Reader
+	requests   chan chan settingsAccessibleReadResult
+	stopped    chan struct{}
+	fallback   []byte
+	pending    []byte
+	pendingErr error
+	exhausted  bool
 }
 
+type settingsAccessibleReadResult struct {
+	line []byte
+	err  error
+}
+
+func newSettingsAccessibleReader(
+	ctx context.Context,
+	input io.Reader,
+) *settingsAccessibleReader {
+	accessible := &settingsAccessibleReader{
+		context:  ctx,
+		reader:   bufio.NewReader(io.LimitReader(input, maximumSettingsInputBytes+1)),
+		requests: make(chan chan settingsAccessibleReadResult),
+		stopped:  make(chan struct{}),
+	}
+	go func() {
+		defer close(accessible.stopped)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case response := <-accessible.requests:
+				line, err := accessible.reader.ReadBytes('\n')
+				select {
+				case response <- settingsAccessibleReadResult{line: line, err: err}:
+				case <-ctx.Done():
+					return
+				}
+				if err != nil {
+					return
+				}
+			}
+		}
+	}()
+	return accessible
+}
+
+// Read returns at most one complete input line to each huh scanner. Accessible
+// fields create a fresh scanner per prompt, so line bounding prevents one
+// prompt from consuming the next. One wrapper-owned, on-demand reader
+// goroutine avoids reading ahead between prompts; cancellation still wins and
+// can never select a displayed default as approval.
 func (reader *settingsAccessibleReader) Read(buffer []byte) (int, error) {
-	if len(buffer) > 1 {
-		buffer = buffer[:1]
+	if len(buffer) == 0 {
+		return 0, nil
 	}
-	read, err := reader.reader.Read(buffer)
-	if errors.Is(err, io.EOF) {
+	if len(reader.pending) > 0 {
+		read := copy(buffer, reader.pending)
+		reader.pending = reader.pending[read:]
+		return read, nil
+	}
+	if reader.pendingErr != nil {
+		err := reader.pendingErr
+		reader.pendingErr = nil
 		reader.exhausted = true
+		return 0, err
 	}
-	return read, err
+	if err := reader.context.Err(); err != nil {
+		return reader.finishWithFallback(buffer, err)
+	}
+	response := make(chan settingsAccessibleReadResult, 1)
+	select {
+	case <-reader.context.Done():
+		return reader.finishWithFallback(buffer, reader.context.Err())
+	case <-reader.stopped:
+		return reader.finishWithFallback(buffer, io.EOF)
+	case reader.requests <- response:
+	}
+	select {
+	case <-reader.context.Done():
+		return reader.finishWithFallback(buffer, reader.context.Err())
+	case result := <-response:
+		if err := reader.context.Err(); err != nil {
+			return reader.finishWithFallback(buffer, err)
+		}
+		if result.err != nil {
+			return reader.finishWithFallback(buffer, result.err)
+		}
+		reader.pending = result.line
+		read := copy(buffer, reader.pending)
+		reader.pending = reader.pending[read:]
+		return read, nil
+	}
+}
+
+func (reader *settingsAccessibleReader) finishWithFallback(
+	buffer []byte,
+	err error,
+) (int, error) {
+	reader.exhausted = true
+	if len(reader.fallback) == 0 {
+		return 0, err
+	}
+	reader.pending = append(reader.pending[:0], reader.fallback...)
+	reader.pendingErr = err
+	read := copy(buffer, reader.pending)
+	reader.pending = reader.pending[read:]
+	return read, nil
+}
+
+func prepareAccessibleFieldFallback(app *runtime, fallback string) func() {
+	reader, ok := app.stdin.(*settingsAccessibleReader)
+	if !ok {
+		return func() {}
+	}
+	previous := reader.fallback
+	reader.fallback = []byte(fallback)
+	return func() { reader.fallback = previous }
 }
 
 const (
@@ -112,6 +219,8 @@ func (command *settingsCommand) Run(app *runtime) error {
 			if err := writeAdvancedSettingsHelp(app); err != nil {
 				return err
 			}
+		case settingsActionSetup:
+			return runGuidedAccountSetup(app, false)
 		}
 	}
 }
@@ -125,7 +234,7 @@ func newLocalSettingsService(app *runtime) (*application.SettingsService, error)
 }
 
 func settingsMenuOptions(settings application.SettingsView) []huh.Option[string] {
-	options := make([]huh.Option[string], 0, 7)
+	options := make([]huh.Option[string], 0, 8)
 	checks := "checks off"
 	if settings.AutomaticChecks {
 		checks = "daily checks"
@@ -153,6 +262,7 @@ func settingsMenuOptions(settings application.SettingsView) []huh.Option[string]
 			settingsActionFeedback,
 		),
 		huh.NewOption("Advanced  edit the complete validated config", settingsActionAdvanced),
+		huh.NewOption("Setup guide  resume accounts, completion, and agents", settingsActionSetup),
 		huh.NewOption("Done", settingsActionDone),
 	)
 	return options
@@ -626,6 +736,8 @@ func confirmAutomaticFeedbackConsent(app *runtime) (bool, error) {
 		return false, err
 	}
 	confirmed := false
+	restoreFallback := prepareAccessibleFieldFallback(app, "n\n")
+	defer restoreFallback()
 	form := settingsForm(app, huh.NewConfirm().
 		Title("Enable automatic public GitHub Issues?").
 		Description(
@@ -639,6 +751,12 @@ func confirmAutomaticFeedbackConsent(app *runtime) (bool, error) {
 			return false, nil
 		}
 		return false, fmt.Errorf("confirm automatic feedback consent: %w", err)
+	}
+	if err := app.context.Err(); err != nil {
+		return false, err
+	}
+	if settingsInputExhausted(app) {
+		return false, nil
 	}
 	return confirmed, nil
 }
@@ -736,6 +854,8 @@ func runSettingsSelect[T comparable](
 		description += " Esc cancels."
 	}
 	var value T
+	restoreFallback := prepareAccessibleFieldFallback(app, "1\n")
+	defer restoreFallback()
 	form := settingsForm(app, huh.NewSelect[T]().
 		Title(title).
 		Description(description).
@@ -748,10 +868,47 @@ func runSettingsSelect[T comparable](
 		}
 		return value, false, fmt.Errorf("run settings selector: %w", err)
 	}
+	if err := app.context.Err(); err != nil {
+		return value, false, err
+	}
 	if settingsInputExhausted(app) {
 		return value, false, nil
 	}
 	return value, true, nil
+}
+
+func runSettingsMultiSelect[T comparable](
+	app *runtime,
+	title string,
+	description string,
+	options []huh.Option[T],
+) ([]T, bool, error) {
+	if !strings.Contains(strings.ToLower(description), "esc") {
+		description += " Esc cancels."
+	}
+	values := make([]T, 0, len(options))
+	restoreFallback := prepareAccessibleFieldFallback(app, "0\n")
+	defer restoreFallback()
+	form := settingsForm(app, huh.NewMultiSelect[T]().
+		Title(title).
+		Description(description).
+		Options(options...).
+		Value(&values).
+		Height(min(14, len(options)+2)).
+		Filterable(len(options) > 8))
+	if err := form.RunWithContext(app.context); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("run settings multi-selector: %w", err)
+	}
+	if err := app.context.Err(); err != nil {
+		return nil, false, err
+	}
+	if settingsInputExhausted(app) {
+		return nil, false, nil
+	}
+	return values, true, nil
 }
 
 func runSettingsInput(
@@ -770,6 +927,8 @@ func runSettingsInput(
 		description += " Type :cancel to cancel."
 		title += " (type :cancel to cancel)"
 	}
+	restoreFallback := prepareAccessibleFieldFallback(app, settingsAccessibleCancel+"\n")
+	defer restoreFallback()
 	form := settingsForm(app, huh.NewInput().
 		Title(title).
 		Description(description).
@@ -787,6 +946,9 @@ func runSettingsInput(
 		}
 		return false, fmt.Errorf("run settings input: %w", err)
 	}
+	if err := app.context.Err(); err != nil {
+		return false, err
+	}
 	*value = strings.TrimSpace(*value)
 	if settingsInputExhausted(app) || accessible && *value == settingsAccessibleCancel {
 		return false, nil
@@ -800,6 +962,8 @@ func runSettingsConfirm(
 	description string,
 ) (bool, error) {
 	confirmed := false
+	restoreFallback := prepareAccessibleFieldFallback(app, "n\n")
+	defer restoreFallback()
 	form := settingsForm(app, huh.NewConfirm().
 		Title(title).
 		Description(description+" Esc goes back.").
@@ -811,6 +975,9 @@ func runSettingsConfirm(
 			return false, nil
 		}
 		return false, fmt.Errorf("run settings confirmation: %w", err)
+	}
+	if err := app.context.Err(); err != nil {
+		return false, err
 	}
 	if settingsInputExhausted(app) {
 		return false, nil
