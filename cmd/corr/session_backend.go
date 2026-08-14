@@ -336,21 +336,22 @@ const (
 // keeps it for the lifetime of its owning server. Every adapter call passes
 // through the same application guard and content-free audit recorder.
 type sessionBackend struct {
-	app           *runtime
-	configuration config.Config
-	guard         *application.Guard
-	recorder      *audit.FileRecorder
-	credentials   *credential.Resolver
-	oauth         oauthClientManager
-	newJMAP       func(context.Context, jmap.Options) (*jmap.Client, error)
-	newIMAP       func(context.Context, imapmail.Options) (*imapmail.Client, error)
-	newCalDAV     func(context.Context, caldavprovider.Options) (*caldavprovider.Client, error)
-	newGoogle     func(context.Context, googleapi.Options) (*googleapi.Client, error)
-	newGraph      func(context.Context, graphapi.Options) (*graphapi.Client, error)
-	newTodoist    func(context.Context, todoist.Options) (*todoist.Client, error)
-	monitorStore  *eventqueue.Store
-	monitor       *application.MonitorService
-	monitorEngine *application.MonitorEngine
+	app            *runtime
+	configuration  config.Config
+	guard          *application.Guard
+	recorder       *audit.FileRecorder
+	credentials    *credential.Resolver
+	oauth          oauthClientManager
+	newJMAP        func(context.Context, jmap.Options) (*jmap.Client, error)
+	newIMAP        func(context.Context, imapmail.Options) (*imapmail.Client, error)
+	newCalDAV      func(context.Context, caldavprovider.Options) (*caldavprovider.Client, error)
+	newCalDAVTasks func(context.Context, caldavprovider.TaskOptions) (*caldavprovider.Client, error)
+	newGoogle      func(context.Context, googleapi.Options) (*googleapi.Client, error)
+	newGraph       func(context.Context, graphapi.Options) (*graphapi.Client, error)
+	newTodoist     func(context.Context, todoist.Options) (*todoist.Client, error)
+	monitorStore   *eventqueue.Store
+	monitor        *application.MonitorService
+	monitorEngine  *application.MonitorEngine
 
 	mu           sync.Mutex
 	activationMu sync.Mutex
@@ -428,6 +429,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		newJMAP:          jmap.New,
 		newIMAP:          imapmail.New,
 		newCalDAV:        caldavprovider.New,
+		newCalDAVTasks:   caldavprovider.NewTasks,
 		newGoogle:        googleapi.New,
 		newGraph:         graphapi.New,
 		newTodoist:       todoist.New,
@@ -541,7 +543,8 @@ func configuredServiceImplemented(
 		}
 	case application.AuthenticationServiceTasks:
 		switch provider { //nolint:exhaustive // Unsupported provider IDs deliberately return false.
-		case domain.ProviderMicrosoftGraph, domain.ProviderTodoist:
+		case domain.ProviderMicrosoftGraph, domain.ProviderTodoist,
+			domain.ProviderCalDAV:
 			return true
 		default:
 			return false
@@ -2656,6 +2659,10 @@ func inactiveTaskRoute(configured config.Account) (*domain.Degradation, error) {
 		configured.Tasks.Todoist != nil {
 		return nil, nil
 	}
+	if configured.Tasks.Provider == domain.ProviderCalDAV &&
+		configured.Tasks.CalDAV != nil {
+		return nil, nil
+	}
 	if configured.Mail == nil && configured.Calendar == nil {
 		return nil, fmt.Errorf(
 			"configured task provider %q is not available in this build",
@@ -3081,6 +3088,61 @@ func (backend *sessionBackend) calDAVAccount(
 		)
 	}
 	return leasedSessionAccount(result), nil
+}
+
+func (backend *sessionBackend) calDAVTaskAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	if configured.Tasks == nil || configured.Tasks.Provider != domain.ProviderCalDAV ||
+		configured.Tasks.CalDAV == nil {
+		return sessionAccount{}, errors.New("CalDAV task route settings are missing")
+	}
+	route := configured.Tasks.CalDAV
+	secret, err := backend.credentials.Resolve(ctx, route.Credential)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	defer func() { _ = secret.Close() }()
+	password := []byte(secret.String())
+	defer func() {
+		for index := range password {
+			password[index] = 0
+		}
+	}()
+	factory := backend.newCalDAVTasks
+	if factory == nil {
+		factory = caldavprovider.NewTasks
+	}
+	client, err := factory(ctx, caldavprovider.TaskOptions{
+		Endpoint: route.Endpoint, TaskListPath: route.TaskListPath,
+		Username: route.Username, Password: password,
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	capabilities := client.TaskCapabilities()
+	tasks, err := application.NewTaskService(
+		backend.guard,
+		client,
+		application.TaskOptions{
+			Capabilities: capabilities,
+			Degradations: client.TaskDegradations(),
+			Provenance: domain.Provenance{
+				AccountID: configured.ID, Provider: domain.ProviderCalDAV,
+			},
+		},
+	)
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, client.Close())
+	}
+	return leasedSessionAccount(sessionAccount{
+		closers: []sessionCloser{client}, tasks: tasks,
+		captured: time.Now().UTC(),
+		capabilities: domain.Capabilities{
+			Tasks: true, IncrementalSync: len(capabilities.SyncModes) != 0,
+		},
+	}), nil
 }
 
 func (backend *sessionBackend) googleAccount(
@@ -3592,6 +3654,13 @@ func (backend *sessionBackend) nonOutlookAccount(
 	}
 	if configured.Tasks != nil && configured.Tasks.Provider == domain.ProviderTodoist {
 		tasks, err := backend.todoistAccount(ctx, configured)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
+		}
+		combined = mergeSessionAccounts(combined, tasks)
+	}
+	if configured.Tasks != nil && configured.Tasks.Provider == domain.ProviderCalDAV {
+		tasks, err := backend.calDAVTaskAccount(ctx, configured)
 		if err != nil {
 			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
 		}

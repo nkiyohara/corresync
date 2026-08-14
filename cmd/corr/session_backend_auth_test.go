@@ -399,6 +399,96 @@ func TestSessionBackendOnlyResolvesCalDAVCredentialForExplicitCLILogin(t *testin
 	}
 }
 
+func TestSessionBackendOnlyResolvesCalDAVTaskCredentialForExplicitCLILogin(t *testing.T) {
+	t.Parallel()
+
+	const accountID domain.AccountID = "acc_00000000000000000000000000000001"
+	keyringReads := 0
+	resolver, err := credential.New(credential.Options{
+		Keyring: func(service, key string) (string, error) {
+			keyringReads++
+			if service != "corresync" || key != "caldav-tasks" {
+				t.Fatalf("keyring request = %q, %q", service, key)
+			}
+			return "synthetic-secret", nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration := config.Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = config.Account{
+		ID: accountID,
+		Tasks: &config.TaskRoute{
+			Provider: domain.ProviderCalDAV,
+			CalDAV: &config.CalDAVTaskRoute{
+				Endpoint: "https://dav.example.invalid/", TaskListPath: "/tasks/",
+				Username: "reader",
+				Credential: config.CredentialRef{
+					Backend: config.CredentialOSKeyring, Key: "caldav-tasks", Consent: true,
+				},
+			},
+		},
+	}
+	factoryCalls := 0
+	var observedPassword []byte
+	factoryError := errors.New("synthetic task factory stop")
+	backend := &sessionBackend{
+		configuration: configuration,
+		credentials:   resolver,
+		accounts:      make(map[domain.AccountID]sessionAccount),
+		previews:      make(map[string]sessionPreview),
+		newCalDAVTasks: func(
+			_ context.Context,
+			options caldavprovider.TaskOptions,
+		) (*caldavprovider.Client, error) {
+			factoryCalls++
+			if options.TaskListPath != "/tasks/" || options.Username != "reader" {
+				t.Fatalf("CalDAV task options = %+v", options)
+			}
+			observedPassword = options.Password
+			return nil, factoryError
+		},
+	}
+	mcpCaller := domain.Caller{Surface: "mcp", Instance: "synthetic-client"}
+	cliCaller := domain.Caller{Surface: "cli", Instance: "synthetic-process"}
+
+	_, err = backend.ListTaskLists(t.Context(), application.TaskListInput{
+		Account: accountID, Limit: 10,
+	}, mcpCaller)
+	action, actionRequired := application.AuthenticationActionFromError(err)
+	if !actionRequired || action.Alias != "tasks" ||
+		action.Service != application.AuthenticationServiceTasks ||
+		action.Provider != domain.ProviderCalDAV {
+		t.Fatalf("ListTaskLists() error = %v", err)
+	}
+	if keyringReads != 0 || factoryCalls != 0 {
+		t.Fatalf("ordinary MCP read touched authentication: keyring=%d factory=%d", keyringReads, factoryCalls)
+	}
+
+	_, err = backend.Login(t.Context(), accountID, mcpCaller)
+	if err == nil || !strings.Contains(err.Error(), "explicit local CLI") {
+		t.Fatalf("MCP Login() error = %v", err)
+	}
+	if keyringReads != 0 || factoryCalls != 0 {
+		t.Fatalf("MCP login touched authentication: keyring=%d factory=%d", keyringReads, factoryCalls)
+	}
+
+	_, err = backend.Login(t.Context(), accountID, cliCaller)
+	if !errors.Is(err, factoryError) {
+		t.Fatalf("CLI Login() error = %v", err)
+	}
+	if keyringReads != 1 || factoryCalls != 1 {
+		t.Fatalf("explicit CLI login did not resolve once: keyring=%d factory=%d", keyringReads, factoryCalls)
+	}
+	for index, value := range observedPassword {
+		if value != 0 {
+			t.Fatalf("temporary credential byte %d was not zeroed", index)
+		}
+	}
+}
+
 func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
 	t *testing.T,
 ) {

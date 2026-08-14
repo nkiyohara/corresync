@@ -229,6 +229,46 @@ func TestTodoistRouteRoundTripsAsSecretFreePublicClient(t *testing.T) {
 	}
 }
 
+func TestCalDAVTaskRouteRoundTripsWithoutAnAccountAddress(t *testing.T) {
+	t.Parallel()
+	configuration := Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = Account{
+		ID: "acc_00000000000000000000000000000009",
+		Tasks: &TaskRoute{
+			Provider: domain.ProviderCalDAV,
+			CalDAV: &CalDAVTaskRoute{
+				Endpoint: "https://dav.example.invalid/", TaskListPath: "/tasks/work/",
+				Username: "task-user",
+				Credential: CredentialRef{
+					Backend: CredentialHelper, Key: "caldav-tasks", Consent: true,
+				},
+			},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := loaded.Accounts["tasks"].Tasks.CalDAV
+	if route == nil || route.Endpoint != "https://dav.example.invalid/" ||
+		route.TaskListPath != "/tasks/work/" || route.Username != "task-user" ||
+		route.Credential.Key != "caldav-tasks" {
+		t.Fatalf("CalDAV task route = %+v", route)
+	}
+	wrongPayload := configuration
+	account := wrongPayload.Accounts["tasks"]
+	account.Tasks.Todoist = &TodoistTaskRoute{}
+	wrongPayload.Accounts["tasks"] = account
+	if err := wrongPayload.Validate(); err == nil || !strings.Contains(err.Error(), "VTODO") {
+		t.Fatalf("mixed CalDAV task payload error = %v", err)
+	}
+}
+
 func TestTodoistRouteRejectsAnEphemeralOAuthPort(t *testing.T) {
 	t.Parallel()
 	configuration := Default()
@@ -883,6 +923,64 @@ provider = "todoist"
 		if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "strict mode") {
 			t.Fatalf("Load(v%d with task route) error = %v", version, err)
 		}
+	}
+}
+
+func TestV6MigrationPreservesTaskRouteAndRejectsCalDAVPayload(t *testing.T) {
+	t.Parallel()
+	const base = `
+version = 6
+default_account = "tasks"
+
+[accounts.tasks]
+id = "acc_00000000000000000000000000000009"
+address = "reader@example.invalid"
+
+[accounts.tasks.tasks]
+provider = "todoist"
+
+[accounts.tasks.tasks.todoist]
+read_only = true
+
+[accounts.tasks.tasks.todoist.oauth]
+api_base = "https://api.todoist.com/api/v1"
+client_id = "synthetic-public-client"
+redirect_uri = "http://127.0.0.1:43123/callback"
+
+[accounts.tasks.tasks.todoist.oauth.authorization]
+backend = "os-keyring"
+key = "tasks-todoist"
+consent = true
+
+[policy]
+mode = "guarded"
+max_recipients = 20
+max_attendees = 50
+
+[browser]
+login_timeout = "5m"
+
+[updates]
+channel = "stable"
+`
+	configuration, err := MigrateV6([]byte(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.Version != CurrentVersion ||
+		configuration.Accounts["tasks"].Tasks.Todoist == nil ||
+		!configuration.Accounts["tasks"].Tasks.Todoist.ReadOnly {
+		t.Fatalf("migrated v6 config = %+v", configuration)
+	}
+	withCalDAV := strings.Replace(
+		base,
+		"[policy]",
+		"[accounts.tasks.tasks.caldav]\nendpoint = \"https://dav.example.invalid/\"\nusername = \"reader\"\n\n[policy]",
+		1,
+	)
+	if _, err := MigrateV6([]byte(withCalDAV)); err == nil ||
+		!strings.Contains(err.Error(), "strict mode") {
+		t.Fatalf("v6 CalDAV task payload error = %v", err)
 	}
 }
 

@@ -697,6 +697,42 @@ func TestAccountAddPersistsTaskOnlyTodoistPublicClientWithoutDiscovery(t *testin
 	}
 }
 
+func TestAccountAddPersistsTaskOnlyCalDAVRouteWithoutDiscovery(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, path, stdout := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{ // #nosec G101 -- fixture strings are non-secret lookup handles.
+		Alias: "tasks", TaskProvider: string(domain.ProviderCalDAV),
+		TaskCalDAVEndpoint:    "https://dav.example.invalid/",
+		TaskListPath:          "/tasks/work/",
+		TaskUsername:          "task-user",
+		TaskCredentialBackend: "helper",
+		TaskCredentialKey:     "caldav-tasks",
+		ApproveTaskCredential: true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	if discoverer.address != "" {
+		t.Fatalf("task-only route started discovery for %q", discoverer.address)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := configuration.Accounts["tasks"].Tasks
+	if route == nil || route.Provider != domain.ProviderCalDAV || route.CalDAV == nil ||
+		route.CalDAV.Endpoint != command.TaskCalDAVEndpoint ||
+		route.CalDAV.TaskListPath != command.TaskListPath ||
+		route.CalDAV.Username != command.TaskUsername ||
+		route.CalDAV.Credential.Backend != config.CredentialHelper ||
+		route.CalDAV.Credential.Key != command.TaskCredentialKey {
+		t.Fatalf("task-only CalDAV route = %#v", route)
+	}
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("task-only output = %q", stdout.String())
+	}
+}
+
 func TestAccountAddRejectsExplicitGraphAPIBaseFromAnotherCloud(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{

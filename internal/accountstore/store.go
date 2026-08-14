@@ -51,6 +51,24 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 	if route.Provider == domain.ProviderTodoist && route.Todoist != nil {
 		return oauthRouteView(route.Provider, &route.Todoist.OAuth)
 	}
+	if route.Provider == domain.ProviderCalDAV && route.CalDAV != nil {
+		endpoints := []application.DiscoveredEndpoint{{
+			Kind: "endpoint", Value: route.CalDAV.Endpoint,
+		}}
+		if route.CalDAV.TaskListPath != "" {
+			endpoints = append(endpoints, application.DiscoveredEndpoint{
+				Kind: "task-list", Value: route.CalDAV.TaskListPath,
+			})
+		}
+		return &application.AccountRouteView{
+			Provider: route.Provider, Endpoints: endpoints,
+			Identity: route.CalDAV.Username,
+			Credential: &application.AccountCredentialView{
+				Configured: true, Backend: string(route.CalDAV.Credential.Backend),
+				Consented: route.CalDAV.Credential.Consent,
+			},
+		}
+	}
 	return application.TaskRouteView(route.Provider)
 }
 
@@ -172,6 +190,16 @@ func taskRouteConfig(
 			OAuth: *oauth, ReadOnly: route.Todoist.ReadOnly,
 		}
 	}
+	if route.CalDAV != nil {
+		result.CalDAV = &config.CalDAVTaskRoute{
+			Endpoint: route.CalDAV.Endpoint, TaskListPath: route.CalDAV.TaskListPath,
+			Username: route.CalDAV.Username,
+			Credential: config.CredentialRef{
+				Backend: config.CredentialBackend(route.CalDAV.Credential.Backend),
+				Key:     route.CalDAV.Credential.Key, Consent: route.CalDAV.Credential.Consent,
+			},
+		}
+	}
 	return result, nil
 }
 
@@ -245,6 +273,9 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 			references,
 			account.Tasks.Todoist.OAuth.Authorization,
 		)
+	}
+	if account.Tasks != nil && account.Tasks.CalDAV != nil {
+		references = append(references, account.Tasks.CalDAV.Credential)
 	}
 	return references
 }

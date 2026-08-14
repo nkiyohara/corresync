@@ -19,6 +19,7 @@ const routeLegacyVersion = 2
 const googleAPILegacyVersion = 3
 const updateChannelLegacyVersion = 4
 const taskRouteLegacyVersion = 5
+const calDAVTaskLegacyVersion = 6
 
 type legacyConfig struct {
 	Version        int                      `toml:"version"`
@@ -98,6 +99,34 @@ type taskRouteLegacyConfig struct {
 	Feedback       Feedback                          `toml:"feedback"`
 }
 
+// calDAVTaskLegacyRoute freezes the v6 task union so VTODO settings cannot be
+// smuggled into an older schema and silently accepted during migration.
+type calDAVTaskLegacyRoute struct {
+	Provider       domain.ProviderID        `toml:"provider"`
+	MicrosoftGraph *MicrosoftGraphTaskRoute `toml:"microsoft_graph,omitempty"`
+	Todoist        *TodoistTaskRoute        `toml:"todoist,omitempty"`
+}
+
+type calDAVTaskLegacyAccount struct {
+	ID       domain.AccountID       `toml:"id"`
+	Address  string                 `toml:"address,omitempty"`
+	Mail     *MailRoute             `toml:"mail,omitempty"`
+	Calendar *CalendarRoute         `toml:"calendar,omitempty"`
+	Tasks    *calDAVTaskLegacyRoute `toml:"tasks,omitempty"`
+	Monitor  *Monitor               `toml:"monitor,omitempty"`
+}
+
+type calDAVTaskLegacyConfig struct {
+	Version        int                                `toml:"version"`
+	DefaultAccount string                             `toml:"default_account"`
+	Accounts       map[string]calDAVTaskLegacyAccount `toml:"accounts"`
+	Policy         Policy                             `toml:"policy"`
+	Browser        Browser                            `toml:"browser"`
+	Credentials    Credentials                        `toml:"credentials,omitempty"`
+	Updates        Updates                            `toml:"updates"`
+	Feedback       Feedback                           `toml:"feedback"`
+}
+
 type updateChannelLegacyUpdates struct {
 	DisableAutomaticChecks bool `toml:"disable_automatic_checks"`
 	AutoInstall            bool `toml:"auto_install"`
@@ -159,6 +188,48 @@ func MigrateV5(data []byte) (Config, error) {
 	}
 	if err := configuration.Validate(); err != nil {
 		return Config{}, fmt.Errorf("validate migrated v5 config: %w", err)
+	}
+	return configuration, nil
+}
+
+// MigrateV6 adds typed CalDAV VTODO settings without changing any existing
+// service route or manufacturing credential consent.
+func MigrateV6(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var legacy calDAVTaskLegacyConfig
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&legacy); err != nil {
+		return Config{}, fmt.Errorf("decode v6 config: %w", err)
+	}
+	if legacy.Version != calDAVTaskLegacyVersion {
+		return Config{}, fmt.Errorf("CalDAV-task legacy config version must be %d", calDAVTaskLegacyVersion)
+	}
+	configuration := Config{
+		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
+		Accounts: make(map[string]Account, len(legacy.Accounts)),
+		Policy:   legacy.Policy, Browser: legacy.Browser,
+		Credentials: legacy.Credentials, Updates: legacy.Updates,
+		Feedback: legacy.Feedback,
+	}
+	for alias, source := range legacy.Accounts {
+		account := Account{
+			ID: source.ID, Address: source.Address, Mail: source.Mail,
+			Calendar: source.Calendar, Monitor: source.Monitor,
+		}
+		if source.Tasks != nil {
+			account.Tasks = &TaskRoute{
+				Provider:       source.Tasks.Provider,
+				MicrosoftGraph: source.Tasks.MicrosoftGraph,
+				Todoist:        source.Tasks.Todoist,
+			}
+		}
+		configuration.Accounts[alias] = account
+	}
+	if err := configuration.Validate(); err != nil {
+		return Config{}, fmt.Errorf("validate migrated v6 config: %w", err)
 	}
 	return configuration, nil
 }

@@ -132,6 +132,15 @@ type TodoistTaskRoute struct {
 	ReadOnly bool       `json:"readOnly,omitempty" toml:"read_only,omitempty"`
 }
 
+// CalDAVTaskRoute points at one account-scoped CalDAV VTODO endpoint.
+// TaskListPath may remain empty until authenticated principal discovery.
+type CalDAVTaskRoute struct {
+	Endpoint     string        `json:"endpoint" toml:"endpoint"`
+	TaskListPath string        `json:"taskListPath,omitempty" toml:"task_list_path,omitempty"`
+	Username     string        `json:"username" toml:"username"`
+	Credential   CredentialRef `json:"credential" toml:"credential"`
+}
+
 // Client returns the secret-free public-client portion of an API route.
 func (route OAuthRoute) Client() OAuthClient {
 	return OAuthClient{
@@ -174,6 +183,7 @@ type TaskRoute struct {
 	Provider       domain.ProviderID        `json:"provider" toml:"provider"`
 	MicrosoftGraph *MicrosoftGraphTaskRoute `json:"microsoftGraph,omitempty" toml:"microsoft_graph,omitempty"`
 	Todoist        *TodoistTaskRoute        `json:"todoist,omitempty" toml:"todoist,omitempty"`
+	CalDAV         *CalDAVTaskRoute         `json:"caldav,omitempty" toml:"caldav,omitempty"`
 }
 
 func (account Account) validate() error {
@@ -300,7 +310,7 @@ func (route TaskRoute) validate() error {
 	}
 	switch route.Provider {
 	case domain.ProviderMicrosoftGraph:
-		if route.MicrosoftGraph == nil || route.Todoist != nil {
+		if route.MicrosoftGraph == nil || route.Todoist != nil || route.CalDAV != nil {
 			return errors.New("microsoft-graph tasks require independent OAuth settings")
 		}
 		if err := route.MicrosoftGraph.OAuth.validateFor(domain.ProviderMicrosoftGraph); err != nil {
@@ -315,19 +325,23 @@ func (route TaskRoute) validate() error {
 		}
 		return nil
 	case domain.ProviderTodoist:
-		if route.Todoist == nil || route.MicrosoftGraph != nil {
+		if route.Todoist == nil || route.MicrosoftGraph != nil || route.CalDAV != nil {
 			return errors.New("todoist tasks require independent OAuth settings")
 		}
 		return route.Todoist.OAuth.validateFor(domain.ProviderTodoist)
+	case domain.ProviderCalDAV:
+		if route.CalDAV == nil || route.MicrosoftGraph != nil || route.Todoist != nil {
+			return errors.New("caldav tasks require CalDAV VTODO settings")
+		}
+		return route.CalDAV.validate()
 	case domain.ProviderMicrosoftTasks,
-		domain.ProviderCalDAV,
 		domain.ProviderGoogleTasks,
 		domain.ProviderAppleReminders,
 		domain.ProviderTickTick,
 		domain.ProviderAnyDoMCP,
 		domain.ProviderThings,
 		domain.ProviderOmniFocus:
-		if route.MicrosoftGraph != nil || route.Todoist != nil {
+		if route.MicrosoftGraph != nil || route.Todoist != nil || route.CalDAV != nil {
 			return errors.New("task route contains settings for another provider")
 		}
 		return nil
@@ -483,7 +497,7 @@ func (route OutlookWebRoute) validate() error {
 }
 
 func (route JMAPRoute) validate() error {
-	if err := validateHTTPSURL("JMAP session URL", route.SessionURL, true); err != nil {
+	if err := validateHTTPSURL("JMAP session URL", route.SessionURL); err != nil {
 		return err
 	}
 	if err := validateUsername(route.Username); err != nil {
@@ -509,7 +523,7 @@ func (route IMAPSMTPRoute) validate() error {
 }
 
 func (route CalDAVRoute) validate() error {
-	if err := validateHTTPSURL("CalDAV endpoint", route.Endpoint, true); err != nil {
+	if err := validateHTTPSURL("CalDAV endpoint", route.Endpoint); err != nil {
 		return err
 	}
 	if err := validateBoundedText("CalDAV calendar path", route.CalendarPath, 2048, true); err != nil {
@@ -517,6 +531,22 @@ func (route CalDAVRoute) validate() error {
 	}
 	if route.CalendarPath != "" && !strings.HasPrefix(route.CalendarPath, "/") {
 		return errors.New("CalDAV calendar path must be absolute")
+	}
+	if err := validateUsername(route.Username); err != nil {
+		return err
+	}
+	return route.Credential.validate(false)
+}
+
+func (route CalDAVTaskRoute) validate() error {
+	if err := validateHTTPSURL("CalDAV endpoint", route.Endpoint); err != nil {
+		return err
+	}
+	if err := validateBoundedText("CalDAV task list path", route.TaskListPath, 2048, true); err != nil {
+		return err
+	}
+	if route.TaskListPath != "" && !strings.HasPrefix(route.TaskListPath, "/") {
+		return errors.New("CalDAV task list path must be absolute")
 	}
 	if err := validateUsername(route.Username); err != nil {
 		return err
@@ -555,7 +585,7 @@ func (route GoogleMailRoute) validate() error {
 }
 
 func (route OAuthRoute) validate() error {
-	if err := validateHTTPSURL("API base", route.APIBase, true); err != nil {
+	if err := validateHTTPSURL("API base", route.APIBase); err != nil {
 		return err
 	}
 	return route.Client().validate()
@@ -690,14 +720,11 @@ func validateBoundedText(name, value string, maximum int, allowEmpty bool) error
 	return nil
 }
 
-func validateHTTPSURL(name, raw string, allowPath bool) error {
+func validateHTTPSURL(name, raw string) error {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" ||
 		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return fmt.Errorf("%s must be a credential-free HTTPS URL", name)
-	}
-	if !allowPath && parsed.Path != "" && parsed.Path != "/" {
-		return fmt.Errorf("%s must not include a path", name)
 	}
 	return nil
 }
