@@ -20,5 +20,5 @@
   "name": "corresync",
   "repository": "https://github.com/nkiyohara/corresync",
   "skills": "./skills/",
-  "version": "0.8.6-rc.6"
+  "version": "0.8.6-rc.7"
 }

@@ -3,7 +3,7 @@
 Corresync models To Do items and reminders without pretending every provider
 has the same feature set. The canonical contract gives every adapter one target
 and one safety model. A configured task route is not by itself a capability
-claim. Microsoft To Do, Todoist, and CalDAV VTODO are implemented against
+claim. Microsoft To Do, Todoist, CalDAV VTODO, and TickTick are implemented against
 synthetic contracts through explicit OAuth or external-credential routes.
 Google Tasks is also implemented against synthetic contracts, but remains
 unreachable behind the production Google OAuth approval gate. The other task
@@ -107,7 +107,7 @@ deterministic adapter contracts but no commit-bound live observation.
 | `caldav` | synthetic with strong ETag | VTODO recurrence and alarms | RELATED-TO parents and categories; assignment unavailable | date, floating, and zoned datetime | RFC 6578 sync token with reset | [#111](https://github.com/nkiyohara/corresync/issues/111) |
 | `google-tasks` | synthetic behind disabled approval gate; strong ETag and assigned-task restrictions | unavailable | subtasks, ordering, output-only source links; no labels | due is date-only | bounded `updatedMin` polling with reset | [#112](https://github.com/nkiyohara/corresync/issues/112) |
 | `apple-reminders` | target after explicit full Reminders permission | recurrence and alarms target | URL target; hierarchy/labels observe | EventKit components require exact mapping | local notification then bounded refetch | [#113](https://github.com/nkiyohara/corresync/issues/113) |
-| `ticktick` | documented Open API target | observe and report absent fields | subtasks target; other client-only fields limited | observe | bounded polling | [#114](https://github.com/nkiyohara/corresync/issues/114) |
+| `ticktick` | synthetic; read-only or create/update/complete/delete; no reopen | exact provider recurrence; reminder replacement unavailable | subtasks/checklists, labels, ordering, one assignee; comments/focus degraded | date or IANA-zoned datetime | bounded full-snapshot polling; no webhook | [#114](https://github.com/nkiyohara/corresync/issues/114) |
 | `anydo-mcp` | allowlisted negotiated tools only | observe from reviewed schema | personal/workspace/calendar/grocery distinctions required | observe | upstream MCP; no implicit retry | [#115](https://github.com/nkiyohara/corresync/issues/115) |
 | `things` | documented local automation only; one-way operations explicit | observe | tags and deep links target; unsupported fields reviewed | observe | bounded polling/local invalidation | [#116](https://github.com/nkiyohara/corresync/issues/116) |
 | `omnifocus` | fixed Omni Automation bridge target | recurrence target | projects, hierarchy, tags and deep links target | defer/due mapping target | bounded polling/local invalidation | [#117](https://github.com/nkiyohara/corresync/issues/117) |
@@ -270,6 +270,44 @@ selection, browser launch, keyring access, session activation, and API traffic
 all stop before Google access. Enabling the route requires production OAuth
 approval, opt-in live evidence, and a separate reviewed release. Synthetic
 coverage is not an availability claim.
+
+## TickTick
+
+The `ticktick` route is independently authorized with an application the user
+registered in TickTick's Developer Center. TickTick documents a confidential
+OAuth client: the code exchange uses the client ID and client secret through
+HTTP Basic, while authorization requests use `tasks:read` or `tasks:write`.
+The client secret stays in an explicitly consented OS-keyring/helper entry;
+mutable owner buffers are overwritten after the exchange, and the OAuth grant
+uses a different OS-keyring handle. No personal API token is accepted. Because
+the published API exposes
+no account identity endpoint, the missing remote identity confirmation is
+reported explicitly and isolation rests on the opaque account plus dedicated
+grant and session.
+
+The adapter discovers task projects and Inbox, then implements bounded
+list/get/search, create, update, complete, and delete. It maps provider
+priorities, status, tags, ordering, checklist items, one assignee, date-only
+values, IANA-zoned datetimes, and exact provider RRULE strings. Mixed time
+kinds, unknown time zones, unsupported reminders, and recurring completion are
+rejected before mutation. Existing start, due, and recurrence values cannot be
+removed because the Open API does not document empty or null update semantics.
+Reopen is unavailable because the Open API does not document it.
+
+Task versions use an exact response ETag when present and otherwise a digest of
+the canonical remote snapshot. Corresync re-reads that version immediately
+before each write, but reports optimistic concurrency unavailable because
+TickTick documents no atomic conditional write. Assignment is a documented
+second provider call, so partial completion returns `write outcome unknown`.
+Project permission is rechecked before mutation. Project/list mutation,
+comments, focus, habits, columns, groups, and unrelated provider APIs are
+outside the shared application boundary.
+
+Filter and search responses are capped at 200 with no documented continuation.
+Polling therefore uses a bounded full snapshot, retains account/list-bound
+membership for tombstones, and fails closed when a complete result or canonical
+8 KiB cursor cannot be represented. The route has deterministic synthetic
+contracts and an opt-in read-only harness, but no recorded live observation.
 
 ## Reads, writes, and sync
 

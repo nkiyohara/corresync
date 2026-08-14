@@ -6,14 +6,14 @@
     <title>Corresync 개인정보 처리방침 — 로컬 우선 메일·캘린더 처리</title>
     <meta
       name="description"
-      content="Corresync가 메일, 캘린더, 로그인 자격 증명, 로컬 데이터와 도메인만 사용하는 호환성 검사기를 처리하는 방식을 설명합니다."
+      content="Corresync가 메일, 캘린더, 할 일, OAuth 로그인 자격 증명, 로컬 데이터와 도메인만 사용하는 호환성 검사기를 처리하는 방식을 설명합니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Corresync 개인정보 처리방침">
     <meta
       property="og:description"
-      content="메일과 캘린더 데이터는 사용자의 장치와 선택한 서비스 사이에서 직접 이동합니다."
+      content="메일, 캘린더, 할 일 데이터는 사용자의 장치와 선택한 서비스 사이에서 직접 이동합니다."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ko_KR">
@@ -30,7 +30,7 @@
     <meta name="twitter:title" content="Corresync 개인정보 처리방침">
     <meta
       name="twitter:description"
-      content="로컬 우선 메일, 캘린더와 자격 증명 처리 안내."
+      content="로컬 우선 메일, 캘린더, 할 일과 자격 증명 처리 안내."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 로고와 영문 제품 소개">
@@ -250,10 +250,14 @@
               자동 재시도하지 않습니다.
             </p>
             <p>
-              Microsoft OAuth는 시스템 브라우저, Outlook Web은 전용 로컬 브라우저
-              프로필, 개방형 표준은 사용자가 선택한 유효한 TLS 엔드포인트를
-              씁니다. 프로젝트는 비밀번호, OAuth 권한, 메일, 첨부 파일이나
-              캘린더 본문을 받지 않습니다.
+              Microsoft, Todoist, TickTick OAuth는 시스템 브라우저, Outlook Web은 전용
+              로컬 브라우저 프로필, 개방형 표준은 사용자가 선택한 유효한
+              TLS 엔드포인트를 씁니다. 할 일 제목, 메모, 날짜, 반복,
+              체크리스트 같은 데이터는 요청한 작업을 위해 장치와 선택한
+              제공자 사이에서만 처리합니다. TickTick 클라이언트 시크릿은
+              로그인에 새로운 인증 코드 교환이 필요할 때만 승인한 자격
+              증명 저장소에서 읽습니다. 유효한 권한을 다시 쓸 때는 읽지
+              않으며 설정이나 OAuth 권한에도 저장하지 않습니다.
             </p>
           </section>
           <section id="storage" aria-labelledby="storage-title">
@@ -266,9 +270,9 @@
                 데이터는 전용 로컬 프로필에 남습니다.
               </li>
               <li>
-                <strong>설정:</strong> 계정 주소, 로컬 별칭, 선택한 경로, 공개
-                OAuth 클라이언트 ID, 루프백 리디렉션과 키체인 핸들을 저장하며
-                비밀 정보는 넣지 않습니다.
+                <strong>설정:</strong> 계정 주소, 로컬 별칭, 선택한 경로, OAuth
+                클라이언트 ID, 루프백 리디렉션과 동의한 자격 증명 핸들을
+                저장하며 클라이언트 비밀값이나 토큰은 넣지 않습니다.
               </li>
               <li>
                 <strong>내용 없는 감사:</strong> 제한된 작업 유형, 결과, 시간,

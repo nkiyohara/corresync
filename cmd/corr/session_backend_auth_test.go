@@ -28,12 +28,14 @@ import (
 )
 
 type oauthManagerStub struct {
-	calls    int
-	route    config.OAuthClient
-	provider oauthlocal.Provider
-	client   *http.Client
-	token    []byte
-	err      error
+	calls              int
+	route              config.OAuthClient
+	provider           oauthlocal.Provider
+	client             *http.Client
+	token              []byte
+	err                error
+	confidentialSecret string
+	confidentialBytes  []byte
 }
 
 type routedOAuthCall struct {
@@ -85,6 +87,15 @@ func (stub *routedOAuthManagerStub) Authorize(
 		route: route, provider: provider,
 	})
 	return &oauthAuthorizationStub{client: client}, nil
+}
+
+func (stub *routedOAuthManagerStub) AuthorizeConfidential(
+	ctx context.Context,
+	route config.OAuthClient,
+	provider oauthlocal.Provider,
+	_ oauthlocal.ClientCredentialResolver,
+) (oauthlocal.Authorization, error) {
+	return stub.Authorize(ctx, route, provider)
 }
 
 func TestProjectionAccountsExposeOnlyContentFreePerServiceStatus(t *testing.T) {
@@ -169,6 +180,26 @@ func (stub *oauthManagerStub) Authorize(
 		client: stub.client,
 		token:  stub.token,
 	}, nil
+}
+
+func (stub *oauthManagerStub) AuthorizeConfidential(
+	ctx context.Context,
+	route config.OAuthClient,
+	provider oauthlocal.Provider,
+	resolve oauthlocal.ClientCredentialResolver,
+) (oauthlocal.Authorization, error) {
+	secret, err := resolve(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		for index := range secret {
+			secret[index] = 0
+		}
+	}()
+	stub.confidentialSecret = string(secret)
+	stub.confidentialBytes = secret
+	return stub.Authorize(ctx, route, provider)
 }
 
 func TestSessionBackendOnlyResolvesJMAPCredentialForExplicitCLILogin(t *testing.T) {

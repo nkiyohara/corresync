@@ -6,14 +6,14 @@
     <title>Corresync 隐私政策 — 本地优先的邮件与日历处理</title>
     <meta
       name="description"
-      content="了解 Corresync 如何处理邮箱、日历、登录凭据、本地数据，以及只查询邮箱域名的兼容性检查工具。"
+      content="了解 Corresync 如何处理邮箱、日历、任务、OAuth 登录凭据、本地数据，以及只查询邮箱域名的兼容性检查工具。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Corresync 隐私政策">
     <meta
       property="og:description"
-      content="邮件与日历直接在你的设备和所选服务之间流转。"
+      content="邮件、日历与任务直接在你的设备和所选服务之间流转。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
@@ -30,7 +30,7 @@
     <meta name="twitter:title" content="Corresync 隐私政策">
     <meta
       name="twitter:description"
-      content="本地优先的邮件、日历与凭据处理说明。"
+      content="本地优先的邮件、日历、任务与凭据处理说明。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 标志和英文产品简介">
@@ -216,9 +216,11 @@
               使用相同的类型化操作和策略检查。读取尽量从元数据开始；发送邮件、邀请参与者等重要写入先显示精确预览，再要求一份与调用方、账号、目标和内容绑定的短时单次批准。系统不会悄悄切换到另一条服务路径，也不会在结果未知时自动重试写入。
             </p>
             <p>
-              Microsoft OAuth 使用系统浏览器；Outlook Web
+              Microsoft、Todoist 和 TickTick OAuth 使用系统浏览器；Outlook Web
               使用专用可见浏览器配置；开放标准路径只连接你选择的有效 TLS
-              端点。项目不接收密码、OAuth 授权、邮件、附件或日历正文。
+              端点。任务标题、备注、日期、重复规则和检查清单等内容只会在你的设备与所选服务商之间按需处理。TickTick
+              客户端密钥仅在登录需要新的授权码交换时从获准的凭据存储中读取；复用有效授权时不会读取，也不会写入配置或
+              OAuth 授权。
             </p>
           </section>
           <section id="storage" aria-labelledby="storage-title">
@@ -231,8 +233,9 @@
                 和站点数据留在专用本地配置中。
               </li>
               <li>
-                <strong>配置：</strong>账号地址、本地别名、所选路径、公开 OAuth
-                客户端 ID、回环重定向和钥匙串句柄，不包含秘密。
+                <strong>配置：</strong>账号地址、本地别名、所选路径、OAuth
+                客户端
+                ID、回环重定向和已同意的凭据句柄，不包含客户端密钥或令牌。
               </li>
               <li>
                 <strong

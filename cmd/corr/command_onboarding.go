@@ -1250,7 +1250,9 @@ func accountAuthenticationKind(
 		}
 	}
 	if account.Tasks != nil && (account.Tasks.Provider == domain.ProviderMicrosoftGraph ||
-		account.Tasks.Provider == domain.ProviderTodoist) {
+		account.Tasks.Provider == domain.ProviderTodoist ||
+		account.Tasks.Provider == domain.ProviderGoogleTasks ||
+		account.Tasks.Provider == domain.ProviderTickTick) {
 		return application.DiscoveryExplicitOAuth
 	}
 	return application.DiscoveryBrowserFirstParty

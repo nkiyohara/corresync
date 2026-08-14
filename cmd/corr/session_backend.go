@@ -32,6 +32,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
 	"github.com/nkiyohara/corresync/internal/provider/outlookweb"
+	"github.com/nkiyohara/corresync/internal/provider/ticktick"
 	"github.com/nkiyohara/corresync/internal/provider/todoist"
 	"github.com/nkiyohara/corresync/internal/rollout"
 	"github.com/nkiyohara/corresync/internal/session"
@@ -46,6 +47,12 @@ type oauthClientManager interface {
 		context.Context,
 		config.OAuthClient,
 		oauthlocal.Provider,
+	) (oauthlocal.Authorization, error)
+	AuthorizeConfidential(
+		context.Context,
+		config.OAuthClient,
+		oauthlocal.Provider,
+		oauthlocal.ClientCredentialResolver,
 	) (oauthlocal.Authorization, error)
 }
 
@@ -351,6 +358,7 @@ type sessionBackend struct {
 	newGoogleTasks func(context.Context, googletasks.Options) (*googletasks.Client, error)
 	newGraph       func(context.Context, graphapi.Options) (*graphapi.Client, error)
 	newTodoist     func(context.Context, todoist.Options) (*todoist.Client, error)
+	newTickTick    func(context.Context, ticktick.Options) (*ticktick.Client, error)
 	monitorStore   *eventqueue.Store
 	monitor        *application.MonitorService
 	monitorEngine  *application.MonitorEngine
@@ -436,6 +444,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		newGoogleTasks:   googletasks.New,
 		newGraph:         graphapi.New,
 		newTodoist:       todoist.New,
+		newTickTick:      ticktick.New,
 		monitorStore:     eventqueue.New(),
 		accounts:         make(map[domain.AccountID]sessionAccount),
 		previews:         make(map[string]sessionPreview),
@@ -547,7 +556,8 @@ func configuredServiceImplemented(
 	case application.AuthenticationServiceTasks:
 		switch provider { //nolint:exhaustive // Unsupported provider IDs deliberately return false.
 		case domain.ProviderMicrosoftGraph, domain.ProviderTodoist,
-			domain.ProviderCalDAV, domain.ProviderGoogleTasks:
+			domain.ProviderCalDAV, domain.ProviderGoogleTasks,
+			domain.ProviderTickTick:
 			return true
 		default:
 			return false
@@ -2671,6 +2681,10 @@ func inactiveTaskRoute(configured config.Account) (*domain.Degradation, error) {
 		configured.Tasks.GoogleTasks != nil {
 		return nil, nil
 	}
+	if configured.Tasks.Provider == domain.ProviderTickTick &&
+		configured.Tasks.TickTick != nil {
+		return nil, nil
+	}
 	if configured.Mail == nil && configured.Calendar == nil {
 		return nil, fmt.Errorf(
 			"configured task provider %q is not available in this build",
@@ -2876,7 +2890,7 @@ func (backend *sessionBackend) jmapAccount(
 		return sessionAccount{}, err
 	}
 	defer func() { _ = secret.Close() }()
-	password := []byte(secret.String())
+	password := secret.CopyBytes()
 	defer func() {
 		for index := range password {
 			password[index] = 0
@@ -2957,7 +2971,7 @@ func (backend *sessionBackend) imapAccount(
 		return sessionAccount{}, err
 	}
 	defer func() { _ = secret.Close() }()
-	password := []byte(secret.String())
+	password := secret.CopyBytes()
 	defer func() {
 		for index := range password {
 			password[index] = 0
@@ -3046,7 +3060,7 @@ func (backend *sessionBackend) calDAVAccount(
 		return sessionAccount{}, err
 	}
 	defer func() { _ = secret.Close() }()
-	password := []byte(secret.String())
+	password := secret.CopyBytes()
 	defer func() {
 		for index := range password {
 			password[index] = 0
@@ -3112,7 +3126,7 @@ func (backend *sessionBackend) calDAVTaskAccount(
 		return sessionAccount{}, err
 	}
 	defer func() { _ = secret.Close() }()
-	password := []byte(secret.String())
+	password := secret.CopyBytes()
 	defer func() {
 		for index := range password {
 			password[index] = 0
@@ -3589,6 +3603,80 @@ func (backend *sessionBackend) googleTaskAccount(
 	}), nil
 }
 
+func (backend *sessionBackend) tickTickAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	if configured.Tasks == nil || configured.Tasks.Provider != domain.ProviderTickTick ||
+		configured.Tasks.TickTick == nil {
+		return sessionAccount{}, errors.New("the TickTick task route settings are missing")
+	}
+	selected := configured.Tasks.TickTick
+	provider, err := oauthlocal.ProviderFor(
+		domain.ProviderTickTick,
+		oauthlocal.Services{Tasks: true, TaskWrite: !selected.ReadOnly},
+	)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	manager := backend.oauth
+	if manager == nil {
+		manager, err = oauthlocal.New(oauthlocal.Options{
+			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
+		})
+		if err != nil {
+			return sessionAccount{}, err
+		}
+	}
+	authorization, err := manager.AuthorizeConfidential(
+		ctx, selected.OAuth.Client(), provider,
+		func(ctx context.Context) ([]byte, error) {
+			secret, err := backend.credentials.Resolve(ctx, selected.OAuth.ClientSecret)
+			if err != nil {
+				return nil, fmt.Errorf("resolve TickTick OAuth client credential: %w", err)
+			}
+			defer func() { _ = secret.Close() }()
+			return secret.CopyBytes(), nil
+		},
+	)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	factory := backend.newTickTick
+	if factory == nil {
+		factory = ticktick.New
+	}
+	client, err := factory(ctx, ticktick.Options{
+		APIBase: selected.OAuth.APIBase, Account: configured.ID,
+		ReadOnly: selected.ReadOnly, HTTP: authorization.HTTPClient(),
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	capabilities := client.TaskCapabilities()
+	tasks, err := application.NewTaskService(
+		backend.guard,
+		client,
+		application.TaskOptions{
+			Capabilities: capabilities,
+			Degradations: client.TaskDegradations(),
+			Provenance: domain.Provenance{
+				AccountID: configured.ID, Provider: domain.ProviderTickTick,
+			},
+		},
+	)
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, client.Close())
+	}
+	return leasedSessionAccount(sessionAccount{
+		closers: []sessionCloser{client}, tasks: tasks,
+		captured: time.Now().UTC(),
+		capabilities: domain.Capabilities{
+			Tasks: true, IncrementalSync: len(capabilities.SyncModes) != 0,
+		},
+	}), nil
+}
+
 type graphServiceSelection struct {
 	route                 config.OAuthRoute
 	mail, calendar, tasks bool
@@ -3741,6 +3829,13 @@ func (backend *sessionBackend) nonOutlookAccount(
 	}
 	if configured.Tasks != nil && configured.Tasks.Provider == domain.ProviderGoogleTasks {
 		tasks, err := backend.googleTaskAccount(ctx, configured)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
+		}
+		combined = mergeSessionAccounts(combined, tasks)
+	}
+	if configured.Tasks != nil && configured.Tasks.Provider == domain.ProviderTickTick {
+		tasks, err := backend.tickTickAccount(ctx, configured)
 		if err != nil {
 			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
 		}

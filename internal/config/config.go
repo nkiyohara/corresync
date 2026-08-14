@@ -15,7 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CurrentVersion = 8
+const CurrentVersion = 9
 
 const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
@@ -263,6 +263,9 @@ func (configuration Config) Validate() error {
 		if _, conflicts := accountIDs[domain.AccountID(alias)]; conflicts {
 			return fmt.Errorf("account alias %q conflicts with an opaque account ID", alias)
 		}
+	}
+	if err := validateTickTickCredentialIsolation(configuration.Accounts); err != nil {
+		return err
 	}
 
 	if err := configuration.Policy.Rules().Validate(); err != nil {

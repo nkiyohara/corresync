@@ -21,6 +21,7 @@ const updateChannelLegacyVersion = 4
 const taskRouteLegacyVersion = 5
 const calDAVTaskLegacyVersion = 6
 const googleTaskLegacyVersion = 7
+const tickTickLegacyVersion = 8
 
 type legacyConfig struct {
 	Version        int                      `toml:"version"`
@@ -155,6 +156,36 @@ type googleTaskLegacyConfig struct {
 	Credentials    Credentials                        `toml:"credentials,omitempty"`
 	Updates        Updates                            `toml:"updates"`
 	Feedback       Feedback                           `toml:"feedback"`
+}
+
+// tickTickLegacyRoute freezes the v8 task union so a confidential-client
+// reference cannot be smuggled into an older schema during migration.
+type tickTickLegacyRoute struct {
+	Provider       domain.ProviderID        `toml:"provider"`
+	MicrosoftGraph *MicrosoftGraphTaskRoute `toml:"microsoft_graph,omitempty"`
+	Todoist        *TodoistTaskRoute        `toml:"todoist,omitempty"`
+	CalDAV         *CalDAVTaskRoute         `toml:"caldav,omitempty"`
+	GoogleTasks    *GoogleTaskRoute         `toml:"google_tasks,omitempty"`
+}
+
+type tickTickLegacyAccount struct {
+	ID       domain.AccountID     `toml:"id"`
+	Address  string               `toml:"address,omitempty"`
+	Mail     *MailRoute           `toml:"mail,omitempty"`
+	Calendar *CalendarRoute       `toml:"calendar,omitempty"`
+	Tasks    *tickTickLegacyRoute `toml:"tasks,omitempty"`
+	Monitor  *Monitor             `toml:"monitor,omitempty"`
+}
+
+type tickTickLegacyConfig struct {
+	Version        int                              `toml:"version"`
+	DefaultAccount string                           `toml:"default_account"`
+	Accounts       map[string]tickTickLegacyAccount `toml:"accounts"`
+	Policy         Policy                           `toml:"policy"`
+	Browser        Browser                          `toml:"browser"`
+	Credentials    Credentials                      `toml:"credentials,omitempty"`
+	Updates        Updates                          `toml:"updates"`
+	Feedback       Feedback                         `toml:"feedback"`
 }
 
 type updateChannelLegacyUpdates struct {
@@ -303,6 +334,48 @@ func MigrateV7(data []byte) (Config, error) {
 	}
 	if err := configuration.Validate(); err != nil {
 		return Config{}, fmt.Errorf("validate migrated v7 config: %w", err)
+	}
+	return configuration, nil
+}
+
+// MigrateV8 adds typed TickTick confidential-client references without
+// selecting a route or manufacturing consent for either external credential.
+func MigrateV8(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var legacy tickTickLegacyConfig
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&legacy); err != nil {
+		return Config{}, fmt.Errorf("decode v8 config: %w", err)
+	}
+	if legacy.Version != tickTickLegacyVersion {
+		return Config{}, fmt.Errorf("TickTick legacy config version must be %d", tickTickLegacyVersion)
+	}
+	configuration := Config{
+		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
+		Accounts: make(map[string]Account, len(legacy.Accounts)),
+		Policy:   legacy.Policy, Browser: legacy.Browser,
+		Credentials: legacy.Credentials, Updates: legacy.Updates,
+		Feedback: legacy.Feedback,
+	}
+	for alias, source := range legacy.Accounts {
+		account := Account{
+			ID: source.ID, Address: source.Address, Mail: source.Mail,
+			Calendar: source.Calendar, Monitor: source.Monitor,
+		}
+		if source.Tasks != nil {
+			account.Tasks = &TaskRoute{
+				Provider: source.Tasks.Provider, MicrosoftGraph: source.Tasks.MicrosoftGraph,
+				Todoist: source.Tasks.Todoist, CalDAV: source.Tasks.CalDAV,
+				GoogleTasks: source.Tasks.GoogleTasks,
+			}
+		}
+		configuration.Accounts[alias] = account
+	}
+	if err := configuration.Validate(); err != nil {
+		return Config{}, fmt.Errorf("validate migrated v8 config: %w", err)
 	}
 	return configuration, nil
 }

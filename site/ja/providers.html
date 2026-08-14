@@ -6,7 +6,7 @@
     <title>対応メール・カレンダー・タスクサービス — Corresync</title>
     <meta
       name="description"
-      content="Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP、CalDAVの対応状況を比較。Gmail、Googleカレンダー、Google Tasksは近日対応です。"
+      content="Outlook、Microsoft 365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP、CalDAVの対応状況を比較。Gmail、Googleカレンダー、Google Tasksは近日対応です。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="iCloudやCalDAV VTODOを含む現在利用可能なメール・カレンダー・タスクの接続経路と、承認待ちのGoogle対応を確認できます。"
+      content="Todoist、TickTick、iCloud、CalDAV VTODOなど、現在利用可能なメール・カレンダー・タスクの接続経路と、承認待ちのGoogle対応を確認できます。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -40,7 +40,7 @@
     >
     <meta
       name="twitter:description"
-      content="Outlook、Todoist、iCloud、CalDAV VTODOの対応状況と、承認待ちのGoogle経路を確認できます。"
+      content="Outlook、Todoist、TickTick、iCloud、CalDAV VTODOの対応状況と、承認待ちのGoogle経路を確認できます。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -306,7 +306,7 @@
           </h2>
           <p>
             各連携のコードはRCに含まれ、合成契約テストでも検証済みです。ただしGoogleの承認までは本番OAuthを無効にしているため、サインイン、スコープ要求、キーチェーン参照、API通信は始まりません。Outlook、Microsoft
-            365、Todoist、iCloud、JMAP、IMAP/SMTP、CalDAVは現在利用できます。
+            365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP、CalDAVは現在利用できます。
           </p>
         </div>
         <div class="route-grid two">
@@ -372,6 +372,61 @@
               Google公式の<a
                 href="https://developers.google.com/workspace/guides/configure-mcp-servers"
               >Workspace MCP設定ガイド</a>を参照してください。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="tasks" aria-labelledby="tasks-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>タスクの接続経路</p>
+          <h2 id="tasks-title">いつものタスクサービスを、そのままつなぐ。</h2>
+          <p>
+            タスクはメールやカレンダーと別に選べます。認可、利用できる機能、同期カーソル、確認後の書き込みは、アカウントごとに分離されます。
+          </p>
+        </div>
+        <div class="route-grid three">
+          <article class="route-card" id="microsoft-todo">
+            <header>
+              <span class="route-icon" aria-hidden="true">To</span><div>
+                <p class="chip">現在利用可能 · 明示的OAuth</p>
+                <h3>Microsoft To Do</h3>
+              </div>
+            </header>
+            <p>
+              タスクリスト、作成・更新、完了・再開・削除、繰り返し、チェックリスト、カテゴリ、上限付きGraph差分同期に対応します。
+            </p>
+            <p class="route-foot">
+              自分で登録・選択する権限のあるMicrosoft
+              Graph公開クライアントを使います。
+            </p>
+          </article>
+          <article class="route-card" id="todoist">
+            <header>
+              <span class="route-icon" aria-hidden="true">Td</span><div>
+                <p class="chip">現在利用可能 · 明示的OAuth</p>
+                <h3>Todoist</h3>
+              </div>
+            </header>
+            <p>
+              プロジェクト、作成・更新と状態変更、リマインダー、繰り返し、サブタスク、ラベル、担当者、日付と時刻、上限付き同期に対応します。
+            </p>
+            <p class="route-foot">
+              PKCE対応の公開OAuthクライアントを使い、プラン依存の機能も隠しません。
+            </p>
+          </article>
+          <article class="route-card accent-card" id="ticktick">
+            <header>
+              <span class="route-icon" aria-hidden="true">Ti</span><div>
+                <p class="chip">現在利用可能 · 明示的OAuth</p>
+                <h3>TickTick</h3>
+              </div>
+            </header>
+            <p>
+              プロジェクトとInbox、検索、作成・更新・完了・削除、繰り返し、チェックリスト、ラベル、1人の担当者、並び順、上限付きポーリングに対応します。
+            </p>
+            <p class="route-foot">
+              自分で登録した、クライアントシークレット方式のOAuthアプリを使います。シークレットは許可した認証情報ストアに残し、再開やリマインダー変更は対応済みと表示しません。
             </p>
           </article>
         </div>

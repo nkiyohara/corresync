@@ -72,11 +72,13 @@ and unshared Corresync-owned OAuth grant state. External standards credentials
 remain in their keyring/helper. Removing the default account requires
 `--new-default`.
 
-## Schema v8
+## Schema v9
 
-Schema v8 adds a typed, independent Google Tasks OAuth payload without enabling
-the approval-gated route. Existing v7 files preserve every route and credential
-consent exactly; migration cannot add or authorize Google Tasks. Schema v7
+Schema v9 adds a typed TickTick task route with separate consented handles for
+its OAuth grant and externally owned confidential-client secret. Existing v8
+files preserve every route and credential consent exactly; migration cannot add
+or authorize TickTick. Schema v8 added the independent Google Tasks OAuth
+payload without enabling the approval-gated route. Schema v7
 added the CalDAV VTODO payload, schema v6 introduced the task route, and
 existing v5 files still migrate with no task route,
 authorization, or capability. Schema v5 added the signed-release channel and
@@ -85,7 +87,7 @@ initialized provider-neutral configuration contains no account and has an
 empty `default_account`. The first account added becomes the default:
 
 ```toml
-version = 8
+version = 9
 default_account = ""
 
 [policy]
@@ -110,7 +112,7 @@ auto_submit = false
 A configured Outlook Web account then looks like:
 
 ```toml
-version = 8
+version = 9
 default_account = "work"
 
 [accounts.work]
@@ -176,7 +178,8 @@ Supported route payloads are:
 | tasks | `todoist` | `tasks.todoist` and `tasks.todoist.oauth` |
 | tasks | `caldav` | `tasks.caldav` |
 | tasks | `google-tasks` | `tasks.google_tasks` and `tasks.google_tasks.oauth`; approval-gated |
-| tasks | `microsoft-web-tasks`, `apple-reminders`, `ticktick`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
+| tasks | `ticktick` | `tasks.ticktick` and `tasks.ticktick.oauth` |
+| tasks | `microsoft-web-tasks`, `apple-reminders`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
 <!-- markdownlint-enable MD013 -->
 
 The payload must match the provider exactly. The staged Google mail-and-calendar
@@ -253,6 +256,44 @@ client-secret or personal-token field. The loopback port is also fixed and must
 exactly match the redirect registered for that public client; Todoist routes do
 not use the ephemeral `:0` convention.
 
+TickTick uses a separate confidential-client route:
+
+```toml
+[accounts.ticktick]
+id = "acc_0000000000000000000000000000000d"
+
+[accounts.ticktick.tasks]
+provider = "ticktick"
+
+[accounts.ticktick.tasks.ticktick]
+read_only = true
+
+[accounts.ticktick.tasks.ticktick.oauth]
+api_base = "https://api.ticktick.com"
+client_id = "synthetic-confidential-client"
+redirect_uri = "http://127.0.0.1:53685/callback"
+
+[accounts.ticktick.tasks.ticktick.oauth.authorization]
+backend = "os-keyring"
+key = "tasks-ticktick-grant"
+consent = true
+
+[accounts.ticktick.tasks.ticktick.oauth.client_secret]
+backend = "os-keyring"
+key = "tasks-ticktick-client-secret"
+consent = true
+```
+
+The authorization grant and client-secret handles must differ, and each is
+dedicated to this TickTick binding: neither may be reused by another route or
+account. Corresync owns and may remove only the grant; the client secret
+remains in the selected external credential owner. `read_only = true`
+requests `tasks:read`; omission requests `tasks:write`. TickTick documents no
+PKCE, refresh grant, or identity endpoint, so the fixed-port loopback must
+exactly match the registered application, token expiry requires a new
+interactive login, and the missing remote identity check is visible as a
+degradation. Personal API tokens are not accepted.
+
 CalDAV VTODO uses a distinct standards route and credential consent, even when
 the same account also has a CalDAV VEVENT calendar:
 
@@ -282,7 +323,7 @@ capabilities, cursors, and writes remain separate. Remaining task providers
 are unavailable and have no arbitrary options map or credential value. See the
 [task contract](tasks.md).
 
-Schema v8 also defines the future Google Tasks route shape:
+Schema v8 introduced the future Google Tasks route shape:
 
 ```toml
 [accounts.google-tasks]
@@ -335,6 +376,17 @@ corr account add reader@example.invalid \
   --task-read-only
 
 corr account add \
+  --alias ticktick \
+  --task-provider ticktick \
+  --task-oauth-client-id synthetic-confidential-client \
+  --task-oauth-redirect-uri http://127.0.0.1:53685/callback \
+  --task-authorization-key tasks-ticktick-grant \
+  --task-oauth-secret-key tasks-ticktick-client-secret \
+  --approve-task-oauth \
+  --approve-task-oauth-secret \
+  --task-read-only
+
+corr account add \
   --alias caldav-tasks \
   --task-provider caldav \
   --task-caldav-endpoint https://dav.example.invalid/ \
@@ -344,13 +396,14 @@ corr account add \
   --approve-task-credential
 ```
 
-Task OAuth flags may use the shared `--oauth-*` public-client values, but the
-separate `--approve-task-oauth` flag is always required. Reusing an exact Graph
-grant within one account combines only the explicitly selected services; a
-stored grant missing the newly reviewed scope is replaced through fresh
-interactive authorization. The legacy omitted cloud value and `global` mean
-the same deployment. One authorization handle cannot be reused for a different
-provider, public client, redirect, or Microsoft cloud.
+Task OAuth flags may use the shared `--oauth-*` client values, but the separate
+`--approve-task-oauth` flag is always required. TickTick additionally requires
+`--approve-task-oauth-secret` for its external client-secret handle. Reusing an
+exact Graph grant within one account combines only the explicitly selected
+services. A stored grant missing the newly reviewed scope is replaced through
+fresh interactive authorization. The legacy omitted cloud value and `global`
+mean the same deployment. One authorization handle cannot be reused for a
+different provider, public client, redirect, or Microsoft cloud.
 
 Use `corr account add` for these combinations; it validates endpoint
 discovery, explicit provider selection, required consent bits, and route
@@ -387,7 +440,8 @@ consent = true
 An account-add review shows the exact backend/key handles before approval.
 Corresync rejects a new account that attempts to reuse a handle already owned
 by another configured account; mail, calendar, and task routes belonging to the
-same account may intentionally share one handle. Existing external credential
+same account may intentionally share one handle, except that TickTick's grant
+and client-secret handles are always dedicated. Existing external credential
 records remain owned by their keyring or helper and are never copied into this
 file.
 

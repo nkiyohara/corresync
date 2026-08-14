@@ -21,7 +21,7 @@ public transports and one authenticated local session owner.
        ├── JMAP adapter
        ├── IMAP/SMTP adapter
        ├── CalDAV adapter
-       └── explicit task adapters (independently gated)
+       └── explicit Microsoft To Do, Todoist, TickTick, and task adapters
 ```
 
 There is no remote MCP transport, TCP daemon listener, hosted relay, or
@@ -141,16 +141,22 @@ The session owner creates all authenticated provider clients:
   release-gated before OAuth and network access until approval; normal-browser
   OAuth and OS-keyring grants after activation;
 - Graph: interactive OAuth browser plus grant in OS keyring;
+- Todoist: public-client OAuth with PKCE and an OS-keyring grant;
+- TickTick: documented confidential-client OAuth, an OS-keyring grant, and a
+  separately consented external client-secret handle resolved only when login
+  requires a new authorization-code exchange;
 - JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference; CalDAV
   VEVENT and VTODO routes own separate consent and sessions;
 - task providers: only the explicit browser, OAuth, standards, local OS, or
   upstream MCP owner defined by that route; none is activated by schema alone.
 
-No application transport accepts a password. Client-secret configuration,
-unattended grants, TLS interception, and raw authorization injection are
-unrepresentable. A generated Google Desktop client credential may enter only
-through the daemon's inherited process environment under ADR 0022; it is absent
-from configuration, browser URLs, grants, CLI/MCP input, and logs. The daemon
+No application transport accepts a password. Client-secret values in
+configuration, unattended grants, TLS interception, and raw authorization
+injection are unrepresentable. A generated Google Desktop client credential may
+enter only through the daemon's inherited process environment under ADR 0022;
+TickTick can name only a separately consented external credential handle. Both
+secret values are absent from configuration, browser URLs, grants, CLI/MCP
+input, and logs. The daemon
 closes secret-owning clients on logout and clears owned mutable secret bytes.
 
 ## Local IPC

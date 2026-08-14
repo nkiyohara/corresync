@@ -6,14 +6,14 @@
     <title>Email, calendar, and task providers — Corresync</title>
     <meta
       name="description"
-      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
+      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Email, calendar, and task providers — Corresync">
     <meta
       property="og:description"
-      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
+      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -34,7 +34,7 @@
     <meta name="twitter:title" content="Email, calendar, and task providers — Corresync">
     <meta
       name="twitter:description"
-      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
+      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -307,8 +307,8 @@
           <p>
             The integrations are included in RC builds and covered by synthetic contracts.
             Production OAuth stays disabled until Google approves it, so no Google sign-in, scope
-            request, keyring access, or API traffic starts. Outlook, Microsoft 365, Todoist, iCloud,
-            JMAP, IMAP/SMTP, and CalDAV routes remain available now.
+            request, keyring access, or API traffic starts. Outlook, Microsoft 365, Todoist,
+            TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV routes remain available now.
           </p>
         </div>
         <div class="route-grid two">
@@ -375,6 +375,68 @@
               Follow Google’s official
               <a href="https://developers.google.com/workspace/guides/configure-mcp-servers"
               >Workspace MCP setup guide</a>.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="tasks" aria-labelledby="tasks-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Task routes</p>
+          <h2 id="tasks-title">Connect the task service you already use.</h2>
+          <p>
+            Task routes are selected independently from mail and calendar. Their authorization,
+            capabilities, cursors, and reviewed writes stay isolated per account.
+          </p>
+        </div>
+        <div class="route-grid three">
+          <article class="route-card" id="microsoft-todo">
+            <header>
+              <span class="route-icon" aria-hidden="true">To</span>
+              <div>
+                <p class="chip">Available now · explicit OAuth</p>
+                <h3>Microsoft To Do</h3>
+              </div>
+            </header>
+            <p>
+              Task lists, typed create and update, complete and reopen, delete, recurrence,
+              checklists, categories, and bounded Graph delta sync.
+            </p>
+            <p class="route-foot">
+              Uses a Microsoft Graph public client you are authorized to register and select.
+            </p>
+          </article>
+          <article class="route-card" id="todoist">
+            <header>
+              <span class="route-icon" aria-hidden="true">Td</span>
+              <div>
+                <p class="chip">Available now · explicit OAuth</p>
+                <h3>Todoist</h3>
+              </div>
+            </header>
+            <p>
+              Task projects, typed writes and state, reminders, recurrence, subtasks, labels,
+              assignment, exact date and time meanings, and bounded sync-token changes.
+            </p>
+            <p class="route-foot">
+              Uses your public OAuth client with PKCE; plan-dependent features remain visible.
+            </p>
+          </article>
+          <article class="route-card accent-card" id="ticktick">
+            <header>
+              <span class="route-icon" aria-hidden="true">Ti</span>
+              <div>
+                <p class="chip">Available now · explicit OAuth</p>
+                <h3>TickTick</h3>
+              </div>
+            </header>
+            <p>
+              Projects and Inbox, search, create, update, complete, delete, recurrence, checklists,
+              labels, one assignee, ordering, and bounded polling.
+            </p>
+            <p class="route-foot">
+              Uses your confidential OAuth client. Its secret stays in an approved credential store;
+              reopen and reminder replacement are not claimed.
             </p>
           </article>
         </div>

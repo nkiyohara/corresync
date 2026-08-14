@@ -54,6 +54,19 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 	if route.Provider == domain.ProviderGoogleTasks && route.GoogleTasks != nil {
 		return oauthRouteView(route.Provider, &route.GoogleTasks.OAuth)
 	}
+	if route.Provider == domain.ProviderTickTick && route.TickTick != nil {
+		return &application.AccountRouteView{
+			Provider: route.Provider,
+			Endpoints: []application.DiscoveredEndpoint{{
+				Kind: "api", Value: route.TickTick.OAuth.APIBase,
+			}},
+			Credential: &application.AccountCredentialView{
+				Configured: true,
+				Backend:    string(route.TickTick.OAuth.Authorization.Backend),
+				Consented:  route.TickTick.OAuth.Authorization.Consent,
+			},
+		}
+	}
 	if route.Provider == domain.ProviderCalDAV && route.CalDAV != nil {
 		endpoints := []application.DiscoveredEndpoint{{
 			Kind: "endpoint", Value: route.CalDAV.Endpoint,
@@ -212,6 +225,26 @@ func taskRouteConfig(
 			OAuth: *oauth, ReadOnly: route.GoogleTasks.ReadOnly,
 		}
 	}
+	if route.TickTick != nil {
+		result.TickTick = &config.TickTickTaskRoute{
+			OAuth: config.TickTickOAuthRoute{
+				APIBase:     route.TickTick.OAuth.APIBase,
+				ClientID:    route.TickTick.OAuth.ClientID,
+				RedirectURI: route.TickTick.OAuth.RedirectURI,
+				Authorization: config.CredentialRef{
+					Backend: config.CredentialBackend(route.TickTick.OAuth.Authorization.Backend),
+					Key:     route.TickTick.OAuth.Authorization.Key,
+					Consent: route.TickTick.OAuth.Authorization.Consent,
+				},
+				ClientSecret: config.CredentialRef{
+					Backend: config.CredentialBackend(route.TickTick.OAuth.ClientSecret.Backend),
+					Key:     route.TickTick.OAuth.ClientSecret.Key,
+					Consent: route.TickTick.OAuth.ClientSecret.Consent,
+				},
+			},
+			ReadOnly: route.TickTick.ReadOnly,
+		}
+	}
 	return result, nil
 }
 
@@ -290,6 +323,13 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 		references = append(
 			references,
 			account.Tasks.GoogleTasks.OAuth.Authorization,
+		)
+	}
+	if account.Tasks != nil && account.Tasks.TickTick != nil {
+		references = append(
+			references,
+			account.Tasks.TickTick.OAuth.Authorization,
+			account.Tasks.TickTick.OAuth.ClientSecret,
 		)
 	}
 	if account.Tasks != nil && account.Tasks.CalDAV != nil {
@@ -863,6 +903,9 @@ func accountOAuthAuthorizationKeys(account config.Account) []string {
 	}
 	if account.Tasks != nil && account.Tasks.GoogleTasks != nil {
 		keys = append(keys, account.Tasks.GoogleTasks.OAuth.Authorization.Key)
+	}
+	if account.Tasks != nil && account.Tasks.TickTick != nil {
+		keys = append(keys, account.Tasks.TickTick.OAuth.Authorization.Key)
 	}
 	slices.Sort(keys)
 	return slices.Compact(keys)

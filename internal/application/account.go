@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/nkiyohara/corresync/internal/approval"
@@ -163,6 +164,22 @@ type AccountGoogleTaskInput struct {
 	ReadOnly bool              `json:"readOnly,omitempty"`
 }
 
+// AccountTickTickOAuthInput configures TickTick's confidential OAuth client.
+// ClientSecret is an external lookup reference, never the secret value.
+type AccountTickTickOAuthInput struct {
+	APIBase       string                 `json:"apiBase"`
+	ClientID      string                 `json:"clientId"`
+	RedirectURI   string                 `json:"redirectUri"`
+	Authorization AccountCredentialInput `json:"authorization"`
+	ClientSecret  AccountCredentialInput `json:"clientSecret"`
+}
+
+// AccountTickTickTaskInput selects an independent task-only TickTick grant.
+type AccountTickTickTaskInput struct {
+	OAuth    AccountTickTickOAuthInput `json:"oauth"`
+	ReadOnly bool                      `json:"readOnly,omitempty"`
+}
+
 // AccountWebInput identifies a provider-owned interactive browser origin.
 type AccountWebInput struct {
 	Origin string `json:"origin"`
@@ -197,6 +214,7 @@ type AccountTaskRouteInput struct {
 	Todoist        *AccountTodoistTaskInput   `json:"todoist,omitempty"`
 	CalDAV         *AccountCalDAVTaskInput    `json:"caldav,omitempty"`
 	GoogleTasks    *AccountGoogleTaskInput    `json:"googleTasks,omitempty"`
+	TickTick       *AccountTickTickTaskInput  `json:"tickTick,omitempty"`
 }
 
 // AccountAddInput explicitly selects service routes to persist. Discovery
@@ -495,6 +513,9 @@ func (service *AccountService) reviewAdd(
 	if err := validateAccountOAuthGrantSharing(input); err != nil {
 		return "", AccountCatalog{}, err
 	}
+	if err := validateAccountTickTickCredentialIsolation(accountCredentialReviews(input)); err != nil {
+		return "", AccountCatalog{}, err
+	}
 	catalog, err := service.List(ctx)
 	if err != nil {
 		return "", AccountCatalog{}, err
@@ -585,6 +606,11 @@ func validateAccountOAuthGrantSharing(input AccountAddInput) error {
 		input.Tasks.GoogleTasks != nil {
 		route := input.Tasks.GoogleTasks.OAuth
 		add(domain.ProviderGoogleTasks, route.ClientID, route.RedirectURI, route.Authorization, "")
+	}
+	if input.Tasks != nil && input.Tasks.Provider == domain.ProviderTickTick &&
+		input.Tasks.TickTick != nil {
+		route := input.Tasks.TickTick.OAuth
+		add(domain.ProviderTickTick, route.ClientID, route.RedirectURI, route.Authorization, "")
 	}
 	for left := range bindings {
 		for right := left + 1; right < len(bindings); right++ {
@@ -695,6 +721,18 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 			Backend: credential.Backend, Key: credential.Key,
 		})
 	}
+	if input.Tasks != nil && input.Tasks.Provider == domain.ProviderTickTick &&
+		input.Tasks.TickTick != nil {
+		for _, credential := range []AccountCredentialInput{
+			input.Tasks.TickTick.OAuth.Authorization,
+			input.Tasks.TickTick.OAuth.ClientSecret,
+		} {
+			reviews = append(reviews, AccountCredentialReview{
+				Service: "tasks", Provider: input.Tasks.Provider,
+				Backend: credential.Backend, Key: credential.Key,
+			})
+		}
+	}
 	if input.Tasks != nil && input.Tasks.Provider == domain.ProviderCalDAV &&
 		input.Tasks.CalDAV != nil {
 		credential := input.Tasks.CalDAV.Credential
@@ -704,6 +742,20 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 		})
 	}
 	return reviews
+}
+
+func validateAccountTickTickCredentialIsolation(reviews []AccountCredentialReview) error {
+	for left := range reviews {
+		for right := left + 1; right < len(reviews); right++ {
+			if (reviews[left].Provider == domain.ProviderTickTick ||
+				reviews[right].Provider == domain.ProviderTickTick) &&
+				reviews[left].Backend == reviews[right].Backend &&
+				reviews[left].Key == reviews[right].Key {
+				return errors.New("TickTick grant and client-secret handles must not be reused by another credential binding")
+			}
+		}
+	}
+	return nil
 }
 
 // Rename preserves the opaque account identity and all account-owned state.
@@ -809,7 +861,8 @@ func accountUsesOAuth(account AccountView) bool {
 		}
 		switch route.Provider {
 		case domain.ProviderGoogle, domain.ProviderMicrosoftGraph,
-			domain.ProviderTodoist, domain.ProviderGoogleTasks:
+			domain.ProviderTodoist, domain.ProviderGoogleTasks,
+			domain.ProviderTickTick:
 			return true
 		case
 			domain.ProviderMicrosoftOWA,
@@ -819,7 +872,6 @@ func accountUsesOAuth(account AccountView) bool {
 			domain.ProviderCalDAV,
 			domain.ProviderMicrosoftTasks,
 			domain.ProviderAppleReminders,
-			domain.ProviderTickTick,
 			domain.ProviderAnyDoMCP,
 			domain.ProviderThings,
 			domain.ProviderOmniFocus,
@@ -1204,7 +1256,7 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
 		}
 		if route.MicrosoftGraph == nil || route.Todoist != nil || route.CalDAV != nil ||
-			route.GoogleTasks != nil {
+			route.GoogleTasks != nil || route.TickTick != nil {
 			return errors.New("microsoft-graph tasks require independent OAuth settings")
 		}
 		if err := validateOAuthInput(domain.ProviderMicrosoftGraph, route.MicrosoftGraph.OAuth); err != nil {
@@ -1223,7 +1275,7 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
 		}
 		if route.Todoist == nil || route.MicrosoftGraph != nil || route.CalDAV != nil ||
-			route.GoogleTasks != nil {
+			route.GoogleTasks != nil || route.TickTick != nil {
 			return errors.New("todoist tasks require independent OAuth settings")
 		}
 		return validateOAuthInput(domain.ProviderTodoist, route.Todoist.OAuth)
@@ -1232,7 +1284,7 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
 		}
 		if route.CalDAV == nil || route.MicrosoftGraph != nil || route.Todoist != nil ||
-			route.GoogleTasks != nil {
+			route.GoogleTasks != nil || route.TickTick != nil {
 			return errors.New("caldav tasks require CalDAV VTODO settings")
 		}
 		return validateCalDAVTaskInput(*route.CalDAV)
@@ -1241,13 +1293,21 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
 		}
 		if route.GoogleTasks == nil || route.MicrosoftGraph != nil || route.Todoist != nil ||
-			route.CalDAV != nil {
+			route.CalDAV != nil || route.TickTick != nil {
 			return errors.New("google-tasks requires independent OAuth settings")
 		}
 		return validateOAuthInput(domain.ProviderGoogleTasks, route.GoogleTasks.OAuth)
+	case domain.ProviderTickTick:
+		if _, available := service.taskAvailable[route.Provider]; !available {
+			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
+		}
+		if route.TickTick == nil || route.MicrosoftGraph != nil || route.Todoist != nil ||
+			route.CalDAV != nil || route.GoogleTasks != nil {
+			return errors.New("ticktick tasks require independent confidential OAuth settings")
+		}
+		return validateTickTickOAuthInput(route.TickTick.OAuth)
 	case domain.ProviderMicrosoftTasks,
 		domain.ProviderAppleReminders,
-		domain.ProviderTickTick,
 		domain.ProviderAnyDoMCP,
 		domain.ProviderThings,
 		domain.ProviderOmniFocus:
@@ -1255,7 +1315,7 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
 		}
 		if route.MicrosoftGraph != nil || route.Todoist != nil || route.CalDAV != nil ||
-			route.GoogleTasks != nil {
+			route.GoogleTasks != nil || route.TickTick != nil {
 			return errors.New("task route contains settings for another provider")
 		}
 		return nil
@@ -1326,12 +1386,44 @@ func validateOAuthInput(
 		return err
 	}
 	if provider == domain.ProviderTodoist {
-		redirect, _ := url.Parse(route.RedirectURI)
-		if redirect.Port() == "0" {
+		if accountOAuthRedirectUsesEphemeralPort(route.RedirectURI) {
 			return errors.New("todoist OAuth requires the fixed loopback port registered for the public client")
 		}
 	}
 	return nil
+}
+
+func validateTickTickOAuthInput(route AccountTickTickOAuthInput) error {
+	if err := validateAccountHTTPSURL("TickTick API base", route.APIBase); err != nil {
+		return err
+	}
+	apiBase, _ := url.Parse(route.APIBase)
+	if apiBase.Host != "api.ticktick.com" || apiBase.RawQuery != "" ||
+		apiBase.EscapedPath() != "" && apiBase.EscapedPath() != "/" {
+		return errors.New("ticktick API base must be https://api.ticktick.com")
+	}
+	if err := validateOAuthClientInput(
+		route.ClientID, route.RedirectURI, route.Authorization,
+	); err != nil {
+		return err
+	}
+	if err := validateAccountCredential(route.ClientSecret); err != nil {
+		return fmt.Errorf("ticktick OAuth client secret: %w", err)
+	}
+	if route.Authorization.Backend == route.ClientSecret.Backend &&
+		route.Authorization.Key == route.ClientSecret.Key {
+		return errors.New("ticktick grant and client secret require different credential handles")
+	}
+	if accountOAuthRedirectUsesEphemeralPort(route.RedirectURI) {
+		return errors.New("ticktick OAuth requires the fixed loopback port registered for the confidential client")
+	}
+	return nil
+}
+
+func accountOAuthRedirectUsesEphemeralPort(raw string) bool {
+	redirect, _ := url.Parse(raw)
+	port, _ := strconv.ParseUint(redirect.Port(), 10, 16)
+	return port == 0
 }
 
 func validateOAuthClientInput(
@@ -1536,6 +1628,16 @@ func taskRouteInputView(route *AccountTaskRouteInput) *AccountRouteView {
 	}
 	if route.Provider == domain.ProviderGoogleTasks && route.GoogleTasks != nil {
 		return oauthRouteView(route.Provider, &route.GoogleTasks.OAuth)
+	}
+	if route.Provider == domain.ProviderTickTick && route.TickTick != nil {
+		return &AccountRouteView{
+			Provider:  route.Provider,
+			Endpoints: []DiscoveredEndpoint{{Kind: "api", Value: route.TickTick.OAuth.APIBase}},
+			Credential: &AccountCredentialView{
+				Configured: true, Backend: route.TickTick.OAuth.Authorization.Backend,
+				Consented: route.TickTick.OAuth.Authorization.Consent,
+			},
+		}
 	}
 	return TaskRouteView(route.Provider)
 }

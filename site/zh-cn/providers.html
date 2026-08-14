@@ -6,14 +6,14 @@
     <title>支持的邮件、日历与任务服务 — Corresync</title>
     <meta
       name="description"
-      content="比较 Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP 和 CalDAV 支持。Gmail、Google 日历与 Google Tasks 即将上线。"
+      content="比较 Outlook、Microsoft 365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 和 CalDAV 支持。Gmail、Google 日历与 Google Tasks 即将上线。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="支持的邮件、日历与任务服务 — Corresync">
     <meta
       property="og:description"
-      content="查看 iCloud、Todoist 与 CalDAV VTODO 等当前可用路径，以及仍在等待审批的 Google 支持。"
+      content="查看 Todoist、TickTick、iCloud 与 CalDAV VTODO 等当前可用路径，以及仍在等待审批的 Google 支持。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
@@ -30,7 +30,7 @@
     <meta name="twitter:title" content="支持的邮件、日历与任务服务 — Corresync">
     <meta
       name="twitter:description"
-      content="查看 Outlook、iCloud、标准协议与等待审批的 Google 支持。"
+      content="查看 Outlook、Todoist、TickTick、iCloud、标准协议与等待审批的 Google 支持。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 标志和英文产品简介">
@@ -290,8 +290,8 @@
             相关代码已包含在 RC 中，并通过合成契约测试。Google
             批准前，生产环境 OAuth
             完全关闭，因此不会启动登录、申请权限、访问钥匙串或产生 API
-            流量。Outlook、Microsoft 365、Todoist、iCloud、JMAP、IMAP/SMTP 和 CalDAV
-            目前均可使用。
+            流量。Outlook、Microsoft 365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 和
+            CalDAV 目前均可使用。
           </p>
         </div>
         <div class="route-grid two">
@@ -353,6 +353,61 @@
               请参阅 Google 官方<a
                 href="https://developers.google.com/workspace/guides/configure-mcp-servers"
               >设置指南</a>。
+            </p>
+          </article>
+        </div>
+      </section>
+      <section id="tasks" aria-labelledby="tasks-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>任务路径</p>
+          <h2 id="tasks-title">连接你一直在用的任务服务。</h2>
+          <p>
+            任务路径可独立于邮件和日历选择。每个账号的授权、能力、同步游标和确认后写入均保持隔离。
+          </p>
+        </div>
+        <div class="route-grid three">
+          <article class="route-card" id="microsoft-todo">
+            <header>
+              <span class="route-icon" aria-hidden="true">To</span><div>
+                <p class="chip">现已可用 · 明确 OAuth</p>
+                <h3>Microsoft To Do</h3>
+              </div>
+            </header>
+            <p>
+              支持任务列表、创建与更新、完成与重新打开、删除、重复规则、检查清单、分类以及有上限的
+              Graph 增量同步。
+            </p>
+            <p class="route-foot">
+              使用你有权注册并选择的 Microsoft Graph 公共客户端。
+            </p>
+          </article>
+          <article class="route-card" id="todoist">
+            <header>
+              <span class="route-icon" aria-hidden="true">Td</span><div>
+                <p class="chip">现已可用 · 明确 OAuth</p>
+                <h3>Todoist</h3>
+              </div>
+            </header>
+            <p>
+              支持项目、任务写入与状态、提醒、重复规则、子任务、标签、负责人、准确的日期时间语义和有上限的同步。
+            </p>
+            <p class="route-foot">
+              使用带 PKCE 的公共 OAuth 客户端；套餐限制会如实显示。
+            </p>
+          </article>
+          <article class="route-card accent-card" id="ticktick">
+            <header>
+              <span class="route-icon" aria-hidden="true">Ti</span><div>
+                <p class="chip">现已可用 · 明确 OAuth</p>
+                <h3>TickTick</h3>
+              </div>
+            </header>
+            <p>
+              支持项目与收集箱、搜索、创建、更新、完成、删除、重复规则、检查清单、标签、单一负责人、排序和有上限的轮询。
+            </p>
+            <p class="route-foot">
+              使用你自行注册、基于客户端密钥的 OAuth
+              应用。密钥留在经批准的凭据存储中；不会声称支持重新打开或替换提醒。
             </p>
           </article>
         </div>

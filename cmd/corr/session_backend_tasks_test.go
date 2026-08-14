@@ -10,6 +10,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
+	"github.com/nkiyohara/corresync/internal/credential"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/policy"
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
@@ -21,7 +22,7 @@ func TestTaskRouteActivationFailsBeforeAuthenticationWithoutAdapter(t *testing.T
 	configuration := config.Default()
 	configuration.DefaultAccount = "tasks"
 	configuration.Accounts["tasks"] = config.Account{
-		ID: accountID, Tasks: &config.TaskRoute{Provider: domain.ProviderTickTick},
+		ID: accountID, Tasks: &config.TaskRoute{Provider: domain.ProviderThings},
 	}
 	backend := &sessionBackend{
 		configuration:    configuration,
@@ -29,7 +30,7 @@ func TestTaskRouteActivationFailsBeforeAuthenticationWithoutAdapter(t *testing.T
 		terminalAccounts: make(map[domain.AccountID]string),
 	}
 	_, err := backend.activateAccount(t.Context(), accountID)
-	if err == nil || !strings.Contains(err.Error(), "task provider \"ticktick\" is not available") {
+	if err == nil || !strings.Contains(err.Error(), "task provider \"things\" is not available") {
 		t.Fatalf("activateAccount() error = %v", err)
 	}
 	if len(backend.accounts) != 0 {
@@ -47,11 +48,11 @@ func TestInactiveTaskRouteDoesNotDisableAnotherService(t *testing.T) {
 				Origin: "https://outlook.example.invalid",
 			},
 		},
-		Tasks: &config.TaskRoute{Provider: domain.ProviderTickTick},
+		Tasks: &config.TaskRoute{Provider: domain.ProviderThings},
 	}
 	degradation, err := inactiveTaskRoute(configured)
 	if err != nil || degradation == nil || degradation.Feature != "tasks.route" ||
-		degradation.Lossy || !strings.Contains(degradation.Reason, "ticktick") {
+		degradation.Lossy || !strings.Contains(degradation.Reason, "things") {
 		t.Fatalf("inactiveTaskRoute() = %+v, %v", degradation, err)
 	}
 	if degradation, err := inactiveTaskRoute(config.Account{}); err != nil || degradation != nil {
@@ -205,6 +206,93 @@ func TestTodoistTaskOnlyRouteActivatesWithObservedIdentityAndPlan(t *testing.T) 
 	account := backend.accounts[accountID]
 	if account.tasks == nil || !account.capabilities.Tasks || !account.capabilities.IncrementalSync {
 		t.Fatalf("Todoist session = %+v", account.capabilities)
+	}
+}
+
+func TestTickTickTaskRouteResolvesConfidentialCredentialOnlyForLogin(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch {
+		case request.Method == http.MethodPost && request.URL.Path == "/open/v1/preference":
+			_, _ = writer.Write([]byte(`{"timeZone":"Europe/London"}`))
+		case request.Method == http.MethodGet && request.URL.Path == "/open/v1/project":
+			_, _ = writer.Write([]byte(`[{"id":"project1","name":"Tasks","permission":"write","kind":"TASK"}]`))
+		default:
+			http.Error(writer, "unexpected route", http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	const accountID domain.AccountID = "acc_00000000000000000000000000000114"
+	configuration := config.Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = config.Account{
+		ID: accountID,
+		Tasks: &config.TaskRoute{
+			Provider: domain.ProviderTickTick,
+			TickTick: &config.TickTickTaskRoute{OAuth: config.TickTickOAuthRoute{
+				APIBase: server.URL, ClientID: "synthetic-ticktick-client",
+				RedirectURI: "http://127.0.0.1:43123/callback",
+				Authorization: config.CredentialRef{
+					Backend: config.CredentialOSKeyring, Key: "ticktick-grant", Consent: true,
+				},
+				ClientSecret: config.CredentialRef{
+					Backend: config.CredentialOSKeyring, Key: "ticktick-secret", Consent: true,
+				},
+			}},
+		},
+	}
+	credentialReads := 0
+	resolver, err := credential.New(credential.Options{
+		Keyring: func(_, key string) (string, error) {
+			credentialReads++
+			if key != "ticktick-secret" {
+				t.Fatalf("credential key = %q", key)
+			}
+			return "synthetic-client-secret", nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := &oauthManagerStub{client: server.Client()}
+	lifecycle, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	backend := &sessionBackend{
+		configuration:  configuration,
+		guard:          daemonMCPGuard(t, policy.DefaultRules(), &daemonMCPAudit{}),
+		credentials:    resolver,
+		oauth:          manager,
+		accounts:       make(map[domain.AccountID]sessionAccount),
+		previews:       make(map[string]sessionPreview),
+		lifecycle:      lifecycle,
+		cancel:         cancel,
+		monitorStarted: make(map[domain.AccountID]bool),
+		monitorCancel:  make(map[domain.AccountID]context.CancelFunc),
+		monitorDone:    make(map[domain.AccountID]chan struct{}),
+	}
+	caller := domain.Caller{Surface: "cli", Instance: "ticktick-task-only-test"}
+	if _, err := backend.Login(t.Context(), accountID, caller); err != nil {
+		t.Fatal(err)
+	}
+	if credentialReads != 1 || manager.calls != 1 ||
+		manager.confidentialSecret != "synthetic-client-secret" ||
+		manager.provider.ID != domain.ProviderTickTick ||
+		!manager.provider.Confidential || !manager.provider.DisablePKCE ||
+		!manager.provider.DisableRefresh ||
+		!slices.Equal(manager.provider.Scopes, []string{"tasks:write"}) {
+		t.Fatalf("TickTick OAuth profile = %+v calls=%d reads=%d", manager.provider, manager.calls, credentialReads)
+	}
+	for _, value := range manager.confidentialBytes {
+		if value != 0 {
+			t.Fatal("TickTick client-secret bytes were not zeroed after authorization")
+		}
+	}
+	page, err := backend.ListTaskLists(t.Context(), application.TaskListInput{
+		Account: accountID, Limit: 10,
+	}, caller)
+	if err != nil || len(page.Lists) != 2 || !page.Lists[0].Default {
+		t.Fatalf("ListTaskLists() = %+v, %v", page, err)
 	}
 }
 

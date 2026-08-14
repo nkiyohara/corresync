@@ -5,6 +5,23 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### TickTick tasks
+
+- Add an explicit TickTick task route for bounded project and Inbox discovery,
+  list/get/search, create, update, complete, delete, recurrence, checklists,
+  labels, one assignee, ordering, date and zoned time, and deletion-aware
+  snapshot polling. Unsupported reopen, reminder, and recurring-completion
+  semantics fail closed.
+- Add TickTick's documented confidential authorization-code exchange with
+  `tasks:read` or `tasks:write`, HTTP Basic client authentication, no invented
+  PKCE or refresh flow, and a separately consented external client-secret
+  handle. Personal API tokens are not accepted, and unexpected refresh tokens
+  are discarded.
+- Introduce configuration schema v9, strict v8 migration, synthetic provider
+  contracts, and an opt-in read-only live harness. Publish the available route
+  naturally across all five Pages languages while retaining its
+  live-unobserved evidence label.
+
 ### Approval-gated Google Tasks
 
 - Add a bounded Google Tasks adapter for task-list discovery, task CRUD/state,

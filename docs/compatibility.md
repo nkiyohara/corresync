@@ -9,7 +9,7 @@ authorized live observations.
 <!-- markdownlint-disable MD013 -->
 | Boundary | Deterministic evidence | Recorded live evidence | v0.8 status |
 | --- | --- | --- | --- |
-| CLI, stable JSON, configuration schema v8 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
+| CLI, stable JSON, configuration schema v9 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
 | Public domain-only compatibility checker | Browser privacy/source checks; DNS, CORS, bounds, redirect, failure, and SSRF fixtures | Not run | Deterministic only; no provider authentication |
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
@@ -20,6 +20,7 @@ authorized live observations.
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | Microsoft Graph To Do | Synthetic OAuth, national-cloud, REST CRUD/delta, recurrence/time-zone, cursor-restart, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
 | Todoist tasks | Synthetic public-client OAuth, refresh rotation, API v1 REST/Sync CRUD, plan, time, temporary-ID, cursor/isolation, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
+| TickTick tasks | Synthetic confidential-client OAuth, transient-secret, REST CRUD/search, time, recurrence, assignment, permission, bounds, polling/tombstone, cursor/isolation, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
 | IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
 | CalDAV calendar | Synthetic WebDAV/iCalendar/conditional-write contracts | Not run | Deterministic only |
@@ -76,6 +77,13 @@ evidence.
   reminders, exact provider recurrence, and sync-token changes are implemented
   through a BYO public client and PKCE. The API v1 route has synthetic evidence
   only and no recorded live observation.
+- `ticktick`: task projects, Inbox, typed reads/search, create/update/complete/
+  delete, recurrence, checklists, labels, ordering, one assignee, and bounded
+  snapshot polling are implemented through a BYO confidential client. Its
+  client secret stays behind a separate external-credential consent, no
+  personal token is accepted, and the missing identity, refresh, atomic-write,
+  reopen, reminder, and complete-pagination contracts remain explicit. The
+  route has synthetic evidence only and no recorded live observation.
 - `jmap`, `imap-smtp`, and `caldav`: implemented against synthetic standards
   contracts, with server-specific behavior exposed through capabilities and
   degradations. CalDAV has independent VEVENT calendar and VTODO task routes;
@@ -85,8 +93,8 @@ evidence.
   and an external credential reference. It has synthetic coverage only and
   remains live-unobserved.
 - task routes: the canonical application, CLI, JSON, IPC, MCP, cursor, and
-  preview/commit contracts are implemented. Microsoft To Do, Todoist, CalDAV
-  VTODO, and the disabled Google Tasks route have deterministic provider
+  preview/commit contracts are implemented. Microsoft To Do, Todoist, TickTick,
+  CalDAV VTODO, and the disabled Google Tasks route have deterministic provider
   contracts and remain live-unobserved. The other
   provider rows in the [Task contract](tasks.md) remain development targets,
   not provider evidence.

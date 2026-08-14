@@ -310,6 +310,26 @@ Apply the same no-CI, no-content, and commit-bound evidence rules as the
 Microsoft To Do harness. Register the exact fixed port shown in
 `CORRESYNC_LIVE_TODOIST_REDIRECT_URI`; the Todoist route rejects port `0`.
 
+TickTick has a separate build-tagged read-only observation. Store the
+confidential-client secret in the OS keyring under a distinct reviewed handle;
+the environment contains only that handle, never the secret. The harness
+requests only `tasks:read`, reads bounded project/task metadata, and logs no
+provider content:
+
+```console
+CORRESYNC_LIVE_CONFIRM=ticktick-read-only \
+CORRESYNC_LIVE_TICKTICK_CLIENT_ID=registered-confidential-client \
+CORRESYNC_LIVE_TICKTICK_REDIRECT_URI=http://127.0.0.1:53685/callback \
+CORRESYNC_LIVE_TICKTICK_AUTHORIZATION_KEY=live-ticktick-grant \
+CORRESYNC_LIVE_TICKTICK_CLIENT_SECRET_KEY=live-ticktick-client-secret \
+mise exec -- go test -tags live ./internal/provider/ticktick \
+  -run '^TestLiveTickTickReadOnly$'
+```
+
+Register the exact fixed loopback port and apply the same no-CI, no-content,
+and commit-bound evidence rules. The harness does not establish an identity
+claim because TickTick's published Open API exposes no identity endpoint.
+
 ## 7. Read-only CLI
 
 Keep output on the test machine:

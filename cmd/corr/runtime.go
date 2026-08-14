@@ -291,7 +291,7 @@ func (app *runtime) accountServices() (
 	}
 	taskAvailable := []domain.ProviderID{
 		domain.ProviderMicrosoftGraph, domain.ProviderTodoist,
-		domain.ProviderCalDAV,
+		domain.ProviderCalDAV, domain.ProviderTickTick,
 	}
 	if rollout.GoogleOAuthApproved {
 		taskAvailable = append(taskAvailable, domain.ProviderGoogleTasks)

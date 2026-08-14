@@ -23,7 +23,7 @@ func TestRunGeneratesAndChecksEveryLocale(t *testing.T) {
 			t.Fatal(err)
 		}
 		page := string(data)
-		for _, expected := range []string{locale.Title, `lang="` + locale.Language + `"`, "0.8.3", "0.8.5", "0.8.6-rc.6"} {
+		for _, expected := range []string{locale.Title, `lang="` + locale.Language + `"`, "0.8.3", "0.8.5", "0.8.6-rc.7"} {
 			if !strings.Contains(page, expected) {
 				t.Fatalf("%s does not contain %q", path, expected)
 			}

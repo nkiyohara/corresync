@@ -96,8 +96,14 @@ gateway or tenant administration service.
   inherited `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` process environment. It is
   bounded, excluded from browser URLs and stored grants, and sent only to
   Google's fixed TLS token endpoint.
-- The Outlook Web route uses visible interactive sign-in. OAuth routes use
-  Authorization Code with PKCE for an explicitly selected public client.
+- TickTick configuration contains only a separately consented external
+  client-secret handle. A new authorization-code exchange resolves it
+  transiently for HTTP Basic authentication to TickTick's fixed token endpoint;
+  reuse of a valid grant does not open the external secret owner. The secret and
+  any unexpected refresh token are never persisted by Corresync.
+- The Outlook Web route uses visible interactive sign-in. Public OAuth routes
+  use Authorization Code with PKCE. TickTick uses the provider's documented
+  confidential Authorization Code contract without inventing PKCE or refresh.
 - The staged Google mail, calendar, and task routes are release-gated before
   browser, OAuth, keyring, session, and network access until production
   approval. After activation each route pins its API base and cannot represent

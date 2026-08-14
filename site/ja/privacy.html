@@ -8,14 +8,14 @@
     </title>
     <meta
       name="description"
-      content="Corresyncがメール、カレンダー、認証情報、端末内データ、ドメインだけを使う対応確認をどのように扱うか説明します。"
+      content="Corresyncがメール、カレンダー、タスク、OAuth認証情報、端末内データ、ドメインだけを使う対応確認をどのように扱うか説明します。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Corresync プライバシーポリシー">
     <meta
       property="og:description"
-      content="メールと予定は、利用者の端末と選んだサービスの間を直接流れます。"
+      content="メール、予定、タスクは、利用者の端末と選んだサービスの間を直接流れます。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -35,7 +35,7 @@
     <meta name="twitter:title" content="Corresync プライバシーポリシー">
     <meta
       name="twitter:description"
-      content="ローカルファーストなメール、カレンダー、認証情報の扱い。"
+      content="ローカルファーストなメール、カレンダー、タスク、認証情報の扱い。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -226,8 +226,8 @@
               CLIとMCPは、同じ型付き操作とポリシーチェックを使います。読み取りはできるだけメタデータから始めます。メール送信や参加者招待などの重要な書き込みは正確なプレビューを示し、呼び出し元、アカウント、対象、内容に結び付いた短時間・一回限りの承認を求めます。別の経路へ勝手に切り替えたり、結果が不明な書き込みを自動再試行したりしません。
             </p>
             <p>
-              Microsoft OAuthはシステムブラウザ、Outlook
-              Webは専用ローカルブラウザ、オープン標準は利用者が選んだ有効なTLSエンドポイントを使います。プロジェクトはパスワード、OAuthの認可情報、メール、添付ファイル、予定の本文を受け取りません。
+              Microsoft、Todoist、TickTickのOAuthはシステムブラウザ、Outlook
+              Webは専用ローカルブラウザ、オープン標準は利用者が選んだ有効なTLSエンドポイントを使います。タスクのタイトル、メモ、日時、繰り返し、チェックリストなどは、選んだ操作のために端末とプロバイダーの間だけで処理されます。TickTickのクライアントシークレットは、新しい認可コード交換が必要なログイン時だけ許可済みの認証情報ストアから読み取ります。有効な認可情報の再利用時には読み取らず、設定やOAuth認可情報にも保存しません。
             </p>
           </section>
           <section id="storage" aria-labelledby="storage-title">
@@ -240,7 +240,7 @@
               </li>
               <li>
                 <strong
-                >設定：</strong>アカウントアドレス、ローカルの別名、選んだ経路、公開OAuthクライアントID、ループバックリダイレクト、キーチェーンハンドル。秘密情報は含みません。
+                >設定：</strong>アカウントアドレス、ローカルの別名、選んだ経路、OAuthクライアントID、ループバックリダイレクト、同意済みの認証情報ハンドル。クライアントシークレットやトークンは含みません。
               </li>
               <li>
                 <strong

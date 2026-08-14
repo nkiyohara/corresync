@@ -40,9 +40,9 @@ one local
 [Model Context Protocol](https://modelcontextprotocol.io/) server.
 Gmail, Google Calendar, and Google Tasks support are coming soon after Google
 OAuth approval. The canonical task tools include explicit Microsoft To Do,
-Todoist, and CalDAV VTODO routes; the Google Tasks code is present but disabled,
-and remaining task-provider adapters stay unavailable until their contracts are
-implemented.
+Todoist, TickTick, and CalDAV VTODO routes; the Google Tasks code is present but
+disabled, and remaining task-provider adapters stay unavailable until their
+contracts are implemented.
 
 - Search mail and build one agenda across accounts without collapsing their
   identity or provider provenance.
@@ -99,6 +99,7 @@ separate explicit choice.
 | Google (coming soon) | Gmail API reads and writes; no permanent delete | Selectable calendars; Google Meet when advertised | Google Tasks through a separate task-only grant | Included but disabled in RC builds while production OAuth approval is pending |
 | Microsoft Graph | Typed reads and writes | Selectable calendars; typed Teams-link creation | Microsoft To Do | Your authorized public OAuth client; OS-keyring grant |
 | Todoist | — | — | Typed Todoist operations | Your authorized public OAuth client; OS-keyring grant |
+| TickTick | — | — | Typed TickTick operations | Your authorized confidential OAuth client; external secret handle and OS-keyring grant |
 | JMAP | Typed mail operations | — | — | OS keyring or approved credential helper |
 | IMAP / SMTP | IMAP read/manage and SMTP draft/send | — | — | OS keyring or approved credential helper |
 | CalDAV | — | Typed calendar operations and conditional scheduling | VTODO lists, search, sync, and reviewed writes | OS keyring or approved credential helper |

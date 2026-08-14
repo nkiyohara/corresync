@@ -83,7 +83,7 @@ func TestTaskOnlyAccountRoundTripsWithExplicitProviderSelection(t *testing.T) {
 	configuration.DefaultAccount = "tasks"
 	configuration.Accounts["tasks"] = Account{
 		ID:    "acc_00000000000000000000000000000009",
-		Tasks: &TaskRoute{Provider: domain.ProviderTickTick},
+		Tasks: &TaskRoute{Provider: domain.ProviderThings},
 	}
 	path := filepath.Join(t.TempDir(), "config.toml")
 	if err := Save(path, configuration); err != nil {
@@ -95,8 +95,8 @@ func TestTaskOnlyAccountRoundTripsWithExplicitProviderSelection(t *testing.T) {
 	}
 	account := loaded.Accounts["tasks"]
 	if account.Mail != nil || account.Calendar != nil ||
-		account.TaskProvider() != domain.ProviderTickTick ||
-		account.PrimaryProvider() != domain.ProviderTickTick {
+		account.TaskProvider() != domain.ProviderThings ||
+		account.PrimaryProvider() != domain.ProviderThings {
 		t.Fatalf("task-only account = %+v", account)
 	}
 }
@@ -271,24 +271,26 @@ func TestCalDAVTaskRouteRoundTripsWithoutAnAccountAddress(t *testing.T) {
 
 func TestTodoistRouteRejectsAnEphemeralOAuthPort(t *testing.T) {
 	t.Parallel()
-	configuration := Default()
-	configuration.DefaultAccount = "tasks"
-	configuration.Accounts["tasks"] = Account{
-		ID:      "acc_00000000000000000000000000000009",
-		Address: "reader@example.test",
-		Tasks: &TaskRoute{
-			Provider: domain.ProviderTodoist,
-			Todoist: &TodoistTaskRoute{OAuth: OAuthRoute{
-				APIBase: "https://api.todoist.com/api/v1", ClientID: "synthetic-public-client",
-				RedirectURI: "http://127.0.0.1:0/callback",
-				Authorization: CredentialRef{
-					Backend: CredentialOSKeyring, Key: "tasks-todoist", Consent: true,
-				},
-			}},
-		},
-	}
-	if err := configuration.Validate(); err == nil || !strings.Contains(err.Error(), "fixed loopback port") {
-		t.Fatalf("Validate() error = %v", err)
+	for _, port := range []string{"0", "00"} {
+		configuration := Default()
+		configuration.DefaultAccount = "tasks"
+		configuration.Accounts["tasks"] = Account{
+			ID:      "acc_00000000000000000000000000000009",
+			Address: "reader@example.test",
+			Tasks: &TaskRoute{
+				Provider: domain.ProviderTodoist,
+				Todoist: &TodoistTaskRoute{OAuth: OAuthRoute{
+					APIBase: "https://api.todoist.com/api/v1", ClientID: "synthetic-public-client",
+					RedirectURI: "http://127.0.0.1:" + port + "/callback",
+					Authorization: CredentialRef{
+						Backend: CredentialOSKeyring, Key: "tasks-todoist", Consent: true,
+					},
+				}},
+			},
+		}
+		if err := configuration.Validate(); err == nil || !strings.Contains(err.Error(), "fixed loopback port") {
+			t.Fatalf("Validate(port=%q) error = %v", port, err)
+		}
 	}
 }
 
@@ -1237,6 +1239,127 @@ func TestGoogleTaskRouteRoundTripsWithPinnedIndependentGrant(t *testing.T) {
 	if err := configuration.Validate(); err == nil ||
 		!strings.Contains(err.Error(), "tasks.googleapis.com") {
 		t.Fatalf("unpinned Google Tasks API base error = %v", err)
+	}
+}
+
+func TestTickTickRouteRoundTripsWithExternalConfidentialCredential(t *testing.T) {
+	t.Parallel()
+	configuration := Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Accounts["tasks"] = Account{
+		ID: "acc_00000000000000000000000000000114",
+		Tasks: &TaskRoute{
+			Provider: domain.ProviderTickTick,
+			TickTick: &TickTickTaskRoute{
+				ReadOnly: true,
+				OAuth: TickTickOAuthRoute{
+					APIBase:     "https://api.ticktick.com",
+					ClientID:    "synthetic-confidential-client",
+					RedirectURI: "http://127.0.0.1:43123/callback",
+					Authorization: CredentialRef{
+						Backend: CredentialOSKeyring, Key: "ticktick-grant", Consent: true,
+					},
+					ClientSecret: CredentialRef{
+						Backend: CredentialHelper, Key: "ticktick-client-secret", Consent: true,
+					},
+				},
+			},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(contents, []byte("secret-value")) ||
+		!bytes.Contains(contents, []byte("ticktick-client-secret")) {
+		t.Fatalf("TickTick config contains unexpected credential material:\n%s", contents)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := loaded.Accounts["tasks"].Tasks
+	if route == nil || route.TickTick == nil || !route.TickTick.ReadOnly ||
+		route.TickTick.OAuth.ClientSecret.Backend != CredentialHelper ||
+		route.TickTick.OAuth.Authorization.Key != "ticktick-grant" {
+		t.Fatalf("TickTick round trip = %+v", loaded.Accounts["tasks"])
+	}
+	account := configuration.Accounts["tasks"]
+	account.Tasks.TickTick.OAuth.APIBase = "https://example.test"
+	configuration.Accounts["tasks"] = account
+	if err := configuration.Validate(); err == nil || !strings.Contains(err.Error(), "api.ticktick.com") {
+		t.Fatalf("unpinned TickTick API base error = %v", err)
+	}
+	account.Tasks.TickTick.OAuth.APIBase = "https://api.ticktick.com"
+	account.Tasks.TickTick.OAuth.RedirectURI = "http://127.0.0.1:00/callback"
+	configuration.Accounts["tasks"] = account
+	if err := configuration.Validate(); err == nil || !strings.Contains(err.Error(), "fixed loopback port") {
+		t.Fatalf("leading-zero ephemeral TickTick port error = %v", err)
+	}
+}
+
+func TestTickTickCredentialHandlesCannotCrossAccountBoundaries(t *testing.T) {
+	t.Parallel()
+	configuration := Default()
+	configuration.DefaultAccount = "first"
+	first := Account{
+		ID: "acc_00000000000000000000000000000114",
+		Tasks: &TaskRoute{
+			Provider: domain.ProviderTickTick,
+			TickTick: &TickTickTaskRoute{OAuth: TickTickOAuthRoute{
+				APIBase: "https://api.ticktick.com", ClientID: "client",
+				RedirectURI: "http://127.0.0.1:43123/callback",
+				Authorization: CredentialRef{
+					Backend: CredentialOSKeyring, Key: "grant-first", Consent: true,
+				},
+				ClientSecret: CredentialRef{
+					Backend: CredentialOSKeyring, Key: "shared-client-secret", Consent: true,
+				},
+			}},
+		},
+	}
+	second := first
+	second.ID = "acc_00000000000000000000000000000115"
+	secondTasks := *first.Tasks
+	secondTickTick := *first.Tasks.TickTick
+	secondOAuth := first.Tasks.TickTick.OAuth
+	secondOAuth.Authorization.Key = "grant-second"
+	secondTickTick.OAuth = secondOAuth
+	secondTasks.TickTick = &secondTickTick
+	second.Tasks = &secondTasks
+	configuration.Accounts["first"] = first
+	configuration.Accounts["second"] = second
+	if err := configuration.Validate(); err == nil ||
+		!strings.Contains(err.Error(), "must not be reused") {
+		t.Fatalf("shared TickTick credential handle error = %v", err)
+	}
+}
+
+func TestMigrateV8RejectsInventedTickTickPayload(t *testing.T) {
+	t.Parallel()
+	legacy := OutlookDefault()
+	legacy.Version = 8
+	raw, err := toml.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migrated, err := MigrateV8(raw)
+	if err != nil || migrated.Version != CurrentVersion {
+		t.Fatalf("MigrateV8() = %+v, %v", migrated, err)
+	}
+	withTickTick := strings.Replace(
+		string(raw),
+		"[policy]",
+		"[accounts.work.tasks]\nprovider = 'ticktick'\n\n[accounts.work.tasks.ticktick]\nread_only = true\n\n[policy]",
+		1,
+	)
+	if _, err := MigrateV8([]byte(withTickTick)); err == nil ||
+		!strings.Contains(err.Error(), "strict mode") {
+		t.Fatalf("v8 TickTick payload error = %v", err)
 	}
 }
 

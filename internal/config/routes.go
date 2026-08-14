@@ -140,6 +140,31 @@ type GoogleTaskRoute struct {
 	ReadOnly bool       `json:"readOnly,omitempty" toml:"read_only,omitempty"`
 }
 
+// TickTickOAuthRoute binds a confidential OAuth client to external references
+// for both its grant and client secret. Neither secret can be represented by
+// the configuration schema.
+type TickTickOAuthRoute struct {
+	APIBase       string        `json:"apiBase" toml:"api_base"`
+	ClientID      string        `json:"clientId" toml:"client_id"`
+	RedirectURI   string        `json:"redirectUri" toml:"redirect_uri"`
+	Authorization CredentialRef `json:"authorization" toml:"authorization"`
+	ClientSecret  CredentialRef `json:"clientSecret" toml:"client_secret"`
+}
+
+// Client returns the secret-free OAuth grant identity.
+func (route TickTickOAuthRoute) Client() OAuthClient {
+	return OAuthClient{
+		ClientID: route.ClientID, RedirectURI: route.RedirectURI,
+		Authorization: route.Authorization,
+	}
+}
+
+// TickTickTaskRoute selects the independent task-only TickTick grant.
+type TickTickTaskRoute struct {
+	OAuth    TickTickOAuthRoute `json:"oauth" toml:"oauth"`
+	ReadOnly bool               `json:"readOnly,omitempty" toml:"read_only,omitempty"`
+}
+
 // CalDAVTaskRoute points at one account-scoped CalDAV VTODO endpoint.
 // TaskListPath may remain empty until authenticated principal discovery.
 type CalDAVTaskRoute struct {
@@ -193,6 +218,7 @@ type TaskRoute struct {
 	Todoist        *TodoistTaskRoute        `json:"todoist,omitempty" toml:"todoist,omitempty"`
 	CalDAV         *CalDAVTaskRoute         `json:"caldav,omitempty" toml:"caldav,omitempty"`
 	GoogleTasks    *GoogleTaskRoute         `json:"googleTasks,omitempty" toml:"google_tasks,omitempty"`
+	TickTick       *TickTickTaskRoute       `json:"tickTick,omitempty" toml:"ticktick,omitempty"`
 }
 
 func (account Account) validate() error {
@@ -258,6 +284,76 @@ type oauthGrantBinding struct {
 	cloud         microsoftcloud.ID
 }
 
+type accountCredentialBinding struct {
+	reference CredentialRef
+	tickTick  bool
+}
+
+func validateTickTickCredentialIsolation(accounts map[string]Account) error {
+	bindings := make([]accountCredentialBinding, 0, len(accounts)*2)
+	add := func(reference CredentialRef, tickTick bool) {
+		bindings = append(bindings, accountCredentialBinding{
+			reference: reference, tickTick: tickTick,
+		})
+	}
+	for _, account := range accounts {
+		if account.Mail != nil {
+			if account.Mail.Provider == domain.ProviderJMAP {
+				add(account.Mail.JMAP.Credential, false)
+			}
+			if account.Mail.Provider == domain.ProviderIMAPSMTP {
+				add(account.Mail.IMAPSMTP.Credential, false)
+			}
+			if account.Mail.Provider == domain.ProviderGoogle {
+				add(account.Mail.Google.Authorization, false)
+			}
+			if account.Mail.Provider == domain.ProviderMicrosoftGraph {
+				add(account.Mail.MicrosoftGraph.Authorization, false)
+			}
+		}
+		if account.Calendar != nil {
+			if account.Calendar.Provider == domain.ProviderCalDAV {
+				add(account.Calendar.CalDAV.Credential, false)
+			}
+			if account.Calendar.Provider == domain.ProviderGoogle {
+				add(account.Calendar.Google.Authorization, false)
+			}
+			if account.Calendar.Provider == domain.ProviderMicrosoftGraph {
+				add(account.Calendar.MicrosoftGraph.Authorization, false)
+			}
+		}
+		if account.Tasks == nil {
+			continue
+		}
+		if account.Tasks.Provider == domain.ProviderMicrosoftGraph {
+			add(account.Tasks.MicrosoftGraph.OAuth.Authorization, false)
+		}
+		if account.Tasks.Provider == domain.ProviderTodoist {
+			add(account.Tasks.Todoist.OAuth.Authorization, false)
+		}
+		if account.Tasks.Provider == domain.ProviderCalDAV {
+			add(account.Tasks.CalDAV.Credential, false)
+		}
+		if account.Tasks.Provider == domain.ProviderGoogleTasks {
+			add(account.Tasks.GoogleTasks.OAuth.Authorization, false)
+		}
+		if account.Tasks.Provider == domain.ProviderTickTick {
+			add(account.Tasks.TickTick.OAuth.Authorization, true)
+			add(account.Tasks.TickTick.OAuth.ClientSecret, true)
+		}
+	}
+	for left := range bindings {
+		for right := left + 1; right < len(bindings); right++ {
+			if (bindings[left].tickTick || bindings[right].tickTick) &&
+				bindings[left].reference.Backend == bindings[right].reference.Backend &&
+				bindings[left].reference.Key == bindings[right].reference.Key {
+				return errors.New("TickTick grant and client-secret handles must not be reused by another credential binding")
+			}
+		}
+	}
+	return nil
+}
+
 func validateOAuthGrantSharing(account Account) error {
 	bindings := make([]oauthGrantBinding, 0, 3)
 	add := func(provider domain.ProviderID, client OAuthClient, cloud microsoftcloud.ID) {
@@ -298,6 +394,11 @@ func validateOAuthGrantSharing(account Account) error {
 		route := account.Tasks.GoogleTasks.OAuth
 		add(domain.ProviderGoogleTasks, route.Client(), "")
 	}
+	if account.Tasks != nil && account.Tasks.Provider == domain.ProviderTickTick &&
+		account.Tasks.TickTick != nil {
+		route := account.Tasks.TickTick.OAuth
+		add(domain.ProviderTickTick, route.Client(), "")
+	}
 	for left := range bindings {
 		for right := left + 1; right < len(bindings); right++ {
 			if bindings[left].authorization.Backend == bindings[right].authorization.Backend &&
@@ -326,7 +427,7 @@ func (route TaskRoute) validate() error {
 	switch route.Provider {
 	case domain.ProviderMicrosoftGraph:
 		if route.MicrosoftGraph == nil || route.Todoist != nil || route.CalDAV != nil ||
-			route.GoogleTasks != nil {
+			route.GoogleTasks != nil || route.TickTick != nil {
 			return errors.New("microsoft-graph tasks require independent OAuth settings")
 		}
 		if err := route.MicrosoftGraph.OAuth.validateFor(domain.ProviderMicrosoftGraph); err != nil {
@@ -342,30 +443,35 @@ func (route TaskRoute) validate() error {
 		return nil
 	case domain.ProviderTodoist:
 		if route.Todoist == nil || route.MicrosoftGraph != nil || route.CalDAV != nil ||
-			route.GoogleTasks != nil {
+			route.GoogleTasks != nil || route.TickTick != nil {
 			return errors.New("todoist tasks require independent OAuth settings")
 		}
 		return route.Todoist.OAuth.validateFor(domain.ProviderTodoist)
 	case domain.ProviderCalDAV:
 		if route.CalDAV == nil || route.MicrosoftGraph != nil || route.Todoist != nil ||
-			route.GoogleTasks != nil {
+			route.GoogleTasks != nil || route.TickTick != nil {
 			return errors.New("caldav tasks require CalDAV VTODO settings")
 		}
 		return route.CalDAV.validate()
 	case domain.ProviderGoogleTasks:
 		if route.GoogleTasks == nil || route.MicrosoftGraph != nil || route.Todoist != nil ||
-			route.CalDAV != nil {
+			route.CalDAV != nil || route.TickTick != nil {
 			return errors.New("google-tasks requires independent OAuth settings")
 		}
 		return route.GoogleTasks.OAuth.validateFor(domain.ProviderGoogleTasks)
+	case domain.ProviderTickTick:
+		if route.TickTick == nil || route.MicrosoftGraph != nil || route.Todoist != nil ||
+			route.CalDAV != nil || route.GoogleTasks != nil {
+			return errors.New("ticktick tasks require independent confidential OAuth settings")
+		}
+		return route.TickTick.OAuth.validate()
 	case domain.ProviderMicrosoftTasks,
 		domain.ProviderAppleReminders,
-		domain.ProviderTickTick,
 		domain.ProviderAnyDoMCP,
 		domain.ProviderThings,
 		domain.ProviderOmniFocus:
 		if route.MicrosoftGraph != nil || route.Todoist != nil || route.CalDAV != nil ||
-			route.GoogleTasks != nil {
+			route.GoogleTasks != nil || route.TickTick != nil {
 			return errors.New("task route contains settings for another provider")
 		}
 		return nil
@@ -643,8 +749,7 @@ func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
 			parsed.RawQuery != "" || parsed.EscapedPath() != "/api/v1" {
 			return errors.New("todoist API base must be https://api.todoist.com/api/v1")
 		}
-		redirect, _ := url.Parse(route.RedirectURI)
-		if redirect.Port() == "0" {
+		if oauthRedirectUsesEphemeralPort(route.RedirectURI) {
 			return errors.New("todoist OAuth requires the fixed loopback port registered for the public client")
 		}
 	case domain.ProviderMicrosoftOWA,
@@ -664,6 +769,37 @@ func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
 		return fmt.Errorf("unknown OAuth API provider %q", provider)
 	}
 	return nil
+}
+
+func (route TickTickOAuthRoute) validate() error {
+	if err := validateHTTPSURL("TickTick API base", route.APIBase); err != nil {
+		return err
+	}
+	parsed, _ := url.Parse(route.APIBase)
+	if parsed.Host != "api.ticktick.com" || parsed.RawQuery != "" ||
+		parsed.EscapedPath() != "" && parsed.EscapedPath() != "/" {
+		return errors.New("ticktick API base must be https://api.ticktick.com")
+	}
+	if err := route.Client().validate(); err != nil {
+		return err
+	}
+	if err := route.ClientSecret.validate(false); err != nil {
+		return fmt.Errorf("ticktick OAuth client secret: %w", err)
+	}
+	if route.ClientSecret.Backend == route.Authorization.Backend &&
+		route.ClientSecret.Key == route.Authorization.Key {
+		return errors.New("ticktick grant and client secret require different credential handles")
+	}
+	if oauthRedirectUsesEphemeralPort(route.RedirectURI) {
+		return errors.New("ticktick OAuth requires the fixed loopback port registered for the confidential client")
+	}
+	return nil
+}
+
+func oauthRedirectUsesEphemeralPort(raw string) bool {
+	redirect, _ := url.Parse(raw)
+	port, _ := strconv.ParseUint(redirect.Port(), 10, 16)
+	return port == 0
 }
 
 func (route WebRoute) validate() error {

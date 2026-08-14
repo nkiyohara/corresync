@@ -37,6 +37,11 @@ Configuration schema v8 adds the independent, approval-gated
 `tasks.google_tasks` payload. Migration from v7 preserves every existing route
 and consent and cannot select or authorize Google Tasks. See ADR 0031.
 
+Configuration schema v9 adds the independently authorized
+`tasks.ticktick` payload. Migration from v8 preserves every existing route and
+consent, rejects hidden TickTick payloads in an older file, and grants no new
+authority. See ADR 0032.
+
 The canonical model contains task lists and versioned tasks with bounded title
 and notes, status, priority, parent, ordering, checklist, assignee, labels,
 links, reminders, recurrence, and completion time. Date-only, floating local
