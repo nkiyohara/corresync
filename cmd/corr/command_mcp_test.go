@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/nkiyohara/corresync/internal/buildinfo"
@@ -431,5 +434,80 @@ func TestMCPSetupRequiresConfiguredAccount(t *testing.T) {
 				t.Fatalf("Run() error = %v, want %q guidance", err, fixture.wantMessage)
 			}
 		})
+	}
+}
+
+func TestMCPServeNegotiatesModernProtocolOverActualStdio(t *testing.T) {
+	repositoryRoot, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatalf("resolve repository root: %v", err)
+	}
+	root := t.TempDir()
+	binary := filepath.Join(root, "corr")
+	// #nosec G204 -- the executable name and every build argument are fixed test values.
+	build := exec.CommandContext(t.Context(), "go", "build", "-trimpath", "-o", binary, "./cmd/corr")
+	build.Dir = repositoryRoot
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build corr: %v\n%s", err, output)
+	}
+
+	configPath := filepath.Join(root, "config.toml")
+	if err := config.Save(configPath, config.Default()); err != nil {
+		t.Fatalf("save provider-neutral config: %v", err)
+	}
+	stateDirectory := filepath.Join(root, "state")
+	environment := append(os.Environ(), "CORRESYNC_STATE_DIR="+stateDirectory)
+	// #nosec G204 -- binary is the freshly built fixture and all arguments are fixed or test-local paths.
+	command := exec.CommandContext(
+		t.Context(), binary, "--config", configPath, "mcp", "serve",
+	)
+	command.Env = environment
+	var stderr bytes.Buffer
+	command.Stderr = &stderr
+	transport := &mcp.CommandTransport{
+		Command: command, TerminateDuration: 2 * time.Second,
+	}
+	client := mcp.NewClient(&mcp.Implementation{
+		Name: "corresync-stdio-conformance", Version: "v1",
+	}, nil)
+	connectContext, cancelConnect := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancelConnect()
+	session, err := client.Connect(connectContext, transport, nil)
+	if err != nil {
+		t.Fatalf("connect to corr mcp serve: %v\nstderr:\n%s", err, stderr.String())
+	}
+	t.Cleanup(func() {
+		_ = session.Close()
+		stopContext, cancelStop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelStop()
+		// #nosec G204 -- binary is the freshly built fixture and all arguments are fixed or test-local paths.
+		stop := exec.CommandContext(
+			stopContext, binary, "--config", configPath, "daemon", "stop", "--json",
+		)
+		stop.Env = environment
+		_ = stop.Run()
+	})
+
+	initialized := session.InitializeResult()
+	if initialized == nil || initialized.ProtocolVersion != "2026-07-28" ||
+		initialized.ServerInfo == nil || initialized.ServerInfo.Name != "io.github.nkiyohara/corresync" {
+		t.Fatalf("stdio initialization = %+v", initialized)
+	}
+	if session.ID() != "" {
+		t.Fatalf("stdio session ID = %q, want empty", session.ID())
+	}
+	tools, err := session.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("list stdio tools: %v\nstderr:\n%s", err, stderr.String())
+	}
+	if len(tools.Tools) != 61 {
+		t.Fatalf("stdio tools = %d, want 61", len(tools.Tools))
+	}
+	templates, err := session.ListResourceTemplates(t.Context(), nil)
+	if err != nil {
+		t.Fatalf("list stdio resource templates: %v\nstderr:\n%s", err, stderr.String())
+	}
+	if len(templates.ResourceTemplates) != 2 {
+		t.Fatalf("stdio resource templates = %d, want 2", len(templates.ResourceTemplates))
 	}
 }
