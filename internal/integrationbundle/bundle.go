@@ -60,32 +60,52 @@ type Surface struct {
 	Limitation string `json:"limitation"`
 }
 
+// PublicationChannel describes one external distribution or discovery
+// surface. Source availability and directory publication are separate states:
+// a checked-in native package must never imply an upstream listing.
+type PublicationChannel struct {
+	ID                string   `json:"id"`
+	DisplayName       string   `json:"displayName"`
+	PackageFormat     string   `json:"packageFormat"`
+	SupportedSurfaces []string `json:"supportedSurfaces"`
+	Owner             string   `json:"owner"`
+	PublishMethod     string   `json:"publishMethod"`
+	State             string   `json:"state"`
+	ObservedVersion   string   `json:"observedVersion,omitempty"`
+	SourceVersioned   bool     `json:"sourceVersioned,omitempty"`
+	VerificationURL   string   `json:"verificationUrl"`
+	SubmissionURL     string   `json:"submissionUrl"`
+	InstallBehavior   string   `json:"installBehavior"`
+	Limitation        string   `json:"limitation"`
+}
+
 type Spec struct {
-	SchemaVersion    int       `json:"schemaVersion"`
-	SourceVersion    string    `json:"sourceVersion"`
-	ID               string    `json:"id"`
-	RegistryName     string    `json:"registryName"`
-	DisplayName      string    `json:"displayName"`
-	Title            string    `json:"title"`
-	Description      string    `json:"description"`
-	ShortDescription string    `json:"shortDescription"`
-	LongDescription  string    `json:"longDescription"`
-	Author           string    `json:"author"`
-	Repository       string    `json:"repository"`
-	RepositoryGit    string    `json:"repositoryGit"`
-	Homepage         string    `json:"homepage"`
-	Documentation    string    `json:"documentation"`
-	Privacy          string    `json:"privacy"`
-	Support          string    `json:"support"`
-	License          string    `json:"license"`
-	Category         string    `json:"category"`
-	BrandColor       string    `json:"brandColor"`
-	Keywords         []string  `json:"keywords"`
-	Launch           Launch    `json:"launch"`
-	Requirements     []string  `json:"requirements"`
-	Effects          Effects   `json:"effects"`
-	Surfaces         []Surface `json:"surfaces"`
-	ConfigOnlyHosts  []string  `json:"configOnlyHosts"`
+	SchemaVersion       int                  `json:"schemaVersion"`
+	SourceVersion       string               `json:"sourceVersion"`
+	ID                  string               `json:"id"`
+	RegistryName        string               `json:"registryName"`
+	DisplayName         string               `json:"displayName"`
+	Title               string               `json:"title"`
+	Description         string               `json:"description"`
+	ShortDescription    string               `json:"shortDescription"`
+	LongDescription     string               `json:"longDescription"`
+	Author              string               `json:"author"`
+	Repository          string               `json:"repository"`
+	RepositoryGit       string               `json:"repositoryGit"`
+	Homepage            string               `json:"homepage"`
+	Documentation       string               `json:"documentation"`
+	Privacy             string               `json:"privacy"`
+	Support             string               `json:"support"`
+	License             string               `json:"license"`
+	Category            string               `json:"category"`
+	BrandColor          string               `json:"brandColor"`
+	Keywords            []string             `json:"keywords"`
+	Launch              Launch               `json:"launch"`
+	Requirements        []string             `json:"requirements"`
+	Effects             Effects              `json:"effects"`
+	Surfaces            []Surface            `json:"surfaces"`
+	ConfigOnlyHosts     []string             `json:"configOnlyHosts"`
+	PublicationChannels []PublicationChannel `json:"publicationChannels"`
 }
 
 type Inputs struct {
@@ -144,7 +164,7 @@ func MustLoad() Spec {
 }
 
 func (spec Spec) Validate() error {
-	if spec.SchemaVersion != 1 {
+	if spec.SchemaVersion != 2 {
 		return fmt.Errorf("unsupported schema version %d", spec.SchemaVersion)
 	}
 	if len(spec.SourceVersion) > maxVersionLength || !versionPattern.MatchString(spec.SourceVersion) {
@@ -184,8 +204,9 @@ func (spec Spec) Validate() error {
 	if !spec.Effects.WritesRequirePreviewCommit || strings.TrimSpace(spec.Effects.SecretPolicy) == "" {
 		return errors.New("guarded writes and the no-secret policy must be explicit")
 	}
-	if len(spec.Keywords) == 0 || len(spec.Requirements) == 0 || len(spec.Surfaces) == 0 || len(spec.ConfigOnlyHosts) == 0 {
-		return errors.New("keywords, requirements, integration surfaces, and config-only hosts are required")
+	if len(spec.Keywords) == 0 || len(spec.Requirements) == 0 || len(spec.Surfaces) == 0 ||
+		len(spec.ConfigOnlyHosts) == 0 || len(spec.PublicationChannels) == 0 {
+		return errors.New("keywords, requirements, integration surfaces, config-only hosts, and publication channels are required")
 	}
 	for name, values := range map[string][]string{"keywords": spec.Keywords, "requirements": spec.Requirements} {
 		for index, value := range values {
@@ -214,7 +235,75 @@ func (spec Spec) Validate() error {
 		}
 		seen[host] = true
 	}
+	channelIDs := make(map[string]bool, len(spec.PublicationChannels))
+	for _, channel := range spec.PublicationChannels {
+		if !idPattern.MatchString(channel.ID) || channelIDs[channel.ID] {
+			return fmt.Errorf("invalid or duplicate publication channel %q", channel.ID)
+		}
+		channelIDs[channel.ID] = true
+		for name, value := range map[string]string{
+			"displayName": channel.DisplayName, "packageFormat": channel.PackageFormat,
+			"owner": channel.Owner, "publishMethod": channel.PublishMethod,
+			"installBehavior": channel.InstallBehavior, "limitation": channel.Limitation,
+		} {
+			if strings.TrimSpace(value) == "" || hasControl(value) {
+				return fmt.Errorf("publication channel %q %s is empty or contains a control character", channel.ID, name)
+			}
+		}
+		if len(channel.SupportedSurfaces) == 0 {
+			return fmt.Errorf("publication channel %q has no supported surface", channel.ID)
+		}
+		for _, surface := range channel.SupportedSurfaces {
+			switch surface {
+			case "local-cli", "local-desktop", "local-ide":
+			default:
+				return fmt.Errorf("publication channel %q has unsupported surface %q", channel.ID, surface)
+			}
+		}
+		switch channel.State {
+		case "published":
+			if !versionPattern.MatchString(channel.ObservedVersion) || channel.SourceVersioned {
+				return fmt.Errorf("published channel %q must have one observed stable version", channel.ID)
+			}
+		case "source-available":
+			if channel.ObservedVersion != "" || !channel.SourceVersioned {
+				return fmt.Errorf("source channel %q must take the generated source version", channel.ID)
+			}
+		case "not-listed":
+			if channel.ObservedVersion != "" || channel.SourceVersioned {
+				return fmt.Errorf("unlisted channel %q cannot claim a version", channel.ID)
+			}
+		default:
+			return fmt.Errorf("publication channel %q has invalid state %q", channel.ID, channel.State)
+		}
+		for name, value := range map[string]string{
+			"verificationUrl": channel.VerificationURL,
+			"submissionUrl":   channel.SubmissionURL,
+		} {
+			parsed, err := url.Parse(value)
+			if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
+				return fmt.Errorf("publication channel %q %s must be an absolute credential-free HTTPS URL", channel.ID, name)
+			}
+		}
+	}
 	return nil
+}
+
+// PublicationChannels returns an independently owned snapshot with any
+// source-versioned channel resolved to version.
+func (spec Spec) PublicationSnapshot(version string) ([]PublicationChannel, error) {
+	if len(version) > maxVersionLength || !versionPattern.MatchString(version) {
+		return nil, fmt.Errorf("invalid publication snapshot version %q", version)
+	}
+	channels := make([]PublicationChannel, len(spec.PublicationChannels))
+	for index, channel := range spec.PublicationChannels {
+		channels[index] = channel
+		channels[index].SupportedSurfaces = slices.Clone(channel.SupportedSurfaces)
+		if channel.SourceVersioned {
+			channels[index].ObservedVersion = version
+		}
+	}
+	return channels, nil
 }
 
 func SourceVersion() string { return MustLoad().SourceVersion }
@@ -246,7 +335,7 @@ func Render(version string, inputs Inputs) ([]Output, error) {
 			spec.ID: map[string]any{"command": spec.Launch.Command, "args": spec.Launch.Args},
 		},
 	}
-	outputs := make([]Output, 0, 12)
+	outputs := make([]Output, 0, 13)
 	addJSON := func(path string, value any) error {
 		data, marshalErr := marshalJSON(value)
 		if marshalErr != nil {
@@ -288,7 +377,10 @@ func Render(version string, inputs Inputs) ([]Output, error) {
 	if err := addJSON("integrations/config-hosts.json", configHosts(spec, version)); err != nil {
 		return nil, err
 	}
-	outputs = append(outputs, Output{Path: "docs/generated/integration-bundles.md", Data: renderDocumentation(spec, version)})
+	outputs = append(outputs,
+		Output{Path: "docs/generated/integration-bundles.md", Data: renderDocumentation(spec, version)},
+		Output{Path: "docs/generated/publication-channels.md", Data: renderPublicationDocumentation(spec, version)},
+	)
 
 	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Path < outputs[j].Path })
 	return outputs, nil
@@ -554,6 +646,40 @@ func renderDocumentation(spec Spec, version string) []byte {
 	document.WriteString("\nA lifecycle adapter must translate the neutral launch and Skill metadata into\n")
 	document.WriteString("each host's documented schema; the metadata is not presented as a native\n")
 	document.WriteString("package.\n")
+	return []byte(document.String())
+}
+
+func renderPublicationDocumentation(spec Spec, version string) []byte {
+	channels, err := spec.PublicationSnapshot(version)
+	if err != nil {
+		panic("validated publication version rejected: " + err.Error())
+	}
+	var document strings.Builder
+	document.WriteString("<!-- Generated by go run ./tools/integrationbundle; do not edit. -->\n\n")
+	document.WriteString("# Publication channels\n\n")
+	fmt.Fprintf(&document, "Canonical source snapshot: `%s`.\n\n", version)
+	document.WriteString("A native package in this repository is not the same as an upstream\n")
+	document.WriteString("directory listing. Only `published` rows claim an externally visible\n")
+	document.WriteString("release; `source-available` rows can be installed from this repository\n")
+	document.WriteString("but are not official marketplace listings.\n\n")
+	document.WriteString("<!-- markdownlint-disable MD013 -->\n")
+	document.WriteString("| Channel | Package | Supported surfaces | State | Visible version | Owner | Publish method | Verification | Submission/review | Install or reload behavior | Limitation |\n")
+	document.WriteString("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n")
+	for _, channel := range channels {
+		visible := "—"
+		if channel.ObservedVersion != "" {
+			visible = "`" + channel.ObservedVersion + "`"
+		}
+		fmt.Fprintf(&document, "| %s | `%s` | %s | `%s` | %s | %s | %s | [check](%s) | [instructions](%s) | %s | %s |\n",
+			channel.DisplayName, channel.PackageFormat, strings.Join(channel.SupportedSurfaces, ", "),
+			channel.State, visible, channel.Owner, channel.PublishMethod, channel.VerificationURL,
+			channel.SubmissionURL, channel.InstallBehavior, channel.Limitation)
+	}
+	document.WriteString("<!-- markdownlint-enable MD013 -->\n\n")
+	document.WriteString("Every supported surface is local. No row enables a hosted relay, private\n")
+	document.WriteString("MCP tunnel, remote sandbox, or hosted-agent path. Stable-only automation\n")
+	document.WriteString("must reuse the already signed and checksummed release artifacts; preview\n")
+	document.WriteString("and RC tags never publish immutable directory records.\n")
 	return []byte(document.String())
 }
 

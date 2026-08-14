@@ -60,6 +60,14 @@ separate reviewed bundle specification:
 
 [Generated integration bundles](generated/integration-bundles.md)
 
+External publication is tracked separately so a local package can never imply
+an upstream marketplace listing. The generated channel matrix records the
+owner, supported local surfaces, publication method, externally visible
+version, verification URL, reload behavior, and hosted-surface limitation for
+every supported directory:
+
+[Generated publication channels](generated/publication-channels.md)
+
 `internal/integrationbundle/spec.json` is canonical public metadata. The
 Codex/OpenAI and Claude/Copilot/VS Code manifests, `.mcp.json`, Gemini
 extension, Kiro Power, config-only host metadata, and this matrix are generated

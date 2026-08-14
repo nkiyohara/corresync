@@ -2782,6 +2782,108 @@ main > .gs-steps {
   overflow-wrap: anywhere;
 }
 
+/* ---------- Integration publication matrix ---------- */
+
+.publication-snapshot {
+  border-top: 1px solid var(--line);
+}
+
+.version-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.version-strip > div {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border-left: 1px solid var(--line);
+}
+
+.version-strip > div:first-child {
+  border-left: 0;
+}
+
+.version-strip dt {
+  margin-bottom: 0.5rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.version-strip dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.15rem, 2.5vw, 1.55rem);
+  font-weight: 700;
+}
+
+.publication-table-wrap {
+  margin-bottom: 0;
+}
+
+.publication-table {
+  min-width: 1120px;
+}
+
+.publication-table td:first-child {
+  color: var(--ink);
+}
+
+.publication-state {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  padding: 0.28em 0.72em;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--paper);
+  font-size: 0.7rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.publication-state.published {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+  background: var(--accent-wash);
+}
+
+.publication-state.source_available {
+  border-color: var(--stripe-blue);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--stripe-blue) 12%, var(--card));
+}
+
+.publication-state.not_listed {
+  border-style: dashed;
+}
+
+.publication-card-grid .benefit-card {
+  min-height: 15rem;
+}
+
+.publication-card-grid .publication-state {
+  margin-bottom: 2.5rem;
+}
+
+.publication-boundary {
+  align-items: start;
+}
+
+.publication-boundary > div:last-child > p:first-child {
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+
 /* ---------- Touch targets and footer wrapping ---------- */
 
 .site-nav a,
@@ -2796,6 +2898,19 @@ main > .gs-steps {
 /* ---------- New-component responsive rules ---------- */
 
 @media (max-width: 980px) {
+  .version-strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .version-strip > div {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .version-strip > div:first-child {
+    border-top: 0;
+  }
+
   .install-grid,
   .journey-grid,
   .outcome-grid,

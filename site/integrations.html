@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync integrations — local MCP, plugins, and verified availability</title>
+    <meta
+      name="description"
+      content="See which Corresync MCP, plugin, extension, Power, and marketplace paths are published, source-available, or not yet listed for local AI agents."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta
+      property="og:title"
+      content="Corresync integrations — local MCP, plugins, and verified availability"
+    >
+    <meta
+      property="og:description"
+      content="See which Corresync MCP, plugin, extension, Power, and marketplace paths are published, source-available, or not yet listed for local AI agents."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/integrations.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync mark beside its local, provider-neutral MCP promise."
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta
+      name="twitter:title"
+      content="Corresync integrations — local MCP, plugins, and verified availability"
+    >
+    <meta
+      name="twitter:description"
+      content="See which Corresync MCP, plugin, extension, Power, and marketplace paths are published, source-available, or not yet listed for local AI agents."
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync mark beside its local, provider-neutral MCP promise."
+    >
+    <link rel="canonical" href="https://corresync.org/integrations.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/integrations.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/integrations.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/integrations.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/integrations.html">
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="site.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync home">
+        <img class="brand-mark" src="corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <div class="header-navs">
+        <nav class="site-nav" aria-label="Primary">
+          <a href="./">Home</a>
+          <a href="getting-started.html">Getting started</a>
+          <a href="providers.html">Providers</a>
+          <a href="features.html">Features</a>
+          <a href="integrations.html" aria-current="page">Integrations</a>
+          <a href="safety.html">Safety</a>
+        </nav>
+        <nav class="language-nav" aria-label="Language">
+          <a href="integrations.html" lang="en" hreflang="en" aria-current="page">EN</a><a
+            href="ja/integrations.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a href="zh-cn/integrations.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="zh-tw/integrations.html" lang="zh-Hant" hreflang="zh-Hant"
+          >繁中</a><a href="ko/integrations.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow">
+          <span aria-hidden="true"></span>Agent integrations, without inflated claims
+        </p>
+        <h1 id="page-title">
+          Use Corresync where your agent runs. <em>See exactly how it is packaged.</em>
+        </h1>
+        <p class="lede">
+          Corresync connects to local AI agents over stdio. This matrix separates direct MCP setup,
+          Skills, native packages, source availability, and actual marketplace publication—so a
+          compatible client is never mistaken for an official listing.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="getting-started.html">Set up detected agents</a>
+          <a class="button secondary" href="#matrix">Read the matrix</a>
+        </div>
+      </section>
+
+      <section class="publication-snapshot" aria-labelledby="snapshot-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Version snapshot</p>
+          <h2 id="snapshot-title">Three versions, three different facts.</h2>
+          <p>
+            The source bundle can be ahead of the latest stable release, while an external registry
+            can still show an older verified record. They are displayed separately on purpose.
+          </p>
+        </div>
+        <dl class="version-strip">
+          <div>
+            <dt>Source bundle</dt>
+            <dd><code>0.8.6-rc.6</code></dd>
+          </div>
+          <div>
+            <dt>Latest stable release</dt>
+            <dd><code>0.8.5</code></dd>
+          </div>
+          <div>
+            <dt>MCP Registry observed</dt>
+            <dd><code>0.8.3</code></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section id="matrix" class="publication-matrix" aria-labelledby="matrix-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Publication matrix</p>
+          <h2 id="matrix-title">What is available now—and where.</h2>
+          <p>
+            Every working integration below is local. “Source available” means the reviewed
+            package is in this repository; it does not mean the upstream vendor lists or endorses
+            it.
+          </p>
+        </div>
+        <div class="legal-table-wrap publication-table-wrap">
+          <table class="legal-table publication-table">
+            <thead>
+              <tr>
+                <th scope="col">Channel</th>
+                <th scope="col">Package</th>
+                <th scope="col">Works in</th>
+                <th scope="col">Directory state</th>
+                <th scope="col">Version</th>
+                <th scope="col">How it ships</th>
+                <th scope="col">Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>GitHub Releases</strong></td>
+                <td>Release archives &#43; MCPB</td>
+                <td>local CLI, local desktop</td>
+                <td><span class="publication-state published">Published</span></td>
+                <td><code>0.8.5</code></td>
+                <td>Verified release automation</td>
+                <td>
+                  <a href="https://github.com/nkiyohara/corresync/releases/latest">Check<span
+                      aria-hidden="true"
+                    >
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Official MCP Registry</strong></td>
+                <td>Self-contained MCPB</td>
+                <td>local desktop</td>
+                <td><span class="publication-state published">Published</span></td>
+                <td><code>0.8.3</code></td>
+                <td>Stable tags only</td>
+                <td>
+                  <a
+                    href="https://registry.modelcontextprotocol.io/v0.1/servers/io.github.nkiyohara%2Fcorresync/versions/latest"
+                  >Check<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>OpenAI plugin directory</strong></td>
+                <td>Thin plugin</td>
+                <td>local CLI</td>
+                <td><span class="publication-state not_listed">Not listed</span></td>
+                <td><code>Not claimed</code></td>
+                <td>Direct setup; directory pending</td>
+                <td>
+                  <a href="https://developers.openai.com/plugins/">Check<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Claude plugin marketplace</strong></td>
+                <td>Shared plugin</td>
+                <td>local CLI</td>
+                <td><span class="publication-state source_available">Source available</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>Versioned repository source</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/.claude-plugin"
+                  >Check<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>GitHub Copilot CLI and VS Code agent plugins</strong></td>
+                <td>Shared plugin</td>
+                <td>local CLI, local IDE</td>
+                <td><span class="publication-state source_available">Source available</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>Versioned repository source</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/plugins/corresync"
+                  >Check<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Gemini CLI extension gallery</strong></td>
+                <td>Thin extension</td>
+                <td>local CLI</td>
+                <td><span class="publication-state source_available">Source available</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>Versioned repository source</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/integrations/gemini-cli/corresync"
+                  >Check<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Kiro Powers</strong></td>
+                <td>Thin Power</td>
+                <td>local IDE</td>
+                <td><span class="publication-state source_available">Source available</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>Versioned repository source</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/integrations/kiro/corresync"
+                  >Check<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Cursor MCP directory</strong></td>
+                <td>Direct MCP config</td>
+                <td>local CLI, local IDE</td>
+                <td><span class="publication-state not_listed">Not listed</span></td>
+                <td><code>Not claimed</code></td>
+                <td>Direct setup; directory pending</td>
+                <td>
+                  <a href="https://cursor.com/marketplace">Check<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Windsurf MCP Marketplace</strong></td>
+                <td>Direct MCP config</td>
+                <td>local CLI, local IDE</td>
+                <td><span class="publication-state not_listed">Not listed</span></td>
+                <td><code>Not claimed</code></td>
+                <td>Direct setup; directory pending</td>
+                <td>
+                  <a href="https://docs.windsurf.com/windsurf/cascade/mcp">Check<span
+                      aria-hidden="true"
+                    >
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Cline Marketplace</strong></td>
+                <td>Direct MCP config</td>
+                <td>local CLI, local IDE</td>
+                <td><span class="publication-state not_listed">Not listed</span></td>
+                <td><code>Not claimed</code></td>
+                <td>Direct setup; directory pending</td>
+                <td>
+                  <a href="https://docs.cline.bot/mcp/mcp-overview">Check<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Roo Code Marketplace</strong></td>
+                <td>Direct MCP config</td>
+                <td>local IDE</td>
+                <td><span class="publication-state not_listed">Not listed</span></td>
+                <td><code>Not claimed</code></td>
+                <td>Direct setup; directory pending</td>
+                <td>
+                  <a href="https://docs.roocode.com/features/mcp/overview">Check<span
+                      aria-hidden="true"
+                    >
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Zed extensions</strong></td>
+                <td>Direct MCP config</td>
+                <td>local IDE</td>
+                <td><span class="publication-state not_listed">Not listed</span></td>
+                <td><code>Not claimed</code></td>
+                <td>Direct setup; directory pending</td>
+                <td>
+                  <a href="https://zed.dev/extensions">Check<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>goose extensions and skills</strong></td>
+                <td>Direct MCP config</td>
+                <td>local CLI, local desktop</td>
+                <td><span class="publication-state not_listed">Not listed</span></td>
+                <td><code>Not claimed</code></td>
+                <td>Direct setup; directory pending</td>
+                <td>
+                  <a
+                    href="https://block.github.io/goose/docs/getting-started/using-extensions/"
+                  >Check<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tinted-section publication-meanings" aria-labelledby="meaning-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Read the labels literally</p>
+          <h2 id="meaning-title">Compatibility, packaging, and publication are separate.</h2>
+        </div>
+        <div class="benefit-grid publication-card-grid">
+          <article class="benefit-card featured">
+            <span class="publication-state published">Published</span><h3>Published</h3>
+            <p>
+              An externally visible record was checked at the version shown. Stable release
+              automation must verify it again after publishing.
+            </p>
+          </article>
+          <article class="benefit-card">
+            <span class="publication-state source_available">Source available</span><h3>
+              Source available
+            </h3>
+            <p>
+              A versioned native package is generated and tested in this repository. An official
+              vendor directory has not been claimed.
+            </p>
+          </article>
+          <article class="benefit-card">
+            <span class="publication-state not_listed">Not listed</span><h3>Not listed</h3>
+            <p>
+              Use corr setup for the reviewed direct MCP path. Marketplace submission waits for
+              native metadata and upstream review.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="honest-edges publication-boundary" aria-labelledby="boundary-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>Local means local</p>
+          <h2 id="boundary-title">No hosted agent or private tunnel is enabled by a listing.</h2>
+        </div>
+        <div>
+          <p>
+            Corresync exposes one local stdio server and local account state. Hosted ChatGPT, cloud
+            agents, Kiro Web, and remote sandboxes cannot reach it merely because a plugin format
+            exists.
+          </p>
+          <p class="fine-print">
+            A hosted relay or private MCP tunnel would introduce a new data path and requires its
+            own architecture decision, consent, privacy disclosure, revocation design, and security
+            review.
+          </p>
+        </div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="integrations-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>The shortest path</p>
+        <h2 id="integrations-cta-title">
+          Let corr setup detect and connect the agents on this machine.
+        </h2>
+        <p>
+          The matrix is reference material. The guided command remains the natural starting point
+          and only offers reviewed local paths.
+        </p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">Open getting started</a>
+          <a class="button secondary" href="providers.html">Check provider routes</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a>
+      <p>
+        Independent local-first mail, calendar, and task tooling. Not affiliated with or endorsed by
+        any provider or agent vendor named here.
+      </p>
+      <nav aria-label="Footer">
+        <a href="getting-started.html">Getting started</a><a href="providers.html">Providers</a><a
+          href="features.html"
+        >Features</a><a href="integrations.html">Integrations</a><a href="safety.html">Safety</a><a
+          href="privacy.html"
+        >Privacy</a><a href="terms.html">Terms</a><a href="https://github.com/nkiyohara/corresync"
+        >GitHub source</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >Security</a><a href="https://github.com/nkiyohara/corresync/releases">Releases</a><a
+          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

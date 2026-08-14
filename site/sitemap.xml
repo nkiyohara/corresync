@@ -42,6 +42,16 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/features.html"/>
   </url>
   <url>
+    <loc>https://corresync.org/integrations.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://corresync.org/ko/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/integrations.html"/>
+  </url>
+  <url>
     <loc>https://corresync.org/safety.html</loc>
     <lastmod>2026-08-12</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://corresync.org/safety.html"/>
@@ -110,6 +120,16 @@
     <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/features.html"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://corresync.org/ko/features.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/features.html"/>
+  </url>
+  <url>
+    <loc>https://corresync.org/ja/integrations.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://corresync.org/ko/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/integrations.html"/>
   </url>
   <url>
     <loc>https://corresync.org/ja/safety.html</loc>
@@ -182,6 +202,16 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/features.html"/>
   </url>
   <url>
+    <loc>https://corresync.org/zh-cn/integrations.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://corresync.org/ko/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/integrations.html"/>
+  </url>
+  <url>
     <loc>https://corresync.org/zh-cn/safety.html</loc>
     <lastmod>2026-08-12</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://corresync.org/safety.html"/>
@@ -252,6 +282,16 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/features.html"/>
   </url>
   <url>
+    <loc>https://corresync.org/zh-tw/integrations.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://corresync.org/ko/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/integrations.html"/>
+  </url>
+  <url>
     <loc>https://corresync.org/zh-tw/safety.html</loc>
     <lastmod>2026-08-12</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://corresync.org/safety.html"/>
@@ -320,6 +360,16 @@
     <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/features.html"/>
     <xhtml:link rel="alternate" hreflang="ko" href="https://corresync.org/ko/features.html"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/features.html"/>
+  </url>
+  <url>
+    <loc>https://corresync.org/ko/integrations.html</loc>
+    <lastmod>2026-08-14</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://corresync.org/ko/integrations.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://corresync.org/integrations.html"/>
   </url>
   <url>
     <loc>https://corresync.org/ko/safety.html</loc>

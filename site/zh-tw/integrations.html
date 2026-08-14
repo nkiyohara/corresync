@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync AI 整合 — 本機 MCP、外掛與實際發布狀態</title>
+    <meta
+      name="description"
+      content="清楚查看 Corresync 在各種 AI 代理中的 MCP、Skill、外掛、擴充套件、Power 與市集上架狀態。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta
+      property="og:title"
+      content="Corresync AI 整合 — 本機 MCP、外掛與實際發布狀態"
+    >
+    <meta
+      property="og:description"
+      content="清楚查看 Corresync 在各種 AI 代理中的 MCP、Skill、外掛、擴充套件、Power 與市集上架狀態。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/zh-tw/integrations.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync 標誌與本機、供應商中立 MCP 的定位說明。"
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta
+      name="twitter:title"
+      content="Corresync AI 整合 — 本機 MCP、外掛與實際發布狀態"
+    >
+    <meta
+      name="twitter:description"
+      content="清楚查看 Corresync 在各種 AI 代理中的 MCP、Skill、外掛、擴充套件、Power 與市集上架狀態。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync 標誌與本機、供應商中立 MCP 的定位說明。"
+    >
+    <link rel="canonical" href="https://corresync.org/zh-tw/integrations.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/integrations.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/integrations.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/integrations.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/integrations.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要內容</a>
+    <div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 首頁">
+        <img class="brand-mark" src="../corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <div class="header-navs">
+        <nav class="site-nav" aria-label="主要導覽">
+          <a href="./">首頁</a>
+          <a href="getting-started.html">開始使用</a>
+          <a href="providers.html">服務商</a>
+          <a href="features.html">功能</a>
+          <a href="integrations.html" aria-current="page">AI 整合</a>
+          <a href="safety.html">安全</a>
+        </nav>
+        <nav class="language-nav" aria-label="語言">
+          <a href="../integrations.html" lang="en" hreflang="en">EN</a><a
+            href="../ja/integrations.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a href="../zh-cn/integrations.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a
+            href="integrations.html"
+            lang="zh-Hant"
+            hreflang="zh-Hant"
+            aria-current="page"
+          >繁中</a><a href="../ko/integrations.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>不誇大能力的 AI 整合</p>
+        <h1 id="page-title">
+          在慣用的代理中使用 Corresync。 <em
+          >封裝方式與發布狀態都說清楚。</em>
+        </h1>
+        <p class="lede">
+          Corresync 透過 stdio 連接本機 AI 代理。本表分開標示直接 MCP
+          設定、Skill、原生封裝、儲存庫原始碼與官方市集上架情況，不會把「相容」說成「官方已上架」。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="getting-started.html">設定偵測到的代理</a>
+          <a class="button secondary" href="#matrix">查看完整矩陣</a>
+        </div>
+      </section>
+
+      <section class="publication-snapshot" aria-labelledby="snapshot-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>版本快照</p>
+          <h2 id="snapshot-title">三個版本號，代表三件不同的事。</h2>
+          <p>
+            開發中的原始碼可能領先最新穩定版，外部登錄檔也可能仍顯示較舊的已驗證紀錄，因此這裡刻意分開呈現。
+          </p>
+        </div>
+        <dl class="version-strip">
+          <div>
+            <dt>原始碼封裝</dt>
+            <dd><code>0.8.6-rc.6</code></dd>
+          </div>
+          <div>
+            <dt>最新穩定版</dt>
+            <dd><code>0.8.5</code></dd>
+          </div>
+          <div>
+            <dt>MCP Registry 實際查得</dt>
+            <dd><code>0.8.3</code></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section id="matrix" class="publication-matrix" aria-labelledby="matrix-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>發布矩陣</p>
+          <h2 id="matrix-title">目前能從哪裡取得什麼。</h2>
+          <p>
+            所有可用整合都只在本機執行。「原始碼可用」只代表本儲存庫含有經過審查的封裝，不代表上游廠商已上架或背書。
+          </p>
+        </div>
+        <div class="legal-table-wrap publication-table-wrap">
+          <table class="legal-table publication-table">
+            <thead>
+              <tr>
+                <th scope="col">管道</th>
+                <th scope="col">形式</th>
+                <th scope="col">適用位置</th>
+                <th scope="col">目錄狀態</th>
+                <th scope="col">版本</th>
+                <th scope="col">提供方式</th>
+                <th scope="col">依據</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>GitHub Releases</strong></td>
+                <td>發布壓縮檔 &#43; MCPB</td>
+                <td>本機 CLI、本機桌面端</td>
+                <td><span class="publication-state published">已發布</span></td>
+                <td><code>0.8.5</code></td>
+                <td>驗證發布後自動提供</td>
+                <td>
+                  <a href="https://github.com/nkiyohara/corresync/releases/latest">核對<span
+                      aria-hidden="true"
+                    >
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Official MCP Registry</strong></td>
+                <td>自包含 MCPB</td>
+                <td>本機桌面端</td>
+                <td><span class="publication-state published">已發布</span></td>
+                <td><code>0.8.3</code></td>
+                <td>僅穩定版標籤</td>
+                <td>
+                  <a
+                    href="https://registry.modelcontextprotocol.io/v0.1/servers/io.github.nkiyohara%2Fcorresync/versions/latest"
+                  >核對<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>OpenAI plugin directory</strong></td>
+                <td>輕量外掛</td>
+                <td>本機 CLI</td>
+                <td><span class="publication-state not_listed">尚未上架</span></td>
+                <td><code>未聲明</code></td>
+                <td>可直接設定，目錄待上架</td>
+                <td>
+                  <a href="https://developers.openai.com/plugins/">核對<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Claude plugin marketplace</strong></td>
+                <td>共用外掛</td>
+                <td>本機 CLI</td>
+                <td><span class="publication-state source_available">原始碼可用</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>含版本的儲存庫原始碼</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/.claude-plugin"
+                  >核對<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>GitHub Copilot CLI and VS Code agent plugins</strong></td>
+                <td>共用外掛</td>
+                <td>本機 CLI、本機 IDE</td>
+                <td><span class="publication-state source_available">原始碼可用</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>含版本的儲存庫原始碼</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/plugins/corresync"
+                  >核對<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Gemini CLI extension gallery</strong></td>
+                <td>輕量擴充套件</td>
+                <td>本機 CLI</td>
+                <td><span class="publication-state source_available">原始碼可用</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>含版本的儲存庫原始碼</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/integrations/gemini-cli/corresync"
+                  >核對<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Kiro Powers</strong></td>
+                <td>輕量 Power</td>
+                <td>本機 IDE</td>
+                <td><span class="publication-state source_available">原始碼可用</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>含版本的儲存庫原始碼</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/integrations/kiro/corresync"
+                  >核對<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Cursor MCP directory</strong></td>
+                <td>直接 MCP 設定</td>
+                <td>本機 CLI、本機 IDE</td>
+                <td><span class="publication-state not_listed">尚未上架</span></td>
+                <td><code>未聲明</code></td>
+                <td>可直接設定，目錄待上架</td>
+                <td>
+                  <a href="https://cursor.com/marketplace">核對<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Windsurf MCP Marketplace</strong></td>
+                <td>直接 MCP 設定</td>
+                <td>本機 CLI、本機 IDE</td>
+                <td><span class="publication-state not_listed">尚未上架</span></td>
+                <td><code>未聲明</code></td>
+                <td>可直接設定，目錄待上架</td>
+                <td>
+                  <a href="https://docs.windsurf.com/windsurf/cascade/mcp">核對<span
+                      aria-hidden="true"
+                    >
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Cline Marketplace</strong></td>
+                <td>直接 MCP 設定</td>
+                <td>本機 CLI、本機 IDE</td>
+                <td><span class="publication-state not_listed">尚未上架</span></td>
+                <td><code>未聲明</code></td>
+                <td>可直接設定，目錄待上架</td>
+                <td>
+                  <a href="https://docs.cline.bot/mcp/mcp-overview">核對<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Roo Code Marketplace</strong></td>
+                <td>直接 MCP 設定</td>
+                <td>本機 IDE</td>
+                <td><span class="publication-state not_listed">尚未上架</span></td>
+                <td><code>未聲明</code></td>
+                <td>可直接設定，目錄待上架</td>
+                <td>
+                  <a href="https://docs.roocode.com/features/mcp/overview">核對<span
+                      aria-hidden="true"
+                    >
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Zed extensions</strong></td>
+                <td>直接 MCP 設定</td>
+                <td>本機 IDE</td>
+                <td><span class="publication-state not_listed">尚未上架</span></td>
+                <td><code>未聲明</code></td>
+                <td>可直接設定，目錄待上架</td>
+                <td>
+                  <a href="https://zed.dev/extensions">核對<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>goose extensions and skills</strong></td>
+                <td>直接 MCP 設定</td>
+                <td>本機 CLI、本機桌面端</td>
+                <td><span class="publication-state not_listed">尚未上架</span></td>
+                <td><code>未聲明</code></td>
+                <td>可直接設定，目錄待上架</td>
+                <td>
+                  <a
+                    href="https://block.github.io/goose/docs/getting-started/using-extensions/"
+                  >核對<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tinted-section publication-meanings" aria-labelledby="meaning-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>按字面理解狀態</p>
+          <h2 id="meaning-title">相容、封裝與發布互不等同。</h2>
+        </div>
+        <div class="benefit-grid publication-card-grid">
+          <article class="benefit-card featured">
+            <span class="publication-state published">已發布</span><h3>已發布</h3>
+            <p>
+              已核對所示版本的外部公開紀錄。穩定版自動流程在發布後還會再次驗證。
+            </p>
+          </article>
+          <article class="benefit-card">
+            <span class="publication-state source_available">原始碼可用</span><h3>
+              原始碼可用
+            </h3>
+            <p>
+              儲存庫會產生並測試含版本的原生封裝，但不宣稱已進入廠商官方目錄。
+            </p>
+          </article>
+          <article class="benefit-card">
+            <span class="publication-state not_listed">尚未上架</span><h3>尚未上架</h3>
+            <p>
+              目前可用 corr setup 完成經過審查的直接 MCP
+              設定；原生中繼資料與上游審查就緒後才會提交。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="honest-edges publication-boundary" aria-labelledby="boundary-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>本機就是本機</p>
+          <h2 id="boundary-title">目錄上架不會自動啟用雲端代理或私人通道。</h2>
+        </div>
+        <div>
+          <p>
+            Corresync 只提供本機 stdio
+            服務與本機帳戶狀態。即使已有外掛格式，託管版
+            ChatGPT、雲端代理、Kiro Web 與遠端沙箱仍無法直接存取。
+          </p>
+          <p class="fine-print">
+            託管中繼或私人 MCP
+            通道會形成新的資料路徑，必須另行完成架構決策、明確同意、隱私揭露、撤銷設計與安全審查。
+          </p>
+        </div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="integrations-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>最快的開始方式</p>
+        <h2 id="integrations-cta-title">
+          讓 corr setup 偵測並連接這台裝置上的代理。
+        </h2>
+        <p>
+          矩陣供查閱；引導指令仍是自然入口，而且只會提供經過審查的本機路徑。
+        </p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">開啟入門指南</a>
+          <a class="button secondary" href="providers.html">檢查服務商路徑</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a>
+      <p>
+        獨立的本機優先郵件、日曆與工作工具。與此處提到的服務商或 AI
+        代理廠商沒有隸屬或背書關係。
+      </p>
+      <nav aria-label="頁尾">
+        <a href="getting-started.html">開始使用</a><a href="providers.html">服務商</a><a
+          href="features.html"
+        >功能</a><a href="integrations.html">AI 整合</a><a href="safety.html">安全</a><a
+          href="privacy.html"
+        >隱私權</a><a href="terms.html">使用條款</a><a
+          href="https://github.com/nkiyohara/corresync"
+        >GitHub 原始碼</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >安全性回報</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >版本發布</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

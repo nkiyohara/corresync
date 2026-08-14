@@ -30,6 +30,9 @@ func TestSpecification(t *testing.T) {
 	if spec.Effects.AutoApproval {
 		t.Fatal("automatic approval must remain disabled")
 	}
+	if len(spec.PublicationChannels) != 13 {
+		t.Fatalf("publication channels = %d, want 13", len(spec.PublicationChannels))
+	}
 	if got := PortableLaunch(); got.Command != "corr" || !slices.Equal(got.Args, []string{"mcp", "serve"}) || got.Transport != "stdio" {
 		t.Fatalf("portable launch = %#v", got)
 	}
@@ -46,8 +49,8 @@ func TestRenderIsDeterministicAndVersioned(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(first) != 12 || len(second) != len(first) {
-		t.Fatalf("outputs = %d and %d, want 12", len(first), len(second))
+	if len(first) != 13 || len(second) != len(first) {
+		t.Fatalf("outputs = %d and %d, want 13", len(first), len(second))
 	}
 	for index := range first {
 		if first[index].Path != second[index].Path || !bytes.Equal(first[index].Data, second[index].Data) {
@@ -67,6 +70,30 @@ func TestRenderIsDeterministicAndVersioned(t *testing.T) {
 	assertOutputContains(t, first, "plugins/corresync/.codex-plugin/plugin.json", `"version": "1.2.3-rc.4"`)
 	assertOutputContains(t, first, "integrations/kiro/corresync/POWER.md", "Kiro Web")
 	assertOutputContains(t, first, "docs/generated/integration-bundles.md", "hosted ChatGPT")
+	assertOutputContains(t, first, "docs/generated/publication-channels.md", "`1.2.3-rc.4`")
+	assertOutputContains(t, first, "docs/generated/publication-channels.md", "`not-listed`")
+}
+
+func TestPublicationSnapshotSeparatesSourceAndExternalVersions(t *testing.T) {
+	t.Parallel()
+	spec := MustLoad()
+	channels, err := spec.PublicationSnapshot("2.0.0-rc.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	versions := make(map[string]string, len(channels))
+	for _, channel := range channels {
+		versions[channel.ID] = channel.ObservedVersion
+	}
+	if versions["mcp-registry"] != "0.8.3" || versions["github-releases"] != "0.8.5" {
+		t.Fatalf("published versions changed with source snapshot: %#v", versions)
+	}
+	if versions["claude-marketplace"] != "2.0.0-rc.1" {
+		t.Fatalf("source version = %q", versions["claude-marketplace"])
+	}
+	if versions["openai-plugin-directory"] != "" {
+		t.Fatalf("unlisted channel claims version %q", versions["openai-plugin-directory"])
+	}
 }
 
 func TestRenderStableAndPreviewVersions(t *testing.T) {

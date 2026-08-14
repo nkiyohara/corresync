@@ -68,16 +68,18 @@ tasks:
       - node --test web/discovery-worker/test/*.test.mjs site/check.test.cjs
 
   integrations:generate:
-    desc: Generate agent-host metadata and native integration bundles
+    desc: Generate agent-host metadata, native bundles, and publication Pages
     cmds:
       - go run ./tools/agenthostcatalog
       - go run ./tools/integrationbundle
+      - go run ./tools/publicationsite
 
   integrations:check:
-    desc: Verify agent-host metadata, native bundles, and the portable Skill
+    desc: Verify agent-host metadata, native bundles, publication Pages, and the portable Skill
     cmds:
       - go run ./tools/agenthostcatalog --check
       - go run ./tools/integrationbundle --check
+      - go run ./tools/publicationsite --check
       - uvx --from '{{.SKILLS_REF_SOURCE}}' skills-ref validate plugins/corresync/skills/corresync
       - >-
         npx --yes @anthropic-ai/claude-code@{{.CLAUDE_CODE_VERSION}}

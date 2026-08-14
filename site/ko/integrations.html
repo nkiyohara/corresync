@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corresync AI 연동 — 로컬 MCP, 플러그인, 실제 배포 상태</title>
+    <meta
+      name="description"
+      content="Corresync의 MCP, Skill, 플러그인, 확장, Power와 마켓 등록 상태를 로컬 AI 에이전트별로 정확히 확인하세요."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta
+      property="og:title"
+      content="Corresync AI 연동 — 로컬 MCP, 플러그인, 실제 배포 상태"
+    >
+    <meta
+      property="og:description"
+      content="Corresync의 MCP, Skill, 플러그인, 확장, Power와 마켓 등록 상태를 로컬 AI 에이전트별로 정확히 확인하세요."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ko_KR">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:url" content="https://corresync.org/ko/integrations.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync 로고와 로컬 공급자 중립 MCP라는 설명."
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta
+      name="twitter:title"
+      content="Corresync AI 연동 — 로컬 MCP, 플러그인, 실제 배포 상태"
+    >
+    <meta
+      name="twitter:description"
+      content="Corresync의 MCP, Skill, 플러그인, 확장, Power와 마켓 등록 상태를 로컬 AI 에이전트별로 정확히 확인하세요."
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync 로고와 로컬 공급자 중립 MCP라는 설명."
+    >
+    <link rel="canonical" href="https://corresync.org/ko/integrations.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/integrations.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/integrations.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/integrations.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/integrations.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">본문으로 이동</a>
+    <div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 홈">
+        <img class="brand-mark" src="../corresync-mark.svg" alt="" width="64" height="64">
+        <span class="brand-name">corresync</span>
+      </a>
+      <div class="header-navs">
+        <nav class="site-nav" aria-label="주 메뉴">
+          <a href="./">홈</a>
+          <a href="getting-started.html">시작하기</a>
+          <a href="providers.html">서비스</a>
+          <a href="features.html">기능</a>
+          <a href="integrations.html" aria-current="page">AI 연동</a>
+          <a href="safety.html">안전</a>
+        </nav>
+        <nav class="language-nav" aria-label="언어">
+          <a href="../integrations.html" lang="en" hreflang="en">EN</a><a
+            href="../ja/integrations.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a href="../zh-cn/integrations.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="../zh-tw/integrations.html" lang="zh-Hant" hreflang="zh-Hant"
+          >繁中</a><a href="integrations.html" lang="ko" hreflang="ko" aria-current="page"
+          >한국어</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>과장 없는 AI 에이전트 연동</p>
+        <h1 id="page-title">
+          평소 쓰는 에이전트에서 Corresync를 사용하세요. <em>패키지와 배포
+            상태도 정확하게.</em>
+        </h1>
+        <p class="lede">
+          Corresync는 stdio로 로컬 AI 에이전트에 연결됩니다. 직접 MCP 설정, Skill,
+          네이티브 패키지, 저장소 제공 여부, 공식 마켓 등록을 따로 표시해
+          ‘호환됨’을 ‘공식 등록됨’으로 오해하지 않게 합니다.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="getting-started.html">감지된 에이전트 설정</a>
+          <a class="button secondary" href="#matrix">전체 표 보기</a>
+        </div>
+      </section>
+
+      <section class="publication-snapshot" aria-labelledby="snapshot-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>버전 현황</p>
+          <h2 id="snapshot-title">세 버전은 서로 다른 사실을 뜻합니다.</h2>
+          <p>
+            개발 중인 소스는 최신 안정판보다 앞설 수 있고, 외부
+            레지스트리에는 더 오래된 검증 기록이 남을 수 있어 의도적으로
+            구분해 표시합니다.
+          </p>
+        </div>
+        <dl class="version-strip">
+          <div>
+            <dt>소스 패키지</dt>
+            <dd><code>0.8.6-rc.6</code></dd>
+          </div>
+          <div>
+            <dt>최신 안정판</dt>
+            <dd><code>0.8.5</code></dd>
+          </div>
+          <div>
+            <dt>MCP Registry 확인값</dt>
+            <dd><code>0.8.3</code></dd>
+          </div>
+        </dl>
+      </section>
+
+      <section id="matrix" class="publication-matrix" aria-labelledby="matrix-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>배포 현황</p>
+          <h2 id="matrix-title">
+            지금 무엇을 어디에서 쓸 수 있는지 확인하세요.
+          </h2>
+          <p>
+            사용 가능한 연동은 모두 로컬에서만 동작합니다. ‘소스
+            제공’은 이 저장소에 검토된 패키지가 있다는 뜻이며, 공급자의
+            공식 마켓 등록이나 보증을 뜻하지 않습니다.
+          </p>
+        </div>
+        <div class="legal-table-wrap publication-table-wrap">
+          <table class="legal-table publication-table">
+            <thead>
+              <tr>
+                <th scope="col">채널</th>
+                <th scope="col">형식</th>
+                <th scope="col">사용 위치</th>
+                <th scope="col">등록 상태</th>
+                <th scope="col">버전</th>
+                <th scope="col">제공 방식</th>
+                <th scope="col">근거</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>GitHub Releases</strong></td>
+                <td>릴리스 압축 파일 &#43; MCPB</td>
+                <td>로컬 CLI · 로컬 데스크톱</td>
+                <td><span class="publication-state published">공개됨</span></td>
+                <td><code>0.8.5</code></td>
+                <td>검증된 릴리스에서 자동 제공</td>
+                <td>
+                  <a href="https://github.com/nkiyohara/corresync/releases/latest">확인<span
+                      aria-hidden="true"
+                    >
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Official MCP Registry</strong></td>
+                <td>자체 포함 MCPB</td>
+                <td>로컬 데스크톱</td>
+                <td><span class="publication-state published">공개됨</span></td>
+                <td><code>0.8.3</code></td>
+                <td>안정판 태그만</td>
+                <td>
+                  <a
+                    href="https://registry.modelcontextprotocol.io/v0.1/servers/io.github.nkiyohara%2Fcorresync/versions/latest"
+                  >확인<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>OpenAI plugin directory</strong></td>
+                <td>경량 플러그인</td>
+                <td>로컬 CLI</td>
+                <td><span class="publication-state not_listed">미등록</span></td>
+                <td><code>표시 안 함</code></td>
+                <td>직접 설정 가능·목록 미등록</td>
+                <td>
+                  <a href="https://developers.openai.com/plugins/">확인<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Claude plugin marketplace</strong></td>
+                <td>공유 플러그인</td>
+                <td>로컬 CLI</td>
+                <td><span class="publication-state source_available">소스 제공</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>버전이 붙은 저장소 소스</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/.claude-plugin"
+                  >확인<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>GitHub Copilot CLI and VS Code agent plugins</strong></td>
+                <td>공유 플러그인</td>
+                <td>로컬 CLI · 로컬 IDE</td>
+                <td><span class="publication-state source_available">소스 제공</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>버전이 붙은 저장소 소스</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/plugins/corresync"
+                  >확인<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Gemini CLI extension gallery</strong></td>
+                <td>경량 확장</td>
+                <td>로컬 CLI</td>
+                <td><span class="publication-state source_available">소스 제공</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>버전이 붙은 저장소 소스</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/integrations/gemini-cli/corresync"
+                  >확인<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Kiro Powers</strong></td>
+                <td>경량 Power</td>
+                <td>로컬 IDE</td>
+                <td><span class="publication-state source_available">소스 제공</span></td>
+                <td><code>0.8.6-rc.6</code></td>
+                <td>버전이 붙은 저장소 소스</td>
+                <td>
+                  <a
+                    href="https://github.com/nkiyohara/corresync/tree/main/integrations/kiro/corresync"
+                  >확인<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Cursor MCP directory</strong></td>
+                <td>직접 MCP 설정</td>
+                <td>로컬 CLI · 로컬 IDE</td>
+                <td><span class="publication-state not_listed">미등록</span></td>
+                <td><code>표시 안 함</code></td>
+                <td>직접 설정 가능·목록 미등록</td>
+                <td>
+                  <a href="https://cursor.com/marketplace">확인<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Windsurf MCP Marketplace</strong></td>
+                <td>직접 MCP 설정</td>
+                <td>로컬 CLI · 로컬 IDE</td>
+                <td><span class="publication-state not_listed">미등록</span></td>
+                <td><code>표시 안 함</code></td>
+                <td>직접 설정 가능·목록 미등록</td>
+                <td>
+                  <a href="https://docs.windsurf.com/windsurf/cascade/mcp">확인<span
+                      aria-hidden="true"
+                    >
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Cline Marketplace</strong></td>
+                <td>직접 MCP 설정</td>
+                <td>로컬 CLI · 로컬 IDE</td>
+                <td><span class="publication-state not_listed">미등록</span></td>
+                <td><code>표시 안 함</code></td>
+                <td>직접 설정 가능·목록 미등록</td>
+                <td>
+                  <a href="https://docs.cline.bot/mcp/mcp-overview">확인<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Roo Code Marketplace</strong></td>
+                <td>직접 MCP 설정</td>
+                <td>로컬 IDE</td>
+                <td><span class="publication-state not_listed">미등록</span></td>
+                <td><code>표시 안 함</code></td>
+                <td>직접 설정 가능·목록 미등록</td>
+                <td>
+                  <a href="https://docs.roocode.com/features/mcp/overview">확인<span
+                      aria-hidden="true"
+                    >
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>Zed extensions</strong></td>
+                <td>직접 MCP 설정</td>
+                <td>로컬 IDE</td>
+                <td><span class="publication-state not_listed">미등록</span></td>
+                <td><code>표시 안 함</code></td>
+                <td>직접 설정 가능·목록 미등록</td>
+                <td>
+                  <a href="https://zed.dev/extensions">확인<span aria-hidden="true">
+                      ↗</span></a>
+                </td>
+              </tr>
+              <tr>
+                <td><strong>goose extensions and skills</strong></td>
+                <td>직접 MCP 설정</td>
+                <td>로컬 CLI · 로컬 데스크톱</td>
+                <td><span class="publication-state not_listed">미등록</span></td>
+                <td><code>표시 안 함</code></td>
+                <td>직접 설정 가능·목록 미등록</td>
+                <td>
+                  <a
+                    href="https://block.github.io/goose/docs/getting-started/using-extensions/"
+                  >확인<span aria-hidden="true"> ↗</span></a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tinted-section publication-meanings" aria-labelledby="meaning-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>상태를 그대로 읽기</p>
+          <h2 id="meaning-title">호환성, 패키지, 공개 여부는 각각 다릅니다.</h2>
+        </div>
+        <div class="benefit-grid publication-card-grid">
+          <article class="benefit-card featured">
+            <span class="publication-state published">공개됨</span><h3>공개됨</h3>
+            <p>
+              표시된 버전의 외부 공개 기록을 확인했습니다. 안정판 자동화도
+              게시 후 같은 내용을 다시 검증합니다.
+            </p>
+          </article>
+          <article class="benefit-card">
+            <span class="publication-state source_available">소스 제공</span><h3>
+              소스 제공
+            </h3>
+            <p>
+              버전이 붙은 네이티브 패키지를 저장소에서 생성하고
+              테스트하지만 공급자 공식 디렉터리 등록을 주장하지 않습니다.
+            </p>
+          </article>
+          <article class="benefit-card">
+            <span class="publication-state not_listed">미등록</span><h3>미등록</h3>
+            <p>
+              현재는 corr setup으로 검토된 직접 MCP 설정을 사용할 수 있습니다.
+              네이티브 메타데이터와 상위 검토가 준비된 뒤 제출합니다.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="honest-edges publication-boundary" aria-labelledby="boundary-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>로컬은 로컬 그대로</p>
+          <h2 id="boundary-title">
+            목록에 올라가도 호스팅 에이전트나 비공개 터널이 켜지지
+            않습니다.
+          </h2>
+        </div>
+        <div>
+          <p>
+            Corresync는 로컬 stdio 서버와 로컬 계정 상태만 제공합니다.
+            플러그인 형식이 있어도 호스팅 ChatGPT, 클라우드 에이전트, Kiro Web,
+            원격 샌드박스에서는 접근할 수 없습니다.
+          </p>
+          <p class="fine-print">
+            호스팅 릴레이나 비공개 MCP 터널은 새로운 데이터 경로입니다.
+            별도의 아키텍처 결정, 명시적 동의, 개인정보 고지, 철회 설계,
+            보안 검토가 필요합니다.
+          </p>
+        </div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="integrations-cta-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>가장 빠른 시작</p>
+        <h2 id="integrations-cta-title">
+          corr setup으로 이 기기의 에이전트를 감지하고 연결하세요.
+        </h2>
+        <p>
+          이 표는 참고 자료입니다. 안내 명령이 기본 시작점이며 검토된
+          로컬 경로만 제안합니다.
+        </p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">시작 안내 열기</a>
+          <a class="button secondary" href="providers.html">서비스 경로 확인</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a>
+      <p>
+        독립적인 로컬 우선 메일·캘린더·작업 도구입니다. 여기에 언급된
+        서비스 또는 AI 에이전트 공급자와 제휴하거나 보증받지 않았습니다.
+      </p>
+      <nav aria-label="바닥글">
+        <a href="getting-started.html">시작하기</a><a href="providers.html">서비스</a><a
+          href="features.html"
+        >기능</a><a href="integrations.html">AI 연동</a><a href="safety.html">안전</a><a
+          href="privacy.html"
+        >개인정보</a><a href="terms.html">이용약관</a><a
+          href="https://github.com/nkiyohara/corresync"
+        >GitHub 소스</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >보안 제보</a><a href="https://github.com/nkiyohara/corresync/releases">릴리스</a><a
+          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>
