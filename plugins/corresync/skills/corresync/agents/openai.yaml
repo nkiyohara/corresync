@@ -1,4 +1,4 @@
 interface:
   display_name: "Corresync"
-  short_description: "Use guarded local mail and calendar tools"
-  default_prompt: "Use $corresync to check my configured inboxes and calendars and summarize what needs attention."
+  short_description: "Use guarded mail, calendar, and task tools"
+  default_prompt: "Use $corresync to check my configured inboxes, calendars, and task lists and summarize what needs attention."

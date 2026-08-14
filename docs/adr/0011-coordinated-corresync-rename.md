@@ -3,6 +3,8 @@
 - Status: accepted; primary-CLI and alias decisions superseded by
   [ADR 0016](0016-short-corr-command.md)
 - Date: 2026-07-28
+- Amended: 2026-08-14 by
+  [ADR 0028](0028-provider-neutral-task-domain.md)
 
 ## Context
 
@@ -37,7 +39,7 @@ canonical target names are:
 | Surface | Target |
 | --- | --- |
 | Product | `Corresync` |
-| MCP display name | `Corresync — Mail & Calendar` |
+| MCP display name | `Corresync — Mail, Calendar & Tasks` |
 | Source repository | `nkiyohara/corresync` |
 | GitHub Pages | `https://corresync.org/` |
 | Go module | `github.com/nkiyohara/corresync` |

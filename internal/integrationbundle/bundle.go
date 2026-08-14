@@ -308,7 +308,7 @@ func RenderMCPBManifest(version string) ([]byte, error) {
 		"name":             spec.ID,
 		"display_name":     spec.DisplayName,
 		"version":          version,
-		"description":      "Local-first mail and calendar MCP server for accounts you control.",
+		"description":      "Local-first mail, calendar, and task MCP server for accounts you control.",
 		"long_description": spec.LongDescription + " Install the Corresync CLI separately to configure and authenticate accounts; the bundle never hosts or relays mailbox data.",
 		"author":           map[string]any{"name": spec.Author, "url": spec.Repository},
 		"repository":       map[string]any{"type": "git", "url": spec.RepositoryGit},
@@ -326,7 +326,7 @@ func RenderMCPBManifest(version string) ([]byte, error) {
 			},
 		},
 		"tools_generated":  true,
-		"keywords":         []string{"mail", "calendar", "productivity", "local-first", "privacy", "mcp", "stdio"},
+		"keywords":         []string{"mail", "calendar", "tasks", "productivity", "local-first", "privacy", "mcp", "stdio"},
 		"license":          spec.License,
 		"privacy_policies": []string{spec.Privacy},
 		"compatibility":    map[string]any{"platforms": []string{"darwin", "linux", "win32"}},
@@ -431,10 +431,10 @@ func claudeMarketplace(spec Spec, version string) map[string]any {
 		"version":     version,
 		"plugins": []any{map[string]any{
 			"name": spec.ID, "displayName": spec.DisplayName, "source": "./plugins/corresync",
-			"description": "Recognize mail and calendar requests and route them to Corresync.",
+			"description": "Recognize mail, calendar, and task requests and route them to Corresync.",
 			"version":     version, "author": map[string]string{"name": spec.Author},
 			"homepage": spec.Homepage, "repository": spec.Repository, "license": spec.License,
-			"category": strings.ToLower(spec.Category), "tags": []string{"outlook", "email", "calendar", "mcp"},
+			"category": strings.ToLower(spec.Category), "tags": []string{"outlook", "email", "calendar", "tasks", "mcp"},
 		}},
 	}
 }
@@ -442,20 +442,21 @@ func claudeMarketplace(spec Spec, version string) map[string]any {
 func codexManifest(spec Spec, version string) map[string]any {
 	return map[string]any{
 		"name": spec.ID, "version": version,
-		"description": "Makes guarded local mail and calendar tools discoverable from natural-language requests.",
+		"description": "Makes guarded local mail, calendar, and task tools discoverable from natural-language requests.",
 		"author":      map[string]string{"name": spec.Author, "url": spec.Repository},
 		"homepage":    spec.Homepage, "repository": spec.Repository, "license": spec.License,
 		"keywords": spec.Keywords, "skills": "./skills/", "mcpServers": "./.mcp.json",
 		"interface": map[string]any{
 			"displayName": spec.DisplayName, "shortDescription": spec.ShortDescription,
-			"longDescription": "For local Codex sessions, recognizes inbox, email, calendar, schedule, and meeting requests and routes them to the guarded local Corresync MCP server. Hosted ChatGPT cannot reach this local stdio integration.",
+			"longDescription": "For local Codex sessions, recognizes inbox, email, calendar, schedule, meeting, reminder, and task requests and routes them to the guarded local Corresync MCP server. Hosted ChatGPT cannot reach this local stdio integration.",
 			"developerName":   spec.Author, "category": spec.Category,
-			"capabilities": []string{"Multi-account mail", "Multi-account calendar", "Reviewed writes", "Local monitoring"},
+			"capabilities": []string{"Multi-account mail", "Multi-account calendar", "Multi-account tasks", "Reviewed writes", "Local monitoring"},
 			"websiteURL":   spec.Homepage, "brandColor": spec.BrandColor,
 			"composerIcon": "./assets/icon.svg", "logo": "./assets/icon.svg",
 			"defaultPrompt": []string{
 				"Check all my inboxes and summarize what needs attention.",
 				"Show my calendars for today.",
+				"Show my open tasks across configured accounts.",
 				"Find the latest email about this project across my accounts.",
 			},
 		},
@@ -464,7 +465,7 @@ func codexManifest(spec Spec, version string) map[string]any {
 
 func claudeManifest(spec Spec, version string) map[string]any {
 	return map[string]any{
-		"name": spec.ID, "description": "Makes guarded local mail and calendar tools discoverable from natural-language requests.",
+		"name": spec.ID, "description": "Makes guarded local mail, calendar, and task tools discoverable from natural-language requests.",
 		"version": version, "author": map[string]string{"name": spec.Author},
 		"homepage": spec.Homepage, "repository": spec.Repository, "license": spec.License,
 		"keywords": spec.Keywords, "mcpServers": "./.mcp.json", "skills": "./skills/",
@@ -474,7 +475,7 @@ func claudeManifest(spec Spec, version string) map[string]any {
 func geminiManifest(spec Spec, version string) map[string]any {
 	return map[string]any{
 		"name": spec.ID, "version": version,
-		"description": "Use the guarded local Corresync mail and calendar MCP server. Requires corr on PATH; no binary, account, or credential is bundled.",
+		"description": "Use the guarded local Corresync mail, calendar, and task MCP server. Requires corr on PATH; no binary, account, or credential is bundled.",
 		"mcpServers": map[string]any{
 			spec.ID: map[string]any{"command": spec.Launch.Command, "args": spec.Launch.Args},
 		},
@@ -506,10 +507,10 @@ func renderKiroPower(spec Spec, version string) []byte {
 		strconv.Quote(spec.DisplayName),
 		strconv.Quote(spec.ShortDescription),
 	)
-	document.WriteString("keywords:\n  - email\n  - calendar\n  - mcp\n  - local-first\n")
+	document.WriteString("keywords:\n  - email\n  - calendar\n  - tasks\n  - mcp\n  - local-first\n")
 	fmt.Fprintf(&document, "author: %s\n---\n\n# Corresync\n\nVersion: %s\n\n", strconv.Quote(spec.Author), version)
 	document.WriteString("Use the local Corresync MCP server and the bundled steering guidance for guarded\n")
-	document.WriteString("mail and calendar work. Install Corresync separately and ensure the `corr`\n")
+	document.WriteString("mail, calendar, and task work. Install Corresync separately and ensure the `corr`\n")
 	document.WriteString("command is on PATH before enabling this Power. The Power contains no account,\n")
 	document.WriteString("credential, token, cookie, or private configuration data. It does not support\n")
 	document.WriteString("Kiro Web or a remote sandbox. Writes remain subject to Corresync's\n")

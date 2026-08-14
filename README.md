@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <strong>All your mail and calendars. One local MCP server and CLI.</strong><br>
+  <strong>Mail, calendars, and tasks. One local MCP server and CLI.</strong><br>
   Provider-neutral, local-first tooling for AI agents, scripts, and you.
 </p>
 
@@ -35,13 +35,17 @@
 </p>
 <!-- markdownlint-enable MD013 MD033 -->
 
-`corr` brings isolated Outlook, Microsoft 365, JMAP, IMAP/SMTP, and CalDAV
-accounts into one terminal—and one local
+`corr` brings isolated mail, calendar, and task accounts into one terminal—and
+one local
 [Model Context Protocol](https://modelcontextprotocol.io/) server.
 Gmail and Google Calendar support are coming soon after Google OAuth approval.
+The canonical task tools are included now; task-provider adapters arrive
+individually and remain unavailable until their contracts are implemented.
 
 - Search mail and build one agenda across accounts without collapsing their
   identity or provider provenance.
+- Use one stable, provenance-preserving task model as provider adapters become
+  available.
 - Use the same typed operations from a human-friendly CLI, stable JSON, or an
   AI agent.
 - Keep sign-in in a visible browser, an explicit public-client OAuth flow, or
@@ -74,7 +78,7 @@ corr integrations setup codex claude-code
 Then ask naturally:
 
 ```text
-Check all my inboxes and calendars and summarize what needs attention today.
+Check my inboxes, calendars, and task lists and summarize what needs attention today.
 ```
 
 One failed provider becomes an explicit partial failure. Successful results
@@ -82,8 +86,9 @@ remain available, and writes still require one exact account.
 
 ## Choose the route that fits
 
-Mail and calendar routes are selected independently. For example, an account
-can pair IMAP/SMTP mail with a CalDAV calendar.
+Mail, calendar, and task routes are selected independently. For example, an
+account can pair IMAP/SMTP mail with a CalDAV calendar; its task route remains a
+separate explicit choice.
 
 <!-- markdownlint-disable MD013 -->
 | Route | Mail | Calendar | Authentication |

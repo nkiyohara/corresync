@@ -1,6 +1,6 @@
 {
   "interface": {
-    "displayName": "Corresync — Mail \u0026 Calendar"
+    "displayName": "Corresync — Mail, Calendar \u0026 Tasks"
   },
   "name": "corresync",
   "plugins": [

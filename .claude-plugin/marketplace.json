@@ -10,8 +10,8 @@
         "name": "Corresync contributors"
       },
       "category": "productivity",
-      "description": "Recognize mail and calendar requests and route them to Corresync.",
-      "displayName": "Corresync — Mail \u0026 Calendar",
+      "description": "Recognize mail, calendar, and task requests and route them to Corresync.",
+      "displayName": "Corresync — Mail, Calendar \u0026 Tasks",
       "homepage": "https://corresync.org/",
       "license": "Apache-2.0",
       "name": "corresync",
@@ -21,6 +21,7 @@
         "outlook",
         "email",
         "calendar",
+        "tasks",
         "mcp"
       ],
       "version": "0.8.6-rc.6"
