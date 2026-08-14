@@ -76,6 +76,11 @@ func (backend *fakeBackend) SessionStatus(
 			Account: testAccountID, Alias: "work",
 			Provider:     domain.ProviderMicrosoftOWA,
 			MailProvider: domain.ProviderMicrosoftOWA, State: "signed_out",
+			Services: testSessionAuthenticationStatuses(
+				testAccountID,
+				"work",
+				domain.ProviderMicrosoftOWA,
+			),
 		}},
 	}, nil
 }
@@ -499,6 +504,11 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 			Account: domain.AccountID(account), Alias: alias,
 			Provider:     domain.ProviderMicrosoftOWA,
 			MailProvider: domain.ProviderMicrosoftOWA, State: "signed_out",
+			Services: testSessionAuthenticationStatuses(
+				domain.AccountID(account),
+				alias,
+				domain.ProviderMicrosoftOWA,
+			),
 		}
 	}
 	tests := []SessionStatusResult{
@@ -535,6 +545,33 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 		if err := validateSessionStatusResult(result); err == nil {
 			t.Fatalf("case %d unexpectedly passed: %+v", index, result)
 		}
+	}
+}
+
+func testSessionAuthenticationStatuses(
+	account domain.AccountID,
+	alias string,
+	mailProvider domain.ProviderID,
+) application.ServiceAuthenticationStatuses {
+	action, err := application.NewAuthenticationActionRequired(
+		application.AuthenticationStateSignedOut,
+		application.AuthenticationReasonNeverAuthenticated,
+		account,
+		alias,
+		application.AuthenticationServiceMail,
+		mailProvider,
+	)
+	if err != nil {
+		panic(err)
+	}
+	return application.ServiceAuthenticationStatuses{
+		Mail: &application.ServiceAuthenticationStatus{
+			Service:  application.AuthenticationServiceMail,
+			Provider: mailProvider,
+			State:    application.AuthenticationStateSignedOut,
+			Reason:   application.AuthenticationReasonNeverAuthenticated,
+			Action:   &action,
+		},
 	}
 }
 

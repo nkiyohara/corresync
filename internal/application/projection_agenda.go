@@ -132,7 +132,7 @@ func (service *ProjectionService) listProjectionAccountAgenda(
 	caller domain.Caller,
 ) agendaProjectionSource {
 	status := newProjectionStatus(account, projectionServiceCalendar)
-	if !account.Authenticated {
+	if !account.ServiceAuthenticated(projectionServiceCalendar) {
 		return agendaProjectionSource{
 			status: projectionUnavailableStatus(
 				account,
@@ -150,9 +150,9 @@ func (service *ProjectionService) listProjectionAccountAgenda(
 		End:   input.End,
 	}, caller)
 	if err != nil {
-		return agendaProjectionSource{status: failProjectionStatus(
+		return agendaProjectionSource{status: failProjectionCallStatus(
 			status,
-			"provider_error",
+			err,
 			"the account calendar did not complete; inspect account status and retry",
 		)}
 	}

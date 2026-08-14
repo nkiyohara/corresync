@@ -59,6 +59,56 @@ func TestMutationToolsHaveNoAllAccountsInput(t *testing.T) {
 	}
 }
 
+func TestAuthenticationFailureHasStructuredMCPErrorAndJSONFallback(t *testing.T) {
+	t.Parallel()
+
+	action, err := application.NewAuthenticationActionRequired(
+		application.AuthenticationStateReauthenticationNeeded,
+		application.AuthenticationReasonSessionExpired,
+		"acc_00000000000000000000000000000001",
+		"work",
+		application.AuthenticationServiceMail,
+		domain.ProviderMicrosoftOWA,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &fakeBackend{err: application.NewAuthenticationActionError(action)}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+	result, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "mail_list",
+		Arguments: map[string]any{
+			"account": "work",
+		},
+	})
+	if err != nil {
+		t.Fatalf("CallTool() protocol error = %v", err)
+	}
+	structured, ok := result.StructuredContent.(map[string]any)
+	if !result.IsError || !ok ||
+		structured["code"] != string(application.AuthenticationCodeReauthenticationNeed) ||
+		structured["alias"] != "work" ||
+		structured["service"] != string(application.AuthenticationServiceMail) {
+		t.Fatalf("CallTool() result = %+v", result)
+	}
+	if len(result.Content) != 1 {
+		t.Fatalf("fallback content = %+v", result.Content)
+	}
+	textContent, ok := result.Content[0].(*mcp.TextContent)
+	if !ok {
+		t.Fatalf("fallback content type = %T", result.Content[0])
+	}
+	var fallback application.AuthenticationActionRequired
+	if err := json.Unmarshal([]byte(textContent.Text), &fallback); err != nil ||
+		fallback.Code != action.Code || fallback.Account != action.Account {
+		t.Fatalf("fallback = %q, error = %v", textContent.Text, err)
+	}
+}
+
 type fakeBackend struct {
 	mailInput            application.MailListInput
 	searchInput          application.MailSearchInput
@@ -1647,6 +1697,18 @@ func TestAccountToolsUseTypedReadOnlyBackend(t *testing.T) {
 				State:            "authenticated",
 				Authenticated:    true,
 				Capabilities:     &domain.Capabilities{Mail: true, Calendar: true},
+				Services: application.ServiceAuthenticationStatuses{
+					Mail: &application.ServiceAuthenticationStatus{
+						Service:  application.AuthenticationServiceMail,
+						Provider: domain.ProviderMicrosoftOWA,
+						State:    application.AuthenticationStateAuthenticated,
+					},
+					Calendar: &application.ServiceAuthenticationStatus{
+						Service:  application.AuthenticationServiceCalendar,
+						Provider: domain.ProviderMicrosoftGraph,
+						State:    application.AuthenticationStateAuthenticated,
+					},
+				},
 			}},
 		},
 	}

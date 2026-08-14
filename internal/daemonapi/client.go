@@ -228,6 +228,38 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 		if account.Provider != expectedProvider {
 			return errors.New("daemon returned an inconsistent primary session provider")
 		}
+		if (account.MailProvider != "") != (account.Services.Mail != nil) ||
+			(account.CalendarProvider != "") != (account.Services.Calendar != nil) ||
+			(account.TaskProvider != "") != (account.Services.Tasks != nil) {
+			return errors.New("daemon returned inconsistent service authentication routes")
+		}
+		authenticatedServices := 0
+		pendingServices := 0
+		for _, service := range account.Services.Values() {
+			if err := service.Validate(account.Account, account.Alias); err != nil {
+				return errors.New("daemon returned invalid service authentication state")
+			}
+			var provider domain.ProviderID
+			switch service.Service {
+			case application.AuthenticationServiceMail:
+				provider = account.MailProvider
+			case application.AuthenticationServiceCalendar:
+				provider = account.CalendarProvider
+			case application.AuthenticationServiceTasks:
+				provider = account.TaskProvider
+			}
+			if service.Provider != provider {
+				return errors.New("daemon returned an inconsistent service provider")
+			}
+			switch service.State {
+			case application.AuthenticationStateAuthenticated:
+				authenticatedServices++
+			case application.AuthenticationStatePending:
+				pendingServices++
+			case application.AuthenticationStateSignedOut,
+				application.AuthenticationStateReauthenticationNeeded:
+			}
+		}
 		if _, exists := seen[account.Account]; exists {
 			return errors.New("daemon returned duplicate session accounts")
 		}
@@ -235,13 +267,31 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 		if index > 0 && result.Accounts[index-1].Alias >= account.Alias {
 			return errors.New("daemon returned unsorted session accounts")
 		}
-		switch account.State {
+		expectedState := "signed_out"
+		if authenticatedServices > 0 {
+			expectedState = "authenticated"
+		} else if pendingServices > 0 {
+			expectedState = "pending"
+		}
+		if account.State != expectedState ||
+			account.Authenticated != (authenticatedServices > 0) {
+			return errors.New("daemon returned inconsistent aggregate session state")
+		}
+		switch expectedState {
 		case "authenticated":
-			if !account.Authenticated || account.CapturedAt == nil || account.CapturedAt.IsZero() {
+			if account.CapturedAt == nil || account.CapturedAt.IsZero() {
 				return errors.New("daemon returned invalid authenticated session state")
 			}
 			if account.Capabilities == nil || account.Capabilities.Validate() != nil {
 				return errors.New("daemon returned invalid account capabilities")
+			}
+			if account.Capabilities.Mail !=
+				(account.Services.Mail != nil && account.Services.Mail.State == application.AuthenticationStateAuthenticated) ||
+				account.Capabilities.Calendar !=
+					(account.Services.Calendar != nil && account.Services.Calendar.State == application.AuthenticationStateAuthenticated) ||
+				account.Capabilities.Tasks !=
+					(account.Services.Tasks != nil && account.Services.Tasks.State == application.AuthenticationStateAuthenticated) {
+				return errors.New("daemon returned capabilities inconsistent with service authentication")
 			}
 			if len(account.Degradations) > 32 {
 				return errors.New("daemon returned unbounded account degradations")
@@ -252,7 +302,7 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 				}
 			}
 		case "pending", "signed_out":
-			if account.Authenticated || account.CapturedAt != nil ||
+			if account.CapturedAt != nil ||
 				account.Capabilities != nil || len(account.Degradations) != 0 {
 				return errors.New("daemon returned invalid inactive session state")
 			}

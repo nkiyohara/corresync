@@ -128,7 +128,7 @@ func (service *ProjectionService) searchProjectionAccount(
 	caller domain.Caller,
 ) mailProjectionSource {
 	status := newProjectionStatus(account, projectionServiceMail)
-	if !account.Authenticated {
+	if !account.ServiceAuthenticated(projectionServiceMail) {
 		return mailProjectionSource{
 			status: projectionUnavailableStatus(
 				account,
@@ -148,9 +148,9 @@ func (service *ProjectionService) searchProjectionAccount(
 		}, caller)
 		if err != nil {
 			status.FetchedItems = len(messages)
-			return mailProjectionSource{status: failProjectionStatus(
+			return mailProjectionSource{status: failProjectionCallStatus(
 				status,
-				"provider_error",
+				err,
 				"the account search did not complete; inspect account status and retry",
 			)}
 		}

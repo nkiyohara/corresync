@@ -3,7 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
 )
 
@@ -25,16 +27,18 @@ type authStatusReport struct {
 }
 
 type sessionStatusView struct {
-	Account          string               `json:"account"`
-	Alias            string               `json:"alias"`
-	Provider         string               `json:"provider"`
-	MailProvider     string               `json:"mailProvider,omitempty"`
-	CalendarProvider string               `json:"calendarProvider,omitempty"`
-	State            string               `json:"state"`
-	Authenticated    bool                 `json:"authenticated"`
-	CapturedAt       string               `json:"capturedAt,omitempty"`
-	Capabilities     *domain.Capabilities `json:"capabilities,omitempty"`
-	Degradations     []domain.Degradation `json:"degradations,omitempty"`
+	Account          string                                    `json:"account"`
+	Alias            string                                    `json:"alias"`
+	Provider         string                                    `json:"provider"`
+	MailProvider     string                                    `json:"mailProvider,omitempty"`
+	CalendarProvider string                                    `json:"calendarProvider,omitempty"`
+	TaskProvider     string                                    `json:"taskProvider,omitempty"`
+	State            string                                    `json:"state"`
+	Authenticated    bool                                      `json:"authenticated"`
+	Services         application.ServiceAuthenticationStatuses `json:"services"`
+	CapturedAt       string                                    `json:"capturedAt,omitempty"`
+	Capabilities     *domain.Capabilities                      `json:"capabilities,omitempty"`
+	Degradations     []domain.Degradation                      `json:"degradations,omitempty"`
 }
 
 func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
@@ -74,8 +78,10 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 			Provider:         string(account.Provider),
 			MailProvider:     string(account.MailProvider),
 			CalendarProvider: string(account.CalendarProvider),
+			TaskProvider:     string(account.TaskProvider),
 			State:            account.State,
 			Authenticated:    account.Authenticated,
+			Services:         account.Services,
 			Capabilities:     account.Capabilities,
 			Degradations:     account.Degradations,
 		}
@@ -114,6 +120,42 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 			view.muted(detail),
 		); err != nil {
 			return err
+		}
+		for _, service := range account.Services.Values() {
+			serviceIcon := view.muted("–")
+			detail := strings.ReplaceAll(string(service.State), "_", " ")
+			switch service.State {
+			case application.AuthenticationStateAuthenticated:
+				serviceIcon = view.success()
+			case application.AuthenticationStatePending,
+				application.AuthenticationStateReauthenticationNeeded:
+				serviceIcon = view.warning()
+			case application.AuthenticationStateSignedOut:
+			}
+			if _, err := view.printf(
+				"      %s  %-8s %s · %s\n",
+				serviceIcon,
+				service.Service,
+				service.Provider,
+				detail,
+			); err != nil {
+				return err
+			}
+			if service.Action != nil &&
+				service.State != application.AuthenticationStatePending {
+				if _, err := view.printf(
+					"         %s\n",
+					view.muted("Next: "+strings.Join(
+						append(
+							[]string{service.Action.NextAction.Command.Executable},
+							service.Action.NextAction.Command.Args...,
+						),
+						" ",
+					)),
+				); err != nil {
+					return err
+				}
+			}
 		}
 		for _, degradation := range account.Degradations {
 			if _, err := view.printf(

@@ -37,6 +37,14 @@ func (*doctorConnectionBackend) SessionStatus(
 		MailProvider: domain.ProviderIMAPSMTP, CalendarProvider: domain.ProviderCalDAV,
 		State: "authenticated", Authenticated: true,
 		CapturedAt: &capturedAt, Capabilities: &capabilities,
+		Services: testAuthenticationStatuses(
+			adapterTestAccountID,
+			"work",
+			domain.ProviderIMAPSMTP,
+			domain.ProviderCalDAV,
+			"",
+			true,
+		),
 	}}}, nil
 }
 

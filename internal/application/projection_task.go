@@ -135,7 +135,7 @@ func (service *ProjectionService) listProjectionAccountTasks(
 	caller domain.Caller,
 ) taskProjectionSource {
 	status := newProjectionStatus(account, projectionServiceTasks)
-	if !account.Authenticated {
+	if !account.ServiceAuthenticated(projectionServiceTasks) {
 		return taskProjectionSource{status: projectionUnavailableStatus(account, projectionServiceTasks)}
 	}
 	target := input.Offset + input.Limit + 1
@@ -150,8 +150,8 @@ func (service *ProjectionService) listProjectionAccountTasks(
 		}, caller)
 		if err != nil {
 			status.FetchedItems = len(tasks)
-			return taskProjectionSource{status: failProjectionStatus(
-				status, "provider_error", "the account task read did not complete; inspect account status and retry",
+			return taskProjectionSource{status: failProjectionCallStatus(
+				status, err, "the account task read did not complete; inspect account status and retry",
 			)}
 		}
 		if err := validateTaskProjectionSourcePage(page, account, input.Status, sourceOffset, limit); err != nil {
