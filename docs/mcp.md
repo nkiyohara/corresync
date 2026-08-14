@@ -229,8 +229,9 @@ Task writes:
 Task content and linked sources are private untrusted provider data. Every task
 write has a separate prepare and commit tool; deletion is destructive. Cursors
 are bound to one provider/account/list/mode and are never write authority. The
-catalog exists before task adapters do, so configured but unavailable routes
-fail without authentication or provider access. See [tasks.md](tasks.md).
+explicit Microsoft Graph route supports Microsoft To Do; other configured task
+routes remain staged and fail without authentication or provider access. See
+[tasks.md](tasks.md).
 
 `calendar_create.onlineMeeting` requests the selected account route's observed
 native meeting service: Teams for Microsoft routes or Google Meet for a Google

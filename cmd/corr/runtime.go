@@ -293,7 +293,7 @@ func (app *runtime) accountServices() (
 		store,
 		store,
 		available,
-		nil,
+		[]domain.ProviderID{domain.ProviderMicrosoftGraph},
 	)
 	if err != nil {
 		return nil, nil, err

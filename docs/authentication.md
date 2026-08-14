@@ -100,13 +100,21 @@ provider-specific exception; Microsoft Graph remains secret-free.
 
 The resulting grant is stored by the operating-system keyring under the
 configured local reference. The TOML contains only that reference and the
-explicit consent bit. Scopes are selected from the configured mail/calendar
+explicit consent bit. Scopes are selected from the configured mail/calendar/task
 services; choosing Graph or Google is never an automatic fallback. Once the
 production gate is separately enabled after approval, Google mail requests
 only the provider-documented
 `https://www.googleapis.com/auth/gmail.modify` scope. The pending RC does not
 construct or display that scope through a production command and cannot begin
 authorization.
+
+Microsoft To Do requests `Tasks.Read` for a read-only route or
+`Tasks.ReadWrite` for a writable route. The separate task approval is required
+even when task settings reuse a mail/calendar public client. A stored grant is
+reused only when its recorded scopes cover the complete selected service set;
+otherwise login starts fresh interactive authorization. Global, GCC High, and
+DoD derive fixed API/authority pairs from `microsoft_cloud`. China task routes
+fail before keyring or browser access because the To Do API is unavailable.
 
 Use only an application registration and account you are authorized to use.
 

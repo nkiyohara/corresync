@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 )
 
 type accountRepositoryStub struct {
@@ -129,6 +130,94 @@ func TestAccountServiceDoesNotInferTaskAvailabilityFromSharedProviderID(t *testi
 		if err == nil || !strings.Contains(err.Error(), "task provider") {
 			t.Fatalf("ReviewAdd(%q) error = %v", provider, err)
 		}
+	}
+}
+
+func TestAccountServiceReviewsIndependentMicrosoftTodoGrant(t *testing.T) {
+	t.Parallel()
+	service, err := NewAccountService(
+		&accountRepositoryStub{}, &accountPurgerStub{}, nil,
+		[]domain.ProviderID{domain.ProviderMicrosoftGraph},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	review, err := service.ReviewAdd(t.Context(), AccountAddInput{
+		Alias: "tasks", Address: "reader@example.test",
+		Tasks: &AccountTaskRouteInput{
+			Provider: domain.ProviderMicrosoftGraph,
+			MicrosoftGraph: &AccountMicrosoftTaskInput{
+				ReadOnly: true,
+				OAuth: AccountOAuthInput{
+					APIBase:        "https://graph.microsoft.us/v1.0",
+					MicrosoftCloud: microsoftcloud.GCCHigh,
+					ClientID:       "synthetic-public-client",
+					RedirectURI:    "http://127.0.0.1:43123/callback",
+					Authorization: AccountCredentialInput{
+						Backend: "os-keyring", Key: "tasks-graph", Consent: true,
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.Tasks == nil || review.Tasks.Provider != domain.ProviderMicrosoftGraph ||
+		len(review.Tasks.Endpoints) != 1 || review.Tasks.Endpoints[0].Value != "https://graph.microsoft.us/v1.0" ||
+		len(review.Credentials) != 1 || review.Credentials[0].Service != "tasks" ||
+		review.Credentials[0].Key != "tasks-graph" {
+		t.Fatalf("Microsoft To Do review = %+v", review)
+	}
+}
+
+func TestAccountServiceRejectsOneOAuthHandleForDifferentGraphGrants(t *testing.T) {
+	t.Parallel()
+	service, err := NewAccountService(
+		&accountRepositoryStub{}, &accountPurgerStub{},
+		[]domain.ProviderID{domain.ProviderMicrosoftGraph},
+		[]domain.ProviderID{domain.ProviderMicrosoftGraph},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorization := AccountCredentialInput{
+		Backend: "os-keyring", Key: "shared-graph", Consent: true,
+	}
+	global := AccountOAuthInput{
+		APIBase:  "https://graph.microsoft.com/v1.0",
+		ClientID: "synthetic-public-client", RedirectURI: "http://127.0.0.1:43123/callback",
+		Authorization: authorization,
+	}
+	explicitGlobal := global
+	explicitGlobal.MicrosoftCloud = microsoftcloud.Global
+	input := AccountAddInput{
+		Alias: "shared", Address: "reader@example.test",
+		Mail: &AccountMailRouteInput{
+			Provider: domain.ProviderMicrosoftGraph, MicrosoftGraph: &global,
+		},
+		Tasks: &AccountTaskRouteInput{
+			Provider: domain.ProviderMicrosoftGraph,
+			MicrosoftGraph: &AccountMicrosoftTaskInput{
+				OAuth: explicitGlobal, ReadOnly: true,
+			},
+		},
+	}
+	if _, err := service.ReviewAdd(t.Context(), input); err != nil {
+		t.Fatalf("legacy and explicit global grant: %v", err)
+	}
+	missingAddress := input
+	missingAddress.Address = ""
+	if _, err := service.ReviewAdd(t.Context(), missingAddress); err == nil ||
+		!strings.Contains(err.Error(), "account address") {
+		t.Fatalf("addressless Microsoft To Do review error = %v", err)
+	}
+
+	input.Tasks.MicrosoftGraph.OAuth.APIBase = "https://graph.microsoft.us/v1.0"
+	input.Tasks.MicrosoftGraph.OAuth.MicrosoftCloud = microsoftcloud.GCCHigh
+	if _, err := service.ReviewAdd(t.Context(), input); err == nil ||
+		!strings.Contains(err.Error(), "authorization handle") {
+		t.Fatalf("conflicting shared OAuth handle error = %v", err)
 	}
 }
 

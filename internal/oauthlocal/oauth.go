@@ -21,6 +21,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
@@ -44,35 +45,64 @@ type Provider struct {
 	AuthParams map[string]string
 }
 
+// Services is the exact service set selected for one public-client grant.
+// TaskWrite has meaning only when Tasks is true.
+type Services struct {
+	Mail           bool
+	Calendar       bool
+	Tasks          bool
+	TaskWrite      bool
+	MicrosoftCloud microsoftcloud.ID
+}
+
 // ProviderFor returns the accepted endpoint and scope set for one explicit
 // OAuth route. It never performs discovery or authorization.
 func ProviderFor(
 	provider domain.ProviderID,
-	mailEnabled, calendarEnabled bool,
+	services Services,
 ) (Provider, error) {
+	if services.TaskWrite && !services.Tasks {
+		return Provider{}, errors.New("task write scope requires the task service")
+	}
 	var result Provider
 	switch provider {
 	case domain.ProviderGoogle:
+		if services.Tasks || services.TaskWrite || services.MicrosoftCloud != "" {
+			return Provider{}, errors.New("google OAuth profile has invalid service options")
+		}
 		if !rollout.GoogleOAuthApproved {
 			return Provider{}, rollout.ErrGoogleOAuthPending
 		}
-		result = googleProviderProfile(mailEnabled, calendarEnabled)
+		result = googleProviderProfile(services.Mail, services.Calendar)
 	case domain.ProviderMicrosoftGraph:
-		// #nosec G101 -- these are public OAuth endpoint URLs, not credentials.
+		cloud, err := microsoftcloud.Resolve(services.MicrosoftCloud)
+		if err != nil {
+			return Provider{}, err
+		}
+		if services.Tasks && !cloud.TasksAvailable {
+			return Provider{}, errors.New("the Microsoft To Do API is unavailable in the selected Microsoft cloud")
+		}
 		result = Provider{
 			ID:       provider,
-			AuthURL:  "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-			TokenURL: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+			AuthURL:  cloud.AuthorizationURL,
+			TokenURL: cloud.TokenURL,
 			Scopes:   []string{"offline_access", "User.Read"},
 			AuthParams: map[string]string{
 				"prompt": "select_account",
 			},
 		}
-		if mailEnabled {
+		if services.Mail {
 			result.Scopes = append(result.Scopes, "Mail.ReadWrite", "Mail.Send")
 		}
-		if calendarEnabled {
+		if services.Calendar {
 			result.Scopes = append(result.Scopes, "Calendars.ReadWrite")
+		}
+		if services.Tasks {
+			scope := "Tasks.Read"
+			if services.TaskWrite {
+				scope = "Tasks.ReadWrite"
+			}
+			result.Scopes = append(result.Scopes, scope)
 		}
 	case domain.ProviderMicrosoftOWA,
 		domain.ProviderJMAP,
@@ -92,8 +122,8 @@ func ProviderFor(
 	default:
 		return Provider{}, fmt.Errorf("unknown OAuth provider %q", provider)
 	}
-	if !mailEnabled && !calendarEnabled {
-		return Provider{}, errors.New("OAuth profile requires a mail or calendar service")
+	if !services.Mail && !services.Calendar && !services.Tasks {
+		return Provider{}, errors.New("OAuth profile requires a mail, calendar, or task service")
 	}
 	slices.Sort(result.Scopes)
 	result.Scopes = slices.Compact(result.Scopes)

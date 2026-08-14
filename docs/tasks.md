@@ -1,16 +1,16 @@
 # Task contract
 
 Corresync models To Do items and reminders without pretending every provider
-has the same feature set. The canonical contract ships before its provider
-adapters so each adapter has one target and one safety model. A configured task
-route is not a capability claim: the current foundation reports all task
-adapters as unavailable until their dependent provider issue is implemented
-and tested.
+has the same feature set. The canonical contract gives every adapter one target
+and one safety model. A configured task route is not by itself a capability
+claim. Microsoft To Do via an explicitly authorized Microsoft Graph route is
+implemented against synthetic contracts; the other task routes remain
+unavailable until their dependent provider issues are implemented and tested.
 
 A staged task route never disables an implemented mail or calendar route on the
 same account: those services may sign in while task status reports an explicit
-unavailable degradation. A task-only account has no active service and fails
-before authentication.
+unavailable degradation. A task-only account is active only when its selected
+adapter is implemented.
 
 ## Canonical model
 
@@ -89,15 +89,16 @@ reads; route degradations are also included in every write review before
 approval. Each write review also repeats the route's observed task capabilities,
 including whether optimistic concurrency is available.
 
-The table below is a development matrix, not a support claim. `target` means
-the dependent issue requires a typed mapping, `limited` means that issue names
-a known constraint, and `observe` means no capability may be asserted until
-adapter evidence exists. Every row is currently **contract only**.
+The table below is a development matrix, not a universal support claim.
+`target` means the dependent issue requires a typed mapping, `limited` means
+that issue names a known constraint, and `observe` means no capability may be
+asserted until adapter evidence exists. `synthetic` means the route has
+deterministic adapter contracts but no commit-bound live observation.
 
 <!-- markdownlint-disable MD013 -->
 | Provider route | CRUD/state | Reminder/recurrence | Hierarchy/metadata | Time contract | Sync candidate | Evidence issue |
 | --- | --- | --- | --- | --- | --- | --- |
-| `microsoft-graph` | target | target | checklist, categories, linked source target; assignment observe | date/time-zone round trip target | delta | [#108](https://github.com/nkiyohara/corresync/issues/108) |
+| `microsoft-graph` | synthetic; read-only or CRUD/state | one absolute reminder; portable recurrence plus exact provider-rule preservation | checklist, categories, typed linked sources; no assignments | zoned datetime; Windows names canonicalized through pinned CLDR | delta with safe reset | [#108](https://github.com/nkiyohara/corresync/issues/108) |
 | `microsoft-web-tasks` | phased target; delete requires ambiguity evidence | observe | modern To Do fields limited | observe | bounded polling | [#109](https://github.com/nkiyohara/corresync/issues/109) |
 | `todoist` | target | target, plan-sensitive | subtasks, labels, assignees target | floating/zoned target | sync cursor; webhook optional | [#110](https://github.com/nkiyohara/corresync/issues/110) |
 | `caldav` | target with ETag | VTODO recurrence/alarm target | RELATED-TO and categories target; assignment observe | date and datetime round trip target | sync token or polling | [#111](https://github.com/nkiyohara/corresync/issues/111) |
@@ -108,6 +109,59 @@ adapter evidence exists. Every row is currently **contract only**.
 | `things` | documented local automation only; one-way operations explicit | observe | tags and deep links target; unsupported fields reviewed | observe | bounded polling/local invalidation | [#116](https://github.com/nkiyohara/corresync/issues/116) |
 | `omnifocus` | fixed Omni Automation bridge target | recurrence target | projects, hierarchy, tags and deep links target | defer/due mapping target | bounded polling/local invalidation | [#117](https://github.com/nkiyohara/corresync/issues/117) |
 <!-- markdownlint-enable MD013 -->
+
+## Microsoft To Do through Graph
+
+The `microsoft-graph` task route is independent of mail and calendar. A
+task-only grant requests `Tasks.Read`; a writable route requests
+`Tasks.ReadWrite`. `offline_access` and `User.Read` support refresh and exact
+delegated-user confirmation against the explicitly configured account address;
+task-only setup does not run provider discovery. Existing mail/calendar grants
+are never expanded silently: configuration requires the separate task approval
+bit, and a stored grant whose recorded scopes do not cover the selected service
+set starts a fresh explicit authorization. Routes share one authorization only
+when the public client, redirect, keyring handle, API base, and Microsoft cloud
+all match exactly.
+
+The adapter supports task-list discovery, list/get, CRUD, complete/reopen,
+categories, checklist replacement, typed Corresync linked resources, one
+absolute reminder, portable recurrence, and delta synchronization. A linked
+resource carries a validated Corresync provenance envelope and provider deep
+link; unrelated provider links stay untouched and are not projected as trusted
+Corresync sources. Checklist replacement preserves validated existing item IDs,
+updates those items in place, and creates or removes only the requested
+difference. Search, hierarchy, assignment, ordering, attachments,
+date-only values, floating datetimes, urgent priority, and cancelled status are
+reported unavailable instead of approximated.
+
+Corresync-originated notes use Graph's plain-text task body so whitespace
+round-trips without an HTML wrapper. A provider-originated HTML task body is
+projected as bounded plain text with an explicit lossy degradation.
+
+Graph may return IANA or Windows time-zone identifiers. Corresync preserves the
+local datetime and converts Windows identifiers through the territory-neutral
+mapping generated from pinned Unicode CLDR 48.2. Non-portable recurrence—such
+as a different weekly boundary or a monthly day that differs from the task
+anchor—is retained as an opaque Graph provider rule rather than silently
+rewritten.
+
+Delta cursors are process-independent opaque URLs bound to the exact account,
+provider, task list, configured HTTPS origin, and API base. A `410 Gone` cursor
+starts a fresh bounded snapshot and marks the result `reset`; cross-origin,
+cross-list, malformed, and oversized cursors fail before network access. Hosted
+webhooks are not required.
+
+Core task writes re-read the exact ETag immediately before submission and send
+the matching conditional header, but the published To Do update contract does
+not document atomic `If-Match` behavior. Optimistic concurrency therefore stays
+false and the limitation appears in every write review. Checklist and linked-
+resource replacement is a bounded multi-request assembly; partial completion
+returns `write outcome unknown` and is never retried automatically.
+
+Global, GCC High, and DoD endpoint/authority pairs are closed configuration
+choices. Microsoft Graph operated by 21Vianet is rejected before OAuth because
+the To Do APIs are unavailable there. All current evidence is synthetic and
+the opt-in live harness never logs list names, titles, notes, or cursor values.
 
 ## Reads, writes, and sync
 

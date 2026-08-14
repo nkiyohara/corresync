@@ -14,6 +14,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
@@ -112,6 +113,99 @@ func TestTaskRouteRejectsNonTaskAndUnknownProviders(t *testing.T) {
 		if err := configuration.Validate(); err == nil {
 			t.Fatalf("task provider %q unexpectedly validated", provider)
 		}
+	}
+}
+
+func TestMicrosoftTodoRouteRoundTripsAndRejectsCrossCloudEndpoints(t *testing.T) {
+	t.Parallel()
+	configuration := Default()
+	configuration.DefaultAccount = "tasks"
+	route := OAuthRoute{
+		APIBase: "https://graph.microsoft.us/v1.0", MicrosoftCloud: microsoftcloud.GCCHigh,
+		ClientID: "synthetic-public-client", RedirectURI: "http://127.0.0.1:43123/callback",
+		Authorization: CredentialRef{
+			Backend: CredentialOSKeyring, Key: "tasks-graph", Consent: true,
+		},
+	}
+	configuration.Accounts["tasks"] = Account{
+		ID:      "acc_00000000000000000000000000000009",
+		Address: "reader@example.test",
+		Tasks: &TaskRoute{
+			Provider:       domain.ProviderMicrosoftGraph,
+			MicrosoftGraph: &MicrosoftGraphTaskRoute{OAuth: route, ReadOnly: true},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := loaded.Accounts["tasks"].Tasks.MicrosoftGraph
+	if got == nil || !got.ReadOnly || got.OAuth.MicrosoftCloud != microsoftcloud.GCCHigh ||
+		got.OAuth.APIBase != route.APIBase {
+		t.Fatalf("Microsoft To Do route = %+v", got)
+	}
+	missingAddress := configuration.Accounts["tasks"]
+	missingAddress.Address = ""
+	if err := missingAddress.validate(); err == nil || !strings.Contains(err.Error(), "email address") {
+		t.Fatalf("addressless Microsoft To Do route error = %v", err)
+	}
+	bad := configuration
+	account := bad.Accounts["tasks"]
+	account.Tasks.MicrosoftGraph.OAuth.APIBase = "https://graph.microsoft.com/v1.0"
+	bad.Accounts["tasks"] = account
+	if err := bad.Validate(); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("cross-cloud route error = %v", err)
+	}
+	account.Tasks.MicrosoftGraph.OAuth.APIBase = "https://microsoftgraph.chinacloudapi.cn/v1.0"
+	account.Tasks.MicrosoftGraph.OAuth.MicrosoftCloud = microsoftcloud.China
+	bad.Accounts["tasks"] = account
+	if err := bad.Validate(); err == nil || !strings.Contains(err.Error(), "unavailable") {
+		t.Fatalf("China To Do route error = %v", err)
+	}
+}
+
+func TestOAuthHandleSharingRequiresTheSameCanonicalGrant(t *testing.T) {
+	t.Parallel()
+	global := OAuthRoute{
+		APIBase:  "https://graph.microsoft.com/v1.0",
+		ClientID: "synthetic-public-client", RedirectURI: "http://127.0.0.1:43123/callback",
+		Authorization: CredentialRef{
+			Backend: CredentialOSKeyring, Key: "shared-graph", Consent: true,
+		},
+	}
+	explicitGlobal := global
+	explicitGlobal.MicrosoftCloud = microsoftcloud.Global
+	configuration := Default()
+	configuration.DefaultAccount = "shared"
+	configuration.Accounts["shared"] = Account{
+		ID:      "acc_00000000000000000000000000000009",
+		Address: "reader@example.test",
+		Mail: &MailRoute{
+			Provider: domain.ProviderMicrosoftGraph, MicrosoftGraph: &global,
+		},
+		Tasks: &TaskRoute{
+			Provider: domain.ProviderMicrosoftGraph,
+			MicrosoftGraph: &MicrosoftGraphTaskRoute{
+				OAuth: explicitGlobal, ReadOnly: true,
+			},
+		},
+	}
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("legacy and explicit global grant: %v", err)
+	}
+
+	conflicting := explicitGlobal
+	conflicting.APIBase = "https://graph.microsoft.us/v1.0"
+	conflicting.MicrosoftCloud = microsoftcloud.GCCHigh
+	account := configuration.Accounts["shared"]
+	account.Tasks.MicrosoftGraph.OAuth = conflicting
+	configuration.Accounts["shared"] = account
+	if err := configuration.Validate(); err == nil || !strings.Contains(err.Error(), "authorization handle") {
+		t.Fatalf("conflicting shared OAuth handle error = %v", err)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
 )
 
@@ -17,32 +18,51 @@ const (
 type oauthConsentRoute struct {
 	provider domain.ProviderID
 	route    config.OAuthClient
-	mail     bool
-	calendar bool
+	services oauthlocal.Services
+}
+
+func oauthConsentLabel(route oauthConsentRoute) (string, error) {
+	label := string(route.provider)
+	if route.provider != domain.ProviderMicrosoftGraph {
+		return label, nil
+	}
+	cloud, err := microsoftcloud.Resolve(route.services.MicrosoftCloud)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s (%s; %s)", label, cloud.ID, cloud.APIBase), nil
 }
 
 func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
-	routes := make([]oauthConsentRoute, 0, 2)
+	routes := make([]oauthConsentRoute, 0, 3)
 	add := func(
 		provider domain.ProviderID,
 		route *config.OAuthClient,
-		mail, calendar bool,
+		services oauthlocal.Services,
 	) {
 		if route == nil {
 			return
 		}
 		for index := range routes {
 			existing := &routes[index]
+			sameCloud := provider != domain.ProviderMicrosoftGraph ||
+				microsoftcloud.Equivalent(
+					existing.services.MicrosoftCloud,
+					services.MicrosoftCloud,
+				)
 			if existing.provider == provider &&
-				oauthClientsEqual(existing.route, *route) {
-				existing.mail = existing.mail || mail
-				existing.calendar = existing.calendar || calendar
+				oauthClientsEqual(existing.route, *route) &&
+				sameCloud {
+				existing.services.Mail = existing.services.Mail || services.Mail
+				existing.services.Calendar = existing.services.Calendar || services.Calendar
+				existing.services.Tasks = existing.services.Tasks || services.Tasks
+				existing.services.TaskWrite = existing.services.TaskWrite || services.TaskWrite
 				return
 			}
 		}
 		routes = append(routes, oauthConsentRoute{
 			provider: provider, route: *route,
-			mail: mail, calendar: calendar,
+			services: services,
 		})
 	}
 	if account.Mail != nil {
@@ -50,12 +70,14 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 		case domain.ProviderGoogle:
 			if account.Mail.Google != nil {
 				client := account.Mail.Google.Client()
-				add(account.Mail.Provider, &client, true, false)
+				add(account.Mail.Provider, &client, oauthlocal.Services{Mail: true})
 			}
 		case domain.ProviderMicrosoftGraph:
 			if account.Mail.MicrosoftGraph != nil {
 				client := account.Mail.MicrosoftGraph.Client()
-				add(account.Mail.Provider, &client, true, false)
+				add(account.Mail.Provider, &client, oauthlocal.Services{
+					Mail: true, MicrosoftCloud: account.Mail.MicrosoftGraph.MicrosoftCloud,
+				})
 			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
 			domain.ProviderJMAP, domain.ProviderIMAPSMTP,
@@ -71,12 +93,14 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 		case domain.ProviderGoogle:
 			if account.Calendar.Google != nil {
 				client := account.Calendar.Google.Client()
-				add(account.Calendar.Provider, &client, false, true)
+				add(account.Calendar.Provider, &client, oauthlocal.Services{Calendar: true})
 			}
 		case domain.ProviderMicrosoftGraph:
 			if account.Calendar.MicrosoftGraph != nil {
 				client := account.Calendar.MicrosoftGraph.Client()
-				add(account.Calendar.Provider, &client, false, true)
+				add(account.Calendar.Provider, &client, oauthlocal.Services{
+					Calendar: true, MicrosoftCloud: account.Calendar.MicrosoftGraph.MicrosoftCloud,
+				})
 			}
 		case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
 			domain.ProviderJMAP, domain.ProviderIMAPSMTP,
@@ -87,11 +111,18 @@ func accountOAuthConsents(account config.Account) ([]oauthConsentRoute, error) {
 			domain.ProviderThings, domain.ProviderOmniFocus:
 		}
 	}
+	if account.Tasks != nil && account.Tasks.Provider == domain.ProviderMicrosoftGraph &&
+		account.Tasks.MicrosoftGraph != nil {
+		client := account.Tasks.MicrosoftGraph.OAuth.Client()
+		add(account.Tasks.Provider, &client, oauthlocal.Services{
+			Tasks: true, TaskWrite: !account.Tasks.MicrosoftGraph.ReadOnly,
+			MicrosoftCloud: account.Tasks.MicrosoftGraph.OAuth.MicrosoftCloud,
+		})
+	}
 	for _, route := range routes {
 		if _, err := oauthlocal.ProviderFor(
 			route.provider,
-			route.mail,
-			route.calendar,
+			route.services,
 		); err != nil {
 			return nil, err
 		}
@@ -115,15 +146,18 @@ func writeOAuthConsentNotice(app *runtime, account config.Account) error {
 	for _, route := range routes {
 		provider, err := oauthlocal.ProviderFor(
 			route.provider,
-			route.mail,
-			route.calendar,
+			route.services,
 		)
+		if err != nil {
+			return err
+		}
+		label, err := oauthConsentLabel(route)
 		if err != nil {
 			return err
 		}
 		if _, err := view.printf(
 			"   %s: %s\n",
-			route.provider,
+			label,
 			sanitizeCell(strings.Join(provider.Scopes, ", "), 1024),
 		); err != nil {
 			return err

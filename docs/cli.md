@@ -117,12 +117,16 @@ corr account add reader@example.invalid \
   --calendar-authorization-key calendar-graph \
   --approve-calendar-oauth
 
-# Coming soon: an explicit task-only route needs no email discovery
-corr account add \
+# Microsoft To Do task-only route needs no email discovery
+corr account add reader@example.invalid \
   --alias tasks \
-  --mail-provider none \
-  --calendar-provider none \
-  --task-provider todoist
+  --task-provider microsoft-graph \
+  --microsoft-cloud global \
+  --task-oauth-client-id synthetic-public-client \
+  --task-oauth-redirect-uri http://127.0.0.1:0/callback \
+  --task-authorization-key tasks-graph \
+  --approve-task-oauth \
+  --task-read-only
 ```
 
 Mail and calendar providers are independent. Calendar-specific OAuth flags
@@ -135,9 +139,9 @@ Corresync-owned OAuth grant; it never deletes an external standards credential.
 The Google example documents the future route shape. In this RC it returns an
 approval-pending message, persists nothing, and starts no browser, keyring, or
 Google API work. Outlook Web, Graph, JMAP, IMAP/SMTP, and CalDAV routes remain
-available as described above. The task-only example likewise documents the
-stable route shape, but all task providers currently return an unavailable
-message before discovery, authentication, or configuration writes.
+available as described above. The Microsoft To Do task-only example is active
+with synthetic contract evidence; the other task provider IDs remain
+unavailable.
 
 ## Authentication and doctor
 
@@ -405,8 +409,9 @@ and digest while the approval binds the complete content.
 
 Complete, reopen, and delete require the exact version returned by a read.
 Every task write previews; `--approve` commits only that single-use review.
-Task adapters remain unavailable until their provider issues ship, even though
-these stable commands and schemas are present. See [tasks.md](tasks.md).
+Microsoft To Do supports lists, list/get, sync, and the typed write commands;
+search returns an explicit unsupported error. Other task adapters remain
+unavailable until their provider issues ship. See [tasks.md](tasks.md).
 
 ## Read-only import staging
 

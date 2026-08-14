@@ -17,12 +17,13 @@ authorized live observations.
 | Legacy Google Web adapter | Synthetic semantic-DOM contracts retained; runtime sign-in disabled before browser launch | Live sign-in rejected by Google on 2026-07-29 | Unsupported |
 | Approval-gated Gmail and Google Calendar APIs/Google Meet field | Synthetic REST, OAuth-gate, and application integration contracts | Prior [IMAP/SMTP observation](evidence/google-macos-arm64-2026-07-30.md) does not cover the new route | Included but disabled; deterministic only; live-unobserved |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
+| Microsoft Graph To Do | Synthetic OAuth, national-cloud, REST CRUD/delta, recurrence/time-zone, cursor-restart, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
 | JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
 | IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
 | CalDAV calendar | Synthetic WebDAV/iCalendar/conditional-write contracts | Not run | Deterministic only |
 | iCloud guided IMAP/SMTP + CalDAV preset | Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts | Not run | Deterministic only; live-unobserved |
 | Cross-account search and agenda | Isolation, ordering, bounds, partial-failure tests | Not run | Deterministic only |
-| Canonical task model, CLI, MCP, IPC, and cross-account projection | Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests | Not run | Contract only; all task provider routes unavailable |
+| Canonical task model, CLI, MCP, IPC, and cross-account projection | Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests | Not run | Implemented; Microsoft Graph adapter enabled separately |
 | Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
 | Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
 | Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
@@ -59,9 +60,10 @@ evidence.
   keyring, browser, or API access. The route has synthetic contracts only and
   remains live-unobserved. The linked macOS observation covers the retired
   IMAP/SMTP transport and is historical context only.
-- `microsoft-graph`: mail, selectable calendars, and typed Teams-link creation are
-  implemented with a BYO public OAuth client, but have no recorded live
-  observation.
+- `microsoft-graph`: mail, selectable calendars, typed Teams-link creation, and
+  Microsoft To Do are implemented with service-derived scopes and a BYO public
+  OAuth client. Global, GCC High, and DoD use closed endpoint/authority pairs;
+  China rejects To Do before OAuth. The route has no recorded live observation.
 - `jmap`, `imap-smtp`, and `caldav`: implemented against synthetic standards
   contracts, with server-specific behavior exposed through capabilities and
   degradations.
@@ -70,9 +72,9 @@ evidence.
   and an external credential reference. It has synthetic coverage only and
   remains live-unobserved.
 - task routes: the canonical application, CLI, JSON, IPC, MCP, cursor, and
-  preview/commit contracts are implemented. No task adapter is enabled by that
-  foundation; the provider matrix in [Task contract](tasks.md) is a development
-  target, not live or deterministic provider evidence.
+  preview/commit contracts are implemented. Microsoft To Do has deterministic
+  provider contracts and remains live-unobserved. The other rows in the
+  [Task contract](tasks.md) remain development targets, not provider evidence.
 
 `pop3` is a reserved unavailable identifier. Its presence in discovery and
 config validation does not constitute an adapter claim.
@@ -139,7 +141,10 @@ deletion, and calendar invitations require separate explicit authorization.
 The `--connection-only` form reports when the active session last established
 TLS and authorization. It makes no fresh authentication attempt, makes no
 folder, message, event, contact, or attachment metadata request, and reports
-Mail/Calendar status independently.
+Mail/Calendar/Tasks status independently. For a Microsoft To Do observation,
+keep task output local and record only the operation and content-free result
+stage. The build-tagged read-only harness in `internal/provider/graphapi`
+requires an explicit confirmation value and never logs task content.
 
 The former managed Google Web live harness is no longer an accepted observation
 path. Do not use automation-hiding flags or browser fingerprint spoofing to

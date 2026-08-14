@@ -266,16 +266,20 @@ func (command *doctorCommand) addOAuthScopes(
 	for _, route := range routes {
 		provider, err := oauthlocal.ProviderFor(
 			route.provider,
-			route.mail,
-			route.calendar,
+			route.services,
 		)
+		if err != nil {
+			report.add("oauth_scopes", "fail", doctorError(err))
+			return
+		}
+		label, err := oauthConsentLabel(route)
 		if err != nil {
 			report.add("oauth_scopes", "fail", doctorError(err))
 			return
 		}
 		summaries = append(
 			summaries,
-			fmt.Sprintf("%s: %s", route.provider, strings.Join(provider.Scopes, ", ")),
+			fmt.Sprintf("%s: %s", label, strings.Join(provider.Scopes, ", ")),
 		)
 	}
 	report.add(
