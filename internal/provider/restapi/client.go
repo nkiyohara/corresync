@@ -116,7 +116,7 @@ func (client *Client) DoJSON(
 		return Result{}, err
 	}
 	if err := decodeJSONResult(result, responseBody, write); err != nil {
-		return Result{}, err
+		return result, err
 	}
 	return result, nil
 }
@@ -151,7 +151,7 @@ func (client *Client) DoForm(
 		return Result{}, err
 	}
 	if err := decodeJSONResult(result, responseBody, write); err != nil {
-		return Result{}, err
+		return result, err
 	}
 	return result, nil
 }
