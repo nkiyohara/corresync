@@ -25,26 +25,14 @@ const (
 	MaxMessageCursorBytes     = 8192
 )
 
-// MessagingRouteKind identifies one explicit transport without making it a
-// provider fallback or a capability inference.
-type MessagingRouteKind string
+type MessagingRouteKind = domain.MessagingRouteKind
 
 const (
-	MessagingRouteTeamsGraph MessagingRouteKind = "teams_graph"
-	MessagingRouteTeamsWeb   MessagingRouteKind = "teams_web"
-	MessagingRouteSlackAPI   MessagingRouteKind = "slack_api"
-	MessagingRouteMattermost MessagingRouteKind = "mattermost_api"
+	MessagingRouteTeamsGraph = domain.MessagingRouteTeamsGraph
+	MessagingRouteTeamsWeb   = domain.MessagingRouteTeamsWeb
+	MessagingRouteSlackAPI   = domain.MessagingRouteSlackAPI
+	MessagingRouteMattermost = domain.MessagingRouteMattermost
 )
-
-func (kind MessagingRouteKind) Validate() error {
-	switch kind {
-	case MessagingRouteTeamsGraph, MessagingRouteTeamsWeb,
-		MessagingRouteSlackAPI, MessagingRouteMattermost:
-		return nil
-	default:
-		return fmt.Errorf("unsupported messaging route %q", kind)
-	}
-}
 
 // MessageActorMode preserves whether the provider acts as the signed-in user
 // or as a visibly attributed app. Unavailable is a capability state, not an

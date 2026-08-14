@@ -68,6 +68,9 @@ func Load(path string) (Config, error) {
 	if version == 8 {
 		return MigrateV8(data)
 	}
+	if version == 9 {
+		return MigrateV9(data)
+	}
 	return Parse(data)
 }
 

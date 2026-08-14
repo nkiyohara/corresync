@@ -72,12 +72,16 @@ and unshared Corresync-owned OAuth grant state. External standards credentials
 remain in their keyring/helper. Removing the default account requires
 `--new-default`.
 
-## Schema v9
+## Schema v10
 
-Schema v9 adds a typed TickTick task route with separate consented handles for
-its OAuth grant and externally owned confidential-client secret. Existing v8
-files preserve every route and credential consent exactly; migration cannot add
-or authorize TickTick. Schema v8 added the independent Google Tasks OAuth
+Schema v10 adds one optional, closed messaging route for Teams Graph, Teams
+Web, Slack, or Mattermost. Existing v9 files preserve every route and consent
+exactly; migration adds no messaging route, workspace, credential reference,
+monitoring consent, or runtime capability. Messaging remains release-gated
+before credential access, browser launch, or provider traffic until the full
+v0.9 evidence manifest is complete. Schema v9 added the typed TickTick task
+route with separate consented handles for its OAuth grant and externally owned
+confidential-client secret. Schema v8 added the independent Google Tasks OAuth
 payload without enabling the approval-gated route. Schema v7
 added the CalDAV VTODO payload, schema v6 introduced the task route, and
 existing v5 files still migrate with no task route,
@@ -87,7 +91,7 @@ initialized provider-neutral configuration contains no account and has an
 empty `default_account`. The first account added becomes the default:
 
 ```toml
-version = 9
+version = 10
 default_account = ""
 
 [policy]
@@ -112,7 +116,7 @@ auto_submit = false
 A configured Outlook Web account then looks like:
 
 ```toml
-version = 9
+version = 10
 default_account = "work"
 
 [accounts.work]
@@ -159,7 +163,8 @@ them.
 
 ## Per-service routes
 
-Each account may have mail, calendar, tasks, or any explicit combination.
+Each account may have mail, calendar, tasks, messages, or any explicit
+combination.
 Supported route payloads are:
 
 <!-- markdownlint-disable MD013 -->
@@ -180,6 +185,9 @@ Supported route payloads are:
 | tasks | `google-tasks` | `tasks.google_tasks` and `tasks.google_tasks.oauth`; approval-gated |
 | tasks | `ticktick` | `tasks.ticktick` and `tasks.ticktick.oauth` |
 | tasks | `microsoft-web-tasks`, `apple-reminders`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
+| messages | `microsoft-teams` | exactly one of `messages.teams_graph` or `messages.teams_web`; v0.9 release-gated |
+| messages | `slack` | `messages.slack`; v0.9 release-gated |
+| messages | `mattermost` | `messages.mattermost`; v0.9 release-gated |
 <!-- markdownlint-enable MD013 -->
 
 The payload must match the provider exactly. The staged Google mail-and-calendar
@@ -189,6 +197,86 @@ migrated schema-v3 account with deliberately distinct Google clients remains
 valid configuration but cannot activate before approval.
 Graph mail and calendar may share one identical API route. An independent
 IMAP/SMTP mail route can be paired with a CalDAV calendar route.
+
+Messaging configuration binds one stable workspace to one explicitly selected
+transport. Teams Graph may reuse an identical Microsoft public-client grant
+within the same account; Teams Web always uses the account's dedicated visible
+browser profile. Slack and Mattermost store only a consented keyring/helper
+reference to an externally installed authorization. Their token value, a
+browser cookie, and an authorization header are not representable in this
+schema. Messaging credential handles cannot be shared across accounts.
+
+```toml
+[accounts.teams.messages]
+provider = "microsoft-teams"
+
+[accounts.teams.messages.teams_graph]
+workspace_id = "tenant-synthetic"
+read_only = true
+
+[accounts.teams.messages.teams_graph.oauth]
+api_base = "https://graph.microsoft.com/v1.0"
+microsoft_cloud = "global"
+client_id = "synthetic-public-client"
+redirect_uri = "http://127.0.0.1:0/callback"
+
+[accounts.teams.messages.teams_graph.oauth.authorization]
+backend = "os-keyring"
+key = "messages-teams-graph"
+consent = true
+```
+
+The alternative Teams Web payload fixes the provider-owned origin and contains
+no credential reference:
+
+```toml
+[accounts.teams.messages]
+provider = "microsoft-teams"
+
+[accounts.teams.messages.teams_web]
+workspace_id = "tenant-synthetic"
+read_only = true
+
+[accounts.teams.messages.teams_web.web]
+origin = "https://teams.microsoft.com"
+```
+
+Slack pins either its commercial or government API base. Mattermost accepts
+one exact credential-free HTTPS origin; its runtime additionally enforces the
+release's DNS/IP, TLS, redirect, and response bounds.
+
+```toml
+[accounts.slack.messages]
+provider = "slack"
+
+[accounts.slack.messages.slack]
+api_base = "https://slack.com/api"
+workspace_id = "T-SYNTHETIC"
+read_only = true
+
+[accounts.slack.messages.slack.authorization]
+backend = "os-keyring"
+key = "messages-slack"
+consent = true
+
+[accounts.mattermost.messages]
+provider = "mattermost"
+
+[accounts.mattermost.messages.mattermost]
+origin = "https://chat.example.invalid"
+workspace_id = "team-synthetic"
+read_only = true
+
+[accounts.mattermost.messages.mattermost.authorization]
+backend = "os-keyring"
+key = "messages-mattermost"
+consent = true
+```
+
+These are schema examples, not activation instructions. Until the v0.9
+manifest records both Teams routes at parity, all provider live observations,
+surface contracts, documentation, and a clean final security review, every
+messaging route stops before any external effect.
 
 The task route remains closed and secret-free. An implemented Microsoft To
 Do task-only route looks like:

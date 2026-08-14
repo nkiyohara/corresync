@@ -15,7 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CurrentVersion = 9
+const CurrentVersion = 10
 
 const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
@@ -41,6 +41,7 @@ type Account struct {
 	Mail     *MailRoute       `json:"mail,omitempty" toml:"mail,omitempty"`
 	Calendar *CalendarRoute   `json:"calendar,omitempty" toml:"calendar,omitempty"`
 	Tasks    *TaskRoute       `json:"tasks,omitempty" toml:"tasks,omitempty"`
+	Messages *MessagingRoute  `json:"messages,omitempty" toml:"messages,omitempty"`
 	Monitor  *Monitor         `json:"monitor,omitempty" toml:"monitor,omitempty"`
 }
 
@@ -265,6 +266,9 @@ func (configuration Config) Validate() error {
 		}
 	}
 	if err := validateTickTickCredentialIsolation(configuration.Accounts); err != nil {
+		return err
+	}
+	if err := validateMessagingCredentialIsolation(configuration.Accounts); err != nil {
 		return err
 	}
 

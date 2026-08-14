@@ -22,6 +22,7 @@ const taskRouteLegacyVersion = 5
 const calDAVTaskLegacyVersion = 6
 const googleTaskLegacyVersion = 7
 const tickTickLegacyVersion = 8
+const messagingLegacyVersion = 9
 
 type legacyConfig struct {
 	Version        int                      `toml:"version"`
@@ -188,9 +189,66 @@ type tickTickLegacyConfig struct {
 	Feedback       Feedback                         `toml:"feedback"`
 }
 
+// messagingLegacyAccount freezes the v9 account shape so a messaging route
+// cannot be smuggled into an older schema and silently accepted by migration.
+type messagingLegacyAccount struct {
+	ID       domain.AccountID `toml:"id"`
+	Address  string           `toml:"address,omitempty"`
+	Mail     *MailRoute       `toml:"mail,omitempty"`
+	Calendar *CalendarRoute   `toml:"calendar,omitempty"`
+	Tasks    *TaskRoute       `toml:"tasks,omitempty"`
+	Monitor  *Monitor         `toml:"monitor,omitempty"`
+}
+
+type messagingLegacyConfig struct {
+	Version        int                               `toml:"version"`
+	DefaultAccount string                            `toml:"default_account"`
+	Accounts       map[string]messagingLegacyAccount `toml:"accounts"`
+	Policy         Policy                            `toml:"policy"`
+	Browser        Browser                           `toml:"browser"`
+	Credentials    Credentials                       `toml:"credentials,omitempty"`
+	Updates        Updates                           `toml:"updates"`
+	Feedback       Feedback                          `toml:"feedback"`
+}
+
 type updateChannelLegacyUpdates struct {
 	DisableAutomaticChecks bool `toml:"disable_automatic_checks"`
 	AutoInstall            bool `toml:"auto_install"`
+}
+
+// MigrateV9 adds an optional, explicit messaging route. Existing accounts
+// receive no route, authorization, workspace, monitoring consent, or runtime
+// capability.
+func MigrateV9(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var legacy messagingLegacyConfig
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&legacy); err != nil {
+		return Config{}, fmt.Errorf("decode v9 config: %w", err)
+	}
+	if legacy.Version != messagingLegacyVersion {
+		return Config{}, fmt.Errorf("messaging legacy config version must be %d", messagingLegacyVersion)
+	}
+	configuration := Config{
+		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
+		Accounts: make(map[string]Account, len(legacy.Accounts)),
+		Policy:   legacy.Policy, Browser: legacy.Browser,
+		Credentials: legacy.Credentials, Updates: legacy.Updates,
+		Feedback: legacy.Feedback,
+	}
+	for alias, source := range legacy.Accounts {
+		configuration.Accounts[alias] = Account{
+			ID: source.ID, Address: source.Address, Mail: source.Mail,
+			Calendar: source.Calendar, Tasks: source.Tasks, Monitor: source.Monitor,
+		}
+	}
+	if err := configuration.Validate(); err != nil {
+		return Config{}, fmt.Errorf("validate migrated v9 config: %w", err)
+	}
+	return configuration, nil
 }
 
 // MigrateV4 adds the stable update channel without broadening either automatic

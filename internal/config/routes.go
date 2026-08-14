@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -221,9 +222,55 @@ type TaskRoute struct {
 	TickTick       *TickTickTaskRoute       `json:"tickTick,omitempty" toml:"ticktick,omitempty"`
 }
 
+// TeamsGraphMessagingRoute binds messaging to one explicitly selected Graph
+// grant and tenant/workspace. ReadOnly is a local ceiling even when the grant
+// contains broader delegated permissions.
+type TeamsGraphMessagingRoute struct {
+	OAuth       OAuthRoute `json:"oauth" toml:"oauth"`
+	WorkspaceID string     `json:"workspaceId" toml:"workspace_id"`
+	ReadOnly    bool       `json:"readOnly,omitempty" toml:"read_only,omitempty"`
+}
+
+// TeamsWebMessagingRoute uses only the provider-owned visible browser. The
+// workspace is persisted after explicit selection and never inferred from an
+// address or reused from a different account profile.
+type TeamsWebMessagingRoute struct {
+	Web         WebRoute `json:"web" toml:"web"`
+	WorkspaceID string   `json:"workspaceId" toml:"workspace_id"`
+	ReadOnly    bool     `json:"readOnly,omitempty" toml:"read_only,omitempty"`
+}
+
+// SlackMessagingRoute references a provider-supported installation token in
+// an external credential owner. The schema cannot represent the token itself.
+type SlackMessagingRoute struct {
+	APIBase       string        `json:"apiBase" toml:"api_base"`
+	WorkspaceID   string        `json:"workspaceId" toml:"workspace_id"`
+	Authorization CredentialRef `json:"authorization" toml:"authorization"`
+	ReadOnly      bool          `json:"readOnly,omitempty" toml:"read_only,omitempty"`
+}
+
+// MattermostMessagingRoute binds one account to one exact approved server and
+// team. Redirect and DNS/IP policy is enforced again by its runtime transport.
+type MattermostMessagingRoute struct {
+	Origin        string        `json:"origin" toml:"origin"`
+	WorkspaceID   string        `json:"workspaceId" toml:"workspace_id"`
+	Authorization CredentialRef `json:"authorization" toml:"authorization"`
+	ReadOnly      bool          `json:"readOnly,omitempty" toml:"read_only,omitempty"`
+}
+
+// MessagingRoute is a closed tagged union. Exactly one route-specific payload
+// must match Provider; there is no automatic fallback between transports.
+type MessagingRoute struct {
+	Provider   domain.MessagingProviderID `json:"provider" toml:"provider"`
+	TeamsGraph *TeamsGraphMessagingRoute  `json:"teamsGraph,omitempty" toml:"teams_graph,omitempty"`
+	TeamsWeb   *TeamsWebMessagingRoute    `json:"teamsWeb,omitempty" toml:"teams_web,omitempty"`
+	Slack      *SlackMessagingRoute       `json:"slack,omitempty" toml:"slack,omitempty"`
+	Mattermost *MattermostMessagingRoute  `json:"mattermost,omitempty" toml:"mattermost,omitempty"`
+}
+
 func (account Account) validate() error {
-	if account.Mail == nil && account.Calendar == nil && account.Tasks == nil {
-		return errors.New("at least one mail, calendar, or task route is required")
+	if account.Mail == nil && account.Calendar == nil && account.Tasks == nil && account.Messages == nil {
+		return errors.New("at least one mail, calendar, task, or messaging route is required")
 	}
 	if account.Mail != nil {
 		if err := account.Mail.validate(); err != nil {
@@ -243,6 +290,11 @@ func (account Account) validate() error {
 			account.Tasks.Provider == domain.ProviderTodoist ||
 			account.Tasks.Provider == domain.ProviderGoogleTasks) && account.Address == "" {
 			return errors.New("an OAuth task route requires the account email address")
+		}
+	}
+	if account.Messages != nil {
+		if err := account.Messages.validate(); err != nil {
+			return fmt.Errorf("messages: %w", err)
 		}
 	}
 	if err := validateOAuthGrantSharing(account); err != nil {
@@ -322,24 +374,31 @@ func validateTickTickCredentialIsolation(accounts map[string]Account) error {
 				add(account.Calendar.MicrosoftGraph.Authorization, false)
 			}
 		}
-		if account.Tasks == nil {
-			continue
+		if account.Tasks != nil {
+			if account.Tasks.Provider == domain.ProviderMicrosoftGraph {
+				add(account.Tasks.MicrosoftGraph.OAuth.Authorization, false)
+			}
+			if account.Tasks.Provider == domain.ProviderTodoist {
+				add(account.Tasks.Todoist.OAuth.Authorization, false)
+			}
+			if account.Tasks.Provider == domain.ProviderCalDAV {
+				add(account.Tasks.CalDAV.Credential, false)
+			}
+			if account.Tasks.Provider == domain.ProviderGoogleTasks {
+				add(account.Tasks.GoogleTasks.OAuth.Authorization, false)
+			}
+			if account.Tasks.Provider == domain.ProviderTickTick {
+				add(account.Tasks.TickTick.OAuth.Authorization, true)
+				add(account.Tasks.TickTick.OAuth.ClientSecret, true)
+			}
 		}
-		if account.Tasks.Provider == domain.ProviderMicrosoftGraph {
-			add(account.Tasks.MicrosoftGraph.OAuth.Authorization, false)
-		}
-		if account.Tasks.Provider == domain.ProviderTodoist {
-			add(account.Tasks.Todoist.OAuth.Authorization, false)
-		}
-		if account.Tasks.Provider == domain.ProviderCalDAV {
-			add(account.Tasks.CalDAV.Credential, false)
-		}
-		if account.Tasks.Provider == domain.ProviderGoogleTasks {
-			add(account.Tasks.GoogleTasks.OAuth.Authorization, false)
-		}
-		if account.Tasks.Provider == domain.ProviderTickTick {
-			add(account.Tasks.TickTick.OAuth.Authorization, true)
-			add(account.Tasks.TickTick.OAuth.ClientSecret, true)
+		if account.Messages != nil {
+			if account.Messages.Slack != nil {
+				add(account.Messages.Slack.Authorization, false)
+			}
+			if account.Messages.Mattermost != nil {
+				add(account.Messages.Mattermost.Authorization, false)
+			}
 		}
 	}
 	for left := range bindings {
@@ -354,8 +413,39 @@ func validateTickTickCredentialIsolation(accounts map[string]Account) error {
 	return nil
 }
 
+func validateMessagingCredentialIsolation(accounts map[string]Account) error {
+	seen := make(map[string]string)
+	aliases := make([]string, 0, len(accounts))
+	for alias := range accounts {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		route := accounts[alias].Messages
+		if route == nil {
+			continue
+		}
+		var reference *CredentialRef
+		switch {
+		case route.Slack != nil:
+			reference = &route.Slack.Authorization
+		case route.Mattermost != nil:
+			reference = &route.Mattermost.Authorization
+		}
+		if reference == nil {
+			continue
+		}
+		key := string(reference.Backend) + "\x00" + reference.Key
+		if previous, exists := seen[key]; exists {
+			return fmt.Errorf("messaging accounts %q and %q reuse one credential handle", previous, alias)
+		}
+		seen[key] = alias
+	}
+	return nil
+}
+
 func validateOAuthGrantSharing(account Account) error {
-	bindings := make([]oauthGrantBinding, 0, 3)
+	bindings := make([]oauthGrantBinding, 0, 4)
 	add := func(provider domain.ProviderID, client OAuthClient, cloud microsoftcloud.ID) {
 		bindings = append(bindings, oauthGrantBinding{
 			provider: provider, clientID: client.ClientID,
@@ -398,6 +488,10 @@ func validateOAuthGrantSharing(account Account) error {
 		account.Tasks.TickTick != nil {
 		route := account.Tasks.TickTick.OAuth
 		add(domain.ProviderTickTick, route.Client(), "")
+	}
+	if account.Messages != nil && account.Messages.TeamsGraph != nil {
+		route := account.Messages.TeamsGraph.OAuth
+		add(domain.ProviderMicrosoftGraph, route.Client(), route.MicrosoftCloud)
 	}
 	for left := range bindings {
 		for right := left + 1; right < len(bindings); right++ {
@@ -485,6 +579,97 @@ func (route TaskRoute) validate() error {
 	default:
 		return fmt.Errorf("provider %q cannot supply a task route", route.Provider)
 	}
+}
+
+func (route MessagingRoute) validate() error {
+	if err := route.Provider.Validate(); err != nil {
+		return err
+	}
+	present := countNonNil(route.TeamsGraph, route.TeamsWeb, route.Slack, route.Mattermost)
+	if present != 1 {
+		return errors.New("exactly one provider-specific messaging route is required")
+	}
+	switch route.Provider {
+	case domain.MessagingProviderMicrosoftTeams:
+		if route.Slack != nil || route.Mattermost != nil ||
+			(route.TeamsGraph == nil) == (route.TeamsWeb == nil) {
+			return errors.New("microsoft-teams requires exactly one Graph or Teams Web route")
+		}
+		if route.TeamsGraph != nil {
+			return route.TeamsGraph.validate()
+		}
+		return route.TeamsWeb.validate()
+	case domain.MessagingProviderSlack:
+		if route.Slack == nil {
+			return errors.New("slack requires Slack API settings")
+		}
+		return route.Slack.validate()
+	case domain.MessagingProviderMattermost:
+		if route.Mattermost == nil {
+			return errors.New("mattermost requires Mattermost API settings")
+		}
+		return route.Mattermost.validate()
+	default:
+		return fmt.Errorf("provider %q cannot supply a messaging route", route.Provider)
+	}
+}
+
+func (route MessagingRoute) Kind() domain.MessagingRouteKind {
+	switch {
+	case route.TeamsGraph != nil:
+		return domain.MessagingRouteTeamsGraph
+	case route.TeamsWeb != nil:
+		return domain.MessagingRouteTeamsWeb
+	case route.Slack != nil:
+		return domain.MessagingRouteSlackAPI
+	case route.Mattermost != nil:
+		return domain.MessagingRouteMattermost
+	default:
+		return ""
+	}
+}
+
+func (route TeamsGraphMessagingRoute) validate() error {
+	if err := route.OAuth.validateFor(domain.ProviderMicrosoftGraph); err != nil {
+		return err
+	}
+	return validateWorkspaceID(route.WorkspaceID)
+}
+
+func (route TeamsWebMessagingRoute) validate() error {
+	if err := route.Web.validateFor("teams.microsoft.com"); err != nil {
+		return err
+	}
+	return validateWorkspaceID(route.WorkspaceID)
+}
+
+func (route SlackMessagingRoute) validate() error {
+	if err := validateHTTPSURL("Slack API base", route.APIBase); err != nil {
+		return err
+	}
+	parsed, _ := url.Parse(route.APIBase)
+	if (parsed.Host != "slack.com" && parsed.Host != "slack-gov.com") ||
+		parsed.EscapedPath() != "/api" {
+		return errors.New("slack API base must be https://slack.com/api or https://slack-gov.com/api")
+	}
+	if err := validateWorkspaceID(route.WorkspaceID); err != nil {
+		return err
+	}
+	return route.Authorization.validate(false)
+}
+
+func (route MattermostMessagingRoute) validate() error {
+	if err := validateOrigin(route.Origin); err != nil {
+		return fmt.Errorf("mattermost origin: %w", err)
+	}
+	if err := validateWorkspaceID(route.WorkspaceID); err != nil {
+		return err
+	}
+	return route.Authorization.validate(false)
+}
+
+func validateWorkspaceID(value string) error {
+	return validateBoundedText("messaging workspace ID", value, 4096, false)
 }
 
 func (route MailRoute) validate() error {
@@ -613,6 +798,14 @@ func isNilPointer(value any) bool {
 	case *WebRoute:
 		return typed == nil
 	case *CalDAVRoute:
+		return typed == nil
+	case *TeamsGraphMessagingRoute:
+		return typed == nil
+	case *TeamsWebMessagingRoute:
+		return typed == nil
+	case *SlackMessagingRoute:
+		return typed == nil
+	case *MattermostMessagingRoute:
 		return typed == nil
 	default:
 		panic("unsupported route pointer")
@@ -812,7 +1005,7 @@ func (route WebRoute) validateFor(host string) error {
 	}
 	parsed, _ := url.Parse(route.Origin)
 	if parsed.Host != host {
-		return fmt.Errorf("google Web origin must be https://%s", host)
+		return fmt.Errorf("web origin must be https://%s", host)
 	}
 	return nil
 }
@@ -935,6 +1128,14 @@ func (account Account) TaskProvider() domain.ProviderID {
 		return ""
 	}
 	return account.Tasks.Provider
+}
+
+// MessagingProvider returns the independently selected messaging adapter.
+func (account Account) MessagingProvider() domain.MessagingProviderID {
+	if account.Messages == nil {
+		return ""
+	}
+	return account.Messages.Provider
 }
 
 // PrimaryProvider preserves compact status output by preferring mail, then

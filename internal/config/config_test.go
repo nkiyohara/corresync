@@ -1406,6 +1406,162 @@ func TestGoogleWebRoutesRequireExactProviderOwnedOrigins(t *testing.T) {
 	}
 }
 
+func TestMessagingRoutesRoundTripWithoutSecrets(t *testing.T) {
+	t.Parallel()
+
+	routes := map[string]*MessagingRoute{
+		"teams-graph": {
+			Provider: domain.MessagingProviderMicrosoftTeams,
+			TeamsGraph: &TeamsGraphMessagingRoute{
+				WorkspaceID: "tenant-synthetic",
+				OAuth: OAuthRoute{
+					APIBase: "https://graph.microsoft.com/v1.0", ClientID: "client-synthetic",
+					RedirectURI: "http://127.0.0.1:43123/callback",
+					Authorization: CredentialRef{
+						Backend: CredentialOSKeyring, Key: "teams-graph-synthetic", Consent: true,
+					},
+				},
+			},
+		},
+		"teams-web": {
+			Provider: domain.MessagingProviderMicrosoftTeams,
+			TeamsWeb: &TeamsWebMessagingRoute{
+				Web: WebRoute{Origin: "https://teams.microsoft.com"}, WorkspaceID: "tenant-synthetic",
+			},
+		},
+		"slack": {
+			Provider: domain.MessagingProviderSlack,
+			Slack: &SlackMessagingRoute{
+				APIBase: "https://slack.com/api", WorkspaceID: "T-SYNTHETIC",
+				Authorization: CredentialRef{Backend: CredentialHelper, Key: "slack-synthetic", Consent: true},
+			},
+		},
+		"mattermost": {
+			Provider: domain.MessagingProviderMattermost,
+			Mattermost: &MattermostMessagingRoute{
+				Origin: "https://chat.example.test", WorkspaceID: "team-synthetic",
+				Authorization: CredentialRef{Backend: CredentialOSKeyring, Key: "mattermost-synthetic", Consent: true},
+			},
+		},
+	}
+	for name, route := range routes {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			configuration := Default()
+			configuration.DefaultAccount = "messages"
+			configuration.Accounts["messages"] = Account{
+				ID: "acc_00000000000000000000000000000116", Messages: route,
+			}
+			path := filepath.Join(t.TempDir(), "config.toml")
+			if err := Save(path, configuration); err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
+			if err != nil {
+				t.Fatal(err)
+			}
+			if bytes.Contains(encoded, []byte("token")) || bytes.Contains(encoded, []byte("password")) {
+				t.Fatalf("messaging config contains a secret-shaped field:\n%s", encoded)
+			}
+			loaded, err := Load(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := loaded.Accounts["messages"].Messages
+			if got == nil || got.Provider != route.Provider || got.Kind() != route.Kind() {
+				t.Fatalf("messaging round trip = %+v, want %+v", got, route)
+			}
+		})
+	}
+}
+
+func TestMessagingRoutesAreClosedAndAuthorityPinned(t *testing.T) {
+	t.Parallel()
+
+	configuration := Default()
+	configuration.DefaultAccount = "messages"
+	configuration.Accounts["messages"] = Account{
+		ID: "acc_00000000000000000000000000000117",
+		Messages: &MessagingRoute{
+			Provider: domain.MessagingProviderSlack,
+			Slack: &SlackMessagingRoute{
+				APIBase: "https://slack.com/api", WorkspaceID: "T-SYNTHETIC",
+				Authorization: CredentialRef{Backend: CredentialOSKeyring, Key: "slack-synthetic", Consent: true},
+			},
+		},
+	}
+	if err := configuration.Validate(); err != nil {
+		t.Fatalf("valid Slack messaging route rejected: %v", err)
+	}
+
+	account := configuration.Accounts["messages"]
+	account.Messages.Slack.APIBase = "https://slack.com.attacker.invalid/api"
+	configuration.Accounts["messages"] = account
+	if err := configuration.Validate(); err == nil || !strings.Contains(err.Error(), "slack API base") {
+		t.Fatalf("lookalike Slack authority error = %v", err)
+	}
+
+	account.Messages.Slack.APIBase = "https://slack.com/api"
+	account.Messages.TeamsWeb = &TeamsWebMessagingRoute{
+		Web: WebRoute{Origin: "https://teams.microsoft.com"}, WorkspaceID: "tenant-synthetic",
+	}
+	configuration.Accounts["messages"] = account
+	if err := configuration.Validate(); err == nil || !strings.Contains(err.Error(), "exactly one") {
+		t.Fatalf("ambiguous messaging union error = %v", err)
+	}
+}
+
+func TestMessagingCredentialHandlesCannotCrossAccounts(t *testing.T) {
+	t.Parallel()
+
+	configuration := Default()
+	configuration.DefaultAccount = "slack"
+	shared := CredentialRef{Backend: CredentialOSKeyring, Key: "shared-messaging", Consent: true}
+	configuration.Accounts["slack"] = Account{
+		ID: "acc_00000000000000000000000000000118",
+		Messages: &MessagingRoute{
+			Provider: domain.MessagingProviderSlack,
+			Slack:    &SlackMessagingRoute{APIBase: "https://slack.com/api", WorkspaceID: "T-SYNTHETIC", Authorization: shared},
+		},
+	}
+	configuration.Accounts["mattermost"] = Account{
+		ID: "acc_00000000000000000000000000000119",
+		Messages: &MessagingRoute{
+			Provider: domain.MessagingProviderMattermost,
+			Mattermost: &MattermostMessagingRoute{
+				Origin: "https://chat.example.test", WorkspaceID: "team-synthetic", Authorization: shared,
+			},
+		},
+	}
+	if err := configuration.Validate(); err == nil || !strings.Contains(err.Error(), "reuse one credential handle") {
+		t.Fatalf("shared messaging credential error = %v", err)
+	}
+}
+
+func TestMigrateV9AddsNoMessagingAuthority(t *testing.T) {
+	t.Parallel()
+
+	legacy := OutlookDefault()
+	legacy.Version = 9
+	raw, err := toml.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migrated, err := MigrateV9(raw)
+	if err != nil || migrated.Version != CurrentVersion || migrated.Accounts["work"].Messages != nil {
+		t.Fatalf("MigrateV9() = %+v, %v", migrated, err)
+	}
+	withMessages := strings.Replace(
+		string(raw),
+		"[policy]",
+		"[accounts.work.messages]\nprovider = 'slack'\n\n[policy]",
+		1,
+	)
+	if _, err := MigrateV9([]byte(withMessages)); err == nil || !strings.Contains(err.Error(), "strict mode") {
+		t.Fatalf("v9 messaging payload error = %v", err)
+	}
+}
+
 func testOutlookAccount(
 	id domain.AccountID,
 	origin string,

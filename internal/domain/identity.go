@@ -107,6 +107,28 @@ func (provider MessagingProviderID) Validate() error {
 	}
 }
 
+// MessagingRouteKind identifies one explicitly selected transport. Keeping it
+// in the domain lets configuration and application code share the same closed
+// identity without either layer depending on a provider adapter.
+type MessagingRouteKind string
+
+const (
+	MessagingRouteTeamsGraph MessagingRouteKind = "teams_graph"
+	MessagingRouteTeamsWeb   MessagingRouteKind = "teams_web"
+	MessagingRouteSlackAPI   MessagingRouteKind = "slack_api"
+	MessagingRouteMattermost MessagingRouteKind = "mattermost_api"
+)
+
+func (kind MessagingRouteKind) Validate() error {
+	switch kind {
+	case MessagingRouteTeamsGraph, MessagingRouteTeamsWeb,
+		MessagingRouteSlackAPI, MessagingRouteMattermost:
+		return nil
+	default:
+		return fmt.Errorf("unsupported messaging route %q", kind)
+	}
+}
+
 // Caller identifies the local adapter instance requesting an operation.
 type Caller struct {
 	Surface  string `json:"surface"`
