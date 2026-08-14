@@ -183,15 +183,39 @@ func (kind ConversationKind) Validate() error {
 	}
 }
 
+// ConversationVisibility preserves provider-observed access shape. Unknown is
+// explicit: a missing provider field must never be normalized to private.
+type ConversationVisibility string
+
+const (
+	ConversationVisibilityUnknown ConversationVisibility = "unknown"
+	ConversationVisibilityPublic  ConversationVisibility = "public"
+	ConversationVisibilityPrivate ConversationVisibility = "private"
+	ConversationVisibilityShared  ConversationVisibility = "shared"
+)
+
+func (visibility ConversationVisibility) Validate() error {
+	switch visibility {
+	case ConversationVisibilityUnknown, ConversationVisibilityPublic,
+		ConversationVisibilityPrivate, ConversationVisibilityShared:
+		return nil
+	default:
+		return fmt.Errorf("unsupported conversation visibility %q", visibility)
+	}
+}
+
 type Conversation struct {
-	ID             string              `json:"id"`
-	Version        string              `json:"version,omitempty"`
-	Kind           ConversationKind    `json:"kind"`
-	Name           string              `json:"name,omitempty"`
-	Topic          string              `json:"topic,omitempty"`
-	MemberCount    int                 `json:"memberCount,omitempty"`
-	LastActivityAt string              `json:"lastActivityAt,omitempty"`
-	Provenance     MessagingProvenance `json:"provenance"`
+	ID               string                 `json:"id"`
+	ContainerID      string                 `json:"containerId,omitempty"`
+	Version          string                 `json:"version,omitempty"`
+	Kind             ConversationKind       `json:"kind"`
+	Visibility       ConversationVisibility `json:"visibility"`
+	Name             string                 `json:"name,omitempty"`
+	Topic            string                 `json:"topic,omitempty"`
+	MemberCount      int                    `json:"memberCount,omitempty"`
+	MemberCountKnown bool                   `json:"memberCountKnown"`
+	LastActivityAt   string                 `json:"lastActivityAt,omitempty"`
+	Provenance       MessagingProvenance    `json:"provenance"`
 }
 
 func (conversation Conversation) Validate() error {
@@ -203,7 +227,15 @@ func (conversation Conversation) Validate() error {
 			return err
 		}
 	}
+	if conversation.ContainerID != "" {
+		if err := validateOpaqueValue("conversation container ID", conversation.ContainerID); err != nil {
+			return err
+		}
+	}
 	if err := conversation.Kind.Validate(); err != nil {
+		return err
+	}
+	if err := conversation.Visibility.Validate(); err != nil {
 		return err
 	}
 	if err := validateMessageDisplay("conversation name", conversation.Name, 4096); err != nil {
@@ -214,6 +246,9 @@ func (conversation Conversation) Validate() error {
 	}
 	if conversation.MemberCount < 0 || conversation.MemberCount > 1_000_000 {
 		return errors.New("conversation member count is out of bounds")
+	}
+	if !conversation.MemberCountKnown && conversation.MemberCount != 0 {
+		return errors.New("an unobserved conversation member count must be zero")
 	}
 	if err := validateOptionalTimestamp("conversation activity", conversation.LastActivityAt); err != nil {
 		return err
@@ -352,6 +387,7 @@ type MessageAttachment struct {
 	Name         string `json:"name"`
 	MediaType    string `json:"mediaType,omitempty"`
 	Size         int64  `json:"size"`
+	SizeKnown    bool   `json:"sizeKnown"`
 	Downloadable bool   `json:"downloadable"`
 }
 
@@ -367,6 +403,9 @@ func (attachment MessageAttachment) Validate() error {
 	}
 	if attachment.Size < 0 || attachment.Size > 1<<40 {
 		return errors.New("message attachment size is out of bounds")
+	}
+	if !attachment.SizeKnown && attachment.Size != 0 {
+		return errors.New("an unobserved message attachment size must be zero")
 	}
 	return nil
 }

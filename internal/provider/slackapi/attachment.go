@@ -85,7 +85,7 @@ func (client *Client) getSlackAttachment(
 		Metadata: application.MessageAttachment{
 			ID: selected.ID, Name: boundedSlackText(name, 4096),
 			MediaType: boundedSlackText(selected.MediaType, 256), Size: selected.Size,
-			Downloadable: true,
+			SizeKnown: true, Downloadable: true,
 		},
 		Data: data,
 	}, nil

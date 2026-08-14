@@ -60,6 +60,7 @@
       "name": "synthetic.txt",
       "mediaType": "text/plain",
       "size": 17,
+      "sizeKnown": true,
       "downloadable": true
     }
   ]

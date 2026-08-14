@@ -168,7 +168,8 @@ func TestMessagingReadsNormalizeAndIsolateProvenance(t *testing.T) {
 	now := time.Date(2026, 8, 14, 12, 1, 0, 0, time.UTC)
 	port := &fakeMessagingPort{
 		conversations: ConversationPage{Conversations: []Conversation{{
-			ID: "conversation-1", Version: "version-1", Kind: ConversationChannel, Name: "Synthetic",
+			ID: "conversation-1", Version: "version-1", Kind: ConversationChannel,
+			Visibility: ConversationVisibilityPrivate, Name: "Synthetic",
 		}}, ObservedAt: now},
 		page: MessagePage{Messages: []MessageSummary{validMessageSummary("message-1", "conversation-1")}, ObservedAt: now},
 	}
@@ -236,7 +237,7 @@ func TestMessagingSensitiveReadsUseExactPreviewAndCommit(t *testing.T) {
 	port := &fakeMessagingPort{
 		message: validMessage("message-1", "conversation-1"),
 		attachment: MessageAttachmentContent{
-			Metadata: MessageAttachment{ID: "attachment-1", Name: "fixture.txt", MediaType: "text/plain", Size: 7, Downloadable: true},
+			Metadata: MessageAttachment{ID: "attachment-1", Name: "fixture.txt", MediaType: "text/plain", Size: 7, SizeKnown: true, Downloadable: true},
 			Data:     []byte("fixture"),
 		},
 	}
@@ -370,6 +371,9 @@ func TestMessagingModelBoundsAndClosedValues(t *testing.T) {
 		(MessageContent{Format: MessageFormatPlain, Text: strings.Repeat("x", MaxMessageTextBytes+1)}).Validate(),
 		(MessageLink{URL: "javascript:alert(1)"}).Validate(),
 		(MessageReaction{Name: "thumbsup", Count: 1}).Validate(),
+		(MessageAttachment{ID: "attachment-1", Name: "fixture", Size: 1}).Validate(),
+		(Conversation{ID: "conversation-1", Kind: ConversationChannel,
+			Visibility: ConversationVisibilityPrivate, MemberCount: 1}).Validate(),
 		(MessageAttachmentUpload{Name: "fixture", Data: make([]byte, MaxMessageAttachmentBytes+1)}).Validate(),
 		(MessageCapabilities{ListConversations: true, History: true, Reply: true, ActorMode: MessageActorApp}).Validate(),
 		(ConversationCreateInput{MessageWriteRoute: validMessageWriteRoute(), Kind: ConversationMeeting,

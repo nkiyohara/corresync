@@ -85,7 +85,12 @@ func mapSlackConversation(source slackConversation) (application.Conversation, e
 	conversation := application.Conversation{
 		ID: source.ID, Version: slackConversationVersion(source), Kind: kind,
 		Name: boundedSlackText(source.Name, 4096), Topic: boundedSlackText(source.Topic.Value, 8192),
-		MemberCount: source.NumMembers,
+		MemberCount: source.NumMembers, MemberCountKnown: true,
+	}
+	if source.IsPrivate || source.IsIM || source.IsMPIM || source.IsGroup {
+		conversation.Visibility = application.ConversationVisibilityPrivate
+	} else {
+		conversation.Visibility = application.ConversationVisibilityPublic
 	}
 	return conversation, nil
 }
@@ -169,7 +174,7 @@ func mapSlackMessage(source slackMessage, conversationID, actorID string) (appli
 		attachments = append(attachments, application.MessageAttachment{
 			ID: file.ID, Name: boundedSlackText(name, 4096),
 			MediaType: boundedSlackText(file.MediaType, 256), Size: file.Size,
-			Downloadable: file.URLPrivateDownload != "" || file.URLPrivate != "",
+			SizeKnown: true, Downloadable: file.URLPrivateDownload != "" || file.URLPrivate != "",
 		})
 	}
 	reactions := make([]application.MessageReaction, 0, len(source.Reactions))

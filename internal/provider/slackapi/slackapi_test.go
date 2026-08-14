@@ -315,7 +315,8 @@ func TestSlackClosedWriteCohortUsesOnlyReviewedMethods(t *testing.T) {
 		t.Fatalf("DeleteMessage() error = %v", err)
 	}
 	created, err := client.CreateConversation(t.Context(), application.ConversationCreateInput{
-		MessageWriteRoute: route, Kind: application.ConversationChannel, Name: "new-channel",
+		MessageWriteRoute: route, Kind: application.ConversationChannel,
+		Visibility: application.ConversationVisibilityPublic, Name: "new-channel",
 		Members: []application.ConversationMemberInput{{ID: "USYNTHETICAPP", Role: application.ConversationMember}},
 	})
 	if err != nil || created.ID != "CNEWCHANNEL" {

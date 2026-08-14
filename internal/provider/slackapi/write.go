@@ -181,6 +181,9 @@ func (client *Client) CreateConversation(
 	var request any
 	switch input.Kind {
 	case application.ConversationChannel:
+		if input.ContainerID != "" || input.Visibility == application.ConversationVisibilityShared {
+			return application.Conversation{}, errors.New("slack channels do not accept a parent container or shared visibility")
+		}
 		if input.Name == "" {
 			return application.Conversation{}, errors.New("slack channel creation requires a name")
 		}
@@ -191,9 +194,13 @@ func (client *Client) CreateConversation(
 		}
 		resource = "conversations.create"
 		request = struct {
-			Name string `json:"name"`
-		}{Name: input.Name}
+			Name      string `json:"name"`
+			IsPrivate bool   `json:"is_private"`
+		}{Name: input.Name, IsPrivate: input.Visibility == application.ConversationVisibilityPrivate}
 	case application.ConversationDirect, application.ConversationGroup:
+		if input.Visibility != application.ConversationVisibilityPrivate {
+			return application.Conversation{}, errors.New("slack direct/group conversations must be private")
+		}
 		members := make([]string, 0, len(input.Members))
 		for _, member := range input.Members {
 			if member.Role != application.ConversationMember {

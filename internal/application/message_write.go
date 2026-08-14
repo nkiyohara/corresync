@@ -173,6 +173,7 @@ type ConversationMemberRole string
 const (
 	ConversationMember ConversationMemberRole = "member"
 	ConversationOwner  ConversationMemberRole = "owner"
+	ConversationGuest  ConversationMemberRole = "guest"
 )
 
 type ConversationMemberInput struct {
@@ -186,7 +187,7 @@ func (member ConversationMemberInput) Validate() error {
 		return err
 	}
 	switch member.Role {
-	case ConversationMember, ConversationOwner:
+	case ConversationMember, ConversationOwner, ConversationGuest:
 	default:
 		return fmt.Errorf("unsupported conversation member role %q", member.Role)
 	}
@@ -195,10 +196,12 @@ func (member ConversationMemberInput) Validate() error {
 
 type ConversationCreateInput struct {
 	MessageWriteRoute
-	Kind    ConversationKind          `json:"kind"`
-	Name    string                    `json:"name,omitempty"`
-	Topic   string                    `json:"topic,omitempty"`
-	Members []ConversationMemberInput `json:"members"`
+	ContainerID string                    `json:"containerId,omitempty"`
+	Kind        ConversationKind          `json:"kind"`
+	Visibility  ConversationVisibility    `json:"visibility"`
+	Name        string                    `json:"name,omitempty"`
+	Topic       string                    `json:"topic,omitempty"`
+	Members     []ConversationMemberInput `json:"members"`
 }
 
 func (input ConversationCreateInput) Validate() error {
@@ -210,6 +213,23 @@ func (input ConversationCreateInput) Validate() error {
 	}
 	if input.Kind == ConversationMeeting {
 		return errors.New("meeting lifecycle creation is outside messaging scope")
+	}
+	if input.ContainerID != "" {
+		if err := validateOpaqueValue("conversation container ID", input.ContainerID); err != nil {
+			return err
+		}
+	}
+	if err := input.Visibility.Validate(); err != nil {
+		return err
+	}
+	if input.Kind != ConversationChannel && input.Visibility != ConversationVisibilityPrivate {
+		return errors.New("direct and group conversations must be private")
+	}
+	if input.Kind != ConversationChannel && input.ContainerID != "" {
+		return errors.New("only a channel can select a parent container")
+	}
+	if input.Kind == ConversationChannel && input.Visibility == ConversationVisibilityUnknown {
+		return errors.New("channel creation requires explicit visibility")
 	}
 	if err := validateMessageDisplay("conversation name", input.Name, 4096); err != nil {
 		return err
@@ -305,6 +325,8 @@ type MessageWriteReview struct {
 	Reaction       string                       `json:"reaction,omitempty"`
 	RemoveReaction bool                         `json:"removeReaction,omitempty"`
 	Kind           ConversationKind             `json:"kind,omitempty"`
+	ContainerID    string                       `json:"containerId,omitempty"`
+	Visibility     ConversationVisibility       `json:"visibility,omitempty"`
 	Name           string                       `json:"name,omitempty"`
 	Topic          string                       `json:"topic,omitempty"`
 	Members        []ConversationMemberInput    `json:"members,omitempty"`
@@ -699,7 +721,8 @@ func (input MessageReactionInput) review() MessageWriteReview {
 
 func (input ConversationCreateInput) review() MessageWriteReview {
 	return MessageWriteReview{
-		Action: "create_conversation", Kind: input.Kind, Name: input.Name, Topic: input.Topic,
+		Action: "create_conversation", ContainerID: input.ContainerID,
+		Kind: input.Kind, Visibility: input.Visibility, Name: input.Name, Topic: input.Topic,
 		Members: append([]ConversationMemberInput(nil), input.Members...),
 	}
 }
