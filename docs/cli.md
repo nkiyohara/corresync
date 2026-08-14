@@ -113,6 +113,13 @@ corr account add reader@example.invalid \
   --calendar-oauth-redirect-uri http://127.0.0.1:0/callback \
   --calendar-authorization-key calendar-graph \
   --approve-calendar-oauth
+
+# Coming soon: an explicit task-only route needs no email discovery
+corr account add \
+  --alias tasks \
+  --mail-provider none \
+  --calendar-provider none \
+  --task-provider todoist
 ```
 
 Mail and calendar providers are independent. Calendar-specific OAuth flags
@@ -125,7 +132,9 @@ Corresync-owned OAuth grant; it never deletes an external standards credential.
 The Google example documents the future route shape. In this RC it returns an
 approval-pending message, persists nothing, and starts no browser, keyring, or
 Google API work. Outlook Web, Graph, JMAP, IMAP/SMTP, and CalDAV routes remain
-available as described above.
+available as described above. The task-only example likewise documents the
+stable route shape, but all task providers currently return an unavailable
+message before discovery, authentication, or configuration writes.
 
 ## Authentication and doctor
 
@@ -354,6 +363,47 @@ capability.
 `--online-meeting` requests the selected route's observed native provider
 (Teams or Google Meet). The transitional `--teams-meeting` spelling requires a
 Teams-capable route and fails on Google rather than silently changing meaning.
+
+## Tasks
+
+```console
+corr tasks lists --account work
+corr tasks list --account work --list-id opaque-list-id
+corr tasks list --all-accounts --status needs_action
+corr tasks get --account work --list-id opaque-list-id --task-id opaque-task-id
+corr tasks search --account work --query synthetic
+corr tasks sync --account work --list-id opaque-list-id --json
+```
+
+Without `--json`, `tasks sync` prints the next cursor as a complete JSON value
+that can be saved verbatim and passed back with `--cursor-file`. Cursors are
+opaque, account/provider/list scoped data and never authorization.
+
+Create and update use the strict canonical JSON contract rather than a growing
+provider-shaped flag dialect:
+
+```console
+corr tasks create --account work --file ./task-create.json
+corr tasks create --account work --file ./task-create.json --approve
+corr tasks update --account work --file ./task-update.json --approve
+
+corr tasks complete --account work \
+  --list-id opaque-list-id \
+  --task-id opaque-task-id \
+  --task-version opaque-version \
+  --approve
+```
+
+The file must omit `account`; `--account` is the only routing selector. Unknown
+JSON fields, trailing values, oversized documents, unsupported capabilities,
+and mismatched replacement flags fail before provider access. Each write prints
+the exact typed review. Notes are represented by a bounded preview, byte count,
+and digest while the approval binds the complete content.
+
+Complete, reopen, and delete require the exact version returned by a read.
+Every task write previews; `--approve` commits only that single-use review.
+Task adapters remain unavailable until their provider issues ship, even though
+these stable commands and schemas are present. See [tasks.md](tasks.md).
 
 ## Read-only import staging
 

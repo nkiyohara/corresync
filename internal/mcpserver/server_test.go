@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -111,6 +113,22 @@ type fakeBackend struct {
 	monitorPage          application.MonitorEventPage
 	monitorAckInput      application.MonitorAcknowledgeInput
 	monitorEvent         application.MonitorEvent
+	taskListsInput       application.TaskListInput
+	taskReadInput        application.TaskReadInput
+	taskProjectionInput  application.TaskProjectionInput
+	taskGetInput         application.TaskGetInput
+	taskSearchInput      application.TaskSearchInput
+	taskSyncInput        application.TaskSyncInput
+	taskCreateInput      application.TaskCreateInput
+	taskUpdateInput      application.TaskUpdateInput
+	taskStateInput       application.TaskStateInput
+	taskListsPage        application.TaskListPage
+	taskPage             application.TaskPage
+	taskProjectionPage   application.TaskProjectionPage
+	task                 application.Task
+	taskChangePage       application.TaskChangePage
+	taskAccess           application.TaskWriteAccess
+	taskAction           string
 	err                  error
 }
 
@@ -392,6 +410,133 @@ func (backend *fakeBackend) CommitCalendarCancel(
 	return backend.calendarCancelAccess, backend.err
 }
 
+func (backend *fakeBackend) ListTaskLists(
+	_ context.Context,
+	input application.TaskListInput,
+	caller domain.Caller,
+) (application.TaskListPage, error) {
+	backend.taskListsInput, backend.caller = input, caller
+	return backend.taskListsPage, backend.err
+}
+
+func (backend *fakeBackend) ListTasks(
+	_ context.Context,
+	input application.TaskReadInput,
+	caller domain.Caller,
+) (application.TaskPage, error) {
+	backend.taskReadInput, backend.caller = input, caller
+	return backend.taskPage, backend.err
+}
+
+func (backend *fakeBackend) ListAllTasks(
+	_ context.Context,
+	input application.TaskProjectionInput,
+	caller domain.Caller,
+) (application.TaskProjectionPage, error) {
+	backend.taskProjectionInput, backend.caller = input, caller
+	return backend.taskProjectionPage, backend.err
+}
+
+func (backend *fakeBackend) GetTask(
+	_ context.Context,
+	input application.TaskGetInput,
+	caller domain.Caller,
+) (application.Task, error) {
+	backend.taskGetInput, backend.caller = input, caller
+	return backend.task, backend.err
+}
+
+func (backend *fakeBackend) SearchTasks(
+	_ context.Context,
+	input application.TaskSearchInput,
+	caller domain.Caller,
+) (application.TaskPage, error) {
+	backend.taskSearchInput, backend.caller = input, caller
+	return backend.taskPage, backend.err
+}
+
+func (backend *fakeBackend) SyncTasks(
+	_ context.Context,
+	input application.TaskSyncInput,
+	caller domain.Caller,
+) (application.TaskChangePage, error) {
+	backend.taskSyncInput, backend.caller = input, caller
+	return backend.taskChangePage, backend.err
+}
+
+func (backend *fakeBackend) CreateTask(
+	_ context.Context,
+	input application.TaskCreateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	backend.taskCreateInput, backend.taskAction, backend.caller = input, "create", caller
+	return backend.taskAccess, backend.err
+}
+
+func (backend *fakeBackend) UpdateTask(
+	_ context.Context,
+	input application.TaskUpdateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	backend.taskUpdateInput, backend.taskAction, backend.caller = input, "update", caller
+	return backend.taskAccess, backend.err
+}
+
+func (backend *fakeBackend) CompleteTask(
+	_ context.Context,
+	input application.TaskStateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	backend.taskStateInput, backend.taskAction, backend.caller = input, "complete", caller
+	return backend.taskAccess, backend.err
+}
+
+func (backend *fakeBackend) ReopenTask(
+	_ context.Context,
+	input application.TaskStateInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	backend.taskStateInput, backend.taskAction, backend.caller = input, "reopen", caller
+	return backend.taskAccess, backend.err
+}
+
+func (backend *fakeBackend) DeleteTask(
+	_ context.Context,
+	input application.TaskDeleteInput,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	backend.taskStateInput, backend.taskAction, backend.caller = input, "delete", caller
+	return backend.taskAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitTaskCreate(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTask("commit_create", token, caller)
+}
+
+func (backend *fakeBackend) CommitTaskUpdate(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTask("commit_update", token, caller)
+}
+
+func (backend *fakeBackend) CommitTaskComplete(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTask("commit_complete", token, caller)
+}
+
+func (backend *fakeBackend) CommitTaskReopen(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTask("commit_reopen", token, caller)
+}
+
+func (backend *fakeBackend) CommitTaskDelete(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.commitTask("commit_delete", token, caller)
+}
+
+func (backend *fakeBackend) commitTask(
+	action, token string,
+	caller domain.Caller,
+) (application.TaskWriteAccess, error) {
+	backend.taskAction, backend.approvalToken, backend.caller = action, token, caller
+	return backend.taskAccess, backend.err
+}
+
 func (backend *fakeBackend) GetMailBody(
 	_ context.Context,
 	input application.MailBodyInput,
@@ -579,7 +724,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 45 || mailTool == nil {
+	if len(tools.Tools) != 61 || mailTool == nil || toolNamed(tools.Tools, "task_list") == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations
@@ -1379,6 +1524,90 @@ func TestMailListToolPropagatesApplicationErrorsAsToolErrors(t *testing.T) {
 	}
 	if !result.IsError {
 		t.Fatalf("CallTool() IsError = false, want true: %+v", result)
+	}
+}
+
+func TestTaskToolsUseTypedRoutesAndSeparateDestructiveCommit(t *testing.T) {
+	t.Parallel()
+
+	backend := &fakeBackend{taskAccess: application.TaskWriteAccess{Status: "approval_required"}}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+	tools, err := client.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"task_lists", "task_list", "task_list_all", "task_get", "task_search", "task_sync"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil || !tool.Annotations.ReadOnlyHint ||
+			tool.Annotations.DestructiveHint == nil || *tool.Annotations.DestructiveHint {
+			t.Fatalf("unsafe task read tool %q: %+v", name, tool)
+		}
+	}
+	for _, name := range []string{"task_create", "task_create_commit", "task_update", "task_update_commit", "task_complete", "task_complete_commit", "task_reopen", "task_reopen_commit"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil || tool.Annotations.ReadOnlyHint ||
+			tool.Annotations.DestructiveHint == nil || *tool.Annotations.DestructiveHint {
+			t.Fatalf("unsafe task write tool %q: %+v", name, tool)
+		}
+	}
+	for _, name := range []string{"task_delete", "task_delete_commit"} {
+		tool := toolNamed(tools.Tools, name)
+		if tool == nil || tool.Annotations == nil || tool.Annotations.ReadOnlyHint ||
+			tool.Annotations.DestructiveHint == nil || !*tool.Annotations.DestructiveHint {
+			t.Fatalf("unsafe task delete tool %q: %+v", name, tool)
+		}
+	}
+	if got := toolNamed(tools.Tools, "task_delete_commit").Meta["io.github.nkiyohara.corresync/data-classification"]; got != "approval-capability" {
+		t.Fatalf("task delete commit classification = %v", got)
+	}
+
+	result, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name:      "task_list",
+		Arguments: map[string]any{"listId": "list-1", "status": "needs_action"},
+	})
+	if err != nil || result.IsError || backend.taskReadInput.Account != "work" ||
+		backend.taskReadInput.ListID != "list-1" || backend.taskReadInput.Limit != 50 ||
+		backend.taskReadInput.Status != application.TaskStatusNeedsAction {
+		t.Fatalf("task_list failed: result=%+v input=%+v error=%v", result, backend.taskReadInput, err)
+	}
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "testdata", "contracts", "task-create-v1.json")) // #nosec G304 -- fixed synthetic fixture.
+	if err != nil {
+		t.Fatal(err)
+	}
+	var taskArguments map[string]any
+	if err := json.Unmarshal(fixture, &taskArguments); err != nil {
+		t.Fatal(err)
+	}
+	result, err = client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "task_create", Arguments: taskArguments,
+	})
+	if err != nil || result.IsError || backend.taskCreateInput.Account != "work" ||
+		backend.taskCreateInput.Title != "Review the synthetic release checklist" ||
+		backend.taskCreateInput.Due == nil || len(backend.taskCreateInput.Labels) != 2 ||
+		len(backend.taskCreateInput.Checklist) != 1 || len(backend.taskCreateInput.Sources) != 1 {
+		t.Fatalf("task_create failed: result=%+v input=%+v error=%v", result, backend.taskCreateInput, err)
+	}
+	result, err = client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "task_delete",
+		Arguments: map[string]any{
+			"listId": "list-1", "taskId": "task-1", "version": "version-1",
+		},
+	})
+	if err != nil || result.IsError || backend.taskAction != "delete" ||
+		backend.taskStateInput.Version != "version-1" {
+		t.Fatalf("task_delete failed: result=%+v input=%+v error=%v", result, backend.taskStateInput, err)
+	}
+	result, err = client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name:      "task_delete_commit",
+		Arguments: map[string]any{"token": "opv1_task_synthetic"}, //nolint:gosec // gitleaks:allow -- synthetic approval fixture
+	})
+	if err != nil || result.IsError || backend.taskAction != "commit_delete" ||
+		backend.approvalToken != "opv1_task_synthetic" {
+		t.Fatalf("task_delete_commit failed: result=%+v token=%q error=%v", result, backend.approvalToken, err)
 	}
 }
 

@@ -16,6 +16,12 @@ not available through a raw protocol escape hatch.
 | `caldav` | — | Calendar | OS keyring or approved credential helper | Implemented; synthetic WebDAV/iCalendar contracts; live-unobserved |
 <!-- markdownlint-enable MD013 -->
 
+Task routes use a separate provider selection described in the
+[task contract](tasks.md). The canonical surfaces and synthetic conformance
+fixtures are implemented, but no task provider adapter is activated by this
+foundation. A configured task route is reported as unavailable until its
+dependent provider issue ships.
+
 Mail and calendar are selected independently. For example, one account may use
 IMAP/SMTP for mail and CalDAV for calendar. `pop3` is reserved without a route
 builder and cannot be selected.
@@ -156,19 +162,39 @@ calendar object and the account reports an explicit degradation.
 Teams chat, channels, calls, recordings, and meeting lifecycle management are
 outside scope.
 
+## Tasks
+
+<!-- markdownlint-disable MD013 -->
+| Capability | CLI | MCP | Safety |
+| --- | --- | --- | --- |
+| Discover lists | `corr tasks lists` | `task_lists` | Bounded metadata and observed capabilities |
+| List one account | `corr tasks list` | `task_list` | Exact account/list provenance |
+| List all accounts | `corr tasks list --all-accounts` | `task_list_all` | Isolated read-only projection with partial failures |
+| Get/search | `corr tasks get/search` | `task_get`, `task_search` | Bounded private untrusted data |
+| Incremental changes | `corr tasks sync` | `task_sync` | Cursor bound to provider, account, list, and mode |
+| Create/update | strict JSON plus optional `--approve` | `task_create/update` plus matching commit | Mandatory typed preview; versioned update |
+| Complete/reopen | exact IDs/version plus optional `--approve` | separate preview/commit pairs | Mandatory typed preview |
+| Delete | exact IDs/version plus optional `--approve` | `task_delete` + `task_delete_commit` | Mandatory destructive preview |
+<!-- markdownlint-enable MD013 -->
+
+Unsupported fields fail before provider access. Representable loss appears in
+task results and the exact write review. Linked mail or event provenance is
+data only and does not create a copy, move, mirror, or generic work-item action.
+No task provider is enabled by the canonical-contract change alone.
+
 ## Accounts and projections
 
 - Every account has a stable opaque ID independent of its editable alias and
   address.
 - Profile, cursor, import, queue, deduplication, and policy state are keyed by
   that ID.
-- Mail and calendar provider routes are independent.
+- Mail, calendar, and task provider routes are independent.
 - Rename preserves identity and state. Remove requires approval and an explicit
   replacement when removing the default account.
 - Remove purges account-local state and any unshared OAuth grant owned by
   Corresync; external standards credential records remain owned by their
   keyring/helper.
-- Cross-account search and agenda merge normalized results deterministically,
+- Cross-account search, agenda, and task projection merge normalized results deterministically,
   retain provenance, enforce global bounds, and return explicit partial
   failures.
 - Writes always select exactly one account; there is no broadcast write.
@@ -239,10 +265,10 @@ provider capabilities, and optionally the latest sanitized error class and
 command shape.
 
 Raw errors, argument values, account IDs, addresses, credentials, lookup keys,
-mail/calendar content, attachment names, queries, environment values, helper
-arguments, browser data, and private paths are excluded by construction. The
-latest error record replaces the previous record rather than appending history.
-Malformed or oversized records become visible degraded sections.
+mail/calendar/task content, attachment names, queries, environment values,
+helper arguments, browser data, and private paths are excluded by construction.
+The latest error record replaces the previous record rather than appending
+history. Malformed or oversized records become visible degraded sections.
 
 Report generation makes no network request. Copy, save, and opening a prefilled
 GitHub page each require an explicit flag after the complete report is shown.

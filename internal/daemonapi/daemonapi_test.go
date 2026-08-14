@@ -45,6 +45,16 @@ type fakeBackend struct {
 	terminalInput       TerminalLoginInput
 	monitorListInput    application.MonitorEventListInput
 	monitorAckInput     application.MonitorAcknowledgeInput
+	taskListInput       application.TaskListInput
+	taskReadInput       application.TaskReadInput
+	taskProjectionInput application.TaskProjectionInput
+	taskGetInput        application.TaskGetInput
+	taskSearchInput     application.TaskSearchInput
+	taskSyncInput       application.TaskSyncInput
+	taskCreateInput     application.TaskCreateInput
+	taskUpdateInput     application.TaskUpdateInput
+	taskStateInput      application.TaskStateInput
+	taskAction          string
 	commitToken         string
 	caller              domain.Caller
 }
@@ -338,6 +348,132 @@ func (backend *fakeBackend) CommitCalendarCancel(_ context.Context, token string
 	return application.CalendarCancelAccess{
 		Status: "cancelled", Cancelled: &application.CalendarCancelResult{ID: "event-1"},
 	}, nil
+}
+
+func daemonTestTask(id string) application.Task {
+	return application.Task{
+		ID: id, Version: "version-1", ListID: "list-1", Title: "Synthetic task",
+		Status: application.TaskStatusNeedsAction, Priority: application.TaskPriorityNone,
+		Capabilities: application.TaskCapabilities{Read: true, CrossListRead: true},
+		Provenance: domain.Provenance{
+			AccountID: testAccountID, Provider: domain.ProviderTodoist,
+			TaskListID: "list-1", SourceObjectID: id,
+		},
+	}
+}
+
+func (backend *fakeBackend) ListTaskLists(_ context.Context, input application.TaskListInput, caller domain.Caller) (application.TaskListPage, error) {
+	backend.taskListInput, backend.caller = input, caller
+	return application.TaskListPage{
+		Lists: []application.TaskList{{
+			ID: "list-1", DisplayName: "Synthetic", Editable: true,
+			Capabilities: application.TaskCapabilities{Read: true, CrossListRead: true},
+			Provenance:   domain.Provenance{AccountID: testAccountID, Provider: domain.ProviderTodoist, TaskListID: "list-1"},
+		}},
+		Offset: input.Offset, Limit: input.Limit,
+	}, nil
+}
+
+func (backend *fakeBackend) ListTasks(_ context.Context, input application.TaskReadInput, caller domain.Caller) (application.TaskPage, error) {
+	backend.taskReadInput, backend.caller = input, caller
+	return application.TaskPage{Tasks: []application.Task{daemonTestTask("task-1")}, Offset: input.Offset, Limit: input.Limit}, nil
+}
+
+func (backend *fakeBackend) ListAllTasks(_ context.Context, input application.TaskProjectionInput, caller domain.Caller) (application.TaskProjectionPage, error) {
+	backend.taskProjectionInput, backend.caller = input, caller
+	capabilities := domain.Capabilities{Tasks: true}
+	return application.TaskProjectionPage{
+		Tasks: []application.ProjectedTask{{AccountAlias: "work", Task: daemonTestTask("task-1")}},
+		Accounts: []application.ProjectionAccountStatus{{
+			Account: testAccountID, Alias: "work", Provider: domain.ProviderTodoist,
+			Service: "tasks", Complete: true, FetchedItems: 1, Exhausted: true,
+			Capabilities: &capabilities,
+		}},
+		Offset: input.Offset, Limit: input.Limit, Complete: true,
+	}, nil
+}
+
+func (backend *fakeBackend) GetTask(_ context.Context, input application.TaskGetInput, caller domain.Caller) (application.Task, error) {
+	backend.taskGetInput, backend.caller = input, caller
+	return daemonTestTask(input.TaskID), nil
+}
+
+func (backend *fakeBackend) SearchTasks(_ context.Context, input application.TaskSearchInput, caller domain.Caller) (application.TaskPage, error) {
+	backend.taskSearchInput, backend.caller = input, caller
+	return application.TaskPage{Tasks: []application.Task{daemonTestTask("task-1")}, Offset: input.Offset, Limit: input.Limit}, nil
+}
+
+func (backend *fakeBackend) SyncTasks(_ context.Context, input application.TaskSyncInput, caller domain.Caller) (application.TaskChangePage, error) {
+	backend.taskSyncInput, backend.caller = input, caller
+	return application.TaskChangePage{
+		Changes: []application.TaskChange{{Kind: application.TaskChangeUpsert, Task: func() *application.Task {
+			task := daemonTestTask("task-1")
+			return &task
+		}()}},
+		Cursor: application.TaskCursor{
+			Provider: domain.ProviderTodoist, Account: testAccountID, ListID: input.ListID,
+			Mode: application.TaskSyncDelta, Value: "cursor-1",
+		},
+	}, nil
+}
+
+func (backend *fakeBackend) CreateTask(_ context.Context, input application.TaskCreateInput, caller domain.Caller) (application.TaskWriteAccess, error) {
+	backend.taskCreateInput, backend.taskAction, backend.caller = input, "create", caller
+	return application.TaskWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) UpdateTask(_ context.Context, input application.TaskUpdateInput, caller domain.Caller) (application.TaskWriteAccess, error) {
+	backend.taskUpdateInput, backend.taskAction, backend.caller = input, "update", caller
+	return application.TaskWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CompleteTask(_ context.Context, input application.TaskStateInput, caller domain.Caller) (application.TaskWriteAccess, error) {
+	backend.taskStateInput, backend.taskAction, backend.caller = input, "complete", caller
+	return application.TaskWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) ReopenTask(_ context.Context, input application.TaskStateInput, caller domain.Caller) (application.TaskWriteAccess, error) {
+	backend.taskStateInput, backend.taskAction, backend.caller = input, "reopen", caller
+	return application.TaskWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) DeleteTask(_ context.Context, input application.TaskDeleteInput, caller domain.Caller) (application.TaskWriteAccess, error) {
+	backend.taskStateInput, backend.taskAction, backend.caller = input, "delete", caller
+	return application.TaskWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CommitTaskCreate(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.committedTask("created", token, caller), nil
+}
+
+func (backend *fakeBackend) CommitTaskUpdate(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.committedTask("updated", token, caller), nil
+}
+
+func (backend *fakeBackend) CommitTaskComplete(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.committedTask("completed", token, caller), nil
+}
+
+func (backend *fakeBackend) CommitTaskReopen(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	return backend.committedTask("reopened", token, caller), nil
+}
+
+func (backend *fakeBackend) CommitTaskDelete(_ context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
+	backend.commitToken, backend.taskAction, backend.caller = token, "deleted", caller
+	return application.TaskWriteAccess{Status: "deleted", Deleted: &application.TaskDeleteResult{
+		ListID: "list-1", TaskID: "task-1",
+		Provenance: domain.Provenance{AccountID: testAccountID, Provider: domain.ProviderTodoist, TaskListID: "list-1", SourceObjectID: "task-1"},
+	}}, nil
+}
+
+func (backend *fakeBackend) committedTask(status, token string, caller domain.Caller) application.TaskWriteAccess {
+	backend.commitToken, backend.taskAction, backend.caller = token, status, caller
+	task := daemonTestTask("task-1")
+	if status == "completed" {
+		task.Status = application.TaskStatusCompleted
+		task.CompletedAt = &application.TaskTemporal{Kind: application.TaskTemporalZoned, Value: "2026-08-13T12:00:00Z", TimeZone: "UTC"}
+	}
+	return application.TaskWriteAccess{Status: status, Task: &task}
 }
 
 func TestServerAuthenticatesBeforeDecoding(t *testing.T) {
@@ -682,6 +818,83 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	cancelAccess, err = client.CommitCalendarCancel(t.Context(), "opv1_synthetic", caller)
 	if err != nil || cancelAccess.Status != "cancelled" {
 		t.Fatalf("CommitCalendarCancel() = %+v, %v", cancelAccess, err)
+	}
+	taskLists, err := client.ListTaskLists(t.Context(), application.TaskListInput{
+		Account: testAccountID, Limit: 25,
+	}, caller)
+	if err != nil || len(taskLists.Lists) != 1 || backend.taskListInput.Account != testAccountID {
+		t.Fatalf("ListTaskLists() = %+v, %v; input=%+v", taskLists, err, backend.taskListInput)
+	}
+	tasks, err := client.ListTasks(t.Context(), application.TaskReadInput{
+		Account: testAccountID, ListID: "list-1", Limit: 25,
+	}, caller)
+	if err != nil || len(tasks.Tasks) != 1 || backend.taskReadInput.ListID != "list-1" {
+		t.Fatalf("ListTasks() = %+v, %v; input=%+v", tasks, err, backend.taskReadInput)
+	}
+	projectedTasks, err := client.ListAllTasks(t.Context(), application.TaskProjectionInput{Limit: 25}, caller)
+	if err != nil || len(projectedTasks.Tasks) != 1 || backend.taskProjectionInput.Limit != 25 {
+		t.Fatalf("ListAllTasks() = %+v, %v; input=%+v", projectedTasks, err, backend.taskProjectionInput)
+	}
+	task, err := client.GetTask(t.Context(), application.TaskGetInput{
+		Account: testAccountID, ListID: "list-1", TaskID: "task-1",
+	}, caller)
+	if err != nil || task.ID != "task-1" || backend.taskGetInput.TaskID != "task-1" {
+		t.Fatalf("GetTask() = %+v, %v; input=%+v", task, err, backend.taskGetInput)
+	}
+	searchedTasks, err := client.SearchTasks(t.Context(), application.TaskSearchInput{
+		Account: testAccountID, ListID: "list-1", Query: "synthetic", Limit: 25,
+	}, caller)
+	if err != nil || len(searchedTasks.Tasks) != 1 || backend.taskSearchInput.Query != "synthetic" {
+		t.Fatalf("SearchTasks() = %+v, %v; input=%+v", searchedTasks, err, backend.taskSearchInput)
+	}
+	syncedTasks, err := client.SyncTasks(t.Context(), application.TaskSyncInput{
+		Account: testAccountID, ListID: "list-1", Limit: 25,
+	}, caller)
+	if err != nil || len(syncedTasks.Changes) != 1 || backend.taskSyncInput.ListID != "list-1" {
+		t.Fatalf("SyncTasks() = %+v, %v; input=%+v", syncedTasks, err, backend.taskSyncInput)
+	}
+	taskAccess, err := client.CreateTask(t.Context(), application.TaskCreateInput{
+		Account: testAccountID, ListID: "list-1", Title: "Synthetic task", Priority: application.TaskPriorityNone,
+	}, caller)
+	if err != nil || taskAccess.Status != "approval_required" || backend.taskCreateInput.Title != "Synthetic task" {
+		t.Fatalf("CreateTask() = %+v, %v; input=%+v", taskAccess, err, backend.taskCreateInput)
+	}
+	taskAccess, err = client.CommitTaskCreate(t.Context(), "opv1_task_create", caller)
+	if err != nil || taskAccess.Status != "created" || backend.commitToken != "opv1_task_create" {
+		t.Fatalf("CommitTaskCreate() = %+v, %v", taskAccess, err)
+	}
+	updatedTitle := "Updated task"
+	taskAccess, err = client.UpdateTask(t.Context(), application.TaskUpdateInput{
+		Account: testAccountID, ListID: "list-1", TaskID: "task-1", Version: "version-1", Title: &updatedTitle,
+	}, caller)
+	if err != nil || taskAccess.Status != "approval_required" || backend.taskUpdateInput.Title == nil {
+		t.Fatalf("UpdateTask() = %+v, %v; input=%+v", taskAccess, err, backend.taskUpdateInput)
+	}
+	taskAccess, err = client.CommitTaskUpdate(t.Context(), "opv1_task_update", caller)
+	if err != nil || taskAccess.Status != "updated" {
+		t.Fatalf("CommitTaskUpdate() = %+v, %v", taskAccess, err)
+	}
+	stateInput := application.TaskStateInput{
+		Account: testAccountID, ListID: "list-1", TaskID: "task-1", Version: "version-1",
+	}
+	for _, operation := range []struct {
+		name    string
+		prepare func(context.Context, application.TaskStateInput, domain.Caller) (application.TaskWriteAccess, error)
+		commit  func(context.Context, string, domain.Caller) (application.TaskWriteAccess, error)
+		status  string
+	}{
+		{"complete", client.CompleteTask, client.CommitTaskComplete, "completed"},
+		{"reopen", client.ReopenTask, client.CommitTaskReopen, "reopened"},
+		{"delete", client.DeleteTask, client.CommitTaskDelete, "deleted"},
+	} {
+		prepared, prepareErr := operation.prepare(t.Context(), stateInput, caller)
+		if prepareErr != nil || prepared.Status != "approval_required" || backend.taskAction != operation.name {
+			t.Fatalf("%s task = %+v, %v action=%q", operation.name, prepared, prepareErr, backend.taskAction)
+		}
+		committed, commitErr := operation.commit(t.Context(), "opv1_task_"+operation.name, caller)
+		if commitErr != nil || committed.Status != operation.status {
+			t.Fatalf("commit %s task = %+v, %v", operation.name, committed, commitErr)
+		}
 	}
 	if err := client.Shutdown(t.Context(), caller); err != nil {
 		t.Fatalf("Shutdown() error = %v", err)

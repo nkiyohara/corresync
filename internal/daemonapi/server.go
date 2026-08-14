@@ -434,9 +434,162 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, err
 		}
 		return server.backend.CommitCalendarCancel(ctx, input.Token, request.Caller)
+	case MethodTaskLists:
+		var input application.TaskListInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.ListTaskLists(ctx, input, request.Caller)
+	case MethodTaskList:
+		var input application.TaskReadInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.ListTasks(ctx, input, request.Caller)
+	case MethodTaskListAll:
+		var input application.TaskProjectionInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.ListAllTasks(ctx, input, request.Caller)
+	case MethodTaskGet:
+		var input application.TaskGetInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.GetTask(ctx, input, request.Caller)
+	case MethodTaskSearch:
+		var input application.TaskSearchInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.SearchTasks(ctx, input, request.Caller)
+	case MethodTaskSync:
+		var input application.TaskSyncInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.SyncTasks(ctx, input, request.Caller)
+	case MethodTaskCreate:
+		var input application.TaskCreateInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.CreateTask(ctx, input, request.Caller)
+	case MethodTaskCommitCreate:
+		return server.commitTask(request, func(backend TaskBackend, token string) (any, error) {
+			return backend.CommitTaskCreate(ctx, token, request.Caller)
+		})
+	case MethodTaskUpdate:
+		var input application.TaskUpdateInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.UpdateTask(ctx, input, request.Caller)
+	case MethodTaskCommitUpdate:
+		return server.commitTask(request, func(backend TaskBackend, token string) (any, error) {
+			return backend.CommitTaskUpdate(ctx, token, request.Caller)
+		})
+	case MethodTaskComplete:
+		var input application.TaskStateInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.CompleteTask(ctx, input, request.Caller)
+	case MethodTaskCommitComplete:
+		return server.commitTask(request, func(backend TaskBackend, token string) (any, error) {
+			return backend.CommitTaskComplete(ctx, token, request.Caller)
+		})
+	case MethodTaskReopen:
+		var input application.TaskStateInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.ReopenTask(ctx, input, request.Caller)
+	case MethodTaskCommitReopen:
+		return server.commitTask(request, func(backend TaskBackend, token string) (any, error) {
+			return backend.CommitTaskReopen(ctx, token, request.Caller)
+		})
+	case MethodTaskDelete:
+		var input application.TaskDeleteInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		backend, err := server.taskBackend()
+		if err != nil {
+			return nil, err
+		}
+		return backend.DeleteTask(ctx, input, request.Caller)
+	case MethodTaskCommitDelete:
+		return server.commitTask(request, func(backend TaskBackend, token string) (any, error) {
+			return backend.CommitTaskDelete(ctx, token, request.Caller)
+		})
 	default:
 		return nil, errors.New("unknown daemon method")
 	}
+}
+
+func (server *Server) taskBackend() (TaskBackend, error) {
+	backend, supported := server.backend.(TaskBackend)
+	if !supported {
+		return nil, errors.New("tasks are not supported by this session owner")
+	}
+	return backend, nil
+}
+
+func (server *Server) commitTask(
+	request requestEnvelope,
+	commit func(TaskBackend, string) (any, error),
+) (any, error) {
+	var input ApprovalInput
+	if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+		return nil, err
+	}
+	backend, err := server.taskBackend()
+	if err != nil {
+		return nil, err
+	}
+	return commit(backend, input.Token)
 }
 
 func (server *Server) writeResult(writer http.ResponseWriter, id string, result any) {

@@ -1,6 +1,6 @@
 # Provider protocol boundary
 
-Corresync presents one typed mail/calendar model while preserving the
+Corresync presents typed mail/calendar/task models while preserving the
 capabilities, degradations, and provenance of each configured provider route.
 Provider protocols are replaceable outer adapters; none of their wire formats
 is part of the public CLI, MCP, domain, or stable JSON contract.
@@ -38,7 +38,9 @@ The closed application surface covers:
   permanent deletion;
 - bounded selectable-calendar discovery and calendar list, reviewed
   create/update/cancel, and provider-supported online-meeting creation;
-- isolated cross-account mail and agenda projections;
+- bounded task-list discovery, task list/get/search/sync, and mandatory-preview
+  create/update/complete/reopen/delete;
+- isolated cross-account mail, agenda, and task projections;
 - content-free session/capability status and local monitor/event state.
 
 Adding a protocol operation does not expose it automatically. It also needs a
@@ -49,6 +51,12 @@ documentation of any degradation.
 Lists remain metadata-first. Bodies, attachment bytes, attendee detail, and
 meeting links are exposed only by the narrow use case that needs them.
 Consequential operations use the server-enforced preview/commit protocol.
+
+Task adapters additionally preserve date-only, floating datetime, and zoned
+datetime meaning; advertise closed feature and sync-mode capabilities; bind
+cursors to provider/account/list/mode; and return linked-source provenance as
+data rather than authority. They cannot accept arbitrary provider properties,
+remote MCP tools, scripts, or copy/move actions. See [tasks.md](tasks.md).
 
 ## Outlook Web
 

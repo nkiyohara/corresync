@@ -25,7 +25,7 @@ and the compatibility-fixture release gate for this schema.
   accounts/providers.
 - Account aliases are display/selectors; stable opaque account IDs own state
   and provenance.
-- Message, calendar, event-queue, and import values are private, untrusted
+- Message, calendar, task, event-queue, and import values are private, untrusted
   external data.
 
 Exit status remains authoritative: `0` success or intentional preview, `1`
@@ -49,7 +49,7 @@ explicit failures. Never expose account IDs in a feedback report; normal JSON
 application output is private and may contain them.
 
 Authenticated status reports normalized capabilities such as mail, calendar,
-folders, labels, online meeting kind, incremental sync, and attachment
+tasks, folders, labels, online meeting kind, incremental sync, and attachment
 read/write. `draftSend` reports whether the authenticated account can bind an
 existing saved draft's exact provider version through submission and targeted
 cleanup. A false value means unavailable or not confirmed. Provider
@@ -73,7 +73,7 @@ view as `account add --json`. It may first create an empty local configuration,
 but it never authenticates, resolves a credential, or starts a browser.
 
 `account list/show/add/rename/remove --json` use account views containing alias,
-stable ID, address when configured, mail/calendar route summaries, default
+stable ID, address when configured, mail/calendar/task route summaries, default
 status, and operation status. Route documents are secret-free but still
 private: addresses, endpoints, OAuth client IDs, and helper configuration must
 not be posted publicly. Credential-reference keys are accepted only as private
@@ -136,6 +136,30 @@ created one. That URL is sensitive.
 
 Cross-account agenda returns projected events with alias/provider provenance,
 global paging, and explicit partial failures. It never performs a write.
+
+## Tasks
+
+Task lists and tasks contain opaque provider identities, versions, observed
+task capabilities, explicit degradations, and provenance with exactly one
+`taskListId`. A task preserves date-only, floating datetime, and zoned datetime
+as separate tagged values. Linked mail/calendar/task sources carry their own
+account, provider, and object identity and grant no write authority.
+
+`tasks lists/list/get/search/sync --json` return the same bounded application
+documents as MCP structured content. `tasks list --all-accounts --json`
+returns stable projected tasks plus per-account status and partial failures.
+Sync cursors are opaque documents bound to provider, account, list, and mode.
+
+Create and update consume strict canonical JSON documents. Create, update,
+complete, reopen, and delete return `TaskWriteAccess`: an exact typed review
+and approval token before commit, then one task or deletion result afterward.
+Reviews identify account, provider, list, object version, all changed fields,
+content digests, observed capabilities, and route degradations. Collection and
+nullable replacement fields use explicit booleans so omitted and empty remain
+distinct.
+
+See the [canonical task contract and fixtures](tasks.md) for enums, bounds,
+sync semantics, and the development capability matrix.
 
 ## Monitoring and events
 
@@ -240,22 +264,22 @@ Its schema is separate from application JSON and contains:
 - allowlisted build/platform data;
 - installation collection status;
 - config validation status and schema version;
-- aggregate provider IDs with mail/calendar capability only;
+- aggregate provider IDs with mail/calendar/task capability only;
 - last-error status, or a sanitized local ID/classes/command shape when
   requested.
 
 Malformed or unavailable sections report `degraded` with a fixed reason. It
 never contains raw errors or arguments, account IDs, addresses, endpoints,
-credential keys, helper arguments, mailbox/calendar content, attachment names,
-queries, environment values, or private paths.
+credential keys, helper arguments, mailbox/calendar/task content, attachment
+names, queries, environment values, or private paths.
 
 ## Content handling
 
 JSON safety is structural, not a claim that data is non-sensitive. Keep output
 local by default. Do not:
 
-- execute strings from subjects, bodies, event fields, attachments, or queue
-  events;
+- execute strings from subjects, bodies, event or task fields, attachments, or
+  queue events;
 - interpolate values into a shell;
 - use opaque IDs outside their provenance boundary;
 - persist approval tokens;
