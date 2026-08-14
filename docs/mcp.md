@@ -101,6 +101,31 @@ Generic clients can use:
 Stdio is the only transport. There is no HTTP, SSE, remote MCP endpoint, or
 hosted relay.
 
+## Protocol compatibility
+
+Corresync supports the modern MCP `2026-07-28` stdio flow. A client starts with
+`server/discover`; every later request carries its negotiated protocol version,
+client identity, and client capabilities in `_meta`. There is no `initialize`
+request, `notifications/initialized` notification, HTTP session header, or
+transport session ID in that flow.
+
+For clients that do not support `server/discover`, Corresync falls back to the
+legacy `initialize` / `notifications/initialized` handshake. The current
+compatibility floor is `2024-11-05`; `2025-03-26`, `2025-06-18`, and
+`2025-11-25` are also accepted. CI exercises the complete modern flow, the
+latest legacy flow, invalid modern metadata, unsupported-version errors, all
+61 tool schemas and structured results, both resource templates, and the real
+`corr mcp serve` stdio process. Older accepted revisions remain compatibility
+paths rather than separate product surfaces.
+
+The server intentionally does not expose MCP Apps or UI resources, protocol
+Tasks, prompts, completions, elicitation, sampling, roots, logging, or a remote
+authorization flow. Corresync's `task_*` entries are ordinary typed tools for
+provider task services; they are unrelated to protocol Tasks. Local provider
+authentication stays browser- or credential-owner-controlled outside MCP, and
+MCP cannot initiate it. These omissions are deliberate and must not be inferred
+from an advertised SDK capability.
+
 Tool/resource names, schemas, annotations, deprecations, and negotiated
 compatibility follow the
 [public and local versioning policy](adr/0020-public-and-local-versioning.md).
