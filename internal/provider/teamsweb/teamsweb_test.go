@@ -27,6 +27,7 @@ type fakeDriver struct {
 	message      application.Message
 	reaction     application.MessageReaction
 	membership   application.ConversationMembershipResult
+	readErr      error
 	writeErr     error
 	getCalls     int
 }
@@ -75,6 +76,9 @@ func (driver *fakeDriver) TeamsListConversations(
 	_ context.Context,
 	_ application.ConversationListInput,
 ) (application.ConversationPage, error) {
+	if driver.readErr != nil {
+		return application.ConversationPage{}, driver.readErr
+	}
 	return application.ConversationPage{
 		Conversations: []application.Conversation{driver.conversation},
 		NextCursor:    driver.nextCursor, Partial: true, PartialReason: "provider_limit",
@@ -112,7 +116,7 @@ func (driver *fakeDriver) TeamsGetMessage(
 	application.MessageGetInput,
 ) (application.Message, error) {
 	driver.getCalls++
-	return driver.message, nil
+	return driver.message, driver.readErr
 }
 
 func (driver *fakeDriver) TeamsSendMessage(
@@ -250,6 +254,28 @@ func TestTeamsWebRejectsRouteDriftAndNarrowsCapabilities(t *testing.T) {
 		WorkspaceID: "workspace-synthetic", Driver: driver,
 	}); err == nil || !strings.Contains(err.Error(), "workspace") {
 		t.Fatalf("identity drift error = %v", err)
+	}
+}
+
+func TestTeamsWebBrowserDriftRequiresReauthenticationWithoutPrivateDetail(t *testing.T) {
+	t.Parallel()
+	driver := newFakeDriver(t)
+	client, err := New(t.Context(), Options{
+		WorkspaceID: driver.workspace, Driver: driver,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver.readErr = errors.New("private chromedp target detail")
+	_, err = client.GetMessage(t.Context(), application.MessageGetInput{
+		Account: syntheticWebAccount, WorkspaceID: driver.workspace,
+		ConversationID: driver.conversation.ID,
+		MessageID:      driver.message.Summary.ID,
+	})
+	reason, ok := application.ProviderAuthenticationReason(err)
+	if !ok || reason != application.AuthenticationReasonInteractionRequired ||
+		strings.Contains(err.Error(), "private chromedp target detail") {
+		t.Fatalf("Teams Web browser drift = %v, reason = %q", err, reason)
 	}
 }
 

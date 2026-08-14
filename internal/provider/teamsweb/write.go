@@ -187,7 +187,7 @@ func (client *Client) ChangeConversationMembership(
 	}
 	conversation, err := client.driver.TeamsGetConversation(ctx, input.ConversationID)
 	if err != nil {
-		return application.ConversationMembershipResult{}, err
+		return application.ConversationMembershipResult{}, driverReadFailure(ctx, err)
 	}
 	if conversation.ID != input.ConversationID || conversation.Version != input.Version {
 		return application.ConversationMembershipResult{}, restapi.ErrPrecondition
@@ -217,7 +217,7 @@ func (client *Client) requireVersion(
 		ThreadRootID: threadRootID, MessageID: messageID,
 	})
 	if err != nil {
-		return application.Message{}, err
+		return application.Message{}, driverReadFailure(ctx, err)
 	}
 	if message.Summary.ConversationID != conversationID || message.Summary.ID != messageID ||
 		message.Summary.Version != version {

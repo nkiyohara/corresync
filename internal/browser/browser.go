@@ -19,6 +19,11 @@ import (
 	"github.com/nkiyohara/corresync/internal/session"
 )
 
+// ErrBrowserSessionUnavailable is a content-free liveness signal. Provider
+// adapters translate it to their typed authentication boundary instead of
+// reusing an authorization snapshot after the owning browser has exited.
+var ErrBrowserSessionUnavailable = errors.New("browser-owned session is unavailable")
+
 // Options define the browser-owned authentication boundary.
 type Options struct {
 	Origin            string
@@ -146,6 +151,14 @@ func (browser *Browser) CurrentSession() (session.Credentials, error) {
 // Apply applies the newest browser-observed credentials to an exact-origin
 // request without exposing them to callers.
 func (browser *Browser) Apply(request *http.Request) error {
+	if browser == nil || browser.context == nil {
+		return ErrBrowserSessionUnavailable
+	}
+	select {
+	case <-browser.context.Done():
+		return ErrBrowserSessionUnavailable
+	default:
+	}
 	if browser.sessions == nil {
 		return errors.New(
 			"authorization observation is disabled for this browser",

@@ -22,10 +22,13 @@ import (
 const (
 	maximumRequestBytes  = 4 << 20
 	maximumResponseBytes = 8 << 20
+	defaultReadAttempts  = 3
 )
 
 // ErrPrecondition indicates a server-enforced version condition failed.
 var ErrPrecondition = errors.New("API write precondition failed")
+
+var errRedirectRejected = errors.New("API redirects are not accepted")
 
 // StatusError is a bounded, content-free HTTP failure. Provider adapters may
 // branch on a documented status such as an expired delta token without
@@ -50,8 +53,9 @@ func IsStatus(err error, status int) bool {
 
 // Client owns one API origin and an already authorized HTTP client.
 type Client struct {
-	base *url.URL
-	http *http.Client
+	base       *url.URL
+	http       *http.Client
+	resilience *readResilience
 }
 
 // Options configures one account-scoped API transport.
@@ -75,9 +79,12 @@ func New(options Options) (*Client, error) {
 		httpClient.Timeout = 30 * time.Second
 	}
 	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error {
-		return errors.New("API redirects are not accepted")
+		return errRedirectRejected
 	}
-	return &Client{base: base, http: &httpClient}, nil
+	return &Client{
+		base: base, http: &httpClient,
+		resilience: newReadResilience(),
+	}, nil
 }
 
 // Result is one bounded provider response.
@@ -187,6 +194,83 @@ func (client *Client) Do(
 	if err != nil {
 		return Result{}, err
 	}
+	payload, err := boundedRequestBody(body)
+	if err != nil {
+		return Result{}, err
+	}
+	if !write {
+		if err := client.resilience.BeforeRead(); err != nil {
+			return Result{}, err
+		}
+	}
+	attempts := 1
+	if !write {
+		attempts = defaultReadAttempts
+	}
+	for attempt := 1; attempt <= attempts; attempt++ {
+		result, callErr := client.doOnce(
+			ctx, method, target, payload, headers, write,
+		)
+		if callErr != nil {
+			if write {
+				return Result{}, callErr
+			}
+			var transient *transientReadError
+			if !errors.As(callErr, &transient) {
+				return Result{}, callErr
+			}
+			if attempt < attempts && ctx.Err() == nil {
+				if sleepErr := client.resilience.Backoff(ctx, attempt, 0); sleepErr != nil {
+					return Result{}, sleepErr
+				}
+				continue
+			}
+			if ctx.Err() == nil {
+				client.resilience.OpenTransient()
+			}
+			return Result{}, callErr
+		}
+		if !write && retryableReadStatus(result.Status) {
+			retryAfter := retryAfterDuration(
+				result.Header.Get("Retry-After"),
+				client.resilience.Now(),
+			)
+			if attempt < attempts && ctx.Err() == nil {
+				if sleepErr := client.resilience.Backoff(ctx, attempt, retryAfter); sleepErr != nil {
+					return Result{}, sleepErr
+				}
+				continue
+			}
+			client.resilience.OpenTransient()
+			return Result{}, apiStatusError(result.Status, result.Body)
+		}
+		if !write && result.Status == http.StatusTooManyRequests {
+			client.resilience.OpenThrottle(
+				retryAfterDuration(
+					result.Header.Get("Retry-After"),
+					client.resilience.Now(),
+				),
+			)
+		} else if !write {
+			client.resilience.Succeed()
+		}
+		return classifyResult(result, write, accepted...)
+	}
+	return Result{}, errors.New("API read exhausted its bounded attempts")
+}
+
+func (client *Client) doOnce(
+	ctx context.Context,
+	method string,
+	target *url.URL,
+	payload []byte,
+	headers http.Header,
+	write bool,
+) (Result, error) {
+	var body io.Reader
+	if payload != nil {
+		body = bytes.NewReader(payload)
+	}
 	request, err := http.NewRequestWithContext(ctx, method, target.String(), body)
 	if err != nil {
 		return Result{}, err
@@ -201,20 +285,29 @@ func (client *Client) Do(
 	}
 	response, err := client.http.Do(request)
 	if err != nil {
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
 		if write {
 			return Result{}, fmt.Errorf("%w: execute API write: %w",
 				application.ErrWriteOutcomeUnknown, err)
 		}
-		return Result{}, err
+		if errors.Is(err, errRedirectRejected) || ctx.Err() != nil {
+			return Result{}, err
+		}
+		return Result{}, &transientReadError{cause: err}
 	}
-	defer func() { _ = response.Body.Close() }()
-	content, err := io.ReadAll(io.LimitReader(response.Body, maximumResponseBytes+1))
-	if err != nil {
+	content, readErr := io.ReadAll(
+		io.LimitReader(response.Body, maximumResponseBytes+1),
+	)
+	closeErr := response.Body.Close()
+	if readErr != nil || closeErr != nil {
+		responseErr := errors.Join(readErr, closeErr)
 		if write {
 			return Result{}, fmt.Errorf("%w: read API write response: %w",
-				application.ErrWriteOutcomeUnknown, err)
+				application.ErrWriteOutcomeUnknown, responseErr)
 		}
-		return Result{}, err
+		return Result{}, &transientReadError{cause: responseErr}
 	}
 	if len(content) > maximumResponseBytes {
 		if write {
@@ -225,38 +318,69 @@ func (client *Client) Do(
 		}
 		return Result{}, errors.New("API response exceeds the configured limit")
 	}
-	result := Result{
+	return Result{
 		Status: response.StatusCode,
 		Header: response.Header.Clone(),
 		Body:   content,
-	}
+	}, nil
+}
+
+type transientReadError struct{ cause error }
+
+func (failure *transientReadError) Error() string {
+	return "transient API read failure"
+}
+
+func (failure *transientReadError) Unwrap() error { return failure.cause }
+
+func classifyResult(result Result, write bool, accepted ...int) (Result, error) {
 	for _, status := range accepted {
-		if response.StatusCode == status {
+		if result.Status == status {
 			return result, nil
 		}
 	}
-	if response.StatusCode == http.StatusUnauthorized {
+	if result.Status == http.StatusUnauthorized {
 		return Result{}, application.NewProviderAuthenticationFailure(
 			application.AuthenticationReasonCredentialRejected,
-			apiStatusError(response.StatusCode, content),
+			apiStatusError(result.Status, result.Body),
 		)
 	}
-	if response.StatusCode == http.StatusPreconditionFailed ||
-		response.StatusCode == http.StatusConflict {
+	if result.Status == http.StatusPreconditionFailed ||
+		result.Status == http.StatusConflict {
 		return Result{}, ErrPrecondition
 	}
-	statusErr := apiStatusError(response.StatusCode, content)
+	statusErr := apiStatusError(result.Status, result.Body)
 	if write &&
-		(response.StatusCode >= http.StatusInternalServerError ||
-			response.StatusCode >= http.StatusOK &&
-				response.StatusCode < http.StatusMultipleChoices) {
-		return Result{}, fmt.Errorf(
-			"%w: %w",
-			application.ErrWriteOutcomeUnknown,
-			statusErr,
-		)
+		(result.Status >= http.StatusInternalServerError ||
+			result.Status >= http.StatusOK && result.Status < http.StatusMultipleChoices) {
+		return Result{}, fmt.Errorf("%w: %w", application.ErrWriteOutcomeUnknown, statusErr)
 	}
 	return Result{}, statusErr
+}
+
+func boundedRequestBody(body io.Reader) ([]byte, error) {
+	if body == nil {
+		return nil, nil
+	}
+	payload, err := io.ReadAll(io.LimitReader(body, maximumRequestBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read API request: %w", err)
+	}
+	if len(payload) > maximumRequestBytes {
+		return nil, errors.New("API request exceeds the configured limit")
+	}
+	return payload, nil
+}
+
+func retryableReadStatus(status int) bool {
+	switch status {
+	case http.StatusBadGateway,
+		http.StatusServiceUnavailable,
+		http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 func (client *Client) target(resource string, query url.Values) (*url.URL, error) {

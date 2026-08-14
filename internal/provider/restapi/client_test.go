@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
 )
@@ -73,11 +75,13 @@ func TestClientBoundsErrorsAndRejectsRedirects(t *testing.T) {
 
 func TestClientMarksAmbiguousWriteTransportFailure(t *testing.T) {
 	t.Parallel()
+	var calls atomic.Int32
 	client, err := New(Options{
 		BaseURL: "https://api.example.invalid/v1",
 		HTTP: &http.Client{Transport: roundTripperFunc(func(
 			*http.Request,
 		) (*http.Response, error) {
+			calls.Add(1)
 			return nil, errors.New("synthetic transport failure")
 		})},
 	})
@@ -95,8 +99,198 @@ func TestClientMarksAmbiguousWriteTransportFailure(t *testing.T) {
 		nil,
 		http.StatusCreated,
 	)
-	if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
-		t.Fatalf("write transport error = %v", err)
+	if !errors.Is(err, application.ErrWriteOutcomeUnknown) || calls.Load() != 1 {
+		t.Fatalf("write transport error = %v calls = %d", err, calls.Load())
+	}
+}
+
+func TestClientRetriesOnlyReadsWithBoundedBackoffAndReplayableBody(t *testing.T) {
+	var calls atomic.Int32
+	client, err := New(Options{
+		BaseURL: "https://api.example.invalid/v1",
+		HTTP: &http.Client{Transport: roundTripperFunc(func(
+			request *http.Request,
+		) (*http.Response, error) {
+			call := calls.Add(1)
+			body, readErr := io.ReadAll(request.Body)
+			if readErr != nil || string(body) != `{"query":"synthetic"}` {
+				t.Fatalf("attempt %d body = %q error = %v", call, body, readErr)
+			}
+			if call < defaultReadAttempts {
+				return nil, errors.New("synthetic transient failure")
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"ok":true}`)),
+			}, nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var delays []time.Duration
+	client.resilience.sleep = func(_ context.Context, delay time.Duration) error {
+		delays = append(delays, delay)
+		return nil
+	}
+	var response struct {
+		OK bool `json:"ok"`
+	}
+	_, err = client.DoJSON(
+		t.Context(), http.MethodPost, "search", nil,
+		map[string]string{"query": "synthetic"}, &response,
+		false, nil, http.StatusOK,
+	)
+	if err != nil || !response.OK || calls.Load() != defaultReadAttempts {
+		t.Fatalf("resilient read response = %+v calls = %d error = %v", response, calls.Load(), err)
+	}
+	wantDelays := []time.Duration{100 * time.Millisecond, 400 * time.Millisecond}
+	if len(delays) != len(wantDelays) {
+		t.Fatalf("read retry delays = %v", delays)
+	}
+	for index := range delays {
+		if delays[index] != wantDelays[index] {
+			t.Fatalf("read retry delays = %v, want %v", delays, wantDelays)
+		}
+	}
+}
+
+func TestClientNeverAcceptsExhaustedTransientReadStatus(t *testing.T) {
+	var calls atomic.Int32
+	client, err := New(Options{
+		BaseURL: "https://api.example.invalid/v1",
+		HTTP: &http.Client{Transport: roundTripperFunc(func(
+			*http.Request,
+		) (*http.Response, error) {
+			calls.Add(1)
+			return &http.Response{
+				StatusCode: http.StatusServiceUnavailable,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(
+					`{"error":{"code":"temporarily_unavailable"}}`,
+				)),
+			}, nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.resilience.sleep = func(context.Context, time.Duration) error { return nil }
+	result, err := client.DoJSON(
+		t.Context(), http.MethodGet, "messages", nil, nil, nil,
+		false, nil, http.StatusOK, http.StatusServiceUnavailable,
+	)
+	if err == nil || result.Status != 0 || calls.Load() != defaultReadAttempts {
+		t.Fatalf("exhausted transient result = %+v calls = %d error = %v", result, calls.Load(), err)
+	}
+}
+
+func TestClientCircuitIsAccountLocalAndRecoversAfterBoundedDelay(t *testing.T) {
+	var calls atomic.Int32
+	client, err := New(Options{
+		BaseURL: "https://api.example.invalid/v1",
+		HTTP: &http.Client{Transport: roundTripperFunc(func(
+			*http.Request,
+		) (*http.Response, error) {
+			if calls.Add(1) <= defaultReadAttempts {
+				return nil, errors.New("synthetic provider outage")
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"ok":true}`)),
+			}, nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, time.August, 14, 22, 0, 0, 0, time.UTC)
+	client.resilience.now = func() time.Time { return now }
+	client.resilience.sleep = func(context.Context, time.Duration) error { return nil }
+	read := func() error {
+		_, callErr := client.DoJSON(
+			t.Context(), http.MethodGet, "messages", nil, nil, nil,
+			false, nil, http.StatusOK,
+		)
+		return callErr
+	}
+	if err := read(); err == nil || calls.Load() != defaultReadAttempts ||
+		strings.Contains(err.Error(), "synthetic provider outage") {
+		t.Fatalf("exhausted read error = %v calls = %d", err, calls.Load())
+	}
+	if err := read(); err == nil {
+		t.Fatal("open circuit allowed another request")
+	} else {
+		var open *CircuitOpenError
+		if !errors.As(err, &open) || open.Throttled ||
+			open.RetryAfter != transientCircuitDelay {
+			t.Fatalf("open circuit error = %#v (%v)", open, err)
+		}
+	}
+	if calls.Load() != defaultReadAttempts {
+		t.Fatalf("open circuit made a provider call: %d", calls.Load())
+	}
+	now = now.Add(transientCircuitDelay)
+	if err := read(); err != nil || calls.Load() != defaultReadAttempts+1 {
+		t.Fatalf("recovered read error = %v calls = %d", err, calls.Load())
+	}
+}
+
+func TestClientRateLimitOpensCircuitWithoutHidingProviderResponse(t *testing.T) {
+	var calls atomic.Int32
+	client, err := New(Options{
+		BaseURL: "https://api.example.invalid/v1",
+		HTTP: &http.Client{Transport: roundTripperFunc(func(
+			*http.Request,
+		) (*http.Response, error) {
+			calls.Add(1)
+			return &http.Response{
+				StatusCode: http.StatusTooManyRequests,
+				Header:     http.Header{"Retry-After": {"60"}},
+				Body:       io.NopCloser(strings.NewReader(`{"error":{"code":"rate_limited"}}`)),
+			}, nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, time.August, 14, 22, 0, 0, 0, time.UTC)
+	client.resilience.now = func() time.Time { return now }
+	result, err := client.DoJSON(
+		t.Context(), http.MethodGet, "messages", nil, nil, nil,
+		false, nil, http.StatusOK, http.StatusTooManyRequests,
+	)
+	if err != nil || result.Status != http.StatusTooManyRequests {
+		t.Fatalf("rate-limit result = %+v error = %v", result, err)
+	}
+	_, err = client.DoJSON(
+		t.Context(), http.MethodGet, "messages", nil, nil, nil,
+		false, nil, http.StatusOK,
+	)
+	var open *CircuitOpenError
+	if !errors.As(err, &open) || !open.Throttled || open.RetryAfter != time.Minute || calls.Load() != 1 {
+		t.Fatalf("throttle circuit error = %#v (%v), calls = %d", open, err, calls.Load())
+	}
+}
+
+func TestRetryAfterDurationAcceptsDeltaAndHTTPDateWithinBounds(t *testing.T) {
+	now := time.Date(2026, time.August, 14, 22, 0, 0, 0, time.UTC)
+	tests := []struct {
+		value string
+		want  time.Duration
+	}{
+		{value: "60", want: time.Minute},
+		{value: now.Add(90 * time.Second).Format(http.TimeFormat), want: 90 * time.Second},
+		{value: now.Add(time.Hour).Format(http.TimeFormat), want: maximumThrottleCircuit},
+		{value: now.Format(http.TimeFormat), want: 0},
+		{value: "private-invalid-value", want: 0},
+	}
+	for _, test := range tests {
+		if got := retryAfterDuration(test.value, now); got != test.want {
+			t.Errorf("retryAfterDuration(%q) = %s, want %s", test.value, got, test.want)
+		}
 	}
 }
 

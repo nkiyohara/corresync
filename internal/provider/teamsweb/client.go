@@ -161,6 +161,16 @@ func (client *Client) requireCapability(enabled bool, feature string) error {
 	return nil
 }
 
+func driverReadFailure(ctx context.Context, err error) error {
+	if err == nil || ctx.Err() != nil {
+		return err
+	}
+	return application.NewProviderAuthenticationFailure(
+		application.AuthenticationReasonInteractionRequired,
+		errors.New("the Teams Web browser-owned session must be reviewed again"),
+	)
+}
+
 func validateConversationID(id string) error {
 	_, err := teamscontract.DecodeConversationID(id)
 	return err

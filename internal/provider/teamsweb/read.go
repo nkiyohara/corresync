@@ -29,7 +29,7 @@ func (client *Client) ListConversations(
 	input.Cursor = providerCursor
 	page, err := client.driver.TeamsListConversations(ctx, input)
 	if err != nil {
-		return application.ConversationPage{}, err
+		return application.ConversationPage{}, driverReadFailure(ctx, err)
 	}
 	for _, conversation := range page.Conversations {
 		if err := validateConversationID(conversation.ID); err != nil {
@@ -71,7 +71,7 @@ func (client *Client) ListMessages(
 	input.Cursor = providerCursor
 	page, err := client.driver.TeamsListMessages(ctx, input)
 	if err != nil {
-		return application.MessagePage{}, err
+		return application.MessagePage{}, driverReadFailure(ctx, err)
 	}
 	page.NextCursor, err = wrapPageCursor(page.NextCursor, expected)
 	return page, err
@@ -106,7 +106,7 @@ func (client *Client) SearchMessages(
 	input.Cursor = providerCursor
 	page, err := client.driver.TeamsSearchMessages(ctx, input)
 	if err != nil {
-		return application.MessagePage{}, err
+		return application.MessagePage{}, driverReadFailure(ctx, err)
 	}
 	page.NextCursor, err = wrapPageCursor(page.NextCursor, expected)
 	return page, err
@@ -128,7 +128,8 @@ func (client *Client) GetMessage(
 	if err := validateConversationID(input.ConversationID); err != nil {
 		return application.Message{}, err
 	}
-	return client.driver.TeamsGetMessage(ctx, input)
+	message, err := client.driver.TeamsGetMessage(ctx, input)
+	return message, driverReadFailure(ctx, err)
 }
 
 func (client *Client) GetMessageAttachment(
