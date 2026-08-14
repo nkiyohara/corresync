@@ -20,6 +20,7 @@ const googleAPILegacyVersion = 3
 const updateChannelLegacyVersion = 4
 const taskRouteLegacyVersion = 5
 const calDAVTaskLegacyVersion = 6
+const googleTaskLegacyVersion = 7
 
 type legacyConfig struct {
 	Version        int                      `toml:"version"`
@@ -120,6 +121,35 @@ type calDAVTaskLegacyConfig struct {
 	Version        int                                `toml:"version"`
 	DefaultAccount string                             `toml:"default_account"`
 	Accounts       map[string]calDAVTaskLegacyAccount `toml:"accounts"`
+	Policy         Policy                             `toml:"policy"`
+	Browser        Browser                            `toml:"browser"`
+	Credentials    Credentials                        `toml:"credentials,omitempty"`
+	Updates        Updates                            `toml:"updates"`
+	Feedback       Feedback                           `toml:"feedback"`
+}
+
+// googleTaskLegacyRoute freezes the v7 task union so Google OAuth settings
+// cannot be smuggled into a pre-Google-Tasks schema and silently accepted.
+type googleTaskLegacyRoute struct {
+	Provider       domain.ProviderID        `toml:"provider"`
+	MicrosoftGraph *MicrosoftGraphTaskRoute `toml:"microsoft_graph,omitempty"`
+	Todoist        *TodoistTaskRoute        `toml:"todoist,omitempty"`
+	CalDAV         *CalDAVTaskRoute         `toml:"caldav,omitempty"`
+}
+
+type googleTaskLegacyAccount struct {
+	ID       domain.AccountID       `toml:"id"`
+	Address  string                 `toml:"address,omitempty"`
+	Mail     *MailRoute             `toml:"mail,omitempty"`
+	Calendar *CalendarRoute         `toml:"calendar,omitempty"`
+	Tasks    *googleTaskLegacyRoute `toml:"tasks,omitempty"`
+	Monitor  *Monitor               `toml:"monitor,omitempty"`
+}
+
+type googleTaskLegacyConfig struct {
+	Version        int                                `toml:"version"`
+	DefaultAccount string                             `toml:"default_account"`
+	Accounts       map[string]googleTaskLegacyAccount `toml:"accounts"`
 	Policy         Policy                             `toml:"policy"`
 	Browser        Browser                            `toml:"browser"`
 	Credentials    Credentials                        `toml:"credentials,omitempty"`
@@ -230,6 +260,49 @@ func MigrateV6(data []byte) (Config, error) {
 	}
 	if err := configuration.Validate(); err != nil {
 		return Config{}, fmt.Errorf("validate migrated v6 config: %w", err)
+	}
+	return configuration, nil
+}
+
+// MigrateV7 adds typed Google Tasks OAuth settings without selecting a route,
+// broadening a grant, or manufacturing authorization consent.
+func MigrateV7(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var legacy googleTaskLegacyConfig
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&legacy); err != nil {
+		return Config{}, fmt.Errorf("decode v7 config: %w", err)
+	}
+	if legacy.Version != googleTaskLegacyVersion {
+		return Config{}, fmt.Errorf("google-task legacy config version must be %d", googleTaskLegacyVersion)
+	}
+	configuration := Config{
+		Version: CurrentVersion, DefaultAccount: legacy.DefaultAccount,
+		Accounts: make(map[string]Account, len(legacy.Accounts)),
+		Policy:   legacy.Policy, Browser: legacy.Browser,
+		Credentials: legacy.Credentials, Updates: legacy.Updates,
+		Feedback: legacy.Feedback,
+	}
+	for alias, source := range legacy.Accounts {
+		account := Account{
+			ID: source.ID, Address: source.Address, Mail: source.Mail,
+			Calendar: source.Calendar, Monitor: source.Monitor,
+		}
+		if source.Tasks != nil {
+			account.Tasks = &TaskRoute{
+				Provider:       source.Tasks.Provider,
+				MicrosoftGraph: source.Tasks.MicrosoftGraph,
+				Todoist:        source.Tasks.Todoist,
+				CalDAV:         source.Tasks.CalDAV,
+			}
+		}
+		configuration.Accounts[alias] = account
+	}
+	if err := configuration.Validate(); err != nil {
+		return Config{}, fmt.Errorf("validate migrated v7 config: %w", err)
 	}
 	return configuration, nil
 }

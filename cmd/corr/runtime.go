@@ -289,14 +289,18 @@ func (app *runtime) accountServices() (
 	if rollout.GoogleOAuthApproved {
 		available = append(available, domain.ProviderGoogle)
 	}
+	taskAvailable := []domain.ProviderID{
+		domain.ProviderMicrosoftGraph, domain.ProviderTodoist,
+		domain.ProviderCalDAV,
+	}
+	if rollout.GoogleOAuthApproved {
+		taskAvailable = append(taskAvailable, domain.ProviderGoogleTasks)
+	}
 	accounts, err := application.NewAccountService(
 		store,
 		store,
 		available,
-		[]domain.ProviderID{
-			domain.ProviderMicrosoftGraph, domain.ProviderTodoist,
-			domain.ProviderCalDAV,
-		},
+		taskAvailable,
 	)
 	if err != nil {
 		return nil, nil, err

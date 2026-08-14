@@ -27,6 +27,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/paths"
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
 	"github.com/nkiyohara/corresync/internal/provider/googleapi"
+	"github.com/nkiyohara/corresync/internal/provider/googletasks"
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
@@ -347,6 +348,7 @@ type sessionBackend struct {
 	newCalDAV      func(context.Context, caldavprovider.Options) (*caldavprovider.Client, error)
 	newCalDAVTasks func(context.Context, caldavprovider.TaskOptions) (*caldavprovider.Client, error)
 	newGoogle      func(context.Context, googleapi.Options) (*googleapi.Client, error)
+	newGoogleTasks func(context.Context, googletasks.Options) (*googletasks.Client, error)
 	newGraph       func(context.Context, graphapi.Options) (*graphapi.Client, error)
 	newTodoist     func(context.Context, todoist.Options) (*todoist.Client, error)
 	monitorStore   *eventqueue.Store
@@ -431,6 +433,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		newCalDAV:        caldavprovider.New,
 		newCalDAVTasks:   caldavprovider.NewTasks,
 		newGoogle:        googleapi.New,
+		newGoogleTasks:   googletasks.New,
 		newGraph:         graphapi.New,
 		newTodoist:       todoist.New,
 		monitorStore:     eventqueue.New(),
@@ -544,7 +547,7 @@ func configuredServiceImplemented(
 	case application.AuthenticationServiceTasks:
 		switch provider { //nolint:exhaustive // Unsupported provider IDs deliberately return false.
 		case domain.ProviderMicrosoftGraph, domain.ProviderTodoist,
-			domain.ProviderCalDAV:
+			domain.ProviderCalDAV, domain.ProviderGoogleTasks:
 			return true
 		default:
 			return false
@@ -2357,7 +2360,8 @@ func (backend *sessionBackend) accountServices(
 			configuredServiceProvider(configured, service),
 		)
 	}
-	if configuredServiceProvider(configured, service) == domain.ProviderGoogle &&
+	if (configuredServiceProvider(configured, service) == domain.ProviderGoogle ||
+		configuredServiceProvider(configured, service) == domain.ProviderGoogleTasks) &&
 		!rollout.GoogleOAuthApproved {
 		return sessionAccount{}, rollout.ErrGoogleOAuthPending
 	}
@@ -2661,6 +2665,10 @@ func inactiveTaskRoute(configured config.Account) (*domain.Degradation, error) {
 	}
 	if configured.Tasks.Provider == domain.ProviderCalDAV &&
 		configured.Tasks.CalDAV != nil {
+		return nil, nil
+	}
+	if configured.Tasks.Provider == domain.ProviderGoogleTasks &&
+		configured.Tasks.GoogleTasks != nil {
 		return nil, nil
 	}
 	if configured.Mail == nil && configured.Calendar == nil {
@@ -3516,6 +3524,71 @@ func (backend *sessionBackend) todoistAccount(
 	}), nil
 }
 
+func (backend *sessionBackend) googleTaskAccount(
+	ctx context.Context,
+	configured config.Account,
+) (sessionAccount, error) {
+	if configured.Tasks == nil || configured.Tasks.Provider != domain.ProviderGoogleTasks ||
+		configured.Tasks.GoogleTasks == nil {
+		return sessionAccount{}, errors.New("the Google Tasks route settings are missing")
+	}
+	selected := configured.Tasks.GoogleTasks
+	provider, err := oauthlocal.ProviderFor(
+		domain.ProviderGoogleTasks,
+		oauthlocal.Services{Tasks: true, TaskWrite: !selected.ReadOnly},
+	)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	manager := backend.oauth
+	if manager == nil {
+		manager, err = oauthlocal.New(oauthlocal.Options{
+			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
+		})
+		if err != nil {
+			return sessionAccount{}, err
+		}
+	}
+	authorization, err := manager.Authorize(ctx, selected.OAuth.Client(), provider)
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	factory := backend.newGoogleTasks
+	if factory == nil {
+		factory = googletasks.New
+	}
+	client, err := factory(ctx, googletasks.Options{
+		APIBase: selected.OAuth.APIBase, Address: configured.Address,
+		Account: configured.ID, ReadOnly: selected.ReadOnly,
+		HTTP: authorization.HTTPClient(),
+	})
+	if err != nil {
+		return sessionAccount{}, err
+	}
+	capabilities := client.TaskCapabilities()
+	tasks, err := application.NewTaskService(
+		backend.guard,
+		client,
+		application.TaskOptions{
+			Capabilities: capabilities,
+			Degradations: client.TaskDegradations(),
+			Provenance: domain.Provenance{
+				AccountID: configured.ID, Provider: domain.ProviderGoogleTasks,
+			},
+		},
+	)
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, client.Close())
+	}
+	return leasedSessionAccount(sessionAccount{
+		closers: []sessionCloser{client}, tasks: tasks,
+		captured: time.Now().UTC(),
+		capabilities: domain.Capabilities{
+			Tasks: true, IncrementalSync: len(capabilities.SyncModes) != 0,
+		},
+	}), nil
+}
+
 type graphServiceSelection struct {
 	route                 config.OAuthRoute
 	mail, calendar, tasks bool
@@ -3661,6 +3734,13 @@ func (backend *sessionBackend) nonOutlookAccount(
 	}
 	if configured.Tasks != nil && configured.Tasks.Provider == domain.ProviderCalDAV {
 		tasks, err := backend.calDAVTaskAccount(ctx, configured)
+		if err != nil {
+			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
+		}
+		combined = mergeSessionAccounts(combined, tasks)
+	}
+	if configured.Tasks != nil && configured.Tasks.Provider == domain.ProviderGoogleTasks {
+		tasks, err := backend.googleTaskAccount(ctx, configured)
 		if err != nil {
 			return sessionAccount{}, errors.Join(err, closeSessionAccount(combined))
 		}

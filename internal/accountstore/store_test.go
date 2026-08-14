@@ -210,6 +210,11 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 		result.APIBase = "https://graph.microsoft.com/v1.0"
 		return result
 	}
+	googleTaskRoute := func(key string) *config.OAuthRoute {
+		result := route(key)
+		result.APIBase = "https://tasks.googleapis.com"
+		return result
+	}
 	const targetID domain.AccountID = "acc_00000000000000000000000000000002"
 	configuration.Accounts["target"] = config.Account{
 		ID: targetID, Address: "target@example.test",
@@ -227,9 +232,9 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 			MicrosoftGraph: graphRoute("shared"),
 		},
 		Tasks: &config.TaskRoute{
-			Provider: domain.ProviderMicrosoftGraph,
-			MicrosoftGraph: &config.MicrosoftGraphTaskRoute{
-				OAuth: *graphRoute("target-task"), ReadOnly: true,
+			Provider: domain.ProviderGoogleTasks,
+			GoogleTasks: &config.GoogleTaskRoute{
+				OAuth: *googleTaskRoute("target-task"), ReadOnly: true,
 			},
 		},
 	}

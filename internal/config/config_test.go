@@ -984,6 +984,61 @@ channel = "stable"
 	}
 }
 
+func TestV7MigrationPreservesCalDAVTaskRouteAndRejectsGooglePayload(t *testing.T) {
+	t.Parallel()
+	const base = `
+version = 7
+default_account = "tasks"
+
+[accounts.tasks]
+id = "acc_00000000000000000000000000000009"
+address = "reader@example.invalid"
+
+[accounts.tasks.tasks]
+provider = "caldav"
+
+[accounts.tasks.tasks.caldav]
+endpoint = "https://dav.example.invalid/"
+task_list_path = "/tasks/work/"
+username = "reader@example.invalid"
+
+[accounts.tasks.tasks.caldav.credential]
+backend = "os-keyring"
+key = "tasks-caldav"
+consent = true
+
+[policy]
+mode = "guarded"
+max_recipients = 20
+max_attendees = 50
+
+[browser]
+login_timeout = "5m"
+
+[updates]
+channel = "stable"
+`
+	configuration, err := MigrateV7([]byte(base))
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := configuration.Accounts["tasks"].Tasks
+	if configuration.Version != CurrentVersion || route == nil ||
+		route.CalDAV == nil || route.CalDAV.TaskListPath != "/tasks/work/" {
+		t.Fatalf("migrated v7 config = %+v", configuration)
+	}
+	withGoogleTasks := strings.Replace(
+		base,
+		"[policy]",
+		"[accounts.tasks.tasks.google_tasks]\nread_only = true\n\n[policy]",
+		1,
+	)
+	if _, err := MigrateV7([]byte(withGoogleTasks)); err == nil ||
+		!strings.Contains(err.Error(), "strict mode") {
+		t.Fatalf("v7 Google Tasks payload error = %v", err)
+	}
+}
+
 func TestMigrateV4RejectsInventedChannelField(t *testing.T) {
 	t.Parallel()
 	_, err := MigrateV4([]byte(`
@@ -1138,6 +1193,50 @@ func TestGoogleMailOAuthRouteRequiresLoopbackAndOSKeyring(t *testing.T) {
 	configuration.Accounts["work"] = account
 	if err := configuration.Validate(); err == nil {
 		t.Fatal("OAuth helper-backed grant was accepted")
+	}
+}
+
+func TestGoogleTaskRouteRoundTripsWithPinnedIndependentGrant(t *testing.T) {
+	t.Parallel()
+	configuration := OutlookDefault()
+	configuration.Accounts["tasks"] = Account{
+		ID:      "acc_00000000000000000000000000000112",
+		Address: "reader@example.test",
+		Tasks: &TaskRoute{
+			Provider: domain.ProviderGoogleTasks,
+			GoogleTasks: &GoogleTaskRoute{
+				ReadOnly: true,
+				OAuth: OAuthRoute{
+					APIBase:     "https://tasks.googleapis.com",
+					ClientID:    "synthetic.apps.googleusercontent.com",
+					RedirectURI: "http://127.0.0.1:43123/callback",
+					Authorization: CredentialRef{
+						Backend: CredentialOSKeyring, Key: "google-tasks", Consent: true,
+					},
+				},
+			},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	route := loaded.Accounts["tasks"].Tasks
+	if route == nil || route.Provider != domain.ProviderGoogleTasks ||
+		route.GoogleTasks == nil || !route.GoogleTasks.ReadOnly ||
+		route.GoogleTasks.OAuth.Authorization.Key != "google-tasks" {
+		t.Fatalf("Google Tasks round trip = %+v", loaded.Accounts["tasks"])
+	}
+	account := configuration.Accounts["tasks"]
+	account.Tasks.GoogleTasks.OAuth.APIBase = "https://example.test"
+	configuration.Accounts["tasks"] = account
+	if err := configuration.Validate(); err == nil ||
+		!strings.Contains(err.Error(), "tasks.googleapis.com") {
+		t.Fatalf("unpinned Google Tasks API base error = %v", err)
 	}
 }
 
