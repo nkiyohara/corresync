@@ -293,7 +293,10 @@ func (app *runtime) accountServices() (
 		store,
 		store,
 		available,
-		[]domain.ProviderID{domain.ProviderMicrosoftGraph, domain.ProviderTodoist},
+		[]domain.ProviderID{
+			domain.ProviderMicrosoftGraph, domain.ProviderTodoist,
+			domain.ProviderCalDAV,
+		},
 	)
 	if err != nil {
 		return nil, nil, err

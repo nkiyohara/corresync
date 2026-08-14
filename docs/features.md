@@ -14,7 +14,7 @@ not available through a raw protocol escape hatch.
 | `todoist` | — | — | Todoist | Explicit BYO public OAuth client with PKCE; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `jmap` | Mail | — | — | OS keyring or approved credential helper | Implemented; synthetic RFC 8620 contracts; live-unobserved |
 | `imap-smtp` | IMAP read/manage, SMTP draft/send | — | — | OS keyring or approved credential helper | Implemented; synthetic protocol contracts; live-unobserved |
-| `caldav` | — | Calendar | Reserved route only | OS keyring or approved credential helper | Calendar implemented; VTODO unavailable; live-unobserved |
+| `caldav` | — | Calendar | VTODO tasks | OS keyring or approved credential helper | Calendar and tasks implemented with separate routes; synthetic contracts; live-unobserved |
 <!-- markdownlint-enable MD013 -->
 
 Task routes use a separate provider selection described in the
@@ -190,8 +190,12 @@ assemble checklist or linked-resource changes report partial outcomes instead
 of retrying. Todoist implements the same task commands except search, with
 plan-observed labels/reminders/deadlines, subtasks, one assignee, exact provider
 recurrence, and bounded sync-token cursors. Its scheduling date and deadline
-remain distinct, and unmapped provider fields are visible degradations. Other
-task providers remain unavailable.
+remain distinct, and unmapped provider fields are visible degradations. CalDAV
+implements VTODO list/read/search, ETag-bound CRUD/state writes, RELATED-TO
+parents, categories, alarms, date/floating/zoned time, recurrence, and RFC 6578
+sync-token reset. Unknown iCalendar properties stay attached to the exact
+object during updates and are reported as degradations. Other task providers
+remain unavailable.
 
 ## Accounts and projections
 

@@ -286,10 +286,10 @@ mutating or reading agent conversations, credentials, mail, or calendar data.
 - `config show --json`: complete validated secret-free configuration; still
   private for the reasons above.
 - `doctor --json`: local check rows; `--online` is opt-in. With
-  `--online --connection-only`, the same check-row schema reports Mail and
-  Calendar's last-authenticated connectivity separately and makes neither a
-  fresh authentication attempt nor any folder, message, event, contact, or
-  attachment metadata request.
+  `--online --connection-only`, the same check-row schema reports the
+  last-authenticated connectivity of Mail, Calendar, and Tasks separately and
+  makes neither a fresh authentication attempt nor any folder, message, event,
+  contact, task, task-list, or attachment metadata request.
 - `version --json`: version, commit, source build date, Go version, OS, and
   architecture.
 - `update check --json`: current/latest version, cache and release status.

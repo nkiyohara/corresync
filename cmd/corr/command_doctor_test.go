@@ -25,27 +25,82 @@ type doctorConnectionBackend struct {
 	contentCalls int
 }
 
+type doctorTaskBackend struct {
+	adapterTestBackend
+	daemonapi.TaskBackend
+	taskListCalls int
+}
+
+const doctorTaskAccountID domain.AccountID = "acc_00000000000000000000000000000002"
+
+func (*doctorTaskBackend) SessionStatus(
+	context.Context,
+	domain.Caller,
+) (daemonapi.SessionStatusResult, error) {
+	capabilities := domain.Capabilities{Tasks: true}
+	capturedAt := time.Unix(1, 0).UTC()
+	return daemonapi.SessionStatusResult{Accounts: []daemonapi.SessionStatus{{
+		Account: doctorTaskAccountID, Alias: "tasks",
+		Provider: domain.ProviderCalDAV, TaskProvider: domain.ProviderCalDAV,
+		State: "authenticated", Authenticated: true,
+		CapturedAt: &capturedAt, Capabilities: &capabilities,
+		Services: testAuthenticationStatuses(
+			doctorTaskAccountID,
+			"tasks",
+			"",
+			"",
+			domain.ProviderCalDAV,
+			true,
+		),
+	}}}, nil
+}
+
+func (backend *doctorTaskBackend) ListTaskLists(
+	_ context.Context,
+	input application.TaskListInput,
+	_ domain.Caller,
+) (application.TaskListPage, error) {
+	backend.taskListCalls++
+	if input.Account != doctorTaskAccountID || input.Limit != 1 {
+		return application.TaskListPage{}, errors.New("unexpected task-list diagnostic input")
+	}
+	return application.TaskListPage{
+		Lists: []application.TaskList{{ID: "synthetic-list", DisplayName: "private"}},
+		Limit: 1,
+	}, nil
+}
+
 func (*doctorConnectionBackend) SessionStatus(
 	context.Context,
 	domain.Caller,
 ) (daemonapi.SessionStatusResult, error) {
-	capabilities := domain.Capabilities{Mail: true, Calendar: true}
+	capabilities := domain.Capabilities{Mail: true, Calendar: true, Tasks: true}
 	capturedAt := time.Unix(1, 0).UTC()
 	return daemonapi.SessionStatusResult{Accounts: []daemonapi.SessionStatus{{
 		Account: adapterTestAccountID, Alias: "work",
 		Provider:     domain.ProviderIMAPSMTP,
 		MailProvider: domain.ProviderIMAPSMTP, CalendarProvider: domain.ProviderCalDAV,
-		State: "authenticated", Authenticated: true,
+		TaskProvider: domain.ProviderCalDAV,
+		State:        "authenticated", Authenticated: true,
 		CapturedAt: &capturedAt, Capabilities: &capabilities,
 		Services: testAuthenticationStatuses(
 			adapterTestAccountID,
 			"work",
 			domain.ProviderIMAPSMTP,
 			domain.ProviderCalDAV,
-			"",
+			domain.ProviderCalDAV,
 			true,
 		),
 	}}}, nil
+}
+
+func (backend *doctorConnectionBackend) ListTaskLists(
+	context.Context,
+	application.TaskListInput,
+	domain.Caller,
+) (application.TaskListPage, error) {
+	backend.contentCalls++
+	return application.TaskListPage{Limit: 1}, errors.New("content-free check requested task lists")
 }
 
 func (backend *doctorConnectionBackend) ListMailFolders(
@@ -204,7 +259,7 @@ func TestDoctorDoesNotRequireBrowserForStandardsRoutes(t *testing.T) {
 	t.Fatalf("doctor report lacks browser check: %+v", report.Checks)
 }
 
-func TestDoctorConnectionOnlyReportsMailAndCalendarWithoutRemoteItemReads(t *testing.T) {
+func TestDoctorConnectionOnlyReportsServicesWithoutRemoteItemReads(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
@@ -231,6 +286,13 @@ func TestDoctorConnectionOnlyReportsMailAndCalendarWithoutRemoteItemReads(t *tes
 		Provider: domain.ProviderCalDAV,
 		CalDAV: &config.CalDAVRoute{
 			Endpoint: "https://caldav.icloud.com:443/",
+			Username: "reader@icloud.com", Credential: shared,
+		},
+	}
+	account.Tasks = &config.TaskRoute{
+		Provider: domain.ProviderCalDAV,
+		CalDAV: &config.CalDAVTaskRoute{
+			Endpoint: "https://caldav.icloud.com:443/", TaskListPath: "/tasks/",
 			Username: "reader@icloud.com", Credential: shared,
 		},
 	}
@@ -271,7 +333,7 @@ func TestDoctorConnectionOnlyReportsMailAndCalendarWithoutRemoteItemReads(t *tes
 	for _, check := range report.Checks {
 		checks[check.Name] = check
 	}
-	for _, name := range []string{"mail_connection", "calendar_connection"} {
+	for _, name := range []string{"mail_connection", "calendar_connection", "task_connection"} {
 		if checks[name].Status != "pass" ||
 			!strings.Contains(checks[name].Detail, "read no") {
 			t.Fatalf("%s check = %+v", name, checks[name])
@@ -279,11 +341,71 @@ func TestDoctorConnectionOnlyReportsMailAndCalendarWithoutRemoteItemReads(t *tes
 	}
 	for _, forbidden := range []string{
 		"folder_contract", "mail_contract", "calendar_folder_contract", "calendar_contract",
+		"task_list_contract",
 	} {
 		if _, exists := checks[forbidden]; exists {
 			t.Fatalf("connection-only report contains %s: %+v", forbidden, report.Checks)
 		}
 	}
+}
+
+func TestDoctorOnlineValidatesTaskListContractWithoutEmittingProviderData(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	configuration := config.Default()
+	configuration.DefaultAccount = "tasks"
+	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Accounts["tasks"] = config.Account{
+		ID: doctorTaskAccountID,
+		Tasks: &config.TaskRoute{
+			Provider: domain.ProviderCalDAV,
+			CalDAV: &config.CalDAVTaskRoute{
+				Endpoint: "https://dav.example.invalid/", TaskListPath: "/tasks/",
+				Username: "reader",
+				Credential: config.CredentialRef{
+					Backend: config.CredentialOSKeyring, Key: "tasks", Consent: true,
+				},
+			},
+		},
+	}
+	configPath := filepath.Join(root, "config.toml")
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+	digest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := localipc.ResolveInState(configPath, filepath.Join(root, "state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &doctorTaskBackend{}
+	stop := startAdapterTestDaemon(t, endpoint, digest, backend)
+	t.Cleanup(stop)
+
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), configPath, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
+	runErr := (&doctorCommand{Online: true, JSON: true}).Run(app)
+	var report doctorReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if runErr != nil || !report.Healthy || backend.taskListCalls != 1 {
+		t.Fatalf("task doctor report = %+v, calls=%d, error=%v", report, backend.taskListCalls, runErr)
+	}
+	for _, check := range report.Checks {
+		if check.Name != "task_list_contract" {
+			continue
+		}
+		if check.Status != "pass" || strings.Contains(stdout.String(), "private") {
+			t.Fatalf("task-list check = %+v, output=%s", check, stdout.String())
+		}
+		return
+	}
+	t.Fatalf("doctor report lacks task-list contract: %+v", report.Checks)
 }
 
 func TestDoctorConnectionOnlyRequiresOnline(t *testing.T) {

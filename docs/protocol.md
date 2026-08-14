@@ -187,6 +187,16 @@ replaces a `RECURRENCE-ID` exception. Cancellation adds the occurrence to the
 master's `EXDATE`, removes any matching exception, advances `SEQUENCE`, and
 updates the calendar object conditionally rather than deleting the series.
 
+The independent CalDAV task route selects only VTODO collections. It maps the
+closed task contract to RFC 5545 fields, uses strong ETags for exact
+read-modify-write operations, and uses RFC 6578 sync tokens only when every
+selected collection advertises that report. Invalid tokens trigger one
+bounded full reset. RFC 5545 temporal consistency and UTC absolute-alarm rules
+are enforced before writes. Unknown iCalendar properties remain on their exact
+object during an update and are surfaced as degradations; no generic property
+API is exposed. Servers that do not expose privilege or sync properties remain
+readable but advertise neither writes nor incremental sync.
+
 ## Compatibility workflow
 
 Deterministic tests use synthetic fixtures with no credentials or personal

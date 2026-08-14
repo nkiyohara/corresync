@@ -166,6 +166,11 @@ and JMAP endpoints must be HTTPS; a JMAP session may advertise
 API/upload/download URLs only on that exact HTTPS origin. Certificate
 verification is never disabled.
 
+A CalDAV VTODO task route follows the same external-credential rule but has
+its own explicit task consent, authenticated discovery, session, and
+capability record. A calendar route never activates tasks merely because the
+same principal exposes VTODO, and a task route never grants VEVENT access.
+
 ## Session status and logout
 
 `corr auth status` is content-free. It reports each configured mail, calendar,
@@ -243,14 +248,15 @@ daemon, and rerun `corr doctor --account ALIAS`. Corresync never adds or suggest
 `corr doctor --online` is the explicit opt-in provider compatibility check for
 an already authenticated session. Run `corr auth login --account ALIAS` first.
 Doctor reports the exact configured OAuth scopes, never starts OAuth or opens a
-provider login, and requests only bounded folder, mail, and calendar metadata
-contracts. It must not be part of default tests or CI.
+provider login, and requests only bounded folder, mail, calendar, and task-list
+metadata contracts. It must not be part of default tests or CI.
 
 `corr doctor --online --connection-only` is the narrower authenticated-session
 status check used by standards onboarding. It reports when TLS and authorization
-were last established, shows Mail and Calendar independently, and requests no
-folder, message, event, contact, or attachment metadata. It never silently
-reauthenticates or claims a new network probe, so run `corr auth login` first.
+were last established, shows Mail, Calendar, and Tasks independently, and
+requests no folder, message, event, contact, task, task-list, or attachment
+metadata. It never silently reauthenticates or claims a new network probe, so
+run `corr auth login` first.
 
 For shareable support material, use `corr feedback --last-error`. It records
 only generalized error classes and a redacted command shape; it never copies

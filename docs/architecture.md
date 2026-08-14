@@ -141,7 +141,8 @@ The session owner creates all authenticated provider clients:
   network access until approval; normal-browser OAuth and OS-keyring grant
   after activation;
 - Graph: interactive OAuth browser plus grant in OS keyring;
-- JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference;
+- JMAP/IMAP/SMTP/CalDAV: OS keyring or approved helper reference; CalDAV
+  VEVENT and VTODO routes own separate consent and sessions;
 - task providers: only the explicit browser, OAuth, standards, local OS, or
   upstream MCP owner defined by that route; none is activated by schema alone.
 

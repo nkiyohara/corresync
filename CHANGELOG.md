@@ -5,6 +5,20 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### CalDAV VTODO tasks
+
+- Add an independent CalDAV task route with VTODO-only collection discovery,
+  bounded list/get/search, date/floating/zoned time, recurrence, alarms,
+  RELATED-TO parents, categories, and explicit degradations for unsupported
+  properties.
+- Protect create, update, completion, reopen, and deletion with strong ETag
+  conditions while preserving unknown iCalendar extensions on exact updates.
+  Add RFC 6578 sync-token changes with one bounded invalid-token reset.
+- Introduce secret-free configuration schema v7 and direct CLI setup for a
+  separately consented external task credential. Migration from v6 preserves
+  all existing routes and grants no new authority. Compatibility remains
+  synthetic and live-unobserved.
+
 ### Resumable guided setup
 
 - Make no-argument `corr setup` a current-state coordinator for optional

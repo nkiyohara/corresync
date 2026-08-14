@@ -171,6 +171,40 @@ func TestAccountServiceReviewsIndependentMicrosoftTodoGrant(t *testing.T) {
 	}
 }
 
+func TestAccountServiceReviewsExplicitCalDAVTaskCredential(t *testing.T) {
+	t.Parallel()
+	service, err := NewAccountService(
+		&accountRepositoryStub{}, &accountPurgerStub{}, nil,
+		[]domain.ProviderID{domain.ProviderCalDAV},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	review, err := service.ReviewAdd(t.Context(), AccountAddInput{
+		Alias: "tasks",
+		Tasks: &AccountTaskRouteInput{
+			Provider: domain.ProviderCalDAV,
+			CalDAV: &AccountCalDAVTaskInput{
+				Endpoint: "https://dav.example.invalid/", TaskListPath: "/tasks/work/",
+				Username: "reader",
+				Credential: AccountCredentialInput{
+					Backend: "helper", Key: "caldav-tasks", Consent: true,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.Address != "" || review.Tasks == nil ||
+		len(review.Tasks.Endpoints) != 2 || review.Tasks.Identity != "reader" ||
+		review.Tasks.Credential == nil || review.Tasks.Credential.Backend != "helper" ||
+		len(review.Credentials) != 1 || review.Credentials[0].Service != "tasks" ||
+		review.Credentials[0].Key != "caldav-tasks" {
+		t.Fatalf("CalDAV task review = %+v", review)
+	}
+}
+
 func TestAccountServiceRejectsOneOAuthHandleForDifferentGraphGrants(t *testing.T) {
 	t.Parallel()
 	service, err := NewAccountService(

@@ -1,5 +1,5 @@
-// Package caldav adapts RFC 4791 calendars to Corresync's closed calendar
-// application port.
+// Package caldav adapts RFC 4791 calendar collections to Corresync's closed
+// calendar and task application ports.
 package caldav
 
 import (
@@ -39,12 +39,26 @@ type Options struct {
 	Client       *http.Client
 }
 
+// TaskOptions identifies one explicitly configured CalDAV VTODO route.
+type TaskOptions struct {
+	Endpoint     string
+	TaskListPath string
+	Username     string
+	Password     []byte
+	Client       *http.Client
+}
+
 // Client owns one external credential and a redirect-rejecting HTTPS client.
 type Client struct {
 	endpoint     *url.URL
+	calendarHome string
 	calendarPath string
 	calendars    []caldav.Calendar
+	taskListPath string
+	taskLists    []caldav.Calendar
+	taskListInfo map[string]taskListInfo
 	username     string
+	principal    string
 	calendarUser string
 	scheduling   bool
 	outboxPath   string
@@ -58,24 +72,89 @@ type Client struct {
 // New performs authenticated principal and calendar discovery. It must only be
 // called from explicit local CLI login.
 func New(ctx context.Context, options Options) (*Client, error) {
-	endpoint, err := validateHTTPSURL("CalDAV endpoint", options.Endpoint)
+	client, calendars, err := newClient(ctx, connectionOptions{
+		endpoint: options.Endpoint,
+		username: options.Username,
+		password: options.Password,
+		client:   options.Client,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if options.Username == "" || len(options.Username) > 320 ||
-		strings.TrimSpace(options.Username) != options.Username ||
-		strings.ContainsAny(options.Username, "\r\n\x00") {
-		return nil, errors.New("CalDAV username is malformed")
+	client.discoverScheduling(ctx, client.principal)
+	selected, eventCalendars, err := selectCollections(
+		calendars,
+		ical.CompEvent,
+		options.CalendarPath,
+		"calendar",
+	)
+	if err != nil {
+		_ = client.Close()
+		return nil, err
 	}
-	if len(options.Password) == 0 || len(options.Password) > 64<<10 {
-		return nil, errors.New("CalDAV credential is empty or too large")
+	client.calendarPath = selected
+	client.calendars = eventCalendars
+	return client, nil
+}
+
+// NewTasks performs authenticated VTODO collection discovery. It must only be
+// called from explicit local CLI login.
+func NewTasks(ctx context.Context, options TaskOptions) (*Client, error) {
+	client, calendars, err := newClient(ctx, connectionOptions{
+		endpoint: options.Endpoint,
+		username: options.Username,
+		password: options.Password,
+		client:   options.Client,
+	})
+	if err != nil {
+		return nil, err
 	}
-	if options.CalendarPath != "" {
-		if !validDAVPath(options.CalendarPath) {
-			return nil, errors.New("CalDAV calendar path is malformed")
-		}
+	selected, taskLists, err := selectCollections(
+		calendars,
+		ical.CompToDo,
+		options.TaskListPath,
+		"task list",
+	)
+	if err != nil {
+		_ = client.Close()
+		return nil, err
 	}
-	httpClient := options.Client
+	client.taskListPath = selected
+	client.taskLists = taskLists
+	client.taskListInfo, err = client.discoverTaskListInfo(
+		ctx, client.calendarHome, taskLists,
+	)
+	if err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	return client, nil
+}
+
+type connectionOptions struct {
+	endpoint string
+	username string
+	password []byte
+	client   *http.Client
+}
+
+func newClient(
+	ctx context.Context,
+	options connectionOptions,
+) (*Client, []caldav.Calendar, error) {
+	endpoint, err := validateHTTPSURL("CalDAV endpoint", options.endpoint)
+	if err != nil {
+		return nil, nil, err
+	}
+	if options.username == "" || len(options.username) > 320 ||
+		strings.TrimSpace(options.username) != options.username ||
+		strings.ContainsAny(options.username, "\r\n\x00") {
+		return nil, nil, errors.New("CalDAV username is malformed")
+	}
+	if len(options.password) == 0 || len(options.password) > 64<<10 {
+		return nil, nil, errors.New("CalDAV credential is empty or too large")
+	}
+	httpClient := options.client
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 30 * time.Second}
 	} else {
@@ -95,7 +174,7 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	case *http.Transport:
 		transport = configured.Clone()
 	default:
-		return nil, errors.New("CalDAV requires an inspectable HTTP transport")
+		return nil, nil, errors.New("CalDAV requires an inspectable HTTP transport")
 	}
 	if transport.TLSClientConfig != nil {
 		transport.TLSClientConfig = transport.TLSClientConfig.Clone()
@@ -103,74 +182,91 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		transport.TLSClientConfig = &tls.Config{}
 	}
 	if transport.TLSClientConfig.InsecureSkipVerify {
-		return nil, errors.New("TLS certificate verification cannot be disabled")
+		return nil, nil, errors.New("TLS certificate verification cannot be disabled")
 	}
 	if transport.TLSClientConfig.MinVersion < tls.VersionTLS12 {
 		transport.TLSClientConfig.MinVersion = tls.VersionTLS12
 	}
 	httpClient.Transport = transport
 	client := &Client{
-		endpoint: endpoint, username: options.Username,
-		password: append([]byte(nil), options.Password...),
+		endpoint: endpoint, username: options.username,
+		password: append([]byte(nil), options.password...),
 		http:     httpClient,
 	}
 	dav, err := caldav.NewClient((*authorizedHTTPClient)(client), endpoint.String())
 	if err != nil {
 		_ = client.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	client.dav = dav
 	principal, err := dav.FindCurrentUserPrincipal(ctx)
 	if err != nil {
 		_ = client.Close()
-		return nil, fmt.Errorf("discover CalDAV principal: %w", err)
+		return nil, nil, fmt.Errorf("discover CalDAV principal: %w", err)
 	}
-	client.discoverScheduling(ctx, principal)
+	principal, ok := client.davPath(principal)
+	if !ok {
+		_ = client.Close()
+		return nil, nil, errors.New("CalDAV discovery returned an invalid principal path")
+	}
+	client.principal = principal
 	home, err := dav.FindCalendarHomeSet(ctx, principal)
 	if err != nil {
 		_ = client.Close()
-		return nil, fmt.Errorf("discover CalDAV home: %w", err)
+		return nil, nil, fmt.Errorf("discover CalDAV home: %w", err)
 	}
+	home, ok = client.davPath(home)
+	if !ok {
+		_ = client.Close()
+		return nil, nil, errors.New("CalDAV discovery returned an invalid calendar home path")
+	}
+	client.calendarHome = home
 	calendars, err := dav.FindCalendars(ctx, home)
 	if err != nil {
 		_ = client.Close()
-		return nil, fmt.Errorf("discover CalDAV calendars: %w", err)
+		return nil, nil, fmt.Errorf("discover CalDAV calendars: %w", err)
 	}
 	if len(calendars) >
 		application.MaxCalendarFolderOffset+application.MaxCalendarFolderPageSize {
 		_ = client.Close()
-		return nil, errors.New("CalDAV calendar discovery exceeds the configured limit")
+		return nil, nil, errors.New("CalDAV calendar discovery exceeds the configured limit")
 	}
 	sort.Slice(calendars, func(left, right int) bool {
 		return calendars[left].Path < calendars[right].Path
 	})
+	return client, calendars, nil
+}
+
+func selectCollections(
+	calendars []caldav.Calendar,
+	component, selectedPath, label string,
+) (string, []caldav.Calendar, error) {
+	if selectedPath != "" && !validDAVPath(selectedPath) {
+		return "", nil, fmt.Errorf("CalDAV %s path is malformed", label)
+	}
 	selected := ""
-	eventCalendars := make([]caldav.Calendar, 0, len(calendars))
+	matching := make([]caldav.Calendar, 0, len(calendars))
 	for _, calendar := range calendars {
-		if !supportsEvents(calendar.SupportedComponentSet) {
+		if !supportsComponent(calendar.SupportedComponentSet, component) {
 			continue
 		}
 		if !validDAVPath(calendar.Path) {
-			_ = client.Close()
-			return nil, errors.New("CalDAV discovery returned an invalid calendar path")
+			return "", nil, errors.New("CalDAV discovery returned an invalid calendar path")
 		}
-		eventCalendars = append(eventCalendars, calendar)
-		if options.CalendarPath == "" || calendar.Path == options.CalendarPath {
+		matching = append(matching, calendar)
+		if selectedPath == "" || calendar.Path == selectedPath {
 			if selected == "" {
 				selected = calendar.Path
 			}
 		}
 	}
 	if selected == "" {
-		_ = client.Close()
-		if options.CalendarPath != "" {
-			return nil, errors.New("configured CalDAV calendar was not discovered")
+		if selectedPath != "" {
+			return "", nil, fmt.Errorf("configured CalDAV %s was not discovered", label)
 		}
-		return nil, errors.New("CalDAV account has no VEVENT calendar")
+		return "", nil, fmt.Errorf("CalDAV account has no %s collection", component)
 	}
-	client.calendarPath = selected
-	client.calendars = eventCalendars
-	return client, nil
+	return selected, matching, nil
 }
 
 type schedulingMultiStatus struct {
@@ -258,7 +354,7 @@ func (client *Client) discoverScheduling(ctx context.Context, principal string) 
 
 func (client *Client) davPath(raw string) (string, bool) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil {
+	if err != nil || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return "", false
 	}
 	if parsed.IsAbs() &&
@@ -347,7 +443,7 @@ func (client *Client) Close() error {
 func validateHTTPSURL(name, raw string) (*url.URL, error) {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" ||
-		parsed.User != nil || parsed.Fragment != "" {
+		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return nil, fmt.Errorf("%s must be an absolute credential-free HTTPS URL", name)
 	}
 	return parsed, nil
@@ -358,12 +454,12 @@ func validDAVPath(value string) bool {
 		!strings.ContainsAny(value, "\r\n\x00?#")
 }
 
-func supportsEvents(values []string) bool {
+func supportsComponent(values []string, component string) bool {
 	if len(values) == 0 {
 		return true
 	}
 	for _, value := range values {
-		if strings.EqualFold(value, ical.CompEvent) {
+		if strings.EqualFold(value, component) {
 			return true
 		}
 	}
@@ -437,11 +533,24 @@ func (client *Client) hasCalendar(calendarPath string) bool {
 	return false
 }
 
+func (client *Client) hasTaskList(taskListPath string) bool {
+	for _, taskList := range client.taskLists {
+		if taskList.Path == taskListPath {
+			return true
+		}
+	}
+	return false
+}
+
+func (client *Client) hasCollection(collectionPath string) bool {
+	return client.hasCalendar(collectionPath) || client.hasTaskList(collectionPath)
+}
+
 func (client *Client) objectURL(
 	objectPath string,
 	calendarPath string,
 ) (*url.URL, error) {
-	if !client.hasCalendar(calendarPath) ||
+	if !client.hasCollection(calendarPath) ||
 		!validDAVPath(objectPath) ||
 		!pathWithin(objectPath, calendarPath) {
 		return nil, errors.New("CalDAV object path escapes the selected calendar")

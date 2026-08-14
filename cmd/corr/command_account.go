@@ -64,6 +64,12 @@ type accountAddCommand struct {
 	TaskAuthorizationKey      string `name:"task-authorization-key" help:"Independent OS-keyring grant handle for tasks; defaults to --authorization-key."`
 	ApproveTaskOAuth          bool   `name:"approve-task-oauth" help:"Confirm the task OAuth grant and its task-only scope."`
 	TaskReadOnly              bool   `name:"task-read-only" help:"Request Tasks.Read instead of Tasks.ReadWrite."`
+	TaskCalDAVEndpoint        string `name:"task-caldav-endpoint" help:"CalDAV HTTPS discovery endpoint for VTODO tasks; defaults to --caldav-endpoint."`
+	TaskListPath              string `name:"task-list-path" help:"Optional absolute CalDAV VTODO collection path."`
+	TaskUsername              string `name:"task-username" help:"CalDAV task login identity; defaults to calendar, mail, or account identity."`
+	TaskCredentialBackend     string `name:"task-credential-backend" help:"External CalDAV task credential backend; defaults to --credential-backend."`
+	TaskCredentialKey         string `name:"task-credential-key" help:"Independent external CalDAV task credential handle."`
+	ApproveTaskCredential     bool   `name:"approve-task-credential" help:"Record explicit consent for the CalDAV task credential."`
 	Username                  string `help:"Mail login identity; defaults to the address and must match it for Google."`
 	CredentialBackend         string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
 	CredentialKey             string `help:"External standards credential lookup key."`
@@ -464,6 +470,40 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 	}
 	provider := domain.ProviderID(command.TaskProvider)
 	result := &application.AccountTaskRouteInput{Provider: provider}
+	if provider == domain.ProviderCalDAV {
+		endpoint := command.TaskCalDAVEndpoint
+		if endpoint == "" {
+			endpoint = command.CalDAVEndpoint
+		}
+		username := command.TaskUsername
+		if username == "" {
+			username = command.CalendarUsername
+		}
+		if username == "" {
+			username = command.Username
+		}
+		if username == "" {
+			username = command.Address
+		}
+		backend := command.TaskCredentialBackend
+		if backend == "" {
+			backend = command.CredentialBackend
+		}
+		if endpoint == "" || username == "" || command.TaskCredentialKey == "" ||
+			!command.ApproveTaskCredential {
+			return nil, errors.New(
+				"caldav tasks require an HTTPS endpoint, login identity, independent external credential handle, and --approve-task-credential",
+			)
+		}
+		result.CalDAV = &application.AccountCalDAVTaskInput{
+			Endpoint: endpoint, TaskListPath: command.TaskListPath,
+			Username: username,
+			Credential: application.AccountCredentialInput{
+				Backend: backend, Key: command.TaskCredentialKey, Consent: true,
+			},
+		}
+		return result, nil
+	}
 	if provider != domain.ProviderMicrosoftGraph && provider != domain.ProviderTodoist {
 		return result, nil
 	}

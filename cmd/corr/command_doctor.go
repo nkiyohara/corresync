@@ -155,6 +155,9 @@ func (command *doctorCommand) Run(app *runtime) error {
 			report.add("calendar_folder_contract", "skip", "provider session is not authenticated")
 			report.add("calendar_contract", "skip", "provider session is not authenticated")
 		}
+		if configured.Tasks != nil {
+			report.add("task_list_contract", "skip", "provider session is not authenticated")
+		}
 		closeErr := client.Close()
 		if closeErr != nil {
 			report.add("daemon_close", "fail", doctorError(closeErr))
@@ -242,6 +245,23 @@ func (command *doctorCommand) Run(app *runtime) error {
 			report.add("calendar_contract", "fail", doctorError(calendarErr))
 		} else {
 			report.add("calendar_contract", "pass", "metadata response accepted; no event data emitted")
+		}
+	}
+	if configured.Tasks == nil {
+		report.add("task_list_contract", "skip", "the account has no task route")
+	} else {
+		_, taskErr := client.ListTaskLists(app.context, application.TaskListInput{
+			Account: accountID,
+			Limit:   1,
+		}, app.caller())
+		if taskErr != nil {
+			report.add("task_list_contract", "fail", doctorError(taskErr))
+		} else {
+			report.add(
+				"task_list_contract",
+				"pass",
+				"metadata response accepted; no task-list data emitted",
+			)
 		}
 	}
 	if err := client.Close(); err != nil {
@@ -344,6 +364,26 @@ func (command *doctorCommand) addContentFreeConnectionChecks(
 				session.CapturedAt,
 				"calendar",
 				"event, contact, or attachment",
+			),
+		)
+	}
+	switch {
+	case configured.Tasks == nil:
+		report.add("task_connection", "skip", "the account has no task route")
+	case capabilities == nil || !capabilities.Tasks:
+		report.add(
+			"task_connection",
+			"fail",
+			"the authenticated session did not confirm the configured task capability",
+		)
+	default:
+		report.add(
+			"task_connection",
+			"pass",
+			connectionConfirmationDetail(
+				session.CapturedAt,
+				"task",
+				"task or task-list",
 			),
 		)
 	}

@@ -72,17 +72,19 @@ and unshared Corresync-owned OAuth grant state. External standards credentials
 remain in their keyring/helper. Removing the default account requires
 `--new-default`.
 
-## Schema v6
+## Schema v7
 
-Schema v6 adds an optional explicit task route to the provider-neutral schema.
-Existing v5 files migrate with no task route, authorization, or capability.
-Schema v5 added the signed-release channel and existing older files retain
-their check and automatic-install consent. A freshly
+Schema v7 adds a typed CalDAV VTODO payload to the existing optional task
+route. Existing v6 files preserve every route and credential consent exactly;
+the migration adds no VTODO route or new authority. Schema v6 introduced the
+task route, and existing v5 files still migrate with no task route,
+authorization, or capability. Schema v5 added the signed-release channel and
+existing older files retain their check and automatic-install consent. A freshly
 initialized provider-neutral configuration contains no account and has an
 empty `default_account`. The first account added becomes the default:
 
 ```toml
-version = 6
+version = 7
 default_account = ""
 
 [policy]
@@ -107,7 +109,7 @@ auto_submit = false
 A configured Outlook Web account then looks like:
 
 ```toml
-version = 6
+version = 7
 default_account = "work"
 
 [accounts.work]
@@ -170,7 +172,9 @@ Supported route payloads are:
 | calendar | `microsoft-graph` | `calendar.microsoft_graph` |
 | calendar | `caldav` | `calendar.caldav` |
 | tasks | `microsoft-graph` | `tasks.microsoft_graph` and `tasks.microsoft_graph.oauth` |
-| tasks | `microsoft-web-tasks`, `todoist`, `caldav`, `google-tasks`, `apple-reminders`, `ticktick`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
+| tasks | `todoist` | `tasks.todoist` and `tasks.todoist.oauth` |
+| tasks | `caldav` | `tasks.caldav` |
+| tasks | `microsoft-web-tasks`, `google-tasks`, `apple-reminders`, `ticktick`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
 <!-- markdownlint-enable MD013 -->
 
 The payload must match the provider exactly. The staged Google mail-and-calendar
@@ -181,7 +185,7 @@ valid configuration but cannot activate before approval.
 Graph mail and calendar may share one identical API route. An independent
 IMAP/SMTP mail route can be paired with a CalDAV calendar route.
 
-The v6 task route remains closed and secret-free. An implemented Microsoft To
+The task route remains closed and secret-free. An implemented Microsoft To
 Do task-only route looks like:
 
 ```toml
@@ -245,8 +249,35 @@ Its address is checked against the delegated Todoist identity at login.
 `data:read_write,data:delete`. The API base is fixed. Configuration has no
 client-secret or personal-token field. The loopback port is also fixed and must
 exactly match the redirect registered for that public client; Todoist routes do
-not use the ephemeral `:0` convention. Remaining task providers are unavailable
-and have no arbitrary options map or credential value. See the
+not use the ephemeral `:0` convention.
+
+CalDAV VTODO uses a distinct standards route and credential consent, even when
+the same account also has a CalDAV VEVENT calendar:
+
+```toml
+[accounts.tasks]
+id = "acc_0000000000000000000000000000000b"
+
+[accounts.tasks.tasks]
+provider = "caldav"
+
+[accounts.tasks.tasks.caldav]
+endpoint = "https://dav.example.invalid/"
+task_list_path = "/dav/tasks/work/"
+username = "reader@example.invalid"
+
+[accounts.tasks.tasks.caldav.credential]
+backend = "os-keyring"
+key = "tasks-caldav"
+consent = true
+```
+
+`task_list_path` is optional; authenticated discovery otherwise selects the
+first VTODO collection. The address may be omitted. The endpoint is HTTPS-only
+and credential-free, while the password or app-specific password stays in the
+selected external credential owner. VEVENT and VTODO discovery, sessions,
+capabilities, cursors, and writes remain separate. Remaining task providers
+are unavailable and have no arbitrary options map or credential value. See the
 [task contract](tasks.md).
 
 Prefer the lifecycle command over hand editing:
@@ -270,6 +301,15 @@ corr account add reader@example.invalid \
   --task-authorization-key tasks-todoist \
   --approve-task-oauth \
   --task-read-only
+
+corr account add \
+  --alias caldav-tasks \
+  --task-provider caldav \
+  --task-caldav-endpoint https://dav.example.invalid/ \
+  --task-list-path /dav/tasks/work/ \
+  --task-username reader@example.invalid \
+  --task-credential-key tasks-caldav \
+  --approve-task-credential
 ```
 
 Task OAuth flags may use the shared `--oauth-*` public-client values, but the

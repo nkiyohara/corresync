@@ -26,6 +26,13 @@ to one opaque account ID and one explicit route. Configuration schema v6 adds
 the closed `accounts.<alias>.tasks.provider` field. Migration from v5 creates
 no task route and grants no new authority.
 
+Configuration schema v7 adds the typed `tasks.caldav` VTODO payload. Migration
+from v6 preserves every existing route and consent without manufacturing a
+CalDAV task route. VEVENT and VTODO collection discovery, credential consent,
+adapter session, capability observation, cursor, and application service
+remain independent even when they use the same server and external credential
+handle.
+
 The canonical model contains task lists and versioned tasks with bounded title
 and notes, status, priority, parent, ordering, checklist, assignee, labels,
 links, reminders, recurrence, and completion time. Date-only, floating local

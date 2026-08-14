@@ -933,6 +933,12 @@ func TestCalDAVRecurringInstanceWritesStayScopedAndScheduled(t *testing.T) {
 
 func TestClientRefusesUnsafeTLSAndRedirects(t *testing.T) {
 	t.Parallel()
+	if _, err := validateHTTPSURL(
+		"CalDAV endpoint",
+		"https://dav.example.invalid/path?credential=not-allowed",
+	); err == nil {
+		t.Fatal("CalDAV endpoint query was accepted")
+	}
 	server, _, _ := newFixtureServer(t)
 	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
 	insecureTransport.TLSClientConfig.InsecureSkipVerify = true

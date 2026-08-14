@@ -296,6 +296,18 @@ func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 				},
 			},
 		},
+		Tasks: &config.TaskRoute{
+			Provider: domain.ProviderCalDAV,
+			CalDAV: &config.CalDAVTaskRoute{
+				Endpoint: "https://dav.example.invalid/", TaskListPath: "/tasks/",
+				Username: "reader@example.invalid",
+				Credential: config.CredentialRef{
+					Backend: config.CredentialHelper,
+					Key:     "private-task-key",
+					Consent: true,
+				},
+			},
+		},
 	}
 	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)
@@ -312,6 +324,7 @@ func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 	for _, private := range []string{
 		"private-credential-key",
 		"private-calendar-key",
+		"private-task-key",
 		"private-helper-command",
 		"--private-profile",
 	} {
@@ -322,6 +335,53 @@ func TestStoreRedactsCredentialLookupDetailsFromAccountViews(t *testing.T) {
 	if !strings.Contains(output, `"backend":"helper"`) ||
 		!strings.Contains(output, `"consented":true`) {
 		t.Fatalf("account catalog omitted safe credential summary: %s", output)
+	}
+}
+
+func TestAddAccountRejectsCrossAccountCalDAVTaskCredentialReuse(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.OutlookDefault()
+	work := configuration.Accounts["work"]
+	work.Tasks = &config.TaskRoute{
+		Provider: domain.ProviderCalDAV,
+		CalDAV: &config.CalDAVTaskRoute{
+			Endpoint: "https://work.example.invalid/dav", TaskListPath: "/tasks/",
+			Username: "work@example.invalid",
+			Credential: config.CredentialRef{
+				Backend: config.CredentialOSKeyring,
+				Key:     "work-task-handle",
+				Consent: true,
+			},
+		},
+	}
+	configuration.Accounts["work"] = work
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	store := Store{ConfigPath: path}
+	err := store.AddAccount(t.Context(), application.AccountRegistration{
+		ID: "acc_00000000000000000000000000000002", Alias: "team",
+		Tasks: &application.AccountTaskRouteInput{
+			Provider: domain.ProviderCalDAV,
+			CalDAV: &application.AccountCalDAVTaskInput{
+				Endpoint: "https://team.example.invalid/dav", TaskListPath: "/tasks/",
+				Username: "team@example.invalid",
+				Credential: application.AccountCredentialInput{
+					Backend: "os-keyring", Key: "work-task-handle", Consent: true,
+				},
+			},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "already belongs") {
+		t.Fatalf("AddAccount() error = %v", err)
+	}
+	reloaded, loadErr := config.Load(path)
+	if loadErr != nil {
+		t.Fatal(loadErr)
+	}
+	if _, exists := reloaded.Accounts["team"]; exists {
+		t.Fatal("rejected CalDAV task account was persisted")
 	}
 }
 
