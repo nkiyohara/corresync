@@ -2,7 +2,7 @@
 
 - Status: accepted
 - Date: 2026-07-18
-- Amended: 2026-07-29
+- Amended: 2026-08-14
 
 ## Context
 
@@ -30,13 +30,18 @@ unless the selected route reports Teams support. The commit result may return
 the join URL for only the single event it just created.
 
 Calendar list remains metadata-only and excludes join URLs. Corresync does not
-expose arbitrary conference fields or any Teams chat, channel, call, recording,
-or post-creation meeting-management operation.
+expose arbitrary conference fields or any Teams call, recording, or
+post-creation meeting-management operation. Provider-neutral Teams messaging
+is a separate, evidence-gated domain under
+[ADR 0034](0034-provider-neutral-messaging.md); it does not broaden this
+calendar operation.
 
 ## Consequences
 
 Humans and agents get a simple preview/commit flow and can use the returned URL
 without broadening calendar reads. Corresync depends on the signed-in calendar
 advertising its native conference service and never falls back to another
-provider. Wider Teams or Google Meet lifecycle features require a separate ADR
-and must not be inferred from this calendar capability.
+provider. Wider Teams or Google Meet lifecycle features must not be inferred
+from this calendar capability. ADR 0034 separately permits bounded messaging
+without permitting calls, recordings, presence, or meeting lifecycle
+management.

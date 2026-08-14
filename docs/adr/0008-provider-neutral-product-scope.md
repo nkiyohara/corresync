@@ -25,11 +25,13 @@ an intended product as though it already existed.
 ## Decision
 
 Adopt a provider-neutral product scope. Corresync is a local-first CLI and MCP
-server for mail, calendar, and task accounts that the signed-in human already
-controls, with multiple accounts and multiple providers as first-class
-concerns. The provider-neutral task domain is decided in
+server for mail, calendar, task, and messaging accounts that the signed-in
+human already controls, with multiple accounts and multiple providers as
+first-class concerns. The provider-neutral task domain is decided in
 [ADR 0028](0028-provider-neutral-task-domain.md). The name and its migration are
-decided in [ADR 0011](0011-coordinated-corresync-rename.md).
+decided in [ADR 0011](0011-coordinated-corresync-rename.md). The bounded,
+evidence-gated messaging domain is decided in
+[ADR 0034](0034-provider-neutral-messaging.md).
 
 One safety model covers every provider. The invariants that apply to Outlook
 Web today apply unchanged to every adapter added later: dependencies point
@@ -58,9 +60,11 @@ unimplemented:
   permission the user does not already have;
 - silently reading or copying passwords, tokens, or cookies that belong to
   another application;
-- Teams chat, channels, calls, recordings, and meeting lifecycle management. A
-  provider-native Teams or Google Meet join link provisioned as a property of
-  one calendar event remains calendar scope exactly as decided in
+- Teams calls, recordings, presence surveillance, and meeting lifecycle
+  management. Provider-neutral chat and channel messaging is permitted only
+  through the bounded routes and release gates in ADR 0034. A provider-native
+  Teams or Google Meet join link provisioned as a property of one calendar
+  event remains calendar scope exactly as decided in
   [ADR 0005](0005-calendar-hosted-teams-links.md).
 
 The domain-only public compatibility checker accepted by
