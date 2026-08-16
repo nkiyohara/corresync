@@ -4173,13 +4173,17 @@ func (backend *sessionBackend) graphAPIAccount(
 	if messaging == nil {
 		return result, nil
 	}
+	grantedScopes, err := authorization.GrantedScopes(ctx)
+	if err != nil {
+		return sessionAccount{}, errors.Join(err, closeSessionAccount(result))
+	}
 	factory := backend.newTeamsGraph
 	if factory == nil {
 		factory = teamsgraph.New
 	}
 	messagingClient, err := factory(ctx, teamsgraph.Options{
 		APIBase: route.APIBase, WorkspaceID: messaging.WorkspaceID,
-		GrantedScopes: provider.Scopes, ReadOnly: messaging.ReadOnly,
+		GrantedScopes: grantedScopes, ReadOnly: messaging.ReadOnly,
 		HTTP: authorizedHTTP,
 	})
 	if err != nil {

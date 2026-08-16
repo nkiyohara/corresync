@@ -37,17 +37,18 @@ type onboardingRoutePlan struct {
 type onboardingService string
 
 const (
-	onboardingServiceMail      onboardingService = "mail"
-	onboardingServiceCalendar  onboardingService = "calendar"
-	onboardingServiceTasks     onboardingService = "tasks"
-	onboardingServiceMessaging onboardingService = "messaging"
+	onboardingServiceMail           onboardingService = "mail"
+	onboardingServiceCalendar       onboardingService = "calendar"
+	onboardingServiceMicrosoftTasks onboardingService = "microsoft_tasks"
+	onboardingServiceGoogleTasks    onboardingService = "google_tasks"
+	onboardingServiceMessaging      onboardingService = "messaging"
 )
 
 type onboardingServiceSelection struct {
-	mail      bool
-	calendar  bool
-	tasks     bool
-	messaging bool
+	mail         bool
+	calendar     bool
+	taskProvider domain.ProviderID
+	messaging    bool
 }
 
 type onboardingRegistration struct {
@@ -507,12 +508,7 @@ func selectOnboardingServices(
 		"Services to configure",
 		"Mail and calendar are preselected when this route can provide them. Optional services use their own explicit route and are verified only after sign-in.",
 		onboardingServiceOptions(plan, messagingEnabled),
-		func(values []onboardingService) error {
-			if len(values) == 0 {
-				return errors.New("select at least one service")
-			}
-			return nil
-		},
+		validateOnboardingServices,
 	)
 	if err != nil || !selected {
 		return onboardingServiceSelection{}, false, err
@@ -524,13 +520,31 @@ func selectOnboardingServices(
 			result.mail = true
 		case onboardingServiceCalendar:
 			result.calendar = true
-		case onboardingServiceTasks:
-			result.tasks = true
+		case onboardingServiceMicrosoftTasks:
+			result.taskProvider = domain.ProviderMicrosoftGraph
+		case onboardingServiceGoogleTasks:
+			result.taskProvider = domain.ProviderGoogleTasks
 		case onboardingServiceMessaging:
 			result.messaging = true
 		}
 	}
 	return result, true, nil
+}
+
+func validateOnboardingServices(values []onboardingService) error {
+	if len(values) == 0 {
+		return errors.New("select at least one service")
+	}
+	taskServices := 0
+	for _, service := range values {
+		if service == onboardingServiceMicrosoftTasks || service == onboardingServiceGoogleTasks {
+			taskServices++
+		}
+	}
+	if taskServices > 1 {
+		return errors.New("select one task service per account")
+	}
+	return nil
 }
 
 func onboardingServiceOptions(
@@ -553,7 +567,7 @@ func onboardingServiceOptions(
 	if plan.usesMicrosoft() {
 		options = append(options, huh.NewOption(
 			"Microsoft To Do · separate, explicit Graph authorization",
-			onboardingServiceTasks,
+			onboardingServiceMicrosoftTasks,
 		))
 		if messagingEnabled {
 			options = append(options, huh.NewOption(
@@ -565,7 +579,7 @@ func onboardingServiceOptions(
 	if plan.usesGoogle() && rollout.GoogleOAuthApproved {
 		options = append(options, huh.NewOption(
 			"Google Tasks · separate, explicit Google authorization",
-			onboardingServiceTasks,
+			onboardingServiceGoogleTasks,
 		))
 	}
 	return options
@@ -752,15 +766,31 @@ func configureOnboardingTaskRoute(
 	services onboardingServiceSelection,
 	alias string,
 ) (accountAddCommand, bool, error) {
-	if !services.tasks {
+	provider := services.taskProvider
+	if provider == "" {
 		return command, true, nil
 	}
-	provider := domain.ProviderMicrosoftGraph
-	if plan.usesGoogle() {
-		provider = domain.ProviderGoogleTasks
-	} else if !plan.usesMicrosoft() {
+	switch provider { //nolint:exhaustive // every other provider follows the explicit unsupported path.
+	case domain.ProviderMicrosoftGraph:
+		if !plan.usesMicrosoft() {
+			return accountAddCommand{}, false, errors.New(
+				"the selected connection route does not offer Microsoft To Do",
+			)
+		}
+	case domain.ProviderGoogleTasks:
+		if !plan.usesGoogle() {
+			return accountAddCommand{}, false, errors.New(
+				"the selected connection route does not offer Google Tasks",
+			)
+		}
+		if !rollout.GoogleOAuthApproved {
+			return accountAddCommand{}, false, googleOAuthPendingError(
+				"Google Tasks was selected.",
+			)
+		}
+	default:
 		return accountAddCommand{}, false, errors.New(
-			"the selected connection route does not offer a guided task service",
+			"the selected guided task service is unsupported",
 		)
 	}
 	if command.OAuthClientID == "" {

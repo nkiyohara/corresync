@@ -35,6 +35,8 @@ const (
 	keyringService        = "corresync/oauth"
 	maximumGrantBytes     = 64 << 10
 	maximumClientSecret   = 4 << 10
+	maximumObservedScopes = 128
+	maximumScopeBytes     = 512
 	authorizationTimeout  = 5 * time.Minute
 	defaultRequestTimeout = 30 * time.Second
 	refreshLockTimeout    = 30 * time.Second
@@ -335,19 +337,23 @@ func New(options Options) (*Manager, error) {
 }
 
 type storedGrant struct {
-	Version     int               `json:"version"`
-	Provider    domain.ProviderID `json:"provider"`
-	ClientID    string            `json:"clientId"`
-	RedirectURI string            `json:"redirectUri"`
-	Scopes      []string          `json:"scopes"`
-	Token       oauth2.Token      `json:"token"`
+	Version        int               `json:"version"`
+	Provider       domain.ProviderID `json:"provider"`
+	ClientID       string            `json:"clientId"`
+	RedirectURI    string            `json:"redirectUri"`
+	Scopes         []string          `json:"scopes"`
+	ObservedScopes []string          `json:"observedScopes,omitempty"`
+	Token          oauth2.Token      `json:"token"`
 }
 
 // Authorization is one account-scoped, refreshable grant projection. The
 // refresh token remains encapsulated in the manager-owned token source.
+// GrantedScopes returns only scope metadata observed in a token response; it
+// never substitutes the scopes Corresync requested.
 type Authorization interface {
 	HTTPClient() *http.Client
 	AccessToken(context.Context) ([]byte, error)
+	GrantedScopes(context.Context) ([]string, error)
 }
 
 // ClientCredentialResolver returns a newly allocated confidential-client
@@ -356,8 +362,30 @@ type Authorization interface {
 type ClientCredentialResolver func(context.Context) ([]byte, error)
 
 type authorization struct {
-	http   *http.Client
-	source oauth2.TokenSource
+	http     *http.Client
+	source   oauth2.TokenSource
+	observed *observedScopeSet
+}
+
+type observedScopeSet struct {
+	mu     sync.RWMutex
+	values []string
+}
+
+func newObservedScopeSet(values []string) *observedScopeSet {
+	return &observedScopeSet{values: append([]string(nil), values...)}
+}
+
+func (set *observedScopeSet) get() []string {
+	set.mu.RLock()
+	defer set.mu.RUnlock()
+	return append([]string(nil), set.values...)
+}
+
+func (set *observedScopeSet) replace(values []string) {
+	set.mu.Lock()
+	defer set.mu.Unlock()
+	set.values = append(set.values[:0], values...)
 }
 
 type classifyingTokenSource struct {
@@ -405,6 +433,20 @@ func (authorization *authorization) AccessToken(ctx context.Context) ([]byte, er
 		return nil, errors.New("OAuth access token is empty or too large")
 	}
 	return []byte(token.AccessToken), nil
+}
+
+func (authorization *authorization) GrantedScopes(
+	ctx context.Context,
+) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	// Resolve the reusable source first so an expired token cannot leave the
+	// caller with scope evidence from before a refresh or scope reduction.
+	if _, err := authorization.source.Token(); err != nil {
+		return nil, err
+	}
+	return authorization.observed.get(), nil
 }
 
 // Authorize loads an existing valid grant or starts explicit PKCE
@@ -510,6 +552,7 @@ func (manager *Manager) authorization(
 ) Authorization {
 	persistedProvider := provider
 	persistedProvider.Scopes = append([]string(nil), grant.Scopes...)
+	observed := newObservedScopeSet(grant.ObservedScopes)
 	if provider.DisableRefresh {
 		source := classifyingTokenSource{source: nonRefreshingTokenSource{token: grant.Token}}
 		baseContext := context.WithValue(
@@ -517,6 +560,7 @@ func (manager *Manager) authorization(
 		)
 		return &authorization{
 			http: oauth2.NewClient(baseContext, source), source: source,
+			observed: observed,
 		}
 	}
 	// Refreshable authorization obeys the interactive login context above. The
@@ -528,11 +572,12 @@ func (manager *Manager) authorization(
 	)
 	persisting := &persistingTokenSource{
 		ctx: baseContext, manager: manager, route: route,
-		provider: persistedProvider,
+		provider: persistedProvider, observed: observed,
 	}
 	reused := classifyingTokenSource{source: oauth2.ReuseTokenSource(&grant.Token, persisting)}
 	return &authorization{
 		http: oauth2.NewClient(baseContext, reused), source: reused,
+		observed: observed,
 	}
 }
 
@@ -606,6 +651,14 @@ func (manager *Manager) load(
 			errStoredGrantMismatch,
 		)
 	}
+	observedScopes, err := normalizeObservedScopes(grant.ObservedScopes)
+	if err != nil {
+		return storedGrant{}, fmt.Errorf(
+			"%w: stored OAuth scope evidence is malformed",
+			errStoredGrantMismatch,
+		)
+	}
+	grant.ObservedScopes = observedScopes
 	return grant, nil
 }
 
@@ -652,6 +705,7 @@ type persistingTokenSource struct {
 	manager  *Manager
 	route    config.OAuthClient
 	provider Provider
+	observed *observedScopeSet
 }
 
 func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
@@ -672,6 +726,7 @@ func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reload OAuth grant before refresh: %w", err)
 	}
+	source.observed.replace(latest.ObservedScopes)
 	if latest.Token.Valid() {
 		return &latest.Token, nil
 	}
@@ -684,9 +739,29 @@ func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := source.manager.save(source.route, source.provider, *token); err != nil {
+	observedScopes := latest.ObservedScopes
+	refreshedScopes, present, err := tokenObservedScopes(
+		token,
+		source.provider.ScopeSeparator,
+	)
+	if err != nil {
+		// Preserve a rotated token while discarding malformed authority
+		// evidence. Capability-aware adapters will fail closed on the empty set.
+		observedScopes = nil
+		present = true
+	}
+	if present {
+		observedScopes = refreshedScopes
+	}
+	if err := source.manager.save(
+		source.route,
+		source.provider,
+		*token,
+		observedScopes,
+	); err != nil {
 		return nil, fmt.Errorf("persist refreshed OAuth grant: %w", err)
 	}
+	source.observed.replace(observedScopes)
 	return token, nil
 }
 
@@ -701,15 +776,21 @@ func (manager *Manager) save(
 	route config.OAuthClient,
 	provider Provider,
 	token oauth2.Token,
+	observedScopes []string,
 ) error {
 	if provider.DisableRefresh {
 		token.RefreshToken = ""
 	}
+	normalizedScopes, err := normalizeObservedScopes(observedScopes)
+	if err != nil {
+		return err
+	}
 	grant := storedGrant{
 		Version: 1, Provider: provider.ID, ClientID: route.ClientID,
-		RedirectURI: route.RedirectURI,
-		Scopes:      append([]string(nil), provider.Scopes...),
-		Token:       token,
+		RedirectURI:    route.RedirectURI,
+		Scopes:         append([]string(nil), provider.Scopes...),
+		ObservedScopes: normalizedScopes,
+		Token:          token,
 	}
 	encoded, err := json.Marshal(grant)
 	if err != nil {
@@ -719,6 +800,69 @@ func (manager *Manager) save(
 		return errors.New("OAuth grant exceeds the storage limit")
 	}
 	return manager.set(keyringService, route.Authorization.Key, string(encoded))
+}
+
+func tokenObservedScopes(
+	token *oauth2.Token,
+	separator string,
+) ([]string, bool, error) {
+	raw := token.Extra("scope")
+	if raw == nil {
+		return nil, false, nil
+	}
+	value, ok := raw.(string)
+	if !ok || len(value) > maximumObservedScopes*maximumScopeBytes {
+		return nil, true, errors.New("OAuth token scope evidence is malformed")
+	}
+	var values []string
+	if separator == "" || separator == " " {
+		values = strings.Fields(value)
+	} else {
+		parts := strings.Split(value, separator)
+		values = make([]string, 0, len(parts))
+		for _, part := range parts {
+			values = append(values, strings.TrimSpace(part))
+		}
+	}
+	normalized, err := normalizeObservedScopes(values)
+	if err != nil || len(normalized) == 0 {
+		return nil, true, errors.New("OAuth token scope evidence is malformed")
+	}
+	return normalized, true, nil
+}
+
+func normalizeObservedScopes(values []string) ([]string, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	if len(values) > maximumObservedScopes {
+		return nil, errors.New("OAuth token scope evidence exceeds the configured limit")
+	}
+	normalized := append([]string(nil), values...)
+	for _, scope := range normalized {
+		if !validOAuthScope(scope) {
+			return nil, errors.New("OAuth token scope evidence is malformed")
+		}
+	}
+	slices.Sort(normalized)
+	normalized = slices.Compact(normalized)
+	return normalized, nil
+}
+
+func validOAuthScope(scope string) bool {
+	if scope == "" || len(scope) > maximumScopeBytes {
+		return false
+	}
+	for index := range len(scope) {
+		character := scope[index]
+		// RFC 6749 scope-token (NQCHAR) excludes spaces, quotes, and backslashes.
+		if character != 0x21 &&
+			(character < 0x23 || character > 0x5b) &&
+			(character < 0x5d || character > 0x7e) {
+			return false
+		}
+	}
+	return true
 }
 
 // DeleteAuthorization removes one Corresync-owned OAuth grant. External

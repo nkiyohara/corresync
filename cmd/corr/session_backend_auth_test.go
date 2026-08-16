@@ -49,9 +49,22 @@ type routedOAuthManagerStub struct {
 }
 
 type oauthAuthorizationStub struct {
-	client *http.Client
-	token  []byte
-	err    error
+	client        *http.Client
+	token         []byte
+	grantedScopes []string
+	err           error
+}
+
+func (authorization *oauthAuthorizationStub) GrantedScopes(
+	ctx context.Context,
+) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if authorization.err != nil {
+		return nil, authorization.err
+	}
+	return append([]string(nil), authorization.grantedScopes...), nil
 }
 
 func (authorization *oauthAuthorizationStub) HTTPClient() *http.Client {

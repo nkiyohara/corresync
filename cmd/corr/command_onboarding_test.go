@@ -21,6 +21,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/integrationlifecycle"
 	"github.com/nkiyohara/corresync/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type failingOnboardingDiscoverer struct {
@@ -205,6 +206,49 @@ func TestGuidedSetupAddsExplicitMicrosoftToDoAlongsideOutlook(t *testing.T) {
 		oauth.RedirectURI != "http://127.0.0.1:0/callback" ||
 		oauth.Authorization.Key != "outlook-todo-microsoft" {
 		t.Fatalf("Microsoft To Do OAuth route = %+v", oauth)
+	}
+}
+
+func TestGuidedTaskChoiceBindsTheExplicitProviderInAMixedPlan(t *testing.T) {
+	t.Parallel()
+	google := &application.ProviderCandidate{Provider: domain.ProviderGoogle}
+	microsoft := &application.ProviderCandidate{Provider: domain.ProviderMicrosoftOWA}
+	plan := onboardingRoutePlan{mail: google, calendar: microsoft}
+	command := accountAddCommand{
+		OAuthClientID:    "synthetic-public-client",
+		OAuthRedirectURI: "http://127.0.0.1:0/callback",
+	}
+
+	configured, selected, err := configureOnboardingTaskRoute(
+		nil,
+		command,
+		plan,
+		onboardingServiceSelection{taskProvider: domain.ProviderMicrosoftGraph},
+		"mixed",
+	)
+	if err != nil || !selected || configured.TaskProvider != string(domain.ProviderMicrosoftGraph) {
+		t.Fatalf("explicit Microsoft task choice = %+v, selected = %t, error = %v", configured, selected, err)
+	}
+
+	_, _, err = configureOnboardingTaskRoute(
+		nil,
+		command,
+		plan,
+		onboardingServiceSelection{taskProvider: domain.ProviderGoogleTasks},
+		"mixed",
+	)
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		t.Fatalf("approval-gated Google task choice error = %v", err)
+	}
+}
+
+func TestOnboardingServiceSelectionRejectsTwoTaskProviders(t *testing.T) {
+	t.Parallel()
+	if err := validateOnboardingServices([]onboardingService{
+		onboardingServiceMicrosoftTasks,
+		onboardingServiceGoogleTasks,
+	}); err == nil || !strings.Contains(err.Error(), "one task service") {
+		t.Fatalf("dual task selection error = %v", err)
 	}
 }
 

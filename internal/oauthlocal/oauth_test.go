@@ -81,7 +81,7 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 			_, _ = io.WriteString(
 				writer,
 				`{"access_token":"synthetic-access","refresh_token":"synthetic-refresh",`+
-					`"token_type":"Bearer","expires_in":3600}`,
+					`"token_type":"Bearer","expires_in":3600,"scope":"mail.read"}`,
 			)
 		case "/protected":
 			if request.Header.Get("Authorization") != "Bearer synthetic-access" {
@@ -204,6 +204,10 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	grantedScopes, err := authorization.GrantedScopes(t.Context())
+	if err != nil || !slices.Equal(grantedScopes, []string{"mail.read"}) {
+		t.Fatalf("GrantedScopes() = %#v, %v", grantedScopes, err)
+	}
 	accessToken, err := authorization.AccessToken(t.Context())
 	if err != nil || string(accessToken) != "synthetic-access" {
 		t.Fatalf("AccessToken() = %q, %v", accessToken, err)
@@ -240,6 +244,9 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	if strings.Contains(stored, "client_secret") ||
 		strings.Contains(stored, "synthetic-code") {
 		t.Fatalf("stored grant contains transient authorization data: %s", stored)
+	}
+	if !strings.Contains(stored, `"observedScopes":["mail.read"]`) {
+		t.Fatalf("stored grant omits observed token scopes: %s", stored)
 	}
 	grant["provider"] = "google-api"
 	legacyStored, err := json.Marshal(grant)
@@ -693,7 +700,7 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(writer,
 			`{"access_token":"access-2","refresh_token":"refresh-2",`+
-				`"token_type":"Bearer","expires_in":3600}`,
+				`"token_type":"Bearer","expires_in":3600,"scope":"data:read"}`,
 		)
 	}))
 	defer tokenServer.Close()
@@ -711,7 +718,8 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 	initial, err := json.Marshal(storedGrant{
 		Version: 1, Provider: domain.ProviderTodoist,
 		ClientID: route.ClientID, RedirectURI: route.RedirectURI,
-		Scopes: provider.Scopes,
+		Scopes:         provider.Scopes,
+		ObservedScopes: []string{"data:read_write"},
 		Token: oauth2.Token{
 			AccessToken: "access-1", RefreshToken: "refresh-1",
 			TokenType: "Bearer", Expiry: time.Now().Add(-time.Hour),
@@ -763,7 +771,7 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 	wait.Add(2)
 	errorsFound := make(chan error, 2)
 	for _, authorization := range []Authorization{first, second} {
-		go func() {
+		go func(authorization Authorization) {
 			defer wait.Done()
 			token, err := authorization.AccessToken(context.Background())
 			if err != nil {
@@ -772,8 +780,17 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 			}
 			if string(token) != "access-2" {
 				errorsFound <- errors.New("unexpected refreshed access token")
+				return
 			}
-		}()
+			scopes, err := authorization.GrantedScopes(context.Background())
+			if err != nil {
+				errorsFound <- err
+				return
+			}
+			if !slices.Equal(scopes, []string{"data:read"}) {
+				errorsFound <- errors.New("refresh retained stale observed scopes")
+			}
+		}(authorization)
 	}
 	wait.Wait()
 	close(errorsFound)
@@ -782,8 +799,69 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if refreshes != 1 || !strings.Contains(stored, `"refresh_token":"refresh-2"`) {
+	if refreshes != 1 || !strings.Contains(stored, `"refresh_token":"refresh-2"`) ||
+		!strings.Contains(stored, `"observedScopes":["data:read"]`) {
 		t.Fatalf("refreshes=%d stored=%s", refreshes, stored)
+	}
+}
+
+func TestObservedOAuthScopesStayBoundedAndNeverFallBackToRequestedScopes(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	requested := []string{"Chat.ReadWrite", "ChatMessage.Send"}
+	grant := storedGrant{
+		Version: 1, Provider: domain.ProviderMicrosoftGraph,
+		ClientID: "synthetic-client", RedirectURI: "http://127.0.0.1:8765/oauth/callback",
+		Scopes: requested,
+		Token: oauth2.Token{
+			AccessToken: "synthetic-access", TokenType: "Bearer",
+			Expiry: time.Now().Add(time.Hour),
+		},
+	}
+	stored, err := json.Marshal(grant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := New(Options{
+		Get: func(string, string) (string, error) { return string(stored), nil },
+		Set: func(string, string, string) error {
+			t.Fatal("existing grant unexpectedly changed")
+			return nil
+		},
+		LockDir: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorization, err := manager.Authorize(
+		t.Context(),
+		config.OAuthClient{
+			ClientID: grant.ClientID, RedirectURI: grant.RedirectURI,
+			Authorization: config.CredentialRef{
+				Backend: config.CredentialOSKeyring, Key: "synthetic", Consent: true,
+			},
+		},
+		Provider{ID: grant.Provider, Scopes: requested},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scopes, err := authorization.GrantedScopes(t.Context())
+	if err != nil || len(scopes) != 0 {
+		t.Fatalf("unobserved GrantedScopes() = %#v, %v", scopes, err)
+	}
+
+	for _, value := range []any{
+		`Chat.ReadWrite"bad`, strings.Repeat("x", maximumScopeBytes+1), 42,
+	} {
+		token := (&oauth2.Token{AccessToken: "synthetic"}).WithExtra(map[string]any{
+			"scope": value,
+		})
+		if _, _, scopeErr := tokenObservedScopes(token, ""); scopeErr == nil {
+			t.Fatalf("tokenObservedScopes(%#v) unexpectedly succeeded", value)
+		}
 	}
 }
 

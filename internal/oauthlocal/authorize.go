@@ -176,14 +176,21 @@ func (manager *Manager) authorize(
 	if provider.DisableRefresh {
 		token.RefreshToken = ""
 	}
-	if err := manager.save(route, provider, *token); err != nil {
+	observedScopes, _, err := tokenObservedScopes(token, provider.ScopeSeparator)
+	if err != nil {
+		// The access grant can still serve non-capability-aware adapters, but
+		// malformed scope metadata must never be treated as authority.
+		observedScopes = nil
+	}
+	if err := manager.save(route, provider, *token, observedScopes); err != nil {
 		return storedGrant{}, fmt.Errorf("store OAuth grant: %w", err)
 	}
 	return storedGrant{
 		Version: 1, Provider: provider.ID, ClientID: route.ClientID,
-		RedirectURI: route.RedirectURI,
-		Scopes:      append([]string(nil), provider.Scopes...),
-		Token:       *token,
+		RedirectURI:    route.RedirectURI,
+		Scopes:         append([]string(nil), provider.Scopes...),
+		ObservedScopes: observedScopes,
+		Token:          *token,
 	}, nil
 }
 
