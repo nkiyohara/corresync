@@ -882,7 +882,7 @@ func runSettingsMultiSelect[T comparable](
 	title string,
 	description string,
 	options []huh.Option[T],
-	validators ...func([]T) error,
+	validate func([]T) error,
 ) ([]T, bool, error) {
 	if !strings.Contains(strings.ToLower(description), "esc") {
 		description += " Esc cancels."
@@ -897,8 +897,8 @@ func runSettingsMultiSelect[T comparable](
 		Value(&values).
 		Height(min(14, len(options)+2)).
 		Filterable(len(options) > 8)
-	if len(validators) > 0 && validators[0] != nil {
-		field.Validate(validators[0])
+	if validate != nil {
+		field.Validate(validate)
 	}
 	form := settingsForm(app, field)
 	if err := form.RunWithContext(app.context); err != nil {

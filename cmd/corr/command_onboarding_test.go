@@ -204,7 +204,7 @@ func TestGuidedSetupAddsExplicitMicrosoftToDoAlongsideOutlook(t *testing.T) {
 	oauth := account.Tasks.MicrosoftGraph.OAuth
 	if oauth.ClientID != "synthetic-public-client" ||
 		oauth.RedirectURI != "http://127.0.0.1:0/callback" ||
-		oauth.Authorization.Key != "outlook-todo-microsoft" {
+		oauth.Authorization.Key != "outlook-todo-microsoft-tasks" {
 		t.Fatalf("Microsoft To Do OAuth route = %+v", oauth)
 	}
 }
@@ -212,11 +212,12 @@ func TestGuidedSetupAddsExplicitMicrosoftToDoAlongsideOutlook(t *testing.T) {
 func TestGuidedTaskChoiceBindsTheExplicitProviderInAMixedPlan(t *testing.T) {
 	t.Parallel()
 	google := &application.ProviderCandidate{Provider: domain.ProviderGoogle}
-	microsoft := &application.ProviderCandidate{Provider: domain.ProviderMicrosoftOWA}
+	microsoft := &application.ProviderCandidate{Provider: domain.ProviderMicrosoftGraph}
 	plan := onboardingRoutePlan{mail: google, calendar: microsoft}
 	command := accountAddCommand{
-		OAuthClientID:    "synthetic-public-client",
-		OAuthRedirectURI: "http://127.0.0.1:0/callback",
+		OAuthClientID:           "synthetic-public-client",
+		OAuthRedirectURI:        "http://127.0.0.1:0/callback",
+		onboardingOAuthProvider: domain.ProviderMicrosoftGraph,
 	}
 
 	configured, selected, err := configureOnboardingTaskRoute(
@@ -228,6 +229,9 @@ func TestGuidedTaskChoiceBindsTheExplicitProviderInAMixedPlan(t *testing.T) {
 	)
 	if err != nil || !selected || configured.TaskProvider != string(domain.ProviderMicrosoftGraph) {
 		t.Fatalf("explicit Microsoft task choice = %+v, selected = %t, error = %v", configured, selected, err)
+	}
+	if configured.TaskAuthorizationKey != "mixed-microsoft-tasks" {
+		t.Fatalf("explicit Microsoft task authorization = %q", configured.TaskAuthorizationKey)
 	}
 
 	_, _, err = configureOnboardingTaskRoute(
@@ -732,6 +736,18 @@ func TestGuidedSetupAddsICloudMailAndCalendarWithOneExternalCredential(t *testin
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("iCloud onboarding output missing %q: %q", expected, stdout.String())
 		}
+	}
+}
+
+func TestICloudCalendarOnlyHandoffUsesItsReviewedCredential(t *testing.T) {
+	t.Parallel()
+	reference := onboardingHandoffCredential(accountAddCommand{
+		CredentialBackend:         "os-keyring",
+		CalendarCredentialBackend: "helper",
+		CalendarCredentialKey:     "icloud-calendar-only",
+	})
+	if reference.backend != "helper" || reference.key != "icloud-calendar-only" {
+		t.Fatalf("calendar-only iCloud handoff credential = %+v", reference)
 	}
 }
 

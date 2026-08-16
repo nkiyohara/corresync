@@ -367,6 +367,7 @@ func runSetupAgentSelection(
 		"Which agents do you use?",
 		"Detected hosts are preselected. Known but missing hosts remain available; Corresync never installs an agent.",
 		options,
+		nil,
 	)
 	if err != nil || !submitted {
 		return setupIntegrationOutcome{}, err

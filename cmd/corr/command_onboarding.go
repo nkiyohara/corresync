@@ -303,13 +303,25 @@ func runAccountRegistrationWizard(
 		return onboardingRegistration{}, false, err
 	}
 	return onboardingRegistration{
-		account: account,
-		preset:  plan.preset,
-		credential: onboardingCredentialReference{
+		account:    account,
+		preset:     plan.preset,
+		credential: onboardingHandoffCredential(routing),
+	}, true, nil
+}
+
+func onboardingHandoffCredential(
+	routing accountAddCommand,
+) onboardingCredentialReference {
+	if routing.CredentialKey != "" {
+		return onboardingCredentialReference{
 			backend: routing.CredentialBackend,
 			key:     routing.CredentialKey,
-		},
-	}, true, nil
+		}
+	}
+	return onboardingCredentialReference{
+		backend: routing.CalendarCredentialBackend,
+		key:     routing.CalendarCredentialKey,
+	}
 }
 
 func onboardingRoutePlans(
@@ -511,6 +523,9 @@ func selectOnboardingServices(
 		validateOnboardingServices,
 	)
 	if err != nil || !selected {
+		return onboardingServiceSelection{}, false, err
+	}
+	if err := validateOnboardingServices(values); err != nil {
 		return onboardingServiceSelection{}, false, err
 	}
 	result := onboardingServiceSelection{}
@@ -770,6 +785,8 @@ func configureOnboardingTaskRoute(
 	if provider == "" {
 		return command, true, nil
 	}
+	oauthProvider := domain.ProviderMicrosoftGraph
+	authorizationSuffix := "microsoft-tasks"
 	switch provider { //nolint:exhaustive // every other provider follows the explicit unsupported path.
 	case domain.ProviderMicrosoftGraph:
 		if !plan.usesMicrosoft() {
@@ -788,30 +805,30 @@ func configureOnboardingTaskRoute(
 				"Google Tasks was selected.",
 			)
 		}
+		oauthProvider = domain.ProviderGoogle
+		authorizationSuffix = "google-tasks"
 	default:
 		return accountAddCommand{}, false, errors.New(
 			"the selected guided task service is unsupported",
 		)
 	}
-	if command.OAuthClientID == "" {
-		oauthProvider := domain.ProviderMicrosoftGraph
-		if provider == domain.ProviderGoogleTasks {
-			oauthProvider = domain.ProviderGoogle
-		}
-		selected, err := configureOnboardingOAuth(app, &command, alias, oauthProvider)
+
+	taskOAuth := command
+	canReuseClient := plan.usesProvider(oauthProvider) &&
+		command.onboardingOAuthProvider == oauthProvider &&
+		command.OAuthClientID != ""
+	if !canReuseClient {
+		taskOAuth = accountAddCommand{}
+		selected, err := configureOnboardingOAuth(app, &taskOAuth, alias, oauthProvider)
 		if err != nil || !selected {
 			return accountAddCommand{}, false, err
 		}
 	}
 	command.TaskProvider = string(provider)
-	command.TaskOAuthClientID = command.OAuthClientID
-	command.TaskOAuthRedirectURI = command.OAuthRedirectURI
+	command.TaskOAuthClientID = taskOAuth.OAuthClientID
+	command.TaskOAuthRedirectURI = taskOAuth.OAuthRedirectURI
+	command.TaskAuthorizationKey = alias + "-" + authorizationSuffix
 	command.ApproveTaskOAuth = true
-	if provider == domain.ProviderGoogleTasks {
-		// Google Tasks is a distinct provider grant. Never let its handle alias
-		// a Gmail or Google Calendar authorization implicitly.
-		command.TaskAuthorizationKey = alias + "-google-tasks"
-	}
 	return command, true, nil
 }
 
@@ -876,17 +893,20 @@ func configureOnboardingMessagingRoute(
 		}
 		return command, result, true, nil
 	}
-	if command.OAuthClientID == "" {
+	messagingOAuth := command
+	if command.OAuthClientID == "" ||
+		command.onboardingOAuthProvider != domain.ProviderMicrosoftGraph {
+		messagingOAuth = accountAddCommand{MicrosoftCloud: command.MicrosoftCloud}
 		selected, err = configureOnboardingOAuth(
-			app, &command, command.Alias, domain.ProviderMicrosoftGraph,
+			app, &messagingOAuth, command.Alias, domain.ProviderMicrosoftGraph,
 		)
 		if err != nil || !selected {
 			return accountAddCommand{}, nil, false, err
 		}
 	}
-	oauth, err := command.oauthRoute(
+	oauth, err := messagingOAuth.oauthRoute(
 		domain.ProviderMicrosoftGraph,
-		onboardingSelectedCandidate(plan),
+		onboardingCandidateForProvider(plan, domain.ProviderMicrosoftGraph),
 		"https://graph.microsoft.com/v1.0",
 		false,
 	)
@@ -992,6 +1012,19 @@ func onboardingSelectedCandidate(
 		return *plan.mail
 	}
 	return *plan.calendar
+}
+
+func onboardingCandidateForProvider(
+	plan onboardingRoutePlan,
+	provider domain.ProviderID,
+) application.ProviderCandidate {
+	if plan.mail != nil && plan.mail.Provider == provider {
+		return *plan.mail
+	}
+	if plan.calendar != nil && plan.calendar.Provider == provider {
+		return *plan.calendar
+	}
+	return application.ProviderCandidate{Provider: provider}
 }
 
 func onboardingHTTPSEndpoint(
@@ -1295,6 +1328,7 @@ func configureOnboardingOAuth(
 	command.OAuthRedirectURI = redirectURI
 	command.AuthorizationKey = alias + "-" + keySuffix
 	command.ApproveOAuth = true
+	command.onboardingOAuthProvider = provider
 	return true, nil
 }
 
@@ -1700,11 +1734,16 @@ func writeICloudOnboardingGuidance(
 	calendar bool,
 ) error {
 	services := "Calendar"
+	identity := "Calendar uses " + sanitizeCell(address, 254) +
+		" by default; you can enter a different Apple Account email next."
 	if mail {
 		services = "Mail"
+		identity = "Mail uses " + sanitizeCell(address, 254) + " as the full username."
 	}
 	if mail && calendar {
 		services = "Mail + Calendar"
+		identity = "Mail uses " + sanitizeCell(address, 254) +
+			" as the full username; Calendar can use a different Apple Account email."
 	}
 	view := newConsoleView(app, app.stdout, true)
 	_, err := view.printf(
@@ -1712,7 +1751,7 @@ func writeICloudOnboardingGuidance(
 		view.info(),
 		view.strong("iCloud "+services),
 		view.muted("Apple requires two-factor authentication before you can create an app-specific password."),
-		view.muted("Mail uses "+sanitizeCell(address, 254)+" as the full username; Calendar can use a different Apple Account email."),
+		view.muted(identity),
 		view.muted("Nothing is opened and no credential is requested until you explicitly choose the post-add handoff."),
 	)
 	return err
