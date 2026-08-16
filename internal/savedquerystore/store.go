@@ -198,7 +198,7 @@ func (store Store) PurgeSavedQueryCatalog(
 	if state.Revision == "" || state.Revision != expectedRevision {
 		return errors.New("saved query catalog changed after review; review it again")
 	}
-	root, err := os.OpenRoot(filepath.Dir(path))
+	root, err := openCatalogRoot(filepath.Dir(path))
 	if err != nil {
 		return fmt.Errorf("open saved query directory: %w", err)
 	}
@@ -233,7 +233,7 @@ func (store Store) path(account domain.AccountID) (string, error) {
 
 func load(path string, account domain.AccountID) (persistedCatalog, error) {
 	directory := filepath.Dir(path)
-	root, err := os.OpenRoot(directory)
+	root, err := openCatalogRoot(directory)
 	if errors.Is(err, os.ErrNotExist) {
 		return persistedCatalog{SchemaVersion: schemaVersion}, nil
 	}
@@ -282,7 +282,7 @@ func inspect(
 	account domain.AccountID,
 ) (application.SavedQueryCatalogState, error) {
 	directory := filepath.Dir(path)
-	root, err := os.OpenRoot(directory)
+	root, err := openCatalogRoot(directory)
 	if errors.Is(err, os.ErrNotExist) {
 		return application.SavedQueryCatalogState{}, nil
 	}
@@ -361,24 +361,20 @@ func save(path string, catalog persistedCatalog) error {
 		return errors.New("saved query catalog exceeds its size bound")
 	}
 	directory := filepath.Dir(path)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
-		return fmt.Errorf("create saved query directory: %w", err)
+	if _, err := os.Lstat(directory); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(directory, 0o700); err != nil {
+			return fmt.Errorf("create saved query directory: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("inspect saved query directory: %w", err)
 	}
-	if err := os.Chmod(directory, 0o700); err != nil { // #nosec G302 -- private query definitions.
-		return fmt.Errorf("protect saved query directory: %w", err)
-	}
-	directoryInfo, err := os.Lstat(directory)
-	if err != nil || !directoryInfo.IsDir() || directoryInfo.Mode()&os.ModeSymlink != 0 {
-		return errors.New("saved query directory is not a regular directory")
-	}
-	root, err := os.OpenRoot(directory)
+	root, err := openCatalogRoot(directory)
 	if err != nil {
 		return fmt.Errorf("open saved query directory: %w", err)
 	}
 	defer func() { _ = root.Close() }()
-	openedDirectory, err := root.Stat(".")
-	if err != nil || !os.SameFile(directoryInfo, openedDirectory) {
-		return errors.New("saved query directory changed while opening")
+	if err := root.Chmod(".", 0o700); err != nil { // #nosec G302 -- private query definitions.
+		return fmt.Errorf("protect saved query directory: %w", err)
 	}
 	name := filepath.Base(path)
 	if info, err := root.Lstat(name); err == nil && !info.Mode().IsRegular() {
@@ -417,6 +413,26 @@ func save(path string, catalog persistedCatalog) error {
 		return fmt.Errorf("protect saved query catalog: %w", err)
 	}
 	return syncDirectory(root)
+}
+
+func openCatalogRoot(directory string) (*os.Root, error) {
+	directoryInfo, err := os.Lstat(directory)
+	if err != nil {
+		return nil, err
+	}
+	if !directoryInfo.IsDir() || directoryInfo.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("saved query directory is not a regular directory")
+	}
+	root, err := os.OpenRoot(directory)
+	if err != nil {
+		return nil, err
+	}
+	openedDirectory, err := root.Stat(".")
+	if err != nil || !os.SameFile(directoryInfo, openedDirectory) {
+		_ = root.Close()
+		return nil, errors.New("saved query directory changed while opening")
+	}
+	return root, nil
 }
 
 func syncDirectory(root *os.Root) error {

@@ -700,6 +700,9 @@ func (backend *daemonMCPBackend) PreviewSavedQuerySave(
 	input application.SavedQuerySaveInput,
 	caller domain.Caller,
 ) (application.SavedQueryChangeAccess, error) {
+	if err := caller.Validate(); err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
 	service, err := backend.savedQueries()
 	if err != nil {
 		return application.SavedQueryChangeAccess{}, err
@@ -767,6 +770,9 @@ func (backend *daemonMCPBackend) PreviewSavedQueryDelete(
 	input application.SavedQueryDeleteInput,
 	caller domain.Caller,
 ) (application.SavedQueryChangeAccess, error) {
+	if err := caller.Validate(); err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
 	service, err := backend.savedQueries()
 	if err != nil {
 		return application.SavedQueryChangeAccess{}, err
@@ -832,6 +838,9 @@ func (backend *daemonMCPBackend) PreviewSavedQueryPurge(
 	input application.SavedQueryPurgeInput,
 	caller domain.Caller,
 ) (application.SavedQueryPurgeAccess, error) {
+	if err := caller.Validate(); err != nil {
+		return application.SavedQueryPurgeAccess{}, err
+	}
 	service, err := backend.savedQueries()
 	if err != nil {
 		return application.SavedQueryPurgeAccess{}, err

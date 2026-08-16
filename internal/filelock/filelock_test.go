@@ -77,3 +77,24 @@ func TestAcquireRejectsSymlinkLockPath(t *testing.T) {
 		t.Fatal("AcquireSidecar() accepted a symlink lock path")
 	}
 }
+
+func TestAcquireRejectsSymlinkDirectoryWithoutChangingTargetMode(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	target := t.TempDir()
+	if err := os.Chmod(target, 0o755); err != nil { // #nosec G302 -- intentionally visible fixture.
+		t.Fatal(err)
+	}
+	linked := filepath.Join(root, "linked")
+	if err := os.Symlink(target, linked); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if _, err := Acquire(context.Background(), filepath.Join(linked, "state.lock")); err == nil {
+		t.Fatal("Acquire() accepted a symlink directory")
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertDirectoryMode(t, info, 0o755)
+}

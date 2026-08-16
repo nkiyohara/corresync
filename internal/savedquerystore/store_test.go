@@ -102,6 +102,29 @@ func TestStoreFailsClosedForMalformedOrLinkedCatalog(t *testing.T) {
 	}
 }
 
+func TestStoreLoadDoesNotFollowALinkedCatalogDirectory(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(outside, "saved-queries.json"),
+		[]byte(`{"schemaVersion":1,"queries":[]}`),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	linked := filepath.Join(root, "linked")
+	if err := os.Symlink(outside, linked); err != nil {
+		t.Skipf("directory symlink unavailable: %v", err)
+	}
+	if _, err := load(
+		filepath.Join(linked, "saved-queries.json"),
+		storeTestAccount,
+	); err == nil {
+		t.Fatal("load followed a linked saved query directory")
+	}
+}
+
 func TestStorePurgesExactReviewedCatalogIncludingCorruption(t *testing.T) {
 	root := t.TempDir()
 	store := NewAt(root)

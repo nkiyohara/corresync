@@ -372,9 +372,9 @@ func writeSavedQueryDefinition(
 			app.stdout,
 			"Folder: %s:%s\nLimit: %d\nTime zone: %s\nPrivate query: %q\n",
 			query.Mail.Folder.Kind,
-			query.Mail.Folder.ID,
+			sanitizeCell(query.Mail.Folder.ID, 4096),
 			query.Mail.Limit,
-			query.Mail.TimeZone,
+			sanitizeCell(query.Mail.TimeZone, 128),
 			query.Mail.Query,
 		)
 		return err
@@ -383,10 +383,10 @@ func writeSavedQueryDefinition(
 		app.stdout,
 		"Calendar: %s:%s\nStart offset: %d minutes\nWindow: %d minutes\nDisplay time zone: %s\n",
 		query.Calendar.Calendar.Kind,
-		query.Calendar.Calendar.ID,
+		sanitizeCell(query.Calendar.Calendar.ID, 4096),
 		query.Calendar.StartOffsetMinutes,
 		query.Calendar.WindowMinutes,
-		query.Calendar.DisplayTimeZone,
+		sanitizeCell(query.Calendar.DisplayTimeZone, 128),
 	)
 	return err
 }
