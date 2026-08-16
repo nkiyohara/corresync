@@ -224,6 +224,9 @@ func mapMattermostMessage(
 	files []mattermostFileInfo,
 	reactions []mattermostReaction,
 ) (application.Message, error) {
+	if len(source.Message) > application.MaxMessageTextBytes {
+		return application.Message{}, errors.New("mattermost returned an oversized message body")
+	}
 	summary, err := mapMattermostSummary(source, conversationID)
 	if err != nil {
 		return application.Message{}, err
@@ -237,6 +240,9 @@ func mapMattermostMessage(
 		if !validMattermostID(file.ID) || file.PostID != source.ID || file.Name == "" || file.Size < 0 {
 			return application.Message{}, errors.New("mattermost returned malformed file metadata")
 		}
+		if _, exists := seenFiles[file.ID]; exists {
+			return application.Message{}, errors.New("mattermost returned duplicate file metadata")
+		}
 		seenFiles[file.ID] = struct{}{}
 		attachments = append(attachments, application.MessageAttachment{
 			ID: file.ID, Name: boundedMattermostText(file.Name, 4096),
@@ -249,16 +255,25 @@ func mapMattermostMessage(
 			return application.Message{}, errors.New("mattermost omitted selected file metadata")
 		}
 	}
+	if len(seenFiles) != len(source.FileIDs) {
+		return application.Message{}, errors.New("mattermost returned unselected file metadata")
+	}
 	type reactionAggregate struct {
 		count   int
 		reacted bool
 	}
 	aggregates := make(map[string]reactionAggregate)
+	seenReactions := make(map[string]struct{}, len(reactions))
 	for _, reaction := range reactions {
 		if reaction.PostID != source.ID || !validMattermostID(reaction.UserID) ||
 			!validMattermostEmoji(reaction.EmojiName) {
 			return application.Message{}, errors.New("mattermost returned malformed reaction metadata")
 		}
+		key := reaction.UserID + "\x00" + reaction.EmojiName
+		if _, exists := seenReactions[key]; exists {
+			return application.Message{}, errors.New("mattermost returned duplicate reaction metadata")
+		}
+		seenReactions[key] = struct{}{}
 		aggregate := aggregates[reaction.EmojiName]
 		aggregate.count++
 		aggregate.reacted = aggregate.reacted || reaction.UserID == actorID
@@ -278,8 +293,11 @@ func mapMattermostMessage(
 		})
 	}
 	return application.Message{
-		Summary:   summary,
-		Content:   application.MessageContent{Format: application.MessageFormatMarkdown, Text: source.Message},
+		Summary: summary,
+		Content: application.MessageContent{
+			Format: application.MessageFormatMarkdown,
+			Text:   boundedMattermostText(source.Message, application.MaxMessageTextBytes),
+		},
 		Reactions: mappedReactions, Attachments: attachments,
 	}, nil
 }

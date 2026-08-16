@@ -73,6 +73,15 @@ func (client *Client) ListMessages(
 	if err != nil {
 		return application.MessagePage{}, driverReadFailure(ctx, err)
 	}
+	for _, message := range page.Messages {
+		if message.ConversationID != input.ConversationID || message.ID == "" ||
+			input.ThreadRootID != "" && message.ThreadRootID != input.ThreadRootID &&
+				message.ID != input.ThreadRootID {
+			return application.MessagePage{}, errors.New(
+				"the Teams Web page returned a message outside the selected conversation",
+			)
+		}
+	}
 	page.NextCursor, err = wrapPageCursor(page.NextCursor, expected)
 	return page, err
 }
@@ -108,6 +117,14 @@ func (client *Client) SearchMessages(
 	if err != nil {
 		return application.MessagePage{}, driverReadFailure(ctx, err)
 	}
+	for _, message := range page.Messages {
+		if message.ID == "" || validateConversationID(message.ConversationID) != nil ||
+			input.ConversationID != "" && message.ConversationID != input.ConversationID {
+			return application.MessagePage{}, errors.New(
+				"the Teams Web search returned a message outside the selected route",
+			)
+		}
+	}
 	page.NextCursor, err = wrapPageCursor(page.NextCursor, expected)
 	return page, err
 }
@@ -129,7 +146,18 @@ func (client *Client) GetMessage(
 		return application.Message{}, err
 	}
 	message, err := client.driver.TeamsGetMessage(ctx, input)
-	return message, driverReadFailure(ctx, err)
+	if err != nil {
+		return application.Message{}, driverReadFailure(ctx, err)
+	}
+	if message.Summary.ConversationID != input.ConversationID ||
+		message.Summary.ID != input.MessageID ||
+		input.ThreadRootID != "" && message.Summary.ThreadRootID != input.ThreadRootID &&
+			message.Summary.ID != input.ThreadRootID {
+		return application.Message{}, errors.New(
+			"the Teams Web page returned a different selected message",
+		)
+	}
+	return message, nil
 }
 
 func (client *Client) GetMessageAttachment(

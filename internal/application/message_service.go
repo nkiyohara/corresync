@@ -136,7 +136,9 @@ func (service *MessagingService) ListMessages(
 	}
 	page, callErr := service.port.ListMessages(ctx, input)
 	if callErr == nil {
-		callErr = service.normalizeMessagePage(input.ConversationID, input.Limit, &page)
+		callErr = service.normalizeMessagePage(
+			input.ConversationID, input.ThreadRootID, input.Limit, &page,
+		)
 	}
 	return page, errors.Join(callErr, service.recordRead(ctx, operation, caller, callErr))
 }
@@ -164,7 +166,7 @@ func (service *MessagingService) SearchMessages(
 	}
 	page, callErr := service.port.SearchMessages(ctx, input)
 	if callErr == nil {
-		callErr = service.normalizeMessagePage(input.ConversationID, input.Limit, &page)
+		callErr = service.normalizeMessagePage(input.ConversationID, "", input.Limit, &page)
 	}
 	return page, errors.Join(callErr, service.recordRead(ctx, operation, caller, callErr))
 }
@@ -296,18 +298,27 @@ func (service *MessagingService) committedSensitiveRead(
 	if err := operation.DecodePayload(destination); err != nil {
 		return domain.Operation{}, err
 	}
+	var account domain.AccountID
+	var workspaceID string
 	switch input := destination.(type) {
 	case *MessageGetInput:
 		err = input.Validate()
+		account, workspaceID = input.Account, input.WorkspaceID
 	case *MessageAttachmentGetInput:
 		err = input.Validate()
+		account, workspaceID = input.Account, input.WorkspaceID
 	default:
 		return domain.Operation{}, errors.New("unsupported messaging sensitive-read payload")
 	}
 	if err != nil {
 		return domain.Operation{}, err
 	}
-	return operation, service.validateRoute(operation.Account(), service.provenance.WorkspaceID)
+	if operation.Account() != account {
+		return domain.Operation{}, errors.New(
+			"messaging sensitive-read account does not match its payload",
+		)
+	}
+	return operation, service.validateRoute(account, workspaceID)
 }
 
 func (service *MessagingService) executeSensitiveRead(
@@ -327,7 +338,10 @@ func (service *MessagingService) executeSensitiveRead(
 			service.normalizeMessage(input.ConversationID, &message.Summary)
 			callErr = message.Validate()
 		}
-		if callErr == nil && message.Summary.ID != input.MessageID {
+		if callErr == nil && (message.Summary.ID != input.MessageID ||
+			message.Summary.ConversationID != input.ConversationID ||
+			input.ThreadRootID != "" && message.Summary.ThreadRootID != input.ThreadRootID &&
+				message.Summary.ID != input.ThreadRootID) {
 			callErr = errors.New("messaging provider returned a different message")
 		}
 		if callErr == nil {
@@ -431,7 +445,12 @@ func (service *MessagingService) normalizeConversationPage(input ConversationLis
 	return validateMessageEncodedSize("conversation page", page)
 }
 
-func (service *MessagingService) normalizeMessagePage(conversationID string, limit int, page *MessagePage) error {
+func (service *MessagingService) normalizeMessagePage(
+	conversationID string,
+	threadRootID string,
+	limit int,
+	page *MessagePage,
+) error {
 	if len(page.Messages) > limit {
 		return errors.New("messaging provider returned too many messages")
 	}
@@ -443,6 +462,9 @@ func (service *MessagingService) normalizeMessagePage(conversationID string, lim
 		summary := &page.Messages[index]
 		if conversationID != "" && summary.ConversationID != conversationID {
 			return errors.New("messaging provider returned a message from another conversation")
+		}
+		if threadRootID != "" && summary.ThreadRootID != threadRootID && summary.ID != threadRootID {
+			return errors.New("messaging provider returned a message from another thread")
 		}
 		service.normalizeMessage(summary.ConversationID, summary)
 		key := summary.ConversationID + "\x00" + summary.ID

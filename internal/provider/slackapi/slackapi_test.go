@@ -334,6 +334,66 @@ func TestSlackWritesRevalidateAndPreserveUnknownOutcomes(t *testing.T) {
 	}
 }
 
+func TestSlackWriteIdentifiersCannotExpandTheReviewedTarget(t *testing.T) {
+	t.Parallel()
+
+	requests := 0
+	server := newSlackServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		if request.URL.Path != "/api/auth.test" {
+			t.Fatalf("unexpected request for rejected identifier: %s", request.URL.Path)
+		}
+		writer.Header().Set(
+			"X-Oauth-Scopes",
+			"channels:manage,groups:write,im:write,mpim:write",
+		)
+		writeSlackJSON(t, writer, map[string]any{
+			"ok": true, "team_id": "TSYNTHETIC",
+			"user_id": "USYNTHETICAPP", "bot_id": "BSYNTHETICAPP",
+		})
+	})
+	defer server.Close()
+	client := newTestSlackClient(t, server)
+	route := application.MessageWriteRoute{
+		Account:     "acc_11111111111111111111111111111111",
+		WorkspaceID: "TSYNTHETIC", Actor: client.MessageActor(),
+	}
+
+	if _, _, err := slackWriteText(
+		application.MessageContent{Format: application.MessageFormatPlain, Text: "fixture"},
+		[]application.MessageMention{{
+			ID: "USYNTHETIC> <!channel", Kind: application.MessageMentionUser,
+		}},
+	); err == nil {
+		t.Fatal("Slack mention delimiter injection was accepted")
+	}
+	if _, err := client.CreateConversation(t.Context(), application.ConversationCreateInput{
+		MessageWriteRoute: route, Kind: application.ConversationDirect,
+		Visibility: application.ConversationVisibilityPrivate,
+		Members: []application.ConversationMemberInput{
+			{ID: client.MessageActor().ID, Role: application.ConversationMember},
+			{ID: "USYNTHETIC,UBROADCAST", Role: application.ConversationMember},
+		},
+	}); err == nil {
+		t.Fatal("Slack member delimiter injection was accepted")
+	}
+	if _, err := client.ChangeConversationMembership(
+		t.Context(),
+		application.ConversationMembershipInput{
+			MessageWriteRoute: route, ConversationID: "CSYNTHETIC",
+			Version: "slcv1_synthetic", Action: application.MembershipAdd,
+			Member: application.ConversationMemberInput{
+				ID: "USYNTHETIC,UBROADCAST", Role: application.ConversationMember,
+			},
+		},
+	); err == nil {
+		t.Fatal("Slack membership delimiter injection was accepted")
+	}
+	if requests != 1 {
+		t.Fatalf("rejected Slack identifiers made %d requests, want auth.test only", requests)
+	}
+}
+
 func TestSlackClosedWriteCohortUsesOnlyReviewedMethods(t *testing.T) {
 	t.Parallel()
 

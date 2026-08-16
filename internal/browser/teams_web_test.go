@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,6 +29,36 @@ func TestMapTeamsObservationPreservesObservedControls(t *testing.T) {
 	}
 }
 
+func TestTeamsOriginAndApplicationPathsStayClosed(t *testing.T) {
+	t.Parallel()
+	browser := &Browser{allowedOrigins: map[string]struct{}{teamsWebOrigin: {}}}
+	for _, origin := range []string{
+		"https://user@teams.microsoft.com",
+		"https://teams.microsoft.com/v2/",
+		"https://teams.microsoft.com?tenant=other",
+	} {
+		if err := browser.validateTeamsOrigin(origin); err == nil {
+			t.Fatalf("validateTeamsOrigin(%q) unexpectedly succeeded", origin)
+		}
+	}
+	for _, path := range []string{"/l/call/opaque", "/l/meeting/opaque", "/l/entity/opaque"} {
+		if teamsApplicationPath(path) {
+			t.Fatalf("teamsApplicationPath(%q) accepted an out-of-scope surface", path)
+		}
+	}
+	if teamsApplicationPath("/v2/calls/opaque") {
+		t.Fatal("teamsApplicationPath accepted an arbitrary v2 surface")
+	}
+	for _, path := range []string{
+		"/", "/v2/", "/l/chat/opaque", "/l/channel/opaque",
+		"/l/team/opaque", "/l/message/opaque",
+	} {
+		if !teamsApplicationPath(path) {
+			t.Fatalf("teamsApplicationPath(%q) rejected an approved surface", path)
+		}
+	}
+}
+
 func TestTeamsDeepLinksStayOnProviderOrigin(t *testing.T) {
 	t.Parallel()
 	chat := teamscontract.Locator{ChatID: "19:chat/with?syntax@thread.v2"}
@@ -45,6 +76,34 @@ func TestTeamsDeepLinksStayOnProviderOrigin(t *testing.T) {
 	}
 }
 
+func TestTeamsNavigationRetainsEveryReviewedRouteComponent(t *testing.T) {
+	t.Parallel()
+	expected, err := url.Parse(
+		teamsWebOrigin + "/l/message/channel/message?tenantId=tenant&groupId=team&parentMessageId=root",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{
+		teamsWebOrigin + "/l/message/other/message?tenantId=tenant&groupId=team&parentMessageId=root",
+		teamsWebOrigin + "/l/message/channel/message?tenantId=other&groupId=team&parentMessageId=root",
+		teamsWebOrigin + "/l/message/channel/message?tenantId=tenant&groupId=other&parentMessageId=root",
+		teamsWebOrigin + "/l/message/channel/message?tenantId=tenant&groupId=team&parentMessageId=other",
+	} {
+		actual, parseErr := url.Parse(raw)
+		if parseErr != nil {
+			t.Fatal(parseErr)
+		}
+		if teamsNavigationMatches(expected, actual) {
+			t.Fatalf("teamsNavigationMatches accepted %q", raw)
+		}
+	}
+	actual, err := url.Parse(expected.String() + "&providerHint=opaque")
+	if err != nil || !teamsNavigationMatches(expected, actual) {
+		t.Fatalf("teamsNavigationMatches rejected a route-preserving provider hint: %v", err)
+	}
+}
+
 func TestTeamsSemanticArgumentsAreJSONStringLiterals(t *testing.T) {
 	t.Parallel()
 	argument := `"); globalThis.corresyncPwned = true; ("`
@@ -56,6 +115,23 @@ func TestTeamsSemanticArgumentsAreJSONStringLiterals(t *testing.T) {
 	decoded, err := strconv.Unquote(literal)
 	if err != nil || decoded != argument {
 		t.Fatalf("expression did not retain the argument as one JSON string: %q", expression)
+	}
+}
+
+func TestTeamsObservationDoesNotTrustNavigationTenantHints(t *testing.T) {
+	t.Parallel()
+	for _, forbidden := range []string{
+		`searchParams.get("tenantId")`, `"[data-tenant-id]"`,
+	} {
+		if strings.Contains(teamsObservationScript, forbidden) {
+			t.Fatalf("Teams observation trusts an ambient tenant hint: %s", forbidden)
+		}
+	}
+	if !strings.Contains(
+		teamsObservationScript,
+		`[data-tid='tenant-switcher'][data-tenant-id]`,
+	) {
+		t.Fatal("Teams observation omitted its explicit tenant switcher boundary")
 	}
 }
 
@@ -74,7 +150,8 @@ func TestMapTeamsConversationAndMessageBounds(t *testing.T) {
 		ID: "actor@example.test", Mode: application.MessageActorDelegatedUser,
 	}
 	message, err := mapTeamsMessage(teamsMessageRow{
-		ID: "message-synthetic", AuthorID: actor.ID, AuthorName: "Actor",
+		ID: "message-synthetic", ChatID: "19:synthetic@thread.v2",
+		AuthorID: actor.ID, AuthorName: "Actor",
 		CreatedAt: "2026-08-14T10:00:00Z", Snippet: "Synthetic",
 		Content: "Synthetic body", Format: "plain",
 	}, conversation.ID, actor)
@@ -84,9 +161,16 @@ func TestMapTeamsConversationAndMessageBounds(t *testing.T) {
 		t.Fatalf("message = %#v, %v", message, err)
 	}
 	if _, err := mapTeamsMessage(teamsMessageRow{
-		ID: "message-synthetic", CreatedAt: "not-a-time", Format: "plain",
+		ID: "message-synthetic", ChatID: "19:synthetic@thread.v2",
+		CreatedAt: "not-a-time", Format: "plain",
 	}, conversation.ID, actor); err == nil {
 		t.Fatal("mapTeamsMessage accepted a malformed timestamp")
+	}
+	if _, err := mapTeamsMessage(teamsMessageRow{
+		ID: "message-synthetic", ChatID: "19:other@thread.v2",
+		AuthorID: actor.ID, CreatedAt: "2026-08-14T10:00:00Z", Format: "plain",
+	}, conversation.ID, actor); err == nil {
+		t.Fatal("mapTeamsMessage accepted another conversation's row")
 	}
 }
 

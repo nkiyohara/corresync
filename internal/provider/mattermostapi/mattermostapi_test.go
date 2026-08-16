@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
@@ -329,6 +331,22 @@ func TestMattermostRateLimitAndReadOnlyCapabilityFailClosed(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "rate limit") {
 		t.Fatalf("ListConversations() error = %v", err)
+	}
+}
+
+func TestMattermostRateLimitResetIsOneBoundedRelativeDelay(t *testing.T) {
+	t.Parallel()
+	before := time.Now().UTC()
+	err := parseMattermostRateLimit(http.Header{"X-Ratelimit-Reset": {"2"}})
+	var limited *RateLimitError
+	if !errors.As(err, &limited) || limited.ResetAt.Before(before.Add(2*time.Second)) ||
+		limited.ResetAt.After(time.Now().UTC().Add(3*time.Second)) {
+		t.Fatalf("parseMattermostRateLimit() = %v", err)
+	}
+	if err := parseMattermostRateLimit(http.Header{
+		"X-Ratelimit-Reset": {"86401"},
+	}); err == nil || strings.Contains(err.Error(), "86401") {
+		t.Fatalf("oversized rate-limit error = %v", err)
 	}
 }
 

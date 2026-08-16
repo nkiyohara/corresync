@@ -378,14 +378,11 @@ func parseMattermostRateLimit(header http.Header) error {
 	if raw == "" {
 		return &RateLimitError{}
 	}
-	seconds, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil || seconds < 0 {
+	delaySeconds, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || delaySeconds < 0 || delaySeconds > int64((24*time.Hour)/time.Second) {
 		return errors.New("mattermost returned a malformed rate-limit reset")
 	}
-	reset := time.Unix(seconds, 0).UTC()
-	if reset.After(time.Now().UTC().Add(24 * time.Hour)) {
-		return errors.New("mattermost returned an excessive rate-limit reset")
-	}
+	reset := time.Now().UTC().Add(time.Duration(delaySeconds) * time.Second)
 	return &RateLimitError{ResetAt: reset}
 }
 

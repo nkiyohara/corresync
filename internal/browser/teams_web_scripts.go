@@ -20,8 +20,9 @@ const teamsObservationScript = `(() => {
     "button[data-tid*='profile']"
   ]);
   const tenant = one([
-    "[data-tenant-id]",
+    "[data-tid='tenant-switcher'][data-tenant-id]",
     "[data-tid='tenant-switcher'][data-id]",
+    "[data-tid='tenant-switcher'] [data-tenant-id]",
     "[data-tid='tenant-switcher'] [data-id]"
   ]);
   const label = String(profile && (profile.getAttribute("aria-label") || profile.getAttribute("title")) || "");
@@ -31,8 +32,7 @@ const teamsObservationScript = `(() => {
     (email && email[0]) || ""
   ).slice(0, 1025);
   const workspaceId = String(
-    tenant && (tenant.getAttribute("data-tenant-id") || tenant.getAttribute("data-id")) ||
-    new URL(location.href).searchParams.get("tenantId") || ""
+    tenant && (tenant.getAttribute("data-tenant-id") || tenant.getAttribute("data-id")) || ""
   ).slice(0, 1025);
   const exists = selectors => !!one(selectors);
   const list = exists([
@@ -118,7 +118,7 @@ const teamsConversationSnapshotScript = `async section => {
     const key = chatId + "\u0000" + teamId + "\u0000" + channelId;
     if ((!chatId && (!teamId || !channelId)) || seen.has(key)) continue;
     seen.add(key);
-    const row = node.closest("[data-tid*='chat-list-item'], [data-tid*='channel-list-item'], li") || node;
+    const row = node.closest("[data-tid*='chat-list-item'], [data-tid*='channel-list-item']") || node;
     const type = clean(row.getAttribute("data-conversation-type"), 32).toLowerCase();
     const membership = clean(row.getAttribute("data-membership-type"), 32).toLowerCase();
     const count = Number(row.getAttribute("data-member-count"));
@@ -126,7 +126,7 @@ const teamsConversationSnapshotScript = `async section => {
     rows.push({
       chatId, teamId, channelId,
       kind: channelId ? "channel" : type === "oneonone" || type === "direct" ? "direct" : type === "meeting" ? "meeting" : "group",
-      visibility: channelId ? membership === "private" ? "private" : membership === "shared" ? "shared" : "public" : "private",
+      visibility: channelId ? membership === "private" ? "private" : membership === "shared" ? "shared" : membership === "standard" || membership === "public" ? "public" : "unknown" : "private",
       name: clean(row.getAttribute("aria-label") || (row.querySelector("[data-tid*='title']") || {}).textContent || row.textContent, 4097),
       topic: clean(row.getAttribute("data-topic"), 8193),
       memberCount: Number.isInteger(count) && count >= 0 ? count : 0,
@@ -152,8 +152,8 @@ const teamsCurrentConversationScript = `(chatId, teamId, channelId) => {
   return {state: "rows", rows: [{
     chatId, teamId, channelId,
     kind: channelId ? "channel" : type === "oneonone" || type === "direct" ? "direct" : type === "meeting" ? "meeting" : "group",
-    visibility: channelId ? membership === "private" ? "private" : membership === "shared" ? "shared" : "public" : "private",
-    name: clean(main.getAttribute("aria-label") || (main.querySelector("[data-tid*='title']") || {}).textContent || main.textContent, 4097),
+    visibility: channelId ? membership === "private" ? "private" : membership === "shared" ? "shared" : membership === "standard" || membership === "public" ? "public" : "unknown" : "private",
+    name: clean(main.getAttribute("aria-label") || (main.querySelector("[data-tid*='title']") || {}).textContent, 4097),
     topic: clean(main.getAttribute("data-topic"), 8193),
     memberCount: Number.isInteger(count) && count >= 0 ? count : 0,
     memberCountKnown: Number.isInteger(count) && count >= 0,
@@ -180,7 +180,11 @@ const teamsMessageSnapshotScript = `(sensitive, chatId, teamId, channelId, threa
     const body = node.querySelector(
       "[data-tid='message-body'], [data-tid='chat-pane-message-body'], [data-tid='post-message-content']"
     );
-    const author = node.querySelector("[data-author-id], [data-user-id], [data-tid='message-author-name']");
+    const header = node.querySelector(
+      "[data-tid='message-header'], [data-tid='chat-pane-message-header'], [data-tid='post-message-header']"
+    );
+    const author = node.matches("[data-author-id], [data-user-id]") ? node
+      : header && header.querySelector("[data-author-id], [data-user-id], [data-tid='message-author-name']");
     const created = node.querySelector("time[datetime]");
     const attachments = Array.from(node.querySelectorAll("[data-attachment-id], [data-file-id]"));
     const links = sensitive ? Array.from((body || node).querySelectorAll("a[href]"))
@@ -270,7 +274,11 @@ const teamsSearchScript = `async query => {
       continue;
     }
     const body = node.querySelector("[data-tid='message-body'], [data-tid='search-result-body']");
-    const author = node.querySelector("[data-author-id], [data-user-id], [data-tid='message-author-name']");
+    const header = node.querySelector(
+      "[data-tid='message-header'], [data-tid='chat-pane-message-header'], [data-tid='post-message-header']"
+    );
+    const author = node.matches("[data-author-id], [data-user-id]") ? node
+      : header && header.querySelector("[data-author-id], [data-user-id], [data-tid='message-author-name']");
     const created = node.querySelector("time[datetime]");
     if (!id || (!chatId && (!teamId || !channelId))) continue;
     rows.push({

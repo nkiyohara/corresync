@@ -63,9 +63,11 @@ func New(ctx context.Context, options Options) (*Client, error) {
 	}
 	observation, err := options.Driver.ObserveTeams(ctx, origin.String())
 	if err != nil {
-		return nil, fmt.Errorf(
-			"the Teams Web application did not reach a recognized signed-in state; complete sign-in in the visible browser: %w",
-			err,
+		return nil, application.NewProviderAuthenticationFailure(
+			application.AuthenticationReasonInteractionRequired,
+			errors.New(
+				"the Teams Web application did not reach a recognized signed-in state; complete sign-in in the visible browser",
+			),
 		)
 	}
 	if observation.WorkspaceID != options.WorkspaceID {
@@ -162,8 +164,11 @@ func (client *Client) requireCapability(enabled bool, feature string) error {
 }
 
 func driverReadFailure(ctx context.Context, err error) error {
-	if err == nil || ctx.Err() != nil {
-		return err
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 	return application.NewProviderAuthenticationFailure(
 		application.AuthenticationReasonInteractionRequired,

@@ -537,6 +537,13 @@ func (service *MessagingService) CommitReact(ctx context.Context, token string, 
 	if callErr == nil {
 		callErr = reaction.Validate()
 	}
+	if callErr == nil && (reaction.Name != input.Reaction ||
+		reaction.ReactedByActor != !input.Remove) {
+		callErr = errors.Join(
+			ErrWriteOutcomeUnknown,
+			errors.New("messaging provider returned a mismatched reaction result"),
+		)
+	}
 	if err := service.finishMessageAudit(ctx, operation, caller, callErr); err != nil {
 		return MessageWriteAccess{}, err
 	}
@@ -553,6 +560,18 @@ func (service *MessagingService) CommitCreateConversation(ctx context.Context, t
 	if callErr == nil {
 		conversation.Provenance = service.itemProvenance(conversation.ID, conversation.ID)
 		callErr = conversation.Validate()
+	}
+	expectedContainerID := input.ContainerID
+	if input.Kind == ConversationChannel && expectedContainerID == "" {
+		expectedContainerID = service.provenance.WorkspaceID
+	}
+	if callErr == nil && (conversation.ContainerID != expectedContainerID ||
+		conversation.Kind != input.Kind || conversation.Visibility != input.Visibility ||
+		conversation.Name != input.Name || conversation.Topic != input.Topic) {
+		callErr = errors.Join(
+			ErrWriteOutcomeUnknown,
+			errors.New("messaging provider returned a mismatched conversation result"),
+		)
 	}
 	if err := service.finishMessageAudit(ctx, operation, caller, callErr); err != nil {
 		return MessageWriteAccess{}, err

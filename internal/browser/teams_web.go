@@ -63,7 +63,7 @@ func (browser *Browser) ObserveTeams(
 	defer browser.interactionMu.Unlock()
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
-	if err := chromedp.Run(operationContext, chromedp.Navigate(origin+"/v2/")); err != nil {
+	if err := chromedp.Run(operationContext, chromedp.Navigate(teamsWebOrigin+"/v2/")); err != nil {
 		return teamscontract.Observation{}, err
 	}
 
@@ -114,7 +114,7 @@ func (browser *Browser) validateTeamsOrigin(origin string) error {
 		return errors.New("the Teams Web route requires a browser-owned session without authorization observation")
 	}
 	parsed, err := url.Parse(origin)
-	if err != nil || browserRequestOrigin(parsed) != teamsWebOrigin ||
+	if err != nil || browserRequestOrigin(parsed) != teamsWebOrigin || parsed.User != nil ||
 		parsed.Path != "" && parsed.Path != "/" || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return errors.New("the Teams Web origin is malformed")
 	}
@@ -125,10 +125,14 @@ func (browser *Browser) validateTeamsOrigin(origin string) error {
 }
 
 func teamsApplicationPath(path string) bool {
-	return path == "/" || strings.HasPrefix(path, "/v2/") || strings.HasPrefix(path, "/l/")
+	return path == "/" || path == "/v2/" ||
+		strings.HasPrefix(path, "/l/chat/") ||
+		strings.HasPrefix(path, "/l/channel/") ||
+		strings.HasPrefix(path, "/l/team/") ||
+		strings.HasPrefix(path, "/l/message/")
 }
 
-func navigateTeamsApplication(ctx context.Context, target string) error {
+func (browser *Browser) navigateTeamsApplication(ctx context.Context, target string) error {
 	parsed, err := url.Parse(target)
 	if err != nil || browserRequestOrigin(parsed) != teamsWebOrigin ||
 		!teamsApplicationPath(parsed.Path) || parsed.User != nil {
@@ -140,9 +144,72 @@ func navigateTeamsApplication(ctx context.Context, target string) error {
 	}
 	finalTarget, _ := url.Parse(location)
 	if browserRequestOrigin(finalTarget) != teamsWebOrigin ||
-		!teamsApplicationPath(finalTarget.Path) {
+		!teamsApplicationPath(finalTarget.Path) || finalTarget.User != nil ||
+		!teamsNavigationMatches(parsed, finalTarget) {
 		return errors.New(
 			"the Teams Web app left its approved origin; complete reauthentication in the visible browser",
+		)
+	}
+	return browser.validateLiveTeamsSession(ctx)
+}
+
+func teamsNavigationMatches(expected, actual *url.URL) bool {
+	if expected == nil || actual == nil || expected.Path != actual.Path {
+		return false
+	}
+	actualQuery := actual.Query()
+	for name, expectedValues := range expected.Query() {
+		if !slices.Equal(expectedValues, actualQuery[name]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (browser *Browser) currentTeamsObservation(
+	ctx context.Context,
+) (teamscontract.Observation, error) {
+	var before, after string
+	var snapshot teamsObservationSnapshot
+	if err := chromedp.Run(
+		ctx,
+		chromedp.Location(&before),
+		chromedp.Evaluate(teamsObservationScript, &snapshot),
+		chromedp.Location(&after),
+	); err != nil {
+		return teamscontract.Observation{}, err
+	}
+	for _, location := range []string{before, after} {
+		target, err := url.Parse(location)
+		if err != nil || browserRequestOrigin(target) != teamsWebOrigin ||
+			target.User != nil || !teamsApplicationPath(target.Path) {
+			return teamscontract.Observation{}, errors.New(
+				"the Teams Web app left its approved origin; complete reauthentication in the visible browser",
+			)
+		}
+	}
+	if snapshot.State != "ready" {
+		return teamscontract.Observation{}, errors.New(
+			"the Teams Web identity is unavailable; complete reauthentication in the visible browser",
+		)
+	}
+	return mapTeamsObservation(snapshot)
+}
+
+func (browser *Browser) validateLiveTeamsSession(ctx context.Context) error {
+	if browser.teamsState == nil || browser.teamsState.revision != teamsSemanticRevision {
+		return errors.New("the Teams Web semantic session is unavailable")
+	}
+	observation, err := browser.currentTeamsObservation(ctx)
+	if err != nil {
+		return err
+	}
+	if observation.Revision != browser.teamsState.revision ||
+		observation.WorkspaceID != browser.teamsState.workspaceID ||
+		observation.Actor.ID != browser.teamsState.actor.ID ||
+		observation.Actor.Mode != browser.teamsState.actor.Mode {
+		return errors.New(
+			"the Teams Web identity changed; start a new account-scoped session before continuing",
 		)
 	}
 	return nil
@@ -201,7 +268,13 @@ func (browser *Browser) teamsOperation(
 	}
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
-	return work(operationContext)
+	if err := browser.validateLiveTeamsSession(operationContext); err != nil {
+		return err
+	}
+	if err := work(operationContext); err != nil {
+		return err
+	}
+	return browser.validateLiveTeamsSession(operationContext)
 }
 
 func (browser *Browser) teamsStateSnapshot() (teamsBrowserState, error) {
@@ -238,9 +311,12 @@ func (browser *Browser) TeamsListConversations(
 	ctx context.Context,
 	input application.ConversationListInput,
 ) (application.ConversationPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.ConversationPage{}, err
+	}
 	var snapshots []teamsConversationSnapshot
 	err := browser.teamsOperation(ctx, input.WorkspaceID, func(operationContext context.Context) error {
-		if err := navigateTeamsApplication(operationContext, teamsWebOrigin+"/v2/"); err != nil {
+		if err := browser.navigateTeamsApplication(operationContext, teamsWebOrigin+"/v2/"); err != nil {
 			return err
 		}
 		for _, section := range []string{"chat", "teams"} {
@@ -303,7 +379,7 @@ func (browser *Browser) TeamsGetConversation(
 	}
 	var snapshot teamsConversationSnapshot
 	err = browser.teamsOperation(ctx, state.workspaceID, func(operationContext context.Context) error {
-		if err := navigateTeamsApplication(
+		if err := browser.navigateTeamsApplication(
 			operationContext,
 			teamsConversationURL(locator, state.workspaceID),
 		); err != nil {
@@ -365,6 +441,9 @@ func (browser *Browser) TeamsListMessages(
 	ctx context.Context,
 	input application.MessageListInput,
 ) (application.MessagePage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessagePage{}, err
+	}
 	state, err := browser.teamsStateSnapshot()
 	if err != nil {
 		return application.MessagePage{}, err
@@ -379,7 +458,7 @@ func (browser *Browser) TeamsListMessages(
 		if input.ThreadRootID != "" {
 			target = teamsMessageURL(locator, input.WorkspaceID, input.ThreadRootID, input.ThreadRootID)
 		}
-		if err := navigateTeamsApplication(operationContext, target); err != nil {
+		if err := browser.navigateTeamsApplication(operationContext, target); err != nil {
 			return err
 		}
 		expression, err := teamsCallExpression(
@@ -397,6 +476,15 @@ func (browser *Browser) TeamsListMessages(
 	summaries, digest, err := mapTeamsMessageSummaries(snapshot, input.ConversationID, state.actor)
 	if err != nil {
 		return application.MessagePage{}, err
+	}
+	if input.ThreadRootID != "" {
+		for _, summary := range summaries {
+			if summary.ThreadRootID != input.ThreadRootID && summary.ID != input.ThreadRootID {
+				return application.MessagePage{}, errors.New(
+					"the Teams Web app returned a message outside the selected thread",
+				)
+			}
+		}
 	}
 	start, err := teamsVisibleOffset(input.Cursor, digest, len(summaries))
 	if err != nil {
@@ -417,6 +505,9 @@ func (browser *Browser) TeamsGetMessage(
 	ctx context.Context,
 	input application.MessageGetInput,
 ) (application.Message, error) {
+	if err := input.Validate(); err != nil {
+		return application.Message{}, err
+	}
 	state, err := browser.teamsStateSnapshot()
 	if err != nil {
 		return application.Message{}, err
@@ -428,7 +519,7 @@ func (browser *Browser) TeamsGetMessage(
 	var snapshot teamsMessageSnapshot
 	err = browser.teamsOperation(ctx, input.WorkspaceID, func(operationContext context.Context) error {
 		target := teamsMessageURL(locator, input.WorkspaceID, input.ThreadRootID, input.MessageID)
-		if err := navigateTeamsApplication(operationContext, target); err != nil {
+		if err := browser.navigateTeamsApplication(operationContext, target); err != nil {
 			return err
 		}
 		expression, err := teamsCallExpression(
@@ -446,20 +537,33 @@ func (browser *Browser) TeamsGetMessage(
 	if snapshot.State != "rows" || len(snapshot.Rows) != 1 || snapshot.Rows[0].ID != input.MessageID {
 		return application.Message{}, errors.New("the Teams Web app did not expose the selected message")
 	}
-	return mapTeamsMessage(snapshot.Rows[0], input.ConversationID, state.actor)
+	message, err := mapTeamsMessage(snapshot.Rows[0], input.ConversationID, state.actor)
+	if err != nil {
+		return application.Message{}, err
+	}
+	if input.ThreadRootID != "" && message.Summary.ThreadRootID != input.ThreadRootID &&
+		message.Summary.ID != input.ThreadRootID {
+		return application.Message{}, errors.New(
+			"the Teams Web app returned a message outside the selected thread",
+		)
+	}
+	return message, nil
 }
 
 func (browser *Browser) TeamsSearchMessages(
 	ctx context.Context,
 	input application.MessageSearchInput,
 ) (application.MessagePage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessagePage{}, err
+	}
 	state, err := browser.teamsStateSnapshot()
 	if err != nil {
 		return application.MessagePage{}, err
 	}
 	var snapshot teamsMessageSnapshot
 	err = browser.teamsOperation(ctx, input.WorkspaceID, func(operationContext context.Context) error {
-		if err := navigateTeamsApplication(operationContext, teamsWebOrigin+"/v2/"); err != nil {
+		if err := browser.navigateTeamsApplication(operationContext, teamsWebOrigin+"/v2/"); err != nil {
 			return err
 		}
 		expression, err := teamsCallExpression(teamsSearchScript, input.Query)
@@ -474,7 +578,8 @@ func (browser *Browser) TeamsSearchMessages(
 	if err != nil {
 		return application.MessagePage{}, err
 	}
-	if snapshot.State != "rows" && snapshot.State != "empty" {
+	if len(snapshot.Rows) > teamsMaximumDOMRows ||
+		snapshot.State != "rows" && snapshot.State != "empty" {
 		return application.MessagePage{}, errors.New("the Teams Web search DOM is unrecognized")
 	}
 	summaries := make([]application.MessageSummary, 0, len(snapshot.Rows))
@@ -648,6 +753,15 @@ func mapTeamsMessage(
 	if !boundedTeamsValue(row.ID) {
 		return application.Message{}, errors.New("the Teams Web app exposed a malformed message identity")
 	}
+	rowConversationID, err := teamsRowConversationID(row.ChatID, row.TeamID, row.ChannelID)
+	if err != nil || rowConversationID != conversationID {
+		return application.Message{}, errors.New(
+			"the Teams Web app exposed a message from a different conversation",
+		)
+	}
+	if row.ThreadRootID != "" && !boundedTeamsValue(row.ThreadRootID) {
+		return application.Message{}, errors.New("the Teams Web app exposed a malformed thread identity")
+	}
 	created, err := teamsTime(row.CreatedAt)
 	if err != nil {
 		return application.Message{}, err
@@ -664,6 +778,15 @@ func mapTeamsMessage(
 		}
 	} else if !row.Deleted {
 		return application.Message{}, errors.New("the Teams Web app exposed a message without an actor")
+	}
+	if err := author.Validate(false); err != nil {
+		return application.Message{}, err
+	}
+	if row.ReplyCount < 0 || row.ReplyCount > 1_000_000 {
+		return application.Message{}, errors.New("the Teams Web app exposed an invalid reply count")
+	}
+	if err := validateTeamsMessageCollections(row); err != nil {
+		return application.Message{}, err
 	}
 	format := application.MessageFormat(row.Format)
 	if format == "" {
@@ -691,10 +814,40 @@ func mapTeamsMessage(
 		Links: slices.Clone(row.Links), Mentions: slices.Clone(row.Mentions),
 		Reactions: slices.Clone(row.Reactions), Attachments: slices.Clone(row.Attachments),
 	}
-	if row.AuthorID == actor.ID {
+	if row.AuthorID != "" && row.AuthorID == actor.ID {
 		message.Summary.Author = actor
 	}
 	return message, nil
+}
+
+func validateTeamsMessageCollections(row teamsMessageRow) error {
+	if len(row.Links) > application.MaxMessageCollectionItems ||
+		len(row.Mentions) > application.MaxMessageCollectionItems ||
+		len(row.Reactions) > application.MaxMessageCollectionItems ||
+		len(row.Attachments) > application.MaxMessageCollectionItems {
+		return errors.New("the Teams Web message collections exceed the configured limit")
+	}
+	for _, link := range row.Links {
+		if err := link.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, mention := range row.Mentions {
+		if err := mention.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, reaction := range row.Reactions {
+		if err := reaction.Validate(); err != nil {
+			return err
+		}
+	}
+	for _, attachment := range row.Attachments {
+		if err := attachment.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func teamsConversationDigest(conversations []application.Conversation) string {

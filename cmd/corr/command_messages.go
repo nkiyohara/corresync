@@ -466,7 +466,8 @@ func writeConversationTable(app *runtime, page application.ConversationPage) err
 			name = conversation.Topic
 		}
 		if _, err := fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n",
-			conversation.Kind, conversation.Visibility,
+			sanitizeCell(string(conversation.Kind), 32),
+			sanitizeCell(string(conversation.Visibility), 32),
 			sanitizeCell(conversation.LastActivityAt, 32),
 			sanitizeCell(name, 80), sanitizeCell(conversation.ID, 4096)); err != nil {
 			return err

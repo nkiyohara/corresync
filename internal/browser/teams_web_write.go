@@ -15,6 +15,8 @@ type teamsWriteSignal struct {
 	State     string `json:"state"`
 	MessageID string `json:"messageId"`
 	ChannelID string `json:"channelId"`
+	MemberID  string `json:"memberId"`
+	Action    string `json:"action"`
 }
 
 func (browser *Browser) TeamsSendMessage(
@@ -38,7 +40,7 @@ func (browser *Browser) TeamsSendMessage(
 		if input.ReplyToID != "" {
 			target = teamsMessageURL(locator, input.WorkspaceID, input.ReplyToID, input.ReplyToID)
 		}
-		if err := navigateTeamsApplication(operationContext, target); err != nil {
+		if err := browser.navigateTeamsApplication(operationContext, target); err != nil {
 			return err
 		}
 		expression, err := teamsCallExpression(
@@ -83,7 +85,7 @@ func (browser *Browser) TeamsEditMessage(
 	}
 	var signal teamsWriteSignal
 	err = browser.teamsOperation(ctx, input.WorkspaceID, func(operationContext context.Context) error {
-		if err := navigateTeamsApplication(
+		if err := browser.navigateTeamsApplication(
 			operationContext,
 			teamsMessageURL(locator, input.WorkspaceID, input.ThreadRootID, input.MessageID),
 		); err != nil {
@@ -130,7 +132,7 @@ func (browser *Browser) TeamsDeleteMessage(
 	}
 	var signal teamsWriteSignal
 	err = browser.teamsOperation(ctx, input.WorkspaceID, func(operationContext context.Context) error {
-		if err := navigateTeamsApplication(
+		if err := browser.navigateTeamsApplication(
 			operationContext,
 			teamsMessageURL(locator, input.WorkspaceID, input.ThreadRootID, input.MessageID),
 		); err != nil {
@@ -176,7 +178,7 @@ func (browser *Browser) TeamsSetReaction(
 	}
 	var signal teamsWriteSignal
 	err = browser.teamsOperation(ctx, input.WorkspaceID, func(operationContext context.Context) error {
-		if err := navigateTeamsApplication(
+		if err := browser.navigateTeamsApplication(
 			operationContext,
 			teamsMessageURL(locator, input.WorkspaceID, input.ThreadRootID, input.MessageID),
 		); err != nil {
@@ -236,7 +238,7 @@ func (browser *Browser) TeamsCreateConversation(
 	var signal teamsWriteSignal
 	err = browser.teamsOperation(ctx, input.WorkspaceID, func(operationContext context.Context) error {
 		query := url.Values{"groupId": {teamID}, "tenantId": {input.WorkspaceID}}
-		if err := navigateTeamsApplication(
+		if err := browser.navigateTeamsApplication(
 			operationContext,
 			teamsWebOrigin+"/l/team/"+url.PathEscape(teamID)+"/conversations?"+query.Encode(),
 		); err != nil {
@@ -263,7 +265,18 @@ func (browser *Browser) TeamsCreateConversation(
 	if err != nil {
 		return application.Conversation{}, err
 	}
-	return browser.TeamsGetConversation(ctx, conversationID)
+	conversation, err := browser.TeamsGetConversation(ctx, conversationID)
+	if err != nil {
+		return application.Conversation{}, err
+	}
+	if conversation.ContainerID != input.ContainerID ||
+		conversation.Kind != input.Kind || conversation.Visibility != input.Visibility ||
+		conversation.Name != input.Name || conversation.Topic != input.Topic {
+		return application.Conversation{}, errors.New(
+			"the Teams Web app returned a mismatched created channel",
+		)
+	}
+	return conversation, nil
 }
 
 func (browser *Browser) TeamsChangeMembership(
@@ -282,14 +295,15 @@ func (browser *Browser) TeamsChangeMembership(
 	}
 	var signal teamsWriteSignal
 	err = browser.teamsOperation(ctx, input.WorkspaceID, func(operationContext context.Context) error {
-		if err := navigateTeamsApplication(
+		if err := browser.navigateTeamsApplication(
 			operationContext,
 			teamsConversationURL(locator, input.WorkspaceID),
 		); err != nil {
 			return err
 		}
 		expression, err := teamsCallExpression(
-			teamsMembershipScript, string(input.Action), input.Member.ID, string(input.Member.Role),
+			teamsMembershipScript, string(input.Action), input.Member.ID,
+			string(input.Member.Role), locator.ChatID, locator.TeamID, locator.ChannelID,
 		)
 		if err != nil {
 			return err
@@ -302,7 +316,8 @@ func (browser *Browser) TeamsChangeMembership(
 	if err != nil {
 		return application.ConversationMembershipResult{}, err
 	}
-	if signal.State != "confirmed" {
+	if signal.State != "confirmed" || signal.MemberID != input.Member.ID ||
+		signal.Action != string(input.Action) {
 		return application.ConversationMembershipResult{}, errors.New(
 			"the Teams Web app did not confirm the membership change",
 		)

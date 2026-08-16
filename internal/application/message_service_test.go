@@ -231,6 +231,23 @@ func TestMessagingRejectsCrossAccountWorkspaceAndProviderLeakage(t *testing.T) {
 	}
 }
 
+func TestMessagingRejectsMessagesOutsideTheSelectedThread(t *testing.T) {
+	t.Parallel()
+	summary := validMessageSummary("message-1", "conversation-1")
+	summary.ThreadRootID = "thread-2"
+	port := &fakeMessagingPort{page: MessagePage{
+		Messages: []MessageSummary{summary}, ObservedAt: time.Now().UTC(),
+	}}
+	service, _ := testMessagingService(t, port, policy.DefaultRules())
+	_, err := service.ListMessages(t.Context(), MessageListInput{
+		Account: testMessageAccount, WorkspaceID: "workspace-1",
+		ConversationID: "conversation-1", ThreadRootID: "thread-1", Limit: 10,
+	}, domain.Caller{Surface: "mcp", Instance: "session-1"})
+	if err == nil || !strings.Contains(err.Error(), "another thread") {
+		t.Fatalf("cross-thread result error = %v", err)
+	}
+}
+
 func TestMessagingSensitiveReadsUseExactPreviewAndCommit(t *testing.T) {
 	t.Parallel()
 
@@ -271,6 +288,60 @@ func TestMessagingSensitiveReadsUseExactPreviewAndCommit(t *testing.T) {
 	attachmentAccess, err := service.CommitGetAttachment(t.Context(), attachmentPreview.Preview.Token, caller)
 	if err != nil || attachmentAccess.Attachment == nil || string(attachmentAccess.Attachment.Data) != "fixture" {
 		t.Fatalf("CommitGetAttachment() = %+v err=%v", attachmentAccess, err)
+	}
+}
+
+func TestMessagingSensitiveReadCommitRebindsRouteAndResult(t *testing.T) {
+	t.Parallel()
+
+	rules := policy.DefaultRules()
+	rules.PreviewSensitiveReads = true
+	guard, _ := newTestGuard(t, rules)
+	caller := domain.Caller{Surface: "mcp", Instance: "session-1"}
+	firstPort := &fakeMessagingPort{
+		message: validMessage("message-1", "conversation-1"),
+	}
+	first, err := NewMessagingService(guard, firstPort, MessagingOptions{
+		Provenance: testMessageProvenance(), Capabilities: testMessageCapabilities(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondProvenance := testMessageProvenance()
+	secondProvenance.WorkspaceID = "workspace-2"
+	secondPort := &fakeMessagingPort{
+		message: validMessage("message-1", "conversation-1"),
+	}
+	second, err := NewMessagingService(guard, secondPort, MessagingOptions{
+		Provenance: secondProvenance, Capabilities: testMessageCapabilities(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := MessageGetInput{
+		Account: testMessageAccount, WorkspaceID: "workspace-1",
+		ConversationID: "conversation-1", MessageID: "message-1",
+	}
+
+	preview, err := first.GetMessage(t.Context(), input, caller)
+	if err != nil || preview.Preview == nil {
+		t.Fatalf("GetMessage() = %+v, %v", preview, err)
+	}
+	if _, err := second.CommitGetMessage(
+		t.Context(), preview.Preview.Token, caller,
+	); err == nil || secondPort.getCalls != 0 {
+		t.Fatalf("cross-workspace commit error = %v, calls = %d", err, secondPort.getCalls)
+	}
+
+	firstPort.message = validMessage("message-1", "conversation-2")
+	preview, err = first.GetMessage(t.Context(), input, caller)
+	if err != nil || preview.Preview == nil {
+		t.Fatalf("GetMessage() = %+v, %v", preview, err)
+	}
+	if _, err := first.CommitGetMessage(
+		t.Context(), preview.Preview.Token, caller,
+	); err == nil || !strings.Contains(err.Error(), "different message") {
+		t.Fatalf("cross-conversation result error = %v", err)
 	}
 }
 
@@ -334,6 +405,79 @@ func TestMessageWritesRequireCapabilitiesAndFreshPreview(t *testing.T) {
 	if port.deleteCalls != 1 || audit.events[len(audit.events)-1].Outcome != AuditOutcomeUnknown {
 		t.Fatalf("delete calls/audit = %d %+v", port.deleteCalls, audit.events)
 	}
+}
+
+func TestMessagingWriteResultsRemainBoundToThePreview(t *testing.T) {
+	t.Parallel()
+
+	caller := domain.Caller{Surface: "mcp", Instance: "session-1"}
+	t.Run("reaction", func(t *testing.T) {
+		port := &fakeMessagingPort{reaction: MessageReaction{
+			Name: "heart", ReactedByActor: true,
+		}}
+		service, _ := testMessagingService(t, port, policy.DefaultRules())
+		preview, err := service.React(t.Context(), MessageReactionInput{
+			MessageWriteRoute: validMessageWriteRoute(),
+			ConversationID:    "conversation-1", MessageID: "message-1",
+			Version: "version-1", Reaction: "like",
+		}, caller)
+		if err != nil || preview.Preview == nil {
+			t.Fatalf("React() = %+v, %v", preview, err)
+		}
+		if _, err := service.CommitReact(
+			t.Context(), preview.Preview.Token, caller,
+		); !errors.Is(err, ErrWriteOutcomeUnknown) {
+			t.Fatalf("mismatched reaction result error = %v", err)
+		}
+	})
+
+	t.Run("conversation", func(t *testing.T) {
+		port := &fakeMessagingPort{conversation: Conversation{
+			ID: "conversation-created", Version: "version-1",
+			Kind: ConversationChannel, Visibility: ConversationVisibilityPrivate,
+		}}
+		service, _ := testMessagingService(t, port, policy.DefaultRules())
+		preview, err := service.CreateConversation(t.Context(), ConversationCreateInput{
+			MessageWriteRoute: validMessageWriteRoute(),
+			Kind:              ConversationDirect,
+			Visibility:        ConversationVisibilityPrivate,
+			Members: []ConversationMemberInput{{
+				ID: "actor-1", Role: ConversationMember,
+			}},
+		}, caller)
+		if err != nil || preview.Preview == nil {
+			t.Fatalf("CreateConversation() = %+v, %v", preview, err)
+		}
+		if _, err := service.CommitCreateConversation(
+			t.Context(), preview.Preview.Token, caller,
+		); !errors.Is(err, ErrWriteOutcomeUnknown) {
+			t.Fatalf("mismatched conversation result error = %v", err)
+		}
+	})
+
+	t.Run("conversation fields", func(t *testing.T) {
+		port := &fakeMessagingPort{conversation: Conversation{
+			ID: "conversation-created", Version: "version-1",
+			ContainerID: "container-1", Kind: ConversationChannel,
+			Visibility: ConversationVisibilityPrivate,
+			Name:       "Different name", Topic: "Reviewed topic",
+		}}
+		service, _ := testMessagingService(t, port, policy.DefaultRules())
+		preview, err := service.CreateConversation(t.Context(), ConversationCreateInput{
+			MessageWriteRoute: validMessageWriteRoute(), ContainerID: "container-1",
+			Kind: ConversationChannel, Visibility: ConversationVisibilityPrivate,
+			Name: "Reviewed name", Topic: "Reviewed topic",
+			Members: []ConversationMemberInput{{ID: "actor-1", Role: ConversationMember}},
+		}, caller)
+		if err != nil || preview.Preview == nil {
+			t.Fatalf("CreateConversation() = %+v, %v", preview, err)
+		}
+		if _, err := service.CommitCreateConversation(
+			t.Context(), preview.Preview.Token, caller,
+		); !errors.Is(err, ErrWriteOutcomeUnknown) {
+			t.Fatalf("mismatched conversation field error = %v", err)
+		}
+	})
 }
 
 func TestMessagingSyncBindsCursorAndRejectsDuplicates(t *testing.T) {

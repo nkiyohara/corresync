@@ -203,6 +203,9 @@ func (client *Client) CreateConversation(
 		}
 		members := make([]string, 0, len(input.Members))
 		for _, member := range input.Members {
+			if !validSlackID(member.ID) {
+				return application.Conversation{}, errors.New("slack conversation member ID is malformed")
+			}
 			if member.Role != application.ConversationMember {
 				return application.Conversation{}, errors.New("slack conversation open does not assign owners")
 			}
@@ -246,6 +249,9 @@ func (client *Client) ChangeConversationMembership(
 	}
 	if input.Member.Role != application.ConversationMember {
 		return application.ConversationMembershipResult{}, errors.New("slack membership changes cannot assign an owner")
+	}
+	if !validSlackID(input.Member.ID) {
+		return application.ConversationMembershipResult{}, errors.New("slack membership user ID is malformed")
 	}
 	before, err := client.getSlackConversation(ctx, input.ConversationID)
 	if err != nil {
@@ -336,6 +342,9 @@ func slackWriteText(content application.MessageContent, mentions []application.M
 	text.Grow(len(content.Text) + len(mentions)*16)
 	text.WriteString(content.Text)
 	for _, mention := range mentions {
+		if !validSlackID(mention.ID) {
+			return "", false, errors.New("slack mention ID is malformed")
+		}
 		if text.Len() != 0 {
 			text.WriteByte(' ')
 		}

@@ -46,6 +46,9 @@ func (client *Client) SendMessage(
 	if message.Summary.ConversationID != input.ConversationID || message.Summary.ID == "" {
 		return application.Message{}, writeUnknown("Teams Web returned a mismatched send result")
 	}
+	if input.ReplyToID != "" && message.Summary.ThreadRootID != input.ReplyToID {
+		return application.Message{}, writeUnknown("Teams Web returned a reply outside the selected thread")
+	}
 	return message, nil
 }
 

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -33,10 +34,15 @@ type Invalidation struct {
 // EventStream is an explicitly opened, account-scoped WebSocket. Constructing
 // a Client does not start it, preserving monitoring as a separate opt-in.
 type EventStream struct {
-	client     *Client
-	connection *websocket.Conn
-	last       int64
-	reconnects int
+	client       *Client
+	lifecycleMu  sync.Mutex
+	stateMu      sync.Mutex
+	connection   *websocket.Conn
+	readMu       sync.Mutex
+	last         int64
+	sequenceSeen bool
+	pendingReset bool
+	reconnects   int
 }
 
 // NewEventStream opens the supported WebSocket endpoint only on an explicit
@@ -46,19 +52,21 @@ func (client *Client) NewEventStream(ctx context.Context) (*EventStream, error) 
 		return nil, errors.New("mattermost WebSocket transport is unavailable")
 	}
 	stream := &EventStream{client: client}
-	if err := stream.connect(ctx); err != nil {
+	connection, err := stream.connect(ctx)
+	if err != nil {
 		return nil, err
 	}
+	stream.connection = connection
 	return stream, nil
 }
 
-func (stream *EventStream) connect(ctx context.Context) error {
+func (stream *EventStream) connect(ctx context.Context) (*websocket.Conn, error) {
 	if stream == nil || stream.client == nil || stream.client.pinned == nil {
-		return errors.New("mattermost WebSocket stream is unavailable")
+		return nil, errors.New("mattermost WebSocket stream is unavailable")
 	}
 	origin, err := url.Parse(stream.client.origin)
 	if err != nil {
-		return errors.New("mattermost WebSocket origin is malformed")
+		return nil, errors.New("mattermost WebSocket origin is malformed")
 	}
 	target := *origin
 	target.Scheme = "wss"
@@ -68,14 +76,14 @@ func (stream *EventStream) connect(ctx context.Context) error {
 		strings.TrimRight(stream.client.origin, "/")+"/api/v4/websocket", nil,
 	)
 	if err != nil {
-		return errors.New("build Mattermost WebSocket authorization request")
+		return nil, errors.New("build Mattermost WebSocket authorization request")
 	}
 	if err := stream.client.authorization.Apply(authorizationRequest); err != nil {
-		return errors.New("authorize Mattermost WebSocket request")
+		return nil, errors.New("authorize Mattermost WebSocket request")
 	}
 	authorization := authorizationRequest.Header.Get("Authorization")
 	if authorization == "" || len(authorization) > 64<<10 || strings.ContainsAny(authorization, "\r\n\x00") {
-		return errors.New("mattermost WebSocket authorization is malformed")
+		return nil, errors.New("mattermost WebSocket authorization is malformed")
 	}
 	header := make(http.Header)
 	header.Set("Authorization", authorization)
@@ -96,51 +104,98 @@ func (stream *EventStream) connect(ctx context.Context) error {
 		_ = response.Body.Close()
 	}
 	if err != nil {
-		return errors.New("connect selected Mattermost WebSocket")
+		return nil, errors.New("connect selected Mattermost WebSocket")
 	}
 	connection.SetReadLimit(maximumWebSocketEventBytes)
-	stream.connection = connection
-	return nil
+	return connection, nil
 }
 
 // Reconnect performs a caller-controlled bounded reconnect. A reconnect never
 // resumes from an event body; the next invalidation forces REST snapshot reset.
 func (stream *EventStream) Reconnect(ctx context.Context) error {
-	if stream == nil || stream.reconnects >= maximumReconnects {
+	if stream == nil {
+		return errors.New("mattermost WebSocket stream is unavailable")
+	}
+	stream.lifecycleMu.Lock()
+	defer stream.lifecycleMu.Unlock()
+	stream.stateMu.Lock()
+	if stream.reconnects >= maximumReconnects {
+		stream.stateMu.Unlock()
 		return errors.New("mattermost WebSocket reconnect limit reached")
 	}
-	if stream.connection != nil {
-		_ = stream.connection.Close()
-		stream.connection = nil
-	}
+	previous := stream.connection
+	stream.connection = nil
 	stream.reconnects++
-	return stream.connect(ctx)
+	stream.stateMu.Unlock()
+	if previous != nil {
+		_ = previous.Close()
+	}
+	connection, err := stream.connect(ctx)
+	if err != nil {
+		return err
+	}
+	stream.stateMu.Lock()
+	stream.connection = connection
+	stream.resetSequenceAfterReconnectLocked()
+	stream.stateMu.Unlock()
+	return nil
+}
+
+func (stream *EventStream) resetSequenceAfterReconnect() {
+	stream.stateMu.Lock()
+	defer stream.stateMu.Unlock()
+	stream.resetSequenceAfterReconnectLocked()
+}
+
+func (stream *EventStream) resetSequenceAfterReconnectLocked() {
+	stream.last = 0
+	stream.sequenceSeen = false
+	stream.pendingReset = true
 }
 
 // Next returns the next bounded state invalidation, ignoring a bounded number
 // of duplicates and irrelevant events. Sequence gaps fail safe to Reset.
 func (stream *EventStream) Next(ctx context.Context) (Invalidation, error) {
-	if stream == nil || stream.connection == nil {
+	if stream == nil {
+		return Invalidation{}, errors.New("mattermost WebSocket stream is not connected")
+	}
+	stream.readMu.Lock()
+	defer stream.readMu.Unlock()
+	stream.stateMu.Lock()
+	if stream.connection == nil {
+		stream.stateMu.Unlock()
 		return Invalidation{}, errors.New("mattermost WebSocket stream is not connected")
 	}
 	connection := stream.connection
+	stream.stateMu.Unlock()
+	if deadline, ok := ctx.Deadline(); ok {
+		if err := connection.SetReadDeadline(deadline); err != nil {
+			return Invalidation{}, errors.New("set Mattermost WebSocket deadline")
+		}
+	} else if err := connection.SetReadDeadline(time.Time{}); err != nil {
+		return Invalidation{}, errors.New("clear Mattermost WebSocket deadline")
+	}
 	cancelRead := make(chan struct{})
+	var cancelWait sync.WaitGroup
+	cancelWait.Add(1)
 	go func() {
+		defer cancelWait.Done()
 		select {
 		case <-ctx.Done():
 			_ = connection.SetReadDeadline(time.Now())
 		case <-cancelRead:
 		}
 	}()
-	defer close(cancelRead)
+	defer func() {
+		close(cancelRead)
+		cancelWait.Wait()
+	}()
 	for ignored := 0; ignored < maximumIgnoredEvents; ignored++ {
-		if deadline, ok := ctx.Deadline(); ok {
-			if err := connection.SetReadDeadline(deadline); err != nil {
-				return Invalidation{}, errors.New("set Mattermost WebSocket deadline")
-			}
-		}
 		messageType, payload, err := connection.ReadMessage()
 		if err != nil {
+			stream.stateMu.Lock()
+			stream.invalidateConnection(connection)
+			stream.stateMu.Unlock()
 			if ctx.Err() != nil {
 				return Invalidation{}, ctx.Err()
 			}
@@ -149,25 +204,71 @@ func (stream *EventStream) Next(ctx context.Context) (Invalidation, error) {
 		if messageType != websocket.TextMessage || len(payload) > maximumWebSocketEventBytes {
 			return Invalidation{}, errors.New("mattermost WebSocket event is malformed or oversized")
 		}
-		invalidation, relevant, err := parseMattermostInvalidation(payload, stream.last)
+		stream.stateMu.Lock()
+		if stream.connection != connection {
+			stream.stateMu.Unlock()
+			return Invalidation{}, errors.New("mattermost WebSocket connection changed during read")
+		}
+		invalidation, relevant, err := parseMattermostInvalidation(payload, stream.last, stream.sequenceSeen)
 		if err != nil {
+			stream.stateMu.Unlock()
 			return Invalidation{}, err
 		}
-		if invalidation.Sequence > stream.last {
-			stream.last = invalidation.Sequence
-		}
+		invalidation, relevant = stream.recordInvalidationLocked(invalidation, relevant)
+		stream.stateMu.Unlock()
 		if relevant {
-			if stream.reconnects != 0 {
-				invalidation.Reset = true
-				stream.reconnects = 0
-			}
 			return invalidation, nil
 		}
 	}
 	return Invalidation{}, errors.New("mattermost WebSocket event flood exceeded the bounded discard limit")
 }
 
-func parseMattermostInvalidation(payload []byte, previous int64) (Invalidation, bool, error) {
+// invalidateConnection runs under stateMu after a terminal WebSocket read.
+// Gorilla WebSocket read errors are permanent, so callers must reconnect
+// rather than accidentally reusing a poisoned connection.
+func (stream *EventStream) invalidateConnection(connection *websocket.Conn) {
+	_ = connection.Close()
+	if stream.connection == connection {
+		stream.connection = nil
+	}
+}
+
+func (stream *EventStream) recordInvalidation(
+	invalidation Invalidation,
+	relevant bool,
+) (Invalidation, bool) {
+	stream.stateMu.Lock()
+	defer stream.stateMu.Unlock()
+	return stream.recordInvalidationLocked(invalidation, relevant)
+}
+
+func (stream *EventStream) recordInvalidationLocked(
+	invalidation Invalidation,
+	relevant bool,
+) (Invalidation, bool) {
+	if !stream.sequenceSeen || invalidation.Sequence > stream.last {
+		stream.last = invalidation.Sequence
+		stream.sequenceSeen = true
+	}
+	if invalidation.Reset {
+		stream.pendingReset = true
+	}
+	if !relevant {
+		return invalidation, false
+	}
+	if stream.pendingReset || stream.reconnects != 0 {
+		invalidation.Reset = true
+		stream.pendingReset = false
+		stream.reconnects = 0
+	}
+	return invalidation, true
+}
+
+func parseMattermostInvalidation(
+	payload []byte,
+	previous int64,
+	sequenceSeen bool,
+) (Invalidation, bool, error) {
 	var envelope struct {
 		Event     string `json:"event"`
 		Sequence  int64  `json:"seq"`
@@ -184,10 +285,10 @@ func parseMattermostInvalidation(payload []byte, previous int64) (Invalidation, 
 		Event: envelope.Event, ConversationID: envelope.Broadcast.ChannelID,
 		Sequence: envelope.Sequence,
 	}
-	if previous != 0 && envelope.Sequence <= previous {
+	if sequenceSeen && envelope.Sequence <= previous {
 		return result, false, nil
 	}
-	if previous != 0 && envelope.Sequence != previous+1 {
+	if sequenceSeen && envelope.Sequence != previous+1 {
 		result.Reset = true
 	}
 	if envelope.Event == "hello" {
@@ -196,10 +297,25 @@ func parseMattermostInvalidation(payload []byte, previous int64) (Invalidation, 
 	if !mattermostInvalidatingEvent(envelope.Event) {
 		return result, false, nil
 	}
+	if mattermostTeamInvalidatingEvent(envelope.Event) {
+		result.Reset = true
+	}
 	if !validMattermostID(envelope.Broadcast.ChannelID) {
+		if result.Reset {
+			return result, true, nil
+		}
 		return Invalidation{}, false, errors.New("mattermost WebSocket invalidation has no bounded conversation")
 	}
 	return result, true, nil
+}
+
+func mattermostTeamInvalidatingEvent(event string) bool {
+	switch event {
+	case "channel_created", "channel_deleted", "channel_restored":
+		return true
+	default:
+		return false
+	}
 }
 
 func mattermostInvalidatingEvent(event string) bool {
@@ -214,17 +330,25 @@ func mattermostInvalidatingEvent(event string) bool {
 }
 
 func (stream *EventStream) Close() error {
-	if stream == nil || stream.connection == nil {
+	if stream == nil {
+		return nil
+	}
+	stream.lifecycleMu.Lock()
+	defer stream.lifecycleMu.Unlock()
+	stream.stateMu.Lock()
+	connection := stream.connection
+	stream.connection = nil
+	stream.stateMu.Unlock()
+	if connection == nil {
 		return nil
 	}
 	deadline := time.Now().Add(time.Second)
-	writeErr := stream.connection.WriteControl(
+	writeErr := connection.WriteControl(
 		websocket.CloseMessage,
 		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
 		deadline,
 	)
-	closeErr := stream.connection.Close()
-	stream.connection = nil
+	closeErr := connection.Close()
 	if writeErr != nil {
 		return fmt.Errorf("close Mattermost WebSocket: %w", writeErr)
 	}
