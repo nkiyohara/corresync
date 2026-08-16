@@ -91,6 +91,11 @@ type accountAddCommand struct {
 	ApproveCalendarCredential bool   `help:"Record consent for a distinct CalDAV credential."`
 	Default                   bool   `help:"Make this the default account."`
 	JSON                      bool   `help:"Write machine-readable JSON."`
+
+	// onboardingOAuthProvider records which guided setup branch populated the
+	// shared OAuth fields. It is ephemeral provenance, never a CLI flag or
+	// persisted account field.
+	onboardingOAuthProvider domain.ProviderID
 }
 
 type accountRenameCommand struct {

@@ -45,7 +45,12 @@ separate explicit step. It supports multiple accounts and multiple detected
 agent hosts, showing one integration preview before any host configuration is
 changed and verifying hosts independently afterward. Re-running it resumes at
 the missing step. The shared account flow is also available under `corr
-settings`. For Apple's documented iCloud address families—or a custom
+settings`. The account flow uses a service checklist: Microsoft accounts can
+configure Outlook Mail, Outlook Calendar, and Microsoft To Do independently,
+with a separate explicit Graph authorization for To Do. Teams is a
+non-selectable coming-soon notice until its source-owned release gate is
+complete; an email domain never proves service availability. For Apple's
+documented iCloud address families—or a custom
 domain with the complete verified Apple service-record set—the wizard combines
 Mail and Calendar and hands app-specific-password enrollment to the operating
 system's own credential prompt. Corresync never reads that password.

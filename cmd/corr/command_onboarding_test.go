@@ -21,6 +21,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/integrationlifecycle"
 	"github.com/nkiyohara/corresync/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type failingOnboardingDiscoverer struct {
@@ -84,7 +85,7 @@ func TestGuidedSetupAddsReviewedOutlookAccountWithoutAuthentication(t *testing.T
 		}},
 	}}
 	app, stdout := guidedSetupRuntime(t, path, discoverer,
-		"reader@example.invalid\npersonal\ny\n4\n3\n")
+		"reader@example.invalid\n0\npersonal\ny\n4\n3\n")
 
 	if err := (&setupCommand{}).Run(app); err != nil {
 		t.Fatal(err)
@@ -110,6 +111,148 @@ func TestGuidedSetupAddsReviewedOutlookAccountWithoutAuthentication(t *testing.T
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("guided setup output missing %q: %q", expected, stdout.String())
 		}
+	}
+}
+
+func TestGuidedSetupLetsOutlookServicesBeSelectedIndependently(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	discoverer := &accountDiscovererStub{observation: application.AccountDiscoveryObservation{
+		Candidates: []application.ProviderCandidate{{
+			Provider: domain.ProviderMicrosoftOWA, Confidence: 98,
+			Authentication: application.DiscoveryBrowserFirstParty,
+			Endpoints: []application.DiscoveredEndpoint{{
+				Kind: "origin", Value: "https://outlook.example.invalid",
+			}},
+			Evidence: []application.DiscoveryEvidence{{
+				Source: "test", Detail: "synthetic Outlook route",
+			}},
+		}},
+	}}
+	app, stdout := guidedSetupRuntime(
+		t, path, discoverer,
+		"reader@example.invalid\n2\n0\nmail-only\ny\n4\n3\n",
+	)
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configured, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configured.Accounts["mail-only"]
+	if account.Mail == nil || account.Mail.OutlookWeb == nil ||
+		account.Calendar != nil || account.Tasks != nil {
+		t.Fatalf("independently selected Outlook services = %+v", account)
+	}
+	for _, expected := range []string{
+		"Services to configure",
+		"Microsoft To Do · separate, explicit Graph authorization",
+		"Teams messaging · coming soon",
+		"Tasks            not configured",
+	} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("service selection output missing %q: %q", expected, stdout.String())
+		}
+	}
+}
+
+func TestGuidedSetupAddsExplicitMicrosoftToDoAlongsideOutlook(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	discoverer := &accountDiscovererStub{observation: application.AccountDiscoveryObservation{
+		Candidates: []application.ProviderCandidate{{
+			Provider: domain.ProviderMicrosoftOWA, Confidence: 98,
+			Authentication: application.DiscoveryBrowserFirstParty,
+			Endpoints: []application.DiscoveredEndpoint{{
+				Kind: "origin", Value: "https://outlook.example.invalid",
+			}},
+			Evidence: []application.DiscoveryEvidence{{
+				Source: "test", Detail: "synthetic Outlook route",
+			}},
+		}},
+	}}
+	app, _ := guidedSetupRuntime(
+		t, path, discoverer,
+		strings.Join([]string{
+			"reader@example.invalid",
+			"3",
+			"0",
+			"outlook-todo",
+			"synthetic-public-client",
+			"http://127.0.0.1:0/callback",
+			"y",
+			"y",
+			"4",
+			"3",
+		}, "\n")+"\n",
+	)
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configured, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configured.Accounts["outlook-todo"]
+	if account.Mail == nil || account.Calendar == nil || account.Tasks == nil ||
+		account.Tasks.MicrosoftGraph == nil {
+		t.Fatalf("Outlook plus Microsoft To Do account = %+v", account)
+	}
+	oauth := account.Tasks.MicrosoftGraph.OAuth
+	if oauth.ClientID != "synthetic-public-client" ||
+		oauth.RedirectURI != "http://127.0.0.1:0/callback" ||
+		oauth.Authorization.Key != "outlook-todo-microsoft-tasks" {
+		t.Fatalf("Microsoft To Do OAuth route = %+v", oauth)
+	}
+}
+
+func TestGuidedTaskChoiceBindsTheExplicitProviderInAMixedPlan(t *testing.T) {
+	t.Parallel()
+	google := &application.ProviderCandidate{Provider: domain.ProviderGoogle}
+	microsoft := &application.ProviderCandidate{Provider: domain.ProviderMicrosoftGraph}
+	plan := onboardingRoutePlan{mail: google, calendar: microsoft}
+	command := accountAddCommand{
+		OAuthClientID:           "synthetic-public-client",
+		OAuthRedirectURI:        "http://127.0.0.1:0/callback",
+		onboardingOAuthProvider: domain.ProviderMicrosoftGraph,
+	}
+
+	configured, selected, err := configureOnboardingTaskRoute(
+		nil,
+		command,
+		plan,
+		onboardingServiceSelection{taskProvider: domain.ProviderMicrosoftGraph},
+		"mixed",
+	)
+	if err != nil || !selected || configured.TaskProvider != string(domain.ProviderMicrosoftGraph) {
+		t.Fatalf("explicit Microsoft task choice = %+v, selected = %t, error = %v", configured, selected, err)
+	}
+	if configured.TaskAuthorizationKey != "mixed-microsoft-tasks" {
+		t.Fatalf("explicit Microsoft task authorization = %q", configured.TaskAuthorizationKey)
+	}
+
+	_, _, err = configureOnboardingTaskRoute(
+		nil,
+		command,
+		plan,
+		onboardingServiceSelection{taskProvider: domain.ProviderGoogleTasks},
+		"mixed",
+	)
+	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		t.Fatalf("approval-gated Google task choice error = %v", err)
+	}
+}
+
+func TestOnboardingServiceSelectionRejectsTwoTaskProviders(t *testing.T) {
+	t.Parallel()
+	if err := validateOnboardingServices([]onboardingService{
+		onboardingServiceMicrosoftTasks,
+		onboardingServiceGoogleTasks,
+	}); err == nil || !strings.Contains(err.Error(), "one task service") {
+		t.Fatalf("dual task selection error = %v", err)
 	}
 }
 
@@ -341,7 +484,7 @@ func TestGuidedSetupConnectsSelectedDetectedAgentThroughReviewedPlan(t *testing.
 		t,
 		path,
 		discoverer,
-		"reader@example.invalid\npersonal\ny\n4\n4\n3\n0\ny\n",
+		"reader@example.invalid\n0\npersonal\ny\n4\n4\n3\n0\ny\n",
 	)
 	codex, ok := app.agentHosts.Lookup("codex")
 	if !ok {
@@ -454,6 +597,7 @@ func TestGuidedSetupConfiguresStandardsRoutesByExternalHandles(t *testing.T) {
 		strings.Join([]string{
 			"reader@example.invalid",
 			"1",
+			"0",
 			"standards",
 			"1",
 			"standards-mail",
@@ -518,6 +662,7 @@ func TestGuidedSetupAddsICloudMailAndCalendarWithOneExternalCredential(t *testin
 		strings.Join([]string{
 			"reader@icloud.com",
 			"1",
+			"0",
 			"icloud-personal",
 			"reader@icloud.com",
 			"1",
@@ -591,6 +736,18 @@ func TestGuidedSetupAddsICloudMailAndCalendarWithOneExternalCredential(t *testin
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("iCloud onboarding output missing %q: %q", expected, stdout.String())
 		}
+	}
+}
+
+func TestICloudCalendarOnlyHandoffUsesItsReviewedCredential(t *testing.T) {
+	t.Parallel()
+	reference := onboardingHandoffCredential(accountAddCommand{
+		CredentialBackend:         "os-keyring",
+		CalendarCredentialBackend: "helper",
+		CalendarCredentialKey:     "icloud-calendar-only",
+	})
+	if reference.backend != "helper" || reference.key != "icloud-calendar-only" {
+		t.Fatalf("calendar-only iCloud handoff credential = %+v", reference)
 	}
 }
 
@@ -686,7 +843,7 @@ func TestGuidedSetupCancellationLeavesNoPartialAccount(t *testing.T) {
 		}},
 	}}
 	app, stdout := guidedSetupRuntime(
-		t, path, discoverer, "reader@example.invalid\npersonal\nn\n",
+		t, path, discoverer, "reader@example.invalid\n0\npersonal\nn\n",
 	)
 
 	if err := (&setupCommand{}).Run(app); err != nil {
@@ -747,7 +904,7 @@ func TestGuidedSetupAccessibleEOFNeverStartsPostAddAuthentication(t *testing.T) 
 		t,
 		path,
 		discoverer,
-		"reader@example.invalid\npersonal\ny\n",
+		"reader@example.invalid\n0\npersonal\ny\n",
 	)
 	started := false
 	app.startDaemon = func(context.Context, string) error {
@@ -843,7 +1000,7 @@ func TestGuidedSetupReportsEarlierAccountsAfterLaterDiscoveryFailure(t *testing.
 		t,
 		path,
 		discoverer,
-		"first@example.invalid\nfirst\ny\n4\n1\nsecond@example.invalid\n",
+		"first@example.invalid\n0\nfirst\ny\n4\n1\nsecond@example.invalid\n",
 	)
 
 	err := (&setupCommand{}).Run(app)
@@ -904,7 +1061,7 @@ func TestGuidedSetupRestartsAnExistingSessionOwnerAfterAccountCommit(t *testing.
 		t,
 		path,
 		discoverer,
-		"2\npersonal@example.invalid\npersonal\n1\ny\n4\n3\n",
+		"2\npersonal@example.invalid\n0\npersonal\n1\ny\n4\n3\n",
 	)
 	app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
 	var replacement lifecycleTestDaemon
@@ -1023,7 +1180,7 @@ func TestSettingsAccountAddUsesTheSharedRegistrationWizard(t *testing.T) {
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
 	app.stdin = strings.NewReader(
-		"1\n1\npersonal@example.invalid\npersonal\n1\ny\n4\n4\n8\n",
+		"1\n1\npersonal@example.invalid\n0\npersonal\n1\ny\n4\n4\n8\n",
 	)
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
