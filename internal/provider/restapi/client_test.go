@@ -276,6 +276,42 @@ func TestClientRateLimitOpensCircuitWithoutHidingProviderResponse(t *testing.T) 
 	}
 }
 
+func TestClientRetryableStatusHonorsRetryAfterWithoutAnotherAttempt(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	client, err := New(Options{
+		BaseURL: "https://api.example.invalid/v1",
+		HTTP: &http.Client{Transport: roundTripperFunc(func(
+			*http.Request,
+		) (*http.Response, error) {
+			calls.Add(1)
+			return &http.Response{
+				StatusCode: http.StatusServiceUnavailable,
+				Header:     http.Header{"Retry-After": {"60"}},
+				Body:       io.NopCloser(strings.NewReader(`{"error":{"code":"unavailable"}}`)),
+			}, nil
+		})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = client.DoJSON(
+		t.Context(), http.MethodGet, "messages", nil, nil, nil,
+		false, nil, http.StatusOK,
+	)
+	if !IsStatus(err, http.StatusServiceUnavailable) || calls.Load() != 1 {
+		t.Fatalf("service unavailable error = %v, calls = %d", err, calls.Load())
+	}
+	_, err = client.DoJSON(
+		t.Context(), http.MethodGet, "messages", nil, nil, nil,
+		false, nil, http.StatusOK,
+	)
+	var open *CircuitOpenError
+	if !errors.As(err, &open) || !open.Throttled || open.RetryAfter <= 0 || calls.Load() != 1 {
+		t.Fatalf("retry-after circuit error = %#v (%v), calls = %d", open, err, calls.Load())
+	}
+}
+
 func TestRetryAfterDurationAcceptsDeltaAndHTTPDateWithinBounds(t *testing.T) {
 	now := time.Date(2026, time.August, 14, 22, 0, 0, 0, time.UTC)
 	tests := []struct {

@@ -220,7 +220,7 @@ func (client *Client) Do(
 				return Result{}, callErr
 			}
 			if attempt < attempts && ctx.Err() == nil {
-				if sleepErr := client.resilience.Backoff(ctx, attempt, 0); sleepErr != nil {
+				if sleepErr := client.resilience.Backoff(ctx, attempt); sleepErr != nil {
 					return Result{}, sleepErr
 				}
 				continue
@@ -235,8 +235,12 @@ func (client *Client) Do(
 				result.Header.Get("Retry-After"),
 				client.resilience.Now(),
 			)
+			if retryAfter > 0 {
+				client.resilience.OpenThrottle(retryAfter)
+				return Result{}, apiStatusError(result.Status, result.Body)
+			}
 			if attempt < attempts && ctx.Err() == nil {
-				if sleepErr := client.resilience.Backoff(ctx, attempt, retryAfter); sleepErr != nil {
+				if sleepErr := client.resilience.Backoff(ctx, attempt); sleepErr != nil {
 					return Result{}, sleepErr
 				}
 				continue

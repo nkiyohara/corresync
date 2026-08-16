@@ -67,12 +67,8 @@ func (resilience *readResilience) BeforeRead() error {
 func (resilience *readResilience) Backoff(
 	ctx context.Context,
 	attempt int,
-	retryAfter time.Duration,
 ) error {
 	delay := time.Duration(attempt*attempt) * 100 * time.Millisecond
-	if retryAfter > delay {
-		delay = retryAfter
-	}
 	if delay > maximumReadBackoff {
 		delay = maximumReadBackoff
 	}
