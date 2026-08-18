@@ -578,6 +578,9 @@ func TestAccountServiceBindsGoogleMailUsernameToAccountAddress(t *testing.T) {
 				Authorization: AccountCredentialInput{
 					Backend: "os-keyring", Key: "google-personal", Consent: true,
 				},
+				ClientSecret: AccountCredentialInput{
+					Backend: "os-keyring", Key: "google-client", Consent: true,
+				},
 			},
 		},
 	})
@@ -603,12 +606,15 @@ func TestAccountServiceAcceptsOnlyTypedGoogleTaskRouteWhenAvailable(t *testing.T
 			Provider: domain.ProviderGoogleTasks,
 			GoogleTasks: &AccountGoogleTaskInput{
 				ReadOnly: true,
-				OAuth: AccountOAuthInput{
+				OAuth: AccountGoogleOAuthInput{
 					APIBase:     "https://tasks.googleapis.com",
 					ClientID:    "synthetic.apps.googleusercontent.com",
 					RedirectURI: "http://127.0.0.1:43123/callback",
 					Authorization: AccountCredentialInput{
 						Backend: "os-keyring", Key: "google-tasks", Consent: true,
+					},
+					ClientSecret: AccountCredentialInput{
+						Backend: "os-keyring", Key: "google-tasks-client", Consent: true,
 					},
 				},
 			},
@@ -618,8 +624,9 @@ func TestAccountServiceAcceptsOnlyTypedGoogleTaskRouteWhenAvailable(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if review.TaskProvider != domain.ProviderGoogleTasks || len(review.Credentials) != 1 ||
-		review.Credentials[0].Key != "google-tasks" {
+	if review.TaskProvider != domain.ProviderGoogleTasks || len(review.Credentials) != 2 ||
+		review.Credentials[0].Key != "google-tasks" ||
+		review.Credentials[1].Key != "google-tasks-client" {
 		t.Fatalf("Google Tasks review = %+v", review)
 	}
 	input.Tasks.GoogleTasks.OAuth.APIBase = "https://www.googleapis.com"

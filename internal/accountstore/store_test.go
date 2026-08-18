@@ -266,10 +266,16 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 		result.APIBase = "https://graph.microsoft.com/v1.0"
 		return result
 	}
-	googleTaskRoute := func(key string) *config.OAuthRoute {
-		result := route(key)
-		result.APIBase = "https://tasks.googleapis.com"
-		return result
+	googleTaskRoute := func(key string) *config.GoogleOAuthRoute {
+		base := route(key)
+		return &config.GoogleOAuthRoute{
+			APIBase: "https://tasks.googleapis.com", ClientID: base.ClientID,
+			RedirectURI: base.RedirectURI, Authorization: base.Authorization,
+			ClientSecret: config.CredentialRef{
+				Backend: config.CredentialOSKeyring,
+				Key:     key + "-client", Consent: true,
+			},
+		}
 	}
 	const targetID domain.AccountID = "acc_00000000000000000000000000000002"
 	configuration.Accounts["target"] = config.Account{
@@ -281,6 +287,10 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 				ClientID:      route("target-only").ClientID,
 				RedirectURI:   route("target-only").RedirectURI,
 				Authorization: route("target-only").Authorization,
+				ClientSecret: config.CredentialRef{
+					Backend: config.CredentialOSKeyring,
+					Key:     "target-client", Consent: true,
+				},
 			},
 		},
 		Calendar: &config.CalendarRoute{

@@ -118,14 +118,15 @@ type AccountIMAPSMTPInput struct {
 	Credential AccountCredentialInput  `json:"credential"`
 }
 
-// AccountGoogleMailInput configures Gmail's fixed API route.
-// It contains only public-client metadata and an OS-keyring grant handle.
+// AccountGoogleMailInput configures Gmail's fixed API route. ClientSecret is
+// an external lookup reference, never the generated credential value.
 type AccountGoogleMailInput struct {
 	Username      string                 `json:"username"`
 	Mailbox       string                 `json:"mailbox,omitempty"`
 	ClientID      string                 `json:"clientId"`
 	RedirectURI   string                 `json:"redirectUri"`
 	Authorization AccountCredentialInput `json:"authorization"`
+	ClientSecret  AccountCredentialInput `json:"clientSecret"`
 }
 
 // AccountCalDAVInput configures authenticated principal discovery for one
@@ -156,6 +157,17 @@ type AccountOAuthInput struct {
 	Authorization  AccountCredentialInput `json:"authorization"`
 }
 
+// AccountGoogleOAuthInput configures one user-owned Google Desktop client.
+// Both values below are consented external handles; neither can carry a token
+// or the generated client credential through CLI, JSON, MCP, or configuration.
+type AccountGoogleOAuthInput struct {
+	APIBase       string                 `json:"apiBase"`
+	ClientID      string                 `json:"clientId"`
+	RedirectURI   string                 `json:"redirectUri"`
+	Authorization AccountCredentialInput `json:"authorization"`
+	ClientSecret  AccountCredentialInput `json:"clientSecret"`
+}
+
 // AccountMicrosoftTaskInput selects an independent delegated Graph grant for
 // Microsoft To Do. ReadOnly chooses Tasks.Read; otherwise Tasks.ReadWrite is
 // requested. The grant is never inferred from a mail or calendar route.
@@ -173,10 +185,9 @@ type AccountTodoistTaskInput struct {
 }
 
 // AccountGoogleTaskInput selects an independent Google Tasks desktop grant.
-// The release-owned approval gate remains authoritative over reachability.
 type AccountGoogleTaskInput struct {
-	OAuth    AccountOAuthInput `json:"oauth"`
-	ReadOnly bool              `json:"readOnly,omitempty"`
+	OAuth    AccountGoogleOAuthInput `json:"oauth"`
+	ReadOnly bool                    `json:"readOnly,omitempty"`
 }
 
 // AccountTickTickOAuthInput configures TickTick's confidential OAuth client.
@@ -264,12 +275,12 @@ type AccountMailRouteInput struct {
 
 // AccountCalendarRouteInput is the corresponding calendar selection.
 type AccountCalendarRouteInput struct {
-	Provider       domain.ProviderID       `json:"provider"`
-	OutlookWeb     *AccountOutlookWebInput `json:"outlookWeb,omitempty"`
-	CalDAV         *AccountCalDAVInput     `json:"caldav,omitempty"`
-	Google         *AccountOAuthInput      `json:"google,omitempty"`
-	GoogleWeb      *AccountWebInput        `json:"googleWeb,omitempty"`
-	MicrosoftGraph *AccountOAuthInput      `json:"microsoftGraph,omitempty"`
+	Provider       domain.ProviderID        `json:"provider"`
+	OutlookWeb     *AccountOutlookWebInput  `json:"outlookWeb,omitempty"`
+	CalDAV         *AccountCalDAVInput      `json:"caldav,omitempty"`
+	Google         *AccountGoogleOAuthInput `json:"google,omitempty"`
+	GoogleWeb      *AccountWebInput         `json:"googleWeb,omitempty"`
+	MicrosoftGraph *AccountOAuthInput       `json:"microsoftGraph,omitempty"`
 }
 
 // AccountTaskRouteInput is the closed task-provider selection. Adapter issues
@@ -649,6 +660,21 @@ type accountOAuthGrantBinding struct {
 }
 
 func validateAccountOAuthGrantSharing(input AccountAddInput) error {
+	if input.Mail != nil && input.Mail.Provider == domain.ProviderGoogle &&
+		input.Mail.Google != nil && input.Calendar != nil &&
+		input.Calendar.Provider == domain.ProviderGoogle &&
+		input.Calendar.Google != nil {
+		mail := input.Mail.Google
+		calendar := input.Calendar.Google
+		if mail.ClientID == calendar.ClientID &&
+			mail.RedirectURI == calendar.RedirectURI &&
+			mail.Authorization == calendar.Authorization &&
+			mail.ClientSecret != calendar.ClientSecret {
+			return errors.New(
+				"one shared Google OAuth grant must use one exact client-credential handle",
+			)
+		}
+	}
 	bindings := make([]accountOAuthGrantBinding, 0, 3)
 	add := func(
 		provider domain.ProviderID,
@@ -742,6 +768,11 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 		case domain.ProviderGoogle:
 			if input.Mail.Google != nil {
 				credential = &input.Mail.Google.Authorization
+				clientSecret := input.Mail.Google.ClientSecret
+				reviews = append(reviews, AccountCredentialReview{
+					Service: "mail OAuth client", Provider: input.Mail.Provider,
+					Backend: clientSecret.Backend, Key: clientSecret.Key,
+				})
 			}
 		case domain.ProviderMicrosoftGraph:
 			if input.Mail.MicrosoftGraph != nil {
@@ -771,6 +802,11 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 		case domain.ProviderGoogle:
 			if input.Calendar.Google != nil {
 				credential = &input.Calendar.Google.Authorization
+				clientSecret := input.Calendar.Google.ClientSecret
+				reviews = append(reviews, AccountCredentialReview{
+					Service: "calendar OAuth client", Provider: input.Calendar.Provider,
+					Backend: clientSecret.Backend, Key: clientSecret.Key,
+				})
 			}
 		case domain.ProviderMicrosoftGraph:
 			if input.Calendar.MicrosoftGraph != nil {
@@ -808,11 +844,19 @@ func accountCredentialReviews(input AccountAddInput) []AccountCredentialReview {
 	}
 	if input.Tasks != nil && input.Tasks.Provider == domain.ProviderGoogleTasks &&
 		input.Tasks.GoogleTasks != nil {
-		credential := input.Tasks.GoogleTasks.OAuth.Authorization
-		reviews = append(reviews, AccountCredentialReview{
-			Service: "tasks", Provider: input.Tasks.Provider,
-			Backend: credential.Backend, Key: credential.Key,
-		})
+		for index, credential := range []AccountCredentialInput{
+			input.Tasks.GoogleTasks.OAuth.Authorization,
+			input.Tasks.GoogleTasks.OAuth.ClientSecret,
+		} {
+			service := "tasks"
+			if index == 1 {
+				service = "tasks OAuth client"
+			}
+			reviews = append(reviews, AccountCredentialReview{
+				Service: service, Provider: input.Tasks.Provider,
+				Backend: credential.Backend, Key: credential.Key,
+			})
+		}
 	}
 	if input.Tasks != nil && input.Tasks.Provider == domain.ProviderTickTick &&
 		input.Tasks.TickTick != nil {
@@ -1267,10 +1311,16 @@ func validateGoogleMailInput(route AccountGoogleMailInput) error {
 	if err := validateOptionalMailbox(route.Mailbox); err != nil {
 		return err
 	}
-	return validateOAuthClientInput(
+	if err := validateOAuthClientInput(
 		route.ClientID,
 		route.RedirectURI,
 		route.Authorization,
+	); err != nil {
+		return err
+	}
+	return validateGoogleClientCredential(
+		route.Authorization,
+		route.ClientSecret,
 	)
 }
 
@@ -1329,7 +1379,7 @@ func (service *AccountService) validateCalendarRoute(route AccountCalendarRouteI
 		if route.Google == nil {
 			return errors.New("google requires Google settings")
 		}
-		return validateOAuthInput(domain.ProviderGoogle, *route.Google)
+		return validateGoogleOAuthInput(domain.ProviderGoogle, *route.Google)
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return errors.New("google-web requires Google Web settings")
@@ -1417,7 +1467,10 @@ func (service *AccountService) validateTaskRoute(route AccountTaskRouteInput) er
 			route.CalDAV != nil || route.TickTick != nil {
 			return errors.New("google-tasks requires independent OAuth settings")
 		}
-		return validateOAuthInput(domain.ProviderGoogleTasks, route.GoogleTasks.OAuth)
+		return validateGoogleOAuthInput(
+			domain.ProviderGoogleTasks,
+			route.GoogleTasks.OAuth,
+		)
 	case domain.ProviderTickTick:
 		if _, available := service.taskAvailable[route.Provider]; !available {
 			return fmt.Errorf("task provider %q is not available in this build", route.Provider)
@@ -1555,19 +1608,6 @@ func validateOAuthInput(
 	}
 	apiBase, _ := url.Parse(route.APIBase)
 	switch provider {
-	case domain.ProviderGoogle:
-		if route.MicrosoftCloud != "" {
-			return errors.New("google OAuth route cannot select a Microsoft cloud")
-		}
-		if apiBase.Host != "www.googleapis.com" || apiBase.RawQuery != "" ||
-			apiBase.EscapedPath() != "" && apiBase.EscapedPath() != "/" {
-			return errors.New("google API base must be https://www.googleapis.com")
-		}
-	case domain.ProviderGoogleTasks:
-		if route.MicrosoftCloud != "" || apiBase.Host != "tasks.googleapis.com" ||
-			apiBase.RawQuery != "" || apiBase.EscapedPath() != "" && apiBase.EscapedPath() != "/" {
-			return errors.New("google Tasks API base must be https://tasks.googleapis.com")
-		}
 	case domain.ProviderMicrosoftGraph:
 		if err := microsoftcloud.ValidateAPIBase(route.MicrosoftCloud, route.APIBase); err != nil {
 			return err
@@ -1577,6 +1617,8 @@ func validateOAuthInput(
 			apiBase.RawQuery != "" || apiBase.EscapedPath() != "/api/v1" {
 			return errors.New("todoist API base must be https://api.todoist.com/api/v1")
 		}
+	case domain.ProviderGoogle, domain.ProviderGoogleTasks:
+		return fmt.Errorf("provider %q requires a typed Google OAuth route", provider)
 	case domain.ProviderMicrosoftOWA,
 		domain.ProviderGoogleWeb,
 		domain.ProviderJMAP,
@@ -1604,6 +1646,55 @@ func validateOAuthInput(
 		if accountOAuthRedirectUsesEphemeralPort(route.RedirectURI) {
 			return errors.New("todoist OAuth requires the fixed loopback port registered for the public client")
 		}
+	}
+	return nil
+}
+
+func validateGoogleOAuthInput(
+	provider domain.ProviderID,
+	route AccountGoogleOAuthInput,
+) error {
+	if err := validateAccountHTTPSURL("API base", route.APIBase); err != nil {
+		return err
+	}
+	apiBase, _ := url.Parse(route.APIBase)
+	switch provider { //nolint:exhaustive // This validator accepts only the two Google API route IDs.
+	case domain.ProviderGoogle:
+		if apiBase.Host != "www.googleapis.com" || apiBase.RawQuery != "" ||
+			apiBase.EscapedPath() != "" && apiBase.EscapedPath() != "/" {
+			return errors.New("google API base must be https://www.googleapis.com")
+		}
+	case domain.ProviderGoogleTasks:
+		if apiBase.Host != "tasks.googleapis.com" || apiBase.RawQuery != "" ||
+			apiBase.EscapedPath() != "" && apiBase.EscapedPath() != "/" {
+			return errors.New("google Tasks API base must be https://tasks.googleapis.com")
+		}
+	default:
+		return fmt.Errorf("provider %q cannot use a Google OAuth route", provider)
+	}
+	if err := validateOAuthClientInput(
+		route.ClientID,
+		route.RedirectURI,
+		route.Authorization,
+	); err != nil {
+		return err
+	}
+	return validateGoogleClientCredential(
+		route.Authorization,
+		route.ClientSecret,
+	)
+}
+
+func validateGoogleClientCredential(
+	authorization AccountCredentialInput,
+	clientSecret AccountCredentialInput,
+) error {
+	if err := validateAccountCredential(clientSecret); err != nil {
+		return fmt.Errorf("google OAuth client credential: %w", err)
+	}
+	if authorization.Backend == clientSecret.Backend &&
+		authorization.Key == clientSecret.Key {
+		return errors.New("google OAuth grant and client credential require different handles")
 	}
 	return nil
 }
@@ -1918,7 +2009,7 @@ func taskRouteInputView(route *AccountTaskRouteInput) *AccountRouteView {
 		}
 	}
 	if route.Provider == domain.ProviderGoogleTasks && route.GoogleTasks != nil {
-		return oauthRouteView(route.Provider, &route.GoogleTasks.OAuth)
+		return googleOAuthRouteView(route.Provider, &route.GoogleTasks.OAuth)
 	}
 	if route.Provider == domain.ProviderTickTick && route.TickTick != nil {
 		return &AccountRouteView{
@@ -1984,8 +2075,7 @@ func mailRouteView(route *AccountMailRouteInput) *AccountRouteView {
 		return &AccountRouteView{
 			Provider: route.Provider,
 			Endpoints: []DiscoveredEndpoint{
-				{Kind: "imap", Value: "implicit://imap.gmail.com:993"},
-				{Kind: "smtp", Value: "starttls://smtp.gmail.com:587"},
+				{Kind: "api", Value: "https://www.googleapis.com"},
 			},
 			Identity: route.Google.Username,
 			Credential: &AccountCredentialView{
@@ -2046,7 +2136,7 @@ func calendarRouteView(route *AccountCalendarRouteInput) *AccountRouteView {
 			},
 		}
 	case domain.ProviderGoogle:
-		return oauthRouteView(route.Provider, route.Google)
+		return googleOAuthRouteView(route.Provider, route.Google)
 	case domain.ProviderGoogleWeb:
 		return webRouteView(route.Provider, route.GoogleWeb)
 	case domain.ProviderMicrosoftGraph:
@@ -2066,6 +2156,23 @@ func calendarRouteView(route *AccountCalendarRouteInput) *AccountRouteView {
 		return &AccountRouteView{Provider: route.Provider}
 	default:
 		return &AccountRouteView{Provider: route.Provider}
+	}
+}
+
+func googleOAuthRouteView(
+	provider domain.ProviderID,
+	route *AccountGoogleOAuthInput,
+) *AccountRouteView {
+	if route == nil {
+		return &AccountRouteView{Provider: provider}
+	}
+	return &AccountRouteView{
+		Provider:  provider,
+		Endpoints: []DiscoveredEndpoint{{Kind: "api", Value: route.APIBase}},
+		Credential: &AccountCredentialView{
+			Configured: true, Backend: route.Authorization.Backend,
+			Consented: route.Authorization.Consent,
+		},
 	}
 }
 

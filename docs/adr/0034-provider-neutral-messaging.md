@@ -135,8 +135,9 @@ until one release manifest proves all of the following:
 5. a clean final security review with no unresolved critical, high, or medium
    finding.
 
-Google Chat is deferred until the production Google OAuth approval boundary is
-resolved. Matrix is deferred until an accepted ADR defines end-to-end
+Google Chat is deferred until an accepted provider contract applies the same
+explicit user-owned Google OAuth model without widening mail/calendar scopes.
+Matrix is deferred until an accepted ADR defines end-to-end
 encryption, key ownership, local storage, backup, and recovery. Neither is a
 fallback. Calls, recordings, presence surveillance, meeting lifecycle
 control, tenant administration, bulk export, hosted relays, private protocols,

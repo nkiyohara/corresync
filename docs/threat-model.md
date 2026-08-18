@@ -97,9 +97,10 @@ single-user tool, not a remote gateway or tenant administration service.
   authorization codes, access tokens, refresh tokens, or client secrets in
   config, CLI, MCP, audit, feedback, or logs.
 - A generated Google Desktop client credential may enter only through the
-  inherited `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` process environment. It is
-  bounded, excluded from browser URLs and stored grants, and sent only to
-  Google's fixed TLS token endpoint.
+  bounded installed-client JSON importer or an explicitly consented external
+  helper. Only its external handle enters config. It is resolved for code
+  exchange or refresh, excluded from browser URLs and stored grants, sent only
+  to Google's fixed TLS token endpoint, and overwritten afterward.
 - TickTick configuration contains only a separately consented external
   client-secret handle. A new authorization-code exchange resolves it
   transiently for HTTP Basic authentication to TickTick's fixed token endpoint;
@@ -108,12 +109,12 @@ single-user tool, not a remote gateway or tenant administration service.
 - The Outlook Web route uses visible interactive sign-in. Public OAuth routes
   use Authorization Code with PKCE. TickTick uses the provider's documented
   confidential Authorization Code contract without inventing PKCE or refresh.
-- The staged Google mail, calendar, and task routes are release-gated before
-  browser, OAuth, keyring, session, and network access until production
-  approval. After activation each route pins its API base and cannot represent
-  a password, app password, alternate host, or arbitrary Google API transport.
-  Google Tasks uses an independent task-only scope set and authorization
-  handle.
+- User-owned Google mail, calendar, and task routes are configured without
+  authentication and may authorize only from explicit local CLI login. Each
+  route pins its API base and cannot represent a password, app password,
+  alternate host, or arbitrary Google API transport. Google Tasks uses an
+  independent task-only scope set and authorization handle. The managed Google
+  route remains release-disabled without a user override.
 - Standards credentials remain behind an OS-keyring entry or an explicitly
   approved helper reference.
 - Slack and Mattermost configuration stores only an account-isolated external

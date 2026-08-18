@@ -12,6 +12,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/googleoauthclient"
 	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
@@ -52,9 +53,11 @@ type onboardingServiceSelection struct {
 }
 
 type onboardingRegistration struct {
-	account    application.AccountView
-	preset     string
-	credential onboardingCredentialReference
+	account          application.AccountView
+	preset           string
+	credential       onboardingCredentialReference
+	googleClientPath string
+	googleClientKey  string
 }
 
 type onboardingAccountProgress struct {
@@ -192,11 +195,6 @@ func runAccountRegistrationWizard(
 	}
 	plans := onboardingRoutePlans(discovery)
 	if len(plans) == 0 {
-		if onboardingDiscoveredPendingGoogle(discovery) {
-			return onboardingRegistration{}, false, googleOAuthPendingError(
-				"Gmail or Google Calendar was found.",
-			)
-		}
 		return onboardingRegistration{}, false, errors.New(
 			"discovery found no available route; use `corr account add ADDRESS --help` for explicit advanced setup",
 		)
@@ -303,10 +301,19 @@ func runAccountRegistrationWizard(
 		return onboardingRegistration{}, false, err
 	}
 	return onboardingRegistration{
-		account:    account,
-		preset:     plan.preset,
-		credential: onboardingHandoffCredential(routing),
+		account:          account,
+		preset:           plan.preset,
+		credential:       onboardingHandoffCredential(routing),
+		googleClientPath: routing.onboardingGoogleClientPath,
+		googleClientKey:  onboardingGoogleClientKey(routing),
 	}, true, nil
+}
+
+func onboardingGoogleClientKey(routing accountAddCommand) string {
+	if routing.OAuthClientSecretKey != "" {
+		return routing.OAuthClientSecretKey
+	}
+	return routing.TaskOAuthSecretKey
 }
 
 func onboardingHandoffCredential(
@@ -413,20 +420,6 @@ func candidateHasDiscoveryEvidence(
 ) bool {
 	for _, evidence := range candidate.Evidence {
 		if evidence.Source == source {
-			return true
-		}
-	}
-	return false
-}
-
-func onboardingDiscoveredPendingGoogle(
-	discovery application.AccountDiscoveryResult,
-) bool {
-	if rollout.GoogleOAuthApproved {
-		return false
-	}
-	for _, candidate := range discovery.Candidates {
-		if candidate.Provider == domain.ProviderGoogle {
 			return true
 		}
 	}
@@ -591,7 +584,7 @@ func onboardingServiceOptions(
 			))
 		}
 	}
-	if plan.usesGoogle() && rollout.GoogleOAuthApproved {
+	if plan.usesGoogle() && rollout.GoogleBYOOAuthEnabled {
 		options = append(options, huh.NewOption(
 			"Google Tasks · separate, explicit Google authorization",
 			onboardingServiceGoogleTasks,
@@ -754,8 +747,8 @@ func configureOnboardingRoutes(
 				app, &command, alias, domain.ProviderMicrosoftGraph,
 			)
 		case domain.ProviderGoogle:
-			return accountAddCommand{}, false, googleOAuthPendingError(
-				"Gmail or Google Calendar was selected.",
+			selected, err = configureOnboardingOAuth(
+				app, &command, alias, domain.ProviderGoogle,
 			)
 		case domain.ProviderGoogleWeb, domain.ProviderPOP3,
 			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
@@ -800,11 +793,6 @@ func configureOnboardingTaskRoute(
 				"the selected connection route does not offer Google Tasks",
 			)
 		}
-		if !rollout.GoogleOAuthApproved {
-			return accountAddCommand{}, false, googleOAuthPendingError(
-				"Google Tasks was selected.",
-			)
-		}
 		oauthProvider = domain.ProviderGoogle
 		authorizationSuffix = "google-tasks"
 	default:
@@ -829,6 +817,14 @@ func configureOnboardingTaskRoute(
 	command.TaskOAuthRedirectURI = taskOAuth.OAuthRedirectURI
 	command.TaskAuthorizationKey = alias + "-" + authorizationSuffix
 	command.ApproveTaskOAuth = true
+	if provider == domain.ProviderGoogleTasks {
+		command.TaskOAuthSecretBackend = taskOAuth.OAuthClientSecretBackend
+		command.TaskOAuthSecretKey = taskOAuth.OAuthClientSecretKey
+		command.ApproveTaskOAuthSecret = taskOAuth.ApproveOAuthClientSecret
+		if command.onboardingGoogleClientPath == "" {
+			command.onboardingGoogleClientPath = taskOAuth.onboardingGoogleClientPath
+		}
+	}
 	return command, true, nil
 }
 
@@ -1291,18 +1287,85 @@ func configureOnboardingOAuth(
 		return false, fmt.Errorf("provider %q has no guided OAuth setup", provider)
 	}
 	clientID := ""
-	selected, err := runSettingsInput(
-		app,
-		name+" "+clientKind+" ID",
-		"Use a public OAuth client registration you are authorized to operate; no client secret is accepted.",
-		&clientID,
-		512,
-		validateOnboardingOpaqueInput,
-	)
-	if err != nil || !selected {
-		return false, err
+	var selected bool
+	var err error
+	var clientCredential onboardingCredentialReference
+	if provider == domain.ProviderGoogle {
+		source, sourceSelected, sourceErr := runOnboardingSelect(
+			app,
+			"Google Desktop OAuth client",
+			"Corresync-managed Google OAuth is not offered. Use a Desktop client from a Google Cloud project you control.",
+			[]huh.Option[string]{
+				huh.NewOption("Import downloaded client JSON (recommended)", "import").Selected(true),
+				huh.NewOption("Use an existing external credential handle", "existing"),
+			},
+			onboardingCancel,
+		)
+		if sourceErr != nil || !sourceSelected {
+			return false, sourceErr
+		}
+		if source == "import" {
+			path := ""
+			selected, err = runSettingsInput(
+				app,
+				"Downloaded Google client JSON",
+				"Path to the OAuth client file downloaded for application type Desktop app.",
+				&path,
+				4096,
+				validateOnboardingPath,
+			)
+			if err != nil || !selected {
+				return false, err
+			}
+			client, parseErr := googleoauthclient.ParseFile(path)
+			if parseErr != nil {
+				return false, parseErr
+			}
+			clientID = client.ID
+			client.Close()
+			clientCredential = onboardingCredentialReference{
+				backend: "os-keyring",
+				key:     alias + "-google-client",
+			}
+			command.onboardingGoogleClientPath = path
+		} else {
+			selected, err = runSettingsInput(
+				app,
+				"Google desktop-client ID",
+				"Use the client_id from a Desktop app in a Google Cloud project you control.",
+				&clientID,
+				512,
+				validateOnboardingOpaqueInput,
+			)
+			if err != nil || !selected {
+				return false, err
+			}
+			clientCredential, selected, err = configureOnboardingCredentialReference(
+				app,
+				"Google Desktop OAuth client",
+				alias+"-google-client",
+			)
+			if err != nil || !selected {
+				return false, err
+			}
+		}
+	} else {
+		selected, err = runSettingsInput(
+			app,
+			name+" "+clientKind+" ID",
+			"Use a public OAuth client registration you are authorized to operate.",
+			&clientID,
+			512,
+			validateOnboardingOpaqueInput,
+		)
+		if err != nil || !selected {
+			return false, err
+		}
 	}
 	redirectURI := "http://127.0.0.1:0/callback"
+	if provider == domain.ProviderGoogle {
+		redirectURI = "http://127.0.0.1:0"
+	}
 	selected, err = runSettingsInput(
 		app,
 		"Registered loopback redirect URI",
@@ -1314,11 +1377,15 @@ func configureOnboardingOAuth(
 	if err != nil || !selected {
 		return false, err
 	}
+	clientLabel := "public client"
+	if provider == domain.ProviderGoogle {
+		clientLabel = "Desktop client"
+	}
 	consent, err := runOnboardingConfirm(
 		app,
-		"Use this public client for an explicit "+name+" authorization later?",
+		"Use this "+clientLabel+" for an explicit "+name+" authorization later?",
 		"Discovery still does not open a browser. Sign-in is offered only after the account is added.",
-		"Use public client",
+		"Use "+clientLabel,
 		"Cancel this account",
 	)
 	if err != nil || !consent {
@@ -1328,6 +1395,11 @@ func configureOnboardingOAuth(
 	command.OAuthRedirectURI = redirectURI
 	command.AuthorizationKey = alias + "-" + keySuffix
 	command.ApproveOAuth = true
+	if provider == domain.ProviderGoogle {
+		command.OAuthClientSecretBackend = clientCredential.backend
+		command.OAuthClientSecretKey = clientCredential.key
+		command.ApproveOAuthClientSecret = true
+	}
 	command.onboardingOAuthProvider = provider
 	return true, nil
 }
@@ -1336,6 +1408,13 @@ func validateOnboardingOpaqueInput(value string) error {
 	if value == "" || len(value) > 512 || strings.TrimSpace(value) != value ||
 		strings.ContainsAny(value, "\r\n\x00") {
 		return errors.New("enter one bounded value")
+	}
+	return nil
+}
+
+func validateOnboardingPath(value string) error {
+	if value == "" || len(value) > 4096 || strings.ContainsAny(value, "\r\n\x00") {
+		return errors.New("enter one local file path")
 	}
 	return nil
 }
@@ -1391,6 +1470,9 @@ func runOnboardingAccountHandoff(
 	if registration.preset == onboardingPresetICloud {
 		return runICloudAccountHandoff(app, registration)
 	}
+	if registration.googleClientPath != "" {
+		return runGoogleAccountHandoff(app, registration)
+	}
 	account := registration.account
 	authentication := accountAuthenticationKind(account)
 	for {
@@ -1434,6 +1516,63 @@ func runOnboardingAccountHandoff(
 			}).Run(app)
 		case "doctor":
 			err = (&doctorCommand{Account: account.Alias}).Run(app)
+		}
+		if err != nil {
+			return err
+		}
+	}
+}
+
+func runGoogleAccountHandoff(
+	app *runtime,
+	registration onboardingRegistration,
+) error {
+	if err := validateOnboardingPath(registration.googleClientPath); err != nil {
+		return errors.New("google OAuth client handoff is missing its downloaded JSON path")
+	}
+	if err := validateOnboardingCredentialKey(registration.googleClientKey); err != nil {
+		return errors.New("google OAuth client handoff is missing its reviewed keyring handle")
+	}
+	clientPath := registration.googleClientPath
+	for {
+		options := make([]huh.Option[string], 0, 5)
+		if clientPath != "" {
+			options = append(options, huh.NewOption(
+				"Store the downloaded OAuth client securely (recommended)",
+				"import",
+			).Selected(true))
+			options = append(options, huh.NewOption(
+				"Finish now and import it later", "finish",
+			))
+		} else {
+			options = append(options,
+				huh.NewOption("Sign in now in Google's browser", "login"),
+				huh.NewOption("Run local setup checks", "doctor"),
+				huh.NewOption("Finish this account later", "finish"),
+			)
+		}
+		action, selected, err := runSettingsSelect(
+			app,
+			"Google OAuth handoff · "+registration.account.Alias,
+			"The downloaded client credential goes only to the OS keyring. Google sign-in remains a separate explicit action.",
+			options,
+		)
+		if err != nil || !selected || action == "finish" {
+			return err
+		}
+		switch action {
+		case "import":
+			err = (&googleClientImportCommand{
+				File: clientPath,
+				Key:  registration.googleClientKey,
+			}).Run(app)
+			if err == nil {
+				clientPath = ""
+			}
+		case "login":
+			err = (&loginCommand{Account: registration.account.Alias}).Run(app)
+		case "doctor":
+			err = (&doctorCommand{Account: registration.account.Alias}).Run(app)
 		}
 		if err != nil {
 			return err
@@ -1774,8 +1913,8 @@ func writeOnboardingDiscovery(
 		availability := "available"
 		if !candidate.Available {
 			availability = "not available in this build"
-			if candidate.Provider == domain.ProviderGoogle && !rollout.GoogleOAuthApproved {
-				availability = "coming soon · production OAuth approval pending"
+			if candidate.Provider == domain.ProviderGoogle {
+				availability = "available with your own Google Desktop OAuth client"
 			}
 		}
 		if _, err := view.printf(

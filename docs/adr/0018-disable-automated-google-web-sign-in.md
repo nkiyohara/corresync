@@ -1,13 +1,13 @@
 # ADR 0018: Disable automated Google Web sign-in
 
-The replacement Google route was subsequently changed and approval-gated by
-[ADR 0026](0026-approval-gated-gmail-api-route.md): Gmail and Calendar both use
-pinned APIs under provider ID `google`, but the route is unavailable until
-production OAuth approval.
+The replacement Google route was subsequently changed by
+[ADR 0036](0036-user-owned-google-oauth-first.md): Gmail and Calendar both use
+pinned APIs under provider ID `google` with an explicit user-owned Desktop
+OAuth client; managed OAuth remains dormant.
 
 - Status: accepted
 - Date: 2026-07-29
-- Amended: 2026-08-11
+- Amended: 2026-08-18
 
 ## Context
 

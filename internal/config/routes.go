@@ -84,7 +84,7 @@ type CalDAVRoute struct {
 }
 
 // OAuthClient identifies a local public client and an OS-keyring grant. It can
-// never represent a client secret, authorization code, or bearer token.
+// never represent a client credential, authorization code, or bearer token.
 type OAuthClient struct {
 	ClientID      string        `json:"clientId" toml:"client_id"`
 	RedirectURI   string        `json:"redirectUri" toml:"redirect_uri"`
@@ -100,10 +100,30 @@ type GoogleMailRoute struct {
 	ClientID      string        `json:"clientId" toml:"client_id"`
 	RedirectURI   string        `json:"redirectUri" toml:"redirect_uri"`
 	Authorization CredentialRef `json:"authorization" toml:"authorization"`
+	ClientSecret  CredentialRef `json:"clientSecret" toml:"client_secret"`
 }
 
 // Client returns the secret-free public-client authorization.
 func (route GoogleMailRoute) Client() OAuthClient {
+	return OAuthClient{
+		ClientID: route.ClientID, RedirectURI: route.RedirectURI,
+		Authorization: route.Authorization,
+	}
+}
+
+// GoogleOAuthRoute binds a user-owned Google Desktop client to one pinned API
+// base. ClientSecret is only an external lookup reference; the configuration
+// schema can never contain the generated credential itself.
+type GoogleOAuthRoute struct {
+	APIBase       string        `json:"apiBase" toml:"api_base"`
+	ClientID      string        `json:"clientId" toml:"client_id"`
+	RedirectURI   string        `json:"redirectUri" toml:"redirect_uri"`
+	Authorization CredentialRef `json:"authorization" toml:"authorization"`
+	ClientSecret  CredentialRef `json:"clientSecret" toml:"client_secret"`
+}
+
+// Client returns the secret-free public-client authorization.
+func (route GoogleOAuthRoute) Client() OAuthClient {
 	return OAuthClient{
 		ClientID: route.ClientID, RedirectURI: route.RedirectURI,
 		Authorization: route.Authorization,
@@ -134,11 +154,10 @@ type TodoistTaskRoute struct {
 }
 
 // GoogleTaskRoute binds the fixed Google Tasks API to an independently
-// consented desktop OAuth grant. It remains unreachable while the release-owned
-// Google approval gate is closed.
+// consented user-owned Desktop OAuth grant.
 type GoogleTaskRoute struct {
-	OAuth    OAuthRoute `json:"oauth" toml:"oauth"`
-	ReadOnly bool       `json:"readOnly,omitempty" toml:"read_only,omitempty"`
+	OAuth    GoogleOAuthRoute `json:"oauth" toml:"oauth"`
+	ReadOnly bool             `json:"readOnly,omitempty" toml:"read_only,omitempty"`
 }
 
 // TickTickOAuthRoute binds a confidential OAuth client to external references
@@ -205,7 +224,7 @@ type CalendarRoute struct {
 	Provider       domain.ProviderID `json:"provider" toml:"provider"`
 	OutlookWeb     *OutlookWebRoute  `json:"outlookWeb,omitempty" toml:"outlook_web,omitempty"`
 	CalDAV         *CalDAVRoute      `json:"caldav,omitempty" toml:"caldav,omitempty"`
-	Google         *OAuthRoute       `json:"google,omitempty" toml:"google,omitempty"`
+	Google         *GoogleOAuthRoute `json:"google,omitempty" toml:"google,omitempty"`
 	GoogleWeb      *WebRoute         `json:"googleWeb,omitempty" toml:"google_web,omitempty"`
 	MicrosoftGraph *OAuthRoute       `json:"microsoftGraph,omitempty" toml:"microsoft_graph,omitempty"`
 }
@@ -358,6 +377,7 @@ func validateTickTickCredentialIsolation(accounts map[string]Account) error {
 			}
 			if account.Mail.Provider == domain.ProviderGoogle {
 				add(account.Mail.Google.Authorization, false)
+				add(account.Mail.Google.ClientSecret, false)
 			}
 			if account.Mail.Provider == domain.ProviderMicrosoftGraph {
 				add(account.Mail.MicrosoftGraph.Authorization, false)
@@ -369,6 +389,7 @@ func validateTickTickCredentialIsolation(accounts map[string]Account) error {
 			}
 			if account.Calendar.Provider == domain.ProviderGoogle {
 				add(account.Calendar.Google.Authorization, false)
+				add(account.Calendar.Google.ClientSecret, false)
 			}
 			if account.Calendar.Provider == domain.ProviderMicrosoftGraph {
 				add(account.Calendar.MicrosoftGraph.Authorization, false)
@@ -386,6 +407,7 @@ func validateTickTickCredentialIsolation(accounts map[string]Account) error {
 			}
 			if account.Tasks.Provider == domain.ProviderGoogleTasks {
 				add(account.Tasks.GoogleTasks.OAuth.Authorization, false)
+				add(account.Tasks.GoogleTasks.OAuth.ClientSecret, false)
 			}
 			if account.Tasks.Provider == domain.ProviderTickTick {
 				add(account.Tasks.TickTick.OAuth.Authorization, true)
@@ -793,6 +815,8 @@ func isNilPointer(value any) bool {
 		return typed == nil
 	case *GoogleMailRoute:
 		return typed == nil
+	case *GoogleOAuthRoute:
+		return typed == nil
 	case *OAuthRoute:
 		return typed == nil
 	case *WebRoute:
@@ -904,7 +928,58 @@ func (route GoogleMailRoute) validate() error {
 	if err := validateMailbox(route.Mailbox); err != nil {
 		return err
 	}
-	return route.Client().validate()
+	if err := route.Client().validate(); err != nil {
+		return err
+	}
+	return validateGoogleClientCredential(
+		route.Authorization,
+		route.ClientSecret,
+	)
+}
+
+func (route GoogleOAuthRoute) validateFor(provider domain.ProviderID) error {
+	if err := validateHTTPSURL("API base", route.APIBase); err != nil {
+		return err
+	}
+	if err := route.Client().validate(); err != nil {
+		return err
+	}
+	if err := validateGoogleClientCredential(
+		route.Authorization,
+		route.ClientSecret,
+	); err != nil {
+		return err
+	}
+	parsed, _ := url.Parse(route.APIBase)
+	switch provider { //nolint:exhaustive // This route type accepts only the two Google API IDs.
+	case domain.ProviderGoogle:
+		if parsed.Host != "www.googleapis.com" || parsed.RawQuery != "" ||
+			parsed.EscapedPath() != "" && parsed.EscapedPath() != "/" {
+			return errors.New("google API base must be https://www.googleapis.com")
+		}
+	case domain.ProviderGoogleTasks:
+		if parsed.Host != "tasks.googleapis.com" || parsed.RawQuery != "" ||
+			parsed.EscapedPath() != "" && parsed.EscapedPath() != "/" {
+			return errors.New("google Tasks API base must be https://tasks.googleapis.com")
+		}
+	default:
+		return fmt.Errorf("provider %q cannot use a Google OAuth route", provider)
+	}
+	return nil
+}
+
+func validateGoogleClientCredential(
+	authorization CredentialRef,
+	clientSecret CredentialRef,
+) error {
+	if err := clientSecret.validate(false); err != nil {
+		return fmt.Errorf("google OAuth client credential: %w", err)
+	}
+	if authorization.Backend == clientSecret.Backend &&
+		authorization.Key == clientSecret.Key {
+		return errors.New("google OAuth grant and client credential require different handles")
+	}
+	return nil
 }
 
 func (route OAuthRoute) validate() error {
@@ -920,19 +995,6 @@ func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
 	}
 	parsed, _ := url.Parse(route.APIBase)
 	switch provider {
-	case domain.ProviderGoogle:
-		if route.MicrosoftCloud != "" {
-			return errors.New("google OAuth route cannot select a Microsoft cloud")
-		}
-		if parsed.Host != "www.googleapis.com" || parsed.RawQuery != "" ||
-			parsed.EscapedPath() != "" && parsed.EscapedPath() != "/" {
-			return errors.New("google API base must be https://www.googleapis.com")
-		}
-	case domain.ProviderGoogleTasks:
-		if route.MicrosoftCloud != "" || parsed.Host != "tasks.googleapis.com" ||
-			parsed.RawQuery != "" || parsed.EscapedPath() != "" && parsed.EscapedPath() != "/" {
-			return errors.New("google Tasks API base must be https://tasks.googleapis.com")
-		}
 	case domain.ProviderMicrosoftGraph:
 		if err := microsoftcloud.ValidateAPIBase(route.MicrosoftCloud, route.APIBase); err != nil {
 			return err
@@ -945,6 +1007,8 @@ func (route OAuthRoute) validateFor(provider domain.ProviderID) error {
 		if oauthRedirectUsesEphemeralPort(route.RedirectURI) {
 			return errors.New("todoist OAuth requires the fixed loopback port registered for the public client")
 		}
+	case domain.ProviderGoogle, domain.ProviderGoogleTasks:
+		return fmt.Errorf("provider %q requires a typed Google OAuth route", provider)
 	case domain.ProviderMicrosoftOWA,
 		domain.ProviderGoogleWeb,
 		domain.ProviderJMAP,

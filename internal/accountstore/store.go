@@ -53,7 +53,7 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 		return oauthRouteView(route.Provider, &route.Todoist.OAuth)
 	}
 	if route.Provider == domain.ProviderGoogleTasks && route.GoogleTasks != nil {
-		return oauthRouteView(route.Provider, &route.GoogleTasks.OAuth)
+		return googleOAuthRouteView(route.Provider, &route.GoogleTasks.OAuth)
 	}
 	if route.Provider == domain.ProviderTickTick && route.TickTick != nil {
 		return &application.AccountRouteView{
@@ -87,6 +87,20 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 		}
 	}
 	return application.TaskRouteView(route.Provider)
+}
+
+func googleOAuthRouteView(
+	provider domain.ProviderID,
+	route *config.GoogleOAuthRoute,
+) *application.AccountRouteView {
+	if route == nil {
+		return &application.AccountRouteView{Provider: provider}
+	}
+	return &application.AccountRouteView{
+		Provider:   provider,
+		Endpoints:  []application.DiscoveredEndpoint{{Kind: "api", Value: route.APIBase}},
+		Credential: credentialRefView(route.Authorization),
+	}
 }
 
 func messagingRouteView(route *config.MessagingRoute) *application.AccountMessagingRouteView {
@@ -304,12 +318,9 @@ func taskRouteConfig(
 		}
 	}
 	if route.GoogleTasks != nil {
-		oauth, err := oauthRouteConfig(&route.GoogleTasks.OAuth)
-		if err != nil {
-			return nil, err
-		}
 		result.GoogleTasks = &config.GoogleTaskRoute{
-			OAuth: *oauth, ReadOnly: route.GoogleTasks.ReadOnly,
+			OAuth:    googleOAuthRouteConfig(route.GoogleTasks.OAuth),
+			ReadOnly: route.GoogleTasks.ReadOnly,
 		}
 	}
 	if route.TickTick != nil {
@@ -349,7 +360,11 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 			}
 		case domain.ProviderGoogle:
 			if account.Mail.Google != nil {
-				references = append(references, account.Mail.Google.Authorization)
+				references = append(
+					references,
+					account.Mail.Google.Authorization,
+					account.Mail.Google.ClientSecret,
+				)
 			}
 		case domain.ProviderMicrosoftGraph:
 			if account.Mail.MicrosoftGraph != nil {
@@ -377,6 +392,7 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 				references = append(
 					references,
 					account.Calendar.Google.Authorization,
+					account.Calendar.Google.ClientSecret,
 				)
 			}
 		case domain.ProviderMicrosoftGraph:
@@ -410,6 +426,7 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 		references = append(
 			references,
 			account.Tasks.GoogleTasks.OAuth.Authorization,
+			account.Tasks.GoogleTasks.OAuth.ClientSecret,
 		)
 	}
 	if account.Tasks != nil && account.Tasks.TickTick != nil {
@@ -548,7 +565,7 @@ func calendarRouteView(route *config.CalendarRoute) *application.AccountRouteVie
 			},
 		}
 	case domain.ProviderGoogle:
-		return oauthRouteView(route.Provider, route.Google)
+		return googleOAuthRouteView(route.Provider, route.Google)
 	case domain.ProviderGoogleWeb:
 		return webRouteView(route.Provider, route.GoogleWeb)
 	case domain.ProviderMicrosoftGraph:
@@ -606,8 +623,7 @@ func googleMailRouteView(
 	return &application.AccountRouteView{
 		Provider: provider,
 		Endpoints: []application.DiscoveredEndpoint{
-			{Kind: "imap", Value: "implicit://imap.gmail.com:993"},
-			{Kind: "smtp", Value: "starttls://smtp.gmail.com:587"},
+			{Kind: "api", Value: "https://www.googleapis.com"},
 		},
 		Identity: route.Username,
 		Credential: &application.AccountCredentialView{
@@ -726,6 +742,7 @@ func mailRouteConfig(
 					Key:     route.Google.Authorization.Key,
 					Consent: route.Google.Authorization.Consent,
 				},
+				ClientSecret: credentialRefConfig(route.Google.ClientSecret),
 			},
 		}, nil
 	case domain.ProviderGoogleWeb:
@@ -795,11 +812,11 @@ func calendarRouteConfig(
 			},
 		}, nil
 	case domain.ProviderGoogle:
-		oauth, err := oauthRouteConfig(route.Google)
-		if err != nil {
-			return nil, err
+		if route.Google == nil {
+			return nil, errors.New("google calendar settings are missing")
 		}
-		return &config.CalendarRoute{Provider: route.Provider, Google: oauth}, nil
+		google := googleOAuthRouteConfig(*route.Google)
+		return &config.CalendarRoute{Provider: route.Provider, Google: &google}, nil
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return nil, errors.New("google Web calendar settings are missing")
@@ -856,6 +873,17 @@ func oauthRouteConfig(
 			Consent: route.Authorization.Consent,
 		},
 	}, nil
+}
+
+func googleOAuthRouteConfig(
+	route application.AccountGoogleOAuthInput,
+) config.GoogleOAuthRoute {
+	return config.GoogleOAuthRoute{
+		APIBase: route.APIBase, ClientID: route.ClientID,
+		RedirectURI:   route.RedirectURI,
+		Authorization: credentialRefConfig(route.Authorization),
+		ClientSecret:  credentialRefConfig(route.ClientSecret),
+	}
 }
 
 // RenameAccount atomically changes only the mutable alias.
@@ -983,13 +1011,11 @@ func accountOAuthAuthorizationKeys(account config.Account) []string {
 		}
 	}
 	if account.Calendar != nil {
-		for _, route := range []*config.OAuthRoute{
-			account.Calendar.Google,
-			account.Calendar.MicrosoftGraph,
-		} {
-			if route != nil {
-				keys = append(keys, route.Authorization.Key)
-			}
+		if account.Calendar.Google != nil {
+			keys = append(keys, account.Calendar.Google.Authorization.Key)
+		}
+		if account.Calendar.MicrosoftGraph != nil {
+			keys = append(keys, account.Calendar.MicrosoftGraph.Authorization.Key)
 		}
 	}
 	if account.Tasks != nil && account.Tasks.MicrosoftGraph != nil {

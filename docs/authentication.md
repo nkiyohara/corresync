@@ -55,24 +55,25 @@ visible browser. Do not use the relay to bypass organization policy.
 
 ## Google
 
-The Gmail, Google Calendar, and Google Tasks integrations are included in RC
-builds but disabled while Corresync's production OAuth application awaits
-Google approval. Gmail discovery explains that support is coming soon. Explicit
-account addition, existing configurations, migrated grants, and mixed-provider
-accounts all stop before a browser opens, the keyring is read, or Google traffic
-is sent.
+The Gmail, Google Calendar, and Google Tasks integrations use a Desktop OAuth
+client in a Google Cloud project the signed-in human controls. Corresync's own
+managed OAuth identity remains disabled and is never a fallback. Follow the
+[annotated Google setup guide](google-oauth-setup.md) to choose an audience,
+enable only the selected APIs, create the Desktop client, import its downloaded
+JSON, and sign in.
 
-After approval, activation will be a separate reviewed release. The normal
-system browser will own authorization; Corresync will never automate the
-sign-in page. Gmail will use the pinned Gmail API, Google Calendar/Meet will use
-the Calendar API, and Google Tasks will use the Tasks API with an account-scoped
-OS-keyring grant. No Google password, app password, cookie, configurable host,
+The normal system browser owns authorization; Corresync never automates the
+sign-in page. Gmail uses the pinned Gmail API, Google Calendar/Meet uses the
+Calendar API, and Google Tasks uses the Tasks API. No Google password, app
+password, cookie, configurable host, service account, domain-wide delegation,
 or unattended login is accepted.
 
-Google's generated Desktop client may require its client credential at the
-token endpoint. Provide `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` only in the
-local Corresync process environment. It is never a config, CLI, MCP, grant, or
-browser-URL field.
+The downloaded Desktop client credential is imported into the OS keyring or
+resolved from an explicitly consented external helper. Configuration stores
+only its handle. The OAuth manager resolves it for a code exchange or token
+refresh, sends it only to Google's fixed TLS token endpoint, and overwrites the
+owned bytes afterward. It never appears in config, CLI/MCP JSON, an
+authorization URL, the stored grant, logs, feedback, or audit output.
 
 Google Workspace administrators can restrict third-party OAuth and API access.
 A rejected or unapproved route fails clearly and never
@@ -80,8 +81,8 @@ falls through to a password or another provider.
 
 ## Google, Microsoft Graph, Todoist, and TickTick OAuth
 
-These routes require an explicitly configured public OAuth client and a
-registered loopback redirect:
+These routes require an explicitly configured OAuth client and a registered
+loopback redirect:
 
 ```text
 http://127.0.0.1:<registered-or-ephemeral-port>/<registered-path>
@@ -96,25 +97,23 @@ ephemeral port. The same in-product notice links the public
 [Terms of Use](https://corresync.org/terms.html) before any
 provider page can open. Corresync does not support a generic confidential
 client, device-code unattended flow, password grant, or broad tenant
-credential. Google Desktop OAuth and the closed TickTick route are the only
+credential. Google Desktop OAuth and the TickTick route are the only
 provider-specific client-credential exceptions; Microsoft Graph and Todoist
 remain secret-free.
 
 The resulting grant is stored by the operating-system keyring under the
 configured local reference. The TOML contains only that reference and the
 explicit consent bit. Scopes are selected from the configured mail/calendar/task
-services; choosing Graph or Google is never an automatic fallback. Once the
-production gate is separately enabled after approval, Google mail requests
-only the provider-documented
-`https://www.googleapis.com/auth/gmail.modify` scope. The pending RC does not
-construct or display that scope through a production command and cannot begin
-authorization.
+services; choosing Graph or Google is never an automatic fallback. Google mail
+requests only the provider-documented
+`https://www.googleapis.com/auth/gmail.modify` scope. Setup displays the exact
+derived set before the explicit CLI login can open Google.
 
 Google Tasks uses a separate provider identity and authorization handle. It
 requests `openid`, `email`, and exactly `tasks.readonly` or `tasks`; it never
 reuses or expands the Gmail/Calendar grant. The verified OpenID email must
-match the configured account. While the shared release gate is closed, task
-setup and activation fail before any grant, keyring, browser, or API access.
+match the configured account. Setup never reuses or expands the mail/calendar
+grant for Tasks.
 
 Microsoft To Do requests `Tasks.Read` for a read-only route or
 `Tasks.ReadWrite` for a writable route. The separate task approval is required

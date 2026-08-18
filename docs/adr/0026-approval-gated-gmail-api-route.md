@@ -1,6 +1,7 @@
 # ADR 0026: Approval-gated Gmail API route
 
-- Status: accepted
+- Status: superseded in its OAuth availability decision by
+  [ADR 0036](0036-user-owned-google-oauth-first.md); its Gmail API contract is retained
 - Date: 2026-08-11
 - Supersedes: the Gmail transport and Google-availability decisions in
   [ADR 0021](0021-google-mail-over-imap-smtp-xoauth2.md)

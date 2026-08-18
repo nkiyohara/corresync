@@ -38,11 +38,11 @@
 `corr` brings isolated mail, calendar, and task accounts into one terminal—and
 one local
 [Model Context Protocol](https://modelcontextprotocol.io/) server.
-Gmail, Google Calendar, and Google Tasks support are coming soon after Google
-OAuth approval. The canonical task tools include explicit Microsoft To Do,
-Todoist, TickTick, and CalDAV VTODO routes; the Google Tasks code is present but
-disabled, and remaining task-provider adapters stay unavailable until their
-contracts are implemented.
+Gmail, Google Calendar, and Google Tasks are available through a Desktop OAuth
+client in a Google Cloud project you control. Corresync-managed Google OAuth
+remains dormant. The canonical task tools also include explicit Microsoft To
+Do, Todoist, TickTick, and CalDAV VTODO routes; remaining task-provider adapters
+stay unavailable until their contracts are implemented.
 
 - Search mail and build one agenda across accounts without collapsing their
   identity or provider provenance.
@@ -98,7 +98,7 @@ separate explicit choice.
 | Route | Mail | Calendar | Tasks | Authentication |
 | --- | --- | --- | --- | --- |
 | Outlook Web | Typed reads and writes | Selectable calendars; provider-supported Teams link | — | Dedicated visible browser profile |
-| Google (coming soon) | Gmail API reads and writes; no permanent delete | Selectable calendars; Google Meet when advertised | Google Tasks through a separate task-only grant | Included but disabled in RC builds while production OAuth approval is pending |
+| Google (your OAuth client) | Gmail API reads and writes; no permanent delete | Selectable calendars; Google Meet when advertised | Google Tasks through a separate task-only grant | Your Desktop OAuth client; client credential and grants in the OS keyring |
 | Microsoft Graph | Typed reads and writes | Selectable calendars; typed Teams-link creation | Microsoft To Do | Your authorized public OAuth client; OS-keyring grant |
 | Todoist | — | — | Typed Todoist operations | Your authorized public OAuth client; OS-keyring grant |
 | TickTick | — | — | Typed TickTick operations | Your authorized confidential OAuth client; external secret handle and OS-keyring grant |
@@ -108,13 +108,11 @@ separate explicit choice.
 <!-- markdownlint-enable MD013 -->
 
 Discovery gathers DNS, well-known, and provider metadata without credentials.
-It never authenticates or adds an account. Microsoft Graph and managed Google
-authorization remain explicit choices and are never automatic fallbacks.
-Google discovery does not add an account while Corresync awaits approval for
-its official Google OAuth application. No Google sign-in starts. For now,
-connect Gmail, Calendar, and Tasks through Google's official
-[Workspace MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers)
-(Developer Preview).
+It never authenticates or adds an account. Microsoft Graph and user-owned
+Google authorization remain explicit choices and are never automatic
+fallbacks. Google discovery can offer guided Desktop-client setup, but no
+Google sign-in starts until a later explicit `corr auth login`. See the
+[annotated Google setup guide](docs/google-oauth-setup.md).
 
 iCloud has a first-class guided preset over the same provider-neutral
 IMAP/SMTP and CalDAV adapters. `corr setup` recognizes documented iCloud Mail
@@ -124,9 +122,9 @@ After the account is added, an explicit handoff can open Apple's app-password
 page and the OS-owned credential prompt; the `corr` process never reads the
 app-specific password.
 
-Every available or staged v0.8 route above has synthetic provider-contract and
-application coverage. The Gmail API route included in RC builds is disabled
-and live-unobserved. Other v0.8 provider and platform implementations remain
+Every available v0.9 route above has synthetic provider-contract and
+application coverage. The user-owned Google API route is available but
+live-unobserved. Other provider and platform implementations remain
 **live-unobserved** until an authorized, content-free observation is bound to
 the exact commit. See [compatibility evidence](docs/compatibility.md) before
 connecting a sensitive account.
@@ -281,14 +279,12 @@ corr account discover reader@example.invalid
 corr account add reader@example.invalid --help
 ```
 
-For Gmail, Google Calendar, and Google Tasks, the integration is included but
-disabled while Corresync's production OAuth application awaits approval.
-Account addition, browser sign-in, keyring access, and Google API traffic
-remain blocked. Until the route opens in a separate approved release, use
-Google's official
-[Workspace MCP setup](https://developers.google.com/workspace/guides/configure-mcp-servers)
-with your agent. It is currently a Google Developer Preview and has its own
-Google Cloud and OAuth setup requirements.
+For Gmail, Google Calendar, and Google Tasks, create a Desktop OAuth client in
+a Google Cloud project you control. Guided setup validates the downloaded
+client JSON and places its generated credential in the OS keyring; account
+addition still does not authenticate. Follow the
+[Google OAuth setup guide](docs/google-oauth-setup.md) for current Cloud
+Console screens, audience choices, exact APIs, scopes, import, and login.
 
 Before installing, the optional
 [provider compatibility checker](https://corresync.org/providers.html#check)
@@ -298,8 +294,10 @@ address, or starts sign-in. The public service uses only a fixed DNS resolver
 and returns no raw DNS record. Skip it whenever you prefer and run `corr account
 discover ADDRESS` locally.
 
-Account addition does not authenticate. OAuth routes require a public-client
-registration you are authorized to use. Standards routes use a keyring entry
+Account addition does not authenticate. OAuth routes require a client
+registration you are authorized to use. Google additionally requires a
+separate external handle for its generated Desktop client credential.
+Standards routes use a keyring entry
 or explicitly approved helper reference. Passwords and tokens never enter
 `config.toml`. See [account and provider configuration](docs/configuration.md).
 The Outlook Web route opens a dedicated visible profile only during the later
@@ -375,10 +373,9 @@ agent.
 
 ## Honest edges
 
-- Gmail, Google Calendar, and Google Tasks code is included in RC builds, but Corresync's
-  production Google OAuth application is awaiting approval. The route is
-  disabled and starts no Google sign-in; use Google's official Workspace MCP
-  in the meantime.
+- Gmail, Google Calendar, and Google Tasks require a user-owned Google Desktop
+  OAuth client. Corresync-managed Google OAuth stays disabled; the user-owned
+  route is synthetic-contract covered and live-unobserved.
 - Microsoft Graph requires your own authorized public-client registration.
   Corresync ships no token relay.
 - Windows desktop notification setup is unavailable because Corresync does
@@ -432,7 +429,8 @@ Read the [architecture](docs/architecture.md),
 | Verify compatibility claims | [Evidence matrix](docs/compatibility.md) |
 | Review privacy and Google data handling | [Privacy Policy](https://corresync.org/privacy.html) |
 | Review use and open-source license terms | [Terms of Use](https://corresync.org/terms.html) |
-| Prepare the official Google OAuth review | [Google verification runbook](docs/google-oauth-verification.md) |
+| Connect Google with your own Desktop client | [Google OAuth setup](docs/google-oauth-setup.md) |
+| Review the dormant managed-client plan | [Google verification runbook](docs/google-oauth-verification.md) |
 | Review every guide | [Documentation map](docs/README.md) |
 
 Users upgrading from versions before v0.7 can follow the

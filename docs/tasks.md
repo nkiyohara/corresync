@@ -5,8 +5,8 @@ has the same feature set. The canonical contract gives every adapter one target
 and one safety model. A configured task route is not by itself a capability
 claim. Microsoft To Do, Todoist, CalDAV VTODO, and TickTick are implemented against
 synthetic contracts through explicit OAuth or external-credential routes.
-Google Tasks is also implemented against synthetic contracts, but remains
-unreachable behind the production Google OAuth approval gate. The other task
+Google Tasks is also implemented against synthetic contracts through a
+user-owned Desktop OAuth client and remains live-unobserved. The other task
 routes remain unavailable until their dependent provider issues are implemented
 and tested.
 
@@ -105,7 +105,7 @@ deterministic adapter contracts but no commit-bound live observation.
 | `microsoft-web-tasks` | phased target; delete requires ambiguity evidence | observe | modern To Do fields limited | observe | bounded polling | [#109](https://github.com/nkiyohara/corresync/issues/109) |
 | `todoist` | synthetic; read-only or CRUD/state | relative/absolute reminders; exact provider recurrence; plan-sensitive | subtasks, labels, one assignee; sections/duration/comments degraded | date/floating/zoned schedule plus date-only deadline | bounded sync token; no webhook | [#110](https://github.com/nkiyohara/corresync/issues/110) |
 | `caldav` | synthetic with strong ETag | VTODO recurrence and alarms | RELATED-TO parents and categories; assignment unavailable | date, floating, and zoned datetime | RFC 6578 sync token with reset | [#111](https://github.com/nkiyohara/corresync/issues/111) |
-| `google-tasks` | synthetic behind disabled approval gate; strong ETag and assigned-task restrictions | unavailable | subtasks, ordering, output-only source links; no labels | due is date-only | bounded `updatedMin` polling with reset | [#112](https://github.com/nkiyohara/corresync/issues/112) |
+| `google-tasks` | synthetic through user-owned Desktop OAuth; strong ETag and assigned-task restrictions | unavailable | subtasks, ordering, output-only source links; no labels | due is date-only | bounded `updatedMin` polling with reset | [#112](https://github.com/nkiyohara/corresync/issues/112) |
 | `apple-reminders` | target after explicit full Reminders permission | recurrence and alarms target | URL target; hierarchy/labels observe | EventKit components require exact mapping | local notification then bounded refetch | [#113](https://github.com/nkiyohara/corresync/issues/113) |
 | `ticktick` | synthetic; read-only or create/update/complete/delete; no reopen | exact provider recurrence; reminder replacement unavailable | subtasks/checklists, labels, ordering, one assignee; comments/focus degraded | date or IANA-zoned datetime | bounded full-snapshot polling; no webhook | [#114](https://github.com/nkiyohara/corresync/issues/114) |
 | `anydo-mcp` | allowlisted negotiated tools only | observe from reviewed schema | personal/workspace/calendar/grocery distinctions required | observe | upstream MCP; no implicit retry | [#115](https://github.com/nkiyohara/corresync/issues/115) |
@@ -264,12 +264,13 @@ the watermark, page token, and scan start to the normal provider/account/list
 envelope; one expired-token response starts a bounded reset without reusing the
 invalid token.
 
-Configuration schema v8 can represent this secret-free independent route, but
-the release-owned Google gate is still false. RC account setup, OAuth profile
-selection, browser launch, keyring access, session activation, and API traffic
-all stop before Google access. Enabling the route requires production OAuth
-approval, opt-in live evidence, and a separate reviewed release. Synthetic
-coverage is not an availability claim.
+Configuration schema v11 represents the independent route, its OAuth grant
+handle, and a separate external handle for the user-owned Desktop client
+credential. Account setup does not resolve either handle or start OAuth.
+Explicit local CLI login creates the authorization; MCP cannot. The session
+owner may later resolve that already consented client credential for a Google
+token refresh without exposing it to the MCP caller. Synthetic coverage is not
+a live availability observation.
 
 ## TickTick
 

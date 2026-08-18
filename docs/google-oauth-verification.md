@@ -1,4 +1,9 @@
-# Google OAuth production and verification runbook
+# Dormant Corresync-managed Google OAuth review runbook
+
+> This is not the current setup path. [ADR 0036](adr/0036-user-owned-google-oauth-first.md)
+> keeps the Corresync-managed client disabled. Use the
+> [user-owned Google OAuth guide](google-oauth-setup.md) now. This document is
+> retained for a possible future reviewed managed client.
 
 This runbook prepares Corresync's official Google desktop OAuth application for
 production. It records the project state, public URLs, requested scopes,
@@ -21,7 +26,7 @@ assessment; the Google verification team makes those decisions.
 | Data access scopes | Mail/calendar registered; tasks need review |
 | Authorized domain and public URLs | Configured and live on `corresync.org` |
 | Synthetic test account | Prior route observed; Gmail API not observed live |
-| Google verification submission | Submitted; approval pending |
+| Google verification submission | Historical attempt; managed route dormant |
 
 Do not describe the Google route as generally available until Google has
 approved the requested access and a separate reviewed release enables the
@@ -116,18 +121,19 @@ domain during review can trigger another brand review.
 Create an OAuth client with application type **Desktop app** and a clear name
 such as `Corresync desktop`. A native application cannot keep an embedded
 client credential confidential, but Google's generated Desktop client may
-still require that value at the token endpoint. Corresync persists only:
+still require that value at the token endpoint. A future managed design may
+persist only:
 
 - the public client ID;
 - `http://127.0.0.1:0` as the native loopback redirect model;
-- an opaque OS-keyring authorization handle; and
+- opaque OS-keyring authorization and client-credential handles; and
 - the user's explicit OAuth consent bit.
 
-Supply the generated value only in the local session owner's
-`CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` process environment. Corresync bounds
-it, excludes it from the browser authorization URL and stored grant, and sends
-it only to Google's fixed TLS token endpoint. Never put it in configuration,
-CLI or MCP input, source, release metadata, CI, issues, logs, support output, or
+The superseded process-environment mechanism must not be revived. Any future
+managed-client design must use a reviewed external credential owner, keep only
+its handle in configuration, exclude the value from the browser authorization
+URL and stored grant, and send it only to Google's fixed TLS token endpoint.
+Never put it in source, release metadata, CI, issues, logs, support output, or
 the verification recording.
 
 The runtime opens Google's authorization endpoint in the normal system browser,
@@ -175,11 +181,11 @@ can enable read-only or writable Google Tasks. Coordinate that scope change
 with the pending submission; do not change the release gate merely because the
 API or scope appears in Cloud Console.
 
-While approval is pending, no production command constructs, displays, or
-requests these Google scopes. After the separate activation release, discovery,
-setup, MCP registration, status, and ordinary tool reads still never start
-OAuth. `corr auth login --account ALIAS` will first print the exact derived
-scope set and open Google only when no matching valid grant is already in the
+The dormant managed client cannot construct, display, or request these scopes.
+The separate user-owned route can do so only from explicit local CLI login.
+Discovery, setup, MCP registration, status, and ordinary tool reads still never
+start OAuth. `corr auth login --account ALIAS` first prints the exact derived
+scope set and opens Google only when no matching valid grant is already in the
 OS keyring.
 
 ### Scope justifications for the verification form
@@ -330,10 +336,10 @@ reproducible synthetic evidence, and keep production branding and behavior
 stable during review. Restricted-scope verification can take weeks; do not
 promise a completion date.
 
-The public RC must keep the production approval gate disabled throughout
-review. After approval, change the gate only in a separate reviewed commit,
-rerun full verification and the final security review, and update every public
-availability claim before release.
+Every release must keep the managed-client route disabled throughout review.
+Enabling it requires a new accepted decision and separate reviewed commit,
+complete verification, final security review, and updated public availability
+claims. It must not replace or probe an existing user-owned route.
 
 ## Ongoing compliance
 

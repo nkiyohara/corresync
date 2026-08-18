@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620" role="img" aria-labelledby="title desc">
+  <title id="title">Google Cloud project picker</title>
+  <desc id="desc">Illustrative browser screen showing the project picker and New Project button.</desc>
+  <rect width="1120" height="620" rx="24" fill="#edf3fb"/>
+  <rect x="36" y="32" width="1048" height="556" rx="18" fill="#fff" stroke="#b9c6d8" stroke-width="2"/>
+  <rect x="36" y="32" width="1048" height="64" rx="18" fill="#f8fafc"/>
+  <circle cx="72" cy="64" r="8" fill="#ea4335"/><circle cx="98" cy="64" r="8" fill="#fbbc04"/><circle cx="124" cy="64" r="8" fill="#34a853"/>
+  <rect x="172" y="48" width="760" height="32" rx="16" fill="#e9eef5"/>
+  <text x="190" y="69" font-family="system-ui,sans-serif" font-size="15" fill="#5f6b7a">console.cloud.google.com</text>
+  <rect x="36" y="96" width="1048" height="64" fill="#fff" stroke="#d9e0ea"/>
+  <text x="72" y="136" font-family="system-ui,sans-serif" font-weight="700" font-size="22" fill="#243143">Google Cloud</text>
+  <rect x="300" y="112" width="320" height="36" rx="7" fill="#e8f0fe" stroke="#4285f4" stroke-width="2"/>
+  <text x="322" y="136" font-family="system-ui,sans-serif" font-size="16" fill="#174ea6">Select a project ▾</text>
+  <rect x="270" y="178" width="580" height="330" rx="14" fill="#fff" stroke="#9aa7b8" stroke-width="2"/>
+  <text x="306" y="224" font-family="system-ui,sans-serif" font-size="24" font-weight="700" fill="#243143">Select a project</text>
+  <line x1="306" y1="248" x2="814" y2="248" stroke="#d9e0ea"/>
+  <text x="318" y="294" font-family="system-ui,sans-serif" font-size="17" fill="#243143">My Corresync</text>
+  <text x="318" y="324" font-family="system-ui,sans-serif" font-size="14" fill="#677386">Project you control</text>
+  <rect x="618" y="430" width="196" height="48" rx="8" fill="#1a73e8"/>
+  <text x="655" y="460" font-family="system-ui,sans-serif" font-size="17" font-weight="700" fill="#fff">NEW PROJECT</text>
+  <path d="M890 454 H830" stroke="#d13b4c" stroke-width="4"/><path d="M830 454 l14 -10 v20 z" fill="#d13b4c"/>
+  <text x="876" y="428" font-family="system-ui,sans-serif" font-size="17" font-weight="700" text-anchor="end" fill="#9b2433">Create one you own</text>
+  <text x="560" y="558" font-family="system-ui,sans-serif" font-size="14" text-anchor="middle" fill="#677386">Illustrative screen — Google may change labels</text>
+</svg>

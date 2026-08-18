@@ -54,17 +54,17 @@ controls. It does not bypass authentication, tenant policy, MFA, Conditional
 Access, disabled services, mailbox permissions, or administrator consent.
 
 The Outlook Web route does not require a third-party Microsoft Graph
-application. Gmail and Google Calendar code is included in RC builds but the
-route is disabled while production OAuth approval is pending: no Google browser
-sign-in, keyring access, scope request, or API traffic can start. After a
-separate approval-activation release, the normal browser will own authorization,
-the grant will stay in the OS keyring, and Gmail and Calendar will use pinned
-Google APIs. Automated Google Web sign-in, passwords, app passwords, cookies,
-custom Google hosts, and silent fallback are not supported. Microsoft
-Graph also requires an explicitly selected public OAuth client. JMAP,
-IMAP/SMTP, and CalDAV routes use only an OS-keyring entry or approved helper
-reference. None of these models is an authorization bypass: the provider must
-already permit the requested operation.
+application. Gmail, Google Calendar, and Google Tasks require a Desktop OAuth
+client in a Google Cloud project the signed-in human controls. Its generated
+client credential and each later grant stay under separate handles in the OS
+keyring or an explicitly approved credential helper. Corresync-managed Google
+OAuth remains disabled and is never a fallback. The normal browser owns Google
+authorization, and provider traffic uses pinned Google endpoints. Automated
+Google Web sign-in, passwords, app passwords, cookies, custom Google hosts, and
+silent fallback are not supported. Microsoft Graph also requires an explicitly
+selected public OAuth client. JMAP, IMAP/SMTP, and CalDAV routes use only an
+OS-keyring entry or approved helper reference. None of these models is an
+authorization bypass: the provider must already permit the requested operation.
 
 Expected controls include:
 

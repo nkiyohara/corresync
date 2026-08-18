@@ -101,8 +101,8 @@ monitoring.
 
 Gmail-API/Google-Calendar-API, Microsoft Graph, JMAP, IMAP/SMTP, and CalDAV
 adapters are implemented behind the shared application boundary. The Google
-route is approval-gated by
-[ADR 0026](0026-approval-gated-gmail-api-route.md). The former read-only
+route uses an explicit user-owned Desktop client under
+[ADR 0036](0036-user-owned-google-oauth-first.md). The former read-only
 Google Web route is disabled before browser launch by
 [ADR 0018](0018-disable-automated-google-web-sign-in.md); its legacy schema and
 synthetic fixtures are not a runtime capability. Remaining route evidence is

@@ -732,7 +732,7 @@ login_timeout = "5m"
 	}
 }
 
-func TestLoadMigratesV3GoogleAPIToGmailXOAUTH2(t *testing.T) {
+func TestLoadRejectsV3GoogleRouteWithoutClientCredentialConsent(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.toml")
 	v3 := []byte(`
@@ -783,26 +783,9 @@ disable_automatic_checks = true
 	if err := os.WriteFile(path, v3, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	configuration, err := Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	account := configuration.Accounts["personal"]
-	if configuration.Version != CurrentVersion ||
-		configuration.DefaultAccount != "personal" ||
-		account.ID != "acc_00000000000000000000000000000003" ||
-		account.MailProvider() != domain.ProviderGoogle ||
-		account.CalendarProvider() != domain.ProviderGoogle ||
-		account.Mail.Google == nil ||
-		account.Mail.Google.Username != "reader@gmail.com" ||
-		account.Mail.Google.Mailbox != "" ||
-		account.Mail.Google.ClientID != "synthetic-google-public-client" ||
-		account.Mail.Google.Authorization.Key != "google-personal-oauth" ||
-		account.Calendar.Google == nil ||
-		account.Calendar.Google.APIBase != "https://www.googleapis.com" ||
-		account.Mail.Google.Client() != account.Calendar.Google.Client() ||
-		!configuration.Updates.DisableAutomaticChecks {
-		t.Fatalf("migrated v3 Google config = %+v", configuration)
+	_, err := Load(path)
+	if err == nil || !strings.Contains(err.Error(), "client-credential reference") {
+		t.Fatalf("Load() error = %v", err)
 	}
 	raw, err := os.ReadFile(path) // #nosec G304 -- path is confined to t.TempDir.
 	if err != nil {
@@ -1166,6 +1149,9 @@ func TestGoogleMailOAuthRouteRequiresLoopbackAndOSKeyring(t *testing.T) {
 				Authorization: CredentialRef{
 					Backend: CredentialOSKeyring, Key: "google-work", Consent: true,
 				},
+				ClientSecret: CredentialRef{
+					Backend: CredentialOSKeyring, Key: "google-client", Consent: true,
+				},
 			},
 		},
 	}
@@ -1208,12 +1194,15 @@ func TestGoogleTaskRouteRoundTripsWithPinnedIndependentGrant(t *testing.T) {
 			Provider: domain.ProviderGoogleTasks,
 			GoogleTasks: &GoogleTaskRoute{
 				ReadOnly: true,
-				OAuth: OAuthRoute{
+				OAuth: GoogleOAuthRoute{
 					APIBase:     "https://tasks.googleapis.com",
 					ClientID:    "synthetic.apps.googleusercontent.com",
 					RedirectURI: "http://127.0.0.1:43123/callback",
 					Authorization: CredentialRef{
 						Backend: CredentialOSKeyring, Key: "google-tasks", Consent: true,
+					},
+					ClientSecret: CredentialRef{
+						Backend: CredentialOSKeyring, Key: "google-tasks-client", Consent: true,
 					},
 				},
 			},
@@ -1559,6 +1548,95 @@ func TestMigrateV9AddsNoMessagingAuthority(t *testing.T) {
 	)
 	if _, err := MigrateV9([]byte(withMessages)); err == nil || !strings.Contains(err.Error(), "strict mode") {
 		t.Fatalf("v9 messaging payload error = %v", err)
+	}
+}
+
+func TestMigrateV10PreservesNonGoogleRoutesWithoutAddingAuthority(t *testing.T) {
+	t.Parallel()
+	legacy := OutlookDefault()
+	legacy.Version = 10
+	raw, err := toml.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	migrated, err := MigrateV10(raw)
+	if err != nil || migrated.Version != CurrentVersion {
+		t.Fatalf("MigrateV10() = %+v, %v", migrated, err)
+	}
+	account := migrated.Accounts["work"]
+	if account.Mail == nil || account.Mail.Provider != domain.ProviderMicrosoftOWA ||
+		account.Calendar == nil || account.Calendar.Provider != domain.ProviderMicrosoftOWA {
+		t.Fatalf("migrated Outlook routes = %+v", account)
+	}
+}
+
+func TestMigrateV10GoogleRouteNamesActionableManualRecovery(t *testing.T) {
+	t.Parallel()
+	defaults := Default()
+	legacy := googleCredentialLegacyConfig{
+		Version: 10, DefaultAccount: "personal",
+		Accounts: map[string]googleCredentialLegacyAccount{
+			"personal": {
+				ID: "acc_00000000000000000000000000000120", Address: "reader@example.test",
+				Mail: &googleCredentialLegacyMailRoute{
+					Provider: domain.ProviderGoogle,
+					Google: &googleCredentialLegacyGoogleMailRoute{
+						Username:    "reader@example.test",
+						ClientID:    "synthetic.apps.googleusercontent.com",
+						RedirectURI: "http://127.0.0.1:43123/oauth/callback",
+						Authorization: CredentialRef{
+							Backend: CredentialOSKeyring, Key: "google-grant", Consent: true,
+						},
+					},
+				},
+			},
+		},
+		Policy: defaults.Policy, Browser: defaults.Browser, Updates: defaults.Updates,
+	}
+	raw, err := toml.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = MigrateV10(raw)
+	if err == nil || !strings.Contains(err.Error(), "recover-a-legacy-google-route") ||
+		!strings.Contains(err.Error(), "file was left unchanged") {
+		t.Fatalf("v10 Google recovery error = %v", err)
+	}
+}
+
+func TestLegacySchemasCannotManufactureGoogleClientCredentialConsent(t *testing.T) {
+	t.Parallel()
+	configuration := OutlookDefault()
+	account := configuration.Accounts["work"]
+	account.Address = "reader@example.test"
+	account.Mail = &MailRoute{
+		Provider: domain.ProviderGoogle,
+		Google: &GoogleMailRoute{
+			Username: "reader@example.test", ClientID: "synthetic.apps.googleusercontent.com",
+			RedirectURI:   "http://127.0.0.1:43123/callback",
+			Authorization: CredentialRef{Backend: CredentialOSKeyring, Key: "google-grant", Consent: true},
+			ClientSecret:  CredentialRef{Backend: CredentialOSKeyring, Key: "google-client", Consent: true},
+		},
+	}
+	account.Calendar = nil
+	configuration.Accounts["work"] = account
+	for _, version := range []int{9, 10} {
+		candidate := configuration
+		candidate.Version = version
+		raw, err := toml.Marshal(candidate)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = map[int]func([]byte) (Config, error){9: MigrateV9, 10: MigrateV10}[version](raw)
+		if err == nil {
+			t.Fatalf("v%d accepted a new Google client-credential reference", version)
+		}
+		if version == 9 && !strings.Contains(err.Error(), "strict mode") {
+			t.Fatalf("v9 smuggling error = %v", err)
+		}
+		if version == 10 && !strings.Contains(err.Error(), "strict mode") {
+			t.Fatalf("v10 smuggling error = %v", err)
+		}
 	}
 }
 

@@ -11,6 +11,7 @@ installed binary, its matching release notes remain authoritative.
 | Install and verify Corresync | [Installation](install.md) |
 | Add an account or choose a provider route | [Configuration](configuration.md) |
 | Understand browser, OAuth, keyring, or helper sign-in | [Authentication](authentication.md) |
+| Connect Gmail, Google Calendar, or Google Tasks | [User-owned Google OAuth setup](google-oauth-setup.md) |
 | Use terminal commands | [CLI guide](cli.md) |
 | Connect Codex, Claude Code, Copilot, or another MCP client | [MCP integration](mcp.md) |
 | Detect local agent hosts and compare integration surfaces | [Agent-host integrations](integrations.md) |
@@ -100,9 +101,10 @@ preview/commit checks regardless of interface.
 - [Architecture decision records](adr/): accepted decisions and consequences
 - [Prior art](prior-art.md): independent-implementation record
 - [Security policy](../SECURITY.md): supported versions and private reporting
-- [Google OAuth verification](google-oauth-verification.md): production
-  branding, scope justifications, restricted-data architecture, evidence, and
-  submission gate
+- [User-owned Google OAuth setup](google-oauth-setup.md): current personal or
+  organization-owned Desktop client setup with annotated browser screens
+- [Google OAuth verification](google-oauth-verification.md): dormant future
+  Corresync-managed client review record; not the current user setup path
 - [Privacy Policy](https://corresync.org/privacy.html): public
   data-access, storage, sharing, retention, and deletion disclosures
 - [Terms of Use](https://corresync.org/terms.html): official

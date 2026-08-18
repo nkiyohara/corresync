@@ -276,9 +276,9 @@ Todoist public-client route supports Todoist. The explicit TickTick route uses
 its separately consented confidential client and supports the same typed MCP
 surface except unsupported operations reported by its capability set. Other
 configured task routes remain staged and fail without authentication or
-provider access. Google Tasks has a complete synthetic adapter but is one of
-those unreachable routes while production Google OAuth approval is pending. See
-[tasks.md](tasks.md).
+provider access. Google Tasks uses a user-owned Desktop OAuth client and a
+separate task-only grant, and remains synthetic-contract covered and
+live-unobserved. See [tasks.md](tasks.md).
 
 `calendar_create.onlineMeeting` requests the selected account route's observed
 native meeting service: Teams for Microsoft routes or Google Meet for a Google
@@ -353,7 +353,9 @@ egress, or purge a queue.
 Tools route through the account's selected service:
 
 - Outlook Web: visible browser-owned session;
-- Google or Graph: explicit OAuth grant in OS keyring;
+- Google: user-owned Desktop client credential plus an explicit OAuth grant in
+  separate external/keyring handles;
+- Graph: explicit OAuth grant in OS keyring;
 - JMAP and IMAP/SMTP: explicit standards credential backend;
 - CalDAV: explicit calendar credential backend.
 
@@ -362,7 +364,7 @@ No tool silently changes providers or initiates administrator consent.
 not permission to configure or authenticate.
 
 Capability checks remain provider-specific. No MCP tool can initiate Google
-OAuth or silently route a blocked Google account through another provider.
+OAuth or silently route a Google account through another provider.
 
 Cross-account tools fan out through isolated services and report partial
 failures without dropping successful results. All write tools still require one

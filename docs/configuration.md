@@ -80,9 +80,15 @@ and unshared Corresync-owned OAuth grant state. External standards credentials
 remain in their keyring/helper. Removing the default account requires
 `--new-default`.
 
-## Schema v10
+## Schema v11
 
-Schema v10 adds one optional, closed messaging route for Teams Graph, Teams
+Schema v11 adds an explicitly consented external credential reference for each
+user-owned Google Desktop OAuth client. A v10 Google route cannot acquire this
+new authority through migration and must follow the
+[legacy-route recovery](google-oauth-setup.md#recover-a-legacy-google-route)
+before it is re-added with `corr setup`; non-Google v10 routes migrate
+unchanged. Schema v10 added one optional,
+closed messaging route for Teams Graph, Teams
 Web, Slack, or Mattermost. Existing v9 files preserve every route and consent
 exactly; migration adds no messaging route, workspace, credential reference,
 monitoring consent, or runtime capability. Messaging remains release-gated
@@ -90,7 +96,7 @@ before credential access, browser launch, or provider traffic until the full
 v0.9 evidence manifest is complete. Schema v9 added the typed TickTick task
 route with separate consented handles for its OAuth grant and externally owned
 confidential-client secret. Schema v8 added the independent Google Tasks OAuth
-payload without enabling the approval-gated route. Schema v7
+payload. Schema v7
 added the CalDAV VTODO payload, schema v6 introduced the task route, and
 existing v5 files still migrate with no task route,
 authorization, or capability. Schema v5 added the signed-release channel and
@@ -99,7 +105,7 @@ initialized provider-neutral configuration contains no account and has an
 empty `default_account`. The first account added becomes the default:
 
 ```toml
-version = 10
+version = 11
 default_account = ""
 
 [policy]
@@ -124,7 +130,7 @@ auto_submit = false
 A configured Outlook Web account then looks like:
 
 ```toml
-version = 10
+version = 11
 default_account = "work"
 
 [accounts.work]
@@ -190,7 +196,7 @@ Supported route payloads are:
 | tasks | `microsoft-graph` | `tasks.microsoft_graph` and `tasks.microsoft_graph.oauth` |
 | tasks | `todoist` | `tasks.todoist` and `tasks.todoist.oauth` |
 | tasks | `caldav` | `tasks.caldav` |
-| tasks | `google-tasks` | `tasks.google_tasks` and `tasks.google_tasks.oauth`; approval-gated |
+| tasks | `google-tasks` | `tasks.google_tasks` and `tasks.google_tasks.oauth`; user-owned Desktop OAuth |
 | tasks | `ticktick` | `tasks.ticktick` and `tasks.ticktick.oauth` |
 | tasks | `microsoft-web-tasks`, `apple-reminders`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
 | messages | `microsoft-teams` | exactly one of `messages.teams_graph` or `messages.teams_web`; v0.9 release-gated |
@@ -198,11 +204,11 @@ Supported route payloads are:
 | messages | `mattermost` | `messages.mattermost`; v0.9 release-gated |
 <!-- markdownlint-enable MD013 -->
 
-The payload must match the provider exactly. The staged Google mail-and-calendar
-route shares one OAuth public client and grant and pins the Gmail and Calendar
-API base. It is not selectable while production OAuth approval is pending. A
-migrated schema-v3 account with deliberately distinct Google clients remains
-valid configuration but cannot activate before approval.
+The payload must match the provider exactly. A Google mail-and-calendar route
+may share one Desktop client, client-credential handle, and grant, and pins the
+Gmail and Calendar API base. Distinct clients require distinct reviewed handles
+and consent. Legacy schema-v3 through v10 Google routes fail closed because
+migration cannot manufacture the new external credential consent.
 Graph mail and calendar may share one identical API route. An independent
 IMAP/SMTP mail route can be paired with a CalDAV calendar route.
 
@@ -422,7 +428,7 @@ capabilities, cursors, and writes remain separate. Remaining task providers
 are unavailable and have no arbitrary options map or credential value. See the
 [task contract](tasks.md).
 
-Schema v8 introduced the future Google Tasks route shape:
+The current Google Tasks route shape is:
 
 ```toml
 [accounts.google-tasks]
@@ -438,19 +444,23 @@ read_only = true
 [accounts.google-tasks.tasks.google_tasks.oauth]
 api_base = "https://tasks.googleapis.com"
 client_id = "synthetic.apps.googleusercontent.com"
-redirect_uri = "http://127.0.0.1:0/oauth/callback"
+redirect_uri = "http://127.0.0.1:0"
 
 [accounts.google-tasks.tasks.google_tasks.oauth.authorization]
 backend = "os-keyring"
 key = "tasks-google"
 consent = true
+
+[accounts.google-tasks.tasks.google_tasks.oauth.client_secret]
+backend = "os-keyring"
+key = "google-desktop-client"
+consent = true
 ```
 
-This is a schema example, not an available setup path. While production Google
-OAuth approval is pending, the CLI refuses to save or activate it before
-browser, keyring, OAuth, or API access. The route requests exactly one task
-scope and cannot reuse a Gmail/Calendar authorization handle. A separate
-reviewed release must enable it after approval and opt-in live evidence.
+The route requests exactly one task scope and cannot reuse a Gmail/Calendar
+authorization handle. It may reference the same Desktop client credential,
+but its grant stays separate. Prefer guided setup so each handle and scope is
+reviewed before persistence.
 
 Prefer the lifecycle command over hand editing:
 
@@ -565,49 +575,45 @@ configuration—not suitable for support reports.
 Corresync never stores a password, cookie, OAuth access/refresh token,
 authorization header, or browser canary in TOML.
 
-## Google OAuth route (coming soon)
+## User-owned Google OAuth route
 
-The Google integration is included but disabled in RC builds while Corresync's
-production OAuth application awaits approval. Discovery may identify Gmail,
-but `account add`, existing routes, and `auth login` stop before persistence,
-browser launch, keyring access, or Google API traffic. There is no environment,
-configuration, CLI, MCP, or BYO-client override for the approval gate.
+The Google integration uses a Desktop OAuth client in a Google Cloud project
+you control. Corresync-managed OAuth remains disabled and has no environment,
+configuration, CLI, MCP, or automatic-fallback override. Follow the
+[browser-screen setup guide](google-oauth-setup.md); guided `corr setup` is the
+recommended route.
 
-After approval, a separate reviewed release will enable the existing explicit
-desktop public-client shape:
+For an advanced scripted setup, securely import the downloaded installed-client
+JSON first:
 
 ```console
+corr auth google-client import ~/Downloads/client_secret.json \
+  --key personal-google-client
 corr account add reader@example.invalid \
   --alias personal \
   --mail-provider google \
   --calendar-provider google \
-  --oauth-client-id synthetic-public-client \
+  --oauth-client-id YOUR_CLIENT_ID.apps.googleusercontent.com \
   --oauth-redirect-uri http://127.0.0.1:0 \
   --authorization-key personal-google \
-  --approve-oauth
+  --approve-oauth \
+  --oauth-client-secret-key personal-google-client \
+  --approve-oauth-client-secret
 corr auth login --account personal
 ```
 
+Import is create-only. If that handle already exists, choose a new handle. Use
+`--replace` only to rotate the same Google client credential intentionally;
+never replace a handle owned by an IMAP, SMTP, CalDAV, or other integration.
+
 The redirect must be an allowed loopback `http://127.0.0.1` URI. Port `0`
 selects an available ephemeral port for public-client registrations that permit
-native-app loopback ports; otherwise configure an explicitly registered port.
-When the route is enabled, `corr auth login` will print the exact service-derived
-scope set before a provider page can open. The flow validates state and grants
-belong to the OS keyring.
-There is no client-secret field and no automatic Google selection. Google's
-generated Desktop client may require its client credential during token
-exchange. Supply it only to the local Corresync process:
-
-```console
-CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET='generated-desktop-client-value' \
-  corr auth login --account personal
-```
-
-Do not commit that value, put it in TOML or a CLI flag, or expose it through
-MCP, logs, support output, or screen recordings. Corresync bounds the inherited
-value, sends it only to Google's fixed TLS token endpoint, and never stores it
-in the authorization URL or OS-keyring grant. Use only a client registration
-you are authorized to operate.
+native-app loopback ports. `corr auth login` prints the exact service-derived
+scope set before a provider page can open. The flow validates state; the
+generated client credential and OAuth grant use separate OS-keyring handles.
+The configuration `client_secret` table stores only an external reference,
+never its value. Do not commit or paste the downloaded value into TOML, a CLI
+argument, MCP, logs, support output, or screen recordings.
 
 The normal system browser owns Google sign-in. Gmail then uses the pinned Gmail
 API with `gmail.modify`; Calendar uses the pinned Google Calendar API; Google

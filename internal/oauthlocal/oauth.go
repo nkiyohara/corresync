@@ -59,10 +59,11 @@ type Provider struct {
 	// exchange. ExchangeScope is set when that endpoint explicitly requires the
 	// reviewed scope. DisablePKCE and DisableRefresh are set only when the
 	// provider's primary contract does not document those mechanisms.
-	Confidential   bool
-	ExchangeScope  bool
-	DisablePKCE    bool
-	DisableRefresh bool
+	Confidential     bool
+	ClientCredential bool
+	ExchangeScope    bool
+	DisablePKCE      bool
+	DisableRefresh   bool
 }
 
 // Services is the exact service set selected for one public-client grant.
@@ -96,8 +97,8 @@ func ProviderFor(
 			services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("google OAuth profile has invalid service options")
 		}
-		if !rollout.GoogleOAuthApproved {
-			return Provider{}, rollout.ErrGoogleOAuthPending
+		if !rollout.GoogleBYOOAuthEnabled {
+			return Provider{}, rollout.ErrGoogleBYOOAuthUnavailable
 		}
 		result = googleProviderProfile(services.Mail, services.Calendar)
 	case domain.ProviderGoogleTasks:
@@ -106,8 +107,8 @@ func ProviderFor(
 			services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("google Tasks OAuth profile has invalid service options")
 		}
-		if !rollout.GoogleOAuthApproved {
-			return Provider{}, rollout.ErrGoogleOAuthPending
+		if !rollout.GoogleBYOOAuthEnabled {
+			return Provider{}, rollout.ErrGoogleBYOOAuthUnavailable
 		}
 		result = googleTaskProviderProfile(services.TaskWrite)
 	case domain.ProviderMicrosoftGraph:
@@ -222,9 +223,10 @@ func ProviderFor(
 func googleProviderProfile(mailEnabled, calendarEnabled bool) Provider {
 	// #nosec G101 -- these are public OAuth endpoint and scope URLs, not credentials.
 	result := Provider{
-		ID:       domain.ProviderGoogle,
-		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL: "https://oauth2.googleapis.com/token",
+		ID:               domain.ProviderGoogle,
+		AuthURL:          "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:         "https://oauth2.googleapis.com/token",
+		ClientCredential: true,
 		AuthParams: map[string]string{
 			"access_type": "offline",
 			"hl":          "en",
@@ -255,10 +257,11 @@ func googleTaskProviderProfile(write bool) Provider {
 		scope = "https://www.googleapis.com/auth/tasks"
 	}
 	return Provider{ // #nosec G101 -- fixed public OAuth endpoints and scope URLs, not credentials.
-		ID:       domain.ProviderGoogleTasks,
-		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL: "https://oauth2.googleapis.com/token",
-		Scopes:   []string{"email", "openid", scope},
+		ID:               domain.ProviderGoogleTasks,
+		AuthURL:          "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:         "https://oauth2.googleapis.com/token",
+		ClientCredential: true,
+		Scopes:           []string{"email", "openid", scope},
 		AuthParams: map[string]string{
 			"access_type": "offline",
 			"hl":          "en",
@@ -273,12 +276,11 @@ type browserOpener func(context.Context, string) error
 
 // Options supplies deterministic outer adapters for synthetic tests.
 type Options struct {
-	HTTP               *http.Client
-	Get                keyringGetter
-	Set                keyringSetter
-	Open               browserOpener
-	BeforeOpen         func(Provider)
-	GoogleClientSecret string
+	HTTP       *http.Client
+	Get        keyringGetter
+	Set        keyringSetter
+	Open       browserOpener
+	BeforeOpen func(Provider)
 	// LockDir permits deterministic tests. Production defaults to a private
 	// application-state directory and contains only hashed grant handles.
 	LockDir string
@@ -286,21 +288,16 @@ type Options struct {
 
 // Manager loads, refreshes, and explicitly creates account-scoped grants.
 type Manager struct {
-	http         *http.Client
-	get          keyringGetter
-	set          keyringSetter
-	open         browserOpener
-	beforeOpen   func(Provider)
-	googleSecret string
-	lockDir      string
+	http       *http.Client
+	get        keyringGetter
+	set        keyringSetter
+	open       browserOpener
+	beforeOpen func(Provider)
+	lockDir    string
 }
 
 // New creates a manager without touching the keyring or network.
 func New(options Options) (*Manager, error) {
-	if len(options.GoogleClientSecret) > maximumClientSecret ||
-		strings.ContainsAny(options.GoogleClientSecret, "\r\n\x00") {
-		return nil, errors.New("google OAuth desktop client credential is malformed")
-	}
 	client, err := secureHTTPClient(options.HTTP)
 	if err != nil {
 		return nil, err
@@ -330,9 +327,8 @@ func New(options Options) (*Manager, error) {
 	}
 	return &Manager{
 		http: client, get: get, set: set, open: open,
-		beforeOpen:   options.BeforeOpen,
-		googleSecret: options.GoogleClientSecret,
-		lockDir:      lockDir,
+		beforeOpen: options.BeforeOpen,
+		lockDir:    lockDir,
 	}, nil
 }
 
@@ -356,9 +352,9 @@ type Authorization interface {
 	GrantedScopes(context.Context) ([]string, error)
 }
 
-// ClientCredentialResolver returns a newly allocated confidential-client
-// credential only when an authorization-code exchange is required. The OAuth
-// manager owns and overwrites the returned bytes.
+// ClientCredentialResolver returns a newly allocated client credential only
+// for an authorization-code exchange or token refresh. The OAuth manager owns
+// and overwrites the returned bytes.
 type ClientCredentialResolver func(context.Context) ([]byte, error)
 
 type authorization struct {
@@ -459,11 +455,8 @@ func (manager *Manager) Authorize(
 	if provider.Confidential {
 		return nil, errors.New("confidential OAuth provider requires an external client credential")
 	}
-	if (provider.ID == domain.ProviderGoogle || provider.ID == domain.ProviderGoogleTasks) &&
-		manager.googleSecret == "" {
-		return nil, errors.New(
-			"google desktop OAuth requires CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET",
-		)
+	if provider.ClientCredential {
+		return nil, errors.New("OAuth provider requires an external client credential")
 	}
 	if route.Authorization.Backend != config.CredentialOSKeyring ||
 		!route.Authorization.Consent {
@@ -472,21 +465,46 @@ func (manager *Manager) Authorize(
 	grant, err := manager.load(route, provider)
 	if errors.Is(err, keyring.ErrNotFound) ||
 		errors.Is(err, errStoredGrantMismatch) {
-		grant, err = manager.authorize(
-			ctx, route, provider, manager.publicClientSecret(provider),
-		)
+		grant, err = manager.authorize(ctx, route, provider, "")
 	}
 	if err != nil {
 		return nil, err
 	}
-	return manager.authorization(ctx, route, provider, grant), nil
+	return manager.authorization(ctx, route, provider, grant, nil), nil
 }
 
-func (manager *Manager) publicClientSecret(provider Provider) string {
-	if provider.ID == domain.ProviderGoogle || provider.ID == domain.ProviderGoogleTasks {
-		return manager.googleSecret
+// AuthorizeWithClientCredential loads or creates a refreshable authorization
+// for a provider whose generated Desktop client requires an externally owned
+// credential. The resolver is invoked only for code exchange or refresh.
+func (manager *Manager) AuthorizeWithClientCredential(
+	ctx context.Context,
+	route config.OAuthClient,
+	provider Provider,
+	resolve ClientCredentialResolver,
+) (Authorization, error) {
+	if provider.Confidential || provider.DisableRefresh || !provider.ClientCredential {
+		return nil, errors.New("OAuth provider is not a supported refreshable credentialed client")
 	}
-	return ""
+	if route.Authorization.Backend != config.CredentialOSKeyring ||
+		!route.Authorization.Consent {
+		return nil, errors.New("OAuth authorization handle is not explicitly consented")
+	}
+	if resolve == nil {
+		return nil, errors.New("OAuth client credential resolver is unavailable")
+	}
+	grant, err := manager.load(route, provider)
+	if errors.Is(err, keyring.ErrNotFound) || errors.Is(err, errStoredGrantMismatch) {
+		clientSecret, resolveErr := resolveClientCredential(ctx, resolve)
+		defer overwrite(clientSecret)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		grant, err = manager.authorize(ctx, route, provider, string(clientSecret))
+	}
+	if err != nil {
+		return nil, err
+	}
+	return manager.authorization(ctx, route, provider, grant, resolve), nil
 }
 
 // AuthorizeConfidential loads an existing valid grant or starts a documented
@@ -510,20 +528,33 @@ func (manager *Manager) AuthorizeConfidential(
 		if resolve == nil {
 			return nil, errors.New("OAuth confidential client credential resolver is unavailable")
 		}
-		clientSecret, resolveErr := resolve(ctx)
+		clientSecret, resolveErr := resolveClientCredential(ctx, resolve)
 		defer overwrite(clientSecret)
 		if resolveErr != nil {
 			return nil, resolveErr
-		}
-		if !validClientCredential(clientSecret) {
-			return nil, errors.New("OAuth confidential client credential is malformed")
 		}
 		grant, err = manager.authorize(ctx, route, provider, string(clientSecret))
 	}
 	if err != nil {
 		return nil, err
 	}
-	return manager.authorization(ctx, route, provider, grant), nil
+	return manager.authorization(ctx, route, provider, grant, nil), nil
+}
+
+func resolveClientCredential(
+	ctx context.Context,
+	resolve ClientCredentialResolver,
+) ([]byte, error) {
+	clientSecret, err := resolve(ctx)
+	if err != nil {
+		overwrite(clientSecret)
+		return nil, err
+	}
+	if !validClientCredential(clientSecret) {
+		overwrite(clientSecret)
+		return nil, errors.New("OAuth client credential is malformed")
+	}
+	return clientSecret, nil
 }
 
 func validClientCredential(value []byte) bool {
@@ -549,6 +580,7 @@ func (manager *Manager) authorization(
 	route config.OAuthClient,
 	provider Provider,
 	grant storedGrant,
+	resolve ClientCredentialResolver,
 ) Authorization {
 	persistedProvider := provider
 	persistedProvider.Scopes = append([]string(nil), grant.Scopes...)
@@ -572,7 +604,7 @@ func (manager *Manager) authorization(
 	)
 	persisting := &persistingTokenSource{
 		ctx: baseContext, manager: manager, route: route,
-		provider: persistedProvider, observed: observed,
+		provider: persistedProvider, observed: observed, resolve: resolve,
 	}
 	reused := classifyingTokenSource{source: oauth2.ReuseTokenSource(&grant.Token, persisting)}
 	return &authorization{
@@ -692,8 +724,7 @@ func oauthConfig(
 			AuthStyle: authStyle,
 		},
 	}
-	if provider.Confidential || provider.ID == domain.ProviderGoogle ||
-		provider.ID == domain.ProviderGoogleTasks {
+	if provider.Confidential || provider.ClientCredential {
 		result.ClientSecret = clientSecret
 	}
 	return result
@@ -706,6 +737,7 @@ type persistingTokenSource struct {
 	route    config.OAuthClient
 	provider Provider
 	observed *observedScopeSet
+	resolve  ClientCredentialResolver
 }
 
 func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
@@ -730,11 +762,18 @@ func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
 	if latest.Token.Valid() {
 		return &latest.Token, nil
 	}
-	configuration := oauthConfig(
-		source.route,
-		source.provider,
-		source.manager.publicClientSecret(source.provider),
-	)
+	clientSecret := []byte(nil)
+	if source.provider.ClientCredential {
+		if source.resolve == nil {
+			return nil, errors.New("OAuth refresh requires an external client credential")
+		}
+		clientSecret, err = resolveClientCredential(source.ctx, source.resolve)
+		if err != nil {
+			return nil, err
+		}
+		defer overwrite(clientSecret)
+	}
+	configuration := oauthConfig(source.route, source.provider, string(clientSecret))
 	token, err := configuration.TokenSource(source.ctx, &latest.Token).Token()
 	if err != nil {
 		return nil, err

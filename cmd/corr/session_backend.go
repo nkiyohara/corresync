@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -78,6 +77,12 @@ type oauthClientManager interface {
 		oauthlocal.Provider,
 	) (oauthlocal.Authorization, error)
 	AuthorizeConfidential(
+		context.Context,
+		config.OAuthClient,
+		oauthlocal.Provider,
+		oauthlocal.ClientCredentialResolver,
+	) (oauthlocal.Authorization, error)
+	AuthorizeWithClientCredential(
 		context.Context,
 		config.OAuthClient,
 		oauthlocal.Provider,
@@ -474,7 +479,6 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		return nil, err
 	}
 	oauth, err := oauthlocal.New(oauthlocal.Options{
-		GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
 		BeforeOpen: func(provider oauthlocal.Provider) {
 			_, _ = fmt.Fprintf(
 				app.stderr,
@@ -1369,9 +1373,6 @@ func (backend *sessionBackend) terminalInteraction(
 	}
 	if hasGoogleWebRoute(configured) {
 		return nil, errUnsupportedLegacyGoogleRoute
-	}
-	if hasGoogleRoute(configured) && !rollout.GoogleOAuthApproved {
-		return nil, rollout.ErrGoogleOAuthPending
 	}
 	profileDirectory, err := paths.ProfileDir(input.Account)
 	if err != nil {
@@ -2786,11 +2787,6 @@ func (backend *sessionBackend) accountServices(
 			configuredServiceProvider(configured, service),
 		)
 	}
-	if (configuredServiceProvider(configured, service) == domain.ProviderGoogle ||
-		configuredServiceProvider(configured, service) == domain.ProviderGoogleTasks) &&
-		!rollout.GoogleOAuthApproved {
-		return sessionAccount{}, rollout.ErrGoogleOAuthPending
-	}
 	if account, active := backend.accounts[accountID]; active &&
 		account.serviceActive(service) {
 		lease := account.lease(service)
@@ -2980,9 +2976,6 @@ func (backend *sessionBackend) activateAccount(
 
 	if hasGoogleWebRoute(configured) {
 		return sessionAccount{}, errUnsupportedLegacyGoogleRoute
-	}
-	if hasGoogleRoute(configured) && !rollout.GoogleOAuthApproved {
-		return sessionAccount{}, rollout.ErrGoogleOAuthPending
 	}
 	taskDegradation, err := inactiveTaskRoute(configured)
 	if err != nil {
@@ -3860,8 +3853,9 @@ func (backend *sessionBackend) googleAccount(
 	ctx context.Context,
 	configured config.Account,
 	clientRoute config.OAuthClient,
+	clientCredential config.CredentialRef,
 	mailRoute *config.GoogleMailRoute,
-	calendarRoute *config.OAuthRoute,
+	calendarRoute *config.GoogleOAuthRoute,
 ) (sessionAccount, error) {
 	mailEnabled := mailRoute != nil
 	calendarEnabled := calendarRoute != nil
@@ -3874,14 +3868,20 @@ func (backend *sessionBackend) googleAccount(
 	}
 	manager := backend.oauth
 	if manager == nil {
-		manager, err = oauthlocal.New(oauthlocal.Options{
-			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
-		})
+		manager, err = oauthlocal.New(oauthlocal.Options{})
 		if err != nil {
 			return sessionAccount{}, err
 		}
 	}
-	authorization, err := manager.Authorize(ctx, clientRoute, provider)
+	authorization, err := manager.AuthorizeWithClientCredential(
+		ctx,
+		clientRoute,
+		provider,
+		backend.oauthClientCredentialResolver(
+			clientCredential,
+			"Google Desktop OAuth client credential",
+		),
+	)
 	if err != nil {
 		return sessionAccount{}, err
 	}
@@ -3994,6 +3994,20 @@ func (backend *sessionBackend) googleAccount(
 	return leasedSessionAccount(result), nil
 }
 
+func (backend *sessionBackend) oauthClientCredentialResolver(
+	reference config.CredentialRef,
+	label string,
+) oauthlocal.ClientCredentialResolver {
+	return func(ctx context.Context) ([]byte, error) {
+		secret, err := backend.credentials.Resolve(ctx, reference)
+		if err != nil {
+			return nil, fmt.Errorf("resolve %s: %w", label, err)
+		}
+		defer func() { _ = secret.Close() }()
+		return secret.CopyBytes(), nil
+	}
+}
+
 func (backend *sessionBackend) graphAPIAccount(
 	ctx context.Context,
 	configured config.Account,
@@ -4016,9 +4030,7 @@ func (backend *sessionBackend) graphAPIAccount(
 	}
 	manager := backend.oauth
 	if manager == nil {
-		manager, err = oauthlocal.New(oauthlocal.Options{
-			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
-		})
+		manager, err = oauthlocal.New(oauthlocal.Options{})
 		if err != nil {
 			return sessionAccount{}, err
 		}
@@ -4221,9 +4233,7 @@ func (backend *sessionBackend) todoistAccount(
 	}
 	manager := backend.oauth
 	if manager == nil {
-		manager, err = oauthlocal.New(oauthlocal.Options{
-			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
-		})
+		manager, err = oauthlocal.New(oauthlocal.Options{})
 		if err != nil {
 			return sessionAccount{}, err
 		}
@@ -4282,14 +4292,20 @@ func (backend *sessionBackend) googleTaskAccount(
 	}
 	manager := backend.oauth
 	if manager == nil {
-		manager, err = oauthlocal.New(oauthlocal.Options{
-			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
-		})
+		manager, err = oauthlocal.New(oauthlocal.Options{})
 		if err != nil {
 			return sessionAccount{}, err
 		}
 	}
-	authorization, err := manager.Authorize(ctx, selected.OAuth.Client(), provider)
+	authorization, err := manager.AuthorizeWithClientCredential(
+		ctx,
+		selected.OAuth.Client(),
+		provider,
+		backend.oauthClientCredentialResolver(
+			selected.OAuth.ClientSecret,
+			"Google Desktop OAuth client credential",
+		),
+	)
 	if err != nil {
 		return sessionAccount{}, err
 	}
@@ -4347,23 +4363,17 @@ func (backend *sessionBackend) tickTickAccount(
 	}
 	manager := backend.oauth
 	if manager == nil {
-		manager, err = oauthlocal.New(oauthlocal.Options{
-			GoogleClientSecret: os.Getenv("CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET"),
-		})
+		manager, err = oauthlocal.New(oauthlocal.Options{})
 		if err != nil {
 			return sessionAccount{}, err
 		}
 	}
 	authorization, err := manager.AuthorizeConfidential(
 		ctx, selected.OAuth.Client(), provider,
-		func(ctx context.Context) ([]byte, error) {
-			secret, err := backend.credentials.Resolve(ctx, selected.OAuth.ClientSecret)
-			if err != nil {
-				return nil, fmt.Errorf("resolve TickTick OAuth client credential: %w", err)
-			}
-			defer func() { _ = secret.Close() }()
-			return secret.CopyBytes(), nil
-		},
+		backend.oauthClientCredentialResolver(
+			selected.OAuth.ClientSecret,
+			"TickTick OAuth client credential",
+		),
 	)
 	if err != nil {
 		return sessionAccount{}, err
@@ -4479,7 +4489,7 @@ func (backend *sessionBackend) nonOutlookAccount(
 		configured.Mail.Provider == domain.ProviderGoogle {
 		googleMail = configured.Mail.Google
 	}
-	var googleCalendar *config.OAuthRoute
+	var googleCalendar *config.GoogleOAuthRoute
 	if configured.Calendar != nil &&
 		configured.Calendar.Provider == domain.ProviderGoogle {
 		googleCalendar = configured.Calendar.Google
@@ -4487,12 +4497,14 @@ func (backend *sessionBackend) nonOutlookAccount(
 	if googleMail != nil || googleCalendar != nil {
 		sharedGoogle := googleMail != nil &&
 			googleCalendar != nil &&
-			oauthClientsEqual(googleMail.Client(), googleCalendar.Client())
+			oauthClientsEqual(googleMail.Client(), googleCalendar.Client()) &&
+			googleMail.ClientSecret == googleCalendar.ClientSecret
 		if sharedGoogle {
 			google, err := backend.googleAccount(
 				ctx,
 				configured,
 				googleMail.Client(),
+				googleMail.ClientSecret,
 				googleMail,
 				googleCalendar,
 			)
@@ -4506,6 +4518,7 @@ func (backend *sessionBackend) nonOutlookAccount(
 					ctx,
 					configured,
 					googleMail.Client(),
+					googleMail.ClientSecret,
 					googleMail,
 					nil,
 				)
@@ -4519,6 +4532,7 @@ func (backend *sessionBackend) nonOutlookAccount(
 					ctx,
 					configured,
 					googleCalendar.Client(),
+					googleCalendar.ClientSecret,
 					nil,
 					googleCalendar,
 				)
@@ -4704,13 +4718,6 @@ func hasGoogleWebRoute(account config.Account) bool {
 		account.Mail.Provider == domain.ProviderGoogleWeb ||
 		account.Calendar != nil &&
 			account.Calendar.Provider == domain.ProviderGoogleWeb
-}
-
-func hasGoogleRoute(account config.Account) bool {
-	return account.Mail != nil &&
-		account.Mail.Provider == domain.ProviderGoogle ||
-		account.Calendar != nil &&
-			account.Calendar.Provider == domain.ProviderGoogle
 }
 
 func hasBrowserRoute(account config.Account) bool {

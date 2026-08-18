@@ -286,14 +286,14 @@ func (app *runtime) accountServices() (
 		domain.ProviderCalDAV,
 		domain.ProviderMicrosoftGraph,
 	}
-	if rollout.GoogleOAuthApproved {
+	if rollout.GoogleBYOOAuthEnabled {
 		available = append(available, domain.ProviderGoogle)
 	}
 	taskAvailable := []domain.ProviderID{
 		domain.ProviderMicrosoftGraph, domain.ProviderTodoist,
 		domain.ProviderCalDAV, domain.ProviderTickTick,
 	}
-	if rollout.GoogleOAuthApproved {
+	if rollout.GoogleBYOOAuthEnabled {
 		taskAvailable = append(taskAvailable, domain.ProviderGoogleTasks)
 	}
 	var messagingAvailable []domain.MessagingRouteKind
