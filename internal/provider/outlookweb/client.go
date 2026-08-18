@@ -149,6 +149,9 @@ func (client *Client) Call(ctx context.Context, action Action, requestBody, resp
 	for attempt := 1; attempt <= attempts; attempt++ {
 		response, callErr := client.callOnce(ctx, action, payload)
 		if callErr != nil {
+			if _, authenticationFailure := application.ProviderAuthenticationReason(callErr); authenticationFailure {
+				return callErr
+			}
 			if attempt < attempts && ctx.Err() == nil {
 				if sleepErr := client.sleep(ctx, retryDelay(attempt, nil)); sleepErr != nil {
 					return sleepErr
@@ -218,7 +221,10 @@ func (client *Client) callOnce(ctx context.Context, action Action, payload []byt
 	request.Header.Set("client-request-id", requestID)
 	request.Header.Set("return-client-request-id", "true")
 	if err := client.authorizer.Apply(request); err != nil {
-		return nil, fmt.Errorf("authorize OWA request: %w", err)
+		return nil, application.NewProviderAuthenticationFailure(
+			application.AuthenticationReasonInteractionRequired,
+			errors.New("outlook web browser authorization is unavailable"),
+		)
 	}
 	if client.mailbox != "" {
 		request.Header.Set("X-AnchorMailbox", client.mailbox)

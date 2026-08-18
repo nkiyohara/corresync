@@ -6,14 +6,14 @@
     <title>Email, calendar, and task providers — Corresync</title>
     <meta
       name="description"
-      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
+      content="Compare Corresync support for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV, including user-owned OAuth setup."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Email, calendar, and task providers — Corresync">
     <meta
       property="og:description"
-      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
+      content="Compare Corresync support for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV, including user-owned OAuth setup."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -34,7 +34,7 @@
     <meta name="twitter:title" content="Email, calendar, and task providers — Corresync">
     <meta
       name="twitter:description"
-      content="Compare Corresync support for Outlook, Microsoft 365, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV. Gmail, Google Calendar, and Google Tasks are coming soon."
+      content="Compare Corresync support for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV, including user-owned OAuth setup."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -163,8 +163,8 @@
           <strong>v0.8 evidence: deterministic and route-specific.</strong>
           <p>
             All available and staged routes below have synthetic provider-contract and application
-            coverage. The staged Google API routes are disabled and live-unobserved; an older
-            observation covers only the retired Gmail IMAP/SMTP transport.
+            coverage. The user-owned Google API routes are live-unobserved; an older observation
+            covers only the retired Gmail IMAP/SMTP transport.
           </p>
         </div>
         <a href="features.html#evidence">How evidence works<span aria-hidden="true"> →</span></a>
@@ -303,12 +303,14 @@
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google routes</p>
-          <h2 id="google-title">Gmail, Google Calendar, and Google Tasks are coming soon.</h2>
+          <h2 id="google-title">
+            Gmail, Calendar, and Tasks work with your own Google OAuth client.
+          </h2>
           <p>
-            The integrations are included in RC builds and covered by synthetic contracts.
-            Production OAuth stays disabled until Google approves it, so no Google sign-in, scope
-            request, keyring access, or API traffic starts. Outlook, Microsoft 365, Todoist,
-            TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV routes remain available now.
+            Create a Desktop OAuth client in a Google Cloud project you control, then import its
+            JSON during guided setup. Corresync-managed OAuth stays dormant; your own client opens
+            the normal Google browser flow. The route is synthetic-contract covered and
+            live-unobserved.
           </p>
         </div>
         <div class="route-grid two">
@@ -316,8 +318,8 @@
             <header>
               <span class="route-icon" aria-hidden="true">GA</span>
               <div>
-                <p class="chip">Approval pending · disabled</p>
-                <h3>Corresync Google route</h3>
+                <p class="chip">Available with setup · user-owned OAuth</p>
+                <h3>Google API route</h3>
               </div>
             </header>
             <dl>
@@ -339,14 +341,15 @@
               <div>
                 <dt>Sign-in</dt>
                 <dd>
-                  Not active in this RC; after approval, normal-browser OAuth with an account-scoped
-                  grant in the OS keyring
+                  Your Desktop OAuth client; its credential and the account-scoped grant stay in
+                  separate OS-keyring entries
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              When a separate reviewed release enables the route after approval, the normal browser
-              will own OAuth and Gmail, Calendar, Meet, and Tasks will use pinned Google APIs.
+              The normal browser owns OAuth. Gmail, Calendar, Meet, and Tasks use pinned Google
+              APIs.
+              <a href="google-oauth.html">See every Google Cloud screen and setup step</a>.
             </p>
           </article>
           <article class="route-card">
@@ -509,7 +512,7 @@
           <h2 id="mix-title">Mail and calendar do not have to come from the same protocol.</h2>
           <p>
             Pair IMAP/SMTP with CalDAV or configure a mail-only or calendar-only account today. The
-            unified Google route joins these choices after approval. Stable account identity keeps
+            unified Google route uses your Desktop OAuth client. Stable account identity keeps
             profiles, credentials, cursors, previews, and audit context isolated.
           </p>
         </div>
@@ -543,7 +546,7 @@
         <ul>
           <li>Provider limitations are returned as typed capabilities or degradations.</li>
           <li>
-            Pending Google routes stop before browser, OAuth, keyring, session, and network access.
+            Automatic discovery never starts Google OAuth; only explicit local login may open it.
           </li>
           <li>Graph authorization never starts from automatic discovery.</li>
           <li>

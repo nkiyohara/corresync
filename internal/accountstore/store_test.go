@@ -86,6 +86,61 @@ func TestListAccountsExposesConfiguredTaskRouteAsUnavailable(t *testing.T) {
 	}
 }
 
+func TestStoreRoundTripsMessagingRouteWithoutCredentialHandleDisclosure(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.Default()
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	store := Store{ConfigPath: path}
+	registration := application.AccountRegistration{
+		ID: "acc_00000000000000000000000000000145", Alias: "slack",
+		Address: "reader@example.invalid", IsDefault: true,
+		Messages: &application.AccountMessagingRouteInput{
+			Provider: domain.MessagingProviderSlack,
+			Slack: &application.AccountSlackMessagingInput{
+				APIBase: "https://slack.com/api", WorkspaceID: "workspace-synthetic-1",
+				Authorization: application.AccountCredentialInput{
+					Backend: "os-keyring", Key: "private-slack-handle", Consent: true,
+				},
+				ReadOnly: true,
+			},
+		},
+	}
+	if err := store.AddAccount(t.Context(), registration); err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := store.ListAccounts(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(catalog.Accounts) != 1 || catalog.Accounts[0].Messages == nil ||
+		catalog.Accounts[0].Messages.Provider != domain.MessagingProviderSlack ||
+		catalog.Accounts[0].Messages.Route != domain.MessagingRouteSlackAPI ||
+		catalog.Accounts[0].Messages.WorkspaceID != "workspace-synthetic-1" ||
+		catalog.Accounts[0].Messages.Credential == nil ||
+		catalog.Accounts[0].Messages.Credential.Backend != "os-keyring" {
+		t.Fatalf("messaging account view = %+v", catalog)
+	}
+	encoded, err := json.Marshal(catalog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "private-slack-handle") {
+		t.Fatalf("account catalog exposed a messaging credential handle: %s", encoded)
+	}
+	reloaded, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.Accounts["slack"].Messages == nil ||
+		reloaded.Accounts["slack"].Messages.Slack.Authorization.Key != "private-slack-handle" {
+		t.Fatalf("persisted messaging route = %+v", reloaded.Accounts["slack"].Messages)
+	}
+}
+
 func TestRemoveAccountPinsReplacementDefaultByStableID(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.toml")
@@ -211,10 +266,16 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 		result.APIBase = "https://graph.microsoft.com/v1.0"
 		return result
 	}
-	googleTaskRoute := func(key string) *config.OAuthRoute {
-		result := route(key)
-		result.APIBase = "https://tasks.googleapis.com"
-		return result
+	googleTaskRoute := func(key string) *config.GoogleOAuthRoute {
+		base := route(key)
+		return &config.GoogleOAuthRoute{
+			APIBase: "https://tasks.googleapis.com", ClientID: base.ClientID,
+			RedirectURI: base.RedirectURI, Authorization: base.Authorization,
+			ClientSecret: config.CredentialRef{
+				Backend: config.CredentialOSKeyring,
+				Key:     key + "-client", Consent: true,
+			},
+		}
 	}
 	const targetID domain.AccountID = "acc_00000000000000000000000000000002"
 	configuration.Accounts["target"] = config.Account{
@@ -226,6 +287,10 @@ func TestPurgeAccountStateDeletesOnlyUnsharedOAuthAuthorizations(t *testing.T) {
 				ClientID:      route("target-only").ClientID,
 				RedirectURI:   route("target-only").RedirectURI,
 				Authorization: route("target-only").Authorization,
+				ClientSecret: config.CredentialRef{
+					Backend: config.CredentialOSKeyring,
+					Key:     "target-client", Consent: true,
+				},
 			},
 		},
 		Calendar: &config.CalendarRoute{

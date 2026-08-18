@@ -35,6 +35,8 @@ const (
 	keyringService        = "corresync/oauth"
 	maximumGrantBytes     = 64 << 10
 	maximumClientSecret   = 4 << 10
+	maximumObservedScopes = 128
+	maximumScopeBytes     = 512
 	authorizationTimeout  = 5 * time.Minute
 	defaultRequestTimeout = 30 * time.Second
 	refreshLockTimeout    = 30 * time.Second
@@ -57,10 +59,11 @@ type Provider struct {
 	// exchange. ExchangeScope is set when that endpoint explicitly requires the
 	// reviewed scope. DisablePKCE and DisableRefresh are set only when the
 	// provider's primary contract does not document those mechanisms.
-	Confidential   bool
-	ExchangeScope  bool
-	DisablePKCE    bool
-	DisableRefresh bool
+	Confidential     bool
+	ClientCredential bool
+	ExchangeScope    bool
+	DisablePKCE      bool
+	DisableRefresh   bool
 }
 
 // Services is the exact service set selected for one public-client grant.
@@ -70,6 +73,8 @@ type Services struct {
 	Calendar       bool
 	Tasks          bool
 	TaskWrite      bool
+	Messages       bool
+	MessageWrite   bool
 	MicrosoftCloud microsoftcloud.ID
 }
 
@@ -82,23 +87,28 @@ func ProviderFor(
 	if services.TaskWrite && !services.Tasks {
 		return Provider{}, errors.New("task write scope requires the task service")
 	}
+	if services.MessageWrite && !services.Messages {
+		return Provider{}, errors.New("messaging write scope requires the messaging service")
+	}
 	var result Provider
 	switch provider {
 	case domain.ProviderGoogle:
-		if services.Tasks || services.TaskWrite || services.MicrosoftCloud != "" {
+		if services.Tasks || services.TaskWrite || services.Messages || services.MessageWrite ||
+			services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("google OAuth profile has invalid service options")
 		}
-		if !rollout.GoogleOAuthApproved {
-			return Provider{}, rollout.ErrGoogleOAuthPending
+		if !rollout.GoogleBYOOAuthEnabled {
+			return Provider{}, rollout.ErrGoogleBYOOAuthUnavailable
 		}
 		result = googleProviderProfile(services.Mail, services.Calendar)
 	case domain.ProviderGoogleTasks:
-		if services.Mail || services.Calendar || !services.Tasks ||
+		if services.Mail || services.Calendar || services.Messages ||
+			services.MessageWrite || !services.Tasks ||
 			services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("google Tasks OAuth profile has invalid service options")
 		}
-		if !rollout.GoogleOAuthApproved {
-			return Provider{}, rollout.ErrGoogleOAuthPending
+		if !rollout.GoogleBYOOAuthEnabled {
+			return Provider{}, rollout.ErrGoogleBYOOAuthUnavailable
 		}
 		result = googleTaskProviderProfile(services.TaskWrite)
 	case domain.ProviderMicrosoftGraph:
@@ -131,8 +141,28 @@ func ProviderFor(
 			}
 			result.Scopes = append(result.Scopes, scope)
 		}
+		if services.Messages {
+			result.Scopes = append(result.Scopes,
+				"Channel.ReadBasic.All",
+				"ChannelMessage.Read.All",
+				"Team.ReadBasic.All",
+			)
+			chatReadScope := "Chat.Read"
+			if services.MessageWrite {
+				chatReadScope = "Chat.ReadWrite"
+				result.Scopes = append(result.Scopes,
+					"ChannelMember.ReadWrite.All",
+					"ChannelMessage.ReadWrite",
+					"ChannelMessage.Send",
+					"ChatMember.ReadWrite",
+					"ChatMessage.Send",
+				)
+			}
+			result.Scopes = append(result.Scopes, chatReadScope)
+		}
 	case domain.ProviderTodoist:
-		if services.Mail || services.Calendar || services.MicrosoftCloud != "" {
+		if services.Mail || services.Calendar || services.Messages ||
+			services.MessageWrite || services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("todoist OAuth profile has invalid service options")
 		}
 		scope := "data:read"
@@ -150,7 +180,8 @@ func ProviderFor(
 			result.Scopes = append(result.Scopes, "data:delete")
 		}
 	case domain.ProviderTickTick:
-		if services.Mail || services.Calendar || !services.Tasks ||
+		if services.Mail || services.Calendar || services.Messages ||
+			services.MessageWrite || !services.Tasks ||
 			services.MicrosoftCloud != "" {
 			return Provider{}, errors.New("ticktick OAuth profile has invalid service options")
 		}
@@ -181,8 +212,8 @@ func ProviderFor(
 	default:
 		return Provider{}, fmt.Errorf("unknown OAuth provider %q", provider)
 	}
-	if !services.Mail && !services.Calendar && !services.Tasks {
-		return Provider{}, errors.New("OAuth profile requires a mail, calendar, or task service")
+	if !services.Mail && !services.Calendar && !services.Tasks && !services.Messages {
+		return Provider{}, errors.New("OAuth profile requires a mail, calendar, task, or messaging service")
 	}
 	slices.Sort(result.Scopes)
 	result.Scopes = slices.Compact(result.Scopes)
@@ -192,9 +223,10 @@ func ProviderFor(
 func googleProviderProfile(mailEnabled, calendarEnabled bool) Provider {
 	// #nosec G101 -- these are public OAuth endpoint and scope URLs, not credentials.
 	result := Provider{
-		ID:       domain.ProviderGoogle,
-		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL: "https://oauth2.googleapis.com/token",
+		ID:               domain.ProviderGoogle,
+		AuthURL:          "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:         "https://oauth2.googleapis.com/token",
+		ClientCredential: true,
 		AuthParams: map[string]string{
 			"access_type": "offline",
 			"hl":          "en",
@@ -225,10 +257,11 @@ func googleTaskProviderProfile(write bool) Provider {
 		scope = "https://www.googleapis.com/auth/tasks"
 	}
 	return Provider{ // #nosec G101 -- fixed public OAuth endpoints and scope URLs, not credentials.
-		ID:       domain.ProviderGoogleTasks,
-		AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL: "https://oauth2.googleapis.com/token",
-		Scopes:   []string{"email", "openid", scope},
+		ID:               domain.ProviderGoogleTasks,
+		AuthURL:          "https://accounts.google.com/o/oauth2/v2/auth",
+		TokenURL:         "https://oauth2.googleapis.com/token",
+		ClientCredential: true,
+		Scopes:           []string{"email", "openid", scope},
 		AuthParams: map[string]string{
 			"access_type": "offline",
 			"hl":          "en",
@@ -243,12 +276,11 @@ type browserOpener func(context.Context, string) error
 
 // Options supplies deterministic outer adapters for synthetic tests.
 type Options struct {
-	HTTP               *http.Client
-	Get                keyringGetter
-	Set                keyringSetter
-	Open               browserOpener
-	BeforeOpen         func(Provider)
-	GoogleClientSecret string
+	HTTP       *http.Client
+	Get        keyringGetter
+	Set        keyringSetter
+	Open       browserOpener
+	BeforeOpen func(Provider)
 	// LockDir permits deterministic tests. Production defaults to a private
 	// application-state directory and contains only hashed grant handles.
 	LockDir string
@@ -256,21 +288,16 @@ type Options struct {
 
 // Manager loads, refreshes, and explicitly creates account-scoped grants.
 type Manager struct {
-	http         *http.Client
-	get          keyringGetter
-	set          keyringSetter
-	open         browserOpener
-	beforeOpen   func(Provider)
-	googleSecret string
-	lockDir      string
+	http       *http.Client
+	get        keyringGetter
+	set        keyringSetter
+	open       browserOpener
+	beforeOpen func(Provider)
+	lockDir    string
 }
 
 // New creates a manager without touching the keyring or network.
 func New(options Options) (*Manager, error) {
-	if len(options.GoogleClientSecret) > maximumClientSecret ||
-		strings.ContainsAny(options.GoogleClientSecret, "\r\n\x00") {
-		return nil, errors.New("google OAuth desktop client credential is malformed")
-	}
 	client, err := secureHTTPClient(options.HTTP)
 	if err != nil {
 		return nil, err
@@ -300,36 +327,61 @@ func New(options Options) (*Manager, error) {
 	}
 	return &Manager{
 		http: client, get: get, set: set, open: open,
-		beforeOpen:   options.BeforeOpen,
-		googleSecret: options.GoogleClientSecret,
-		lockDir:      lockDir,
+		beforeOpen: options.BeforeOpen,
+		lockDir:    lockDir,
 	}, nil
 }
 
 type storedGrant struct {
-	Version     int               `json:"version"`
-	Provider    domain.ProviderID `json:"provider"`
-	ClientID    string            `json:"clientId"`
-	RedirectURI string            `json:"redirectUri"`
-	Scopes      []string          `json:"scopes"`
-	Token       oauth2.Token      `json:"token"`
+	Version        int               `json:"version"`
+	Provider       domain.ProviderID `json:"provider"`
+	ClientID       string            `json:"clientId"`
+	RedirectURI    string            `json:"redirectUri"`
+	Scopes         []string          `json:"scopes"`
+	ObservedScopes []string          `json:"observedScopes,omitempty"`
+	Token          oauth2.Token      `json:"token"`
 }
 
 // Authorization is one account-scoped, refreshable grant projection. The
 // refresh token remains encapsulated in the manager-owned token source.
+// GrantedScopes returns only scope metadata observed in a token response; it
+// never substitutes the scopes Corresync requested.
 type Authorization interface {
 	HTTPClient() *http.Client
 	AccessToken(context.Context) ([]byte, error)
+	GrantedScopes(context.Context) ([]string, error)
 }
 
-// ClientCredentialResolver returns a newly allocated confidential-client
-// credential only when an authorization-code exchange is required. The OAuth
-// manager owns and overwrites the returned bytes.
+// ClientCredentialResolver returns a newly allocated client credential only
+// for an authorization-code exchange or token refresh. The OAuth manager owns
+// and overwrites the returned bytes.
 type ClientCredentialResolver func(context.Context) ([]byte, error)
 
 type authorization struct {
-	http   *http.Client
-	source oauth2.TokenSource
+	http     *http.Client
+	source   oauth2.TokenSource
+	observed *observedScopeSet
+}
+
+type observedScopeSet struct {
+	mu     sync.RWMutex
+	values []string
+}
+
+func newObservedScopeSet(values []string) *observedScopeSet {
+	return &observedScopeSet{values: append([]string(nil), values...)}
+}
+
+func (set *observedScopeSet) get() []string {
+	set.mu.RLock()
+	defer set.mu.RUnlock()
+	return append([]string(nil), set.values...)
+}
+
+func (set *observedScopeSet) replace(values []string) {
+	set.mu.Lock()
+	defer set.mu.Unlock()
+	set.values = append(set.values[:0], values...)
 }
 
 type classifyingTokenSource struct {
@@ -379,6 +431,20 @@ func (authorization *authorization) AccessToken(ctx context.Context) ([]byte, er
 	return []byte(token.AccessToken), nil
 }
 
+func (authorization *authorization) GrantedScopes(
+	ctx context.Context,
+) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	// Resolve the reusable source first so an expired token cannot leave the
+	// caller with scope evidence from before a refresh or scope reduction.
+	if _, err := authorization.source.Token(); err != nil {
+		return nil, err
+	}
+	return authorization.observed.get(), nil
+}
+
 // Authorize loads an existing valid grant or starts explicit PKCE
 // authorization. Callers must invoke it only from the local CLI login boundary.
 func (manager *Manager) Authorize(
@@ -389,11 +455,8 @@ func (manager *Manager) Authorize(
 	if provider.Confidential {
 		return nil, errors.New("confidential OAuth provider requires an external client credential")
 	}
-	if (provider.ID == domain.ProviderGoogle || provider.ID == domain.ProviderGoogleTasks) &&
-		manager.googleSecret == "" {
-		return nil, errors.New(
-			"google desktop OAuth requires CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET",
-		)
+	if provider.ClientCredential {
+		return nil, errors.New("OAuth provider requires an external client credential")
 	}
 	if route.Authorization.Backend != config.CredentialOSKeyring ||
 		!route.Authorization.Consent {
@@ -402,21 +465,46 @@ func (manager *Manager) Authorize(
 	grant, err := manager.load(route, provider)
 	if errors.Is(err, keyring.ErrNotFound) ||
 		errors.Is(err, errStoredGrantMismatch) {
-		grant, err = manager.authorize(
-			ctx, route, provider, manager.publicClientSecret(provider),
-		)
+		grant, err = manager.authorize(ctx, route, provider, "")
 	}
 	if err != nil {
 		return nil, err
 	}
-	return manager.authorization(ctx, route, provider, grant), nil
+	return manager.authorization(ctx, route, provider, grant, nil), nil
 }
 
-func (manager *Manager) publicClientSecret(provider Provider) string {
-	if provider.ID == domain.ProviderGoogle || provider.ID == domain.ProviderGoogleTasks {
-		return manager.googleSecret
+// AuthorizeWithClientCredential loads or creates a refreshable authorization
+// for a provider whose generated Desktop client requires an externally owned
+// credential. The resolver is invoked only for code exchange or refresh.
+func (manager *Manager) AuthorizeWithClientCredential(
+	ctx context.Context,
+	route config.OAuthClient,
+	provider Provider,
+	resolve ClientCredentialResolver,
+) (Authorization, error) {
+	if provider.Confidential || provider.DisableRefresh || !provider.ClientCredential {
+		return nil, errors.New("OAuth provider is not a supported refreshable credentialed client")
 	}
-	return ""
+	if route.Authorization.Backend != config.CredentialOSKeyring ||
+		!route.Authorization.Consent {
+		return nil, errors.New("OAuth authorization handle is not explicitly consented")
+	}
+	if resolve == nil {
+		return nil, errors.New("OAuth client credential resolver is unavailable")
+	}
+	grant, err := manager.load(route, provider)
+	if errors.Is(err, keyring.ErrNotFound) || errors.Is(err, errStoredGrantMismatch) {
+		clientSecret, resolveErr := resolveClientCredential(ctx, resolve)
+		defer overwrite(clientSecret)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		grant, err = manager.authorize(ctx, route, provider, string(clientSecret))
+	}
+	if err != nil {
+		return nil, err
+	}
+	return manager.authorization(ctx, route, provider, grant, resolve), nil
 }
 
 // AuthorizeConfidential loads an existing valid grant or starts a documented
@@ -440,20 +528,33 @@ func (manager *Manager) AuthorizeConfidential(
 		if resolve == nil {
 			return nil, errors.New("OAuth confidential client credential resolver is unavailable")
 		}
-		clientSecret, resolveErr := resolve(ctx)
+		clientSecret, resolveErr := resolveClientCredential(ctx, resolve)
 		defer overwrite(clientSecret)
 		if resolveErr != nil {
 			return nil, resolveErr
-		}
-		if !validClientCredential(clientSecret) {
-			return nil, errors.New("OAuth confidential client credential is malformed")
 		}
 		grant, err = manager.authorize(ctx, route, provider, string(clientSecret))
 	}
 	if err != nil {
 		return nil, err
 	}
-	return manager.authorization(ctx, route, provider, grant), nil
+	return manager.authorization(ctx, route, provider, grant, nil), nil
+}
+
+func resolveClientCredential(
+	ctx context.Context,
+	resolve ClientCredentialResolver,
+) ([]byte, error) {
+	clientSecret, err := resolve(ctx)
+	if err != nil {
+		overwrite(clientSecret)
+		return nil, err
+	}
+	if !validClientCredential(clientSecret) {
+		overwrite(clientSecret)
+		return nil, errors.New("OAuth client credential is malformed")
+	}
+	return clientSecret, nil
 }
 
 func validClientCredential(value []byte) bool {
@@ -479,9 +580,11 @@ func (manager *Manager) authorization(
 	route config.OAuthClient,
 	provider Provider,
 	grant storedGrant,
+	resolve ClientCredentialResolver,
 ) Authorization {
 	persistedProvider := provider
 	persistedProvider.Scopes = append([]string(nil), grant.Scopes...)
+	observed := newObservedScopeSet(grant.ObservedScopes)
 	if provider.DisableRefresh {
 		source := classifyingTokenSource{source: nonRefreshingTokenSource{token: grant.Token}}
 		baseContext := context.WithValue(
@@ -489,6 +592,7 @@ func (manager *Manager) authorization(
 		)
 		return &authorization{
 			http: oauth2.NewClient(baseContext, source), source: source,
+			observed: observed,
 		}
 	}
 	// Refreshable authorization obeys the interactive login context above. The
@@ -500,11 +604,12 @@ func (manager *Manager) authorization(
 	)
 	persisting := &persistingTokenSource{
 		ctx: baseContext, manager: manager, route: route,
-		provider: persistedProvider,
+		provider: persistedProvider, observed: observed, resolve: resolve,
 	}
 	reused := classifyingTokenSource{source: oauth2.ReuseTokenSource(&grant.Token, persisting)}
 	return &authorization{
 		http: oauth2.NewClient(baseContext, reused), source: reused,
+		observed: observed,
 	}
 }
 
@@ -578,6 +683,14 @@ func (manager *Manager) load(
 			errStoredGrantMismatch,
 		)
 	}
+	observedScopes, err := normalizeObservedScopes(grant.ObservedScopes)
+	if err != nil {
+		return storedGrant{}, fmt.Errorf(
+			"%w: stored OAuth scope evidence is malformed",
+			errStoredGrantMismatch,
+		)
+	}
+	grant.ObservedScopes = observedScopes
 	return grant, nil
 }
 
@@ -611,8 +724,7 @@ func oauthConfig(
 			AuthStyle: authStyle,
 		},
 	}
-	if provider.Confidential || provider.ID == domain.ProviderGoogle ||
-		provider.ID == domain.ProviderGoogleTasks {
+	if provider.Confidential || provider.ClientCredential {
 		result.ClientSecret = clientSecret
 	}
 	return result
@@ -624,6 +736,8 @@ type persistingTokenSource struct {
 	manager  *Manager
 	route    config.OAuthClient
 	provider Provider
+	observed *observedScopeSet
+	resolve  ClientCredentialResolver
 }
 
 func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
@@ -644,21 +758,49 @@ func (source *persistingTokenSource) Token() (*oauth2.Token, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reload OAuth grant before refresh: %w", err)
 	}
+	source.observed.replace(latest.ObservedScopes)
 	if latest.Token.Valid() {
 		return &latest.Token, nil
 	}
-	configuration := oauthConfig(
-		source.route,
-		source.provider,
-		source.manager.publicClientSecret(source.provider),
-	)
+	clientSecret := []byte(nil)
+	if source.provider.ClientCredential {
+		if source.resolve == nil {
+			return nil, errors.New("OAuth refresh requires an external client credential")
+		}
+		clientSecret, err = resolveClientCredential(source.ctx, source.resolve)
+		if err != nil {
+			return nil, err
+		}
+		defer overwrite(clientSecret)
+	}
+	configuration := oauthConfig(source.route, source.provider, string(clientSecret))
 	token, err := configuration.TokenSource(source.ctx, &latest.Token).Token()
 	if err != nil {
 		return nil, err
 	}
-	if err := source.manager.save(source.route, source.provider, *token); err != nil {
+	observedScopes := latest.ObservedScopes
+	refreshedScopes, present, err := tokenObservedScopes(
+		token,
+		source.provider.ScopeSeparator,
+	)
+	if err != nil {
+		// Preserve a rotated token while discarding malformed authority
+		// evidence. Capability-aware adapters will fail closed on the empty set.
+		observedScopes = nil
+		present = true
+	}
+	if present {
+		observedScopes = refreshedScopes
+	}
+	if err := source.manager.save(
+		source.route,
+		source.provider,
+		*token,
+		observedScopes,
+	); err != nil {
 		return nil, fmt.Errorf("persist refreshed OAuth grant: %w", err)
 	}
+	source.observed.replace(observedScopes)
 	return token, nil
 }
 
@@ -673,15 +815,21 @@ func (manager *Manager) save(
 	route config.OAuthClient,
 	provider Provider,
 	token oauth2.Token,
+	observedScopes []string,
 ) error {
 	if provider.DisableRefresh {
 		token.RefreshToken = ""
 	}
+	normalizedScopes, err := normalizeObservedScopes(observedScopes)
+	if err != nil {
+		return err
+	}
 	grant := storedGrant{
 		Version: 1, Provider: provider.ID, ClientID: route.ClientID,
-		RedirectURI: route.RedirectURI,
-		Scopes:      append([]string(nil), provider.Scopes...),
-		Token:       token,
+		RedirectURI:    route.RedirectURI,
+		Scopes:         append([]string(nil), provider.Scopes...),
+		ObservedScopes: normalizedScopes,
+		Token:          token,
 	}
 	encoded, err := json.Marshal(grant)
 	if err != nil {
@@ -691,6 +839,69 @@ func (manager *Manager) save(
 		return errors.New("OAuth grant exceeds the storage limit")
 	}
 	return manager.set(keyringService, route.Authorization.Key, string(encoded))
+}
+
+func tokenObservedScopes(
+	token *oauth2.Token,
+	separator string,
+) ([]string, bool, error) {
+	raw := token.Extra("scope")
+	if raw == nil {
+		return nil, false, nil
+	}
+	value, ok := raw.(string)
+	if !ok || len(value) > maximumObservedScopes*maximumScopeBytes {
+		return nil, true, errors.New("OAuth token scope evidence is malformed")
+	}
+	var values []string
+	if separator == "" || separator == " " {
+		values = strings.Fields(value)
+	} else {
+		parts := strings.Split(value, separator)
+		values = make([]string, 0, len(parts))
+		for _, part := range parts {
+			values = append(values, strings.TrimSpace(part))
+		}
+	}
+	normalized, err := normalizeObservedScopes(values)
+	if err != nil || len(normalized) == 0 {
+		return nil, true, errors.New("OAuth token scope evidence is malformed")
+	}
+	return normalized, true, nil
+}
+
+func normalizeObservedScopes(values []string) ([]string, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	if len(values) > maximumObservedScopes {
+		return nil, errors.New("OAuth token scope evidence exceeds the configured limit")
+	}
+	normalized := append([]string(nil), values...)
+	for _, scope := range normalized {
+		if !validOAuthScope(scope) {
+			return nil, errors.New("OAuth token scope evidence is malformed")
+		}
+	}
+	slices.Sort(normalized)
+	normalized = slices.Compact(normalized)
+	return normalized, nil
+}
+
+func validOAuthScope(scope string) bool {
+	if scope == "" || len(scope) > maximumScopeBytes {
+		return false
+	}
+	for index := range len(scope) {
+		character := scope[index]
+		// RFC 6749 scope-token (NQCHAR) excludes spaces, quotes, and backslashes.
+		if character != 0x21 &&
+			(character < 0x23 || character > 0x5b) &&
+			(character < 0x5d || character > 0x7e) {
+			return false
+		}
+	}
+	return true
 }
 
 // DeleteAuthorization removes one Corresync-owned OAuth grant. External

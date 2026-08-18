@@ -16,6 +16,11 @@ import (
 	"github.com/nkiyohara/corresync/internal/mcpserver"
 )
 
+var (
+	_ mcpserver.Backend          = (*daemonMCPBackend)(nil)
+	_ mcpserver.MessagingBackend = (*daemonMCPBackend)(nil)
+)
+
 type mcpCommand struct {
 	Serve  mcpServeCommand  `cmd:"" help:"Run the local MCP server."`
 	Config mcpConfigCommand `cmd:"" help:"Generate client configuration without changing client files."`

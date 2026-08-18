@@ -1,0 +1,29 @@
+{
+  "account": "",
+  "workspaceId": "workspace-synthetic-001",
+  "actor": {
+    "id": "actor-synthetic-app",
+    "mode": "app",
+    "displayName": "Synthetic App"
+  },
+  "conversationId": "conversation-synthetic-001",
+  "replyToId": "message-synthetic-root",
+  "content": {
+    "format": "markdown",
+    "text": "Synthetic **outgoing** message"
+  },
+  "mentions": [
+    {
+      "id": "actor-synthetic-recipient",
+      "kind": "user",
+      "displayName": "Synthetic Recipient"
+    }
+  ],
+  "attachments": [
+    {
+      "name": "synthetic.txt",
+      "mediaType": "text/plain",
+      "data": "c3ludGhldGlj"
+    }
+  ]
+}

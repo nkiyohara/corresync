@@ -5,6 +5,71 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.9.0-rc.1 - 2026-08-18
+
+### User-owned Google OAuth
+
+- Make Gmail, Google Calendar, Google Meet event links, and Google Tasks
+  available through an explicitly selected Desktop OAuth client in a Google
+  Cloud project the signed-in human controls. Corresync-managed Google OAuth
+  remains release-disabled and is never an automatic fallback.
+- Add bounded Desktop-client JSON import into the OS keyring, guided setup for
+  selecting Google services, transient client-credential resolution for code
+  exchange and refresh, and configuration schema v11. Legacy Google routes
+  fail closed instead of manufacturing the new credential consent.
+- Publish a five-language setup guide and update Pages, the domain-only
+  compatibility checker, security documentation, and agent-integration
+  metadata. The adapters remain synthetic-contract covered and live-unobserved.
+
+### Private saved queries
+
+- Save bounded mail and calendar query definitions as private, owner-only,
+  account-local state without persisting provider results or creating a shadow
+  mailbox. Catalog size, definition count, fields, and file paths are closed
+  and mechanically bounded.
+- Execute every saved query against the selected provider and report explicit
+  live freshness. An unavailable provider returns a typed failure instead of a
+  stale successful page.
+- Require explicit CLI approval or caller-bound MCP preview/commit for local
+  definition changes. Saved queries cannot enable monitoring, notifications,
+  agent dispatch, or data egress.
+
+### Explicit authentication recovery
+
+- Return one typed recovery action for the exact account and service when a
+  read needs authentication, without starting login, reading a keyring, or
+  accepting a credential through MCP.
+- Resume only after the human completes the browser, terminal, MFA, or secure
+  credential flow and the same service reports ready. Reads may retry once;
+  writes always require a new preview and approval.
+- Preserve provider and account selection, bound `Retry-After`, and keep
+  cancellation, ambiguity, and unavailable terminal access explicit instead of
+  silently switching routes.
+
+### Release-gated messaging foundations
+
+- Add provider-neutral message contracts and synthetic adapters for Teams
+  Graph, Teams Web, Slack, and Mattermost behind the same typed application
+  use cases used by CLI and MCP.
+- Keep the immutable source-owned release gate closed before setup choices,
+  catalogs, session construction, credential access, browser launch, or
+  provider traffic. Messaging remains unavailable and unadvertised in this RC
+  pending exact-revision live observation and approval.
+- Bind consequential messaging writes to the exact account, workspace, actor,
+  target version, payload, and caller through preview/commit. Code inclusion
+  does not claim observed provider capability.
+
+## 0.8.6 - 2026-08-18
+
+### Account service selection
+
+- Let guided setup choose mail, calendar, and task services independently for
+  each account through one reviewed multi-select step, while preserving the
+  deterministic non-interactive account commands.
+- Derive only compatible provider routes from the selected services, show the
+  resulting authentication boundary before account creation, and leave every
+  unselected service unconfigured.
+
 ### TickTick tasks
 
 - Add an explicit TickTick task route for bounded project and Inbox discovery,

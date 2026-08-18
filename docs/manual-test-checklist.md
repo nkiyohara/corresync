@@ -255,6 +255,21 @@ Pass criteria:
 - unavailable behavior appears as a degradation, not a silent provider
   fallback.
 
+For an authorized browser-backed test account, close the browser after a
+successful login and attempt one read. The read must not use the last observed
+authorization snapshot or return an empty success. Status must immediately
+show `reauthentication_required` with `interaction_required` for only the
+affected service lease, while unrelated accounts and independently routed
+services remain active. Complete the exact local login action, verify status,
+and repeat that read once. Do not repeat a write or reuse an earlier approval.
+
+After an ordinary suspend/resume or short network interruption, retry only a
+read that failed visibly. A stateless API route may already have made its three
+bounded attempts; persistent failure must remain visible and local to that
+account/provider. Rate limiting must remain distinguishable from login, and a
+429 must not cause an automatic request loop. Do not manufacture a live outage
+or bypass provider controls to obtain this observation.
+
 For iCloud, create the app-specific password only on the fixed Apple Account
 page opened by an explicit guided action. Confirm that macOS Keychain, Linux
 Secret Service, or Windows Credential Manager owns the password prompt and that
@@ -346,7 +361,19 @@ corr calendar list --account ALIAS \
 corr tasks lists --account ALIAS --json
 corr tasks list --account ALIAS --list-id OPAQUE_LIST_ID --limit 5 --json
 corr tasks sync --account ALIAS --list-id OPAQUE_LIST_ID --json
+corr queries save mail synthetic 'subject:synthetic' --account ALIAS --json
+corr queries save mail synthetic 'subject:synthetic' \
+  --account ALIAS --approve --json
+corr queries list --account ALIAS --json
+corr queries run synthetic --account ALIAS --json
 ```
+
+Confirm the first save is only a review, the committed definition is isolated
+to `ALIAS`, and the run reports `source: live_provider`, an absolute
+`fetchedAt`, `cached: false`, and `stale: false`. Confirm no provider result is
+written under the account state root. Review and delete the definition; then
+repeat with a disposable malformed bounded catalog and verify `queries purge`
+rejects a changed revision but removes the exact approved corrupt file.
 
 Optionally test one explicit body and bounded attachment without copying IDs
 into the evidence memo. Verify list/search omit bodies/bytes and all terminal

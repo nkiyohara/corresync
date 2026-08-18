@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "type": "message",
+      "text": "Synthetic <@USYNTHETICRECIPIENT> reference <https://example.invalid/reference|fixture>",
+      "user": "USYNTHETICAPP",
+      "bot_id": "BSYNTHETICAPP",
+      "username": "Synthetic App",
+      "ts": "1723636800.000001",
+      "reply_count": 1,
+      "files": [
+        {
+          "id": "FSYNTHETIC",
+          "name": "synthetic.txt",
+          "mimetype": "text/plain",
+          "size": 17,
+          "mode": "hosted",
+          "file_access": "visible",
+          "url_private": "https://files.slack.com/files-pri/TSYNTHETIC-FSYNTHETIC/synthetic.txt"
+        }
+      ],
+      "reactions": [
+        {
+          "name": "thumbsup",
+          "count": 1,
+          "users": [
+            "USYNTHETICAPP"
+          ]
+        }
+      ]
+    }
+  ],
+  "has_more": false,
+  "response_metadata": {
+    "next_cursor": ""
+  }
+}

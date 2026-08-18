@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 1,
-  "googleOAuthApproved": false,
+  "schemaVersion": 2,
+  "googleBYOOAuthEnabled": true,
+  "googleManagedOAuthEnabled": false,
   "families": [
     {
       "id": "microsoft-consumer",

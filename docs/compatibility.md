@@ -1,22 +1,22 @@
 # Compatibility evidence
 
 Compatibility is an evidence claim, not an inference from a fixture or a
-provider brand. This page distinguishes deterministic v0.8 coverage from
+provider brand. This page distinguishes deterministic v0.9 coverage from
 authorized live observations.
 
-## v0.8 evidence
+## v0.9 evidence
 
 <!-- markdownlint-disable MD013 -->
-| Boundary | Deterministic evidence | Recorded live evidence | v0.8 status |
+| Boundary | Deterministic evidence | Recorded live evidence | v0.9 status |
 | --- | --- | --- | --- |
-| CLI, stable JSON, configuration schema v9 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
+| CLI, stable JSON, configuration schema v11 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
 | Public domain-only compatibility checker | Browser privacy/source checks; DNS, CORS, bounds, redirect, failure, and SSRF fixtures | Not run | Deterministic only; no provider authentication |
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
 | Outlook Web mail/calendar | Synthetic typed wire contracts | Historical Microsoft 365 notes, not commit-bound | Deterministic only; live-unobserved |
 | Legacy Google Web adapter | Synthetic semantic-DOM contracts retained; runtime sign-in disabled before browser launch | Live sign-in rejected by Google on 2026-07-29 | Unsupported |
-| Approval-gated Gmail and Google Calendar APIs/Google Meet field | Synthetic REST, OAuth-gate, and application integration contracts | Prior [IMAP/SMTP observation](evidence/google-macos-arm64-2026-07-30.md) does not cover the new route | Included but disabled; deterministic only; live-unobserved |
-| Approval-gated Google Tasks API | Synthetic REST, identity, independent-scope, OAuth-gate, ETag, assigned-task, polling/reset, and application integration contracts | Not run | Included but disabled; deterministic only; live-unobserved |
+| User-owned OAuth Gmail and Google Calendar APIs/Google Meet field | Synthetic REST, credential-import, OAuth, migration, and application integration contracts | Prior [IMAP/SMTP observation](evidence/google-macos-arm64-2026-07-30.md) does not cover the new route | Available with user setup; deterministic only; live-unobserved |
+| User-owned OAuth Google Tasks API | Synthetic REST, identity, independent-scope, OAuth, ETag, assigned-task, polling/reset, and application integration contracts | Not run | Available with user setup; deterministic only; live-unobserved |
 | Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
 | Microsoft Graph To Do | Synthetic OAuth, national-cloud, REST CRUD/delta, recurrence/time-zone, cursor-restart, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
 | Todoist tasks | Synthetic public-client OAuth, refresh rotation, API v1 REST/Sync CRUD, plan, time, temporary-ID, cursor/isolation, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
@@ -28,6 +28,9 @@ authorized live observations.
 | iCloud guided IMAP/SMTP + CalDAV preset | Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts | Not run | Deterministic only; live-unobserved |
 | Cross-account search and agenda | Isolation, ordering, bounds, partial-failure tests | Not run | Deterministic only |
 | Canonical task model, CLI, MCP, IPC, and cross-account projection | Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests | Not run | Implemented; Microsoft Graph adapter enabled separately |
+| Private saved mail/calendar queries and no-content-cache decision | Account isolation, strict bounded store, revision race, corrupt purge, CLI/MCP schema, live freshness, and resource-bound tests | Not run | Implemented; definitions only, provider results never persisted |
+| Account/service recovery and provider drift | Per-lease invalidation, concurrency/drain, preview/monitor cleanup, stateless API retry/circuit, throttle, browser-owner loss, and content-free error tests | Not run | Deterministic only; live-unobserved |
+| Provider-neutral messaging model, Teams Graph/Web, Slack API, and Mattermost REST/WebSocket adapters, schema, and release gate | Shared synthetic fixtures; account/workspace/actor isolation, Graph/Web parity, role/scope capability observation, semantic DOM bounds, SSRF/DNS pinning, redirect/compression/event bounds, cursor binding, malformed result, and preview/commit tests | Not run | Included but disabled; provider live and surface evidence incomplete |
 | Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
 | Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
 | Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
@@ -59,20 +62,35 @@ evidence.
   unsupported and stops before browser launch. Google rejected the observed
   software-controlled browser sign-in; Corresync does not disguise automation.
 - `google`: Gmail API mail, selectable Google calendars, and Google Meet
-  creation after observed calendar capability are implemented behind an
-  approval gate. RC builds reject account addition and activation before OAuth,
-  keyring, browser, or API access. The route has synthetic contracts only and
+  creation after observed calendar capability are implemented through an
+  explicitly selected user-owned Desktop OAuth client. Account addition starts
+  no OAuth; explicit local login may resolve the external credential and grant.
+  The route has synthetic contracts only and
   remains live-unobserved. The linked macOS observation covers the retired
   IMAP/SMTP transport and is historical context only.
 - `google-tasks`: task-list discovery, typed task CRUD/state, subtasks,
   ordering, output-only source links, date-only due values, ETag conditions,
-  and deletion-aware polling are implemented behind the same approval gate.
-  The route uses an independent task-only grant, stops before OAuth while the
-  gate is closed, and has synthetic evidence only.
+  and deletion-aware polling use the same user-owned Desktop client model.
+  The route uses an independent task-only grant and has synthetic evidence only.
 - `microsoft-graph`: mail, selectable calendars, typed Teams-link creation, and
   Microsoft To Do are implemented with service-derived scopes and a BYO public
   OAuth client. Global, GCC High, and DoD use closed endpoint/authority pairs;
   China rejects To Do before OAuth. The route has no recorded live observation.
+- `slack`: supported Web API translation is implemented with exact workspace
+  and actor confirmation, observed installation scopes, bounded cursors and
+  file reads, rate-limit preservation, and outcome-unknown writes. Attachment
+  writes remain unavailable because upload and message creation are not one
+  atomic reviewed commit. The route is release-disabled and live-unobserved.
+- `mattermost`: supported v4 REST translation and an explicitly opened,
+  content-free WebSocket invalidation stream are implemented for one selected
+  public HTTPS origin and team. DNS answers are validated and pinned before
+  authorization; redirects, private/special destinations, compressed
+  responses, oversized content, replay, sequence gaps, and event floods fail
+  safely. Capabilities come from the actor's returned system, team, and channel
+  role definitions. REST sync uses reset snapshots, and WebSocket events only
+  request an earlier snapshot. Attachment sends and ID-bound mention writes
+  remain unavailable because the provider contracts cannot preserve one atomic
+  reviewed payload. The route is release-disabled and live-unobserved.
 - `todoist`: task lists, typed task CRUD/state, plan-sensitive metadata,
   reminders, exact provider recurrence, and sync-token changes are implemented
   through a BYO public client and PKCE. The API v1 route has synthetic evidence
@@ -94,7 +112,7 @@ evidence.
   remains live-unobserved.
 - task routes: the canonical application, CLI, JSON, IPC, MCP, cursor, and
   preview/commit contracts are implemented. Microsoft To Do, Todoist, TickTick,
-  CalDAV VTODO, and the disabled Google Tasks route have deterministic provider
+  CalDAV VTODO, and the user-owned OAuth Google Tasks route have deterministic provider
   contracts and remain live-unobserved. The other
   provider rows in the [Task contract](tasks.md) remain development targets,
   not provider evidence.

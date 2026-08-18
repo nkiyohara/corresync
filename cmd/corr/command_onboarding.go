@@ -12,6 +12,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/googleoauthclient"
 	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
@@ -34,10 +35,29 @@ type onboardingRoutePlan struct {
 	preset   string
 }
 
+type onboardingService string
+
+const (
+	onboardingServiceMail           onboardingService = "mail"
+	onboardingServiceCalendar       onboardingService = "calendar"
+	onboardingServiceMicrosoftTasks onboardingService = "microsoft_tasks"
+	onboardingServiceGoogleTasks    onboardingService = "google_tasks"
+	onboardingServiceMessaging      onboardingService = "messaging"
+)
+
+type onboardingServiceSelection struct {
+	mail         bool
+	calendar     bool
+	taskProvider domain.ProviderID
+	messaging    bool
+}
+
 type onboardingRegistration struct {
-	account    application.AccountView
-	preset     string
-	credential onboardingCredentialReference
+	account          application.AccountView
+	preset           string
+	credential       onboardingCredentialReference
+	googleClientPath string
+	googleClientKey  string
 }
 
 type onboardingAccountProgress struct {
@@ -175,16 +195,15 @@ func runAccountRegistrationWizard(
 	}
 	plans := onboardingRoutePlans(discovery)
 	if len(plans) == 0 {
-		if onboardingDiscoveredPendingGoogle(discovery) {
-			return onboardingRegistration{}, false, googleOAuthPendingError(
-				"Gmail or Google Calendar was found.",
-			)
-		}
 		return onboardingRegistration{}, false, errors.New(
 			"discovery found no available route; use `corr account add ADDRESS --help` for explicit advanced setup",
 		)
 	}
 	plan, selected, err := selectOnboardingRoutePlan(app, plans)
+	if err != nil || !selected {
+		return onboardingRegistration{}, false, err
+	}
+	services, selected, err := selectOnboardingServices(app, plan)
 	if err != nil || !selected {
 		return onboardingRegistration{}, false, err
 	}
@@ -211,24 +230,46 @@ func runAccountRegistrationWizard(
 	}
 	routing, selected, err := configureOnboardingRoutes(
 		app,
-		plan,
+		plan.withServices(services),
 		discovery,
 		alias,
 	)
 	if err != nil || !selected {
 		return onboardingRegistration{}, false, err
 	}
-	selectedCandidate := onboardingSelectedCandidate(plan)
-	mailRoute, calendarRoute, _, err := routing.routes(
-		selectedCandidate,
-		discovery,
+	routing, selected, err = configureOnboardingTaskRoute(
+		app, routing, plan, services, alias,
 	)
+	if err != nil || !selected {
+		return onboardingRegistration{}, false, err
+	}
+	routing, messagingRoute, selected, err := configureOnboardingMessagingRoute(
+		app, routing, plan, services,
+	)
+	if err != nil || !selected {
+		return onboardingRegistration{}, false, err
+	}
+	var mailRoute *application.AccountMailRouteInput
+	var calendarRoute *application.AccountCalendarRouteInput
+	selectedPlan := plan.withServices(services)
+	if selectedPlan.mail != nil || selectedPlan.calendar != nil {
+		selectedCandidate := onboardingSelectedCandidate(selectedPlan)
+		mailRoute, calendarRoute, _, err = routing.routes(
+			selectedCandidate,
+			discovery,
+		)
+	}
+	if err != nil {
+		return onboardingRegistration{}, false, err
+	}
+	taskRoute, err := routing.taskRoute()
 	if err != nil {
 		return onboardingRegistration{}, false, err
 	}
 	input := application.AccountAddInput{
 		Alias: alias, Address: discovery.Address,
-		Mail: mailRoute, Calendar: calendarRoute, Default: makeDefault,
+		Mail: mailRoute, Calendar: calendarRoute, Tasks: taskRoute,
+		Messages: messagingRoute, Default: makeDefault,
 	}
 	review, err := accounts.ReviewAdd(app.context, input)
 	if err != nil {
@@ -260,13 +301,34 @@ func runAccountRegistrationWizard(
 		return onboardingRegistration{}, false, err
 	}
 	return onboardingRegistration{
-		account: account,
-		preset:  plan.preset,
-		credential: onboardingCredentialReference{
+		account:          account,
+		preset:           plan.preset,
+		credential:       onboardingHandoffCredential(routing),
+		googleClientPath: routing.onboardingGoogleClientPath,
+		googleClientKey:  onboardingGoogleClientKey(routing),
+	}, true, nil
+}
+
+func onboardingGoogleClientKey(routing accountAddCommand) string {
+	if routing.OAuthClientSecretKey != "" {
+		return routing.OAuthClientSecretKey
+	}
+	return routing.TaskOAuthSecretKey
+}
+
+func onboardingHandoffCredential(
+	routing accountAddCommand,
+) onboardingCredentialReference {
+	if routing.CredentialKey != "" {
+		return onboardingCredentialReference{
 			backend: routing.CredentialBackend,
 			key:     routing.CredentialKey,
-		},
-	}, true, nil
+		}
+	}
+	return onboardingCredentialReference{
+		backend: routing.CalendarCredentialBackend,
+		key:     routing.CalendarCredentialKey,
+	}
 }
 
 func onboardingRoutePlans(
@@ -364,20 +426,6 @@ func candidateHasDiscoveryEvidence(
 	return false
 }
 
-func onboardingDiscoveredPendingGoogle(
-	discovery application.AccountDiscoveryResult,
-) bool {
-	if rollout.GoogleOAuthApproved {
-		return false
-	}
-	for _, candidate := range discovery.Candidates {
-		if candidate.Provider == domain.ProviderGoogle {
-			return true
-		}
-	}
-	return false
-}
-
 func newOnboardingRoutePlan(
 	mailCandidate *application.ProviderCandidate,
 	calendarCandidate *application.ProviderCandidate,
@@ -441,8 +489,8 @@ func selectOnboardingRoutePlan(
 	}
 	index, selected, err := runOnboardingSelect(
 		app,
-		"Mail and calendar route",
-		"Choose the services you recognize. No browser or credential access starts here.",
+		"Connection route",
+		"Choose a candidate you recognize. Discovery evidence does not prove account access, and no sign-in starts here.",
 		options,
 		-1,
 	)
@@ -450,6 +498,126 @@ func selectOnboardingRoutePlan(
 		return onboardingRoutePlan{}, false, err
 	}
 	return plans[index], true, nil
+}
+
+func selectOnboardingServices(
+	app *runtime,
+	plan onboardingRoutePlan,
+) (onboardingServiceSelection, bool, error) {
+	messagingEnabled := rollout.MessagingCatalogEnabled()
+	if err := writeOnboardingPendingServices(app, plan, messagingEnabled); err != nil {
+		return onboardingServiceSelection{}, false, err
+	}
+	values, selected, err := runSettingsMultiSelect(
+		app,
+		"Services to configure",
+		"Mail and calendar are preselected when this route can provide them. Optional services use their own explicit route and are verified only after sign-in.",
+		onboardingServiceOptions(plan, messagingEnabled),
+		validateOnboardingServices,
+	)
+	if err != nil || !selected {
+		return onboardingServiceSelection{}, false, err
+	}
+	if err := validateOnboardingServices(values); err != nil {
+		return onboardingServiceSelection{}, false, err
+	}
+	result := onboardingServiceSelection{}
+	for _, service := range values {
+		switch service {
+		case onboardingServiceMail:
+			result.mail = true
+		case onboardingServiceCalendar:
+			result.calendar = true
+		case onboardingServiceMicrosoftTasks:
+			result.taskProvider = domain.ProviderMicrosoftGraph
+		case onboardingServiceGoogleTasks:
+			result.taskProvider = domain.ProviderGoogleTasks
+		case onboardingServiceMessaging:
+			result.messaging = true
+		}
+	}
+	return result, true, nil
+}
+
+func validateOnboardingServices(values []onboardingService) error {
+	if len(values) == 0 {
+		return errors.New("select at least one service")
+	}
+	taskServices := 0
+	for _, service := range values {
+		if service == onboardingServiceMicrosoftTasks || service == onboardingServiceGoogleTasks {
+			taskServices++
+		}
+	}
+	if taskServices > 1 {
+		return errors.New("select one task service per account")
+	}
+	return nil
+}
+
+func onboardingServiceOptions(
+	plan onboardingRoutePlan,
+	messagingEnabled bool,
+) []huh.Option[onboardingService] {
+	options := make([]huh.Option[onboardingService], 0, 4)
+	if plan.mail != nil {
+		options = append(options, huh.NewOption(
+			"Mail · "+providerDisplayName(plan.mail.Provider),
+			onboardingServiceMail,
+		).Selected(true))
+	}
+	if plan.calendar != nil {
+		options = append(options, huh.NewOption(
+			"Calendar · "+providerDisplayName(plan.calendar.Provider),
+			onboardingServiceCalendar,
+		).Selected(true))
+	}
+	if plan.usesMicrosoft() {
+		options = append(options, huh.NewOption(
+			"Microsoft To Do · separate, explicit Graph authorization",
+			onboardingServiceMicrosoftTasks,
+		))
+		if messagingEnabled {
+			options = append(options, huh.NewOption(
+				"Teams messaging · choose Teams Web or Microsoft Graph next",
+				onboardingServiceMessaging,
+			))
+		}
+	}
+	if plan.usesGoogle() && rollout.GoogleBYOOAuthEnabled {
+		options = append(options, huh.NewOption(
+			"Google Tasks · separate, explicit Google authorization",
+			onboardingServiceGoogleTasks,
+		))
+	}
+	return options
+}
+
+func (plan onboardingRoutePlan) withServices(
+	services onboardingServiceSelection,
+) onboardingRoutePlan {
+	selected := plan
+	if !services.mail {
+		selected.mail = nil
+	}
+	if !services.calendar {
+		selected.calendar = nil
+	}
+	return selected
+}
+
+func (plan onboardingRoutePlan) usesMicrosoft() bool {
+	return plan.usesProvider(domain.ProviderMicrosoftOWA) ||
+		plan.usesProvider(domain.ProviderMicrosoftGraph)
+}
+
+func (plan onboardingRoutePlan) usesGoogle() bool {
+	return plan.usesProvider(domain.ProviderGoogle)
+}
+
+func (plan onboardingRoutePlan) usesProvider(provider domain.ProviderID) bool {
+	return plan.mail != nil && plan.mail.Provider == provider ||
+		plan.calendar != nil && plan.calendar.Provider == provider
 }
 
 func runOnboardingSelect[T comparable](
@@ -518,7 +686,9 @@ func configureOnboardingRoutes(
 		CredentialBackend: "os-keyring",
 	}
 	if plan.preset == onboardingPresetICloud {
-		return configureICloudOnboardingRoutes(app, command, discovery, alias)
+		return configureICloudOnboardingRoutes(
+			app, command, discovery, alias, plan.mail != nil, plan.calendar != nil,
+		)
 	}
 	if plan.mail != nil {
 		command.Provider = string(plan.mail.Provider)
@@ -573,10 +743,12 @@ func configureOnboardingRoutes(
 				selected, err = configureOnboardingCalendarCredential(app, &command, alias)
 			}
 		case domain.ProviderMicrosoftGraph:
-			selected, err = configureOnboardingOAuth(app, &command, alias)
+			selected, err = configureOnboardingOAuth(
+				app, &command, alias, domain.ProviderMicrosoftGraph,
+			)
 		case domain.ProviderGoogle:
-			return accountAddCommand{}, false, googleOAuthPendingError(
-				"Gmail or Google Calendar was selected.",
+			selected, err = configureOnboardingOAuth(
+				app, &command, alias, domain.ProviderGoogle,
 			)
 		case domain.ProviderGoogleWeb, domain.ProviderPOP3,
 			domain.ProviderMicrosoftTasks, domain.ProviderTodoist,
@@ -595,52 +767,228 @@ func configureOnboardingRoutes(
 	return command, true, nil
 }
 
+func configureOnboardingTaskRoute(
+	app *runtime,
+	command accountAddCommand,
+	plan onboardingRoutePlan,
+	services onboardingServiceSelection,
+	alias string,
+) (accountAddCommand, bool, error) {
+	provider := services.taskProvider
+	if provider == "" {
+		return command, true, nil
+	}
+	oauthProvider := domain.ProviderMicrosoftGraph
+	authorizationSuffix := "microsoft-tasks"
+	switch provider { //nolint:exhaustive // every other provider follows the explicit unsupported path.
+	case domain.ProviderMicrosoftGraph:
+		if !plan.usesMicrosoft() {
+			return accountAddCommand{}, false, errors.New(
+				"the selected connection route does not offer Microsoft To Do",
+			)
+		}
+	case domain.ProviderGoogleTasks:
+		if !plan.usesGoogle() {
+			return accountAddCommand{}, false, errors.New(
+				"the selected connection route does not offer Google Tasks",
+			)
+		}
+		oauthProvider = domain.ProviderGoogle
+		authorizationSuffix = "google-tasks"
+	default:
+		return accountAddCommand{}, false, errors.New(
+			"the selected guided task service is unsupported",
+		)
+	}
+
+	taskOAuth := command
+	canReuseClient := plan.usesProvider(oauthProvider) &&
+		command.onboardingOAuthProvider == oauthProvider &&
+		command.OAuthClientID != ""
+	if !canReuseClient {
+		taskOAuth = accountAddCommand{}
+		selected, err := configureOnboardingOAuth(app, &taskOAuth, alias, oauthProvider)
+		if err != nil || !selected {
+			return accountAddCommand{}, false, err
+		}
+	}
+	command.TaskProvider = string(provider)
+	command.TaskOAuthClientID = taskOAuth.OAuthClientID
+	command.TaskOAuthRedirectURI = taskOAuth.OAuthRedirectURI
+	command.TaskAuthorizationKey = alias + "-" + authorizationSuffix
+	command.ApproveTaskOAuth = true
+	if provider == domain.ProviderGoogleTasks {
+		command.TaskOAuthSecretBackend = taskOAuth.OAuthClientSecretBackend
+		command.TaskOAuthSecretKey = taskOAuth.OAuthClientSecretKey
+		command.ApproveTaskOAuthSecret = taskOAuth.ApproveOAuthClientSecret
+		if command.onboardingGoogleClientPath == "" {
+			command.onboardingGoogleClientPath = taskOAuth.onboardingGoogleClientPath
+		}
+	}
+	return command, true, nil
+}
+
+func configureOnboardingMessagingRoute(
+	app *runtime,
+	command accountAddCommand,
+	plan onboardingRoutePlan,
+	services onboardingServiceSelection,
+) (accountAddCommand, *application.AccountMessagingRouteInput, bool, error) {
+	if !services.messaging {
+		return command, nil, true, nil
+	}
+	if !plan.usesMicrosoft() {
+		return accountAddCommand{}, nil, false, errors.New(
+			"the selected connection route does not offer guided messaging",
+		)
+	}
+	if !rollout.MessagingCatalogEnabled() {
+		return accountAddCommand{}, nil, false, rollout.ErrMessagingPending
+	}
+	route, selected, err := runOnboardingSelect(
+		app,
+		"Teams connection",
+		"Choose one explicit transport. Corresync never probes or falls back to Microsoft Graph automatically.",
+		[]huh.Option[domain.MessagingRouteKind]{
+			huh.NewOption(
+				"Teams Web · provider-owned browser session",
+				domain.MessagingRouteTeamsWeb,
+			).Selected(true),
+			huh.NewOption(
+				"Microsoft Graph · explicit public-client authorization",
+				domain.MessagingRouteTeamsGraph,
+			),
+		},
+		domain.MessagingRouteKind(onboardingCancel),
+	)
+	if err != nil || !selected {
+		return accountAddCommand{}, nil, false, err
+	}
+	if err := rollout.RequireMessaging(domain.MessagingProviderMicrosoftTeams, route); err != nil {
+		return accountAddCommand{}, nil, false, err
+	}
+	workspaceID := ""
+	selected, err = runSettingsInput(
+		app,
+		"Teams tenant or workspace ID",
+		"Enter the exact provider identifier you control. It is route metadata and is never inferred from the email address.",
+		&workspaceID,
+		4096,
+		validateOnboardingMessagingWorkspace,
+	)
+	if err != nil || !selected {
+		return accountAddCommand{}, nil, false, err
+	}
+	result := &application.AccountMessagingRouteInput{
+		Provider: domain.MessagingProviderMicrosoftTeams,
+	}
+	if route == domain.MessagingRouteTeamsWeb {
+		result.TeamsWeb = &application.AccountTeamsWebMessagingInput{
+			Web:         application.AccountWebInput{Origin: "https://teams.microsoft.com"},
+			WorkspaceID: workspaceID,
+		}
+		return command, result, true, nil
+	}
+	messagingOAuth := command
+	if command.OAuthClientID == "" ||
+		command.onboardingOAuthProvider != domain.ProviderMicrosoftGraph {
+		messagingOAuth = accountAddCommand{MicrosoftCloud: command.MicrosoftCloud}
+		selected, err = configureOnboardingOAuth(
+			app, &messagingOAuth, command.Alias, domain.ProviderMicrosoftGraph,
+		)
+		if err != nil || !selected {
+			return accountAddCommand{}, nil, false, err
+		}
+	}
+	oauth, err := messagingOAuth.oauthRoute(
+		domain.ProviderMicrosoftGraph,
+		onboardingCandidateForProvider(plan, domain.ProviderMicrosoftGraph),
+		"https://graph.microsoft.com/v1.0",
+		false,
+	)
+	if err != nil {
+		return accountAddCommand{}, nil, false, err
+	}
+	result.TeamsGraph = &application.AccountTeamsGraphMessagingInput{
+		OAuth: *oauth, WorkspaceID: workspaceID,
+	}
+	return command, result, true, nil
+}
+
+func validateOnboardingMessagingWorkspace(value string) error {
+	if value == "" || len(value) > 4096 || strings.TrimSpace(value) != value ||
+		strings.ContainsAny(value, "\r\n\x00") {
+		return errors.New("enter one bounded Teams tenant or workspace identifier")
+	}
+	return nil
+}
+
 func configureICloudOnboardingRoutes(
 	app *runtime,
 	command accountAddCommand,
 	discovery application.AccountDiscoveryResult,
 	alias string,
+	mail bool,
+	calendar bool,
 ) (accountAddCommand, bool, error) {
-	if err := writeICloudOnboardingGuidance(app, discovery.Address); err != nil {
+	if err := writeICloudOnboardingGuidance(
+		app, discovery.Address, mail, calendar,
+	); err != nil {
 		return accountAddCommand{}, false, err
 	}
 	calendarUsername := discovery.Address
-	selected, err := runSettingsInput(
-		app,
-		"Apple Account email for Calendar",
-		"Keep the discovered address unless your Apple Account sign-in uses another email.",
-		&calendarUsername,
-		254,
-		validateSettingsEmailAddress,
-	)
-	if err != nil || !selected {
-		return accountAddCommand{}, false, err
+	if calendar {
+		selected, err := runSettingsInput(
+			app,
+			"Apple Account email for Calendar",
+			"Keep the discovered address unless your Apple Account sign-in uses another email.",
+			&calendarUsername,
+			254,
+			validateSettingsEmailAddress,
+		)
+		if err != nil || !selected {
+			return accountAddCommand{}, false, err
+		}
+	}
+	service := "iCloud Mail"
+	credentialKey := alias + "-icloud-mail"
+	if calendar {
+		service = "iCloud Calendar"
+		credentialKey = alias + "-icloud-calendar"
+	}
+	if mail && calendar {
+		service = "iCloud Mail and Calendar"
+		credentialKey = alias + "-icloud"
 	}
 	reference, selected, err := configureOnboardingCredentialReference(
 		app,
-		"iCloud Mail and Calendar",
-		alias+"-icloud",
+		service,
+		credentialKey,
 	)
 	if err != nil || !selected {
 		return accountAddCommand{}, false, err
 	}
-	command.Provider = string(domain.ProviderIMAPSMTP)
-	command.CalendarProvider = string(domain.ProviderCalDAV)
-	command.IMAPHost = "imap.mail.me.com"
-	command.IMAPPort = 993
-	command.IMAPTLS = "implicit"
-	command.SMTPHost = "smtp.mail.me.com"
-	command.SMTPPort = 587
-	command.SMTPTLS = "starttls"
-	command.CalDAVEndpoint = "https://caldav.icloud.com:443/"
-	command.Username = discovery.Address
-	command.CalendarUsername = calendarUsername
-	command.CredentialBackend = reference.backend
-	command.CredentialKey = reference.key
-	command.ApproveCredential = true
-	command.CalendarCredentialBackend = reference.backend
-	command.CalendarCredentialKey = reference.key
-	command.ApproveCalendarCredential = true
+	if mail {
+		command.Provider = string(domain.ProviderIMAPSMTP)
+		command.IMAPHost = "imap.mail.me.com"
+		command.IMAPPort = 993
+		command.IMAPTLS = "implicit"
+		command.SMTPHost = "smtp.mail.me.com"
+		command.SMTPPort = 587
+		command.SMTPTLS = "starttls"
+		command.Username = discovery.Address
+		command.CredentialBackend = reference.backend
+		command.CredentialKey = reference.key
+		command.ApproveCredential = true
+	}
+	if calendar {
+		command.CalendarProvider = string(domain.ProviderCalDAV)
+		command.CalDAVEndpoint = "https://caldav.icloud.com:443/"
+		command.CalendarUsername = calendarUsername
+		command.CalendarCredentialBackend = reference.backend
+		command.CalendarCredentialKey = reference.key
+		command.ApproveCalendarCredential = true
+	}
 	return command, true, nil
 }
 
@@ -660,6 +1008,19 @@ func onboardingSelectedCandidate(
 		return *plan.mail
 	}
 	return *plan.calendar
+}
+
+func onboardingCandidateForProvider(
+	plan onboardingRoutePlan,
+	provider domain.ProviderID,
+) application.ProviderCandidate {
+	if plan.mail != nil && plan.mail.Provider == provider {
+		return *plan.mail
+	}
+	if plan.calendar != nil && plan.calendar.Provider == provider {
+		return *plan.calendar
+	}
+	return application.ProviderCandidate{Provider: provider}
 }
 
 func onboardingHTTPSEndpoint(
@@ -903,20 +1264,108 @@ func configureOnboardingOAuth(
 	app *runtime,
 	command *accountAddCommand,
 	alias string,
+	provider domain.ProviderID,
 ) (bool, error) {
+	name := "Microsoft"
+	clientKind := "public-client"
+	keySuffix := "microsoft"
+	switch provider {
+	case domain.ProviderMicrosoftGraph:
+	case domain.ProviderGoogle:
+		name = "Google"
+		clientKind = "desktop-client"
+		keySuffix = "google"
+	case domain.ProviderMicrosoftOWA, domain.ProviderGoogleWeb,
+		domain.ProviderJMAP, domain.ProviderIMAPSMTP, domain.ProviderCalDAV,
+		domain.ProviderPOP3, domain.ProviderMicrosoftTasks,
+		domain.ProviderTodoist, domain.ProviderGoogleTasks,
+		domain.ProviderAppleReminders, domain.ProviderTickTick,
+		domain.ProviderAnyDoMCP, domain.ProviderThings,
+		domain.ProviderOmniFocus:
+		return false, fmt.Errorf("provider %q has no guided OAuth setup", provider)
+	default:
+		return false, fmt.Errorf("provider %q has no guided OAuth setup", provider)
+	}
 	clientID := ""
-	selected, err := runSettingsInput(
-		app,
-		"Microsoft public-client ID",
-		"Use a public OAuth client registration you are authorized to operate; no client secret is accepted.",
-		&clientID,
-		512,
-		validateOnboardingOpaqueInput,
-	)
-	if err != nil || !selected {
-		return false, err
+	var selected bool
+	var err error
+	var clientCredential onboardingCredentialReference
+	if provider == domain.ProviderGoogle {
+		source, sourceSelected, sourceErr := runOnboardingSelect(
+			app,
+			"Google Desktop OAuth client",
+			"Corresync-managed Google OAuth is not offered. Use a Desktop client from a Google Cloud project you control.",
+			[]huh.Option[string]{
+				huh.NewOption("Import downloaded client JSON (recommended)", "import").Selected(true),
+				huh.NewOption("Use an existing external credential handle", "existing"),
+			},
+			onboardingCancel,
+		)
+		if sourceErr != nil || !sourceSelected {
+			return false, sourceErr
+		}
+		if source == "import" {
+			path := ""
+			selected, err = runSettingsInput(
+				app,
+				"Downloaded Google client JSON",
+				"Path to the OAuth client file downloaded for application type Desktop app.",
+				&path,
+				4096,
+				validateOnboardingPath,
+			)
+			if err != nil || !selected {
+				return false, err
+			}
+			client, parseErr := googleoauthclient.ParseFile(path)
+			if parseErr != nil {
+				return false, parseErr
+			}
+			clientID = client.ID
+			client.Close()
+			clientCredential = onboardingCredentialReference{
+				backend: "os-keyring",
+				key:     alias + "-google-client",
+			}
+			command.onboardingGoogleClientPath = path
+		} else {
+			selected, err = runSettingsInput(
+				app,
+				"Google desktop-client ID",
+				"Use the client_id from a Desktop app in a Google Cloud project you control.",
+				&clientID,
+				512,
+				validateOnboardingOpaqueInput,
+			)
+			if err != nil || !selected {
+				return false, err
+			}
+			clientCredential, selected, err = configureOnboardingCredentialReference(
+				app,
+				"Google Desktop OAuth client",
+				alias+"-google-client",
+			)
+			if err != nil || !selected {
+				return false, err
+			}
+		}
+	} else {
+		selected, err = runSettingsInput(
+			app,
+			name+" "+clientKind+" ID",
+			"Use a public OAuth client registration you are authorized to operate.",
+			&clientID,
+			512,
+			validateOnboardingOpaqueInput,
+		)
+		if err != nil || !selected {
+			return false, err
+		}
 	}
 	redirectURI := "http://127.0.0.1:0/callback"
+	if provider == domain.ProviderGoogle {
+		redirectURI = "http://127.0.0.1:0"
+	}
 	selected, err = runSettingsInput(
 		app,
 		"Registered loopback redirect URI",
@@ -928,11 +1377,15 @@ func configureOnboardingOAuth(
 	if err != nil || !selected {
 		return false, err
 	}
+	clientLabel := "public client"
+	if provider == domain.ProviderGoogle {
+		clientLabel = "Desktop client"
+	}
 	consent, err := runOnboardingConfirm(
 		app,
-		"Use this public client for an explicit Microsoft authorization later?",
+		"Use this "+clientLabel+" for an explicit "+name+" authorization later?",
 		"Discovery still does not open a browser. Sign-in is offered only after the account is added.",
-		"Use public client",
+		"Use "+clientLabel,
 		"Cancel this account",
 	)
 	if err != nil || !consent {
@@ -940,8 +1393,14 @@ func configureOnboardingOAuth(
 	}
 	command.OAuthClientID = clientID
 	command.OAuthRedirectURI = redirectURI
-	command.AuthorizationKey = alias + "-graph"
+	command.AuthorizationKey = alias + "-" + keySuffix
 	command.ApproveOAuth = true
+	if provider == domain.ProviderGoogle {
+		command.OAuthClientSecretBackend = clientCredential.backend
+		command.OAuthClientSecretKey = clientCredential.key
+		command.ApproveOAuthClientSecret = true
+	}
+	command.onboardingOAuthProvider = provider
 	return true, nil
 }
 
@@ -949,6 +1408,13 @@ func validateOnboardingOpaqueInput(value string) error {
 	if value == "" || len(value) > 512 || strings.TrimSpace(value) != value ||
 		strings.ContainsAny(value, "\r\n\x00") {
 		return errors.New("enter one bounded value")
+	}
+	return nil
+}
+
+func validateOnboardingPath(value string) error {
+	if value == "" || len(value) > 4096 || strings.ContainsAny(value, "\r\n\x00") {
+		return errors.New("enter one local file path")
 	}
 	return nil
 }
@@ -1004,6 +1470,9 @@ func runOnboardingAccountHandoff(
 	if registration.preset == onboardingPresetICloud {
 		return runICloudAccountHandoff(app, registration)
 	}
+	if registration.googleClientPath != "" {
+		return runGoogleAccountHandoff(app, registration)
+	}
 	account := registration.account
 	authentication := accountAuthenticationKind(account)
 	for {
@@ -1054,6 +1523,63 @@ func runOnboardingAccountHandoff(
 	}
 }
 
+func runGoogleAccountHandoff(
+	app *runtime,
+	registration onboardingRegistration,
+) error {
+	if err := validateOnboardingPath(registration.googleClientPath); err != nil {
+		return errors.New("google OAuth client handoff is missing its downloaded JSON path")
+	}
+	if err := validateOnboardingCredentialKey(registration.googleClientKey); err != nil {
+		return errors.New("google OAuth client handoff is missing its reviewed keyring handle")
+	}
+	clientPath := registration.googleClientPath
+	for {
+		options := make([]huh.Option[string], 0, 5)
+		if clientPath != "" {
+			options = append(options, huh.NewOption(
+				"Store the downloaded OAuth client securely (recommended)",
+				"import",
+			).Selected(true))
+			options = append(options, huh.NewOption(
+				"Finish now and import it later", "finish",
+			))
+		} else {
+			options = append(options,
+				huh.NewOption("Sign in now in Google's browser", "login"),
+				huh.NewOption("Run local setup checks", "doctor"),
+				huh.NewOption("Finish this account later", "finish"),
+			)
+		}
+		action, selected, err := runSettingsSelect(
+			app,
+			"Google OAuth handoff · "+registration.account.Alias,
+			"The downloaded client credential goes only to the OS keyring. Google sign-in remains a separate explicit action.",
+			options,
+		)
+		if err != nil || !selected || action == "finish" {
+			return err
+		}
+		switch action {
+		case "import":
+			err = (&googleClientImportCommand{
+				File: clientPath,
+				Key:  registration.googleClientKey,
+			}).Run(app)
+			if err == nil {
+				clientPath = ""
+			}
+		case "login":
+			err = (&loginCommand{Account: registration.account.Alias}).Run(app)
+		case "doctor":
+			err = (&doctorCommand{Account: registration.account.Alias}).Run(app)
+		}
+		if err != nil {
+			return err
+		}
+	}
+}
+
 func runICloudAccountHandoff(
 	app *runtime,
 	registration onboardingRegistration,
@@ -1079,7 +1605,7 @@ func runICloudAccountHandoff(
 			)
 		}
 		options = append(options,
-			huh.NewOption("Authenticate Mail and Calendar now", "login"),
+			huh.NewOption("Authenticate selected iCloud services now", "login"),
 			huh.NewOption("Run a content-free connection check", "doctor_online"),
 			huh.NewOption("Run local setup checks", "doctor"),
 			huh.NewOption("Finish this account later", "finish").
@@ -1255,6 +1781,10 @@ func accountAuthenticationKind(
 		account.Tasks.Provider == domain.ProviderTickTick) {
 		return application.DiscoveryExplicitOAuth
 	}
+	if account.Messages != nil &&
+		account.Messages.Route == domain.MessagingRouteTeamsGraph {
+		return application.DiscoveryExplicitOAuth
+	}
 	return application.DiscoveryBrowserFirstParty
 }
 
@@ -1318,14 +1848,49 @@ func writeOnboardingWelcome(app *runtime) error {
 	return err
 }
 
-func writeICloudOnboardingGuidance(app *runtime, address string) error {
+func writeOnboardingPendingServices(
+	app *runtime,
+	plan onboardingRoutePlan,
+	messagingEnabled bool,
+) error {
+	if !plan.usesMicrosoft() || messagingEnabled {
+		return nil
+	}
+	view := newConsoleView(app, app.stdout, true)
+	_, err := view.printf(
+		"\n%s  %s\n   %s\n\n",
+		view.info(),
+		view.strong("Teams messaging · coming soon"),
+		view.muted("The v0.9 implementation is still awaiting release evidence and approval, so setup will not configure or open Teams today."),
+	)
+	return err
+}
+
+func writeICloudOnboardingGuidance(
+	app *runtime,
+	address string,
+	mail bool,
+	calendar bool,
+) error {
+	services := "Calendar"
+	identity := "Calendar uses " + sanitizeCell(address, 254) +
+		" by default; you can enter a different Apple Account email next."
+	if mail {
+		services = "Mail"
+		identity = "Mail uses " + sanitizeCell(address, 254) + " as the full username."
+	}
+	if mail && calendar {
+		services = "Mail + Calendar"
+		identity = "Mail uses " + sanitizeCell(address, 254) +
+			" as the full username; Calendar can use a different Apple Account email."
+	}
 	view := newConsoleView(app, app.stdout, true)
 	_, err := view.printf(
 		"\n%s  %s\n   %s\n   %s\n   %s\n\n",
 		view.info(),
-		view.strong("iCloud Mail + Calendar"),
+		view.strong("iCloud "+services),
 		view.muted("Apple requires two-factor authentication before you can create an app-specific password."),
-		view.muted("Mail uses "+sanitizeCell(address, 254)+" as the full username; Calendar can use a different Apple Account email."),
+		view.muted(identity),
 		view.muted("Nothing is opened and no credential is requested until you explicitly choose the post-add handoff."),
 	)
 	return err
@@ -1348,8 +1913,8 @@ func writeOnboardingDiscovery(
 		availability := "available"
 		if !candidate.Available {
 			availability = "not available in this build"
-			if candidate.Provider == domain.ProviderGoogle && !rollout.GoogleOAuthApproved {
-				availability = "coming soon · production OAuth approval pending"
+			if candidate.Provider == domain.ProviderGoogle {
+				availability = "available with your own Google Desktop OAuth client"
 			}
 		}
 		if _, err := view.printf(
@@ -1370,13 +1935,15 @@ func writeOnboardingAccountReview(
 ) error {
 	view := newConsoleView(app, app.stdout, true)
 	if _, err := view.printf(
-		"\n%s  %s\n\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %t\n",
+		"\n%s  %s\n\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %s\n  %-16s %t\n",
 		view.info(),
 		view.strong("Review account before adding"),
 		"Local name", sanitizeCell(review.Alias, 64),
 		"Address", sanitizeCell(review.Address, 254),
 		"Mail", onboardingProviderValue(review.MailProvider),
 		"Calendar", onboardingProviderValue(review.CalendarProvider),
+		"Tasks", onboardingProviderValue(review.TaskProvider),
+		"Messages", onboardingMessagingProviderValue(review.MessagingProvider),
 		"Default", review.MakesDefault,
 	); err != nil {
 		return err
@@ -1387,6 +1954,7 @@ func writeOnboardingAccountReview(
 	}{
 		{service: "Mail", view: review.Mail},
 		{service: "Calendar", view: review.Calendar},
+		{service: "Tasks", view: review.Tasks},
 	} {
 		if route.view == nil {
 			continue
@@ -1421,6 +1989,15 @@ func writeOnboardingAccountReview(
 			return err
 		}
 	}
+	if review.Messages != nil {
+		if _, err := view.printf(
+			"  %-16s %s · %s\n  %-16s %s\n",
+			"Messaging route", review.Messages.Provider, review.Messages.Route,
+			"Workspace", sanitizeCell(review.Messages.WorkspaceID, 4096),
+		); err != nil {
+			return err
+		}
+	}
 	_, err := view.printf(
 		"\n   %s\n   %s\n   %s\n",
 		view.muted("No browser, credential value, provider API, or administrator flow has been opened."),
@@ -1435,6 +2012,13 @@ func onboardingProviderValue(provider domain.ProviderID) string {
 		return "not configured"
 	}
 	return providerDisplayName(provider)
+}
+
+func onboardingMessagingProviderValue(provider domain.MessagingProviderID) string {
+	if provider == "" {
+		return "not configured"
+	}
+	return string(provider)
 }
 
 func writeOnboardingAccountAdded(

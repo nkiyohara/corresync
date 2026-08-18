@@ -1,0 +1,11 @@
+{
+  "value": [
+    {
+      "id": "channel-synthetic",
+      "displayName": "Architecture",
+      "description": "Synthetic channel fixture",
+      "membershipType": "private",
+      "createdDateTime": "2026-08-14T12:00:00Z"
+    }
+  ]
+}

@@ -274,6 +274,12 @@ non-interactive script, use `corr setup ADDRESS --alias NAME`, followed by the
 explicit account-specific `corr auth login`, `corr doctor`, and `corr
 integrations setup HOST --yes` commands.
 
+For Microsoft candidates, a checkbox-style service step selects Outlook Mail,
+Outlook Calendar, and optional Microsoft To Do independently. To Do is an
+explicit Graph route even when Mail and Calendar use Outlook Web; there is no
+automatic Graph probe or fallback. Teams remains a non-selectable coming-soon
+notice until the complete v0.9 messaging cohort is release-enabled.
+
 The browser owns sign-in, MFA, Conditional Access, and session cookies.
 Corresync never asks for a password or copies an authorization header into its
 configuration. Online doctor reuses that authenticated session and never starts
@@ -297,15 +303,12 @@ corr account add reader@example.invalid --help
 
 Discovery is credential-free. Review its candidates and choose one explicitly.
 Microsoft Graph requires a registered public OAuth client and an OS-keyring
-authorization handle. The Gmail, Google Calendar, and independent Google Tasks
-routes are included but disabled in RC builds while production OAuth approval
-is pending, so Google account addition and sign-in stop before any credential
-or network access. After a separate activation release, all three will use
-pinned Google APIs. Workspace administrators may still require approval or
-block access. A
-generated Google Desktop client may also require its client credential in the
-local `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` process environment; never put it in
-configuration or command arguments. JMAP, IMAP/SMTP, and CalDAV use an
+authorization handle. Gmail, Google Calendar, and Google Tasks use a Desktop
+OAuth client from a Google Cloud project you control; the generated credential
+is imported into an external OS-keyring handle and never placed in
+configuration or command arguments. Workspace administrators may still require
+approval or block access. Follow the [Google setup guide](google-oauth-setup.md).
+JMAP, IMAP/SMTP, and CalDAV use an
 OS-keyring entry or an explicitly approved credential helper. See
 [configuration.md](configuration.md) and
 [authentication.md](authentication.md).

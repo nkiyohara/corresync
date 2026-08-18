@@ -286,21 +286,31 @@ func (app *runtime) accountServices() (
 		domain.ProviderCalDAV,
 		domain.ProviderMicrosoftGraph,
 	}
-	if rollout.GoogleOAuthApproved {
+	if rollout.GoogleBYOOAuthEnabled {
 		available = append(available, domain.ProviderGoogle)
 	}
 	taskAvailable := []domain.ProviderID{
 		domain.ProviderMicrosoftGraph, domain.ProviderTodoist,
 		domain.ProviderCalDAV, domain.ProviderTickTick,
 	}
-	if rollout.GoogleOAuthApproved {
+	if rollout.GoogleBYOOAuthEnabled {
 		taskAvailable = append(taskAvailable, domain.ProviderGoogleTasks)
+	}
+	var messagingAvailable []domain.MessagingRouteKind
+	if rollout.MessagingCatalogEnabled() {
+		messagingAvailable = []domain.MessagingRouteKind{
+			domain.MessagingRouteTeamsGraph,
+			domain.MessagingRouteTeamsWeb,
+			domain.MessagingRouteSlackAPI,
+			domain.MessagingRouteMattermost,
+		}
 	}
 	accounts, err := application.NewAccountService(
 		store,
 		store,
 		available,
 		taskAvailable,
+		messagingAvailable...,
 	)
 	if err != nil {
 		return nil, nil, err

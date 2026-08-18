@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "channels": [
+    {
+      "id": "CSYNTHETIC",
+      "name": "synthetic-channel",
+      "is_channel": true,
+      "is_member": true,
+      "num_members": 3,
+      "updated": 1723636800,
+      "topic": {
+        "value": "Synthetic fixture topic"
+      }
+    }
+  ],
+  "response_metadata": {
+    "next_cursor": "cursor-synthetic-next"
+  }
+}

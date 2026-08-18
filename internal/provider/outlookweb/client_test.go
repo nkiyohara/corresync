@@ -24,6 +24,12 @@ func (authorizer *fakeAuthorizer) Apply(request *http.Request) error {
 	return nil
 }
 
+type failingAuthorizer struct{}
+
+func (*failingAuthorizer) Apply(*http.Request) error {
+	return errors.New("private browser process detail")
+}
+
 func testClient(t *testing.T, server *httptest.Server, actionOptions func(*Options)) *Client {
 	t.Helper()
 	options := Options{
@@ -176,6 +182,24 @@ func TestClientClassifiesSessionExpiryAndSafeHTTPError(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "private") {
 		t.Fatalf("HTTPError exposed response body: %v", err)
+	}
+}
+
+func TestClientClassifiesBrowserOwnerExitWithoutPrivateDetail(t *testing.T) {
+	client, err := NewClient(Options{
+		Origin:     "https://outlook.example.invalid",
+		Authorizer: &failingAuthorizer{},
+		HTTPClient: &http.Client{},
+		UserAgent:  "corresync/test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Call(t.Context(), FindItem, struct{}{}, nil)
+	reason, ok := application.ProviderAuthenticationReason(err)
+	if !ok || reason != application.AuthenticationReasonInteractionRequired ||
+		strings.Contains(err.Error(), "private browser process detail") {
+		t.Fatalf("browser owner failure = %v, reason = %q", err, reason)
 	}
 }
 

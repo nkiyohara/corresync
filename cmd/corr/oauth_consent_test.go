@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -12,18 +11,22 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
-	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
-func TestOAuthConsentNoticeStopsBeforePendingGoogleLogin(t *testing.T) {
+func TestOAuthConsentNoticeShowsBYOGoogleScopes(t *testing.T) {
 	t.Parallel()
-	route := config.OAuthRoute{
+	route := config.GoogleOAuthRoute{
 		APIBase:     "https://www.googleapis.com",
 		ClientID:    "synthetic-client",
 		RedirectURI: "http://127.0.0.1:0/oauth/callback",
 		Authorization: config.CredentialRef{
 			Backend: config.CredentialOSKeyring,
 			Key:     "synthetic-google",
+			Consent: true,
+		},
+		ClientSecret: config.CredentialRef{
+			Backend: config.CredentialOSKeyring,
+			Key:     "synthetic-google-client",
 			Consent: true,
 		},
 	}
@@ -34,6 +37,7 @@ func TestOAuthConsentNoticeStopsBeforePendingGoogleLogin(t *testing.T) {
 				Username: "reader@example.test",
 				ClientID: route.ClientID, RedirectURI: route.RedirectURI,
 				Authorization: route.Authorization,
+				ClientSecret:  route.ClientSecret,
 			},
 		},
 		Calendar: &config.CalendarRoute{
@@ -49,11 +53,13 @@ func TestOAuthConsentNoticeStopsBeforePendingGoogleLogin(t *testing.T) {
 		buildinfo.Info{Version: "dev"},
 	)
 	err := writeOAuthConsentNotice(app, account)
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+	if err != nil {
 		t.Fatalf("writeOAuthConsentNotice() error = %v", err)
 	}
-	if stderr.Len() != 0 {
-		t.Fatalf("pending Google consent notice = %q", stderr.String())
+	if !strings.Contains(stderr.String(), "gmail.modify") ||
+		!strings.Contains(stderr.String(), "calendar.events") ||
+		strings.Contains(stderr.String(), "synthetic-google-client") {
+		t.Fatalf("Google consent notice = %q", stderr.String())
 	}
 }
 

@@ -207,6 +207,35 @@ distinct.
 See the [canonical task contract and fixtures](tasks.md) for enums, bounds,
 sync semantics, and the development capability matrix.
 
+## Private saved queries
+
+`queries list/show --json` return versioned private definitions for one opaque
+account ID. A mail definition contains a typed folder, provider-native query,
+page limit, and provider time zone. A calendar definition contains a typed
+calendar, relative start offset, bounded window, and IANA display time zone.
+Each definition has a deterministic `revision`; no credential or provider
+result is present.
+
+`queries run --json` returns the definition and exactly one `mail` or
+`calendar` page alongside explicit freshness:
+
+```json
+{
+  "query": {},
+  "fetchedAt": "2026-08-14T20:00:00Z",
+  "source": "live_provider",
+  "cached": false,
+  "stale": false,
+  "displayTimeZone": "UTC",
+  "mail": {"messages": [], "totalItemsInView": 0, "includesLastItem": true}
+}
+```
+
+There is no offline success shape and no persistent mail/calendar result
+cache. Save/delete previews use `SavedQueryChangeAccess`; catalog purge uses
+`SavedQueryPurgeAccess`. `status` is `approval_required` or `completed`, and
+MCP previews additionally contain the normal single-use approval capability.
+
 ## Monitoring and events
 
 Monitor status is content-free with:

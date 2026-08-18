@@ -36,15 +36,13 @@ func acquire(ctx context.Context, path string, protectDirectory bool) (*Lock, er
 		return nil, errors.New("lock path must be clean and absolute")
 	}
 	directory := filepath.Dir(path)
-	if err := os.MkdirAll(directory, 0o700); err != nil {
-		return nil, fmt.Errorf("create lock directory: %w", err)
-	}
-	if protectDirectory {
-		if err := os.Chmod(directory, 0o700); err != nil { // #nosec G302 -- a private lock directory needs owner execute.
-			return nil, fmt.Errorf("protect lock directory: %w", err)
-		}
-	}
 	directoryInfo, err := os.Lstat(directory)
+	if errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(directory, 0o700); err != nil {
+			return nil, fmt.Errorf("create lock directory: %w", err)
+		}
+		directoryInfo, err = os.Lstat(directory)
+	}
 	if err != nil || !directoryInfo.IsDir() || isLinkLike(directoryInfo) {
 		if err != nil {
 			return nil, fmt.Errorf("inspect lock directory: %w", err)
@@ -62,6 +60,12 @@ func acquire(ctx context.Context, path string, protectDirectory bool) (*Lock, er
 			return nil, fmt.Errorf("inspect opened lock directory: %w", err)
 		}
 		return nil, errors.New("lock directory changed while opening")
+	}
+	if protectDirectory {
+		if err := root.Chmod(".", 0o700); err != nil { // #nosec G302 -- a private lock directory needs owner execute.
+			_ = root.Close()
+			return nil, fmt.Errorf("protect lock directory: %w", err)
+		}
 	}
 	name := filepath.Base(path)
 	var expected os.FileInfo

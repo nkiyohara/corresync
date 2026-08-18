@@ -25,7 +25,6 @@ import (
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/microsoftcloud"
-	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type tokenSourceFunc func() (*oauth2.Token, error)
@@ -81,7 +80,7 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 			_, _ = io.WriteString(
 				writer,
 				`{"access_token":"synthetic-access","refresh_token":"synthetic-refresh",`+
-					`"token_type":"Bearer","expires_in":3600}`,
+					`"token_type":"Bearer","expires_in":3600,"scope":"mail.read"}`,
 			)
 		case "/protected":
 			if request.Header.Get("Authorization") != "Bearer synthetic-access" {
@@ -104,7 +103,8 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	provider := Provider{
 		ID:      domain.ProviderGoogle,
 		AuthURL: apiServer.URL + "/authorize", TokenURL: apiServer.URL + "/token",
-		Scopes: []string{"mail.read", "calendar.write"},
+		Scopes:           []string{"mail.read", "calendar.write"},
+		ClientCredential: true,
 		AuthParams: map[string]string{
 			"access_type": "offline",
 			"hl":          "en",
@@ -112,8 +112,7 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	}
 	openCalls := 0
 	manager, err := New(Options{
-		HTTP:               baseClient,
-		GoogleClientSecret: "synthetic-client-credential",
+		HTTP: baseClient,
 		Get: func(service, key string) (string, error) {
 			if service != keyringService || key != "synthetic-grant" {
 				t.Fatalf("keyring get = %q %q", service, key)
@@ -200,9 +199,18 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 			Consent: true,
 		},
 	}
-	authorization, err := manager.Authorize(t.Context(), route.Client(), provider)
+	resolve := func(context.Context) ([]byte, error) {
+		return []byte("synthetic-client-credential"), nil
+	}
+	authorization, err := manager.AuthorizeWithClientCredential(
+		t.Context(), route.Client(), provider, resolve,
+	)
 	if err != nil {
 		t.Fatal(err)
+	}
+	grantedScopes, err := authorization.GrantedScopes(t.Context())
+	if err != nil || !slices.Equal(grantedScopes, []string{"mail.read"}) {
+		t.Fatalf("GrantedScopes() = %#v, %v", grantedScopes, err)
 	}
 	accessToken, err := authorization.AccessToken(t.Context())
 	if err != nil || string(accessToken) != "synthetic-access" {
@@ -241,6 +249,9 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 		strings.Contains(stored, "synthetic-code") {
 		t.Fatalf("stored grant contains transient authorization data: %s", stored)
 	}
+	if !strings.Contains(stored, `"observedScopes":["mail.read"]`) {
+		t.Fatalf("stored grant omits observed token scopes: %s", stored)
+	}
 	grant["provider"] = "google-api"
 	legacyStored, err := json.Marshal(grant)
 	if err != nil {
@@ -248,18 +259,22 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	}
 	stored = string(legacyStored)
 
-	second, err := manager.Client(t.Context(), route, provider)
+	second, err := manager.AuthorizeWithClientCredential(
+		t.Context(), route.Client(), provider, resolve,
+	)
 	if err != nil || second == nil {
-		t.Fatalf("existing grant Client() = %v, %v", second, err)
+		t.Fatalf("existing grant authorization = %v, %v", second, err)
 	}
 	if openCalls != 1 {
 		t.Fatalf("existing grant reopened authorization: %d", openCalls)
 	}
 
 	provider.Scopes = append(provider.Scopes, "calendar.list.read")
-	third, err := manager.Client(t.Context(), route, provider)
+	third, err := manager.AuthorizeWithClientCredential(
+		t.Context(), route.Client(), provider, resolve,
+	)
 	if err != nil || third == nil {
-		t.Fatalf("expanded-scope Client() = %v, %v", third, err)
+		t.Fatalf("expanded-scope authorization = %v, %v", third, err)
 	}
 	if openCalls != 2 {
 		t.Fatalf("expanded scopes did not start fresh explicit authorization: %d", openCalls)
@@ -280,31 +295,43 @@ func TestManagerRequiresBoundedGoogleDesktopClientCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = manager.Authorize(t.Context(), config.OAuthClient{}, provider)
-	if err == nil ||
-		!strings.Contains(err.Error(), "CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET") {
+	if err == nil || !strings.Contains(err.Error(), "external client credential") {
 		t.Fatalf("Authorize() error = %v", err)
 	}
-
-	_, err = New(Options{GoogleClientSecret: strings.Repeat("x", maximumClientSecret+1)})
-	if err == nil || !strings.Contains(err.Error(), "malformed") {
-		t.Fatalf("New() oversized credential error = %v", err)
+	route := config.OAuthClient{
+		ClientID: "synthetic", RedirectURI: "http://127.0.0.1:0/callback",
+		Authorization: config.CredentialRef{
+			Backend: config.CredentialOSKeyring, Key: "grant", Consent: true,
+		},
 	}
-	for _, value := range []string{"line\rbreak", "line\nbreak", "nul\x00byte"} {
-		if _, malformedErr := New(Options{GoogleClientSecret: value}); malformedErr == nil ||
-			!strings.Contains(malformedErr.Error(), "malformed") {
-			t.Fatalf("New() credential %q error = %v", value, malformedErr)
+	manager, err = New(Options{
+		Get: func(string, string) (string, error) { return "", keyring.ErrNotFound },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range [][]byte{
+		{},
+		[]byte(strings.Repeat("x", maximumClientSecret+1)),
+		[]byte("line\rbreak"), []byte("line\nbreak"), []byte("nul\x00byte"),
+	} {
+		_, malformedErr := manager.AuthorizeWithClientCredential(
+			t.Context(), route, provider,
+			func(context.Context) ([]byte, error) { return value, nil },
+		)
+		if malformedErr == nil || !strings.Contains(malformedErr.Error(), "malformed") {
+			t.Fatalf("credential %q error = %v", value, malformedErr)
 		}
 	}
 }
 
-func TestGoogleOAuthProfileIsPresentButApprovalGated(t *testing.T) {
+func TestGoogleOAuthProfileIsAvailableOnlyForBYODesktopClients(t *testing.T) {
 	t.Parallel()
 
-	_, err := ProviderFor(domain.ProviderGoogle, Services{Mail: true, Calendar: true})
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
-		t.Fatalf("ProviderFor() error = %v", err)
+	provider, err := ProviderFor(domain.ProviderGoogle, Services{Mail: true, Calendar: true})
+	if err != nil || !provider.ClientCredential {
+		t.Fatalf("ProviderFor() = %+v, %v", provider, err)
 	}
-	provider := googleProviderProfile(true, true)
 	if !slices.Contains(
 		provider.Scopes,
 		"https://www.googleapis.com/auth/gmail.modify",
@@ -317,12 +344,12 @@ func TestGoogleOAuthProfileIsPresentButApprovalGated(t *testing.T) {
 	}
 }
 
-func TestGoogleTaskOAuthProfileIsIndependentAndApprovalGated(t *testing.T) {
+func TestGoogleTaskOAuthProfileIsIndependentAndCredentialed(t *testing.T) {
 	t.Parallel()
 
-	_, err := ProviderFor(domain.ProviderGoogleTasks, Services{Tasks: true})
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
-		t.Fatalf("ProviderFor() error = %v", err)
+	profile, err := ProviderFor(domain.ProviderGoogleTasks, Services{Tasks: true})
+	if err != nil || !profile.ClientCredential {
+		t.Fatalf("ProviderFor() = %+v, %v", profile, err)
 	}
 	read := googleTaskProviderProfile(false)
 	write := googleTaskProviderProfile(true)
@@ -387,6 +414,56 @@ func TestMicrosoftTodoScopesAndNationalCloudAuthorities(t *testing.T) {
 		Tasks: true, MicrosoftCloud: microsoftcloud.China,
 	}); err == nil || !strings.Contains(err.Error(), "unavailable") {
 		t.Fatalf("China task profile error = %v", err)
+	}
+}
+
+func TestMicrosoftTeamsScopesStayWithinSelectedParityCohort(t *testing.T) {
+	t.Parallel()
+	read, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{
+		Messages: true, MicrosoftCloud: microsoftcloud.Global,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scope := range []string{
+		"Chat.Read", "Team.ReadBasic.All", "Channel.ReadBasic.All",
+		"ChannelMessage.Read.All", "User.Read",
+	} {
+		if !slices.Contains(read.Scopes, scope) {
+			t.Fatalf("Teams read profile omits %q: %#v", scope, read.Scopes)
+		}
+	}
+	for _, scope := range []string{
+		"Chat.ReadWrite", "ChatMessage.Send", "ChannelMessage.Send",
+		"Chat.Create", "Channel.Create", "Mail.ReadWrite", "Tasks.Read",
+	} {
+		if slices.Contains(read.Scopes, scope) {
+			t.Fatalf("Teams read profile unexpectedly includes %q: %#v", scope, read.Scopes)
+		}
+	}
+
+	write, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{
+		Messages: true, MessageWrite: true, MicrosoftCloud: microsoftcloud.Global,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scope := range []string{
+		"Chat.ReadWrite", "ChatMessage.Send", "ChannelMessage.Send",
+		"ChannelMessage.ReadWrite", "ChatMember.ReadWrite",
+		"ChannelMember.ReadWrite.All",
+	} {
+		if !slices.Contains(write.Scopes, scope) {
+			t.Fatalf("Teams write profile omits %q: %#v", scope, write.Scopes)
+		}
+	}
+	for _, scope := range []string{"Chat.Read", "Chat.Create", "Channel.Create"} {
+		if slices.Contains(write.Scopes, scope) {
+			t.Fatalf("Teams write profile unexpectedly includes %q: %#v", scope, write.Scopes)
+		}
+	}
+	if _, err := ProviderFor(domain.ProviderMicrosoftGraph, Services{MessageWrite: true}); err == nil {
+		t.Fatal("message write profile accepted no messaging service")
 	}
 }
 
@@ -643,7 +720,7 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(writer,
 			`{"access_token":"access-2","refresh_token":"refresh-2",`+
-				`"token_type":"Bearer","expires_in":3600}`,
+				`"token_type":"Bearer","expires_in":3600,"scope":"data:read"}`,
 		)
 	}))
 	defer tokenServer.Close()
@@ -661,7 +738,8 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 	initial, err := json.Marshal(storedGrant{
 		Version: 1, Provider: domain.ProviderTodoist,
 		ClientID: route.ClientID, RedirectURI: route.RedirectURI,
-		Scopes: provider.Scopes,
+		Scopes:         provider.Scopes,
+		ObservedScopes: []string{"data:read_write"},
 		Token: oauth2.Token{
 			AccessToken: "access-1", RefreshToken: "refresh-1",
 			TokenType: "Bearer", Expiry: time.Now().Add(-time.Hour),
@@ -713,7 +791,7 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 	wait.Add(2)
 	errorsFound := make(chan error, 2)
 	for _, authorization := range []Authorization{first, second} {
-		go func() {
+		go func(authorization Authorization) {
 			defer wait.Done()
 			token, err := authorization.AccessToken(context.Background())
 			if err != nil {
@@ -722,8 +800,17 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 			}
 			if string(token) != "access-2" {
 				errorsFound <- errors.New("unexpected refreshed access token")
+				return
 			}
-		}()
+			scopes, err := authorization.GrantedScopes(context.Background())
+			if err != nil {
+				errorsFound <- err
+				return
+			}
+			if !slices.Equal(scopes, []string{"data:read"}) {
+				errorsFound <- errors.New("refresh retained stale observed scopes")
+			}
+		}(authorization)
 	}
 	wait.Wait()
 	close(errorsFound)
@@ -732,8 +819,142 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if refreshes != 1 || !strings.Contains(stored, `"refresh_token":"refresh-2"`) {
+	if refreshes != 1 || !strings.Contains(stored, `"refresh_token":"refresh-2"`) ||
+		!strings.Contains(stored, `"observedScopes":["data:read"]`) {
 		t.Fatalf("refreshes=%d stored=%s", refreshes, stored)
+	}
+}
+
+func TestCredentialedDesktopClientResolvesCredentialForRefresh(t *testing.T) {
+	t.Parallel()
+	tokenServer := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		if err := request.ParseForm(); err != nil {
+			t.Error(err)
+			http.Error(writer, "bad form", http.StatusBadRequest)
+			return
+		}
+		if request.Form.Get("refresh_token") != "google-refresh" ||
+			request.Form.Get("client_id") != "google-desktop-client" ||
+			request.Form.Get("client_secret") != "google-client-credential" {
+			t.Errorf("refresh form = %#v", request.Form)
+			http.Error(writer, "bad refresh", http.StatusBadRequest)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(writer,
+			`{"access_token":"google-access-2","token_type":"Bearer","expires_in":3600}`,
+		)
+	}))
+	defer tokenServer.Close()
+
+	provider := Provider{
+		ID: domain.ProviderGoogle, AuthURL: tokenServer.URL + "/authorize",
+		TokenURL: tokenServer.URL, Scopes: []string{"mail.read"},
+		ClientCredential: true,
+	}
+	route := config.OAuthClient{
+		ClientID: "google-desktop-client", RedirectURI: "http://127.0.0.1:0",
+		Authorization: config.CredentialRef{
+			Backend: config.CredentialOSKeyring, Key: "google-refresh-grant", Consent: true,
+		},
+	}
+	stored, err := json.Marshal(storedGrant{
+		Version: 1, Provider: provider.ID, ClientID: route.ClientID,
+		RedirectURI: route.RedirectURI, Scopes: provider.Scopes,
+		Token: oauth2.Token{
+			AccessToken: "google-access-1", RefreshToken: "google-refresh",
+			TokenType: "Bearer", Expiry: time.Now().Add(-time.Hour),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := New(Options{
+		HTTP:    tokenServer.Client(),
+		Get:     func(string, string) (string, error) { return string(stored), nil },
+		Set:     func(string, string, string) error { return nil },
+		LockDir: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	credential := []byte("google-client-credential")
+	authorization, err := manager.AuthorizeWithClientCredential(
+		t.Context(), route, provider,
+		func(context.Context) ([]byte, error) { return credential, nil },
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := authorization.AccessToken(t.Context())
+	if err != nil || string(token) != "google-access-2" {
+		t.Fatalf("refreshed access token = %q, %v", token, err)
+	}
+	if !slices.Equal(credential, make([]byte, len(credential))) {
+		t.Fatalf("refresh retained client credential = %q", credential)
+	}
+}
+
+func TestObservedOAuthScopesStayBoundedAndNeverFallBackToRequestedScopes(
+	t *testing.T,
+) {
+	t.Parallel()
+
+	requested := []string{"Chat.ReadWrite", "ChatMessage.Send"}
+	grant := storedGrant{
+		Version: 1, Provider: domain.ProviderMicrosoftGraph,
+		ClientID: "synthetic-client", RedirectURI: "http://127.0.0.1:8765/oauth/callback",
+		Scopes: requested,
+		Token: oauth2.Token{
+			AccessToken: "synthetic-access", TokenType: "Bearer",
+			Expiry: time.Now().Add(time.Hour),
+		},
+	}
+	stored, err := json.Marshal(grant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := New(Options{
+		Get: func(string, string) (string, error) { return string(stored), nil },
+		Set: func(string, string, string) error {
+			t.Fatal("existing grant unexpectedly changed")
+			return nil
+		},
+		LockDir: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorization, err := manager.Authorize(
+		t.Context(),
+		config.OAuthClient{
+			ClientID: grant.ClientID, RedirectURI: grant.RedirectURI,
+			Authorization: config.CredentialRef{
+				Backend: config.CredentialOSKeyring, Key: "synthetic", Consent: true,
+			},
+		},
+		Provider{ID: grant.Provider, Scopes: requested},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scopes, err := authorization.GrantedScopes(t.Context())
+	if err != nil || len(scopes) != 0 {
+		t.Fatalf("unobserved GrantedScopes() = %#v, %v", scopes, err)
+	}
+
+	for _, value := range []any{
+		`Chat.ReadWrite"bad`, strings.Repeat("x", maximumScopeBytes+1), 42,
+	} {
+		token := (&oauth2.Token{AccessToken: "synthetic"}).WithExtra(map[string]any{
+			"scope": value,
+		})
+		if _, _, scopeErr := tokenObservedScopes(token, ""); scopeErr == nil {
+			t.Fatalf("tokenObservedScopes(%#v) unexpectedly succeeded", value)
+		}
 	}
 }
 

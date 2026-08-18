@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gmail・GoogleカレンダーのOAuth設定 — Corresync</title>
+    <meta
+      name="description"
+      content="自分で管理するGoogleデスクトップOAuthクライアントを使って、Gmail、Googleカレンダー、Meetリンク、Google TasksをCorresyncにつなぐ手順。Cloud Consoleの画面、API、スコープ、安全な取り込みまで丁寧に案内します。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Gmail・GoogleカレンダーのOAuth設定 — Corresync">
+    <meta
+      property="og:description"
+      content="自分のGoogle Cloudプロジェクトで、Google連携をわかりやすく安全に設定する画面付きガイド。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/ja/google-oauth.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="ローカルファーストのメール・カレンダーCLI／MCPサーバー、Corresync。"
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Gmail・GoogleカレンダーのOAuth設定 — Corresync">
+    <meta
+      name="twitter:description"
+      content="自分で管理するデスクトップOAuthクライアントでGoogle連携を設定します。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="ローカルファーストのメール・カレンダーCLI／MCPサーバー、Corresync。"
+    >
+    <link rel="canonical" href="https://corresync.org/ja/google-oauth.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/google-oauth.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/google-oauth.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/google-oauth.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/google-oauth.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/google-oauth.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/google-oauth.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へ移動</a><div class="airmail" aria-hidden="true">
+    </div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync ホーム"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="メイン">
+          <a href="./">ホーム</a><a href="getting-started.html">はじめる</a><a
+            href="providers.html"
+          >プロバイダー</a><a href="features.html">機能</a><a href="safety.html"
+          >安全性</a>
+        </nav>
+        <nav class="language-nav" aria-label="言語">
+          <a href="../google-oauth.html" lang="en" hreflang="en">EN</a><a
+            href="google-oauth.html"
+            lang="ja"
+            hreflang="ja"
+            aria-current="page"
+          >日本語</a><a href="../zh-cn/google-oauth.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="../zh-tw/google-oauth.html" lang="zh-Hant" hreflang="zh-Hant"
+          >繁中</a><a href="../ko/google-oauth.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow">
+          <span aria-hidden="true"></span>自分のプロジェクト、自分の同意
+        </p>
+        <h1 id="page-title">
+          Corresync側のOAuth審査を待たずに、<em>Googleをつなぐ。</em>
+        </h1>
+        <p class="lede">
+          自分で管理するGoogle
+          Cloudプロジェクトに「デスクトップアプリ」のOAuthクライアントを作ります。Corresyncはダウンロードしたファイルを検証し、生成された認証情報をOSのキーチェーンへ保存。ログイン、MFA、同意はいつものGoogleブラウザ画面で行います。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#steps">画面を見ながら設定する</a><a
+            class="button secondary"
+            href="providers.html#google"
+          >対応状況を見る</a>
+        </div>
+      </section>
+      <section class="evidence-banner" aria-label="Google OAuthの状態">
+        <span class="status-dot" aria-hidden="true"></span><div>
+          <strong
+          >自分で用意するOAuthは利用可能。Corresync管理版は休眠中です。</strong><p>
+            アダプターは合成契約テスト済みですが、現行版での実環境観測は未記録です。Google側のAudience、割り当て、警告、組織ポリシーは引き続き適用されます。
+          </p>
+        </div>
+      </section>
+      <section id="steps" aria-labelledby="steps-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>4つのブラウザ画面</p>
+          <h2 id="steps-title">必要最小限のGoogleプロジェクトを作ります。</h2>
+          <p>
+            下図はアカウントの実画面を写したものではなく、迷いやすい場所を示す案内図です。Googleが表示名を変えた場合も、選ぶ対象と安全境界は同じです。
+          </p>
+        </div>
+        <div class="browser-guide">
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">01 · プロジェクト</p>
+              <h3>自分が所有するプロジェクトを選ぶ</h3>
+              <p>
+                Google Cloud
+                Console上部のプロジェクト選択から作成または選択します。他アプリのクライアントや認証情報は流用しません。
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>console.cloud.google.com</code>
+              </div>
+              <div class="browser-content">
+                <strong>プロジェクトの選択</strong><div class="browser-choice selected">
+                  My Corresync · 自分が管理
+                </div>
+                <div class="browser-action">新しいプロジェクト</div>
+                <figcaption class="browser-note">
+                  同意画面の主体と割り当てはこのプロジェクトに属します。
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">02 · API</p>
+              <h3>選んだサービスだけを有効にする</h3>
+              <p>
+                メールはGmail API、予定表とMeetリンクはGoogle Calendar
+                API、タスクを使う場合だけGoogle Tasks APIを有効にします。
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>APIとサービス / ライブラリ</code>
+              </div>
+              <div class="browser-content">
+                <strong>APIライブラリ</strong><div class="browser-choice selected">
+                  Gmail API · Calendar API
+                </div>
+                <div class="browser-choice">Tasks API · 選んだ場合のみ</div>
+                <figcaption class="browser-note">
+                  Chat、Drive、連絡先、管理APIは不要です。
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">03 · Audience</p>
+              <h3>利用者とスコープを正直に選ぶ</h3>
+              <p>
+                同じWorkspace組織だけで使える条件を満たすときのみInternal、それ以外はExternalです。Testingの間は接続するアカウントをテストユーザーへ追加します。Testingの認可は7日で失効します。
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>Google Auth Platform / Audience</code>
+              </div>
+              <div class="browser-content">
+                <strong>対象</strong><div class="browser-choice selected">
+                  External · 個人など
+                </div>
+                <div class="browser-choice">Internal · 対象組織のみ</div>
+                <figcaption class="browser-note">
+                  Data
+                  AccessにはGmail変更、Calendar一覧読取＋予定、Tasksのどちらか一方。
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">04 · クライアント</p>
+              <h3>デスクトップアプリを作り、JSONを保存する</h3>
+              <p>
+                Clientsで「デスクトップアプリ」を選びます。ウェブアプリ、サービスアカウント、APIキーではありません。JSONは非公開のまま保管してください。
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>Google Auth Platform / Clients</code>
+              </div>
+              <div class="browser-content">
+                <strong
+                >OAuthクライアントを作成</strong><div class="browser-choice selected">
+                  アプリの種類 · デスクトップアプリ
+                </div>
+                <div class="browser-action">JSONをダウンロード</div>
+                <figcaption class="browser-note">
+                  127.0.0.1の空きポートを認可ごとに使います。
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+        </div>
+      </section>
+      <section aria-labelledby="connect-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>安全なローカル受け渡し</p>
+          <h2 id="connect-title">
+            細かなところはガイド付きセットアップに任せられます。
+          </h2>
+          <p>
+            <code>corr
+              setup</code>を実行し、Googleと使いたいサービスを選び、「ダウンロードしたクライアントJSONを取り込む」を選択します。クライアントID、ループバックURI、スコープ、別々のキーチェーンハンドルを確認します。この時点ではログインしません。
+          </p>
+        </div>
+        <pre class="oauth-command" tabindex="0"><code>$ corr setup
+$ corr auth login --account personal
+$ corr doctor --account personal</code></pre>
+        <p class="fine-print">
+          スクリプトでは最初に <code>corr auth google-client import FILE --key
+            HANDLE</code>
+          を使います。生成された値をTOML、コマンド引数、MCP、Issue、サポート出力へ貼らないでください。入力ファイルはCorresyncが勝手に削除しません。
+        </p>
+      </section>
+      <section class="honest-edges" aria-labelledby="choices-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>公開状態を変える前に</p>
+          <h2 id="choices-title">
+            個人利用なら審査不要の場合があります。ただし制限は残ります。
+          </h2>
+          <p class="fine-print">
+            Googleは現在、100ユーザー未満の個人利用や条件を満たすInternal利用を、審査が必須でない例として案内しています。未確認アプリの警告、人数上限、制限付きスコープの方針、組織管理、最新規約は別に適用されます。
+          </p>
+        </div>
+        <ul>
+          <li>
+            Testingでは登録したテストユーザーだけが使え、認可は7日で失効します。
+          </li>
+          <li>
+            Workspace管理者は、クライアントIDとスコープを拒否または審査対象にできます。
+          </li>
+          <li>
+            回避策としてサービスアカウントやドメイン全体の委任を使いません。
+          </li>
+          <li>
+            MCPは認証済みセッションを使えますが、Google
+            OAuthを開始できません。
+          </li>
+        </ul>
+      </section>
+      <section class="final-cta" aria-labelledby="oauth-cta">
+        <p class="eyebrow"><span aria-hidden="true"></span>準備ができたら</p>
+        <h2 id="oauth-cta">クライアントを作り、その後はローカルに。</h2>
+        <p>
+          GoogleログインはGoogleのブラウザ画面のまま。メール、予定、タスク、認証情報がCorresyncのサーバーを通ることはありません。
+        </p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">Corresyncをインストール</a><a
+            class="button secondary"
+            href="https://github.com/nkiyohara/corresync/blob/main/docs/google-oauth-setup.md"
+          >技術ガイドを開く</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        独立したローカルファーストのツールです。Googleとは提携・承認関係にありません。
+      </p>
+      <nav aria-label="フッター">
+        <a href="getting-started.html">はじめる</a><a href="providers.html"
+        >プロバイダー</a><a href="features.html">機能</a><a href="safety.html"
+        >安全性</a><a href="privacy.html">プライバシー</a><a href="terms.html"
+        >利用条件</a><a href="https://github.com/nkiyohara/corresync">GitHubソース</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >セキュリティ</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >リリース</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

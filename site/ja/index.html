@@ -6,7 +6,7 @@
     <title>Corresync — メールとカレンダーを、ひとつのローカルMCPへ</title>
     <meta
       name="description"
-      content="Outlook、Microsoft 365、JMAP、IMAP/SMTP、CalDAV、タスクをつなぐローカルファーストMCPサーバーとCLI。Gmail、Googleカレンダー、Google Tasksは近日対応です。"
+      content="Outlook、Microsoft 365、Gmail、Googleカレンダー、Google Tasks、JMAP、IMAP/SMTP、CalDAVをつなぐローカルファーストMCPサーバーとCLI。Googleは自分のデスクトップOAuthクライアントで利用できます。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -135,9 +135,8 @@
           </p>
           <p class="hero-providers">
             <strong>現在利用可能：</strong>Outlook Web · Microsoft Graph · Todoist ·
-            TickTick · JMAP · IMAP/SMTP · CalDAV。<strong
-            >近日対応：</strong>Gmail、Googleカレンダー、Google Tasks（Google
-            OAuth承認待ち）。 アカウントごとの対応範囲や管理者要件は、<a
+            TickTick · JMAP · IMAP/SMTP · CalDAV · Gmail · Googleカレンダー · Google
+            Tasks。Googleは自分で管理するCloudプロジェクトのデスクトップOAuthクライアントが必要です。アカウントごとの対応範囲や管理者要件は、<a
               href="providers.html"
             >対応サービス一覧</a>で確認できます。
           </p>
@@ -240,13 +239,14 @@
         <div>
           <p class="eyebrow"><span aria-hidden="true"></span>Google対応について</p>
           <h2 id="policy-callout-title">
-            実装は済んでいます。いまは承認待ちです。
+            自分のOAuthクライアントで、Googleをつなげます。
           </h2>
           <p>
-            Gmail、Googleカレンダー、Google
-            TasksのコードはRCに含まれていますが、本番OAuthは無効です。
-            Googleへのサインイン、キーチェーン参照、スコープ要求、API通信はいずれも始まりません。
-            承認後、別のレビュー済みリリースで初めて有効化します。
+            自分のGoogle
+            CloudプロジェクトにデスクトップOAuthクライアントを作り、
+            ガイド付き設定でJSONを読み込みます。認証情報とアカウントの認可はOSキーチェーンに保存し、
+            Corresync管理版OAuthは無効のままです。<a href="google-oauth.html"
+            >画面付きの手順を見る</a>。
           </p>
         </div>
         <div class="actions">
@@ -470,9 +470,9 @@ corr auth login --account personal</code></pre>
           </article>
           <article class="route-family accent-card">
             <p class="chip">明示的OAuth</p>
-            <h3>Microsoft Graph · Googleは近日対応</h3>
+            <h3>Microsoft Graph · Googleは自分のクライアントで</h3>
             <p>
-              Graphは許可された公開クライアントを明示的に選べます。Google経路は本番OAuth承認まで完全に無効です。
+              Graphは許可された公開クライアントを明示的に選べます。Googleは自分のデスクトップOAuthクライアントを使います。
             </p>
           </article>
           <article class="route-family">
@@ -488,7 +488,7 @@ corr auth login --account personal</code></pre>
           <p>
             <strong
             >根拠も明示します。</strong>各経路には決定的な合成データによる契約テストがあります。Google
-            API経路は無効で、実環境では未観測です。
+            API経路は合成契約テスト済みで、実環境では未観測です。
           </p>
           <a href="providers.html#check">アドレスを非公開で確認<span aria-hidden="true">
               →</span></a>
@@ -546,7 +546,7 @@ corr auth login --account personal</code></pre>
         <ul>
           <li>
             <strong>Gmail、Googleカレンダー、Google
-              Tasksは承認待ちです。</strong>コードはRCに含まれますが、本番OAuthは無効です。
+              Tasksは自分のOAuthクライアントで利用できます。</strong>ガイド付き設定が秘密値をOSキーチェーンへ保存します。
           </li>
           <li>
             <strong>Microsoft
@@ -562,7 +562,8 @@ corr auth login --account personal</code></pre>
           </li>
           <li>
             <strong
-            >Teamsチャットや会議管理は対象外です。</strong>予定に付く純正参加リンクだけを扱います。
+            >Teamsのチャットとチャネルは、現行リリースでは利用できません。</strong>
+            実装はリリース証拠ゲートの内側にあり、通話、録画、プレゼンス、会議ライフサイクル管理は引き続き対象外です。
           </li>
         </ul>
       </section>

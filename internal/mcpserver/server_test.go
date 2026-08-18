@@ -109,77 +109,133 @@ func TestAuthenticationFailureHasStructuredMCPErrorAndJSONFallback(t *testing.T)
 	}
 }
 
+func TestSavedQueryToolsResolveOneAccountAndPreserveTypedDefaults(t *testing.T) {
+	t.Parallel()
+
+	account := domain.AccountID("acc_00000000000000000000000000000071")
+	backend := &fakeBackend{accountView: application.AccountView{
+		ID: account, Alias: "work",
+	}}
+	server, err := New(backend, Options{Version: "dev", Instance: "saved-query-test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+	result, err := client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "saved_query_save_mail",
+		Arguments: map[string]any{
+			"account": "work", "name": "priority", "query": "is:unread",
+		},
+	})
+	if err != nil || result.IsError {
+		t.Fatalf("saved_query_save_mail result = %+v, error = %v", result, err)
+	}
+	input := backend.savedQuerySaveInput
+	if input.Account != account || input.Name != "priority" ||
+		input.Kind != application.SavedQueryMail || input.Mail == nil ||
+		input.Mail.Folder.Kind != application.MailFolderDistinguished ||
+		input.Mail.Folder.ID != "inbox" || input.Mail.Limit != 25 ||
+		input.Mail.TimeZone != "UTC" {
+		t.Fatalf("saved mail query input = %+v", input)
+	}
+
+	result, err = client.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "saved_query_run",
+		Arguments: map[string]any{
+			"account": "work", "name": "priority", "offset": float64(4),
+		},
+	})
+	if err != nil || result.IsError {
+		t.Fatalf("saved_query_run result = %+v, error = %v", result, err)
+	}
+	if backend.savedQueryRunInput.Account != account ||
+		backend.savedQueryRunInput.Name != "priority" ||
+		backend.savedQueryRunInput.Offset != 4 {
+		t.Fatalf("saved query run input = %+v", backend.savedQueryRunInput)
+	}
+}
+
 type fakeBackend struct {
-	mailInput            application.MailListInput
-	searchInput          application.MailSearchInput
-	searchAllInput       application.MailProjectionInput
-	folderInput          application.MailFolderListInput
-	calendarFolderInput  application.CalendarFolderListInput
-	bodyInput            application.MailBodyInput
-	attachmentInput      application.MailAttachmentInput
-	approvalToken        string
-	calendarInput        application.CalendarListInput
-	agendaInput          application.AgendaProjectionInput
-	calendarCreate       application.CalendarCreateInput
-	calendarUpdate       application.CalendarUpdateInput
-	calendarCancel       application.CalendarCancelInput
-	caller               domain.Caller
-	mailPage             application.MailPage
-	mailProjection       application.MailProjectionPage
-	folderPage           application.MailFolderPage
-	calendarFolderPage   application.CalendarFolderPage
-	bodyAccess           application.MailBodyAccess
-	attachmentAccess     application.MailAttachmentAccess
-	draftInput           application.MailDraftInput
-	draftAccess          application.MailDraftAccess
-	sendInput            application.MailSendInput
-	sendAccess           application.MailSendAccess
-	sendDraftInput       application.MailDraftSendInput
-	sendDraftAccess      application.MailDraftSendAccess
-	moveInput            application.MailMoveInput
-	moveAccess           application.MailMoveAccess
-	readStateInput       application.MailReadStateInput
-	readStateAccess      application.MailReadStateAccess
-	calendarPage         application.CalendarPage
-	agendaPage           application.AgendaProjectionPage
-	calendarAccess       application.CalendarCreateAccess
-	calendarUpdateAccess application.CalendarUpdateAccess
-	calendarCancelAccess application.CalendarCancelAccess
-	discoveryAddress     string
-	discoveryResult      application.AccountDiscoveryResult
-	accountReference     string
-	accountCatalog       application.AccountCatalog
-	accountView          application.AccountView
-	sessionStatus        application.SessionStatusResult
-	accountAddInput      application.AccountAddInput
-	accountRenameInput   application.AccountRenameInput
-	accountRemoveInput   application.AccountRemoveInput
-	accountChangeAccess  application.AccountChangeAccess
-	settingsInput        application.SettingsUpdateInput
-	settingsView         application.SettingsView
-	settingsAccess       application.SettingsChangeAccess
-	monitorStatus        application.MonitorStatus
-	monitorListInput     application.MonitorEventListInput
-	monitorPage          application.MonitorEventPage
-	monitorAckInput      application.MonitorAcknowledgeInput
-	monitorEvent         application.MonitorEvent
-	taskListsInput       application.TaskListInput
-	taskReadInput        application.TaskReadInput
-	taskProjectionInput  application.TaskProjectionInput
-	taskGetInput         application.TaskGetInput
-	taskSearchInput      application.TaskSearchInput
-	taskSyncInput        application.TaskSyncInput
-	taskCreateInput      application.TaskCreateInput
-	taskUpdateInput      application.TaskUpdateInput
-	taskStateInput       application.TaskStateInput
-	taskListsPage        application.TaskListPage
-	taskPage             application.TaskPage
-	taskProjectionPage   application.TaskProjectionPage
-	task                 application.Task
-	taskChangePage       application.TaskChangePage
-	taskAccess           application.TaskWriteAccess
-	taskAction           string
-	err                  error
+	mailInput             application.MailListInput
+	searchInput           application.MailSearchInput
+	searchAllInput        application.MailProjectionInput
+	folderInput           application.MailFolderListInput
+	calendarFolderInput   application.CalendarFolderListInput
+	bodyInput             application.MailBodyInput
+	attachmentInput       application.MailAttachmentInput
+	approvalToken         string
+	calendarInput         application.CalendarListInput
+	agendaInput           application.AgendaProjectionInput
+	calendarCreate        application.CalendarCreateInput
+	calendarUpdate        application.CalendarUpdateInput
+	calendarCancel        application.CalendarCancelInput
+	caller                domain.Caller
+	mailPage              application.MailPage
+	mailProjection        application.MailProjectionPage
+	folderPage            application.MailFolderPage
+	calendarFolderPage    application.CalendarFolderPage
+	bodyAccess            application.MailBodyAccess
+	attachmentAccess      application.MailAttachmentAccess
+	draftInput            application.MailDraftInput
+	draftAccess           application.MailDraftAccess
+	sendInput             application.MailSendInput
+	sendAccess            application.MailSendAccess
+	sendDraftInput        application.MailDraftSendInput
+	sendDraftAccess       application.MailDraftSendAccess
+	moveInput             application.MailMoveInput
+	moveAccess            application.MailMoveAccess
+	readStateInput        application.MailReadStateInput
+	readStateAccess       application.MailReadStateAccess
+	calendarPage          application.CalendarPage
+	agendaPage            application.AgendaProjectionPage
+	calendarAccess        application.CalendarCreateAccess
+	calendarUpdateAccess  application.CalendarUpdateAccess
+	calendarCancelAccess  application.CalendarCancelAccess
+	discoveryAddress      string
+	discoveryResult       application.AccountDiscoveryResult
+	accountReference      string
+	accountCatalog        application.AccountCatalog
+	accountView           application.AccountView
+	sessionStatus         application.SessionStatusResult
+	accountAddInput       application.AccountAddInput
+	accountRenameInput    application.AccountRenameInput
+	accountRemoveInput    application.AccountRemoveInput
+	accountChangeAccess   application.AccountChangeAccess
+	settingsInput         application.SettingsUpdateInput
+	settingsView          application.SettingsView
+	settingsAccess        application.SettingsChangeAccess
+	monitorStatus         application.MonitorStatus
+	monitorListInput      application.MonitorEventListInput
+	monitorPage           application.MonitorEventPage
+	monitorAckInput       application.MonitorAcknowledgeInput
+	monitorEvent          application.MonitorEvent
+	savedQueryAccount     domain.AccountID
+	savedQueryInput       application.SavedQueryDeleteInput
+	savedQueryRunInput    application.SavedQueryRunInput
+	savedQuerySaveInput   application.SavedQuerySaveInput
+	savedQueryCatalog     application.SavedQueryCatalog
+	savedQuery            application.SavedQueryDefinition
+	savedQueryExecution   application.SavedQueryExecution
+	savedQueryAccess      application.SavedQueryChangeAccess
+	savedQueryPurge       application.SavedQueryPurgeInput
+	savedQueryPurgeAccess application.SavedQueryPurgeAccess
+	taskListsInput        application.TaskListInput
+	taskReadInput         application.TaskReadInput
+	taskProjectionInput   application.TaskProjectionInput
+	taskGetInput          application.TaskGetInput
+	taskSearchInput       application.TaskSearchInput
+	taskSyncInput         application.TaskSyncInput
+	taskCreateInput       application.TaskCreateInput
+	taskUpdateInput       application.TaskUpdateInput
+	taskStateInput        application.TaskStateInput
+	taskListsPage         application.TaskListPage
+	taskPage              application.TaskPage
+	taskProjectionPage    application.TaskProjectionPage
+	task                  application.Task
+	taskChangePage        application.TaskChangePage
+	taskAccess            application.TaskWriteAccess
+	taskAction            string
+	err                   error
 }
 
 func (backend *fakeBackend) DefaultAccount() domain.AccountID { return "work" }
@@ -328,6 +384,87 @@ func (backend *fakeBackend) AcknowledgeMonitorEvent(
 	backend.monitorAckInput = input
 	backend.caller = caller
 	return backend.monitorEvent, backend.err
+}
+
+func (backend *fakeBackend) ListSavedQueries(
+	_ context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (application.SavedQueryCatalog, error) {
+	backend.savedQueryAccount, backend.caller = account, caller
+	return backend.savedQueryCatalog, backend.err
+}
+
+func (backend *fakeBackend) GetSavedQuery(
+	_ context.Context,
+	input application.SavedQueryDeleteInput,
+	caller domain.Caller,
+) (application.SavedQueryDefinition, error) {
+	backend.savedQueryInput, backend.caller = input, caller
+	return backend.savedQuery, backend.err
+}
+
+func (backend *fakeBackend) RunSavedQuery(
+	_ context.Context,
+	input application.SavedQueryRunInput,
+	caller domain.Caller,
+) (application.SavedQueryExecution, error) {
+	backend.savedQueryRunInput, backend.caller = input, caller
+	return backend.savedQueryExecution, backend.err
+}
+
+func (backend *fakeBackend) PreviewSavedQuerySave(
+	_ context.Context,
+	input application.SavedQuerySaveInput,
+	caller domain.Caller,
+) (application.SavedQueryChangeAccess, error) {
+	backend.savedQuerySaveInput, backend.caller = input, caller
+	return backend.savedQueryAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitSavedQuerySave(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.SavedQueryChangeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.savedQueryAccess, backend.err
+}
+
+func (backend *fakeBackend) PreviewSavedQueryDelete(
+	_ context.Context,
+	input application.SavedQueryDeleteInput,
+	caller domain.Caller,
+) (application.SavedQueryChangeAccess, error) {
+	backend.savedQueryInput, backend.caller = input, caller
+	return backend.savedQueryAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitSavedQueryDelete(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.SavedQueryChangeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.savedQueryAccess, backend.err
+}
+
+func (backend *fakeBackend) PreviewSavedQueryPurge(
+	_ context.Context,
+	input application.SavedQueryPurgeInput,
+	caller domain.Caller,
+) (application.SavedQueryPurgeAccess, error) {
+	backend.savedQueryPurge, backend.caller = input, caller
+	return backend.savedQueryPurgeAccess, backend.err
+}
+
+func (backend *fakeBackend) CommitSavedQueryPurge(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.SavedQueryPurgeAccess, error) {
+	backend.approvalToken, backend.caller = token, caller
+	return backend.savedQueryPurgeAccess, backend.err
 }
 
 func (backend *fakeBackend) ListMail(
@@ -774,7 +911,8 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 61 || mailTool == nil || toolNamed(tools.Tools, "task_list") == nil {
+	if len(tools.Tools) != 71 || mailTool == nil || toolNamed(tools.Tools, "task_list") == nil ||
+		toolNamed(tools.Tools, "saved_query_run") == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}
 	annotation := mailTool.Annotations

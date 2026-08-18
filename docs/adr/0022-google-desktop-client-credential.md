@@ -1,6 +1,6 @@
 # ADR 0022: Google Desktop client credential at the process boundary
 
-- Status: accepted
+- Status: superseded by [ADR 0036](0036-user-owned-google-oauth-first.md)
 - Date: 2026-07-30
 
 ## Context

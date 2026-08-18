@@ -11,6 +11,7 @@ installed binary, its matching release notes remain authoritative.
 | Install and verify Corresync | [Installation](install.md) |
 | Add an account or choose a provider route | [Configuration](configuration.md) |
 | Understand browser, OAuth, keyring, or helper sign-in | [Authentication](authentication.md) |
+| Connect Gmail, Google Calendar, or Google Tasks | [User-owned Google OAuth setup](google-oauth-setup.md) |
 | Use terminal commands | [CLI guide](cli.md) |
 | Connect Codex, Claude Code, Copilot, or another MCP client | [MCP integration](mcp.md) |
 | Detect local agent hosts and compare integration surfaces | [Agent-host integrations](integrations.md) |
@@ -45,7 +46,12 @@ separate explicit step. It supports multiple accounts and multiple detected
 agent hosts, showing one integration preview before any host configuration is
 changed and verifying hosts independently afterward. Re-running it resumes at
 the missing step. The shared account flow is also available under `corr
-settings`. For Apple's documented iCloud address families—or a custom
+settings`. The account flow uses a service checklist: Microsoft accounts can
+configure Outlook Mail, Outlook Calendar, and Microsoft To Do independently,
+with a separate explicit Graph authorization for To Do. Teams is a
+non-selectable coming-soon notice until its source-owned release gate is
+complete; an email domain never proves service availability. For Apple's
+documented iCloud address families—or a custom
 domain with the complete verified Apple service-record set—the wizard combines
 Mail and Calendar and hands app-specific-password enrollment to the operating
 system's own credential prompt. Corresync never reads that password.
@@ -95,9 +101,10 @@ preview/commit checks regardless of interface.
 - [Architecture decision records](adr/): accepted decisions and consequences
 - [Prior art](prior-art.md): independent-implementation record
 - [Security policy](../SECURITY.md): supported versions and private reporting
-- [Google OAuth verification](google-oauth-verification.md): production
-  branding, scope justifications, restricted-data architecture, evidence, and
-  submission gate
+- [User-owned Google OAuth setup](google-oauth-setup.md): current personal or
+  organization-owned Desktop client setup with annotated browser screens
+- [Google OAuth verification](google-oauth-verification.md): dormant future
+  Corresync-managed client review record; not the current user setup path
 - [Privacy Policy](https://corresync.org/privacy.html): public
   data-access, storage, sharing, retention, and deletion disclosures
 - [Terms of Use](https://corresync.org/terms.html): official

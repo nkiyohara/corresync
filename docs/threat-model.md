@@ -1,14 +1,15 @@
 # Threat model
 
-Corresync handles private mail/calendar/task data and the authority to act as an
-interactively authenticated user. It is a local single-user tool, not a remote
-gateway or tenant administration service.
+Corresync handles private mail, calendar, task, and messaging data and the
+authority to act as an interactively authenticated user. It is a local
+single-user tool, not a remote gateway or tenant administration service.
 
 ## Assets
 
 - browser sessions, OAuth grants, and credential-helper results;
-- messages, attachments, recipients, events, attendees, meeting links, task
-  lists, reminders, notes, recurrence, and linked sources;
+- mail and chat messages, channels, threads, reactions, attachments,
+  recipients, events, attendees, meeting links, task lists, reminders, notes,
+  recurrence, and linked sources;
 - authority to send mail, change mailbox state, alter meetings, or mutate tasks;
 - stable account identities, provider cursors, import staging, event queues,
   monitor configuration, and local notification/runner destinations;
@@ -44,6 +45,9 @@ gateway or tenant administration service.
   ordinary connection metadata is visible to those operators;
 - an explicitly selected upstream task MCP is an external provider boundary,
   never an extension of Corresync's trusted local MCP server.
+- a selected self-hosted Mattermost origin, its DNS answers, TLS endpoint,
+  REST responses, and WebSocket events are one untrusted provider boundary;
+  self-hosting does not make a private or special-use destination safe.
 
 ## Public compatibility-checker controls
 
@@ -93,9 +97,10 @@ gateway or tenant administration service.
   authorization codes, access tokens, refresh tokens, or client secrets in
   config, CLI, MCP, audit, feedback, or logs.
 - A generated Google Desktop client credential may enter only through the
-  inherited `CORRESYNC_GOOGLE_OAUTH_CLIENT_SECRET` process environment. It is
-  bounded, excluded from browser URLs and stored grants, and sent only to
-  Google's fixed TLS token endpoint.
+  bounded installed-client JSON importer or an explicitly consented external
+  helper. Only its external handle enters config. It is resolved for code
+  exchange or refresh, excluded from browser URLs and stored grants, sent only
+  to Google's fixed TLS token endpoint, and overwritten afterward.
 - TickTick configuration contains only a separately consented external
   client-secret handle. A new authorization-code exchange resolves it
   transiently for HTTP Basic authentication to TickTick's fixed token endpoint;
@@ -104,14 +109,22 @@ gateway or tenant administration service.
 - The Outlook Web route uses visible interactive sign-in. Public OAuth routes
   use Authorization Code with PKCE. TickTick uses the provider's documented
   confidential Authorization Code contract without inventing PKCE or refresh.
-- The staged Google mail, calendar, and task routes are release-gated before
-  browser, OAuth, keyring, session, and network access until production
-  approval. After activation each route pins its API base and cannot represent
-  a password, app password, alternate host, or arbitrary Google API transport.
-  Google Tasks uses an independent task-only scope set and authorization
-  handle.
+- User-owned Google mail, calendar, and task routes are configured without
+  authentication and may authorize only from explicit local CLI login. Each
+  route pins its API base and cannot represent a password, app password,
+  alternate host, or arbitrary Google API transport. Google Tasks uses an
+  independent task-only scope set and authorization handle. The managed Google
+  route remains release-disabled without a user override.
 - Standards credentials remain behind an OS-keyring entry or an explicitly
   approved helper reference.
+- Slack and Mattermost configuration stores only an account-isolated external
+  authorization reference. Mattermost resolves and pins a bounded set of
+  public DNS answers before the external bearer authorizer may touch a request;
+  the adapter never accepts a token value or WebSocket auth challenge payload.
+- Slack private-file reads map the selected fixed API base to one fixed file
+  origin and use a separate exact-origin bearer capability. Redirects, query
+  credentials, arbitrary hosts, and non-private-file paths fail before the
+  authorization can leave its owner.
 - Guided OS-keyring enrollment invokes only the fixed platform credential tool
   with a bounded reviewed handle and no password argument. The child owns the
   TTY prompt; `corr` receives only its exit status. MCP, JSON, pipes, and
@@ -201,6 +214,20 @@ gateway or tenant administration service.
   attachments, imports, queues, runner input, and feedback records.
 - Bind task cursors to one provider, account, list, and advertised mode. Treat
   local notifications as invalidation only; refetch through bounded reads.
+- Treat saved query definitions as private untrusted state: isolate them by
+  opaque account ID, store no provider results or credentials, bind every
+  replacement/deletion/purge to the reviewed revision, and report every run as
+  a live non-cached read. Never let a definition enable monitoring, a runner,
+  notification delivery, authentication, or egress.
+- Bind messaging cursors and writes to one opaque account, route, workspace,
+  actor, conversation, thread, and version. Treat Mattermost WebSocket payloads
+  as content-free invalidations only; deduplicate bounded sequences and recover
+  every gap or reconnect through an anchored REST snapshot reset.
+- For self-hosted messaging, require one credential-free HTTPS DNS origin,
+  valid public DNS answers pinned for the transport lifetime, normal
+  certificate verification, no proxy or redirect, identity encoding only, and
+  bounded REST/file/event bodies. Reject mixed public/private answers, IP
+  literals, DNS rebinding, alternate authorities, and compressed responses.
 - Treat linked task sources as untrusted provenance, never authorization to
   follow a URL or copy, move, or mirror an object. Reject self-loops before any
   future workflow preview.
@@ -277,7 +304,7 @@ gateway or tenant administration service.
 - TLS interception or bypassing organizational controls;
 - automatic provider fallback or tenant-wide/delegated authorization;
 - generic provider actions or arbitrary protocol payloads;
-- Teams chat, channels, calls, recordings, or meeting lifecycle management;
+- Teams calls, recordings, presence, or meeting lifecycle management;
 - remote Corresync MCP transport, hosted relay, multi-user daemon, or ambient
   network listener; an explicit allowlisted upstream provider adapter does not
   expose Corresync remotely;

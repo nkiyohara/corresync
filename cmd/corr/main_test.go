@@ -158,6 +158,28 @@ func TestLegacyRootLoginHelpRemainsAvailable(t *testing.T) {
 	}
 }
 
+func TestPendingMessagingCommandsStayHiddenButParseable(t *testing.T) {
+	t.Parallel()
+
+	var root bytes.Buffer
+	var rootErr bytes.Buffer
+	if code := run(context.Background(), nil, &root, &rootErr); code != 0 {
+		t.Fatalf("root help code = %d, stderr = %q", code, rootErr.String())
+	}
+	if strings.Contains(root.String(), "messages") {
+		t.Fatalf("pending messaging command was advertised in root help:\n%s", root.String())
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if code := run(context.Background(), []string{"messages", "--help"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("message help code = %d, stderr = %q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "Read and manage provider-neutral messaging") {
+		t.Fatalf("message command is not parseable by exact name: %q", stdout.String())
+	}
+}
+
 func TestUpdateDefaultsToActionAndKeepsCheckOnlySubcommand(t *testing.T) {
 	t.Parallel()
 

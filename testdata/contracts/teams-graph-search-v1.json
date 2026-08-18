@@ -1,0 +1,36 @@
+{
+  "value": [
+    {
+      "hitsContainers": [
+        {
+          "hits": [
+            {
+              "hitId": "message-synthetic",
+              "resource": {
+                "id": "message-synthetic",
+                "etag": "etag-synthetic-1",
+                "messageType": "message",
+                "createdDateTime": "2026-08-14T12:00:00Z",
+                "lastModifiedDateTime": "2026-08-14T12:01:00Z",
+                "summary": "Synthetic search summary",
+                "chatId": "chat-synthetic",
+                "from": {
+                  "user": {
+                    "id": "user-synthetic",
+                    "displayName": "Synthetic Teams User"
+                  }
+                },
+                "body": {
+                  "contentType": "text",
+                  "content": "Synthetic secret search body"
+                },
+                "attachments": []
+              }
+            }
+          ],
+          "moreResultsAvailable": false
+        }
+      ]
+    }
+  ]
+}

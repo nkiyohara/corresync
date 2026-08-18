@@ -24,6 +24,16 @@ Every provider adapter must:
 - expose only closed typed operations, never raw actions, URLs, headers,
   methods, MIME parts, Graph properties, JMAP method calls, or WebDAV bodies.
 
+The shared stateless API transport may repeat an idempotent read at most twice
+after its first attempt. It retries only transport/read failures and HTTP
+502/503/504, uses short bounded backoff, and opens a five-second circuit after
+the third failure. HTTP 429 is returned to the provider adapter without an
+automatic retry and opens an account-route-local throttle circuit for a
+bounded `Retry-After` interval. A consequential write always has one network
+attempt. Stateful JMAP, IMAP, SMTP, and WebDAV operations are not placed behind
+this generic replay policy; their protocol-specific state and partial-outcome
+rules remain authoritative.
+
 Discovery is a separate unauthenticated boundary. DNS and well-known metadata
 may suggest ranked routes, but discovery cannot read credentials, start OAuth,
 launch a login, create an account, or choose a provider silently.
@@ -64,10 +74,12 @@ The undocumented Outlook Web service is isolated in
 `internal/provider/outlookweb`. Requests target the configured HTTPS origin and
 the closed `/owa/service.svc?action=<registered-action>` registry.
 
-The browser authorizes a request only after exact-origin validation. Redirects
-are not followed. HTTP 401, 403, and login timeout become `session expired`.
-Only reads may retry; `Retry-After` is bounded. OWA actions retain their
-synthetic `__type` metadata and are normalized behind typed contracts.
+The browser authorizes a request only after exact-origin validation and while
+its owning context remains live. Redirects are not followed. Browser exit and
+authorization-observer loss require interaction again; HTTP 401, 403, and
+login timeout become `session expired`. Only reads may retry; `Retry-After` is
+bounded. OWA actions retain their synthetic `__type` metadata and are
+normalized behind typed contracts.
 
 The registry includes only the actions required for implemented folder, mail,
 attachment, calendar, and reviewed write operations. The typed `FindFolder`
@@ -82,13 +94,16 @@ management are not exposed.
 
 ## Google
 
-The Gmail, Google Calendar, and Google Tasks adapters ship behind a
-release-owned approval gate. While it is false, account selection, explicit
-addition, session activation, and OAuth profile creation independently fail
-before browser, keyring, grant, or network access. The gate has no environment,
-configuration, CLI, MCP, or BYO-client override.
+The Gmail, Google Calendar, and Google Tasks adapters use an explicitly selected
+user-owned Desktop OAuth client. Account setup records only reviewed external
+credential handles and starts no authentication. MCP cannot initiate OAuth;
+only explicit local CLI login may create or expand an authorization. After
+that boundary, the session owner may resolve the already consented client
+credential when Google requires a token refresh; MCP cannot invoke that
+resolution directly and never receives the credential or grant.
+Corresync-managed Google OAuth remains separately disabled.
 
-After a separate post-approval release enables the route, Gmail uses the pinned
+Gmail uses the pinned
 Gmail API with `gmail.modify`. Reads, MIME traversal, pagination, identifiers,
 attachments, and provider payloads are bounded. Draft, send, read-state, label,
 archive, Trash, and untrash mutations map to closed typed endpoints. The
@@ -106,8 +121,8 @@ Google Tasks uses a separate task-only provider route and authorization handle
 with exactly `tasks.readonly` or `tasks` plus verified OpenID identity. Its
 bounded REST adapter exposes the shared task-list discovery and task CRUD/state
 ports, date-only due values, ETag conditions, subtasks, ordering, output-only
-source links, and deletion-aware `updatedMin` polling. The approval gate stops
-the route before OAuth or provider traffic in every RC.
+source links, and deletion-aware `updatedMin` polling. It never reuses or widens
+the Gmail/Calendar grant.
 
 ## Microsoft Graph
 

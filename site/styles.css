@@ -716,6 +716,111 @@ p > code, li > code {
   font-size: 0.88rem;
 }
 
+/* ---------- Google OAuth browser guide ---------- */
+
+.browser-guide {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.browser-step {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.72fr) minmax(20rem, 1.28fr);
+  gap: clamp(1.4rem, 4vw, 3.2rem);
+  align-items: center;
+  padding: clamp(1.35rem, 3vw, 2.2rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.browser-step-copy p:last-child {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.browser-shot {
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.8rem;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.62rem 0.8rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+
+.browser-bar i {
+  width: 0.58rem;
+  height: 0.58rem;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.browser-bar code {
+  min-width: 0;
+  margin-left: 0.45rem;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-content {
+  display: grid;
+  gap: 0.7rem;
+  min-height: 13rem;
+  padding: 1.25rem;
+}
+
+.browser-content strong {
+  font-size: 1.02rem;
+}
+
+.browser-choice,
+.browser-action,
+.browser-note {
+  padding: 0.72rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--card);
+  font-size: 0.78rem;
+}
+
+.browser-choice.selected {
+  border: 2px solid var(--accent);
+}
+
+.browser-action {
+  width: fit-content;
+  color: var(--btn-primary-ink);
+  background: var(--btn-primary-bg);
+  font-weight: 750;
+}
+
+.browser-note {
+  color: var(--muted);
+  background: var(--accent-wash);
+}
+
+.oauth-command {
+  margin-top: 1.2rem;
+}
+
+@media (max-width: 760px) {
+  .browser-step {
+    grid-template-columns: 1fr;
+  }
+}
+
 pre {
   overflow-x: auto;
   margin: 0;

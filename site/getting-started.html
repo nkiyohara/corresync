@@ -295,10 +295,9 @@ corr update</code></pre>
                 system asks for that password directly; Corresync never receives it.
               </p>
               <p>
-                <strong>Using Google?</strong> The Gmail, Calendar, and Tasks API code is in this
-                RC, but the production OAuth application is awaiting approval, so the route is
-                completely disabled and no Google sign-in can start. For now, connect your agent
-                directly to Google’s official Workspace MCP servers.
+                <strong>Using Google?</strong> Create a Desktop OAuth client in a Google Cloud
+                project you control. Guided setup validates the downloaded JSON and imports the
+                generated credential into your OS keyring before an explicit browser login.
               </p>
               <p class="step-links">
                 <a href="providers.html#check">Check your address without sending it</a> ·
@@ -343,12 +342,13 @@ corr doctor --account personal</code></pre>
                 </p>
               </div>
               <div class="install-block">
-                <p class="os-label" id="gs-signin-discover">Gmail · temporary connection path</p>
+                <p class="os-label" id="gs-signin-discover">
+                  Gmail · Google Calendar · Google Tasks
+                </p>
                 <p class="block-note">
-                  Use Google’s official
-                  <a href="https://developers.google.com/workspace/guides/configure-mcp-servers"
-                  >Workspace MCP setup guide</a>. The service is currently a Google Developer
-                  Preview and has its own Google Cloud and OAuth setup requirements.
+                  Follow the <a href="google-oauth.html">illustrated Google OAuth guide</a> to
+                  create a Desktop client, choose only the services you need, and keep both the
+                  client credential and account grant in the OS keyring.
                 </p>
               </div>
             </div>

@@ -16,6 +16,7 @@ require (
 	github.com/emersion/go-webdav v0.7.0
 	github.com/google/jsonschema-go v0.4.3
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/jotaen/kong-completion v0.0.14
 	github.com/mattn/go-shellwords v1.0.14
 	github.com/minio/selfupdate v0.6.0

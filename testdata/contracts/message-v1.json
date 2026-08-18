@@ -1,0 +1,67 @@
+{
+  "summary": {
+    "id": "message-synthetic-001",
+    "version": "version-synthetic-001",
+    "conversationId": "conversation-synthetic-001",
+    "threadRootId": "message-synthetic-root",
+    "author": {
+      "id": "actor-synthetic-author",
+      "mode": "delegated_user",
+      "displayName": "Synthetic Author"
+    },
+    "createdAt": "2026-08-14T12:00:00Z",
+    "updatedAt": "2026-08-14T12:01:00Z",
+    "snippet": "Synthetic contract message",
+    "replyCount": 2,
+    "hasAttachments": true,
+    "deleted": false,
+    "provenance": {
+      "accountId": "acc_11111111111111111111111111111111",
+      "provider": "slack",
+      "route": "slack_api",
+      "workspaceId": "workspace-synthetic-001",
+      "actor": {
+        "id": "actor-synthetic-app",
+        "mode": "app",
+        "displayName": "Synthetic App"
+      },
+      "conversationId": "conversation-synthetic-001",
+      "sourceObjectId": "message-synthetic-001"
+    }
+  },
+  "content": {
+    "format": "markdown",
+    "text": "Synthetic **contract** message"
+  },
+  "links": [
+    {
+      "url": "https://example.invalid/reference",
+      "label": "Synthetic reference"
+    }
+  ],
+  "mentions": [
+    {
+      "id": "actor-synthetic-recipient",
+      "kind": "user",
+      "displayName": "Synthetic Recipient"
+    }
+  ],
+  "reactions": [
+    {
+      "name": "thumbsup",
+      "count": 1,
+      "countKnown": true,
+      "reactedByActor": true
+    }
+  ],
+  "attachments": [
+    {
+      "id": "attachment-synthetic-001",
+      "name": "synthetic.txt",
+      "mediaType": "text/plain",
+      "size": 17,
+      "sizeKnown": true,
+      "downloadable": true
+    }
+  ]
+}

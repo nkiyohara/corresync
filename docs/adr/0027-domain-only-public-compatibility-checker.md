@@ -50,12 +50,12 @@ operator. Invocation logs and Workers observability are disabled in the
 deployment configuration. A rate-limit binding uses one global product key so
 the application does not inspect or retain a visitor IP.
 
-The public signal catalog and the Google approval gate are generated from the
-same Go declarations used by local discovery. CI fails when the artifact is
-stale. Public inference remains evidence rather than authorization or a
-capability guarantee. The CLI remains the fuller local discovery path and may
-perform bounded, TLS-validated well-known discovery that this public service
-deliberately omits.
+The public signal catalog and separate user-owned/managed Google route modes
+are generated from the same Go declarations used by local discovery. CI fails
+when the artifact is stale. Public inference remains evidence rather than
+authorization or a capability guarantee. The CLI remains the fuller local
+discovery path and may perform bounded, TLS-validated well-known discovery that
+this public service deliberately omits.
 
 ## Consequences
 

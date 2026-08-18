@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/nkiyohara/corresync/internal/session"
 )
 
 func TestRequireGraphicalSession(t *testing.T) {
@@ -69,6 +71,28 @@ func TestBrowserOwnedModeCannotExposeAuthorization(t *testing.T) {
 	}
 	if err := instance.Apply(request); err == nil {
 		t.Fatal("Apply() exposed a browser-owned session")
+	}
+}
+
+func TestBrowserCannotApplyAuthorizationAfterOwnerExit(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	manager, err := session.NewManager("https://outlook.example.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	browser := &Browser{context: ctx, sessions: manager}
+	cancel()
+	request, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"https://outlook.example.invalid/owa/service.svc",
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := browser.Apply(request); !errors.Is(err, ErrBrowserSessionUnavailable) {
+		t.Fatalf("Apply() after browser exit error = %v", err)
 	}
 }
 

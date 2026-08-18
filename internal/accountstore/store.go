@@ -35,6 +35,7 @@ func (store Store) ListAccounts(context.Context) (application.AccountCatalog, er
 			Mail:      mailRouteView(account.Mail),
 			Calendar:  calendarRouteView(account.Calendar),
 			Tasks:     taskRouteView(account.Tasks),
+			Messages:  messagingRouteView(account.Messages),
 			IsDefault: alias == configuration.DefaultAccount,
 		})
 	}
@@ -52,7 +53,7 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 		return oauthRouteView(route.Provider, &route.Todoist.OAuth)
 	}
 	if route.Provider == domain.ProviderGoogleTasks && route.GoogleTasks != nil {
-		return oauthRouteView(route.Provider, &route.GoogleTasks.OAuth)
+		return googleOAuthRouteView(route.Provider, &route.GoogleTasks.OAuth)
 	}
 	if route.Provider == domain.ProviderTickTick && route.TickTick != nil {
 		return &application.AccountRouteView{
@@ -86,6 +87,53 @@ func taskRouteView(route *config.TaskRoute) *application.AccountRouteView {
 		}
 	}
 	return application.TaskRouteView(route.Provider)
+}
+
+func googleOAuthRouteView(
+	provider domain.ProviderID,
+	route *config.GoogleOAuthRoute,
+) *application.AccountRouteView {
+	if route == nil {
+		return &application.AccountRouteView{Provider: provider}
+	}
+	return &application.AccountRouteView{
+		Provider:   provider,
+		Endpoints:  []application.DiscoveredEndpoint{{Kind: "api", Value: route.APIBase}},
+		Credential: credentialRefView(route.Authorization),
+	}
+}
+
+func messagingRouteView(route *config.MessagingRoute) *application.AccountMessagingRouteView {
+	if route == nil {
+		return nil
+	}
+	view := &application.AccountMessagingRouteView{
+		Provider: route.Provider, Route: route.Kind(),
+	}
+	switch {
+	case route.TeamsGraph != nil:
+		view.WorkspaceID, view.ReadOnly = route.TeamsGraph.WorkspaceID, route.TeamsGraph.ReadOnly
+		view.Endpoints = []application.DiscoveredEndpoint{{Kind: "api", Value: route.TeamsGraph.OAuth.APIBase}}
+		view.Credential = credentialRefView(route.TeamsGraph.OAuth.Authorization)
+	case route.TeamsWeb != nil:
+		view.WorkspaceID, view.ReadOnly = route.TeamsWeb.WorkspaceID, route.TeamsWeb.ReadOnly
+		view.Endpoints = []application.DiscoveredEndpoint{{Kind: "origin", Value: route.TeamsWeb.Web.Origin}}
+	case route.Slack != nil:
+		view.WorkspaceID, view.ReadOnly = route.Slack.WorkspaceID, route.Slack.ReadOnly
+		view.Endpoints = []application.DiscoveredEndpoint{{Kind: "api", Value: route.Slack.APIBase}}
+		view.Credential = credentialRefView(route.Slack.Authorization)
+	case route.Mattermost != nil:
+		view.WorkspaceID, view.ReadOnly = route.Mattermost.WorkspaceID, route.Mattermost.ReadOnly
+		view.Endpoints = []application.DiscoveredEndpoint{{Kind: "origin", Value: route.Mattermost.Origin}}
+		view.Credential = credentialRefView(route.Mattermost.Authorization)
+	}
+	return view
+}
+
+func credentialRefView(reference config.CredentialRef) *application.AccountCredentialView {
+	return &application.AccountCredentialView{
+		Configured: true, Backend: string(reference.Backend), Consented: reference.Consent,
+	}
 }
 
 // ListCredentialBindings returns private handle ownership for application
@@ -151,9 +199,13 @@ func (store Store) AddAccount(
 		if err != nil {
 			return err
 		}
+		messages, err := messagingRouteConfig(account.Messages)
+		if err != nil {
+			return err
+		}
 		candidate := config.Account{
 			ID: account.ID, Address: account.Address,
-			Mail: mail, Calendar: calendar, Tasks: tasks,
+			Mail: mail, Calendar: calendar, Tasks: tasks, Messages: messages,
 		}
 		for _, requested := range accountCredentialReferences(candidate) {
 			for alias, existing := range configuration.Accounts {
@@ -176,6 +228,55 @@ func (store Store) AddAccount(
 		}
 		return nil
 	})
+}
+
+func messagingRouteConfig(
+	route *application.AccountMessagingRouteInput,
+) (*config.MessagingRoute, error) {
+	if route == nil {
+		return nil, nil
+	}
+	if err := route.Provider.Validate(); err != nil {
+		return nil, err
+	}
+	result := &config.MessagingRoute{Provider: route.Provider}
+	if route.TeamsGraph != nil {
+		oauth, err := oauthRouteConfig(&route.TeamsGraph.OAuth)
+		if err != nil {
+			return nil, err
+		}
+		result.TeamsGraph = &config.TeamsGraphMessagingRoute{
+			OAuth: *oauth, WorkspaceID: route.TeamsGraph.WorkspaceID,
+			ReadOnly: route.TeamsGraph.ReadOnly,
+		}
+	}
+	if route.TeamsWeb != nil {
+		result.TeamsWeb = &config.TeamsWebMessagingRoute{
+			Web:         config.WebRoute{Origin: route.TeamsWeb.Web.Origin},
+			WorkspaceID: route.TeamsWeb.WorkspaceID, ReadOnly: route.TeamsWeb.ReadOnly,
+		}
+	}
+	if route.Slack != nil {
+		result.Slack = &config.SlackMessagingRoute{
+			APIBase: route.Slack.APIBase, WorkspaceID: route.Slack.WorkspaceID,
+			Authorization: credentialRefConfig(route.Slack.Authorization),
+			ReadOnly:      route.Slack.ReadOnly,
+		}
+	}
+	if route.Mattermost != nil {
+		result.Mattermost = &config.MattermostMessagingRoute{
+			Origin: route.Mattermost.Origin, WorkspaceID: route.Mattermost.WorkspaceID,
+			Authorization: credentialRefConfig(route.Mattermost.Authorization),
+			ReadOnly:      route.Mattermost.ReadOnly,
+		}
+	}
+	return result, nil
+}
+
+func credentialRefConfig(input application.AccountCredentialInput) config.CredentialRef {
+	return config.CredentialRef{
+		Backend: config.CredentialBackend(input.Backend), Key: input.Key, Consent: input.Consent,
+	}
 }
 
 func taskRouteConfig(
@@ -217,12 +318,9 @@ func taskRouteConfig(
 		}
 	}
 	if route.GoogleTasks != nil {
-		oauth, err := oauthRouteConfig(&route.GoogleTasks.OAuth)
-		if err != nil {
-			return nil, err
-		}
 		result.GoogleTasks = &config.GoogleTaskRoute{
-			OAuth: *oauth, ReadOnly: route.GoogleTasks.ReadOnly,
+			OAuth:    googleOAuthRouteConfig(route.GoogleTasks.OAuth),
+			ReadOnly: route.GoogleTasks.ReadOnly,
 		}
 	}
 	if route.TickTick != nil {
@@ -262,7 +360,11 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 			}
 		case domain.ProviderGoogle:
 			if account.Mail.Google != nil {
-				references = append(references, account.Mail.Google.Authorization)
+				references = append(
+					references,
+					account.Mail.Google.Authorization,
+					account.Mail.Google.ClientSecret,
+				)
 			}
 		case domain.ProviderMicrosoftGraph:
 			if account.Mail.MicrosoftGraph != nil {
@@ -290,6 +392,7 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 				references = append(
 					references,
 					account.Calendar.Google.Authorization,
+					account.Calendar.Google.ClientSecret,
 				)
 			}
 		case domain.ProviderMicrosoftGraph:
@@ -323,6 +426,7 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 		references = append(
 			references,
 			account.Tasks.GoogleTasks.OAuth.Authorization,
+			account.Tasks.GoogleTasks.OAuth.ClientSecret,
 		)
 	}
 	if account.Tasks != nil && account.Tasks.TickTick != nil {
@@ -334,6 +438,16 @@ func accountCredentialReferences(account config.Account) []config.CredentialRef 
 	}
 	if account.Tasks != nil && account.Tasks.CalDAV != nil {
 		references = append(references, account.Tasks.CalDAV.Credential)
+	}
+	if account.Messages != nil {
+		switch {
+		case account.Messages.TeamsGraph != nil:
+			references = append(references, account.Messages.TeamsGraph.OAuth.Authorization)
+		case account.Messages.Slack != nil:
+			references = append(references, account.Messages.Slack.Authorization)
+		case account.Messages.Mattermost != nil:
+			references = append(references, account.Messages.Mattermost.Authorization)
+		}
 	}
 	return references
 }
@@ -451,7 +565,7 @@ func calendarRouteView(route *config.CalendarRoute) *application.AccountRouteVie
 			},
 		}
 	case domain.ProviderGoogle:
-		return oauthRouteView(route.Provider, route.Google)
+		return googleOAuthRouteView(route.Provider, route.Google)
 	case domain.ProviderGoogleWeb:
 		return webRouteView(route.Provider, route.GoogleWeb)
 	case domain.ProviderMicrosoftGraph:
@@ -509,8 +623,7 @@ func googleMailRouteView(
 	return &application.AccountRouteView{
 		Provider: provider,
 		Endpoints: []application.DiscoveredEndpoint{
-			{Kind: "imap", Value: "implicit://imap.gmail.com:993"},
-			{Kind: "smtp", Value: "starttls://smtp.gmail.com:587"},
+			{Kind: "api", Value: "https://www.googleapis.com"},
 		},
 		Identity: route.Username,
 		Credential: &application.AccountCredentialView{
@@ -629,6 +742,7 @@ func mailRouteConfig(
 					Key:     route.Google.Authorization.Key,
 					Consent: route.Google.Authorization.Consent,
 				},
+				ClientSecret: credentialRefConfig(route.Google.ClientSecret),
 			},
 		}, nil
 	case domain.ProviderGoogleWeb:
@@ -698,11 +812,11 @@ func calendarRouteConfig(
 			},
 		}, nil
 	case domain.ProviderGoogle:
-		oauth, err := oauthRouteConfig(route.Google)
-		if err != nil {
-			return nil, err
+		if route.Google == nil {
+			return nil, errors.New("google calendar settings are missing")
 		}
-		return &config.CalendarRoute{Provider: route.Provider, Google: oauth}, nil
+		google := googleOAuthRouteConfig(*route.Google)
+		return &config.CalendarRoute{Provider: route.Provider, Google: &google}, nil
 	case domain.ProviderGoogleWeb:
 		if route.GoogleWeb == nil {
 			return nil, errors.New("google Web calendar settings are missing")
@@ -759,6 +873,17 @@ func oauthRouteConfig(
 			Consent: route.Authorization.Consent,
 		},
 	}, nil
+}
+
+func googleOAuthRouteConfig(
+	route application.AccountGoogleOAuthInput,
+) config.GoogleOAuthRoute {
+	return config.GoogleOAuthRoute{
+		APIBase: route.APIBase, ClientID: route.ClientID,
+		RedirectURI:   route.RedirectURI,
+		Authorization: credentialRefConfig(route.Authorization),
+		ClientSecret:  credentialRefConfig(route.ClientSecret),
+	}
 }
 
 // RenameAccount atomically changes only the mutable alias.
@@ -886,13 +1011,11 @@ func accountOAuthAuthorizationKeys(account config.Account) []string {
 		}
 	}
 	if account.Calendar != nil {
-		for _, route := range []*config.OAuthRoute{
-			account.Calendar.Google,
-			account.Calendar.MicrosoftGraph,
-		} {
-			if route != nil {
-				keys = append(keys, route.Authorization.Key)
-			}
+		if account.Calendar.Google != nil {
+			keys = append(keys, account.Calendar.Google.Authorization.Key)
+		}
+		if account.Calendar.MicrosoftGraph != nil {
+			keys = append(keys, account.Calendar.MicrosoftGraph.Authorization.Key)
 		}
 	}
 	if account.Tasks != nil && account.Tasks.MicrosoftGraph != nil {
@@ -906,6 +1029,9 @@ func accountOAuthAuthorizationKeys(account config.Account) []string {
 	}
 	if account.Tasks != nil && account.Tasks.TickTick != nil {
 		keys = append(keys, account.Tasks.TickTick.OAuth.Authorization.Key)
+	}
+	if account.Messages != nil && account.Messages.TeamsGraph != nil {
+		keys = append(keys, account.Messages.TeamsGraph.OAuth.Authorization.Key)
 	}
 	slices.Sort(keys)
 	return slices.Compact(keys)

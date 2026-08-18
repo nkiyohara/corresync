@@ -290,8 +290,9 @@
             <h3>Google and Graph</h3>
             <p>
               Explicit selection, PKCE, registered loopback redirect, service-minimal scopes, and
-              OS-keyring grant storage. A required Google Desktop client credential stays only in
-              the local process environment; Graph remains secret-free.
+              OS-keyring grant storage. A Google Desktop client credential is imported into a
+              separate OS-keyring entry and never represented in configuration; Graph remains
+              secret-free.
             </p>
           </article>
           <article>
@@ -371,7 +372,10 @@
             No tenant-wide access, administrator capability probe, or automatic Graph authorization
           </li>
           <li>No generic provider property or arbitrary action escape hatch</li>
-          <li>No Teams chat, channels, calls, recordings, or meeting lifecycle management</li>
+          <li>
+            No Teams messaging in this release; calls, recordings, presence, and meeting lifecycle
+            management remain out of scope
+          </li>
           <li>No automatic retry after an ambiguous write</li>
         </ul>
       </section>

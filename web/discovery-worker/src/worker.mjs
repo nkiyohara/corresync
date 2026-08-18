@@ -1,6 +1,6 @@
 import catalog from "../catalog.json" with { type: "json" };
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const DNS_ENDPOINT = "https://cloudflare-dns.com/dns-query";
 const MAX_REQUEST_BYTES = 512;
 const MAX_DNS_BYTES = 64 * 1024;
@@ -314,16 +314,16 @@ function classificationFor(group, variant, score, conflict) {
     };
   }
   if (group === "google") {
-    const enabled = catalog.googleOAuthApproved === true;
+    const enabled = catalog.googleBYOOAuthEnabled === true;
     return {
       family: "google", displayName: displayNameForGroup(group),
       variant,
       confidence: score >= 90 ? "high" : "medium",
-      status: enabled ? (score >= 90 ? "verified" : "likely") : "not_available",
+      status: enabled ? "additional_setup" : "not_available",
       conflict: false,
       summary: enabled
-        ? "Public records match the available Corresync Google route."
-        : "The Corresync Google route is disabled while production OAuth approval is pending.",
+        ? "Public records match Corresync's user-owned Google OAuth route; you must create and select your own Desktop client."
+        : "The Corresync Google route is disabled in this build.",
     };
   }
   if (group === "standards") {
@@ -376,21 +376,23 @@ function routesFor(primary, standards, groups) {
     ));
   }
   if (wanted.has("google")) {
-    const enabled = catalog.googleOAuthApproved === true;
+    const enabled = catalog.googleBYOOAuthEnabled === true;
     routes.push(route(
-      "google", "Gmail and Google Calendar", enabled ? "available" : "not_available",
-      enabled ? "Typed Gmail API operations" : "Gmail API support is included but disabled",
+      "google", "Gmail and Google Calendar", enabled ? "additional_setup" : "not_available",
+      enabled ? "Typed Gmail API operations" : "Gmail API support is disabled",
       enabled
         ? "Selectable calendars and provider-supported Google Meet links"
-        : "Google Calendar and Meet support is included but disabled",
-      enabled ? "public_oauth" : "disabled",
+        : "Google Calendar and Meet support is disabled",
+      enabled ? "user_owned_oauth" : "disabled",
       enabled
-        ? "The normal browser owns OAuth; the grant stays in the OS keyring."
-        : "Not active in this RC; no Google sign-in can start.",
-      [],
+        ? "You own the Google Desktop OAuth client; Corresync stores its credential and your grant in the OS keyring."
+        : "Not active in this build; no Google sign-in can start.",
       enabled
-        ? ["Provider policy and existing mailbox permissions still apply."]
-        : ["Production OAuth approval is pending.", "A separate reviewed release must enable the route."],
+        ? ["Create a Desktop OAuth client in a Google Cloud project you control.", "Enable the Gmail, Calendar, and any selected Tasks APIs."]
+        : [],
+      enabled
+        ? ["Synthetic-contract covered and live-unobserved.", "Corresync-managed Google OAuth remains disabled.", "Google testing-mode and organization policy can limit authorization lifetime or access."]
+        : ["A separate reviewed release must enable the route."],
     ));
   }
   if (wanted.has("apple")) {

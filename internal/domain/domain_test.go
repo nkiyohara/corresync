@@ -134,6 +134,24 @@ func TestTargetedOperationDigestBindsExactTarget(t *testing.T) {
 	}
 }
 
+func TestMessagingTargetKindsRemainClosedAndBounded(t *testing.T) {
+	t.Parallel()
+
+	valid := []TargetRef{
+		{Kind: TargetWorkspace, ID: "workspace-1"},
+		{Kind: TargetConversation, ID: "11:workspace-114:conversation-1"},
+		{Kind: TargetMessage, ID: "11:workspace-114:conversation-19:message-1"},
+	}
+	for _, target := range valid {
+		if err := target.Validate(); err != nil {
+			t.Fatalf("TargetRef(%+v).Validate() error = %v", target, err)
+		}
+	}
+	if err := (TargetRef{Kind: TargetMessage, ID: strings.Repeat("x", 3*4096+17)}).Validate(); err == nil {
+		t.Fatal("oversized messaging target unexpectedly succeeded")
+	}
+}
+
 func TestTaskTargetHasASeparateCompositeBound(t *testing.T) {
 	t.Parallel()
 

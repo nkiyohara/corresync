@@ -87,6 +87,48 @@ func (provider ProviderID) Validate() error {
 	return nil
 }
 
+// MessagingProviderID is separate from the mail/calendar/task provider union
+// so adding a communications route cannot accidentally make it selectable by
+// an unrelated service switch.
+type MessagingProviderID string
+
+const (
+	MessagingProviderMicrosoftTeams MessagingProviderID = "microsoft-teams"
+	MessagingProviderSlack          MessagingProviderID = "slack"
+	MessagingProviderMattermost     MessagingProviderID = "mattermost"
+)
+
+func (provider MessagingProviderID) Validate() error {
+	switch provider {
+	case MessagingProviderMicrosoftTeams, MessagingProviderSlack, MessagingProviderMattermost:
+		return nil
+	default:
+		return fmt.Errorf("invalid messaging provider ID %q", provider)
+	}
+}
+
+// MessagingRouteKind identifies one explicitly selected transport. Keeping it
+// in the domain lets configuration and application code share the same closed
+// identity without either layer depending on a provider adapter.
+type MessagingRouteKind string
+
+const (
+	MessagingRouteTeamsGraph MessagingRouteKind = "teams_graph"
+	MessagingRouteTeamsWeb   MessagingRouteKind = "teams_web"
+	MessagingRouteSlackAPI   MessagingRouteKind = "slack_api"
+	MessagingRouteMattermost MessagingRouteKind = "mattermost_api"
+)
+
+func (kind MessagingRouteKind) Validate() error {
+	switch kind {
+	case MessagingRouteTeamsGraph, MessagingRouteTeamsWeb,
+		MessagingRouteSlackAPI, MessagingRouteMattermost:
+		return nil
+	default:
+		return fmt.Errorf("unsupported messaging route %q", kind)
+	}
+}
+
 // Caller identifies the local adapter instance requesting an operation.
 type Caller struct {
 	Surface  string `json:"surface"`

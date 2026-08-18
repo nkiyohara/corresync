@@ -13,6 +13,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/paths"
+	"github.com/nkiyohara/corresync/internal/savedquerystore"
 	"github.com/nkiyohara/corresync/internal/settingsstore"
 )
 
@@ -646,4 +647,278 @@ func (backend *daemonMCPBackend) ResolveAccount(reference string) (domain.Accoun
 		return "", err
 	}
 	return account.ID, nil
+}
+
+func (backend *daemonMCPBackend) savedQueries() (*application.SavedQueryService, error) {
+	return application.NewSavedQueryService(savedquerystore.New(), backend.Client)
+}
+
+func (backend *daemonMCPBackend) ListSavedQueries(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (application.SavedQueryCatalog, error) {
+	if err := caller.Validate(); err != nil {
+		return application.SavedQueryCatalog{}, err
+	}
+	service, err := backend.savedQueries()
+	if err != nil {
+		return application.SavedQueryCatalog{}, err
+	}
+	return service.List(ctx, account)
+}
+
+func (backend *daemonMCPBackend) GetSavedQuery(
+	ctx context.Context,
+	input application.SavedQueryDeleteInput,
+	caller domain.Caller,
+) (application.SavedQueryDefinition, error) {
+	if err := caller.Validate(); err != nil {
+		return application.SavedQueryDefinition{}, err
+	}
+	service, err := backend.savedQueries()
+	if err != nil {
+		return application.SavedQueryDefinition{}, err
+	}
+	return service.Get(ctx, input)
+}
+
+func (backend *daemonMCPBackend) RunSavedQuery(
+	ctx context.Context,
+	input application.SavedQueryRunInput,
+	caller domain.Caller,
+) (application.SavedQueryExecution, error) {
+	service, err := backend.savedQueries()
+	if err != nil {
+		return application.SavedQueryExecution{}, err
+	}
+	return service.Run(ctx, input, caller)
+}
+
+func (backend *daemonMCPBackend) PreviewSavedQuerySave(
+	ctx context.Context,
+	input application.SavedQuerySaveInput,
+	caller domain.Caller,
+) (application.SavedQueryChangeAccess, error) {
+	if err := caller.Validate(); err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	service, err := backend.savedQueries()
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	review, err := service.ReviewSave(ctx, input)
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	preview, err := backend.prepareSavedQueryOperation(
+		ctx,
+		"saved_query.save",
+		domain.EffectReversibleWrite,
+		review.Account,
+		review,
+		caller,
+	)
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	return application.SavedQueryChangeAccess{
+		Status: "approval_required", Review: &review, Preview: preview,
+	}, nil
+}
+
+func (backend *daemonMCPBackend) CommitSavedQuerySave(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.SavedQueryChangeAccess, error) {
+	operation, err := backend.guard.CommitFor(
+		ctx,
+		token,
+		caller,
+		"saved_query.save",
+		domain.EffectReversibleWrite,
+	)
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	var review application.SavedQueryChangeReview
+	if err := operation.DecodePayload(&review); err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	if review.Account != operation.Account() {
+		return application.SavedQueryChangeAccess{}, errors.New(
+			"approved saved query no longer matches its account",
+		)
+	}
+	service, err := backend.savedQueries()
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	query, executionErr := service.ApplySave(ctx, review)
+	auditErr := backend.guard.RecordExecution(ctx, operation, caller, executionErr)
+	if executionErr != nil || auditErr != nil {
+		return application.SavedQueryChangeAccess{}, errors.Join(executionErr, auditErr)
+	}
+	return application.SavedQueryChangeAccess{
+		Status: "completed", Query: &query,
+	}, nil
+}
+
+func (backend *daemonMCPBackend) PreviewSavedQueryDelete(
+	ctx context.Context,
+	input application.SavedQueryDeleteInput,
+	caller domain.Caller,
+) (application.SavedQueryChangeAccess, error) {
+	if err := caller.Validate(); err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	service, err := backend.savedQueries()
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	review, err := service.ReviewDelete(ctx, input)
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	preview, err := backend.prepareSavedQueryOperation(
+		ctx,
+		"saved_query.delete",
+		domain.EffectDestructiveWrite,
+		review.Account,
+		review,
+		caller,
+	)
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	return application.SavedQueryChangeAccess{
+		Status: "approval_required", Review: &review, Preview: preview,
+	}, nil
+}
+
+func (backend *daemonMCPBackend) CommitSavedQueryDelete(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.SavedQueryChangeAccess, error) {
+	operation, err := backend.guard.CommitFor(
+		ctx,
+		token,
+		caller,
+		"saved_query.delete",
+		domain.EffectDestructiveWrite,
+	)
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	var review application.SavedQueryChangeReview
+	if err := operation.DecodePayload(&review); err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	if review.Account != operation.Account() {
+		return application.SavedQueryChangeAccess{}, errors.New(
+			"approved saved query deletion no longer matches its account",
+		)
+	}
+	service, err := backend.savedQueries()
+	if err != nil {
+		return application.SavedQueryChangeAccess{}, err
+	}
+	executionErr := service.ApplyDelete(ctx, review)
+	auditErr := backend.guard.RecordExecution(ctx, operation, caller, executionErr)
+	if executionErr != nil || auditErr != nil {
+		return application.SavedQueryChangeAccess{}, errors.Join(executionErr, auditErr)
+	}
+	return application.SavedQueryChangeAccess{Status: "completed"}, nil
+}
+
+func (backend *daemonMCPBackend) PreviewSavedQueryPurge(
+	ctx context.Context,
+	input application.SavedQueryPurgeInput,
+	caller domain.Caller,
+) (application.SavedQueryPurgeAccess, error) {
+	if err := caller.Validate(); err != nil {
+		return application.SavedQueryPurgeAccess{}, err
+	}
+	service, err := backend.savedQueries()
+	if err != nil {
+		return application.SavedQueryPurgeAccess{}, err
+	}
+	review, err := service.ReviewPurge(ctx, input)
+	if err != nil {
+		return application.SavedQueryPurgeAccess{}, err
+	}
+	preview, err := backend.prepareSavedQueryOperation(
+		ctx,
+		"saved_query.purge",
+		domain.EffectDestructiveWrite,
+		review.Account,
+		review,
+		caller,
+	)
+	if err != nil {
+		return application.SavedQueryPurgeAccess{}, err
+	}
+	return application.SavedQueryPurgeAccess{
+		Status: "approval_required", Review: &review, Preview: preview,
+	}, nil
+}
+
+func (backend *daemonMCPBackend) CommitSavedQueryPurge(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.SavedQueryPurgeAccess, error) {
+	operation, err := backend.guard.CommitFor(
+		ctx,
+		token,
+		caller,
+		"saved_query.purge",
+		domain.EffectDestructiveWrite,
+	)
+	if err != nil {
+		return application.SavedQueryPurgeAccess{}, err
+	}
+	var review application.SavedQueryPurgeReview
+	if err := operation.DecodePayload(&review); err != nil {
+		return application.SavedQueryPurgeAccess{}, err
+	}
+	if review.Account != operation.Account() {
+		return application.SavedQueryPurgeAccess{}, errors.New(
+			"approved saved query purge no longer matches its account",
+		)
+	}
+	service, err := backend.savedQueries()
+	if err != nil {
+		return application.SavedQueryPurgeAccess{}, err
+	}
+	executionErr := service.ApplyPurge(ctx, review)
+	auditErr := backend.guard.RecordExecution(ctx, operation, caller, executionErr)
+	if executionErr != nil || auditErr != nil {
+		return application.SavedQueryPurgeAccess{}, errors.Join(executionErr, auditErr)
+	}
+	return application.SavedQueryPurgeAccess{Status: "completed", Purged: true}, nil
+}
+
+func (backend *daemonMCPBackend) prepareSavedQueryOperation(
+	ctx context.Context,
+	name string,
+	effect domain.Effect,
+	account domain.AccountID,
+	payload any,
+	caller domain.Caller,
+) (*approval.Preview, error) {
+	operation, err := domain.NewOperation(name, effect, account, payload)
+	if err != nil {
+		return nil, err
+	}
+	preparation, err := backend.guard.Prepare(ctx, operation, caller)
+	if err != nil {
+		return nil, err
+	}
+	if preparation.Preview == nil {
+		return nil, errors.New("saved query policy did not issue the required preview")
+	}
+	return preparation.Preview, nil
 }

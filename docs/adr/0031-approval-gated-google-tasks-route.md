@@ -1,6 +1,7 @@
 # ADR 0031: Independent approval-gated Google Tasks route
 
-- Status: accepted
+- Status: superseded in its OAuth availability decision by
+  [ADR 0036](0036-user-owned-google-oauth-first.md); its Tasks API contract is retained
 - Date: 2026-08-14
 
 ## Context

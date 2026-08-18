@@ -24,7 +24,6 @@ import (
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
-	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type oauthManagerStub struct {
@@ -49,9 +48,22 @@ type routedOAuthManagerStub struct {
 }
 
 type oauthAuthorizationStub struct {
-	client *http.Client
-	token  []byte
-	err    error
+	client        *http.Client
+	token         []byte
+	grantedScopes []string
+	err           error
+}
+
+func (authorization *oauthAuthorizationStub) GrantedScopes(
+	ctx context.Context,
+) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if authorization.err != nil {
+		return nil, authorization.err
+	}
+	return append([]string(nil), authorization.grantedScopes...), nil
 }
 
 func (authorization *oauthAuthorizationStub) HTTPClient() *http.Client {
@@ -95,6 +107,22 @@ func (stub *routedOAuthManagerStub) AuthorizeConfidential(
 	provider oauthlocal.Provider,
 	_ oauthlocal.ClientCredentialResolver,
 ) (oauthlocal.Authorization, error) {
+	return stub.Authorize(ctx, route, provider)
+}
+
+func (stub *routedOAuthManagerStub) AuthorizeWithClientCredential(
+	ctx context.Context,
+	route config.OAuthClient,
+	provider oauthlocal.Provider,
+	resolve oauthlocal.ClientCredentialResolver,
+) (oauthlocal.Authorization, error) {
+	secret, err := resolve(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for index := range secret {
+		secret[index] = 0
+	}
 	return stub.Authorize(ctx, route, provider)
 }
 
@@ -200,6 +228,15 @@ func (stub *oauthManagerStub) AuthorizeConfidential(
 	stub.confidentialSecret = string(secret)
 	stub.confidentialBytes = secret
 	return stub.Authorize(ctx, route, provider)
+}
+
+func (stub *oauthManagerStub) AuthorizeWithClientCredential(
+	ctx context.Context,
+	route config.OAuthClient,
+	provider oauthlocal.Provider,
+	resolve oauthlocal.ClientCredentialResolver,
+) (oauthlocal.Authorization, error) {
+	return stub.AuthorizeConfidential(ctx, route, provider, resolve)
 }
 
 func TestSessionBackendOnlyResolvesJMAPCredentialForExplicitCLILogin(t *testing.T) {
@@ -521,19 +558,24 @@ func TestSessionBackendOnlyResolvesCalDAVTaskCredentialForExplicitCLILogin(t *te
 	}
 }
 
-func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
+func TestSessionBackendOnlyAuthorizesBYOGoogleRouteForExplicitCLILogin(
 	t *testing.T,
 ) {
 	t.Parallel()
 
 	const accountID domain.AccountID = "acc_00000000000000000000000000000001"
-	route := config.OAuthRoute{
+	route := config.GoogleOAuthRoute{
 		APIBase:     "https://www.googleapis.com",
 		ClientID:    "synthetic.apps.googleusercontent.com",
 		RedirectURI: "http://127.0.0.1:53682/oauth/callback",
 		Authorization: config.CredentialRef{
 			Backend: config.CredentialOSKeyring,
 			Key:     "google-work",
+			Consent: true,
+		},
+		ClientSecret: config.CredentialRef{
+			Backend: config.CredentialOSKeyring,
+			Key:     "google-client",
 			Consent: true,
 		},
 	}
@@ -546,6 +588,7 @@ func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
 				Username: "reader@example.test",
 				ClientID: route.ClientID, RedirectURI: route.RedirectURI,
 				Authorization: route.Authorization,
+				ClientSecret:  route.ClientSecret,
 			},
 		},
 		Calendar: &config.CalendarRoute{
@@ -554,6 +597,20 @@ func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
 	}
 	manager := &oauthManagerStub{client: http.DefaultClient}
 	factoryCalls := 0
+	credentialReads := 0
+	resolver, err := credential.New(credential.Options{
+		Keyring: func(service, key string) (string, error) {
+			credentialReads++
+			if service != "corresync" || key != "google-client" {
+				t.Fatalf("client credential read = %q %q", service, key)
+			}
+			return "synthetic-client-credential", nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	factoryError := errors.New("synthetic Google adapter stop")
 	backend := &sessionBackend{
 		configuration: configuration,
 		guard: daemonMCPGuard(
@@ -561,7 +618,7 @@ func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
 			policy.DefaultRules(),
 			&daemonMCPAudit{},
 		),
-		oauth:    manager,
+		oauth: manager, credentials: resolver,
 		accounts: make(map[domain.AccountID]sessionAccount),
 		previews: make(map[string]sessionPreview),
 		newGoogle: func(
@@ -569,23 +626,23 @@ func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
 			googleapi.Options,
 		) (*googleapi.Client, error) {
 			factoryCalls++
-			return nil, errors.New("pending Google route reached its adapter")
+			return nil, factoryError
 		},
 	}
 	mcpCaller := domain.Caller{Surface: "mcp", Instance: "synthetic-client"}
 	cliCaller := domain.Caller{Surface: "cli", Instance: "synthetic-process"}
 
-	_, err := backend.ListMail(t.Context(), application.MailListInput{
+	_, err = backend.ListMail(t.Context(), application.MailListInput{
 		Account: accountID,
 		Folder: application.MailFolder{
 			Kind: application.MailFolderDistinguished, ID: "inbox",
 		},
 		Limit: 25,
 	}, mcpCaller)
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
-		t.Fatalf("ListMail() error = %v", err)
+	if err == nil {
+		t.Fatal("ListMail() succeeded before explicit login")
 	}
-	if manager.calls != 0 || factoryCalls != 0 {
+	if manager.calls != 0 || factoryCalls != 0 || credentialReads != 0 {
 		t.Fatalf(
 			"ordinary MCP read touched OAuth: manager=%d factory=%d",
 			manager.calls,
@@ -602,17 +659,19 @@ func TestSessionBackendNeverAuthorizesPendingGoogleRoute(
 			factoryCalls,
 		)
 	}
-	if _, err := backend.Login(t.Context(), accountID, cliCaller); !errors.Is(
-		err, rollout.ErrGoogleOAuthPending,
-	) {
+	if _, err := backend.Login(t.Context(), accountID, cliCaller); !errors.Is(err, factoryError) {
 		t.Fatalf("CLI Login() error = %v", err)
 	}
-	if manager.calls != 0 || factoryCalls != 0 {
-		t.Fatalf("pending Google touched OAuth or API: manager=%d factory=%d", manager.calls, factoryCalls)
+	if manager.calls != 1 || factoryCalls != 1 || credentialReads != 1 ||
+		manager.confidentialSecret != "synthetic-client-credential" {
+		t.Fatalf(
+			"explicit Google login boundary: manager=%d factory=%d credentials=%d secret=%q",
+			manager.calls, factoryCalls, credentialReads, manager.confidentialSecret,
+		)
 	}
 }
 
-func TestSessionBackendNeverAuthorizesPendingGoogleTaskRoute(t *testing.T) {
+func TestSessionBackendOnlyAuthorizesBYOGoogleTasksForExplicitCLILogin(t *testing.T) {
 	t.Parallel()
 
 	const accountID domain.AccountID = "acc_00000000000000000000000000000112"
@@ -622,7 +681,7 @@ func TestSessionBackendNeverAuthorizesPendingGoogleTaskRoute(t *testing.T) {
 		Tasks: &config.TaskRoute{
 			Provider: domain.ProviderGoogleTasks,
 			GoogleTasks: &config.GoogleTaskRoute{
-				OAuth: config.OAuthRoute{
+				OAuth: config.GoogleOAuthRoute{
 					APIBase:     "https://tasks.googleapis.com",
 					ClientID:    "synthetic.apps.googleusercontent.com",
 					RedirectURI: "http://127.0.0.1:53682/oauth/callback",
@@ -630,45 +689,65 @@ func TestSessionBackendNeverAuthorizesPendingGoogleTaskRoute(t *testing.T) {
 						Backend: config.CredentialOSKeyring,
 						Key:     "google-tasks", Consent: true,
 					},
+					ClientSecret: config.CredentialRef{
+						Backend: config.CredentialOSKeyring,
+						Key:     "google-tasks-client", Consent: true,
+					},
 				},
 			},
 		},
 	}
 	manager := &oauthManagerStub{client: http.DefaultClient}
 	factoryCalls := 0
+	credentialReads := 0
+	resolver, err := credential.New(credential.Options{
+		Keyring: func(service, key string) (string, error) {
+			credentialReads++
+			if service != "corresync" || key != "google-tasks-client" {
+				t.Fatalf("client credential read = %q %q", service, key)
+			}
+			return "synthetic-client-credential", nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	factoryError := errors.New("synthetic Google Tasks adapter stop")
 	backend := &sessionBackend{
 		configuration: configuration,
 		guard:         daemonMCPGuard(t, policy.DefaultRules(), &daemonMCPAudit{}),
 		oauth:         manager,
+		credentials:   resolver,
 		accounts:      make(map[domain.AccountID]sessionAccount),
 		previews:      make(map[string]sessionPreview),
 		newGoogleTasks: func(context.Context, googletasks.Options) (*googletasks.Client, error) {
 			factoryCalls++
-			return nil, errors.New("pending Google Tasks route reached its adapter")
+			return nil, factoryError
 		},
 	}
 	mcpCaller := domain.Caller{Surface: "mcp", Instance: "synthetic-client"}
 	cliCaller := domain.Caller{Surface: "cli", Instance: "synthetic-process"}
-	_, err := backend.ListTaskLists(t.Context(), application.TaskListInput{
+	_, err = backend.ListTaskLists(t.Context(), application.TaskListInput{
 		Account: accountID, Limit: 25,
 	}, mcpCaller)
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
-		t.Fatalf("ListTaskLists() error = %v", err)
+	if err == nil {
+		t.Fatal("ListTaskLists() succeeded before explicit login")
 	}
 	if _, err := backend.Login(t.Context(), accountID, mcpCaller); err == nil {
 		t.Fatal("MCP Login() unexpectedly authorized Google Tasks")
 	}
-	if _, err := backend.Login(t.Context(), accountID, cliCaller); !errors.Is(
-		err, rollout.ErrGoogleOAuthPending,
-	) {
+	if _, err := backend.Login(t.Context(), accountID, cliCaller); !errors.Is(err, factoryError) {
 		t.Fatalf("CLI Login() error = %v", err)
 	}
-	if manager.calls != 0 || factoryCalls != 0 {
-		t.Fatalf("pending Google Tasks touched OAuth or API: manager=%d factory=%d", manager.calls, factoryCalls)
+	if manager.calls != 1 || factoryCalls != 1 || credentialReads != 1 {
+		t.Fatalf(
+			"explicit Google Tasks login boundary: manager=%d factory=%d credentials=%d",
+			manager.calls, factoryCalls, credentialReads,
+		)
 	}
 }
 
-func TestSessionBackendBlocksDistinctMigratedGoogleGrants(t *testing.T) {
+func TestSessionBackendKeepsDistinctBYOGoogleGrantsIsolated(t *testing.T) {
 	t.Parallel()
 
 	const accountID domain.AccountID = "acc_00000000000000000000000000000001"
@@ -681,7 +760,7 @@ func TestSessionBackendBlocksDistinctMigratedGoogleGrants(t *testing.T) {
 			Consent: true,
 		},
 	}
-	calendarRoute := config.OAuthRoute{
+	calendarRoute := config.GoogleOAuthRoute{
 		APIBase:     "https://www.googleapis.com",
 		ClientID:    "synthetic-calendar.apps.googleusercontent.com",
 		RedirectURI: "http://127.0.0.1:53683/oauth/callback",
@@ -689,6 +768,10 @@ func TestSessionBackendBlocksDistinctMigratedGoogleGrants(t *testing.T) {
 			Backend: config.CredentialOSKeyring,
 			Key:     "google-calendar",
 			Consent: true,
+		},
+		ClientSecret: config.CredentialRef{
+			Backend: config.CredentialOSKeyring,
+			Key:     "google-calendar-client", Consent: true,
 		},
 	}
 	configuration := config.OutlookDefault()
@@ -701,6 +784,10 @@ func TestSessionBackendBlocksDistinctMigratedGoogleGrants(t *testing.T) {
 				ClientID:      mailClient.ClientID,
 				RedirectURI:   mailClient.RedirectURI,
 				Authorization: mailClient.Authorization,
+				ClientSecret: config.CredentialRef{
+					Backend: config.CredentialOSKeyring,
+					Key:     "google-mail-client", Consent: true,
+				},
 			},
 		},
 		Calendar: &config.CalendarRoute{
@@ -714,7 +801,20 @@ func TestSessionBackendBlocksDistinctMigratedGoogleGrants(t *testing.T) {
 		"google-mail":     http.DefaultClient,
 		"google-calendar": http.DefaultClient,
 	}}
+	resolver, err := credential.New(credential.Options{
+		Keyring: func(service, key string) (string, error) {
+			if service != "corresync" ||
+				(key != "google-mail-client" && key != "google-calendar-client") {
+				t.Fatalf("client credential read = %q %q", service, key)
+			}
+			return "synthetic-client-credential", nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	factoryCalls := 0
+	factoryError := errors.New("synthetic isolated Google adapter stop")
 	backend := &sessionBackend{
 		configuration: configuration,
 		guard: daemonMCPGuard(
@@ -722,7 +822,7 @@ func TestSessionBackendBlocksDistinctMigratedGoogleGrants(t *testing.T) {
 			policy.DefaultRules(),
 			&daemonMCPAudit{},
 		),
-		oauth:    manager,
+		oauth: manager, credentials: resolver,
 		accounts: make(map[domain.AccountID]sessionAccount),
 		previews: make(map[string]sessionPreview),
 		newIMAP: func(
@@ -736,19 +836,20 @@ func TestSessionBackendBlocksDistinctMigratedGoogleGrants(t *testing.T) {
 			googleapi.Options,
 		) (*googleapi.Client, error) {
 			factoryCalls++
-			return nil, errors.New("pending Google route reached its adapter")
+			return nil, factoryError
 		},
 	}
-	_, err := backend.Login(
+	_, err = backend.Login(
 		t.Context(),
 		accountID,
 		domain.Caller{Surface: "cli", Instance: "synthetic-process"},
 	)
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+	if !errors.Is(err, factoryError) {
 		t.Fatalf("Login() error = %v", err)
 	}
-	if len(manager.calls) != 0 || factoryCalls != 0 {
-		t.Fatalf("pending migrated grants touched OAuth or API: calls=%+v factory=%d", manager.calls, factoryCalls)
+	if len(manager.calls) != 1 || manager.calls[0].route.Authorization.Key != "google-mail" ||
+		factoryCalls != 1 {
+		t.Fatalf("isolated Google grants = calls=%+v factory=%d", manager.calls, factoryCalls)
 	}
 }
 
@@ -1002,10 +1103,10 @@ func TestSessionBackendDoesNotPartiallyActivateMixedPendingGoogleAccount(t *test
 	)
 	defer googleBeta.Close()
 
-	googleAlphaRoute := sessionOAuthRoute(googleAlpha.URL, "google-alpha")
+	googleAlphaRoute := sessionGoogleOAuthRoute(googleAlpha.URL, "google-alpha")
 	graphAlphaRoute := sessionOAuthRoute(graphAlpha.URL, "graph-alpha")
 	graphBetaRoute := sessionOAuthRoute(graphBeta.URL, "graph-beta")
-	googleBetaRoute := sessionOAuthRoute(googleBeta.URL, "google-beta")
+	googleBetaRoute := sessionGoogleOAuthRoute(googleBeta.URL, "google-beta")
 	configuration := config.OutlookDefault()
 	configuration.DefaultAccount = "alpha"
 	configuration.Accounts = map[string]config.Account{
@@ -1038,6 +1139,18 @@ func TestSessionBackendDoesNotPartiallyActivateMixedPendingGoogleAccount(t *test
 		"graph-beta":   graphBeta.Client(),
 		"google-beta":  googleBeta.Client(),
 	}}
+	resolver, err := credential.New(credential.Options{
+		Keyring: func(service, key string) (string, error) {
+			if service != "corresync" ||
+				(key != "google-alpha-client" && key != "google-beta-client") {
+				t.Fatalf("Google client credential read = %q %q", service, key)
+			}
+			return "synthetic-client-credential", nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	lifecycle, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	backend := &sessionBackend{
@@ -1048,6 +1161,7 @@ func TestSessionBackendDoesNotPartiallyActivateMixedPendingGoogleAccount(t *test
 			&daemonMCPAudit{},
 		),
 		oauth:          manager,
+		credentials:    resolver,
 		newGoogle:      googleapi.New,
 		newGraph:       graphapi.New,
 		accounts:       make(map[domain.AccountID]sessionAccount),
@@ -1061,16 +1175,28 @@ func TestSessionBackendDoesNotPartiallyActivateMixedPendingGoogleAccount(t *test
 	caller := domain.Caller{Surface: "cli", Instance: "hybrid-provider-test"}
 	for _, accountID := range []domain.AccountID{alphaID, betaID} {
 		_, err := backend.Login(t.Context(), accountID, caller)
-		if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
+		if err != nil {
 			t.Fatalf("Login(%s) error = %v", accountID, err)
 		}
 	}
-	if len(manager.calls) != 0 || len(backend.accounts) != 0 {
+	if len(manager.calls) != 4 || len(backend.accounts) != 2 {
 		t.Fatalf(
-			"mixed pending accounts were partially activated: OAuth=%+v sessions=%+v",
+			"mixed BYO accounts were not isolated: OAuth=%+v sessions=%+v",
 			manager.calls,
 			backend.accounts,
 		)
+	}
+}
+
+func sessionGoogleOAuthRoute(base, key string) config.GoogleOAuthRoute {
+	public := sessionOAuthRoute(base, key)
+	return config.GoogleOAuthRoute{
+		APIBase: public.APIBase, ClientID: public.ClientID,
+		RedirectURI: public.RedirectURI, Authorization: public.Authorization,
+		ClientSecret: config.CredentialRef{
+			Backend: config.CredentialOSKeyring,
+			Key:     key + "-client", Consent: true,
+		},
 	}
 }
 

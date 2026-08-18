@@ -114,7 +114,7 @@ legacy `initialize` / `notifications/initialized` handshake. The current
 compatibility floor is `2024-11-05`; `2025-03-26`, `2025-06-18`, and
 `2025-11-25` are also accepted. CI exercises the complete modern flow, the
 latest legacy flow, invalid modern metadata, unsupported-version errors, all
-61 tool schemas and structured results, both resource templates, and the real
+71 tool schemas and structured results, both resource templates, and the real
 `corr mcp serve` stdio process. Older accepted revisions remain compatibility
 paths rather than separate product surfaces.
 
@@ -145,6 +145,12 @@ A write is never replayed after authentication; obtain a new preview and fresh
 approval. Decline, cancellation, failure, or a host without terminal access
 leaves the action as an explicit blocker, and alternatives require the user's
 choice.
+
+The current local provider flows do not have a reviewed URL broker, so MCP
+elicitation is intentionally not advertised or used for authentication. A
+client that supports elicitation receives the same exact action object as a
+legacy client; only a future separately reviewed broker may add a consented
+multi-round-trip enhancement without changing this baseline.
 
 Tool/resource names, schemas, annotations, deprecations, and negotiated
 compatibility follow the
@@ -190,7 +196,7 @@ aliases over the same reviewed command and rendering contracts.
 
 ## Tool catalog
 
-The server exposes 61 narrow tools.
+The server exposes 71 narrow tools.
 
 Accounts and local monitoring:
 
@@ -200,6 +206,22 @@ Accounts and local monitoring:
 - `account_rename`, `account_rename_commit`;
 - `account_remove`, `account_remove_commit`;
 - `monitor_status`, `events_list`, `event_acknowledge`.
+
+Private saved queries:
+
+- `saved_queries_list`, `saved_query_show`, `saved_query_run`;
+- `saved_query_save_mail`, `saved_query_save_calendar`,
+  `saved_query_save_commit`;
+- `saved_query_delete`, `saved_query_delete_commit`;
+- `saved_queries_purge`, `saved_queries_purge_commit`.
+
+List and show read only account-local definitions. Run performs one bounded
+live provider read and always exposes freshness and no-cache fields. Save,
+replace, delete, and purge share the CLI application service but MCP retains a
+caller-, account-, payload-, expiry-, and revision-bound preview/commit. Purge
+can recover a bounded malformed catalog without accepting a stale preview.
+Definitions and results are private untrusted data. They cannot enable
+monitoring, notifications, runners, authentication, or egress.
 
 Use `settings_show` before changing an everyday setting. `settings_update`
 returns the current value, proposed value, dependent changes, equivalent CLI
@@ -254,9 +276,9 @@ Todoist public-client route supports Todoist. The explicit TickTick route uses
 its separately consented confidential client and supports the same typed MCP
 surface except unsupported operations reported by its capability set. Other
 configured task routes remain staged and fail without authentication or
-provider access. Google Tasks has a complete synthetic adapter but is one of
-those unreachable routes while production Google OAuth approval is pending. See
-[tasks.md](tasks.md).
+provider access. Google Tasks uses a user-owned Desktop OAuth client and a
+separate task-only grant, and remains synthetic-contract covered and
+live-unobserved. See [tasks.md](tasks.md).
 
 `calendar_create.onlineMeeting` requests the selected account route's observed
 native meeting service: Teams for Microsoft routes or Google Meet for a Google
@@ -331,7 +353,9 @@ egress, or purge a queue.
 Tools route through the account's selected service:
 
 - Outlook Web: visible browser-owned session;
-- Google or Graph: explicit OAuth grant in OS keyring;
+- Google: user-owned Desktop client credential plus an explicit OAuth grant in
+  separate external/keyring handles;
+- Graph: explicit OAuth grant in OS keyring;
 - JMAP and IMAP/SMTP: explicit standards credential backend;
 - CalDAV: explicit calendar credential backend.
 
@@ -340,7 +364,7 @@ No tool silently changes providers or initiates administrator consent.
 not permission to configure or authenticate.
 
 Capability checks remain provider-specific. No MCP tool can initiate Google
-OAuth or silently route a blocked Google account through another provider.
+OAuth or silently route a Google account through another provider.
 
 Cross-account tools fan out through isolated services and report partial
 failures without dropping successful results. All write tools still require one

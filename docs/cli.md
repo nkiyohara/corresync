@@ -80,15 +80,19 @@ corr account add reader@example.invalid \
   --mail-provider microsoft-owa \
   --origin https://outlook.cloud.microsoft
 
-# Coming soon: Gmail API and Google Calendar (disabled pending OAuth approval)
+# Gmail API and Google Calendar with your own Desktop OAuth client
+corr auth google-client import ~/Downloads/client_secret.json \
+  --key personal-google-client
 corr account add reader@example.invalid \
   --alias personal \
   --mail-provider google \
   --calendar-provider google \
-  --oauth-client-id synthetic-public-client \
+  --oauth-client-id YOUR_CLIENT_ID.apps.googleusercontent.com \
   --oauth-redirect-uri http://127.0.0.1:0 \
   --authorization-key personal-google \
-  --approve-oauth
+  --approve-oauth \
+  --oauth-client-secret-key personal-google-client \
+  --approve-oauth-client-secret
 
 # IMAP/SMTP mail plus CalDAV calendar
 corr account add reader@example.invalid \
@@ -160,14 +164,18 @@ corr account add \
   --task-credential-key tasks-caldav \
   --approve-task-credential
 
-# Coming soon: Google Tasks uses a separate task-only OAuth grant
+# Google Tasks uses a separate task-only OAuth grant and client handle
+corr auth google-client import ~/Downloads/tasks_client_secret.json \
+  --key google-tasks-client
 corr account add reader@example.invalid \
   --alias google-tasks \
   --task-provider google-tasks \
   --task-oauth-client-id synthetic-public-client \
-  --task-oauth-redirect-uri http://127.0.0.1:0/callback \
+  --task-oauth-redirect-uri http://127.0.0.1:0 \
   --task-authorization-key tasks-google \
   --approve-task-oauth \
+  --task-oauth-secret-key google-tasks-client \
+  --approve-task-oauth-secret \
   --task-read-only
 ```
 
@@ -178,13 +186,15 @@ alias for `--mail-provider`. No account command accepts a password or token.
 Approved removal discloses and purges account-local state plus an unshared
 Corresync-owned OAuth grant; it never deletes an external standards credential.
 
-The Google examples document future route shapes. In this RC each returns an
-approval-pending message, persists nothing, and starts no browser, keyring, or
-Google API work. Outlook Web, Graph, JMAP, IMAP/SMTP, and CalDAV routes remain
-available as described above. The Microsoft To Do, Todoist, and TickTick
-task-only examples are active with synthetic contract evidence. Google Tasks
-has synthetic contract evidence but remains approval-gated; the other task
-provider IDs remain unavailable.
+The Google examples require a Desktop client in a Cloud project you control.
+Account addition persists only reviewed references and starts no browser,
+keyring read, or Google API work. `corr auth login` is the separate explicit
+authorization boundary. Follow [Google OAuth setup](google-oauth-setup.md).
+The import command refuses to overwrite an existing handle. Use `--replace`
+only for an intentional rotation of that same Google client credential, never
+for a handle used by another provider or standards credential.
+All Google adapters remain synthetic-contract covered and live-unobserved; the
+other unavailable task provider IDs remain unavailable.
 
 ## Authentication and doctor
 
@@ -204,11 +214,11 @@ open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
 closes the entire local session owner.
 `--terminal` is an optional Outlook-Web-only browser relay and requires an
-interactive TTY. The staged `google` route is disabled pending production OAuth
-approval and stops before sign-in or network access. After a separate activation
-release it will use normal-browser OAuth and pinned Gmail/Calendar APIs; it will
-never automate Google sign-in. `auth status` is content-free and prints the
-mail, calendar, and task state separately. A signed-out or expired route shows
+interactive TTY. Google uses normal-browser OAuth and pinned Gmail/Calendar
+APIs; it never automates Google sign-in. Its client credential must already be
+available through the reviewed external handle. `auth status` is content-free
+and prints the mail, calendar, and task state separately. A signed-out or
+expired route shows
 the exact local `corr auth login --account ALIAS` action; the command does not
 run that action automatically.
 
@@ -469,6 +479,40 @@ constraints. Search is unavailable for Microsoft To Do and Todoist. TickTick
 uses the documented bounded search endpoint, while CalDAV performs a bounded
 local search over its selected VTODO collections. Other task adapters remain
 unavailable until their provider issues ship. See [tasks.md](tasks.md).
+
+## Private saved queries
+
+Saved queries keep a bounded private definition for one exact account. They do
+not save message or event results and do not run in the background.
+
+```console
+# Review, then save the exact mail definition.
+corr queries save mail priority 'is:unread importance:high' --account work
+corr queries save mail priority 'is:unread importance:high' \
+  --account work --approve
+
+# A calendar window is relative to each run, not frozen at save time.
+corr queries save calendar next-week --account work \
+  --start-offset 0s --window 168h --time-zone Europe/London --approve
+
+corr queries list --account work
+corr queries show priority --account work
+corr queries run priority --account work --json
+```
+
+Every run calls the configured live mail or calendar route and reports
+`source: live_provider`, `fetchedAt`, `cached: false`, and `stale: false` in
+JSON. Provider unavailability is an error; an old page is never substituted.
+Mail syntax remains provider-native. Calendar definitions use one typed
+calendar plus a relative start and bounded window because Corresync does not
+invent a calendar text-search contract.
+
+Save and replacement show the complete definition before `--approve`. Delete
+is revision-bound, and `queries purge` binds approval to the exact catalog
+bytes so it can safely recover a bounded malformed catalog without deleting a
+newer replacement. Account removal deletes saved definitions with that
+account's state. Neither CLI nor MCP can turn a saved query into monitoring,
+notifications, runner execution, authentication, or egress.
 
 ## Read-only import staging
 

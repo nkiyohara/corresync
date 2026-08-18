@@ -11,7 +11,6 @@ import (
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/microsoftcloud"
-	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type accountCommand struct {
@@ -38,59 +37,71 @@ type accountShowCommand struct {
 }
 
 type accountAddCommand struct {
-	Address                   string `arg:"" optional:"" help:"Bare email address; task-only routes may omit it."`
-	Alias                     string `help:"Local alias; defaults to the address local part."`
-	Provider                  string `help:"Compatibility alias for --mail-provider."`
-	MailProvider              string `help:"Explicit mail provider override; use none for calendar-only."`
-	CalendarProvider          string `help:"Explicit calendar provider override; use none for mail-only."`
-	TaskProvider              string `help:"Explicit task provider override; use none to omit tasks."`
-	MicrosoftCloud            string `default:"global" enum:"global,gcc-high,dod,china" help:"Microsoft Graph deployment shared by selected Microsoft services."`
-	Origin                    string `help:"Outlook Web HTTPS origin override."`
-	Mailbox                   string `help:"Optional routed or sender mailbox identity."`
-	SessionURL                string `help:"JMAP HTTPS session resource."`
-	APIBase                   string `help:"Google Calendar or Microsoft Graph API HTTPS base override."`
-	OAuthClientID             string `name:"oauth-client-id" help:"BYO OAuth public-client ID."`
-	OAuthRedirectURI          string `name:"oauth-redirect-uri" help:"Registered http://127.0.0.1 loopback redirect URI."`
-	AuthorizationKey          string `help:"OS-keyring handle for the OAuth grant."`
-	ApproveOAuth              bool   `name:"approve-oauth" help:"Confirm explicit OAuth authorization when no valid grant exists."`
-	CalendarAPIBase           string `name:"calendar-api-base" help:"Calendar OAuth API HTTPS base override."`
-	CalendarOAuthClientID     string `name:"calendar-oauth-client-id" help:"Calendar BYO OAuth public-client ID; defaults to --oauth-client-id."`
-	CalendarOAuthRedirectURI  string `name:"calendar-oauth-redirect-uri" help:"Calendar loopback redirect; defaults to --oauth-redirect-uri."`
-	CalendarAuthorizationKey  string `name:"calendar-authorization-key" help:"Calendar OAuth grant key; defaults to --authorization-key."`
-	ApproveCalendarOAuth      bool   `name:"approve-calendar-oauth" help:"Confirm a distinct calendar OAuth authorization."`
-	TaskAPIBase               string `name:"task-api-base" help:"Pinned task API base override."`
-	TaskOAuthClientID         string `name:"task-oauth-client-id" help:"Task BYO OAuth client ID; defaults to --oauth-client-id."`
-	TaskOAuthRedirectURI      string `name:"task-oauth-redirect-uri" help:"Task loopback redirect; defaults to --oauth-redirect-uri."`
-	TaskAuthorizationKey      string `name:"task-authorization-key" help:"Independent OS-keyring grant handle for tasks; defaults to --authorization-key."`
-	ApproveTaskOAuth          bool   `name:"approve-task-oauth" help:"Confirm the task OAuth grant and its task-only scope."`
-	TaskOAuthSecretBackend    string `name:"task-oauth-secret-backend" default:"os-keyring" enum:"os-keyring,helper" help:"External backend for a confidential task OAuth client secret."`
-	TaskOAuthSecretKey        string `name:"task-oauth-secret-key" help:"External lookup handle for a confidential task OAuth client secret."`
-	ApproveTaskOAuthSecret    bool   `name:"approve-task-oauth-secret" help:"Record explicit consent to resolve the confidential task OAuth client secret."`
-	TaskReadOnly              bool   `name:"task-read-only" help:"Request the selected provider's read-only task scope."`
-	TaskCalDAVEndpoint        string `name:"task-caldav-endpoint" help:"CalDAV HTTPS discovery endpoint for VTODO tasks; defaults to --caldav-endpoint."`
-	TaskListPath              string `name:"task-list-path" help:"Optional absolute CalDAV VTODO collection path."`
-	TaskUsername              string `name:"task-username" help:"CalDAV task login identity; defaults to calendar, mail, or account identity."`
-	TaskCredentialBackend     string `name:"task-credential-backend" help:"External CalDAV task credential backend; defaults to --credential-backend."`
-	TaskCredentialKey         string `name:"task-credential-key" help:"Independent external CalDAV task credential handle."`
-	ApproveTaskCredential     bool   `name:"approve-task-credential" help:"Record explicit consent for the CalDAV task credential."`
-	Username                  string `help:"Mail login identity; defaults to the address and must match it for Google."`
-	CredentialBackend         string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
-	CredentialKey             string `help:"External standards credential lookup key."`
-	ApproveCredential         bool   `help:"Record explicit consent to use that external credential."`
-	IMAPHost                  string `help:"IMAP server host."`
-	IMAPPort                  uint16 `help:"IMAP server port."`
-	IMAPTLS                   string `name:"imap-tls" default:"implicit" enum:"implicit,starttls" help:"IMAP TLS mode."`
-	SMTPHost                  string `help:"SMTP Submission server host."`
-	SMTPPort                  uint16 `help:"SMTP Submission server port."`
-	SMTPTLS                   string `name:"smtp-tls" default:"starttls" enum:"implicit,starttls" help:"SMTP TLS mode."`
-	CalDAVEndpoint            string `name:"caldav-endpoint" help:"CalDAV HTTPS discovery endpoint."`
-	CalendarPath              string `help:"Optional absolute CalDAV calendar path."`
-	CalendarUsername          string `help:"CalDAV login identity; defaults to --username or the address."`
-	CalendarCredentialBackend string `help:"External CalDAV credential backend; defaults to --credential-backend."`
-	CalendarCredentialKey     string `help:"External CalDAV credential key; defaults to --credential-key."`
-	ApproveCalendarCredential bool   `help:"Record consent for a distinct CalDAV credential."`
-	Default                   bool   `help:"Make this the default account."`
-	JSON                      bool   `help:"Write machine-readable JSON."`
+	Address                          string `arg:"" optional:"" help:"Bare email address; task-only routes may omit it."`
+	Alias                            string `help:"Local alias; defaults to the address local part."`
+	Provider                         string `help:"Compatibility alias for --mail-provider."`
+	MailProvider                     string `help:"Explicit mail provider override; use none for calendar-only."`
+	CalendarProvider                 string `help:"Explicit calendar provider override; use none for mail-only."`
+	TaskProvider                     string `help:"Explicit task provider override; use none to omit tasks."`
+	MicrosoftCloud                   string `default:"global" enum:"global,gcc-high,dod,china" help:"Microsoft Graph deployment shared by selected Microsoft services."`
+	Origin                           string `help:"Outlook Web HTTPS origin override."`
+	Mailbox                          string `help:"Optional routed or sender mailbox identity."`
+	SessionURL                       string `help:"JMAP HTTPS session resource."`
+	APIBase                          string `help:"Google Calendar or Microsoft Graph API HTTPS base override."`
+	OAuthClientID                    string `name:"oauth-client-id" help:"BYO OAuth public-client ID."`
+	OAuthRedirectURI                 string `name:"oauth-redirect-uri" help:"Registered http://127.0.0.1 loopback redirect URI."`
+	AuthorizationKey                 string `help:"OS-keyring handle for the OAuth grant."`
+	ApproveOAuth                     bool   `name:"approve-oauth" help:"Confirm explicit OAuth authorization when no valid grant exists."`
+	OAuthClientSecretBackend         string `name:"oauth-client-secret-backend" default:"os-keyring" enum:"os-keyring,helper" help:"External backend for a Google Desktop client credential."`
+	OAuthClientSecretKey             string `name:"oauth-client-secret-key" help:"External lookup handle for a Google Desktop client credential."`
+	ApproveOAuthClientSecret         bool   `name:"approve-oauth-client-secret" help:"Record explicit consent to resolve the Google Desktop client credential."`
+	CalendarAPIBase                  string `name:"calendar-api-base" help:"Calendar OAuth API HTTPS base override."`
+	CalendarOAuthClientID            string `name:"calendar-oauth-client-id" help:"Calendar BYO OAuth public-client ID; defaults to --oauth-client-id."`
+	CalendarOAuthRedirectURI         string `name:"calendar-oauth-redirect-uri" help:"Calendar loopback redirect; defaults to --oauth-redirect-uri."`
+	CalendarAuthorizationKey         string `name:"calendar-authorization-key" help:"Calendar OAuth grant key; defaults to --authorization-key."`
+	ApproveCalendarOAuth             bool   `name:"approve-calendar-oauth" help:"Confirm a distinct calendar OAuth authorization."`
+	CalendarOAuthClientSecretBackend string `name:"calendar-oauth-client-secret-backend" help:"Calendar Google Desktop client credential backend (os-keyring or helper); defaults to --oauth-client-secret-backend."`
+	CalendarOAuthClientSecretKey     string `name:"calendar-oauth-client-secret-key" help:"Calendar Google Desktop client credential handle; defaults to --oauth-client-secret-key."`
+	ApproveCalendarOAuthClientSecret bool   `name:"approve-calendar-oauth-client-secret" help:"Confirm a distinct Calendar Google client credential reference."`
+	TaskAPIBase                      string `name:"task-api-base" help:"Pinned task API base override."`
+	TaskOAuthClientID                string `name:"task-oauth-client-id" help:"Task BYO OAuth client ID; defaults to --oauth-client-id."`
+	TaskOAuthRedirectURI             string `name:"task-oauth-redirect-uri" help:"Task loopback redirect; defaults to --oauth-redirect-uri."`
+	TaskAuthorizationKey             string `name:"task-authorization-key" help:"Independent OS-keyring grant handle for tasks; defaults to --authorization-key."`
+	ApproveTaskOAuth                 bool   `name:"approve-task-oauth" help:"Confirm the task OAuth grant and its task-only scope."`
+	TaskOAuthSecretBackend           string `name:"task-oauth-secret-backend" help:"External backend for a confidential task OAuth client secret (os-keyring or helper); defaults to --oauth-client-secret-backend."`
+	TaskOAuthSecretKey               string `name:"task-oauth-secret-key" help:"External lookup handle for a confidential task OAuth client secret."`
+	ApproveTaskOAuthSecret           bool   `name:"approve-task-oauth-secret" help:"Record explicit consent to resolve the confidential task OAuth client secret."`
+	TaskReadOnly                     bool   `name:"task-read-only" help:"Request the selected provider's read-only task scope."`
+	TaskCalDAVEndpoint               string `name:"task-caldav-endpoint" help:"CalDAV HTTPS discovery endpoint for VTODO tasks; defaults to --caldav-endpoint."`
+	TaskListPath                     string `name:"task-list-path" help:"Optional absolute CalDAV VTODO collection path."`
+	TaskUsername                     string `name:"task-username" help:"CalDAV task login identity; defaults to calendar, mail, or account identity."`
+	TaskCredentialBackend            string `name:"task-credential-backend" help:"External CalDAV task credential backend; defaults to --credential-backend."`
+	TaskCredentialKey                string `name:"task-credential-key" help:"Independent external CalDAV task credential handle."`
+	ApproveTaskCredential            bool   `name:"approve-task-credential" help:"Record explicit consent for the CalDAV task credential."`
+	Username                         string `help:"Mail login identity; defaults to the address and must match it for Google."`
+	CredentialBackend                string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
+	CredentialKey                    string `help:"External standards credential lookup key."`
+	ApproveCredential                bool   `help:"Record explicit consent to use that external credential."`
+	IMAPHost                         string `help:"IMAP server host."`
+	IMAPPort                         uint16 `help:"IMAP server port."`
+	IMAPTLS                          string `name:"imap-tls" default:"implicit" enum:"implicit,starttls" help:"IMAP TLS mode."`
+	SMTPHost                         string `help:"SMTP Submission server host."`
+	SMTPPort                         uint16 `help:"SMTP Submission server port."`
+	SMTPTLS                          string `name:"smtp-tls" default:"starttls" enum:"implicit,starttls" help:"SMTP TLS mode."`
+	CalDAVEndpoint                   string `name:"caldav-endpoint" help:"CalDAV HTTPS discovery endpoint."`
+	CalendarPath                     string `help:"Optional absolute CalDAV calendar path."`
+	CalendarUsername                 string `help:"CalDAV login identity; defaults to --username or the address."`
+	CalendarCredentialBackend        string `help:"External CalDAV credential backend; defaults to --credential-backend."`
+	CalendarCredentialKey            string `help:"External CalDAV credential key; defaults to --credential-key."`
+	ApproveCalendarCredential        bool   `help:"Record consent for a distinct CalDAV credential."`
+	Default                          bool   `help:"Make this the default account."`
+	JSON                             bool   `help:"Write machine-readable JSON."`
+
+	// onboardingOAuthProvider records which guided setup branch populated the
+	// shared OAuth fields. It is ephemeral provenance, never a CLI flag or
+	// persisted account field.
+	onboardingOAuthProvider    domain.ProviderID
+	onboardingGoogleClientPath string
 }
 
 type accountRenameCommand struct {
@@ -116,20 +127,6 @@ var errUnsupportedLegacyGoogleRoute = errors.New(
 	"this account uses an unsupported legacy Google route; remove it and " +
 		"add it again with provider google",
 )
-
-const googleWorkspaceMCPGuide = "https://developers.google.com/workspace/guides/configure-mcp-servers"
-
-func googleOAuthPendingError(prefix string) error {
-	return fmt.Errorf(
-		"%s %w. Outlook Web is available now; JMAP, IMAP/SMTP, CalDAV, and "+
-			"Microsoft Graph can also be configured when your provider supports "+
-			"them. Until then, Google's official Workspace MCP servers are an "+
-			"independent Developer Preview: %s",
-		prefix,
-		rollout.ErrGoogleOAuthPending,
-		googleWorkspaceMCPGuide,
-	)
-}
 
 func (command *accountDiscoverCommand) Run(app *runtime) error {
 	_, discoverer, err := app.accountServices()
@@ -265,6 +262,30 @@ func (command *accountShowCommand) Run(app *runtime) error {
 			}
 		}
 	}
+	if account.Messages != nil {
+		if _, err := view.printf(
+			"\n  %-10s %s\n  %-10s %s\n  %-10s %s\n  %-10s %s\n",
+			"Messages", account.Messages.Provider,
+			"Route", account.Messages.Route,
+			"Workspace", sanitizeCell(account.Messages.WorkspaceID, 4096),
+			"Available", yesNo(account.Messages.Available),
+		); err != nil {
+			return err
+		}
+		for _, endpoint := range account.Messages.Endpoints {
+			if _, err := view.printf("  %-10s %s\n", endpoint.Kind, sanitizeCell(endpoint.Value, 2048)); err != nil {
+				return err
+			}
+		}
+		if account.Messages.Credential != nil {
+			if _, err := view.printf(
+				"  %-10s %s · consent %s\n", "Credential",
+				account.Messages.Credential.Backend, yesNo(account.Messages.Credential.Consented),
+			); err != nil {
+				return err
+			}
+		}
+	}
 	_, err = view.printf(
 		"\n  %s\n",
 		view.command(
@@ -294,10 +315,6 @@ func (command *accountAddCommand) Run(app *runtime) error {
 		)
 	}
 	if command.TaskProvider != "" && command.TaskProvider != "none" {
-		if domain.ProviderID(command.TaskProvider) == domain.ProviderGoogleTasks &&
-			!rollout.GoogleOAuthApproved {
-			return googleOAuthPendingError("Google Tasks was selected.")
-		}
 		if err := accounts.ValidateTaskProviderSelection(domain.ProviderID(command.TaskProvider)); err != nil {
 			return err
 		}
@@ -564,16 +581,41 @@ func (command accountAddCommand) taskRoute() (*application.AccountTaskRouteInput
 		return result, nil
 	}
 	if provider == domain.ProviderGoogleTasks {
+		distinctClientCredential := command.TaskOAuthSecretBackend != "" ||
+			command.TaskOAuthSecretKey != ""
+		secretBackend := command.TaskOAuthSecretBackend
+		if secretBackend == "" {
+			secretBackend = command.OAuthClientSecretBackend
+		}
+		if secretBackend == "" {
+			secretBackend = "os-keyring"
+		}
+		secretKey := command.TaskOAuthSecretKey
+		if secretKey == "" {
+			secretKey = command.OAuthClientSecretKey
+		}
+		secretApproved := command.ApproveTaskOAuthSecret
+		if !distinctClientCredential {
+			secretApproved = secretApproved || command.ApproveOAuthClientSecret
+		}
+		if secretBackend == "" || secretKey == "" || !secretApproved {
+			return nil, errors.New(
+				"google-tasks requires an external Desktop client-credential handle and --approve-task-oauth-secret",
+			)
+		}
 		apiBase := command.TaskAPIBase
 		if apiBase == "" {
 			apiBase = "https://tasks.googleapis.com"
 		}
 		result.GoogleTasks = &application.AccountGoogleTaskInput{
 			ReadOnly: command.TaskReadOnly,
-			OAuth: application.AccountOAuthInput{
+			OAuth: application.AccountGoogleOAuthInput{
 				APIBase: apiBase, ClientID: clientID, RedirectURI: redirectURI,
 				Authorization: application.AccountCredentialInput{
 					Backend: "os-keyring", Key: authorizationKey, Consent: true,
+				},
+				ClientSecret: application.AccountCredentialInput{
+					Backend: secretBackend, Key: secretKey, Consent: true,
 				},
 			},
 		}
@@ -754,11 +796,7 @@ func (command accountAddCommand) routes(
 	case domain.ProviderCalDAV:
 		return command.finishRoutes(nil, nil, "", selected, discovery)
 	case domain.ProviderGoogle:
-		if !rollout.GoogleOAuthApproved {
-			return nil, nil, "", googleOAuthPendingError("A Google route was selected.")
-		}
-		oauth, err := command.oauthRoute(
-			domain.ProviderGoogle,
+		oauth, err := command.googleOAuthRoute(
 			selected,
 			"https://www.googleapis.com",
 			command.Provider == "none",
@@ -776,18 +814,14 @@ func (command accountAddCommand) routes(
 				Google: &application.AccountGoogleMailInput{
 					Username: username, Mailbox: command.Mailbox,
 					ClientID: oauth.ClientID, RedirectURI: oauth.RedirectURI,
-					Authorization: oauth.Authorization,
+					Authorization: oauth.Authorization, ClientSecret: oauth.ClientSecret,
 				},
 			},
 			&application.AccountCalendarRouteInput{
 				Provider: domain.ProviderGoogle,
-				Google: &application.AccountOAuthInput{
-					APIBase: oauth.APIBase, ClientID: oauth.ClientID,
-					RedirectURI: oauth.RedirectURI, Authorization: oauth.Authorization,
-				},
+				Google:   oauth,
 			},
-			"IMAP imap.gmail.com:993 · SMTP smtp.gmail.com:587 · Calendar "+
-				oauth.APIBase,
+			"Gmail API · Google Calendar API "+oauth.APIBase,
 			selected,
 			discovery,
 		)
@@ -857,6 +891,9 @@ func (command accountAddCommand) oauthRoute(
 	approved := command.ApproveOAuth
 	cloudID := microsoftcloud.ID("")
 	if calendar {
+		distinctAuthorization := command.CalendarOAuthClientID != "" ||
+			command.CalendarOAuthRedirectURI != "" ||
+			command.CalendarAuthorizationKey != ""
 		if command.CalendarAPIBase != "" {
 			apiBase = command.CalendarAPIBase
 			explicitAPIBase = true
@@ -872,6 +909,9 @@ func (command accountAddCommand) oauthRoute(
 		}
 		if command.ApproveCalendarOAuth {
 			approved = true
+		}
+		if distinctAuthorization && !command.ApproveCalendarOAuth {
+			approved = false
 		}
 	}
 	if apiBase == "" {
@@ -912,6 +952,56 @@ func (command accountAddCommand) oauthRoute(
 	}, nil
 }
 
+func (command accountAddCommand) googleOAuthRoute(
+	selected application.ProviderCandidate,
+	defaultBase string,
+	calendar bool,
+) (*application.AccountGoogleOAuthInput, error) {
+	base, err := command.oauthRoute(
+		domain.ProviderGoogle,
+		selected,
+		defaultBase,
+		calendar,
+	)
+	if err != nil {
+		return nil, err
+	}
+	backend := command.OAuthClientSecretBackend
+	if backend == "" {
+		backend = "os-keyring"
+	}
+	key := command.OAuthClientSecretKey
+	approved := command.ApproveOAuthClientSecret
+	if calendar {
+		distinctClientCredential := command.CalendarOAuthClientSecretBackend != "" ||
+			command.CalendarOAuthClientSecretKey != ""
+		if command.CalendarOAuthClientSecretBackend != "" {
+			backend = command.CalendarOAuthClientSecretBackend
+		}
+		if command.CalendarOAuthClientSecretKey != "" {
+			key = command.CalendarOAuthClientSecretKey
+		}
+		if command.ApproveCalendarOAuthClientSecret {
+			approved = true
+		}
+		if distinctClientCredential && !command.ApproveCalendarOAuthClientSecret {
+			approved = false
+		}
+	}
+	if backend == "" || key == "" || !approved {
+		return nil, errors.New(
+			"google requires an external Desktop client-credential handle and explicit client-credential approval",
+		)
+	}
+	return &application.AccountGoogleOAuthInput{
+		APIBase: base.APIBase, ClientID: base.ClientID,
+		RedirectURI: base.RedirectURI, Authorization: base.Authorization,
+		ClientSecret: application.AccountCredentialInput{
+			Backend: backend, Key: key, Consent: true,
+		},
+	}, nil
+}
+
 func (command accountAddCommand) finishRoutes(
 	mail *application.AccountMailRouteInput,
 	calendar *application.AccountCalendarRouteInput,
@@ -948,12 +1038,6 @@ func (command accountAddCommand) finishRoutes(
 			provider,
 		)
 	case domain.ProviderGoogle, domain.ProviderMicrosoftGraph:
-		if provider == string(domain.ProviderGoogle) &&
-			!rollout.GoogleOAuthApproved {
-			return nil, nil, "", googleOAuthPendingError(
-				"A Google Calendar route was selected.",
-			)
-		}
 		if calendar == nil ||
 			calendar.Provider != domain.ProviderID(provider) ||
 			command.hasDistinctCalendarOAuth() {
@@ -962,27 +1046,36 @@ func (command accountAddCommand) finishRoutes(
 			if provider == string(domain.ProviderMicrosoftGraph) {
 				defaultBase = "https://graph.microsoft.com/v1.0"
 			}
-			oauth, err := command.oauthRoute(
-				domain.ProviderID(provider),
-				candidate,
-				defaultBase,
-				true,
-			)
-			if err != nil {
-				return nil, nil, "", err
-			}
 			calendar = &application.AccountCalendarRouteInput{
 				Provider: domain.ProviderID(provider),
 			}
 			if provider == string(domain.ProviderGoogle) {
+				oauth, err := command.googleOAuthRoute(candidate, defaultBase, true)
+				if err != nil {
+					return nil, nil, "", err
+				}
 				calendar.Google = oauth
+				if endpoint == "" {
+					endpoint = oauth.APIBase
+				} else {
+					endpoint += " · " + provider + " " + oauth.APIBase
+				}
 			} else {
+				oauth, err := command.oauthRoute(
+					domain.ProviderMicrosoftGraph,
+					candidate,
+					defaultBase,
+					true,
+				)
+				if err != nil {
+					return nil, nil, "", err
+				}
 				calendar.MicrosoftGraph = oauth
-			}
-			if endpoint == "" {
-				endpoint = oauth.APIBase
-			} else {
-				endpoint += " · " + provider + " " + oauth.APIBase
+				if endpoint == "" {
+					endpoint = oauth.APIBase
+				} else {
+					endpoint += " · " + provider + " " + oauth.APIBase
+				}
 			}
 		}
 		return mail, calendar, endpoint, nil
@@ -1085,7 +1178,10 @@ func (command accountAddCommand) hasDistinctCalendarOAuth() bool {
 		command.CalendarOAuthClientID != "" ||
 		command.CalendarOAuthRedirectURI != "" ||
 		command.CalendarAuthorizationKey != "" ||
-		command.ApproveCalendarOAuth
+		command.ApproveCalendarOAuth ||
+		command.CalendarOAuthClientSecretBackend != "" ||
+		command.CalendarOAuthClientSecretKey != "" ||
+		command.ApproveCalendarOAuthClientSecret
 }
 
 func (command *accountRenameCommand) Run(app *runtime) error {
@@ -1162,11 +1258,6 @@ func selectAccountCandidate(
 				provider,
 			)
 		}
-		if provider == domain.ProviderGoogle && !rollout.GoogleOAuthApproved {
-			return application.ProviderCandidate{}, googleOAuthPendingError(
-				"A Google route was selected.",
-			)
-		}
 		for _, candidate := range result.Candidates {
 			if candidate.Provider == provider {
 				if !candidate.Available {
@@ -1228,14 +1319,6 @@ func selectAccountCandidate(
 	for _, candidate := range result.Candidates {
 		if candidate.Available && !candidate.RequiresExplicitSelection {
 			return candidate, nil
-		}
-	}
-	for _, candidate := range result.Candidates {
-		if candidate.Provider == domain.ProviderGoogle &&
-			!rollout.GoogleOAuthApproved {
-			return application.ProviderCandidate{}, googleOAuthPendingError(
-				"Gmail was found.",
-			)
 		}
 	}
 	return application.ProviderCandidate{}, errors.New(
@@ -1310,7 +1393,7 @@ func candidateHTTPSEndpoint(
 }
 
 func accountRouteLabel(account application.AccountView) string {
-	mail, calendar, tasks := "–", "–", "–"
+	mail, calendar, tasks, messages := "–", "–", "–", "–"
 	if account.Mail != nil {
 		mail = string(account.Mail.Provider)
 	}
@@ -1320,10 +1403,13 @@ func accountRouteLabel(account application.AccountView) string {
 	if account.Tasks != nil {
 		tasks = string(account.Tasks.Provider)
 	}
-	if mail == calendar && calendar == tasks {
+	if account.Messages != nil {
+		messages = string(account.Messages.Provider)
+	}
+	if mail == calendar && calendar == tasks && tasks == messages {
 		return mail
 	}
-	return "mail:" + mail + " · cal:" + calendar + " · tasks:" + tasks
+	return "mail:" + mail + " · cal:" + calendar + " · tasks:" + tasks + " · msg:" + messages
 }
 
 func yesNo(value bool) string {

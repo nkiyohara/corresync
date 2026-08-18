@@ -55,6 +55,19 @@ type fakeBackend struct {
 	taskUpdateInput     application.TaskUpdateInput
 	taskStateInput      application.TaskStateInput
 	taskAction          string
+	conversationInput   application.ConversationListInput
+	messageListInput    application.MessageListInput
+	messageSearchInput  application.MessageSearchInput
+	messageGetInput     application.MessageGetInput
+	messageAttachInput  application.MessageAttachmentGetInput
+	messageSyncInput    application.MessageSyncInput
+	messageSendInput    application.MessageSendInput
+	messageEditInput    application.MessageEditInput
+	messageDeleteInput  application.MessageDeleteInput
+	messageReactInput   application.MessageReactionInput
+	conversationCreate  application.ConversationCreateInput
+	membershipInput     application.ConversationMembershipInput
+	messageAction       string
 	commitToken         string
 	caller              domain.Caller
 }
@@ -481,6 +494,189 @@ func (backend *fakeBackend) committedTask(status, token string, caller domain.Ca
 	return application.TaskWriteAccess{Status: status, Task: &task}
 }
 
+func (backend *fakeBackend) ListConversations(
+	_ context.Context,
+	input application.ConversationListInput,
+	caller domain.Caller,
+) (application.ConversationPage, error) {
+	backend.conversationInput, backend.caller = input, caller
+	return application.ConversationPage{Conversations: []application.Conversation{{ID: "conversation-1"}}}, nil
+}
+
+func (backend *fakeBackend) ListMessages(
+	_ context.Context,
+	input application.MessageListInput,
+	caller domain.Caller,
+) (application.MessagePage, error) {
+	backend.messageListInput, backend.caller = input, caller
+	return application.MessagePage{Messages: []application.MessageSummary{{ID: "message-1"}}}, nil
+}
+
+func (backend *fakeBackend) SearchMessages(
+	_ context.Context,
+	input application.MessageSearchInput,
+	caller domain.Caller,
+) (application.MessagePage, error) {
+	backend.messageSearchInput, backend.caller = input, caller
+	return application.MessagePage{Messages: []application.MessageSummary{{ID: "message-1"}}}, nil
+}
+
+func (backend *fakeBackend) GetMessage(
+	_ context.Context,
+	input application.MessageGetInput,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	backend.messageGetInput, backend.caller = input, caller
+	return application.MessageSensitiveAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CommitGetMessage(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	backend.commitToken, backend.caller = token, caller
+	return application.MessageSensitiveAccess{Status: "completed"}, nil
+}
+
+func (backend *fakeBackend) GetMessageAttachment(
+	_ context.Context,
+	input application.MessageAttachmentGetInput,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	backend.messageAttachInput, backend.caller = input, caller
+	return application.MessageSensitiveAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CommitGetMessageAttachment(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	backend.commitToken, backend.caller = token, caller
+	return application.MessageSensitiveAccess{Status: "completed"}, nil
+}
+
+func (backend *fakeBackend) SyncMessages(
+	_ context.Context,
+	input application.MessageSyncInput,
+	caller domain.Caller,
+) (application.MessageChangePage, error) {
+	backend.messageSyncInput, backend.caller = input, caller
+	return application.MessageChangePage{Changes: []application.MessageChange{{Kind: application.MessageChangeDelete, ID: "message-1"}}}, nil
+}
+
+func (backend *fakeBackend) SendMessage(
+	_ context.Context,
+	input application.MessageSendInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	backend.messageSendInput, backend.messageAction, backend.caller = input, "send", caller
+	return application.MessageWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CommitSendMessage(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.committedMessage("sent", token, caller), nil
+}
+
+func (backend *fakeBackend) EditMessage(
+	_ context.Context,
+	input application.MessageEditInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	backend.messageEditInput, backend.messageAction, backend.caller = input, "edit", caller
+	return application.MessageWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CommitEditMessage(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.committedMessage("edited", token, caller), nil
+}
+
+func (backend *fakeBackend) DeleteMessage(
+	_ context.Context,
+	input application.MessageDeleteInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	backend.messageDeleteInput, backend.messageAction, backend.caller = input, "delete", caller
+	return application.MessageWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CommitDeleteMessage(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.committedMessage("deleted", token, caller), nil
+}
+
+func (backend *fakeBackend) ReactToMessage(
+	_ context.Context,
+	input application.MessageReactionInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	backend.messageReactInput, backend.messageAction, backend.caller = input, "react", caller
+	return application.MessageWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CommitMessageReaction(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.committedMessage("reacted", token, caller), nil
+}
+
+func (backend *fakeBackend) CreateConversation(
+	_ context.Context,
+	input application.ConversationCreateInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	backend.conversationCreate, backend.messageAction, backend.caller = input, "create_conversation", caller
+	return application.MessageWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CommitCreateConversation(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.committedMessage("conversation_created", token, caller), nil
+}
+
+func (backend *fakeBackend) ChangeConversationMembership(
+	_ context.Context,
+	input application.ConversationMembershipInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	backend.membershipInput, backend.messageAction, backend.caller = input, "membership", caller
+	return application.MessageWriteAccess{Status: "approval_required"}, nil
+}
+
+func (backend *fakeBackend) CommitConversationMembership(
+	_ context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	return backend.committedMessage("membership_changed", token, caller), nil
+}
+
+func (backend *fakeBackend) committedMessage(
+	status string,
+	token string,
+	caller domain.Caller,
+) application.MessageWriteAccess {
+	backend.commitToken, backend.messageAction, backend.caller = token, status, caller
+	return application.MessageWriteAccess{Status: status}
+}
+
 func TestServerAuthenticatesBeforeDecoding(t *testing.T) {
 	t.Parallel()
 
@@ -545,6 +741,36 @@ func TestValidateSessionStatusResultRejectsInvalidState(t *testing.T) {
 		if err := validateSessionStatusResult(result); err == nil {
 			t.Fatalf("case %d unexpectedly passed: %+v", index, result)
 		}
+	}
+}
+
+func TestValidateSessionStatusResultAcceptsMessagingOnlyRoute(t *testing.T) {
+	t.Parallel()
+	action, err := application.NewAuthenticationActionRequired(
+		application.AuthenticationStateSignedOut,
+		application.AuthenticationReasonNeverAuthenticated,
+		testAccountID,
+		"work",
+		application.AuthenticationServiceMessages,
+		domain.ProviderID(domain.MessagingProviderSlack),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := application.ServiceAuthenticationStatus{
+		Service:  application.AuthenticationServiceMessages,
+		Provider: domain.ProviderID(domain.MessagingProviderSlack),
+		State:    application.AuthenticationStateSignedOut,
+		Reason:   application.AuthenticationReasonNeverAuthenticated,
+		Action:   &action,
+	}
+	if err := validateSessionStatusResult(SessionStatusResult{Accounts: []SessionStatus{{
+		Account: testAccountID, Alias: "work",
+		MessagingProvider: domain.MessagingProviderSlack,
+		State:             "signed_out",
+		Services:          application.ServiceAuthenticationStatuses{Messages: &status},
+	}}}); err != nil {
+		t.Fatalf("validateSessionStatusResult() error = %v", err)
 	}
 }
 
@@ -932,6 +1158,126 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 		if commitErr != nil || committed.Status != operation.status {
 			t.Fatalf("commit %s task = %+v, %v", operation.name, committed, commitErr)
 		}
+	}
+	conversations, err := client.ListConversations(t.Context(), application.ConversationListInput{
+		Account: testAccountID, WorkspaceID: "workspace-1", Limit: 25,
+	}, caller)
+	if err != nil || len(conversations.Conversations) != 1 ||
+		backend.conversationInput.WorkspaceID != "workspace-1" {
+		t.Fatalf("ListConversations() = %+v, %v; input=%+v", conversations, err, backend.conversationInput)
+	}
+	messages, err := client.ListMessages(t.Context(), application.MessageListInput{
+		Account: testAccountID, WorkspaceID: "workspace-1", ConversationID: "conversation-1", Limit: 25,
+	}, caller)
+	if err != nil || len(messages.Messages) != 1 || backend.messageListInput.ConversationID != "conversation-1" {
+		t.Fatalf("ListMessages() = %+v, %v; input=%+v", messages, err, backend.messageListInput)
+	}
+	messages, err = client.SearchMessages(t.Context(), application.MessageSearchInput{
+		Account: testAccountID, WorkspaceID: "workspace-1", ConversationID: "conversation-1",
+		Query: "synthetic", Limit: 25,
+	}, caller)
+	if err != nil || len(messages.Messages) != 1 || backend.messageSearchInput.Query != "synthetic" {
+		t.Fatalf("SearchMessages() = %+v, %v; input=%+v", messages, err, backend.messageSearchInput)
+	}
+	messageRoute := application.MessageGetInput{
+		Account: testAccountID, WorkspaceID: "workspace-1", ConversationID: "conversation-1", MessageID: "message-1",
+	}
+	messageAccess, err := client.GetMessage(t.Context(), messageRoute, caller)
+	if err != nil || messageAccess.Status != "approval_required" || backend.messageGetInput.MessageID != "message-1" {
+		t.Fatalf("GetMessage() = %+v, %v; input=%+v", messageAccess, err, backend.messageGetInput)
+	}
+	messageAccess, err = client.CommitGetMessage(t.Context(), "opv1_message_get", caller)
+	if err != nil || messageAccess.Status != "completed" || backend.commitToken != "opv1_message_get" {
+		t.Fatalf("CommitGetMessage() = %+v, %v", messageAccess, err)
+	}
+	messageAccess, err = client.GetMessageAttachment(t.Context(), application.MessageAttachmentGetInput{
+		Account: testAccountID, WorkspaceID: "workspace-1", ConversationID: "conversation-1",
+		MessageID: "message-1", AttachmentID: "attachment-1",
+	}, caller)
+	if err != nil || messageAccess.Status != "approval_required" ||
+		backend.messageAttachInput.AttachmentID != "attachment-1" {
+		t.Fatalf("GetMessageAttachment() = %+v, %v; input=%+v", messageAccess, err, backend.messageAttachInput)
+	}
+	messageAccess, err = client.CommitGetMessageAttachment(t.Context(), "opv1_message_attachment", caller)
+	if err != nil || messageAccess.Status != "completed" || backend.commitToken != "opv1_message_attachment" {
+		t.Fatalf("CommitGetMessageAttachment() = %+v, %v", messageAccess, err)
+	}
+	changes, err := client.SyncMessages(t.Context(), application.MessageSyncInput{
+		Account: testAccountID, WorkspaceID: "workspace-1", ConversationID: "conversation-1", Limit: 25,
+	}, caller)
+	if err != nil || len(changes.Changes) != 1 || backend.messageSyncInput.Limit != 25 {
+		t.Fatalf("SyncMessages() = %+v, %v; input=%+v", changes, err, backend.messageSyncInput)
+	}
+	writeRoute := application.MessageWriteRoute{
+		Account: testAccountID, WorkspaceID: "workspace-1",
+		Actor: application.MessageActor{ID: "actor-1", Mode: application.MessageActorDelegatedUser},
+	}
+	writeAccess, err := client.SendMessage(t.Context(), application.MessageSendInput{
+		MessageWriteRoute: writeRoute, ConversationID: "conversation-1",
+		Content: application.MessageContent{Format: application.MessageFormatPlain, Text: "Synthetic message"},
+	}, caller)
+	if err != nil || writeAccess.Status != "approval_required" || backend.messageSendInput.Content.Text != "Synthetic message" {
+		t.Fatalf("SendMessage() = %+v, %v; input=%+v", writeAccess, err, backend.messageSendInput)
+	}
+	writeAccess, err = client.CommitSendMessage(t.Context(), "opv1_message_send", caller)
+	if err != nil || writeAccess.Status != "sent" || backend.commitToken != "opv1_message_send" {
+		t.Fatalf("CommitSendMessage() = %+v, %v", writeAccess, err)
+	}
+	writeAccess, err = client.EditMessage(t.Context(), application.MessageEditInput{
+		MessageWriteRoute: writeRoute, ConversationID: "conversation-1", MessageID: "message-1", Version: "version-1",
+		Content: application.MessageContent{Format: application.MessageFormatPlain, Text: "Edited message"},
+	}, caller)
+	if err != nil || writeAccess.Status != "approval_required" || backend.messageEditInput.Content.Text != "Edited message" {
+		t.Fatalf("EditMessage() = %+v, %v; input=%+v", writeAccess, err, backend.messageEditInput)
+	}
+	writeAccess, err = client.CommitEditMessage(t.Context(), "opv1_message_edit", caller)
+	if err != nil || writeAccess.Status != "edited" {
+		t.Fatalf("CommitEditMessage() = %+v, %v", writeAccess, err)
+	}
+	writeAccess, err = client.DeleteMessage(t.Context(), application.MessageDeleteInput{
+		MessageWriteRoute: writeRoute, ConversationID: "conversation-1", MessageID: "message-1", Version: "version-1",
+	}, caller)
+	if err != nil || writeAccess.Status != "approval_required" || backend.messageDeleteInput.MessageID != "message-1" {
+		t.Fatalf("DeleteMessage() = %+v, %v; input=%+v", writeAccess, err, backend.messageDeleteInput)
+	}
+	writeAccess, err = client.CommitDeleteMessage(t.Context(), "opv1_message_delete", caller)
+	if err != nil || writeAccess.Status != "deleted" {
+		t.Fatalf("CommitDeleteMessage() = %+v, %v", writeAccess, err)
+	}
+	writeAccess, err = client.ReactToMessage(t.Context(), application.MessageReactionInput{
+		MessageWriteRoute: writeRoute, ConversationID: "conversation-1", MessageID: "message-1", Version: "version-1",
+		Reaction: "thumbsup",
+	}, caller)
+	if err != nil || writeAccess.Status != "approval_required" || backend.messageReactInput.Reaction != "thumbsup" {
+		t.Fatalf("ReactToMessage() = %+v, %v; input=%+v", writeAccess, err, backend.messageReactInput)
+	}
+	writeAccess, err = client.CommitMessageReaction(t.Context(), "opv1_message_react", caller)
+	if err != nil || writeAccess.Status != "reacted" {
+		t.Fatalf("CommitMessageReaction() = %+v, %v", writeAccess, err)
+	}
+	writeAccess, err = client.CreateConversation(t.Context(), application.ConversationCreateInput{
+		MessageWriteRoute: writeRoute, Kind: application.ConversationGroup,
+		Visibility: application.ConversationVisibilityPrivate,
+		Members:    []application.ConversationMemberInput{{ID: "member-1", Role: application.ConversationMember}},
+	}, caller)
+	if err != nil || writeAccess.Status != "approval_required" || len(backend.conversationCreate.Members) != 1 {
+		t.Fatalf("CreateConversation() = %+v, %v; input=%+v", writeAccess, err, backend.conversationCreate)
+	}
+	writeAccess, err = client.CommitCreateConversation(t.Context(), "opv1_conversation_create", caller)
+	if err != nil || writeAccess.Status != "conversation_created" {
+		t.Fatalf("CommitCreateConversation() = %+v, %v", writeAccess, err)
+	}
+	writeAccess, err = client.ChangeConversationMembership(t.Context(), application.ConversationMembershipInput{
+		MessageWriteRoute: writeRoute, ConversationID: "conversation-1", Version: "version-1",
+		Action: application.MembershipAdd,
+		Member: application.ConversationMemberInput{ID: "member-2", Role: application.ConversationMember},
+	}, caller)
+	if err != nil || writeAccess.Status != "approval_required" || backend.membershipInput.Member.ID != "member-2" {
+		t.Fatalf("ChangeConversationMembership() = %+v, %v; input=%+v", writeAccess, err, backend.membershipInput)
+	}
+	writeAccess, err = client.CommitConversationMembership(t.Context(), "opv1_conversation_membership", caller)
+	if err != nil || writeAccess.Status != "membership_changed" || backend.caller != caller {
+		t.Fatalf("CommitConversationMembership() = %+v, %v; caller=%+v", writeAccess, err, backend.caller)
 	}
 	if err := client.Shutdown(t.Context(), caller); err != nil {
 		t.Fatalf("Shutdown() error = %v", err)

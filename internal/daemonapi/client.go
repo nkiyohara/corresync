@@ -197,8 +197,10 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 		if err := domain.AccountAlias(account.Alias).Validate(); err != nil {
 			return errors.New("daemon returned an invalid session account alias")
 		}
-		if err := account.Provider.Validate(); err != nil {
-			return errors.New("daemon returned an invalid session provider")
+		if account.Provider != "" {
+			if err := account.Provider.Validate(); err != nil {
+				return errors.New("daemon returned an invalid session provider")
+			}
 		}
 		if account.MailProvider != "" {
 			if err := account.MailProvider.Validate(); err != nil {
@@ -215,7 +217,13 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 				return errors.New("daemon returned an invalid task session provider")
 			}
 		}
-		if account.MailProvider == "" && account.CalendarProvider == "" && account.TaskProvider == "" {
+		if account.MessagingProvider != "" {
+			if err := account.MessagingProvider.Validate(); err != nil {
+				return errors.New("daemon returned an invalid messaging session provider")
+			}
+		}
+		if account.MailProvider == "" && account.CalendarProvider == "" &&
+			account.TaskProvider == "" && account.MessagingProvider == "" {
 			return errors.New("daemon returned a session without a provider route")
 		}
 		expectedProvider := account.MailProvider
@@ -230,7 +238,8 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 		}
 		if (account.MailProvider != "") != (account.Services.Mail != nil) ||
 			(account.CalendarProvider != "") != (account.Services.Calendar != nil) ||
-			(account.TaskProvider != "") != (account.Services.Tasks != nil) {
+			(account.TaskProvider != "") != (account.Services.Tasks != nil) ||
+			(account.MessagingProvider != "") != (account.Services.Messages != nil) {
 			return errors.New("daemon returned inconsistent service authentication routes")
 		}
 		authenticatedServices := 0
@@ -247,6 +256,8 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 				provider = account.CalendarProvider
 			case application.AuthenticationServiceTasks:
 				provider = account.TaskProvider
+			case application.AuthenticationServiceMessages:
+				provider = domain.ProviderID(account.MessagingProvider)
 			}
 			if service.Provider != provider {
 				return errors.New("daemon returned an inconsistent service provider")
@@ -290,7 +301,9 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 				account.Capabilities.Calendar !=
 					(account.Services.Calendar != nil && account.Services.Calendar.State == application.AuthenticationStateAuthenticated) ||
 				account.Capabilities.Tasks !=
-					(account.Services.Tasks != nil && account.Services.Tasks.State == application.AuthenticationStateAuthenticated) {
+					(account.Services.Tasks != nil && account.Services.Tasks.State == application.AuthenticationStateAuthenticated) ||
+				account.Capabilities.Messages !=
+					(account.Services.Messages != nil && account.Services.Messages.State == application.AuthenticationStateAuthenticated) {
 				return errors.New("daemon returned capabilities inconsistent with service authentication")
 			}
 			if len(account.Degradations) > 32 {
@@ -716,6 +729,206 @@ func (client *Client) DeleteTask(
 
 func (client *Client) CommitTaskDelete(ctx context.Context, token string, caller domain.Caller) (application.TaskWriteAccess, error) {
 	return client.commitTask(ctx, MethodTaskCommitDelete, token, caller)
+}
+
+func (client *Client) ListConversations(
+	ctx context.Context,
+	input application.ConversationListInput,
+	caller domain.Caller,
+) (application.ConversationPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.ConversationPage{}, err
+	}
+	var result application.ConversationPage
+	return result, client.call(ctx, MethodMessageConversations, caller, input, &result)
+}
+
+func (client *Client) ListMessages(
+	ctx context.Context,
+	input application.MessageListInput,
+	caller domain.Caller,
+) (application.MessagePage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessagePage{}, err
+	}
+	var result application.MessagePage
+	return result, client.call(ctx, MethodMessageList, caller, input, &result)
+}
+
+func (client *Client) SearchMessages(
+	ctx context.Context,
+	input application.MessageSearchInput,
+	caller domain.Caller,
+) (application.MessagePage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessagePage{}, err
+	}
+	var result application.MessagePage
+	return result, client.call(ctx, MethodMessageSearch, caller, input, &result)
+}
+
+func (client *Client) GetMessage(
+	ctx context.Context,
+	input application.MessageGetInput,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageSensitiveAccess{}, err
+	}
+	var result application.MessageSensitiveAccess
+	return result, client.call(ctx, MethodMessageGet, caller, input, &result)
+}
+
+func (client *Client) CommitGetMessage(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	var result application.MessageSensitiveAccess
+	return result, client.call(ctx, MethodMessageCommitGet, caller, ApprovalInput{Token: token}, &result)
+}
+
+func (client *Client) GetMessageAttachment(
+	ctx context.Context,
+	input application.MessageAttachmentGetInput,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageSensitiveAccess{}, err
+	}
+	var result application.MessageSensitiveAccess
+	return result, client.call(ctx, MethodMessageAttachment, caller, input, &result)
+}
+
+func (client *Client) CommitGetMessageAttachment(
+	ctx context.Context,
+	token string,
+	caller domain.Caller,
+) (application.MessageSensitiveAccess, error) {
+	var result application.MessageSensitiveAccess
+	return result, client.call(ctx, MethodMessageCommitAttach, caller, ApprovalInput{Token: token}, &result)
+}
+
+func (client *Client) SyncMessages(
+	ctx context.Context,
+	input application.MessageSyncInput,
+	caller domain.Caller,
+) (application.MessageChangePage, error) {
+	if err := input.ValidateRoute(); err != nil {
+		return application.MessageChangePage{}, err
+	}
+	var result application.MessageChangePage
+	return result, client.call(ctx, MethodMessageSync, caller, input, &result)
+}
+
+func (client *Client) SendMessage(
+	ctx context.Context,
+	input application.MessageSendInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageSend, input, caller)
+}
+
+func (client *Client) CommitSendMessage(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitSend, token, caller)
+}
+
+func (client *Client) EditMessage(
+	ctx context.Context,
+	input application.MessageEditInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageEdit, input, caller)
+}
+
+func (client *Client) CommitEditMessage(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitEdit, token, caller)
+}
+
+func (client *Client) DeleteMessage(
+	ctx context.Context,
+	input application.MessageDeleteInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageDelete, input, caller)
+}
+
+func (client *Client) CommitDeleteMessage(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitDelete, token, caller)
+}
+
+func (client *Client) ReactToMessage(
+	ctx context.Context,
+	input application.MessageReactionInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageReact, input, caller)
+}
+
+func (client *Client) CommitMessageReaction(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitReact, token, caller)
+}
+
+func (client *Client) CreateConversation(
+	ctx context.Context,
+	input application.ConversationCreateInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodConversationCreate, input, caller)
+}
+
+func (client *Client) CommitCreateConversation(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodConversationCommit, token, caller)
+}
+
+func (client *Client) ChangeConversationMembership(
+	ctx context.Context,
+	input application.ConversationMembershipInput,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
+	return client.prepareMessageWrite(ctx, MethodMessageMembership, input, caller)
+}
+
+func (client *Client) CommitConversationMembership(ctx context.Context, token string, caller domain.Caller) (application.MessageWriteAccess, error) {
+	return client.commitMessageWrite(ctx, MethodMessageCommitMember, token, caller)
+}
+
+func (client *Client) prepareMessageWrite(
+	ctx context.Context,
+	method Method,
+	input any,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	var result application.MessageWriteAccess
+	return result, client.call(ctx, method, caller, input, &result)
+}
+
+func (client *Client) commitMessageWrite(
+	ctx context.Context,
+	method Method,
+	token string,
+	caller domain.Caller,
+) (application.MessageWriteAccess, error) {
+	var result application.MessageWriteAccess
+	return result, client.call(ctx, method, caller, ApprovalInput{Token: token}, &result)
 }
 
 func (client *Client) prepareTaskState(
