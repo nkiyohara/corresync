@@ -141,11 +141,10 @@
               的密碼或權杖由鑰匙圈或明確核准的認證資料輔助程式持有，設定只儲存外部引用。
             </p>
             <p>
-              Gmail、Google 行事曆和 Google Tasks 程式碼已包含在 RC
-              中，但正式環境 OAuth 通過審核前整條 Google
-              路徑保持關閉。帳號新增、瀏覽器授權、權限請求、鑰匙圈讀取和
-              Google API
-              流量都無法啟動。以下說明只適用於將來經另一次獨立審閱後啟用的版本。
+              Gmail、Google 行事曆和 Google Tasks 使用你自行管理的 Google Cloud
+              專案中的桌面 OAuth 用戶端。
+              引導設定會驗證下載的用戶端，將產生的認證資料存入系統鑰匙圈，設定中只保留不透明參照。
+              Corresync 管理的 Google OAuth 保持關閉。
             </p>
             <div
               class="legal-table-wrap"

@@ -172,11 +172,11 @@
               endpoint credentials.
             </p>
             <p>
-              Gmail, Google Calendar, and Google Tasks code is included in RC releases, but every
-              Google route is disabled while the production OAuth application awaits approval.
-              Account addition, browser OAuth, consent, keyring access, and Google API traffic
-              cannot start. The practices below describe the route that a separate reviewed release
-              may enable only after approval.
+              Gmail, Google Calendar, and Google Tasks use a Desktop OAuth client in a Google Cloud
+              project you control. Guided setup validates the downloaded client, stores its
+              generated credential in the OS keyring, and records only opaque references in
+              configuration. Corresync-managed Google OAuth remains disabled. The practices below
+              apply when you explicitly configure and sign in to your own client.
             </p>
             <div
               class="legal-table-wrap"
@@ -397,12 +397,11 @@
             <p class="legal-kicker">04 · How processing works</p>
             <h2 id="processing-title">Direct connections, explicit actions</h2>
             <p>
-              The Google route is currently stopped before authentication or network access. After
-              approval and a separate release-gate change, it will open Google’s authorization
-              page in your system browser using OAuth 2.0 with PKCE and a loopback redirect, then
-              connect directly from your device to Google’s fixed Gmail, Calendar, and Tasks API
-              endpoints over TLS. The project does not receive your password, OAuth grant, email,
-              attachment, or calendar content.
+              After you explicitly configure a user-owned Desktop client, the Google route opens
+              Google’s authorization page in your system browser using OAuth 2.0 with PKCE and a
+              loopback redirect, then connect directly from your device to Google’s fixed Gmail,
+              Calendar, and Tasks API endpoints over TLS. The project does not receive your
+              password, OAuth grant, email, attachment, or calendar content.
             </p>
             <p>
               Microsoft Graph uses the same local public-client OAuth pattern against Microsoft’s

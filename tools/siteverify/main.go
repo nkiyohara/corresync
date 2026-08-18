@@ -29,6 +29,7 @@ var pageFiles = []string{
 	"index.html",
 	"getting-started.html",
 	"providers.html",
+	"google-oauth.html",
 	"features.html",
 	"integrations.html",
 	"safety.html",
@@ -37,17 +38,20 @@ var pageFiles = []string{
 }
 
 type page struct {
-	path        string
-	lang        string
-	canonical   string
-	title       string
-	description string
-	ids         map[string]struct{}
-	links       []string
-	assets      []string
-	alternates  map[string]string
-	languageNav map[string]string
-	navCurrent  string
+	path         string
+	lang         string
+	canonical    string
+	title        string
+	description  string
+	ids          map[string]struct{}
+	links        []string
+	assets       []string
+	alternates   map[string]string
+	languageNav  map[string]string
+	navCurrent   string
+	browserSteps int
+	browserShots int
+	browserNotes int
 }
 
 type sitemap struct {
@@ -175,6 +179,17 @@ func verifySite(root string) error {
 		if err := verifyLanguageNavigation(root, item, pages); err != nil {
 			return err
 		}
+		if filepath.Base(item.path) == "google-oauth.html" {
+			if item.browserSteps != 4 || item.browserShots != 4 || item.browserNotes != 4 {
+				return fmt.Errorf(
+					"%s browser guide counts: steps=%d shots=%d notes=%d, want 4 each",
+					item.path,
+					item.browserSteps,
+					item.browserShots,
+					item.browserNotes,
+				)
+			}
+		}
 	}
 	if err := verifySitemap(root, canonicals); err != nil {
 		return err
@@ -281,6 +296,15 @@ func parsePage(root, path string) (page, error) {
 			}
 			if node.Data == "footer" && hasClass(attributes["class"], "site-footer") {
 				siteFooterCount++
+			}
+			if node.Data == "article" && hasClass(attributes["class"], "browser-step") {
+				item.browserSteps++
+			}
+			if node.Data == "figure" && hasClass(attributes["class"], "browser-shot") {
+				item.browserShots++
+			}
+			if node.Data == "figcaption" && hasClass(attributes["class"], "browser-note") {
+				item.browserNotes++
 			}
 			if node.Data == "nav" && hasClass(attributes["class"], "language-nav") {
 				languageNavCount++

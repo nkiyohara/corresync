@@ -6,7 +6,7 @@
     <title>Corresync — 用一個本機 MCP 管理所有信箱和行事曆</title>
     <meta
       name="description"
-      content="連接 Outlook、Microsoft 365、JMAP、IMAP/SMTP、CalDAV 與待辦事項的本機優先 MCP 伺服器和 CLI。Gmail、Google 行事曆與 Google Tasks 即將推出。"
+      content="連接 Outlook、Microsoft 365、Gmail、Google 行事曆、Google Tasks、JMAP、IMAP/SMTP 與 CalDAV 的本機優先 MCP 伺服器和 CLI。Google 使用你自己的桌面 OAuth 用戶端。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -124,9 +124,9 @@
           </p>
           <p class="hero-providers">
             <strong>現已支援：</strong>Outlook Web · Microsoft Graph · Todoist · TickTick ·
-            JMAP · IMAP/SMTP · CalDAV。<strong>即將支援：</strong>Gmail、Google
-            行事曆和 Google Tasks，等待 Google OAuth
-            審核。每個帳號的能力與管理員要求都會明確展示——<a
+            JMAP · IMAP/SMTP · CalDAV · Gmail · Google 行事曆 · Google Tasks。 Google
+            需要你自行管理的 Cloud 專案中的桌面 OAuth
+            用戶端。每個帳號的能力與管理員要求都會明確展示——<a
               href="providers.html"
             >比較連線方式</a>。
           </p>
@@ -212,12 +212,13 @@
       <section class="policy-callout" aria-labelledby="policy-callout-title">
         <div>
           <p class="eyebrow"><span aria-hidden="true"></span>Google 支援狀態</p>
-          <h2 id="policy-callout-title">程式碼已經就緒，目前只等審核。</h2>
+          <h2 id="policy-callout-title">用你自己的 OAuth 用戶端連接 Google。</h2>
           <p>
-            Gmail、Google 行事曆和 Google Tasks 程式碼已經包含在 RC
-            中，但正式環境 OAuth 仍然關閉：不會啟動 Google
-            登入、讀取鑰匙圈、要求 OAuth 權限範圍或傳送 API
-            請求。通過審核後也必須透過另一次獨立審閱的發布才能啟用。
+            在你自己的 Google Cloud 專案中建立桌面 OAuth
+            用戶端，用引導設定匯入下載的 JSON，
+            再在平常的瀏覽器中登入。用戶端認證資料與帳號授權都保存在系統鑰匙圈；Corresync
+            管理的 Google OAuth 保持關閉。
+            <a href="google-oauth.html">按圖解完成設定</a>。
           </p>
         </div>
         <div class="actions">
@@ -421,10 +422,10 @@ corr auth login --account personal</code></pre>
           </article>
           <article class="route-family accent-card">
             <p class="chip">明確 OAuth</p>
-            <h3>Microsoft Graph · Google 即將上線</h3>
+            <h3>Microsoft Graph · Google 使用你自己的用戶端</h3>
             <p>
-              Graph 使用你有權使用的公開用戶端。Google 路徑在正式環境 OAuth
-              通過審核前完全關閉。
+              Graph 使用你有權使用的公開用戶端。Google 使用你自己的桌面 OAuth
+              用戶端。
             </p>
           </article>
           <article class="route-family">
@@ -439,7 +440,7 @@ corr auth login --account personal</code></pre>
           <span class="status-dot" aria-hidden="true"></span><p>
             <strong
             >證據也說清楚。</strong>每條路徑都有確定性的合成契約測試；Google
-            API 路徑目前關閉且尚未進行即時觀測。
+            API 路徑已通過合成契約測試，尚未進行即時觀測。
           </p><a href="providers.html#check">私密檢查信箱位址<span aria-hidden="true">
               →</span></a>
         </div>
@@ -455,9 +456,9 @@ corr auth login --account personal</code></pre>
         </div>
         <ul>
           <li>
-            <strong>Gmail、Google 行事曆和 Google Tasks
-              仍在等待審核。</strong>程式碼在 RC 中，但正式環境 OAuth
-            保持關閉。
+            <strong>Gmail、Google 行事曆和 Google Tasks 可使用你自己的 OAuth
+              用戶端。</strong>
+            引導設定會在明確登入前將桌面用戶端認證資料匯入系統鑰匙圈。
           </li>
           <li>
             <strong>Microsoft Graph 需自備 OAuth。</strong>Corresync

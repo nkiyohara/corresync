@@ -6,7 +6,7 @@
     <title>Corresync — 모든 메일과 캘린더를 하나의 로컬 MCP로</title>
     <meta
       name="description"
-      content="Outlook, Microsoft 365, JMAP, IMAP/SMTP, CalDAV, 할 일을 연결하는 로컬 우선 MCP 서버와 CLI입니다. Gmail, Google 캘린더, Google Tasks는 곧 지원됩니다."
+      content="Outlook, Microsoft 365, Gmail, Google 캘린더, Google Tasks, JMAP, IMAP/SMTP, CalDAV를 연결하는 로컬 우선 MCP 서버와 CLI입니다. Google은 직접 소유한 데스크톱 OAuth 클라이언트로 사용합니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -119,11 +119,10 @@
           </p>
           <p class="hero-providers">
             <strong>지금 사용 가능:</strong> Outlook Web · Microsoft Graph · Todoist ·
-            TickTick · JMAP · IMAP/SMTP · CalDAV. <strong>곧 지원:</strong> Gmail, Google
-            캘린더, Google Tasks는 Google OAuth 승인을 기다리고 있습니다. 계정별
-            기능과 관리자 요구 사항은 숨기지 않고 표시합니다. <a
-              href="providers.html"
-            >연결 방식 비교</a>
+            TickTick · JMAP · IMAP/SMTP · CalDAV · Gmail · Google 캘린더 · Google Tasks.
+            Google은 직접 관리하는 Cloud 프로젝트의 데스크톱 OAuth
+            클라이언트가 필요합니다. 계정별 기능과 관리자 요구 사항은
+            숨기지 않고 표시합니다. <a href="providers.html">연결 방식 비교</a>
           </p>
           <div class="actions">
             <a class="button primary" href="getting-started.html">4단계로 설정하기</a><a
@@ -214,13 +213,15 @@
         <div>
           <p class="eyebrow"><span aria-hidden="true"></span>Google 지원 현황</p>
           <h2 id="policy-callout-title">
-            코드는 준비됐고, 지금은 승인만 기다립니다.
+            직접 소유한 OAuth 클라이언트로 Google을 연결하세요.
           </h2>
           <p>
-            Gmail, Google 캘린더, Google Tasks 코드는 RC에 포함되어 있지만 운영
-            환경 OAuth는 완전히 꺼져 있습니다. Google 로그인, 권한 요청,
-            키체인 접근, API 호출은 시작되지 않습니다. 승인이 나더라도
-            별도로 검토한 릴리스에서만 기능을 켤 수 있습니다.
+            직접 관리하는 Google Cloud 프로젝트에 데스크톱 OAuth 클라이언트를
+            만들고, 안내 설정에서 다운로드한 JSON을 가져온 뒤 평소 쓰는
+            브라우저에서 로그인합니다. 클라이언트 자격 증명과 계정 권한은
+            키체인에 남고, Corresync 관리형 Google OAuth는 비활성 상태를
+            유지합니다.
+            <a href="google-oauth.html">화면별 안내를 따라하세요</a>.
           </p>
         </div>
         <div class="actions">
@@ -399,10 +400,10 @@ corr auth login --account personal</code></pre>
           </article>
           <article class="route-family accent-card">
             <p class="chip">명시적 OAuth</p>
-            <h3>Microsoft Graph · Google 곧 지원</h3>
+            <h3>Microsoft Graph · Google은 직접 소유한 클라이언트로</h3>
             <p>
-              Graph는 사용 권한이 있는 공개 클라이언트를 씁니다. Google 경로는
-              승인 전까지 완전히 닫혀 있습니다.
+              Graph는 사용 권한이 있는 공개 클라이언트를 씁니다. Google은 직접
+              소유한 데스크톱 OAuth 클라이언트를 사용합니다.
             </p>
           </article>
           <article class="route-family">
@@ -417,8 +418,8 @@ corr auth login --account personal</code></pre>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span><p>
             <strong>근거도 함께 공개합니다.</strong> 모든 개발 경로에는
-            결정적인 합성 계약 테스트가 있으며, Google API 경로는 현재 꺼져
-            있고 실사용 관찰 전입니다.
+            결정적인 합성 계약 테스트가 있으며, Google API 경로는 합성 계약
+            테스트를 통과했지만 실사용 관찰 전입니다.
           </p><a href="providers.html#check">메일 주소를 비공개로 확인하기<span
               aria-hidden="true"
             >
@@ -432,8 +433,10 @@ corr auth login --account personal</code></pre>
         </div>
         <ul>
           <li>
-            <strong>Gmail, Google 캘린더, Google Tasks는 승인 대기 중입니다.</strong>
-            코드는 RC에 있지만 운영 환경 OAuth는 꺼져 있습니다.
+            <strong>Gmail, Google 캘린더, Google Tasks는 직접 소유한 OAuth
+              클라이언트로 사용할 수 있습니다.</strong>
+            안내 설정이 명시적 로그인 전에 데스크톱 클라이언트 자격
+            증명을 키체인으로 가져옵니다.
           </li>
           <li>
             <strong>Microsoft Graph OAuth 클라이언트는 사용자가 준비합니다.</strong>
