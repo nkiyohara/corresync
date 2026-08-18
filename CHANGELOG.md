@@ -21,6 +21,55 @@ All notable user-facing changes are recorded here. The project follows
   compatibility checker, security documentation, and agent-integration
   metadata. The adapters remain synthetic-contract covered and live-unobserved.
 
+### Private saved queries
+
+- Save bounded mail and calendar query definitions as private, owner-only,
+  account-local state without persisting provider results or creating a shadow
+  mailbox. Catalog size, definition count, fields, and file paths are closed
+  and mechanically bounded.
+- Execute every saved query against the selected provider and report explicit
+  live freshness. An unavailable provider returns a typed failure instead of a
+  stale successful page.
+- Require explicit CLI approval or caller-bound MCP preview/commit for local
+  definition changes. Saved queries cannot enable monitoring, notifications,
+  agent dispatch, or data egress.
+
+### Explicit authentication recovery
+
+- Return one typed recovery action for the exact account and service when a
+  read needs authentication, without starting login, reading a keyring, or
+  accepting a credential through MCP.
+- Resume only after the human completes the browser, terminal, MFA, or secure
+  credential flow and the same service reports ready. Reads may retry once;
+  writes always require a new preview and approval.
+- Preserve provider and account selection, bound `Retry-After`, and keep
+  cancellation, ambiguity, and unavailable terminal access explicit instead of
+  silently switching routes.
+
+### Release-gated messaging foundations
+
+- Add provider-neutral message contracts and synthetic adapters for Teams
+  Graph, Teams Web, Slack, and Mattermost behind the same typed application
+  use cases used by CLI and MCP.
+- Keep the immutable source-owned release gate closed before setup choices,
+  catalogs, session construction, credential access, browser launch, or
+  provider traffic. Messaging remains unavailable and unadvertised in this RC
+  pending exact-revision live observation and approval.
+- Bind consequential messaging writes to the exact account, workspace, actor,
+  target version, payload, and caller through preview/commit. Code inclusion
+  does not claim observed provider capability.
+
+## 0.8.6 - 2026-08-18
+
+### Account service selection
+
+- Let guided setup choose mail, calendar, and task services independently for
+  each account through one reviewed multi-select step, while preserving the
+  deterministic non-interactive account commands.
+- Derive only compatible provider routes from the selected services, show the
+  resulting authentication boundary before account creation, and leave every
+  unselected service unconfigured.
+
 ### TickTick tasks
 
 - Add an explicit TickTick task route for bounded project and Inbox discovery,
@@ -38,7 +87,7 @@ All notable user-facing changes are recorded here. The project follows
   naturally across all five Pages languages while retaining its
   live-unobserved evidence label.
 
-### Google Tasks
+### Approval-gated Google Tasks
 
 - Add a bounded Google Tasks adapter for task-list discovery, task CRUD/state,
   ETag-conditional writes, subtasks, ordering, output-only source links, and
@@ -48,10 +97,10 @@ All notable user-facing changes are recorded here. The project follows
   `tasks.readonly` or `tasks`, verified account identity, and secret-free
   configuration schema v8. Migration from v7 preserves every route and cannot
   manufacture or smuggle a Google Tasks grant.
-- Require a user-owned Google Desktop client and a separate task-only grant;
-  no Corresync-managed client or automatic fallback is available. The adapter
-  remains deterministic and live-unobserved until an opt-in observation is
-  recorded.
+- Keep account setup, OAuth, keyring access, sessions, and provider traffic
+  unreachable behind the existing production-approval gate. The code ships as
+  deterministic, live-unobserved RC scaffolding and is not advertised as
+  available.
 
 ### CalDAV VTODO tasks
 

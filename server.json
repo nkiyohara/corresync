@@ -3,7 +3,7 @@
   "name": "io.github.nkiyohara/corresync",
   "title": "Corresync",
   "description": "Local-first mail, calendar, and task MCP with isolated accounts and guarded writes.",
-  "version": "0.8.3",
+  "version": "0.8.6",
   "repository": {
     "url": "https://github.com/nkiyohara/corresync",
     "source": "github"
@@ -12,8 +12,8 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/nkiyohara/corresync/releases/download/v0.8.3/corresync_0.8.3.mcpb",
-      "fileSha256": "ac233b091fce5cfae45a481920f4329e406f9e22abc069fe8f74cae7aeb7daff",
+      "identifier": "https://github.com/nkiyohara/corresync/releases/download/v0.8.6/corresync_0.8.6.mcpb",
+      "fileSha256": "ec63172075be8d1163ea3099325ddc14aa75904728b16bb04b4b5b2005932c8e",
       "transport": {
         "type": "stdio"
       }
