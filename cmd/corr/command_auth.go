@@ -6,13 +6,75 @@ import (
 	"strings"
 
 	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/credential"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/googleoauthclient"
 )
 
 type authCommand struct {
-	Login  loginCommand      `cmd:"" help:"Explicitly authenticate one configured provider route."`
-	Status authStatusCommand `cmd:"" help:"Inspect content-free session state."`
-	Logout authLogoutCommand `cmd:"" help:"Close one account session or all local sessions."`
+	Login        loginCommand        `cmd:"" help:"Explicitly authenticate one configured provider route."`
+	Status       authStatusCommand   `cmd:"" help:"Inspect content-free session state."`
+	Logout       authLogoutCommand   `cmd:"" help:"Close one account session or all local sessions."`
+	GoogleClient googleClientCommand `cmd:"" help:"Securely prepare a user-owned Google Desktop OAuth client."`
+}
+
+type googleClientCommand struct {
+	Import googleClientImportCommand `cmd:"" help:"Import a downloaded Desktop client into the OS keyring."`
+}
+
+type googleClientImportCommand struct {
+	File    string `arg:"" type:"path" help:"Downloaded Google Desktop OAuth client JSON file."`
+	Key     string `required:"" help:"OS-keyring handle to record in the account route."`
+	Replace bool   `help:"Replace the existing OS-keyring value at this exact handle."`
+	JSON    bool   `help:"Write machine-readable non-secret metadata."`
+
+	store        func(string, []byte) error
+	replaceStore func(string, []byte) error
+}
+
+type googleClientImportResult struct {
+	Imported      bool   `json:"imported"`
+	ClientID      string `json:"clientId"`
+	CredentialKey string `json:"credentialKey"`
+	RedirectURI   string `json:"redirectUri"`
+}
+
+func (command *googleClientImportCommand) Run(app *runtime) error {
+	client, err := googleoauthclient.ParseFile(command.File)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	store := command.store
+	if command.Replace {
+		store = command.replaceStore
+		if store == nil {
+			store = credential.ReplaceOSKeyring
+		}
+	} else if store == nil {
+		store = credential.StoreOSKeyring
+	}
+	if err := store(command.Key, client.Secret); err != nil {
+		return fmt.Errorf("store Google OAuth client credential: %w", err)
+	}
+	result := googleClientImportResult{
+		Imported: true, ClientID: client.ID, CredentialKey: command.Key,
+		RedirectURI: "http://127.0.0.1:0",
+	}
+	if command.JSON {
+		return writeJSON(app.stdout, result)
+	}
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err = view.printf(
+		"%s  %s\n\n  %-14s %s\n  %-14s %s\n  %-14s %s\n\n   %s\n",
+		view.success(),
+		view.strong("Google Desktop OAuth client ready"),
+		"Client ID", sanitizeCell(result.ClientID, 512),
+		"Keyring handle", sanitizeCell(result.CredentialKey, 256),
+		"Loopback", result.RedirectURI,
+		view.muted("The generated client credential is in the OS keyring and never entered Corresync configuration."),
+	)
+	return err
 }
 
 type authStatusCommand struct {

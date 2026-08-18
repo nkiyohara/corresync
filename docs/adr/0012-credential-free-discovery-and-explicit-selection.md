@@ -1,14 +1,14 @@
 # ADR 0012: Credential-free discovery and explicit provider selection
 
 The Google candidate and its availability described here are amended by
-[ADR 0026](0026-approval-gated-gmail-api-route.md): it advertises one staged
-`google` API route that remains unavailable until production OAuth approval.
+[ADR 0036](0036-user-owned-google-oauth-first.md): it advertises an explicit
+user-owned Desktop OAuth route while managed Corresync OAuth remains dormant.
 The optional domain-only public projection is constrained separately by
 [ADR 0027](0027-domain-only-public-compatibility-checker.md).
 
 - Status: accepted
 - Date: 2026-07-28
-- Amended: 2026-08-14
+- Amended: 2026-08-18
 
 ## Context
 
@@ -91,10 +91,10 @@ selection; merely discovering it never opens a browser or reads a grant.
 
 The former automatic `google-web` decision is superseded by
 [ADR 0018](0018-disable-automated-google-web-sign-in.md). Google consumer
-domains and Google-hosted Workspace MX evidence now produce only a
-`google` provider candidate. Until production OAuth approval, that candidate is
-reported as unavailable and cannot be selected; discovery never starts its
-authorization.
+domains and Google-hosted Workspace MX evidence now produce only a `google`
+provider candidate. It is reported as requiring additional setup: the human
+must explicitly configure a user-owned Desktop OAuth client before local
+login. Discovery never starts authorization or selects a managed Google client.
 
 Before an authorization browser opens, the CLI displays the exact mail and
 calendar scopes. Submitting consent or an admin-review request always requires
@@ -119,17 +119,20 @@ configuration, state, logs, audit records, or MCP output, and is never accepted
 as a command-line flag or as the value of an inherited environment variable.
 
 Neither backend is consulted during discovery, capability probing, or automatic
-selection, and no MCP tool can read a secret, resolve a reference, trigger a
-credential prompt, or authenticate. An MCP account-add preview may persist a
-reviewed private handle reference, but its result explicitly requires a later
-`corr auth login` invocation from the local CLI before the reference can be
-used. The approval digest binds the complete input. Ordinary account reads omit
-the private lookup key; the account-add approval review deliberately displays
-the exact backend/key handle and rejects cross-account reuse so the human can
-see where later login will resolve a secret. This is the single narrow
-exception to "no secrets in core": the secret belongs to an external facility
-that the human already trusts, and this project holds a reference to it rather
-than a copy of it.
+selection, and no MCP tool can read a secret, directly resolve a reference,
+trigger a credential prompt, or create or expand an authorization. An MCP
+account-add preview may persist a reviewed private handle reference, but its
+result explicitly requires a later `corr auth login` invocation from the local
+CLI before a new authorization can use it. Once that explicit boundary has
+established a session, the session owner may resolve the already consented
+credential when a provider requires token refresh; the MCP caller neither
+requests nor receives it. The approval digest binds the complete input.
+Ordinary account reads omit the private lookup key; the account-add approval
+review deliberately displays the exact backend/key handle and rejects
+cross-account reuse so the human can see where later login will resolve a
+secret. This is the single narrow exception to "no secrets in core": the secret
+belongs to an external facility that the human already trusts, and this project
+holds a reference to it rather than a copy of it.
 
 Guided enrollment may launch a fixed operating-system credential command after
 the account route and handle have been reviewed and added. The `corr` process
@@ -169,12 +172,12 @@ Discovery will sometimes be wrong. It is built to be explainable and
 overridable rather than authoritative, so a wrong guess costs a manual
 configuration instead of an unwanted authorization request. Corresync ships no
 centrally held OAuth client secret. Graph uses an explicitly selected
-bring-your-own public-client registration. The staged Google route has no
-runtime override and stops before OAuth until the release gate is changed
-after production approval.
+bring-your-own public-client registration. Google uses an explicitly selected
+user-owned Desktop client whose credential remains behind the external
+credential facility; the managed-client route has no runtime override.
 
 Google Web no longer trades API completeness for consent safety because its
 software-controlled browser cannot reliably reach the authenticated provider
-surface. After approval, users must explicitly select and authorize `google`,
-or configure a standards route that their account and administrator permit.
+surface. Users must explicitly select and authorize `google`, or configure a
+standards route that their account and administrator permit.
 Corresync does not disguise automation or fall back around a blocked route.

@@ -21,7 +21,6 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/integrationlifecycle"
 	"github.com/nkiyohara/corresync/internal/localipc"
-	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type failingOnboardingDiscoverer struct {
@@ -214,15 +213,27 @@ func TestGuidedTaskChoiceBindsTheExplicitProviderInAMixedPlan(t *testing.T) {
 	google := &application.ProviderCandidate{Provider: domain.ProviderGoogle}
 	microsoft := &application.ProviderCandidate{Provider: domain.ProviderMicrosoftGraph}
 	plan := onboardingRoutePlan{mail: google, calendar: microsoft}
-	command := accountAddCommand{
+	microsoftCommand := accountAddCommand{
 		OAuthClientID:           "synthetic-public-client",
 		OAuthRedirectURI:        "http://127.0.0.1:0/callback",
+		AuthorizationKey:        "mixed-microsoft",
+		ApproveOAuth:            true,
 		onboardingOAuthProvider: domain.ProviderMicrosoftGraph,
+	}
+	googleCommand := accountAddCommand{
+		OAuthClientID:            "synthetic-public-client",
+		OAuthRedirectURI:         "http://127.0.0.1:0/callback",
+		AuthorizationKey:         "mixed-google",
+		ApproveOAuth:             true,
+		OAuthClientSecretBackend: "os-keyring",
+		OAuthClientSecretKey:     "mixed-google-client",
+		ApproveOAuthClientSecret: true,
+		onboardingOAuthProvider:  domain.ProviderGoogle,
 	}
 
 	configured, selected, err := configureOnboardingTaskRoute(
 		nil,
-		command,
+		microsoftCommand,
 		plan,
 		onboardingServiceSelection{taskProvider: domain.ProviderMicrosoftGraph},
 		"mixed",
@@ -234,15 +245,20 @@ func TestGuidedTaskChoiceBindsTheExplicitProviderInAMixedPlan(t *testing.T) {
 		t.Fatalf("explicit Microsoft task authorization = %q", configured.TaskAuthorizationKey)
 	}
 
-	_, _, err = configureOnboardingTaskRoute(
+	configured, selected, err = configureOnboardingTaskRoute(
 		nil,
-		command,
+		googleCommand,
 		plan,
 		onboardingServiceSelection{taskProvider: domain.ProviderGoogleTasks},
 		"mixed",
 	)
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
-		t.Fatalf("approval-gated Google task choice error = %v", err)
+	if err != nil || !selected || configured.TaskProvider != string(domain.ProviderGoogleTasks) {
+		t.Fatalf("explicit Google task choice = %+v, selected = %t, error = %v", configured, selected, err)
+	}
+	if configured.TaskAuthorizationKey != "mixed-google-tasks" ||
+		configured.TaskOAuthSecretKey != "mixed-google-client" ||
+		!configured.ApproveTaskOAuthSecret {
+		t.Fatalf("Google task OAuth route = %+v", configured)
 	}
 }
 
@@ -924,7 +940,7 @@ func TestGuidedSetupAccessibleEOFNeverStartsPostAddAuthentication(t *testing.T) 
 	}
 }
 
-func TestGuidedSetupReportsApprovalPendingGoogleWithoutPersistence(t *testing.T) {
+func TestGuidedSetupOffersBYOGoogleWithoutPersistenceAtEOF(t *testing.T) {
 	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
 	path := filepath.Join(t.TempDir(), "config.toml")
 	discoverer := &accountDiscovererStub{observation: application.AccountDiscoveryObservation{
@@ -941,15 +957,15 @@ func TestGuidedSetupReportsApprovalPendingGoogleWithoutPersistence(t *testing.T)
 	app, stdout := guidedSetupRuntime(t, path, discoverer, "reader@gmail.com\n")
 
 	err := (&setupCommand{}).Run(app)
-	if err == nil || !strings.Contains(err.Error(), "awaiting approval") {
-		t.Fatalf("Google guided setup error = %v", err)
+	if err != nil {
+		t.Fatalf("Google guided setup at safe EOF = %v", err)
 	}
 	configured, loadErr := config.Load(path)
 	if loadErr != nil || len(configured.Accounts) != 0 {
 		t.Fatalf("Google guided setup persisted an account: %+v, %v", configured, loadErr)
 	}
-	if !strings.Contains(stdout.String(), "coming soon") {
-		t.Fatalf("Google guided setup output = %q", stdout.String())
+	if stdout.Len() == 0 {
+		t.Fatal("Google guided setup wrote no review UI")
 	}
 }
 

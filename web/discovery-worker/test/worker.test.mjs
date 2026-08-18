@@ -37,24 +37,27 @@ test("Microsoft MX and Autodiscover produce a high-confidence family with policy
   assert.doesNotMatch(JSON.stringify(result), /tenant\.mail\.protection/);
 });
 
-test("Google families are identified while the generated approval gate stays closed", async () => {
+test("Google families offer the explicit user-owned OAuth route", async () => {
   for (const records of [
     {},
     { SRV: ["0 1 443 service.gmail.com."] },
   ]) {
     const result = await discoverDomain("gmail.com", dnsFixture(records));
     assert.equal(result.classification.family, "google");
-    assert.equal(result.classification.status, "not_available");
+    assert.equal(result.classification.status, "additional_setup");
     assert.equal(result.routes.length, 1);
     assert.equal(result.routes[0].provider, "google");
-    assert.equal(result.routes[0].status, "not_available");
+    assert.equal(result.routes[0].status, "additional_setup");
+    assert.equal(result.routes[0].signIn.owner, "user_owned_oauth");
+    assert.match(result.routes[0].requirements.join(" "), /Desktop OAuth client/);
   }
 
   const catalog = JSON.parse(await readFile(
     new URL("../catalog.json", import.meta.url),
     "utf8",
   ));
-  assert.equal(catalog.googleOAuthApproved, false);
+  assert.equal(catalog.googleBYOOAuthEnabled, true);
+  assert.equal(catalog.googleManagedOAuthEnabled, false);
 });
 
 test("iCloud domains and complete Apple service records expose one guided preset", async () => {

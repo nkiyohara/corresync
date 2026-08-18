@@ -5,6 +5,20 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### User-owned Google OAuth
+
+- Make Gmail, Google Calendar, Google Meet event links, and Google Tasks
+  available through an explicitly selected Desktop OAuth client in a Google
+  Cloud project the signed-in human controls. Corresync-managed Google OAuth
+  remains release-disabled and is never an automatic fallback.
+- Add bounded Desktop-client JSON import into the OS keyring, guided setup for
+  selecting Google services, transient client-credential resolution for code
+  exchange and refresh, and configuration schema v10. Legacy Google routes
+  fail closed instead of manufacturing the new credential consent.
+- Publish a five-language setup guide and update security documentation and
+  agent-integration metadata. The adapters remain synthetic-contract covered
+  and live-unobserved.
+
 ## 0.8.6 - 2026-08-18
 
 ### Account service selection
@@ -33,7 +47,7 @@ All notable user-facing changes are recorded here. The project follows
   naturally across all five Pages languages while retaining its
   live-unobserved evidence label.
 
-### Approval-gated Google Tasks
+### Google Tasks
 
 - Add a bounded Google Tasks adapter for task-list discovery, task CRUD/state,
   ETag-conditional writes, subtasks, ordering, output-only source links, and
@@ -43,10 +57,10 @@ All notable user-facing changes are recorded here. The project follows
   `tasks.readonly` or `tasks`, verified account identity, and secret-free
   configuration schema v8. Migration from v7 preserves every route and cannot
   manufacture or smuggle a Google Tasks grant.
-- Keep account setup, OAuth, keyring access, sessions, and provider traffic
-  unreachable behind the existing production-approval gate. The code ships as
-  deterministic, live-unobserved RC scaffolding and is not advertised as
-  available.
+- Require a user-owned Google Desktop client and a separate task-only grant;
+  no Corresync-managed client or automatic fallback is available. The adapter
+  remains deterministic and live-unobserved until an opt-in observation is
+  recorded.
 
 ### CalDAV VTODO tasks
 

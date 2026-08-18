@@ -9,7 +9,7 @@ not available through a raw protocol escape hatch.
 | Provider ID | Mail | Calendar | Tasks | Authentication | v0.8 evidence |
 | --- | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | — | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
-| `google` / `google-tasks` (coming soon) | Gmail API; no permanent delete | Selectable Google calendars and Google Meet when advertised | Google Tasks with an independent task-only grant | Included but disabled until production OAuth approval; no sign-in starts | Synthetic API/application contracts; live-unobserved |
+| `google` / `google-tasks` | Gmail API; no permanent delete | Selectable Google calendars and Google Meet when advertised | Google Tasks with an independent task-only grant | Explicit user-owned Desktop OAuth client; external client-credential handle and OS-keyring grants | Implemented; synthetic API/application contracts; live-unobserved |
 | `microsoft-graph` | Mail | Selectable calendars, Teams meeting link | Microsoft To Do | Explicit BYO public OAuth client; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `todoist` | — | — | Todoist | Explicit BYO public OAuth client with PKCE; grant in OS keyring | Implemented; synthetic adapter/integration contracts; live-unobserved |
 | `ticktick` | — | — | TickTick | Explicit BYO confidential OAuth client; external secret handle and OS-keyring grant | Implemented; synthetic adapter/integration contracts; live-unobserved |
@@ -21,8 +21,8 @@ not available through a raw protocol escape hatch.
 Task routes use a separate provider selection described in the
 [task contract](tasks.md). Microsoft To Do is active only through the explicit
 `microsoft-graph` task route, Todoist through `todoist`, and TickTick through
-the explicit `ticktick` confidential-client route. Google Tasks is implemented
-behind the disabled approval gate. Other configured task routes remain
+the explicit `ticktick` confidential-client route. Google Tasks uses an
+explicit user-owned Desktop client. Other configured task routes remain
 unavailable until their dependent provider issue ships.
 
 Mail and calendar are selected independently. For example, one account may use
@@ -52,11 +52,11 @@ requires explicit provider selection whenever discovery is ambiguous.
 Microsoft domain or hosted-MX evidence offers both Outlook Web and Microsoft
 Graph, but Graph is always marked as an explicit OAuth choice and is never
 selected as a fallback.
-Google evidence identifies the staged `google` route but cannot select or add
-it while production OAuth approval is pending. The CLI explains that Gmail was
-found, no sign-in started, and support is coming soon. When separately
-activated after approval, the routes pin the Gmail, Calendar, and Tasks API
-bases; Google Tasks uses an independent task-only grant.
+Google evidence identifies a route that needs a user-owned Desktop OAuth
+client. Guided setup can validate and import the downloaded client into the OS
+keyring, but discovery and account addition start no sign-in. The routes pin
+the Gmail, Calendar, and Tasks API bases; Google Tasks uses an independent
+task-only grant.
 Workspace policy may still require administrator approval or block API access;
 Corresync never silently falls back to another route.
 
@@ -95,13 +95,12 @@ reported and never automatically retried.
 
 Provider differences remain visible:
 
-- The staged Gmail API adapter uses bounded native search, message, attachment,
+- The Gmail API adapter uses bounded native search, message, attachment,
   label, draft, send, modify, Trash, and untrash operations. It never calls the
   immediate permanent-delete endpoint; move to Trash is available instead.
   Confirmed partial mutations require reconciliation. Push history and
-  scheduled send are not exposed. After production approval, mail requests
-  the provider-documented `gmail.modify` scope; while approval is pending no
-  Google scope or authorization page is presented;
+  scheduled send are not exposed. A configured mail route requests the
+  provider-documented `gmail.modify` scope only at explicit local CLI login;
 - Graph query syntax differs from Outlook AQS. Reply/forward and move
   revalidate the exact reviewed source before invoking actions that expose no
   atomic source ETag precondition. Permanent deletion uses Graph's explicit
@@ -204,8 +203,8 @@ Its missing identity, refresh, atomic-concurrency, reopen, reminder, and
 unpageable 200-result contracts remain explicit. Other task providers remain
 unavailable. Google Tasks implements task-list discovery, task CRUD/state,
 subtasks, ordering, date-only due values, output-only source links, exact ETag
-conditions, and bounded deletion-aware polling, but the route is unreachable
-until a separate post-approval release enables it.
+conditions, and bounded deletion-aware polling through an explicitly
+configured, user-owned Desktop OAuth client.
 
 ## Accounts and projections
 
