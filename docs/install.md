@@ -274,6 +274,12 @@ non-interactive script, use `corr setup ADDRESS --alias NAME`, followed by the
 explicit account-specific `corr auth login`, `corr doctor`, and `corr
 integrations setup HOST --yes` commands.
 
+For Microsoft candidates, a checkbox-style service step selects Outlook Mail,
+Outlook Calendar, and optional Microsoft To Do independently. To Do is an
+explicit Graph route even when Mail and Calendar use Outlook Web; there is no
+automatic Graph probe or fallback. Teams remains a non-selectable coming-soon
+notice until the complete v0.9 messaging cohort is release-enabled.
+
 The browser owns sign-in, MFA, Conditional Access, and session cookies.
 Corresync never asks for a password or copies an authorization header into its
 configuration. Online doctor reuses that authenticated session and never starts

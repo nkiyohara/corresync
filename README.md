@@ -233,6 +233,14 @@ their independent local integration plans, apply only one confirmed plan, and
 verify each result. Re-running `corr setup` skips healthy work and offers the
 missing or repairable steps.
 
+After choosing a connection route, the wizard presents a service checklist.
+For a Microsoft account, Outlook Mail and Calendar are preselected and can be
+changed independently; Microsoft To Do is an optional, explicit Graph
+authorization. Teams messaging is shown as coming soon while the v0.9 release
+gate is closed and cannot be selected, persisted, or opened. Discovery is only
+route evidence: it never proves that any checked service is enabled for the
+account, and it never triggers a Graph fallback.
+
 Run `corr settings` to open the same account wizard; sign in to, rename,
 select, or remove accounts; and manage updates, safety, and browser sign-in
 from an arrow-key form. Its Setup guide entry resumes the complete coordinator
