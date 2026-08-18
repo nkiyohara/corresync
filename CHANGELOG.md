@@ -5,6 +5,8 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.9.0-rc.1 - 2026-08-18
+
 ### User-owned Google OAuth
 
 - Make Gmail, Google Calendar, Google Meet event links, and Google Tasks

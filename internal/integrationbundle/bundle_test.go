@@ -25,7 +25,7 @@ func TestSpecification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spec.SourceVersion != "0.8.6-rc.7" {
+	if spec.SourceVersion != "0.9.0-rc.1" {
 		t.Fatalf("source version = %q", spec.SourceVersion)
 	}
 	if spec.Effects.AutoApproval {
@@ -107,7 +107,7 @@ func TestPublicationSnapshotSeparatesSourceAndExternalVersions(t *testing.T) {
 	for _, channel := range channels {
 		versions[channel.ID] = channel.ObservedVersion
 	}
-	if versions["mcp-registry"] != "0.8.3" || versions["github-releases"] != "0.8.5" {
+	if versions["mcp-registry"] != "0.8.6" || versions["github-releases"] != "0.8.6" {
 		t.Fatalf("published versions changed with source snapshot: %#v", versions)
 	}
 	if versions["claude-marketplace"] != "2.0.0-rc.1" {
