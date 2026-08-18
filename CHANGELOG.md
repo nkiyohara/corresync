@@ -5,6 +5,17 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.6 - 2026-08-18
+
+### Account service selection
+
+- Let guided setup choose mail, calendar, and task services independently for
+  each account through one reviewed multi-select step, while preserving the
+  deterministic non-interactive account commands.
+- Derive only compatible provider routes from the selected services, show the
+  resulting authentication boundary before account creation, and leave every
+  unselected service unconfigured.
+
 ### TickTick tasks
 
 - Add an explicit TickTick task route for bounded project and Inbox discovery,
