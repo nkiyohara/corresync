@@ -6,7 +6,7 @@
     <title>지원하는 메일·캘린더·할 일 서비스 — Corresync</title>
     <meta
       name="description"
-      content="Outlook, Microsoft 365, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, CalDAV 지원을 비교하세요. Gmail, Google 캘린더, Google Tasks는 곧 지원됩니다."
+      content="Outlook, Microsoft 365, Gmail, Google 캘린더, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, CalDAV 지원과 사용자 소유 OAuth 설정을 비교하세요."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="Todoist, TickTick, iCloud, CalDAV VTODO를 포함해 지금 사용할 수 있는 경로와 승인 대기 중인 Google 지원을 확인합니다."
+      content="Todoist, TickTick, iCloud, CalDAV VTODO를 포함한 경로와 직접 소유한 데스크톱 OAuth 클라이언트를 쓰는 Google 지원을 확인합니다."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ko_KR">
@@ -33,7 +33,7 @@
     <meta name="twitter:title" content="Corresync 메일·캘린더·할 일 지원">
     <meta
       name="twitter:description"
-      content="Outlook, Todoist, TickTick, iCloud, 표준 프로토콜과 승인 대기 중인 Google 지원을 확인하세요."
+      content="Outlook, Todoist, TickTick, iCloud, 표준 프로토콜과 직접 소유한 데스크톱 OAuth 클라이언트를 쓰는 Google 지원을 확인하세요."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 로고와 영문 제품 소개">
@@ -162,8 +162,8 @@
         <span class="status-dot" aria-hidden="true"></span><div>
           <strong>v0.8의 근거는 경로별로 구분됩니다.</strong><p>
             아래의 사용 가능 또는 준비 중인 경로에는 결정적인 합성 공급자
-            계약과 애플리케이션 테스트가 있습니다. Gmail API 경로는 꺼져
-            있고 아직 실사용 관찰 전입니다.
+            계약과 애플리케이션 테스트가 있습니다. Gmail API 경로는 합성
+            계약 테스트를 통과했지만 아직 실사용 관찰 전입니다.
           </p>
         </div><a href="features.html#evidence">근거를 읽는 방법<span aria-hidden="true">
             →</span></a>
@@ -305,21 +305,23 @@
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google 경로</p>
-          <h2 id="google-title">Gmail, Google 캘린더, Google Tasks는 곧 지원됩니다.</h2>
-          <p>
-            관련 코드는 RC에 포함되어 합성 계약 테스트를 통과했습니다.
-            하지만 Google 승인 전에는 운영 환경 OAuth가 완전히 꺼져 있어
-            로그인, 권한 요청, 키체인 접근, API 트래픽이 시작되지 않습니다.
-            Outlook, Microsoft 365, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, CalDAV는 지금
+          <h2 id="google-title">
+            Gmail, Google 캘린더, Google Tasks는 직접 소유한 OAuth 클라이언트로
             사용할 수 있습니다.
+          </h2>
+          <p>
+            직접 관리하는 Google Cloud 프로젝트에 데스크톱 OAuth 클라이언트를
+            만들고 안내 설정에서 JSON을 가져오세요. Corresync 관리형 OAuth는
+            휴면 상태로 남고, 직접 소유한 클라이언트가 Google의 일반
+            브라우저 흐름을 엽니다.
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">GA</span><div>
-                <p class="chip">승인 대기 · 비활성</p>
-                <h3>Corresync Google 경로</h3>
+                <p class="chip">설정 후 사용 가능 · 사용자 소유 OAuth</p>
+                <h3>Google API 경로</h3>
               </div>
             </header>
             <dl>
@@ -343,13 +345,15 @@
               <div>
                 <dt>로그인</dt>
                 <dd>
-                  이 RC에서는 사용할 수 없음. 승인 후 일반 브라우저 OAuth와
-                  계정별 키체인 권한 사용
+                  직접 소유한 데스크톱 OAuth 클라이언트. 클라이언트 자격
+                  증명과 계정별 권한을 별도의 키체인 항목에 보관
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              승인 후에도 별도로 검토한 릴리스에서만 활성화할 수 있습니다.
+              일반 브라우저가 OAuth를 담당하고 기기에서 고정된 Google API로
+              직접 연결합니다. <a href="google-oauth.html"
+              >Google Cloud 화면과 전체 단계 보기</a>.
             </p>
           </article>
           <article class="route-card">
@@ -542,8 +546,8 @@
             제한은 명확히 정의된 기능 또는 성능 저하로 명확히 반환됩니다.
           </li>
           <li>
-            승인 대기 중인 Google 경로는 브라우저, OAuth, 키체인, 세션,
-            네트워크보다 앞에서 멈춥니다.
+            자동 탐색은 Google OAuth를 시작하지 않으며 명시적인 로컬 로그인만
+            브라우저를 열 수 있습니다.
           </li>
           <li>자동 탐색은 Graph 권한 요청을 시작하지 않습니다.</li>
           <li>

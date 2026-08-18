@@ -142,11 +142,10 @@
               的密码或令牌由钥匙串或明确批准的凭据助手持有，配置只保存外部引用。
             </p>
             <p>
-              Gmail、Google 日历和 Google Tasks 代码已包含在 RC 中，但生产环境
-              OAuth 获批前整条 Google
-              路径保持关闭。账号添加、浏览器授权、权限请求、钥匙串读取和
-              Google API
-              流量都无法启动。以下说明只适用于将来经另一次独立审阅后启用的版本。
+              Gmail、Google 日历和 Google Tasks 使用你自己管理的 Google Cloud
+              项目中的桌面 OAuth 客户端。
+              引导设置会验证下载的客户端，将生成的凭据存入系统钥匙串，配置中只保留不透明引用。
+              Corresync 管理的 Google OAuth 保持关闭。
             </p>
             <div
               class="legal-table-wrap"

@@ -6,7 +6,7 @@
     <title>支援的郵件、行事曆與待辦事項服務 — Corresync</title>
     <meta
       name="description"
-      content="比較 Outlook、Microsoft 365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 與 CalDAV 支援。Gmail、Google 行事曆和 Google Tasks 即將推出。"
+      content="比較 Outlook、Microsoft 365、Gmail、Google 行事曆、Google Tasks、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 與 CalDAV 支援，以及自備 OAuth 設定。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="查看 Todoist、TickTick、iCloud 與 CalDAV VTODO 等目前可用路徑，以及仍在等待審核的 Google 支援。"
+      content="查看 Todoist、TickTick、iCloud 與 CalDAV VTODO 等路徑，以及使用你自己的桌面 OAuth 用戶端的 Google 支援。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -36,7 +36,7 @@
     >
     <meta
       name="twitter:description"
-      content="查看 Outlook、Todoist、TickTick、iCloud、標準協定與等待審核的 Google 支援。"
+      content="查看 Outlook、Todoist、TickTick、iCloud、標準協定與使用你自己的桌面 OAuth 用戶端的 Google 支援。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
@@ -161,7 +161,7 @@
         <span class="status-dot" aria-hidden="true"></span><div>
           <strong>v0.8 證據是確定且按路徑區分的。</strong><p>
             下列可用或準備中的路徑都有合成 服務供應商契約 與 application
-            測試。新 Gmail API 路徑處於關閉狀態，尚未即時觀測。
+            測試。Google API 路徑已通過合成契約測試，尚未即時觀測。
           </p>
         </div><a href="features.html#evidence">證據如何解讀<span aria-hidden="true">
             →</span></a>
@@ -287,21 +287,21 @@
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google 路徑</p>
-          <h2 id="google-title">Gmail、Google 行事曆和 Google Tasks 即將推出。</h2>
+          <h2 id="google-title">
+            Gmail、Google 行事曆和 Google Tasks 可使用你自己的 OAuth 用戶端。
+          </h2>
           <p>
-            相關程式碼已包含在 RC 中，並通過合成契約測試。Google
-            通過審核前，正式環境 OAuth
-            完全關閉，因此不會啟動登入、要求權限、存取鑰匙圈或產生 API
-            流量。Outlook、Microsoft 365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 與
-            CalDAV 目前皆可使用。
+            在你自行管理的 Google Cloud 專案中建立桌面 OAuth
+            用戶端，然後在引導設定中匯入 JSON。 Corresync 管理的 OAuth
+            保持休眠；你自己的用戶端會開啟 Google 的一般瀏覽器流程。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">GA</span><div>
-                <p class="chip">等待審核 · 已關閉</p>
-                <h3>Corresync Google 路徑</h3>
+                <p class="chip">設定後可用 · 自備 OAuth</p>
+                <h3>Google API 路徑</h3>
               </div>
             </header>
             <dl>
@@ -323,13 +323,15 @@
               <div>
                 <dt>登入</dt>
                 <dd>
-                  本 RC 不可用；通過審核後使用普通瀏覽器 OAuth，帳號 授權
-                  存入系統鑰匙圈
+                  你自己的桌面 OAuth
+                  用戶端；用戶端認證資料與帳號授權分別存入系統鑰匙圈
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              通過審核後仍需另一次獨立審閱的發布才能啟用。
+              一般瀏覽器負責 OAuth，裝置直接連結固定的 Google API。<a
+                href="google-oauth.html"
+              >查看 Google Cloud 畫面與全部步驟</a>。
             </p>
           </article>
           <article class="route-card">
@@ -507,8 +509,8 @@
         <ul>
           <li>限制會作為型別化能力或降級明確回傳。</li>
           <li>
-            等待審核的 Google
-            路徑在瀏覽器、OAuth、鑰匙圈、會話和網路前停止。
+            自動探索不會啟動 Google
+            OAuth；只有明確的本機登入才可開啟瀏覽器。
           </li>
           <li>自動發現不會啟動 Graph 授權。</li>
           <li>只有所選行事曆路徑報告支援時才請求會議連結。</li>

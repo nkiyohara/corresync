@@ -224,13 +224,11 @@ scoop install corresync/corresync</code></pre>
             </p>
           </aside>
           <aside class="note-card">
-            <h3>Google 계정은 지금 어떻게 되나요?</h3>
+            <h3>Google 계정은 어떻게 연결하나요?</h3>
             <p>
-              Gmail, Google 캘린더, Google Tasks 코드는 RC에 들어 있지만 운영 환경
-              OAuth 승인 전까지 경로가 완전히 꺼져 있습니다. 설정 결과에는
-              “곧 지원”이라고 표시되며 Google 로그인은 시작되지 않습니다.
-              Outlook Web, 명시적으로 선택한 Microsoft Graph, JMAP, IMAP/SMTP, CalDAV는
-              현재 사용할 수 있습니다.
+              직접 관리하는 Google Cloud 프로젝트에 데스크톱 OAuth 클라이언트를
+              만드세요. 안내 설정이 다운로드한 JSON을 검증하고, 명시적인
+              브라우저 로그인 전에 자격 증명을 키체인으로 가져옵니다.
             </p>
           </aside>
         </div>
@@ -273,8 +271,8 @@ scoop install corresync/corresync</code></pre>
               승인한 자격 증명 도우미가 보관하며 설정에는 참조만 남습니다.
             </li>
             <li>
-              <strong>Google:</strong> 승인 전에는 이 명령도 로그인보다 앞에서
-              중단됩니다.
+              <strong>Google:</strong> 직접 소유한 데스크톱 OAuth 클라이언트와
+              키체인에 가져온 자격 증명을 사용합니다.
             </li>
           </ul>
           <p>연결된 계정과 관찰된 기능을 확인합니다.</p>

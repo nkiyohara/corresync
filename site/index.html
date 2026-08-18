@@ -10,7 +10,7 @@
     <title>Corresync — one local MCP server for all your email and calendars</title>
     <meta
       name="description"
-      content="Local MCP server and CLI for Outlook, Microsoft 365, JMAP, IMAP/SMTP, CalDAV, and tasks. Gmail, Google Calendar, and Google Tasks are coming soon."
+      content="Local MCP server and CLI for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, JMAP, IMAP/SMTP, CalDAV, and tasks. Bring your own Google Desktop OAuth client."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -20,7 +20,7 @@
     >
     <meta
       property="og:description"
-      content="Local MCP server and CLI for Outlook, Microsoft 365, JMAP, IMAP/SMTP, CalDAV, and tasks. Gmail, Google Calendar, and Google Tasks are coming soon."
+      content="Local MCP server and CLI for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, JMAP, IMAP/SMTP, CalDAV, and tasks. Bring your own Google Desktop OAuth client."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -44,7 +44,7 @@
     >
     <meta
       name="twitter:description"
-      content="Local MCP server and CLI for Outlook, Microsoft 365, JMAP, IMAP/SMTP, CalDAV, and tasks. Gmail, Google Calendar, and Google Tasks are coming soon."
+      content="Local MCP server and CLI for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, JMAP, IMAP/SMTP, CalDAV, and tasks. Bring your own Google Desktop OAuth client."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -82,7 +82,7 @@
           "programmingLanguage": "Go",
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
-          "description": "A local-first, provider-neutral MCP server and CLI for isolated mail, calendar, and task accounts, with Gmail, Google Calendar, and Google Tasks coming soon after OAuth approval."
+          "description": "A local-first, provider-neutral MCP server and CLI for isolated mail, calendar, and task accounts, including Gmail, Google Calendar, and Google Tasks through a user-owned Desktop OAuth client."
         }
       ]
     }
@@ -132,9 +132,9 @@
           </p>
           <p class="hero-providers">
             <strong>Available now:</strong> Outlook Web · Microsoft Graph · Todoist · TickTick ·
-            JMAP · IMAP/SMTP · CalDAV. <strong>Coming soon:</strong> Gmail, Google Calendar, and
-            Google Tasks, pending Google OAuth approval. Capabilities and administrator requirements
-            are explicit per account —
+            JMAP · IMAP/SMTP · CalDAV · Gmail · Google Calendar · Google Tasks. Google requires
+            a Desktop OAuth client in a Cloud project you control. Capabilities and administrator
+            requirements are explicit per account —
             <a href="providers.html">compare the routes</a>.
           </p>
           <div class="actions">
@@ -226,12 +226,12 @@
       <section class="policy-callout" aria-labelledby="policy-callout-title">
         <div>
           <p class="eyebrow"><span aria-hidden="true"></span>Your data, explained</p>
-          <h2 id="policy-callout-title">Google support is built—and waiting for approval.</h2>
+          <h2 id="policy-callout-title">Connect Google with an OAuth client you control.</h2>
           <p>
-            Gmail, Google Calendar, and Google Tasks code is included in the RC, but production
-            OAuth is disabled: no Google sign-in, keyring access, scope request, or API traffic
-            starts. After approval, a separate reviewed release will enable direct, local,
-            purpose-bound access.
+            Create a Desktop OAuth client in your own Google Cloud project, import its downloaded
+            JSON through guided setup, then sign in in your normal browser. The client credential
+            and account grant stay in the OS keyring; Corresync-managed Google OAuth stays disabled.
+            <a href="google-oauth.html">Follow the illustrated setup</a>.
           </p>
         </div>
         <div class="actions">
@@ -443,11 +443,11 @@ payload is approved.</span></code></pre>
           </article>
           <article class="route-family accent-card">
             <p class="chip">Explicit OAuth</p>
-            <h3>Microsoft Graph · Google coming soon</h3>
+            <h3>Microsoft Graph · Google with your own client</h3>
             <p>
-              Microsoft Graph accepts a public client you are authorized to use now. Gmail and
-              Google Calendar are included but disabled while production OAuth approval is pending;
-              use Google’s official Workspace MCP for now.
+              Microsoft Graph accepts a public client you are authorized to use. Gmail, Google
+              Calendar, and Google Tasks use a Desktop client from a Google Cloud project you
+              control.
             </p>
           </article>
           <article class="route-family">
@@ -463,7 +463,7 @@ payload is approved.</span></code></pre>
           <span class="status-dot" aria-hidden="true"></span>
           <p>
             <strong>Evidence, stated plainly.</strong> Every available or staged route ships with
-            deterministic synthetic contract coverage. The new Gmail API route is disabled and
+            deterministic synthetic contract coverage. The user-owned Google API route is
             live-unobserved; an older observation covers only the retired IMAP/SMTP transport.
           </p>
           <a href="providers.html#check">Check an address privately<span aria-hidden="true">
@@ -519,9 +519,8 @@ payload is approved.</span></code></pre>
         </div>
         <ul>
           <li>
-            <strong>Gmail, Google Calendar, and Google Tasks are coming soon.</strong> The code is
-            in the RC, but production OAuth stays disabled until Google approves it. No Google
-            sign-in starts; use Google’s official Workspace MCP servers in the meantime.
+            <strong>Gmail, Google Calendar, and Google Tasks use your own OAuth client.</strong>
+            Guided setup imports a Google Desktop client into the OS keyring before explicit login.
           </li>
           <li>
             <strong>Microsoft Graph is bring-your-own OAuth.</strong> Corresync does not operate a

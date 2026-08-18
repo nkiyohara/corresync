@@ -286,9 +286,10 @@
             <h3 id="faq-provider">Will it work with my accounts?</h3>
             <p>
               Outlook Web, Microsoft Graph, Todoist, TickTick, JMAP, IMAP/SMTP, and CalDAV routes
-              are available now; Gmail, Google Calendar, and Google Tasks are built but disabled
-              pending production OAuth approval. You pick mail and calendar routes independently per
-              account, and any degradation is explicit. The optional <a href="providers.html#check"
+              are available now; Gmail, Google Calendar, and Google Tasks use a Desktop OAuth client
+              in a Google Cloud project you control. You pick mail and calendar routes independently
+              per account, and any degradation is explicit. The optional <a
+                href="providers.html#check"
               >private compatibility checker</a> sends only the domain after the @, or you can skip
               it and discover locally after installation.
             </p>
@@ -297,9 +298,9 @@
             <h3 id="faq-cost">Does it cost anything?</h3>
             <p>
               No. Corresync is open source under the Apache-2.0 license. You bring the accounts you
-              already have. Microsoft Graph additionally needs a public OAuth client registration
-              you are authorized to use; Corresync is preparing its official OAuth application
-              before any Corresync Google connection can open.
+              already have. Microsoft Graph needs a public OAuth client you are authorized to use;
+              Google needs your own Desktop OAuth client. Corresync-managed Google OAuth stays
+              dormant.
             </p>
           </article>
           <article aria-labelledby="faq-data">
@@ -355,9 +356,9 @@
         </div>
         <ul>
           <li>
-            <strong>Corresync Google connection is not available yet.</strong> The production OAuth
-            application is awaiting approval, so the route is completely disabled. Use Google’s
-            official Workspace MCP servers in the meantime.
+            <strong>Google connections require your own OAuth client.</strong> Guided setup
+            validates a downloaded Desktop client and keeps its credential and each account grant in
+            the OS keyring. <a href="google-oauth.html">Follow the illustrated guide</a>.
           </li>
           <li>
             <strong>No token relay.</strong> Microsoft Graph uses a public client you register and
