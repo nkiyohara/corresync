@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync — メールとカレンダーを、ひとつのローカルMCPへ</title>
+    <title>Corresync — メール・予定・タスクのローカルMCP</title>
     <meta
       name="description"
-      content="Outlook、Microsoft 365、Gmail、Googleカレンダー、Google Tasks、JMAP、IMAP/SMTP、CalDAVをつなぐローカルファーストMCPサーバーとCLI。Googleは自分のデスクトップOAuthクライアントで利用できます。"
+      content="Outlook、Gmail、Googleカレンダー、Microsoft To Do、Google Tasks、Todoist、TickTick、JMAP、IMAP/SMTP、CalDAVを扱うローカルファーストMCPサーバーとCLI。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync — メールとカレンダーを、ひとつのローカルMCPへ"
+      content="Corresync — メール・予定・タスクをひとつのローカルMCPへ"
     >
     <meta
       property="og:description"
-      content="仕事用も個人用も、アカウントを混ぜずに横断検索。送信前には必ず内容を確認できる、ローカルファーストのMCPサーバーとCLIです。"
+      content="仕事用も個人用も、メール、予定、タスクをひとつのローカルCLIとMCPへ。アカウントごとの認証と接続方法は分離したままです。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -31,21 +31,21 @@
     <meta property="og:image:height" content="630">
     <meta
       property="og:image:alt"
-      content="Corresyncのロゴと、メールとカレンダーのためのローカルMCPであることを示す英語のメッセージ"
+      content="Corresyncのロゴと、メール、予定、タスクのためのローカルMCPであることを示す英語のメッセージ"
     >
     <meta name="twitter:card" content="summary_large_image">
     <meta
       name="twitter:title"
-      content="Corresync — メールとカレンダーを、ひとつのローカルMCPへ"
+      content="Corresync — メール・予定・タスクをひとつのローカルMCPへ"
     >
     <meta
       name="twitter:description"
-      content="仕事用も個人用も、アカウントを混ぜずに横断検索。送信前には必ず内容を確認できます。"
+      content="メール、予定、タスクをひとつのローカルCLIとMCPへ。アカウントごとの認証は分離したままです。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
-      content="Corresyncのロゴと、メールとカレンダーのためのローカルMCPであることを示す英語のメッセージ"
+      content="Corresyncのロゴと、メール、予定、タスクのためのローカルMCPであることを示す英語のメッセージ"
     >
     <link rel="canonical" href="https://corresync.org/ja/">
     <link rel="alternate" hreflang="en" href="https://corresync.org/">
@@ -80,7 +80,7 @@
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
           "inLanguage": "ja",
-          "description": "メールとカレンダーの複数アカウントを安全に扱う、ローカルファーストでプロバイダー中立なMCPサーバーとCLI。"
+          "description": "メール、カレンダー、タスクの複数アカウントを分離して扱う、ローカルファーストでプロバイダー中立なMCPサーバーとCLI。"
         }
       ]
     }
@@ -122,23 +122,22 @@
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
           <p class="eyebrow">
-            <span aria-hidden="true"></span>ローカルファースト · MCPサーバー + CLI
+            <span aria-hidden="true"></span>メール · カレンダー · タスク
           </p>
           <h1 id="hero-title">
-            メールも予定も、<em>ひとつのローカルMCPから。</em>
+            仕事のやり取りを、<em>ひとつのローカルMCPから。</em>
           </h1>
           <p class="lede">
-            仕事用と個人用のメール・カレンダーを、Codex、Claude
-            Code、MCP対応エージェント、
-            そして普段のターミナルにつなげます。アカウントごとの本人性と認可は分けたまま、
-            すべての受信箱を検索し、予定をひとつにまとめ、送信内容は実行前に確認できます。
+            仕事用と個人用のメール、予定、タスクを、Codex、Claude
+            Code、MCP対応エージェント、そして普段のターミナルへ。アカウントごとの本人性と認可は混ぜずに、
+            探す、整理する、返す、実行するをひとつの型付きインターフェースにまとめます。
           </p>
           <p class="hero-providers">
-            <strong>現在利用可能：</strong>Outlook Web · Microsoft Graph · Todoist ·
-            TickTick · JMAP · IMAP/SMTP · CalDAV · Gmail · Googleカレンダー · Google
-            Tasks。Googleは自分で管理するCloudプロジェクトのデスクトップOAuthクライアントが必要です。アカウントごとの対応範囲や管理者要件は、<a
+            <strong>いつものサービスを、いつもの認証のまま：</strong>Outlook ·
+            Gmail · Google カレンダー · Microsoft To Do · Todoist · TickTick ·
+            オープン標準。接続経路と機能はアカウントごとに明示します。<a
               href="providers.html"
-            >対応サービス一覧</a>で確認できます。
+            >サービス別の詳細を見る</a>。
           </p>
           <div class="actions">
             <a class="button primary" href="getting-started.html">4ステップではじめる</a>
@@ -215,6 +214,106 @@
             <a href="getting-started.html">スタートガイド</a>にまとめています。
           </p>
         </div>
+      </section>
+
+      <section class="service-landscape" aria-labelledby="service-landscape-title">
+        <div class="section-heading">
+          <p class="eyebrow">
+            <span aria-hidden="true"></span>一日の仕事を、ひとつの窓口に
+          </p>
+          <h2 id="service-landscape-title">
+            メールも、予定も、タスクも。サインイン方法はそのまま。
+          </h2>
+          <p>
+            自分で管理するアカウントを、ひとつのローカルCLIとMCPサーバーから扱えます。
+            機能はサービスやアカウントによって異なるため、設定では接続方法と利用範囲を明確に示します。
+          </p>
+        </div>
+        <div class="service-grid">
+          <article class="service-group">
+            <h3>メール</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img src="../assets/service-icons/outlook.svg" alt="" width="24" height="24">Outlook
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/gmail.svg" alt="" width="24" height="24">Gmail
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/icloud.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >iCloudメール
+              </li>
+              <li class="service-chip protocol-chip">JMAP / IMAP</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>カレンダー</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/outlook.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Outlookカレンダー
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/google-calendar.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Googleカレンダー
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/icloud.svg" alt="" width="24" height="24">iCloud
+              </li>
+              <li class="service-chip protocol-chip">CalDAV</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>タスク</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/microsoft-todo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Microsoft To Do
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/google-tasks.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Google Tasks
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/todoist.svg" alt="" width="24" height="24">Todoist
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/ticktick.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >TickTick
+              </li>
+            </ul>
+          </article>
+        </div>
+        <p class="service-cta">
+          <a href="providers.html">サービスごとの接続方法を見る<span
+              aria-hidden="true"
+            >
+              →</span></a>
+        </p>
       </section>
 
       <section class="trust-row" aria-label="Corresyncを選ぶ理由">
@@ -486,9 +585,8 @@ corr auth login --account personal</code></pre>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span>
           <p>
-            <strong
-            >根拠も明示します。</strong>各経路には決定的な合成データによる契約テストがあります。Google
-            API経路は合成契約テスト済みで、実環境では未観測です。
+            <strong>選ぶ前に、必要な情報がわかります。</strong>
+            サービス一覧には、正確なサインイン方法、設定要件、アカウントごとに異なる機能をまとめています。
           </p>
           <a href="providers.html#check">アドレスを非公開で確認<span aria-hidden="true">
               →</span></a>
@@ -557,13 +655,8 @@ corr auth login --account personal</code></pre>
             >Windowsのデスクトップ通知は未対応です。</strong>キューと承認済みランナーは利用できます。
           </li>
           <li>
-            <strong
-            >対応表現は証拠の範囲内です。</strong>合成テストを実環境での互換性確認とは呼びません。
-          </li>
-          <li>
-            <strong
-            >Teamsのチャットとチャネルは、現行リリースでは利用できません。</strong>
-            実装はリリース証拠ゲートの内側にあり、通話、録画、プレゼンス、会議ライフサイクル管理は引き続き対象外です。
+            <strong>機能はアカウントごとに確認します。</strong>
+            メールアドレスのブランドだけで決めつけず、設定時に接続経路とサービスを表示します。
           </li>
         </ul>
       </section>

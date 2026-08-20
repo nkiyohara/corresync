@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync — 用一个本地 MCP 管理所有邮箱和日历</title>
+    <title>Corresync — 用一个本地 MCP 连接邮件、日历与任务</title>
     <meta
       name="description"
-      content="连接 Outlook、Microsoft 365、Gmail、Google 日历、Google Tasks、JMAP、IMAP/SMTP 与 CalDAV 的本地优先 MCP 服务器和 CLI。Google 使用你自己的桌面 OAuth 客户端。"
+      content="面向 Outlook、Gmail、Google 日历、Microsoft To Do、Google Tasks、Todoist、TickTick、JMAP、IMAP/SMTP 与 CalDAV 的本地优先 MCP 服务器和 CLI。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync — 用一个本地 MCP 管理所有邮箱和日历"
+      content="Corresync — 用一个本地 MCP 连接邮件、日历与任务"
     >
     <meta
       property="og:description"
-      content="工作与个人账号彼此隔离，却能统一搜索、查看日程，并在发送前逐项确认。"
+      content="把邮件、日历与任务接入一个本地 CLI 和 MCP，同时保持工作与个人账号彼此隔离。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
@@ -30,21 +30,21 @@
     <meta property="og:image:height" content="630">
     <meta
       property="og:image:alt"
-      content="Corresync 标志，以及介绍本地邮件与日历 MCP 的英文文字"
+      content="Corresync 标志，以及介绍本地邮件、日历与任务 MCP 的英文文字"
     >
     <meta name="twitter:card" content="summary_large_image">
     <meta
       name="twitter:title"
-      content="Corresync — 用一个本地 MCP 管理所有邮箱和日历"
+      content="Corresync — 用一个本地 MCP 连接邮件、日历与任务"
     >
     <meta
       name="twitter:description"
-      content="统一搜索多个账号、汇总日程，并在每次发送前确认。"
+      content="把邮件、日历与任务接入一个本地 CLI 和 MCP，同时隔离每个账号的身份与授权。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
-      content="Corresync 标志，以及介绍本地邮件与日历 MCP 的英文文字"
+      content="Corresync 标志，以及介绍本地邮件、日历与任务 MCP 的英文文字"
     >
     <link rel="canonical" href="https://corresync.org/zh-cn/">
     <link rel="alternate" hreflang="en" href="https://corresync.org/">
@@ -79,7 +79,7 @@
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
           "inLanguage": "zh-Hans",
-          "description": "本地优先、提供商中立的邮件与日历 MCP 服务器和 CLI。"
+          "description": "本地优先、提供商中立的邮件、日历与任务 MCP 服务器和 CLI。"
         }
       ]
     }
@@ -115,20 +115,22 @@
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span aria-hidden="true"></span>本地优先 · MCP 服务器 + CLI</p>
-          <h1 id="hero-title">所有邮箱和日历，<em>一个本地 MCP 就够了。</em></h1>
+          <p class="eyebrow">
+            <span aria-hidden="true"></span>邮件 · 日历 · 任务
+          </p>
+          <h1 id="hero-title">
+            散落在各个账号中的工作，<em>汇入一个本地 MCP。</em>
+          </h1>
           <p class="lede">
-            把工作与个人邮件、日历连接到 Codex、Claude Code、任何 MCP
+            把工作与个人邮件、日历和任务接入 Codex、Claude Code、任何 MCP
             智能体和终端。Corresync
-            始终隔离每个账号的身份与授权，同时让你跨收件箱搜索、汇总日程，并在任何发送发生前亲自确认。
+            始终隔离每个账号的身份与授权，再用同一套类型化操作帮你查找、规划、跟进和执行。
           </p>
           <p class="hero-providers">
-            <strong>现已支持：</strong>Outlook Web · Microsoft Graph · Todoist · TickTick ·
-            JMAP · IMAP/SMTP · CalDAV · Gmail · Google 日历 · Google Tasks。 Google
-            需要你自己管理的 Cloud 项目中的桌面 OAuth
-            客户端。每个账号的能力与管理员要求都会明确展示——<a
-              href="providers.html"
-            >比较连接方式</a>。
+            <strong>围绕你每天使用的服务：</strong>Outlook · Gmail · Google 日历 ·
+            Microsoft To Do · Todoist · TickTick ·
+            开放标准。连接路径与功能按账号明确展示——<a href="providers.html"
+            >查看服务详情</a>。
           </p>
           <div class="actions">
             <a class="button primary" href="getting-started.html">四步完成设置</a><a
@@ -191,6 +193,94 @@
             MCP 客户端命令请见<a href="getting-started.html">快速开始</a>。
           </p>
         </div>
+      </section>
+
+      <section class="service-landscape" aria-labelledby="service-landscape-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>一天的工作，一个入口</p>
+          <h2 id="service-landscape-title">
+            邮件、日历和任务，都不必改变原来的登录方式。
+          </h2>
+          <p>
+            用一个本地 CLI 和 MCP
+            服务器连接你自己掌控的账号。不同服务和账号开放的功能各不相同，因此设置过程会明确展示连接路径与可用范围。
+          </p>
+        </div>
+        <div class="service-grid">
+          <article class="service-group">
+            <h3>邮件</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img src="../assets/service-icons/outlook.svg" alt="" width="24" height="24">Outlook
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/gmail.svg" alt="" width="24" height="24">Gmail
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/icloud.svg" alt="" width="24" height="24">iCloud
+                邮件
+              </li>
+              <li class="service-chip protocol-chip">JMAP / IMAP</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>日历</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img src="../assets/service-icons/outlook.svg" alt="" width="24" height="24">Outlook
+                日历
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/google-calendar.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Google 日历
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/icloud.svg" alt="" width="24" height="24">iCloud
+              </li>
+              <li class="service-chip protocol-chip">CalDAV</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>任务</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/microsoft-todo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Microsoft To Do
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/google-tasks.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Google Tasks
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/todoist.svg" alt="" width="24" height="24">Todoist
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/ticktick.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >TickTick
+              </li>
+            </ul>
+          </article>
+        </div>
+        <p class="service-cta">
+          <a href="providers.html">查看服务与连接方式<span aria-hidden="true">
+              →</span></a>
+        </p>
       </section>
 
       <section class="trust-row" aria-label="为什么选择 Corresync">
@@ -436,9 +526,8 @@ corr auth login --account personal</code></pre>
         </div>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span><p>
-            <strong
-            >证据也说清楚。</strong>每条路径都有确定性的合成契约测试；Google
-            API 路径已通过合成契约测试，尚未进行实时观测。
+            <strong>选择前先看清细节。</strong>
+            服务指南会列出准确的登录方式、设置要求，以及因账号而异的功能。
           </p><a href="providers.html#check">私密检查邮箱地址<span aria-hidden="true">
               →</span></a>
         </div>
@@ -467,12 +556,8 @@ corr auth login --account personal</code></pre>
             仍可使用。
           </li>
           <li>
-            <strong
-            >支持声明受证据约束。</strong>合成契约不会被包装成实时兼容性证明。
-          </li>
-          <li>
-            <strong>当前版本尚未启用 Teams 聊天与频道。</strong>
-            实现已置于发布证据门控之后；通话、录制、在线状态监视和会议生命周期管理仍不在范围内。
+            <strong>功能以账号为准。</strong>
+            设置过程会显示该账号的连接路径与服务，而不会只凭邮箱品牌猜测。
           </li>
         </ul>
       </section>

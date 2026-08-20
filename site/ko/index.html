@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync — 모든 메일과 캘린더를 하나의 로컬 MCP로</title>
+    <title>Corresync — 메일·캘린더·할 일을 하나의 로컬 MCP로</title>
     <meta
       name="description"
-      content="Outlook, Microsoft 365, Gmail, Google 캘린더, Google Tasks, JMAP, IMAP/SMTP, CalDAV를 연결하는 로컬 우선 MCP 서버와 CLI입니다. Google은 직접 소유한 데스크톱 OAuth 클라이언트로 사용합니다."
+      content="Outlook, Gmail, Google 캘린더, Microsoft To Do, Google Tasks, Todoist, TickTick, JMAP, IMAP/SMTP, CalDAV를 아우르는 로컬 우선 MCP 서버와 CLI입니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync — 모든 메일과 캘린더를 하나의 로컬 MCP로"
+      content="Corresync — 메일·캘린더·할 일을 하나의 로컬 MCP로"
     >
     <meta
       property="og:description"
-      content="업무용과 개인용 계정을 격리한 채 통합 검색하고, 보내기 전에 직접 확인하세요."
+      content="메일, 캘린더, 할 일을 하나의 로컬 CLI와 MCP로 모으면서 업무용과 개인용 계정은 서로 격리합니다."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ko_KR">
@@ -28,15 +28,24 @@
     <meta property="og:image" content="https://corresync.org/social-card.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Corresync 로고와 영문 제품 소개">
+    <meta
+      property="og:image:alt"
+      content="메일, 캘린더, 할 일을 위한 로컬 MCP를 소개하는 Corresync 이미지"
+    >
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Corresync — 로컬 메일·캘린더 MCP">
+    <meta
+      name="twitter:title"
+      content="Corresync — 메일·캘린더·할 일을 위한 로컬 MCP"
+    >
     <meta
       name="twitter:description"
-      content="여러 계정을 한 번에 검색하고 일정을 모아 보되, 보내기는 직접 승인하세요."
+      content="메일, 캘린더, 할 일을 하나의 로컬 CLI와 MCP로 모으면서 계정별 신원과 권한은 분리합니다."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
-    <meta name="twitter:image:alt" content="Corresync 로고와 영문 제품 소개">
+    <meta
+      name="twitter:image:alt"
+      content="메일, 캘린더, 할 일을 위한 로컬 MCP를 소개하는 Corresync 이미지"
+    >
     <link rel="canonical" href="https://corresync.org/ko/">
     <link rel="alternate" hreflang="en" href="https://corresync.org/">
     <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/">
@@ -70,7 +79,7 @@
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
           "inLanguage": "ko",
-          "description": "로컬 우선 방식의 제공자 중립 메일·캘린더 MCP 서버 및 CLI."
+          "description": "로컬 우선 방식의 제공자 중립 메일·캘린더·할 일 MCP 서버 및 CLI."
         }
       ]
     }
@@ -108,21 +117,21 @@
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span aria-hidden="true"></span>로컬 우선 · MCP 서버 + CLI</p>
-          <h1 id="hero-title">모든 메일과 캘린더를, <em>하나의 로컬 MCP로.</em></h1>
+          <p class="eyebrow">
+            <span aria-hidden="true"></span>메일 · 캘린더 · 할 일
+          </p>
+          <h1 id="hero-title">계정마다 흩어진 일을, <em>하나의 로컬 MCP로.</em></h1>
           <p class="lede">
-            업무용과 개인용 메일·캘린더를 Codex, Claude Code, MCP 에이전트 또는
-            터미널에 연결하세요. Corresync는 계정마다 신원과 권한을
-            분리하면서도 여러 받은편지함을 함께 검색하고 일정을 한눈에
-            보여 줍니다. 보내기 같은 중요한 작업은 언제나 사용자가 먼저
-            확인합니다.
+            업무용과 개인용 메일, 캘린더, 할 일을 Codex, Claude Code, MCP
+            에이전트와 터미널에 연결하세요. Corresync는 계정별 신원과 권한을
+            분리한 채 하나의 타입화된 인터페이스로 찾기, 계획하기, 후속
+            처리와 실행을 이어 줍니다.
           </p>
           <p class="hero-providers">
-            <strong>지금 사용 가능:</strong> Outlook Web · Microsoft Graph · Todoist ·
-            TickTick · JMAP · IMAP/SMTP · CalDAV · Gmail · Google 캘린더 · Google Tasks.
-            Google은 직접 관리하는 Cloud 프로젝트의 데스크톱 OAuth
-            클라이언트가 필요합니다. 계정별 기능과 관리자 요구 사항은
-            숨기지 않고 표시합니다. <a href="providers.html">연결 방식 비교</a>
+            <strong>매일 쓰는 서비스를 중심으로:</strong> Outlook · Gmail · Google
+            캘린더 · Microsoft To Do · Todoist · TickTick · 개방형 표준. 연결
+            경로와 기능은 계정별로 명확히 표시합니다. <a href="providers.html"
+            >서비스 상세 보기</a>
           </p>
           <div class="actions">
             <a class="button primary" href="getting-started.html">4단계로 설정하기</a><a
@@ -193,6 +202,94 @@
             있습니다.
           </p>
         </div>
+      </section>
+      <section class="service-landscape" aria-labelledby="service-landscape-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>하루의 일을 한곳에서</p>
+          <h2 id="service-landscape-title">
+            메일, 캘린더, 할 일을 위해 로그인 방식을 바꿀 필요는 없습니다.
+          </h2>
+          <p>
+            직접 관리하는 계정을 하나의 로컬 CLI와 MCP 서버에서 연결합니다.
+            서비스와 계정마다 제공하는 기능이 다르므로 설정 과정에서 연결
+            경로와 이용 범위를 분명히 보여 줍니다.
+          </p>
+        </div>
+        <div class="service-grid">
+          <article class="service-group">
+            <h3>메일</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img src="../assets/service-icons/outlook.svg" alt="" width="24" height="24">Outlook
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/gmail.svg" alt="" width="24" height="24">Gmail
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/icloud.svg" alt="" width="24" height="24">iCloud
+                Mail
+              </li>
+              <li class="service-chip protocol-chip">JMAP / IMAP</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>캘린더</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img src="../assets/service-icons/outlook.svg" alt="" width="24" height="24">Outlook
+                캘린더
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/google-calendar.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Google 캘린더
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/icloud.svg" alt="" width="24" height="24">iCloud
+              </li>
+              <li class="service-chip protocol-chip">CalDAV</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>할 일</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/microsoft-todo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Microsoft To Do
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/google-tasks.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Google Tasks
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/todoist.svg" alt="" width="24" height="24">Todoist
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/ticktick.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >TickTick
+              </li>
+            </ul>
+          </article>
+        </div>
+        <p class="service-cta">
+          <a href="providers.html">서비스와 연결 방식 살펴보기<span aria-hidden="true">
+              →</span></a>
+        </p>
       </section>
       <section class="trust-row" aria-label="Corresync를 선택하는 이유">
         <div>
@@ -417,9 +514,9 @@ corr auth login --account personal</code></pre>
         </div>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span><p>
-            <strong>근거도 함께 공개합니다.</strong> 모든 개발 경로에는
-            결정적인 합성 계약 테스트가 있으며, Google API 경로는 합성 계약
-            테스트를 통과했지만 실사용 관찰 전입니다.
+            <strong>선택하기 전에 세부 정보를 확인하세요.</strong>
+            서비스 안내에서 정확한 로그인 방식, 설정 요건, 계정별 기능을
+            함께 볼 수 있습니다.
           </p><a href="providers.html#check">메일 주소를 비공개로 확인하기<span
               aria-hidden="true"
             >
@@ -444,14 +541,9 @@ corr auth login --account personal</code></pre>
           </li>
           <li><strong>Windows 데스크톱 알림은 아직 지원하지 않습니다.</strong></li>
           <li>
-            <strong>지원 주장은 근거 범위를 넘지 않습니다.</strong> 합성 계약
-            테스트를 실사용 호환성 증거처럼 표현하지 않습니다.
-          </li>
-          <li>
-            <strong>현재 릴리스에서는 Teams 채팅과 채널을 사용할 수
-              없습니다.</strong>
-            구현은 릴리스 증거 게이트 뒤에 유지되며, 통화·녹화·프레즌스
-            감시·회의 수명 주기 관리는 계속 범위 밖입니다.
+            <strong>기능은 계정별로 확인합니다.</strong>
+            이메일 브랜드만으로 추측하지 않고 설정 과정에서 해당 계정의
+            연결 경로와 서비스를 보여 줍니다.
           </li>
         </ul>
       </section>
