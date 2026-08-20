@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { readFile } = require("node:fs/promises");
+const { readFile, readdir } = require("node:fs/promises");
 const test = require("node:test");
 
 const {
@@ -149,6 +149,65 @@ test("every localized page explains the user-owned Google OAuth route", async ()
       assert.match(source, /OAuth/, path);
       assert.match(source, ownership, path);
     }
+  }
+});
+
+test("localized homepages present three service domains with local icons", async () => {
+  const homepages = new Map([
+    ["index.html", ["Mail", "Calendar", "Tasks"]],
+    ["ja/index.html", ["メール", "カレンダー", "タスク"]],
+    ["zh-cn/index.html", ["邮件", "日历", "任务"]],
+    ["zh-tw/index.html", ["郵件", "行事曆", "待辦"]],
+    ["ko/index.html", ["메일", "캘린더", "할 일"]],
+  ]);
+  const iconNames = [
+    "outlook.svg",
+    "gmail.svg",
+    "google-calendar.svg",
+    "google-tasks.svg",
+    "microsoft-todo.svg",
+    "todoist.svg",
+    "ticktick.svg",
+    "icloud.svg",
+  ];
+
+  for (const [path, headings] of homepages) {
+    const source = await readFile(new URL(path, `file://${__dirname}/`), "utf8");
+    const iconPrefix = path === "index.html" ? "" : "../";
+    const landscape = source.match(
+      /<section class="service-landscape"[\s\S]*?<\/section>/,
+    )?.[0];
+    assert.ok(landscape, path);
+    assert.equal((landscape.match(/<article class="service-group">/g) || []).length, 3, path);
+    for (const heading of headings) {
+      assert.ok(landscape.includes(`<h3>${heading}</h3>`), `${path}: ${heading}`);
+    }
+    for (const iconName of iconNames) {
+      assert.ok(
+        landscape.includes(`src="${iconPrefix}assets/service-icons/${iconName}"`),
+        `${path}: ${iconName}`,
+      );
+    }
+    assert.doesNotMatch(
+      source,
+      /<img\b[^>]*\b(?:src|srcset)\s*=\s*["']?\s*(?:https?:)?\/\//i,
+      path,
+    );
+  }
+});
+
+test("bundled service icons are inert standalone SVGs", async () => {
+  const iconNames = (await readdir(new URL("assets/service-icons/", `file://${__dirname}/`)))
+    .filter((name) => name.endsWith(".svg"));
+  assert.ok(iconNames.length > 0);
+  for (const iconName of iconNames) {
+    const path = `assets/service-icons/${iconName}`;
+    const source = await readFile(new URL(path, `file://${__dirname}/`), "utf8");
+    assert.match(source, /^<svg\b[^>]*>[\s\S]*<\/svg>\s*$/, path);
+    assert.doesNotMatch(source, /<(?:script|style|foreignObject|image|use)\b/i, path);
+    assert.doesNotMatch(source, /\b(?:href|on\w+)\s*=/i, path);
+    assert.doesNotMatch(source, /\bstyle\s*=/i, path);
+    assert.doesNotMatch(source, /url\(\s*["']?(?:https?:|\/\/|data:)/i, path);
   }
 });
 

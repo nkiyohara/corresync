@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync — 用一個本機 MCP 管理所有信箱和行事曆</title>
+    <title>Corresync — 用一個本機 MCP 連接郵件、行事曆與待辦</title>
     <meta
       name="description"
-      content="連接 Outlook、Microsoft 365、Gmail、Google 行事曆、Google Tasks、JMAP、IMAP/SMTP 與 CalDAV 的本機優先 MCP 伺服器和 CLI。Google 使用你自己的桌面 OAuth 用戶端。"
+      content="適用於 Outlook、Gmail、Google 行事曆、Microsoft To Do、Google Tasks、Todoist、TickTick、JMAP、IMAP/SMTP 與 CalDAV 的本機優先 MCP 伺服器和 CLI。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync — 用一個本機 MCP 管理所有信箱和行事曆"
+      content="Corresync — 用一個本機 MCP 連接郵件、行事曆與待辦"
     >
     <meta
       property="og:description"
-      content="工作與個人帳號彼此隔離，卻能統一搜尋、查看日程，並在傳送前逐項確認。"
+      content="把郵件、行事曆與待辦接入一個本機 CLI 和 MCP，同時讓工作與個人帳號彼此隔離。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -30,21 +30,21 @@
     <meta property="og:image:height" content="630">
     <meta
       property="og:image:alt"
-      content="Corresync 標誌，以及介紹本機郵件與行事曆 MCP 的英文文字"
+      content="Corresync 標誌，以及介紹本機郵件、行事曆與待辦 MCP 的英文文字"
     >
     <meta name="twitter:card" content="summary_large_image">
     <meta
       name="twitter:title"
-      content="Corresync — 用一個本機 MCP 管理所有信箱和行事曆"
+      content="Corresync — 用一個本機 MCP 連接郵件、行事曆與待辦"
     >
     <meta
       name="twitter:description"
-      content="統一搜尋多個帳號、彙總日程，並在每次傳送前確認。"
+      content="把郵件、行事曆與待辦接入一個本機 CLI 和 MCP，同時隔離每個帳號的身分與授權。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
-      content="Corresync 標誌，以及介紹本機郵件與行事曆 MCP 的英文文字"
+      content="Corresync 標誌，以及介紹本機郵件、行事曆與待辦 MCP 的英文文字"
     >
     <link rel="canonical" href="https://corresync.org/zh-tw/">
     <link rel="alternate" hreflang="en" href="https://corresync.org/">
@@ -79,7 +79,7 @@
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
           "inLanguage": "zh-Hant",
-          "description": "本機優先、供應商中立的郵件與行事曆 MCP 伺服器和 CLI。"
+          "description": "本機優先、供應商中立的郵件、行事曆與待辦 MCP 伺服器和 CLI。"
         }
       ]
     }
@@ -115,20 +115,23 @@
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span aria-hidden="true"></span>本機優先 · MCP 伺服器 + CLI</p>
-          <h1 id="hero-title">所有信箱和行事曆，<em>一個本機 MCP 就夠了。</em></h1>
+          <p class="eyebrow">
+            <span aria-hidden="true"></span>郵件 · 行事曆 · 待辦
+          </p>
+          <h1 id="hero-title">
+            散落在各個帳號裡的工作，<em>匯入一個本機 MCP。</em>
+          </h1>
           <p class="lede">
-            把工作與個人郵件、行事曆連線到 Codex、Claude Code、任何 MCP
+            把工作與個人郵件、行事曆和待辦接入 Codex、Claude Code、任何 MCP
             智慧體和終端。Corresync
-            始終隔離每個帳號的身分與授權，同時讓你跨收件匣搜尋、彙總日程，並在任何傳送發生前親自確認。
+            始終隔離每個帳號的身分與授權，再用同一套型別化操作幫你尋找、規劃、跟進和執行。
           </p>
           <p class="hero-providers">
-            <strong>現已支援：</strong>Outlook Web · Microsoft Graph · Todoist · TickTick ·
-            JMAP · IMAP/SMTP · CalDAV · Gmail · Google 行事曆 · Google Tasks。 Google
-            需要你自行管理的 Cloud 專案中的桌面 OAuth
-            用戶端。每個帳號的能力與管理員要求都會明確展示——<a
+            <strong>圍繞你每天使用的服務：</strong>Outlook · Gmail · Google 行事曆
+            · Microsoft To Do · Todoist · TickTick ·
+            開放標準。連線路徑與功能會按帳號清楚列出——<a
               href="providers.html"
-            >比較連線方式</a>。
+            >查看服務詳情</a>。
           </p>
           <div class="actions">
             <a class="button primary" href="getting-started.html">四步完成設定</a><a
@@ -191,6 +194,94 @@
             MCP 用戶端命令請見<a href="getting-started.html">開始使用</a>。
           </p>
         </div>
+      </section>
+
+      <section class="service-landscape" aria-labelledby="service-landscape-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>一天的工作，一個入口</p>
+          <h2 id="service-landscape-title">
+            郵件、行事曆和待辦，都不必改變原本的登入方式。
+          </h2>
+          <p>
+            用一個本機 CLI 和 MCP
+            伺服器連接你自己掌控的帳號。不同服務與帳號開放的功能各不相同，因此設定過程會清楚顯示連線路徑與可用範圍。
+          </p>
+        </div>
+        <div class="service-grid">
+          <article class="service-group">
+            <h3>郵件</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img src="../assets/service-icons/outlook.svg" alt="" width="24" height="24">Outlook
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/gmail.svg" alt="" width="24" height="24">Gmail
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/icloud.svg" alt="" width="24" height="24">iCloud
+                郵件
+              </li>
+              <li class="service-chip protocol-chip">JMAP / IMAP</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>行事曆</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img src="../assets/service-icons/outlook.svg" alt="" width="24" height="24">Outlook
+                行事曆
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/google-calendar.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Google 行事曆
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/icloud.svg" alt="" width="24" height="24">iCloud
+              </li>
+              <li class="service-chip protocol-chip">CalDAV</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>待辦</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/microsoft-todo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Microsoft To Do
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/google-tasks.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Google Tasks
+              </li>
+              <li class="service-chip">
+                <img src="../assets/service-icons/todoist.svg" alt="" width="24" height="24">Todoist
+              </li>
+              <li class="service-chip">
+                <img
+                  src="../assets/service-icons/ticktick.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >TickTick
+              </li>
+            </ul>
+          </article>
+        </div>
+        <p class="service-cta">
+          <a href="providers.html">查看服務與連線方式<span aria-hidden="true">
+              →</span></a>
+        </p>
       </section>
 
       <section class="trust-row" aria-label="為什麼選擇 Corresync">
@@ -438,9 +529,8 @@ corr auth login --account personal</code></pre>
         </div>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span><p>
-            <strong
-            >證據也說清楚。</strong>每條路徑都有確定性的合成契約測試；Google
-            API 路徑已通過合成契約測試，尚未進行即時觀測。
+            <strong>選擇前先看清細節。</strong>
+            服務指南會列出確切的登入方式、設定需求，以及因帳號而異的功能。
           </p><a href="providers.html#check">私密檢查信箱位址<span aria-hidden="true">
               →</span></a>
         </div>
@@ -469,12 +559,8 @@ corr auth login --account personal</code></pre>
             仍可使用。
           </li>
           <li>
-            <strong
-            >支援宣告受證據約束。</strong>合成契約不會被包裝成即時相容性證明。
-          </li>
-          <li>
-            <strong>目前版本尚未啟用 Teams 聊天與頻道。</strong>
-            實作已置於發行證據閘門之後；通話、錄製、上線狀態監控與會議生命週期管理仍不在範圍內。
+            <strong>功能以帳號為準。</strong>
+            設定過程會顯示該帳號的連線路徑與服務，而不會只憑信箱品牌猜測。
           </li>
         </ul>
       </section>

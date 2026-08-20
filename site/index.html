@@ -7,20 +7,20 @@
       name="google-site-verification"
       content="du6yQYCD4HROJoMhBnPxnbcntabW8RFRJbfZrRcVcic"
     >
-    <title>Corresync — one local MCP server for all your email and calendars</title>
+    <title>Corresync — local MCP and CLI for mail, calendars, and tasks</title>
     <meta
       name="description"
-      content="Local MCP server and CLI for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, JMAP, IMAP/SMTP, CalDAV, and tasks. Bring your own Google Desktop OAuth client."
+      content="A local-first MCP server and CLI for mail, calendars, and tasks across Outlook, Gmail, Google Calendar, Microsoft To Do, Google Tasks, Todoist, TickTick, JMAP, IMAP/SMTP, and CalDAV."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync — one local MCP server for all your email and calendars"
+      content="Corresync — local MCP and CLI for mail, calendars, and tasks"
     >
     <meta
       property="og:description"
-      content="Local MCP server and CLI for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, JMAP, IMAP/SMTP, CalDAV, and tasks. Bring your own Google Desktop OAuth client."
+      content="Bring mail, calendars, and tasks into one local CLI and MCP server, while each account keeps its own provider route and sign-in."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -35,21 +35,21 @@
     <meta property="og:image:height" content="630">
     <meta
       property="og:image:alt"
-      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <meta name="twitter:card" content="summary_large_image">
     <meta
       name="twitter:title"
-      content="Corresync — one local MCP server for all your email and calendars"
+      content="Corresync — local MCP and CLI for mail, calendars, and tasks"
     >
     <meta
       name="twitter:description"
-      content="Local MCP server and CLI for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, JMAP, IMAP/SMTP, CalDAV, and tasks. Bring your own Google Desktop OAuth client."
+      content="Bring mail, calendars, and tasks into one local CLI and MCP server, while each account keeps its own provider route and sign-in."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
-      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <link rel="canonical" href="https://corresync.org/">
     <link rel="alternate" hreflang="en" href="https://corresync.org/">
@@ -82,7 +82,7 @@
           "programmingLanguage": "Go",
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
-          "description": "A local-first, provider-neutral MCP server and CLI for isolated mail, calendar, and task accounts, including Gmail, Google Calendar, and Google Tasks through a user-owned Desktop OAuth client."
+          "description": "A local-first, provider-neutral MCP server and CLI for account-isolated mail, calendars, and tasks."
         }
       ]
     }
@@ -122,20 +122,21 @@
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span aria-hidden="true"></span>Local-first · MCP server + CLI</p>
-          <h1 id="hero-title">One local MCP server for <em>all your email and calendars.</em></h1>
+          <p class="eyebrow">
+            <span aria-hidden="true"></span>Mail · Calendar · Tasks
+          </p>
+          <h1 id="hero-title">One local surface for <em>the work across your accounts.</em></h1>
           <p class="lede">
-            Connect multiple work and personal email and calendar accounts to Codex, Claude Code,
-            any MCP agent, and your own terminal. Corresync keeps each account’s identity and
-            authorization isolated while you search every inbox, see one agenda, and approve every
-            send before it happens.
+            Bring work and personal mail, calendars, and task lists to Codex, Claude Code, any MCP
+            agent, and your own terminal. Corresync keeps every account’s identity and
+            authorization isolated while one typed interface helps you find, plan, follow up, and
+            act.
           </p>
           <p class="hero-providers">
-            <strong>Available now:</strong> Outlook Web · Microsoft Graph · Todoist · TickTick ·
-            JMAP · IMAP/SMTP · CalDAV · Gmail · Google Calendar · Google Tasks. Google requires
-            a Desktop OAuth client in a Cloud project you control. Capabilities and administrator
-            requirements are explicit per account —
-            <a href="providers.html">compare the routes</a>.
+            <strong>Built around the services you already use:</strong> Outlook · Gmail · Google
+            Calendar · Microsoft To Do · Todoist · TickTick · open standards. Routes and
+            capabilities remain explicit per account —
+            <a href="providers.html">explore the provider details</a>.
           </p>
           <div class="actions">
             <a class="button primary" href="getting-started.html">Get set up in four steps</a>
@@ -203,6 +204,89 @@
             <a href="getting-started.html#other-install-methods">getting started</a>.
           </p>
         </div>
+      </section>
+
+      <section class="service-landscape" aria-labelledby="service-landscape-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Your working day, one surface</p>
+          <h2 id="service-landscape-title">
+            Mail, calendars, and tasks—without changing how you sign in.
+          </h2>
+          <p>
+            Corresync is one local CLI and MCP server for the accounts you already control. Each
+            provider exposes a different set of capabilities, so setup stays explicit and the
+            details remain attached to the account.
+          </p>
+        </div>
+        <div class="service-grid">
+          <article class="service-group">
+            <h3>Mail</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img src="assets/service-icons/outlook.svg" alt="" width="24" height="24">Outlook
+              </li>
+              <li class="service-chip">
+                <img src="assets/service-icons/gmail.svg" alt="" width="24" height="24">Gmail
+              </li>
+              <li class="service-chip">
+                <img src="assets/service-icons/icloud.svg" alt="" width="24" height="24">iCloud Mail
+              </li>
+              <li class="service-chip protocol-chip">JMAP / IMAP</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>Calendar</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img src="assets/service-icons/outlook.svg" alt="" width="24" height="24">Outlook
+                Calendar
+              </li>
+              <li class="service-chip">
+                <img
+                  src="assets/service-icons/google-calendar.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Google Calendar
+              </li>
+              <li class="service-chip">
+                <img src="assets/service-icons/icloud.svg" alt="" width="24" height="24">iCloud
+              </li>
+              <li class="service-chip protocol-chip">CalDAV</li>
+            </ul>
+          </article>
+          <article class="service-group">
+            <h3>Tasks</h3>
+            <ul class="service-list">
+              <li class="service-chip">
+                <img
+                  src="assets/service-icons/microsoft-todo.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Microsoft To Do
+              </li>
+              <li class="service-chip">
+                <img
+                  src="assets/service-icons/google-tasks.svg"
+                  alt=""
+                  width="24"
+                  height="24"
+                >Google Tasks
+              </li>
+              <li class="service-chip">
+                <img src="assets/service-icons/todoist.svg" alt="" width="24" height="24">Todoist
+              </li>
+              <li class="service-chip">
+                <img src="assets/service-icons/ticktick.svg" alt="" width="24" height="24">TickTick
+              </li>
+            </ul>
+          </article>
+        </div>
+        <p class="service-cta">
+          <a href="providers.html">Explore providers and setup routes<span aria-hidden="true">
+              →</span></a>
+        </p>
       </section>
 
       <section class="trust-row" aria-label="Why Corresync">
@@ -462,9 +546,9 @@ payload is approved.</span></code></pre>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span>
           <p>
-            <strong>Evidence, stated plainly.</strong> Every available or staged route ships with
-            deterministic synthetic contract coverage. The user-owned Google API route is
-            live-unobserved; an older observation covers only the retired IMAP/SMTP transport.
+            <strong>Choose with the details in view.</strong> The provider guide shows the exact
+            sign-in route, setup requirements, and account-dependent capabilities before you add
+            anything.
           </p>
           <a href="providers.html#check">Check an address privately<span aria-hidden="true">
               →</span></a>
@@ -531,13 +615,8 @@ payload is approved.</span></code></pre>
             runner modes remain available.
           </li>
           <li>
-            <strong>Provider support is evidence-scoped.</strong> Synthetic contracts do not become
-            live compatibility claims.
-          </li>
-          <li>
-            <strong>Teams chat and channels are not enabled in this release.</strong> Their
-            implementation remains behind release evidence gates. Calls, recordings, presence, and
-            meeting lifecycle management remain out of scope.
+            <strong>Capabilities stay account-specific.</strong> Setup shows the route and services
+            available to that account instead of guessing from the email brand.
           </li>
         </ul>
       </section>
