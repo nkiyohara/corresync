@@ -2,8 +2,8 @@
   role="img" aria-labelledby="card-title card-desc">
   <title id="card-title">Corresync</title>
   <desc id="card-desc">
-    Corresync mark beside the words: one local MCP for your email and
-    calendars. Provider-neutral, preview before commit.
+    Corresync mark beside the words: one local MCP for mail, calendars,
+    and tasks. Provider-neutral, preview before commit.
   </desc>
   <rect width="1200" height="630" fill="#13233b"/>
   <g opacity="0.12" fill="none" stroke-width="64"
@@ -23,8 +23,8 @@
   <g font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
     <text x="236" y="156" font-size="52" letter-spacing="7" fill="#f2ede2">corresync</text>
     <text x="84" y="330" font-size="76" font-weight="700" fill="#f2ede2">One local MCP for</text>
-    <text x="84" y="420" font-size="76" font-weight="700"
-      fill="#f2ede2">your email &amp; calendars.</text>
+    <text x="84" y="414" font-size="66" font-weight="700"
+      fill="#f2ede2">mail, calendars &amp; tasks.</text>
     <text x="84" y="496" font-size="36"
       fill="#e0574a">Provider-neutral · preview before commit</text>
     <text x="84" y="562" font-size="28" fill="#8fa0b8">corresync.org</text>
