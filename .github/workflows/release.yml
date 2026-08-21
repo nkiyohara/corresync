@@ -137,18 +137,23 @@ jobs:
           notary_zip="$RUNNER_TEMP/corresync-notary.zip"
           mkdir -p "$notary_root"
 
-          binary_count="$(
-            jq '[.[] | select(.type == "Binary" and .goos == "darwin")] | length' \
+          primary_count="$(
+            jq '[.[] | select(.type == "Binary" and .goos == "darwin" and .name == "corr")] | length' \
               dist/artifacts.json
           )"
-          test "$binary_count" -eq 4
+          compatibility_count="$(
+            jq '[.[] | select(.type == "Binary" and .goos == "darwin" and .name == "corresync")] | length' \
+              dist/artifacts.json
+          )"
+          test "$primary_count" -eq 2
+          test "$compatibility_count" -eq 2
           jq -r '
             .[]
-            | select(.type == "Binary" and .goos == "darwin")
-            | [.path, .goarch, .name]
+            | select(.type == "Binary" and .goos == "darwin" and .name == "corr")
+            | [.path, .goarch]
             | @tsv
           ' dist/artifacts.json |
-            while IFS=$'\t' read -r binary architecture name; do
+            while IFS=$'\t' read -r binary architecture; do
               test -f "$binary"
               mkdir -p "$notary_root/$architecture"
               codesign \
@@ -161,7 +166,24 @@ jobs:
               codesign --verify --strict --verbose=2 "$binary"
               codesign --display --verbose=4 "$binary" 2>&1 |
                 grep -F "TeamIdentifier=$MACOS_TEAM_ID"
-              install -m 0755 "$binary" "$notary_root/$architecture/$name"
+              compatibility_binary="$(
+                jq -er --arg architecture "$architecture" '
+                  .[]
+                  | select(
+                      .type == "Binary"
+                      and .goos == "darwin"
+                      and .goarch == $architecture
+                      and .name == "corresync"
+                    )
+                  | .path
+                ' dist/artifacts.json
+              )"
+              test -f "$compatibility_binary"
+              install -m 0755 "$binary" "$compatibility_binary"
+              cmp -s "$binary" "$compatibility_binary"
+              codesign --verify --strict --verbose=2 "$compatibility_binary"
+              install -m 0755 "$binary" "$notary_root/$architecture/corr"
+              install -m 0755 "$binary" "$notary_root/$architecture/corresync"
             done
 
           ditto -c -k --keepParent "$notary_root" "$notary_zip"

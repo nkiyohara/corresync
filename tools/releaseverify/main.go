@@ -878,8 +878,16 @@ func verifyZip(path string, want []string, version string) error {
 	defer func() { _ = archive.Close() }()
 	names := make([]string, 0, len(archive.File))
 	versioned := make(map[string][]byte)
+	compatibilityHashes := make(map[string]string, 2)
 	for _, file := range archive.File {
 		names = append(names, file.Name)
+		if file.Name == "corr.exe" || file.Name == "corresync.exe" {
+			hash, hashErr := hashZipEntry(file)
+			if hashErr != nil {
+				return fmt.Errorf("hash compatibility entry %q: %w", file.Name, hashErr)
+			}
+			compatibilityHashes[file.Name] = hash
+		}
 		if isVersionedIntegration(file.Name) {
 			data, readErr := readZipEntry(file)
 			if readErr != nil {
@@ -889,6 +897,13 @@ func verifyZip(path string, want []string, version string) error {
 		}
 	}
 	if err := verifyIntegrationVersions(versioned, version); err != nil {
+		return fmt.Errorf("archive %q: %w", filepath.Base(path), err)
+	}
+	if err := verifyCompatibilityHashes(
+		compatibilityHashes,
+		"corr.exe",
+		"corresync.exe",
+	); err != nil {
 		return fmt.Errorf("archive %q: %w", filepath.Base(path), err)
 	}
 	return requireReleaseFiles(filepath.Base(path), names, want)
@@ -908,6 +923,7 @@ func verifyTarGzip(path string, want []string, version string) error {
 	tarReader := tar.NewReader(gzipReader)
 	var names []string
 	versioned := make(map[string][]byte)
+	compatibilityHashes := make(map[string]string, 2)
 	for {
 		header, err := tarReader.Next()
 		if errors.Is(err, io.EOF) {
@@ -917,6 +933,14 @@ func verifyTarGzip(path string, want []string, version string) error {
 			return fmt.Errorf("read tarball %q: %w", filepath.Base(path), err)
 		}
 		names = append(names, header.Name)
+		if header.Name == "corr" || header.Name == "corresync" {
+			hash, hashErr := hashTarEntry(tarReader, header)
+			if hashErr != nil {
+				return fmt.Errorf("hash compatibility entry %q: %w", header.Name, hashErr)
+			}
+			compatibilityHashes[header.Name] = hash
+			continue
+		}
 		if isVersionedIntegration(header.Name) {
 			const maximum = 256 * 1024
 			if header.Size < 0 || header.Size > maximum {
@@ -935,7 +959,47 @@ func verifyTarGzip(path string, want []string, version string) error {
 	if err := verifyIntegrationVersions(versioned, version); err != nil {
 		return fmt.Errorf("archive %q: %w", filepath.Base(path), err)
 	}
+	if err := verifyCompatibilityHashes(
+		compatibilityHashes,
+		"corr",
+		"corresync",
+	); err != nil {
+		return fmt.Errorf("archive %q: %w", filepath.Base(path), err)
+	}
 	return requireReleaseFiles(filepath.Base(path), names, want)
+}
+
+func hashTarEntry(reader io.Reader, header *tar.Header) (string, error) {
+	const maximumBinaryBytes = 256 * 1024 * 1024
+
+	if header.Size < 0 || header.Size > maximumBinaryBytes {
+		return "", fmt.Errorf("entry %q exceeds %d bytes", header.Name, maximumBinaryBytes)
+	}
+	hash := sha256.New()
+	written, err := io.Copy(hash, io.LimitReader(reader, maximumBinaryBytes+1))
+	if err != nil {
+		return "", err
+	}
+	if written != header.Size {
+		return "", fmt.Errorf("entry %q size is %d, want %d", header.Name, written, header.Size)
+	}
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func verifyCompatibilityHashes(
+	hashes map[string]string,
+	primary string,
+	compatibility string,
+) error {
+	primaryHash := hashes[primary]
+	compatibilityHash := hashes[compatibility]
+	if primaryHash == "" || compatibilityHash == "" {
+		return errors.New("release archive is missing a compatibility executable")
+	}
+	if primaryHash != compatibilityHash {
+		return errors.New("primary and compatibility executables are not identical")
+	}
+	return nil
 }
 
 func isVersionedIntegration(path string) bool {

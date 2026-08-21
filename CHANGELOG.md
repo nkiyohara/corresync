@@ -5,6 +5,18 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Fixed
+
+- Keep the browser-owned Outlook Web session attached to the daemon lifetime
+  after the interactive login request returns, so the first bounded read does
+  not immediately require reauthentication.
+- Compare projection authentication actions by value after daemon JSON
+  transport, preserving structured partial failures instead of exposing an
+  internal agenda consistency error.
+- Sign each macOS `corr` binary once, copy its exact signed bytes to the finite
+  `corresync` compatibility entry, and reject any release archive where the two
+  commands differ.
+
 ## 0.9.0-rc.1 - 2026-08-18
 
 ### User-owned Google OAuth
