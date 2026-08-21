@@ -5,6 +5,16 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.9.0-rc.3 - 2026-08-21
+
+### Crash diagnostics
+
+- Preserve one private, bounded, replace-in-place crash record for CLI, MCP,
+  detached daemon, request, monitor, and owned background panic boundaries.
+  The record excludes panic values, raw errors, arguments, paths, identifiers,
+  credentials, and provider content; explicit `corr feedback --last-error` can
+  review it locally, while automatic public feedback remains ineligible.
+
 ## 0.9.0-rc.2 - 2026-08-21
 
 ### Fixed

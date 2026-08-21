@@ -13,7 +13,7 @@ author: "Corresync contributors"
 
 # Corresync
 
-Version: 0.9.0-rc.2
+Version: 0.9.0-rc.3
 
 Use the local Corresync MCP server and the bundled steering guidance for guarded
 mail, calendar, and task work. Install Corresync separately and ensure the `corr`
