@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,7 +14,9 @@ import (
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
+	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/localipc"
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
@@ -219,6 +222,88 @@ func TestSettingsRemovesNonDefaultAccountAfterConfirmation(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Review account removal") ||
 		!strings.Contains(stdout.String(), "Removed account zeta") {
+		t.Fatalf("settings output = %q", stdout.String())
+	}
+}
+
+func TestSettingsRemovesFinalAccountAfterConfirmation(t *testing.T) {
+	path := saveSettingsFixture(t)
+	initial, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialDigest, err := config.Fingerprint(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := localipc.ResolveInState(path, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := startLifecycleTestDaemon(
+		t.Context(),
+		t,
+		endpoint,
+		daemonapi.ProtocolVersion,
+		"dev",
+		701,
+		initialDigest,
+		initial.Accounts[initial.DefaultAccount].ID,
+	)
+	t.Cleanup(previous.stop)
+	var stdout bytes.Buffer
+	app := newRuntime(
+		t.Context(), path, &stdout, &bytes.Buffer{},
+		buildinfo.Info{Version: "dev", OS: "linux", Arch: "amd64"},
+	)
+	app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
+	var starts atomic.Int32
+	var replacement lifecycleTestDaemon
+	app.startDaemon = func(ctx context.Context, configPath string) error {
+		digest, fingerprintErr := config.Fingerprint(configPath)
+		if fingerprintErr != nil {
+			return fingerprintErr
+		}
+		starts.Add(1)
+		replacement = startLifecycleTestDaemon(
+			ctx,
+			t,
+			endpoint,
+			daemonapi.ProtocolVersion,
+			"dev",
+			702,
+			digest,
+			"",
+		)
+		return nil
+	}
+	app.stdin = strings.NewReader("1\n2\n4\ny\n2\n8\n")
+	app.interactiveInput = func() bool { return true }
+	app.interactiveStdout = func() bool { return true }
+	app.lookupEnv = settingsTestEnvironment
+
+	if err := (&settingsCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replacement.stop != nil {
+		t.Cleanup(replacement.stop)
+	}
+	if len(configuration.Accounts) != 0 || configuration.DefaultAccount != "" {
+		t.Fatalf("settings after final account removal = %+v", configuration)
+	}
+	if starts.Load() != 1 || previous.shutdowns.Load() != 1 {
+		t.Fatalf(
+			"settings final removal starts=%d shutdowns=%d",
+			starts.Load(),
+			previous.shutdowns.Load(),
+		)
+	}
+	if !strings.Contains(stdout.String(), "Review account removal") ||
+		!strings.Contains(stdout.String(), "Removed account work") {
 		t.Fatalf("settings output = %q", stdout.String())
 	}
 }

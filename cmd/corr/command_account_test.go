@@ -217,6 +217,20 @@ func TestAccountManualOverrideAndLifecycle(t *testing.T) {
 	}
 }
 
+func TestAccountRemoveAllowsEmptyConfiguration(t *testing.T) {
+	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
+	if err := (&accountRemoveCommand{Account: "work", Approve: true}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(configuration.Accounts) != 0 || configuration.DefaultAccount != "" {
+		t.Fatalf("configuration after final account removal = %+v", configuration)
+	}
+}
+
 func TestSelectAccountCandidateDoesNotAutoSelectExplicitConsent(t *testing.T) {
 	t.Parallel()
 	result := application.AccountDiscoveryResult{

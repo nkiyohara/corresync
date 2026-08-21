@@ -240,15 +240,15 @@ func (backend *daemonMCPBackend) PreviewAccountAdd(
 	input application.AccountAddInput,
 	caller domain.Caller,
 ) (application.AccountChangeAccess, error) {
-	review, err := backend.accounts.ReviewAdd(ctx, input)
+	plan, review, err := backend.accounts.PlanAdd(ctx, input)
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
 	operation, err := domain.NewOperation(
 		"account.add",
 		domain.EffectReversibleWrite,
-		backend.DefaultAccount(),
-		input,
+		plan.Account,
+		plan,
 	)
 	if err != nil {
 		return application.AccountChangeAccess{}, err
@@ -284,15 +284,20 @@ func (backend *daemonMCPBackend) CommitAccountAdd(
 	if err != nil {
 		return application.AccountChangeAccess{}, err
 	}
-	var input application.AccountAddInput
-	if err := operation.DecodePayload(&input); err != nil {
+	var plan application.AccountAddPlan
+	if err := operation.DecodePayload(&plan); err != nil {
 		return application.AccountChangeAccess{}, err
+	}
+	if operation.Account() != plan.Account {
+		return application.AccountChangeAccess{}, errors.New(
+			"approved account addition no longer matches its stable identity",
+		)
 	}
 	account, err := backend.executeAccountMutation(
 		ctx,
 		caller,
 		func(callContext context.Context) (application.AccountView, error) {
-			return backend.accounts.Add(callContext, input)
+			return backend.accounts.AddPlanned(callContext, plan)
 		},
 	)
 	auditErr := backend.guard.RecordExecution(ctx, operation, caller, err)

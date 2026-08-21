@@ -112,7 +112,7 @@ type accountRenameCommand struct {
 
 type accountRemoveCommand struct {
 	Account    string `arg:"" help:"Account alias or stable opaque ID."`
-	NewDefault string `help:"Replacement alias when removing the default account."`
+	NewDefault string `help:"Replacement alias when removing the default while another account remains."`
 	Approve    bool   `help:"Confirm deletion of Corresync-owned local state."`
 	JSON       bool   `help:"Write machine-readable JSON."`
 }

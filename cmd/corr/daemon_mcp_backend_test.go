@@ -176,6 +176,96 @@ func TestDaemonMCPAccountLifecycleUsesCallerBoundPreviewCommit(t *testing.T) {
 	}
 }
 
+func TestDaemonMCPAccountLifecycleRemovesFinalAccount(t *testing.T) {
+	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
+	accounts, _, err := app.accountServices()
+	if err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := &daemonMCPAudit{}
+	rules := policy.DefaultRules()
+	rules.PreviewReversibleWrites = true
+	backend := &daemonMCPBackend{
+		app: app, configuration: configuration,
+		defaultAccount: configuration.Accounts[configuration.DefaultAccount].ID,
+		accounts:       accounts,
+		guard:          daemonMCPGuard(t, rules, recorder),
+		accountMutation: func(
+			ctx context.Context,
+			_ domain.Caller,
+			change func(context.Context) (application.AccountView, error),
+		) (application.AccountView, error) {
+			return change(ctx)
+		},
+	}
+	caller := domain.Caller{Surface: "mcp", Instance: "final-account-removal-test"}
+	preview, err := backend.PreviewAccountRemove(
+		t.Context(),
+		application.AccountRemoveInput{Account: "work"},
+		caller,
+	)
+	if err != nil || preview.Preview == nil || preview.Review == nil {
+		t.Fatalf("final account removal preview = %+v error = %v", preview, err)
+	}
+	if preview.Review.ReplacementDefault != "" ||
+		preview.Review.ReplacementAccount != "" {
+		t.Fatalf("final account removal requested a replacement: %+v", preview.Review)
+	}
+	committed, err := backend.CommitAccountRemove(
+		t.Context(),
+		preview.Preview.Token,
+		caller,
+	)
+	if err != nil || committed.Account == nil || committed.Account.Alias != "work" {
+		t.Fatalf("final account removal commit = %+v error = %v", committed, err)
+	}
+	updated, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Accounts) != 0 || updated.DefaultAccount != "" {
+		t.Fatalf("configuration after MCP final account removal = %+v", updated)
+	}
+	addInput := application.AccountAddInput{
+		Alias: "restored", Address: "reader@example.invalid",
+		Mail: &application.AccountMailRouteInput{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &application.AccountOutlookWebInput{
+				Origin: "https://outlook.example.invalid",
+			},
+		},
+	}
+	addPreview, err := backend.PreviewAccountAdd(t.Context(), addInput, caller)
+	if err != nil || addPreview.Preview == nil || addPreview.Review == nil {
+		t.Fatalf("account add from empty preview = %+v error = %v", addPreview, err)
+	}
+	if addPreview.Review.Account == "" ||
+		addPreview.Preview.Operation.Account != addPreview.Review.Account {
+		t.Fatalf("account add preview did not bind its planned identity: %+v", addPreview)
+	}
+	added, err := backend.CommitAccountAdd(
+		t.Context(), addPreview.Preview.Token, caller,
+	)
+	if err != nil || added.Account == nil || added.Account.ID != addPreview.Review.Account {
+		t.Fatalf("account add from empty commit = %+v error = %v", added, err)
+	}
+	restored, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(restored.Accounts) != 1 || restored.DefaultAccount != "restored" ||
+		restored.Accounts["restored"].ID != addPreview.Review.Account {
+		t.Fatalf("configuration after MCP account restoration = %+v", restored)
+	}
+	if len(recorder.events) != 6 {
+		t.Fatalf("final removal and restoration audit events = %d, want 6", len(recorder.events))
+	}
+}
+
 func TestDaemonMCPSavedQueriesUseCallerAndRevisionBoundPreviewCommit(t *testing.T) {
 	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
 	configuration, err := config.Load(path)
@@ -609,5 +699,118 @@ func TestDaemonMCPAccountMutationRestartsAroundConfigurationChange(t *testing.T)
 	resolved, err = staleBackend.ResolveAccount("office")
 	if err != nil || resolved != account.ID {
 		t.Fatalf("other process resolution = %q error = %v", resolved, err)
+	}
+}
+
+func TestDaemonMCPFinalAccountRemovalRestartsIntoEmptyConfiguration(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(root, "state"))
+	configPath := filepath.Join(root, "config.toml")
+	configuration := config.OutlookDefault()
+	accountID := configuration.Accounts[configuration.DefaultAccount].ID
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+	initialDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := localipc.ResolveInState(
+		configPath,
+		filepath.Join(root, "state"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := startLifecycleTestDaemon(
+		t.Context(),
+		t,
+		endpoint,
+		daemonapi.ProtocolVersion,
+		"dev",
+		601,
+		initialDigest,
+		accountID,
+	)
+	t.Cleanup(previous.stop)
+
+	app := newRuntime(
+		t.Context(),
+		configPath,
+		&bytes.Buffer{},
+		&bytes.Buffer{},
+		buildinfo.Info{Version: "dev", OS: "linux", Arch: "amd64"},
+	)
+	app.endpoint = func(string) (localipc.Endpoint, error) {
+		return endpoint, nil
+	}
+	var starts atomic.Int32
+	var replacement lifecycleTestDaemon
+	app.startDaemon = func(ctx context.Context, path string) error {
+		if path != configPath {
+			t.Fatalf("restart path = %q", path)
+		}
+		digest, fingerprintErr := config.Fingerprint(path)
+		if fingerprintErr != nil {
+			return fingerprintErr
+		}
+		starts.Add(1)
+		replacement = startLifecycleTestDaemon(
+			ctx,
+			t,
+			endpoint,
+			daemonapi.ProtocolVersion,
+			"dev",
+			602,
+			digest,
+			"",
+		)
+		return nil
+	}
+	client, err := daemonapi.NewClient(endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	accounts, _, err := app.accountServices()
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend := &daemonMCPBackend{
+		Client: client, app: app, accounts: accounts,
+		configuration: configuration, defaultAccount: accountID,
+	}
+	removed, err := backend.commitAccountMutation(
+		t.Context(),
+		domain.Caller{Surface: "mcp", Instance: "final-removal-restart-test"},
+		func(ctx context.Context) (application.AccountView, error) {
+			return accounts.Remove(ctx, application.AccountRemoveInput{Account: "work"})
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replacement.stop != nil {
+		t.Cleanup(replacement.stop)
+	}
+	if removed.ID != accountID || starts.Load() != 1 || previous.shutdowns.Load() != 1 {
+		t.Fatalf(
+			"mutation result = %+v starts=%d shutdowns=%d",
+			removed,
+			starts.Load(),
+			previous.shutdowns.Load(),
+		)
+	}
+	updated, err := config.Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Accounts) != 0 || updated.DefaultAccount != "" ||
+		backend.DefaultAccount() != "" {
+		t.Fatalf(
+			"empty configuration = %+v backend default = %q",
+			updated,
+			backend.DefaultAccount(),
+		)
 	}
 }

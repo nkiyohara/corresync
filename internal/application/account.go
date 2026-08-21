@@ -306,6 +306,15 @@ type AccountAddInput struct {
 	Default  bool                        `json:"default"`
 }
 
+// AccountAddPlan binds an application-generated stable identity to the exact
+// account-add input reviewed by a consequential-write surface. The opaque ID
+// is generated before approval so an empty catalog does not need a surrogate
+// default account as its policy boundary.
+type AccountAddPlan struct {
+	Account domain.AccountID `json:"account"`
+	Input   AccountAddInput  `json:"input"`
+}
+
 // AccountRegistration is the validated write contract passed only to the local
 // configuration repository. It is never serialized as an account read result.
 type AccountRegistration struct {
@@ -325,10 +334,11 @@ type AccountRenameInput struct {
 	NewAlias string `json:"newAlias"`
 }
 
-// AccountRemoveInput selects a replacement default when necessary.
+// AccountRemoveInput selects a replacement default when another account will
+// remain. Removing the final account clears the default.
 type AccountRemoveInput struct {
-	Account            string `json:"account"`
-	ReplacementDefault string `json:"replacementDefault,omitempty"`
+	Account            string `json:"account" jsonschema:"Configured account alias or stable opaque ID"`
+	ReplacementDefault string `json:"replacementDefault,omitempty" jsonschema:"Replacement alias when removing the default and another account will remain; omit when removing the final account"`
 }
 
 // AccountChangeReview is the bounded, secret-free account lifecycle summary
@@ -491,16 +501,50 @@ func (service *AccountService) Add(
 	ctx context.Context,
 	input AccountAddInput,
 ) (AccountView, error) {
+	plan, _, err := service.PlanAdd(ctx, input)
+	if err != nil {
+		return AccountView{}, err
+	}
+	return service.AddPlanned(ctx, plan)
+}
+
+// PlanAdd validates an addition and allocates the exact opaque identity that a
+// preview/commit protocol must bind before issuing approval.
+func (service *AccountService) PlanAdd(
+	ctx context.Context,
+	input AccountAddInput,
+) (AccountAddPlan, AccountChangeReview, error) {
+	review, err := service.ReviewAdd(ctx, input)
+	if err != nil {
+		return AccountAddPlan{}, AccountChangeReview{}, err
+	}
+	accountID, err := service.newID()
+	if err != nil {
+		return AccountAddPlan{}, AccountChangeReview{}, fmt.Errorf("generate account ID: %w", err)
+	}
+	if err := accountID.ValidateOpaque(); err != nil {
+		return AccountAddPlan{}, AccountChangeReview{}, fmt.Errorf("generate account ID: %w", err)
+	}
+	review.Account = accountID
+	return AccountAddPlan{Account: accountID, Input: input}, review, nil
+}
+
+// AddPlanned commits one previously planned account identity after rechecking
+// the complete input against the current catalog.
+func (service *AccountService) AddPlanned(
+	ctx context.Context,
+	plan AccountAddPlan,
+) (AccountView, error) {
+	if err := plan.Account.ValidateOpaque(); err != nil {
+		return AccountView{}, fmt.Errorf("validate planned account ID: %w", err)
+	}
+	input := plan.Input
 	normalizedAddress, catalog, err := service.reviewAdd(ctx, input)
 	if err != nil {
 		return AccountView{}, err
 	}
-	accountID, err := service.newID()
-	if err != nil {
-		return AccountView{}, fmt.Errorf("generate account ID: %w", err)
-	}
 	registration := AccountRegistration{
-		ID: accountID, Alias: input.Alias, Address: normalizedAddress,
+		ID: plan.Account, Alias: input.Alias, Address: normalizedAddress,
 		Mail: cloneMailRoute(input.Mail), Calendar: cloneCalendarRoute(input.Calendar),
 		Tasks: cloneTaskRoute(input.Tasks), Messages: cloneMessagingRoute(input.Messages),
 		IsDefault: input.Default || len(catalog.Accounts) == 0,
@@ -1051,7 +1095,12 @@ func (service *AccountService) reviewRemove(
 		return AccountView{}, "", "", err
 	}
 	if len(catalog.Accounts) == 1 {
-		return AccountView{}, "", "", errors.New("cannot remove the only configured account")
+		if input.ReplacementDefault != "" {
+			return AccountView{}, "", "", errors.New(
+				"--new-default is not valid when removing the only configured account",
+			)
+		}
+		return account, "", "", nil
 	}
 	replacement := input.ReplacementDefault
 	var replacementAccountID domain.AccountID
