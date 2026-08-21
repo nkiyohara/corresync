@@ -2991,6 +2991,7 @@ func (backend *sessionBackend) activateAccount(
 		var captured session.Credentials
 		handle, captured, err := backend.app.authenticate(
 			ctx,
+			backend.lifecycle,
 			backend.configuration,
 			accountID,
 			configured,

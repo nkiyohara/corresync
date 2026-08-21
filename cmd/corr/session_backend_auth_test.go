@@ -24,7 +24,18 @@ import (
 	"github.com/nkiyohara/corresync/internal/provider/graphapi"
 	"github.com/nkiyohara/corresync/internal/provider/imapmail"
 	"github.com/nkiyohara/corresync/internal/provider/jmap"
+	"github.com/nkiyohara/corresync/internal/session"
 )
+
+type readyBrowserHandle struct{}
+
+func (readyBrowserHandle) WaitForSession(context.Context) (session.Credentials, error) {
+	return session.Credentials{}, nil
+}
+
+func (readyBrowserHandle) Apply(*http.Request) error { return nil }
+
+func (readyBrowserHandle) Close() error { return nil }
 
 type oauthManagerStub struct {
 	calls              int
@@ -35,6 +46,49 @@ type oauthManagerStub struct {
 	err                error
 	confidentialSecret string
 	confidentialBytes  []byte
+}
+
+func TestOutlookBrowserUsesSessionOwnerLifetimeAfterLoginRequest(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+
+	configuration := config.OutlookDefault()
+	configured := configuration.Accounts[configuration.DefaultAccount]
+	requestContext, cancelRequest := context.WithCancel(context.Background())
+	lifecycleContext, cancelLifecycle := context.WithCancel(context.Background())
+	defer cancelLifecycle()
+
+	var launchedDone <-chan struct{}
+	app := &runtime{
+		stderr: &strings.Builder{},
+		launch: func(ctx context.Context, _ browser.Options) (browserHandle, error) {
+			launchedDone = ctx.Done()
+			return readyBrowserHandle{}, nil
+		},
+	}
+	handle, _, err := app.authenticate(
+		requestContext,
+		lifecycleContext,
+		configuration,
+		configured.ID,
+		configured,
+	)
+	if err != nil {
+		t.Fatalf("authenticate() error = %v", err)
+	}
+	defer func() { _ = handle.Close() }()
+
+	cancelRequest()
+	select {
+	case <-launchedDone:
+		t.Fatal("login request cancellation ended browser lifetime")
+	default:
+	}
+	cancelLifecycle()
+	select {
+	case <-launchedDone:
+	default:
+		t.Fatal("session owner cancellation left browser alive")
+	}
 }
 
 type routedOAuthCall struct {
