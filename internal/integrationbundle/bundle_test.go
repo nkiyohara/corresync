@@ -25,7 +25,7 @@ func TestSpecification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if spec.SourceVersion != "0.9.0-rc.1" {
+	if spec.SourceVersion != "0.9.0-rc.2" {
 		t.Fatalf("source version = %q", spec.SourceVersion)
 	}
 	if spec.Effects.AutoApproval {

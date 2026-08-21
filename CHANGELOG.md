@@ -5,6 +5,8 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.9.0-rc.2 - 2026-08-21
+
 ### Fixed
 
 - Keep the browser-owned Outlook Web session attached to the daemon lifetime
