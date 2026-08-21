@@ -921,7 +921,14 @@ func (store Store) RemoveAccount(
 			return fmt.Errorf("account ID %q is not configured", accountID)
 		}
 		if len(configuration.Accounts) == 1 {
-			return errors.New("cannot remove the only configured account")
+			if replacementDefault != "" {
+				return errors.New(
+					"replacement default is not valid when removing the only configured account",
+				)
+			}
+			configuration.DefaultAccount = ""
+			delete(configuration.Accounts, alias)
+			return nil
 		}
 		if alias == configuration.DefaultAccount {
 			if replacementDefault == "" || replacementDefault == accountID {

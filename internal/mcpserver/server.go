@@ -641,7 +641,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "account_remove",
 		Title:       "Preview removing an account",
-		Description: "Resolve one account, validate any replacement default, and return a caller-bound destructive approval preview. Preview does not close sessions, purge state, delete authorization grants, or change configuration.",
+		Description: "Resolve one account, require a replacement default only when another account will remain, and return a caller-bound destructive approval preview. Removing the final account leaves an empty provider-neutral configuration. Preview does not close sessions, purge state, delete authorization grants, or change configuration.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Review destructive account removal",
 			ReadOnlyHint:    false,

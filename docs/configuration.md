@@ -78,7 +78,9 @@ Rename preserves the stable ID and every account-local state tree. Remove
 requires approval and deletes Corresync-owned profile, import, cursor, queue,
 and unshared Corresync-owned OAuth grant state. External standards credentials
 remain in their keyring/helper. Removing the default account requires
-`--new-default`.
+`--new-default` when another account will remain. Removing the final account
+clears `default_account` and returns to the same provider-neutral empty
+configuration created by `corr config init`.
 
 ## Schema v11
 

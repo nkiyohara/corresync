@@ -84,6 +84,85 @@ func TestAccountServiceAcceptsEmptyOnboardingCatalog(t *testing.T) {
 	}
 }
 
+func TestAccountServicePlansAndCommitsExactOpaqueIdentityFromEmptyCatalog(t *testing.T) {
+	t.Parallel()
+	repository := &accountRepositoryStub{}
+	service, err := NewAccountService(
+		repository,
+		&accountPurgerStub{},
+		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plannedID := domain.AccountID("acc_00000000000000000000000000000008")
+	service.newID = func() (domain.AccountID, error) { return plannedID, nil }
+	input := AccountAddInput{
+		Alias: "work", Address: "reader@example.invalid",
+		Mail: &AccountMailRouteInput{
+			Provider: domain.ProviderMicrosoftOWA,
+			OutlookWeb: &AccountOutlookWebInput{
+				Origin: "https://outlook.example.invalid",
+			},
+		},
+	}
+	plan, review, err := service.PlanAdd(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Account != plannedID || review.Account != plannedID || !review.MakesDefault {
+		t.Fatalf("account add plan = %+v review = %+v", plan, review)
+	}
+	account, err := service.AddPlanned(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if account.ID != plannedID || repository.added.ID != plannedID ||
+		!repository.added.IsDefault {
+		t.Fatalf("planned account = %+v registration = %+v", account, repository.added)
+	}
+	plan.Account = "work"
+	if _, err := service.AddPlanned(t.Context(), plan); err == nil ||
+		!strings.Contains(err.Error(), "planned account ID") {
+		t.Fatalf("invalid planned identity error = %v", err)
+	}
+}
+
+func TestAccountServiceRemovesFinalAccountWithoutReplacement(t *testing.T) {
+	t.Parallel()
+	work := accountFixture("work", "acc_00000000000000000000000000000001", true)
+	repository := &accountRepositoryStub{
+		catalog: AccountCatalog{Accounts: []AccountView{work}},
+	}
+	purger := &accountPurgerStub{}
+	service, err := NewAccountService(
+		repository,
+		purger,
+		[]domain.ProviderID{domain.ProviderMicrosoftOWA},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	review, err := service.ReviewRemove(t.Context(), AccountRemoveInput{Account: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.ReplacementDefault != "" || review.ReplacementAccount != "" ||
+		!review.PurgesLocalState {
+		t.Fatalf("final account removal review = %+v", review)
+	}
+	removed, err := service.Remove(t.Context(), AccountRemoveInput{Account: "work"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed.ID != work.ID || purger.account != work.ID ||
+		repository.removedID != work.ID || repository.replacement != "" {
+		t.Fatalf("removed = %+v repository = %+v purger = %+v", removed, repository, purger)
+	}
+}
+
 func TestAccountServiceAddsTaskOnlyRouteWithoutAddress(t *testing.T) {
 	t.Parallel()
 	repository := &accountRepositoryStub{}
@@ -539,9 +618,9 @@ func TestAccountServiceFailsClosed(t *testing.T) {
 	}
 	if _, err := service.Remove(
 		context.Background(),
-		AccountRemoveInput{Account: "work"},
+		AccountRemoveInput{Account: "work", ReplacementDefault: "work"},
 	); err == nil {
-		t.Fatal("Remove() accepted the only account")
+		t.Fatal("Remove() accepted a replacement for the only account")
 	}
 
 	repository.catalog.Accounts = append(

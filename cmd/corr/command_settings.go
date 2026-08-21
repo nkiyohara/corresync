@@ -383,17 +383,10 @@ func runAccountSettings(
 			"default",
 		))
 	}
-	if len(settings.Accounts) > 1 {
-		options = append(options, huh.NewOption(
-			"Remove · deletes Corresync local state for "+alias,
-			"remove",
-		))
-	} else {
-		options = append(options, huh.NewOption(
-			"Remove unavailable · add another account first",
-			"remove_unavailable",
-		))
-	}
+	options = append(options, huh.NewOption(
+		"Remove · deletes Corresync local state for "+alias,
+		"remove",
+	))
 	options = append(options, huh.NewOption("Back", "back"))
 	action, selected, err := runSettingsSelect(
 		app,
@@ -415,8 +408,6 @@ func runAccountSettings(
 		})
 	case "remove":
 		return runRemoveAccountSettings(app, settings, account)
-	case "remove_unavailable":
-		return writeLastAccountRemovalHelp(app)
 	case "rename":
 	default:
 		return nil
@@ -469,7 +460,7 @@ func runRemoveAccountSettings(
 	account application.SettingsAccount,
 ) error {
 	replacement := ""
-	if account.IsDefault {
+	if account.IsDefault && len(settings.Accounts) > 1 {
 		options := make([]huh.Option[string], 0, len(settings.Accounts)-1)
 		for _, candidate := range settings.Accounts {
 			if candidate.Alias == account.Alias {
@@ -537,7 +528,7 @@ func runSettingsAccountMutation(app *runtime, change func() error) error {
 		return err
 	}
 	changeErr := change()
-	restartErr := (&daemonStartCommand{}).Run(app)
+	restartErr := restartSettingsSessionOwner(app)
 	if changeErr != nil {
 		return errors.Join(changeErr, restartErr)
 	}
@@ -548,6 +539,15 @@ func runSettingsAccountMutation(app *runtime, change func() error) error {
 		)
 	}
 	return nil
+}
+
+func restartSettingsSessionOwner(app *runtime) (returnErr error) {
+	client, status, err := app.openDaemonWithOptions(app.context, true)
+	if err != nil {
+		return err
+	}
+	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
+	return writeDaemonStatus(app, status, false)
 }
 
 func waitForSettingsDaemonStop(app *runtime) error {
@@ -1036,16 +1036,6 @@ func writeAdvancedSettingsHelp(app *runtime) error {
 		view.info(), view.strong("Advanced configuration"),
 		view.command("corr config edit"),
 		view.muted("The editor validates the complete file before replacing your current config."),
-	)
-	return err
-}
-
-func writeLastAccountRemovalHelp(app *runtime) error {
-	view := newConsoleView(app, app.stdout, true)
-	_, err := view.printf(
-		"\n%s  %s\n   %s\n\n",
-		view.info(), view.strong("Keep one configured account"),
-		view.muted("Add a replacement account first, then remove this one."),
 	)
 	return err
 }

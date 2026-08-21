@@ -63,6 +63,30 @@ func TestStoreLifecyclePreservesStableID(t *testing.T) {
 	}
 }
 
+func TestRemoveFinalAccountClearsDefault(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := config.OutlookDefault()
+	accountID := configuration.Accounts[configuration.DefaultAccount].ID
+	if err := config.Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	store := Store{ConfigPath: path}
+	if err := store.RemoveAccount(t.Context(), accountID, accountID); err == nil {
+		t.Fatal("RemoveAccount() accepted a replacement for the final account")
+	}
+	if err := store.RemoveAccount(t.Context(), accountID, ""); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.Accounts) != 0 || updated.DefaultAccount != "" {
+		t.Fatalf("final account removal = %+v", updated)
+	}
+}
+
 func TestListAccountsExposesConfiguredTaskRouteAsUnavailable(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "config.toml")

@@ -231,7 +231,9 @@ configuration. Account aliases use the existing `account_rename` preview and
 `account_rename_commit` pair. Account onboarding and removal use the separate
 `account_add` / `account_add_commit` and `account_remove` /
 `account_remove_commit` preview pairs; provider sign-in remains an explicit
-local CLI action.
+local CLI action. Removing the final account leaves an empty provider-neutral
+configuration, and a later `account_add` preview binds the new opaque identity
+before approval so the MCP lifecycle can populate it again.
 
 Read and project:
 

@@ -5,6 +5,16 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.9.0-rc.4 - 2026-08-21
+
+### Account lifecycle
+
+- Allow the final configured account to be removed through CLI settings or the
+  caller-bound MCP preview/commit flow, clearing `default_account` and
+  restarting into the provider-neutral empty configuration.
+- Bind MCP account-add approval to its planned opaque identity so an empty
+  configuration can be populated again without a surrogate default account.
+
 ## 0.9.0-rc.3 - 2026-08-21
 
 ### Crash diagnostics

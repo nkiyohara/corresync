@@ -58,7 +58,9 @@ The top-level Accounts category opens a second level containing **Add account**
 and the configured account list. Selecting an account opens graphical or
 terminal sign-in, rename, default, and removal actions for that account; Back
 returns to the account list. Removal shows the local-state impact, defaults to
-cancellation, and asks for a replacement before deleting the current default.
+cancellation, and asks for a replacement before deleting the current default
+when another account will remain. The final account can be removed and leaves
+an empty provider-neutral configuration.
 The form stops and restarts a running session owner around account
 configuration changes. Every choice explains its effect and displays the exact
 direct command. Set `CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader
