@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/feedback"
@@ -21,7 +22,7 @@ const (
 )
 
 type feedbackCommand struct {
-	LastError  bool   `help:"Include the most recent sanitized local command error, when available."`
+	LastError  bool   `help:"Include the most recent sanitized local command error and process crash, when available."`
 	Copy       bool   `help:"Copy the reviewed report with the platform clipboard command."`
 	Save       string `type:"path" placeholder:"PATH" help:"Save the reviewed report to a new owner-only file."`
 	OpenGitHub bool   `name:"open-github" help:"Open a prefilled GitHub Issue page after showing the report; never submit it."`
@@ -127,6 +128,7 @@ func (app *runtime) feedbackReport(includeLastError bool) ([]byte, error) {
 		InstallMethod: string(app.installMethod()),
 		Config:        feedback.ConfigStatus{Status: "degraded", Reason: "collection_failed"},
 		LastError:     feedback.LastErrorStatus{Status: "not-requested"},
+		LastCrash:     feedback.LastCrashStatus{Status: "not-requested"},
 	}
 	configuration, err := app.loadFeedbackConfig()
 	if err == nil {
@@ -146,8 +148,29 @@ func (app *runtime) feedbackReport(includeLastError bool) ([]byte, error) {
 	}
 	if includeLastError {
 		input.LastError = app.feedbackLastError()
+		input.LastCrash = app.feedbackLastCrash()
 	}
 	return feedback.Generate(input)
+}
+
+func (app *runtime) feedbackLastCrash() feedback.LastCrashStatus {
+	path, err := paths.FeedbackCrashPath()
+	if err != nil {
+		return feedback.LastCrashStatus{Status: "degraded", Reason: "state_unavailable"}
+	}
+	record, err := (feedback.CrashStore{Path: path}).Load()
+	switch {
+	case err == nil:
+		return feedback.LastCrashStatus{
+			Status: "ok", ID: record.ID, RecordedAt: record.RecordedAt.Format(time.RFC3339),
+			ProcessRole: record.ProcessRole, Boundary: record.Boundary,
+			Build: &record.Build, Frames: record.Frames,
+		}
+	case errors.Is(err, feedback.ErrNoRecord):
+		return feedback.LastCrashStatus{Status: "absent"}
+	default:
+		return feedback.LastCrashStatus{Status: "degraded", Reason: "diagnostic_invalid"}
+	}
 }
 
 func (app *runtime) loadFeedbackConfig() (config.Config, error) {

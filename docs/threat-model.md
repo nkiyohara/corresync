@@ -269,8 +269,10 @@ single-user tool, not a remote gateway or tenant administration service.
 - Exclude authorization, addresses, subjects, bodies, attachment names, event
   text, task titles, notes, reminders, links, queries, task cursors, credential
   references, runner arguments, and approval values.
-- Keep only one bounded, owner-only generalized last-error record; replacement
-  is atomic and symlink-safe.
+- Keep only one bounded, owner-only generalized last-error record and one
+  separately bounded sanitized last-crash record; each replaces rather than
+  appends and is atomic and symlink-safe. Crash evidence excludes panic values,
+  errors, arguments, source paths, identifiers, request data, and content.
 - Build feedback from an allowlist. Raw errors, arguments, paths, identifiers,
   content, environment values, and credentials are not accepted by the report
   schema.
@@ -279,6 +281,10 @@ single-user tool, not a remote gateway or tenant administration service.
 - Keep automatic public issue submission default-off, interactive-CLI-only,
   externally authenticated by `gh`, and confined to a smaller closed schema.
   MCP cannot enable it. Never collect then heuristically mask a raw error.
+- Record a panic at owned process, daemon-request, server, monitor, and
+  background-work boundaries before terminating the process or stopping every
+  daemon listener. Never continue serving uncertain state and never make a
+  crash record eligible for automatic submission.
 
 ## Supply-chain controls
 

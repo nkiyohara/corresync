@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -24,23 +25,27 @@ const maxConcurrentCalls = 32
 
 // ServerOptions identifies the process serving one API namespace.
 type ServerOptions struct {
+	Context               context.Context
 	Version               string
 	ProcessID             int
 	StartedAt             time.Time
 	Credential            string
 	ConfigDigest          string
 	AllowNoDefaultAccount bool
+	RecordPanic           func()
 }
 
 // Server hosts the daemon API over a caller-provided local-only listener.
 type Server struct {
-	backend  Backend
-	status   Status
-	token    string
-	slots    chan struct{}
-	stop     chan struct{}
-	stopOnce sync.Once
-	http     *http.Server
+	backend     Backend
+	status      Status
+	token       string
+	slots       chan struct{}
+	stop        chan struct{}
+	stopOnce    sync.Once
+	http        *http.Server
+	recordPanic func()
+	failed      atomic.Bool
 }
 
 // NewServer constructs a fail-closed handler with bounded concurrency.
@@ -53,6 +58,10 @@ func NewServer(backend Backend, options ServerOptions) (*Server, error) {
 	}
 	if options.StartedAt.IsZero() {
 		return nil, errors.New("daemon start time is required")
+	}
+	baseContext := options.Context
+	if baseContext == nil {
+		baseContext = context.Background()
 	}
 	if err := validateConfigDigest(options.ConfigDigest); err != nil {
 		return nil, err
@@ -77,9 +86,10 @@ func NewServer(backend Backend, options ServerOptions) (*Server, error) {
 			DefaultAccount: defaultAccount,
 			ConfigDigest:   options.ConfigDigest,
 		},
-		token: options.Credential,
-		slots: make(chan struct{}, maxConcurrentCalls),
-		stop:  make(chan struct{}),
+		token:       options.Credential,
+		slots:       make(chan struct{}, maxConcurrentCalls),
+		stop:        make(chan struct{}),
+		recordPanic: options.RecordPanic,
 	}
 	server.http = &http.Server{
 		Handler:           server,
@@ -91,6 +101,9 @@ func NewServer(backend Backend, options ServerOptions) (*Server, error) {
 		IdleTimeout:    30 * time.Second,
 		MaxHeaderBytes: 8 << 10,
 		ErrorLog:       log.New(io.Discard, "", 0),
+		BaseContext: func(net.Listener) context.Context {
+			return baseContext
+		},
 	}
 	return server, nil
 }
@@ -101,6 +114,9 @@ func (server *Server) Serve(listener net.Listener) error {
 		return errors.New("daemon listener is required")
 	}
 	err := server.http.Serve(listener)
+	if server.failed.Load() {
+		return errors.New("daemon stopped after an internal panic")
+	}
 	if errors.Is(err, http.ErrServerClosed) || errors.Is(err, net.ErrClosed) {
 		return nil
 	}
@@ -115,6 +131,19 @@ func (server *Server) Done() <-chan struct{} { return server.stop }
 
 // ServeHTTP authenticates before reading a potentially sensitive body.
 func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			// net/http recovers handler panics per connection. Stop every listener
+			// first so a request panic can never leave uncertain daemon state
+			// serving subsequent CLI or MCP calls, even if diagnostics fail.
+			server.failed.Store(true)
+			_ = server.http.Close()
+			if server.recordPanic != nil {
+				server.recordPanic()
+			}
+			panic(recovered)
+		}
+	}()
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("Content-Type", contentType)
 	if request.Method != http.MethodPost || request.URL.Path != requestPath ||

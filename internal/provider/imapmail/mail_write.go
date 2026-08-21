@@ -157,11 +157,11 @@ func (client *Client) findMessage(
 	messageID string,
 ) (id, changeKey string, returnErr error) {
 	returnErr = client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		mailbox, err := client.resolveMailbox(connection, folder)
+		mailbox, err := client.resolveMailbox(ctx, connection, folder)
 		if err != nil {
 			return err
 		}
-		id, changeKey, err = identifyMessage(connection, mailbox, messageID)
+		id, changeKey, err = identifyMessage(ctx, connection, mailbox, messageID)
 		return err
 	})
 	return id, changeKey, returnErr
@@ -176,7 +176,7 @@ func (client *Client) appendMessage(
 	kind string,
 ) (id, changeKey string, returnErr error) {
 	returnErr = client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		mailbox, err := client.resolveMailbox(connection, folder)
+		mailbox, err := client.resolveMailbox(ctx, connection, folder)
 		if err != nil {
 			return err
 		}
@@ -191,7 +191,7 @@ func (client *Client) appendMessage(
 				err,
 			)
 		}
-		id, changeKey, err = identifyMessage(connection, mailbox, messageID)
+		id, changeKey, err = identifyMessage(ctx, connection, mailbox, messageID)
 		if err != nil {
 			return imapCommittedWriteError("confirm appended IMAP "+kind, err)
 		}
@@ -201,6 +201,7 @@ func (client *Client) appendMessage(
 }
 
 func identifyMessage(
+	ctx context.Context,
 	connection *imapclient.Client,
 	mailbox string,
 	messageID string,
@@ -220,7 +221,7 @@ func identifyMessage(
 	if len(uids) != 1 {
 		return "", "", errors.New("message could not be identified uniquely")
 	}
-	messages, err := fetchUIDs(connection, uids, metadataItems)
+	messages, err := fetchUIDs(ctx, connection, uids, metadataItems)
 	if err != nil {
 		return "", "", err
 	}
@@ -258,7 +259,7 @@ func (client *Client) MoveMail(
 	}
 	var result application.MailMoveResult
 	err = client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		_, err := requireState(connection, reference, input.ChangeKey)
+		_, err := requireState(ctx, connection, reference, input.ChangeKey)
 		if err != nil {
 			return err
 		}
@@ -266,7 +267,7 @@ func (client *Client) MoveMail(
 		if err != nil {
 			return err
 		}
-		destination, err := client.resolveMailbox(connection, input.Destination)
+		destination, err := client.resolveMailbox(ctx, connection, input.Destination)
 		if err != nil {
 			return err
 		}
@@ -347,7 +348,7 @@ func (client *Client) SetMailReadState(
 	}
 	var result application.MailReadStateResult
 	err = client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		status, err := requireState(connection, reference, input.ChangeKey)
+		status, err := requireState(ctx, connection, reference, input.ChangeKey)
 		if err != nil {
 			return err
 		}
@@ -368,7 +369,7 @@ func (client *Client) SetMailReadState(
 				err,
 			)
 		}
-		messages, err := fetchUIDs(connection, []uint32{reference.UID}, metadataItems)
+		messages, err := fetchUIDs(ctx, connection, []uint32{reference.UID}, metadataItems)
 		if err != nil {
 			return imapCommittedWriteError(
 				"confirm IMAP message read state",
@@ -412,7 +413,7 @@ func (client *Client) deleteExactMessage(
 	changeKey string,
 ) error {
 	return client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		if _, err := requireState(connection, reference, changeKey); err != nil {
+		if _, err := requireState(ctx, connection, reference, changeKey); err != nil {
 			return err
 		}
 		supported, err := connection.Support("UIDPLUS")
@@ -455,6 +456,7 @@ func (client *Client) deleteExactMessage(
 }
 
 func requireState(
+	ctx context.Context,
 	connection *imapclient.Client,
 	reference messageReference,
 	expected string,
@@ -466,7 +468,7 @@ func requireState(
 	if status.UidValidity != reference.UIDValidity {
 		return nil, errors.New("IMAP UIDVALIDITY changed")
 	}
-	messages, err := fetchUIDs(connection, []uint32{reference.UID}, metadataItems)
+	messages, err := fetchUIDs(ctx, connection, []uint32{reference.UID}, metadataItems)
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +513,7 @@ func (client *Client) compose(
 	var parsed parsedMIME
 	var envelope *imap.Envelope
 	err = client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		status, message, raw, err := fetchRawMessage(connection, reference)
+		status, message, raw, err := fetchRawMessage(ctx, connection, reference)
 		if err != nil {
 			return err
 		}

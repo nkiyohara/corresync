@@ -39,7 +39,7 @@ func TestFeedbackPrintsCompleteReportBeforeOfferingActions(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 	output := stdout.String()
-	reportPosition := strings.Index(output, `"schema_version": 1`)
+	reportPosition := strings.Index(output, `"schema_version": 2`)
 	actionPosition := strings.Index(output, "Nothing was uploaded")
 	if reportPosition < 0 || actionPosition < reportPosition {
 		t.Fatalf("report was not shown before actions:\n%s", output)
@@ -84,7 +84,7 @@ func TestFeedbackCopyRunsOnlyAfterWritingReviewedReport(t *testing.T) {
 		name string,
 		arguments ...string,
 	) error {
-		if !strings.Contains(stdout.String(), `"schema_version": 1`) {
+		if !strings.Contains(stdout.String(), `"schema_version": 2`) {
 			return errors.New("action ran before report output")
 		}
 		if name != "xclip" || strings.Join(arguments, " ") != "-selection clipboard" {
@@ -114,7 +114,7 @@ func TestFeedbackOpenGitHubOnlyOpensPrefilledPage(t *testing.T) {
 		name string,
 		arguments ...string,
 	) error {
-		if !strings.Contains(stdout.String(), `"schema_version": 1`) {
+		if !strings.Contains(stdout.String(), `"schema_version": 2`) {
 			return errors.New("action ran before report output")
 		}
 		if name != "xdg-open" || len(arguments) != 1 {

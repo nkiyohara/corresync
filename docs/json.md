@@ -341,12 +341,17 @@ Its schema is separate from application JSON and contains:
 - config validation status and schema version;
 - aggregate provider IDs with mail/calendar/task capability only;
 - last-error status, or a sanitized local ID/classes/command shape when
-  requested.
+  requested;
+- last-crash status, or a sanitized local ID/time/build/process role/boundary
+  and bounded Corresync source-symbol stack when requested.
 
 Malformed or unavailable sections report `degraded` with a fixed reason. It
 never contains raw errors or arguments, account IDs, addresses, endpoints,
 credential keys, helper arguments, mailbox/calendar/task content, attachment
-names, queries, environment values, or private paths.
+names, message content, queries, environment values, private paths, panic
+values, runtime argument values, or non-Corresync stack frames. Feedback report
+schema version 2 adds `last_crash`, `message_content_included`, and
+`raw_panic_included`; both privacy booleans are always false.
 
 ## Content handling
 

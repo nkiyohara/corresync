@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestErrorRecordNeverRetainsValuesOrRawError(t *testing.T) {
@@ -141,6 +143,78 @@ func TestStoreRejectsMalformedOversizedAndSymlinkRecords(t *testing.T) {
 	}
 }
 
+func TestCrashRecordIsBoundedContentFreeAndReplaceOnly(t *testing.T) {
+	t.Parallel()
+
+	privateValues := []string{
+		"Bearer synthetic-access-token",
+		"person@example.test",
+		"/home/private-user/mail.eml",
+	}
+	callers := make([]uintptr, 64)
+	count := runtime.Callers(1, callers)
+	first := NewCrashRecord(
+		Build{
+			Version: "v0.9.0-rc.3", Commit: "0123456789abcdef",
+			BuildDate: "2026-08-21T12:00:00Z", GoVersion: "go1.26.0",
+			Platform: "linux/amd64",
+		},
+		"daemon",
+		"daemon_request",
+		time.Date(2026, 8, 21, 12, 1, 2, 999, time.UTC),
+		callers[:count],
+	)
+	if err := first.validate(); err != nil {
+		t.Fatalf("crash record invalid: %v, %+v", err, first)
+	}
+	if len(first.Frames) == 0 || len(first.Frames) > maximumCrashFrames || first.RecordedAt.Nanosecond() != 0 {
+		t.Fatalf("crash record bounds = %+v", first)
+	}
+
+	path := filepath.Join(t.TempDir(), "diagnostics", "last-crash.json")
+	store := CrashStore{Path: path}
+	if err := store.Save(first); err != nil {
+		t.Fatalf("Save(first) error = %v", err)
+	}
+	second := NewCrashRecord(
+		first.Build, "mcp", "background_work", first.RecordedAt.Add(time.Minute), callers[:count],
+	)
+	if err := store.Save(second); err != nil {
+		t.Fatalf("Save(second) error = %v", err)
+	}
+	loaded, err := store.Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if loaded.ID != second.ID || loaded.ProcessRole != "mcp" {
+		t.Fatalf("loaded crash record = %+v", loaded)
+	}
+	encoded, err := os.ReadFile(path) // #nosec G304 -- test-owned path.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(encoded, []byte(first.ID)) || bytes.Count(encoded, []byte{'\n'}) != 1 {
+		t.Fatalf("crash store retained history: %s", encoded)
+	}
+	for _, private := range privateValues {
+		if bytes.Contains(encoded, []byte(private)) {
+			t.Fatalf("crash store retained private input %q: %s", private, encoded)
+		}
+	}
+}
+
+func TestCrashStoreRejectsMalformedRecord(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "last-crash.json")
+	if err := os.WriteFile(path, []byte(`{"version":1,"panic":"private"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (CrashStore{Path: path}).Load(); !errors.Is(err, ErrInvalidRecord) {
+		t.Fatalf("Load() error = %v, want ErrInvalidRecord", err)
+	}
+}
+
 func TestGenerateIsDeterministicAndAllowlisted(t *testing.T) {
 	t.Parallel()
 
@@ -187,6 +261,48 @@ func TestGenerateIsDeterministicAndAllowlisted(t *testing.T) {
 	} {
 		if !bytes.Contains(first, []byte(want)) {
 			t.Fatalf("report is missing %q:\n%s", want, first)
+		}
+	}
+}
+
+func TestGenerateIncludesOnlyReviewedCrashEvidence(t *testing.T) {
+	t.Parallel()
+
+	callers := make([]uintptr, 64)
+	count := runtime.Callers(1, callers)
+	crash := NewCrashRecord(
+		Build{
+			Version: "v0.9.0-rc.3", Commit: "0123456789abcdef",
+			BuildDate: "2026-08-21T12:00:00Z", GoVersion: "go1.26.0",
+			Platform: "linux/amd64",
+		},
+		"daemon", "daemon_request", time.Unix(1_776_945_600, 0).UTC(), callers[:count],
+	)
+	report, err := Generate(Input{
+		Build:         crash.Build,
+		InstallMethod: "direct",
+		Config:        ConfigStatus{Status: "ok", SchemaVersion: 11},
+		LastError:     LastErrorStatus{Status: "absent"},
+		LastCrash: LastCrashStatus{
+			Status: "ok", ID: crash.ID, RecordedAt: crash.RecordedAt.Format(time.RFC3339),
+			ProcessRole: crash.ProcessRole, Boundary: crash.Boundary,
+			Build: &crash.Build, Frames: crash.Frames,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`"schema_version": 2`, `"last_crash"`, `"raw_panic_included": false`,
+		`"process_role": "daemon"`, `"boundary": "daemon_request"`,
+	} {
+		if !bytes.Contains(report, []byte(want)) {
+			t.Fatalf("report missing %q:\n%s", want, report)
+		}
+	}
+	for _, forbidden := range []string{"panic_value", "raw_error", "/home/private-user"} {
+		if bytes.Contains(report, []byte(forbidden)) {
+			t.Fatalf("report retained forbidden value %q:\n%s", forbidden, report)
 		}
 	}
 }
@@ -248,6 +364,7 @@ func TestGenerateAutomaticUsesOnlyClosedAllowlist(t *testing.T) {
 		t.Fatalf("GenerateAutomatic() error = %v", err)
 	}
 	for _, want := range []string{
+		`"schema_version": 1`,
 		`"submission": "automatic-opt-in"`,
 		`"destination": "public-github-issue"`,
 		`"raw_error_included": false`,

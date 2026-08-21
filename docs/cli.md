@@ -603,9 +603,22 @@ runs. `--copy`, `--save`, and `--open-github` are mutually exclusive.
 `--save` creates a new owner-only file and never overwrites. `--open-github`
 launches a prefilled browser page, requires a GitHub account, and never submits.
 
-Report generation performs no network request. The last-error record is a
-replace-in-place, bounded, owner-only file containing only generalized error
-classes, a local hash ID, command/subcommand placeholders, and flag names.
+Report generation performs no network request. `--last-error` includes two
+independent replace-in-place, bounded, owner-only records when available:
+
+- the latest ordinary command failure, reduced to generalized error classes,
+  a local hash ID, command/subcommand placeholders, and flag names;
+- the latest process panic, reduced to public build metadata, UTC time, fixed
+  CLI/daemon/MCP and boundary codes, a local hash ID, and at most 32 Corresync
+  source symbols with line numbers.
+
+The crash record contains no panic value, raw error, argument, source path,
+account or provider identifier, request data, credential, approval value, or
+mail/calendar/task/message content. Recording does not make the panic
+recoverable: the top-level command exits nonzero, owned background goroutines
+re-raise, and a daemon request panic stops every listener before the standard
+HTTP server can recover that connection. The separate automatic public issue
+path never includes crash records.
 
 Automatic public issue submission is a separate, default-off choice:
 

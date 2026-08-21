@@ -129,7 +129,7 @@ func (client *Client) exactDraft(
 	}
 	var draft exactIMAPDraft
 	err = client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		draftsMailbox, err := client.resolveMailbox(connection, application.MailFolder{
+		draftsMailbox, err := client.resolveMailbox(ctx, connection, application.MailFolder{
 			Kind: application.MailFolderDistinguished, ID: "drafts",
 		})
 		if err != nil {
@@ -138,7 +138,7 @@ func (client *Client) exactDraft(
 		if reference.Mailbox != draftsMailbox {
 			return errors.New("IMAP message is not in the selected Drafts mailbox")
 		}
-		status, message, raw, err := fetchRawMessage(connection, reference)
+		status, message, raw, err := fetchRawMessage(ctx, connection, reference)
 		if err != nil {
 			return err
 		}

@@ -140,6 +140,21 @@ func TestUpdateCachePathUsesPrivateStateTree(t *testing.T) {
 	}
 }
 
+func TestFeedbackCrashPathSharesPrivateDiagnosticsDirectory(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+	errorPath, err := FeedbackErrorPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	crashPath, err := FeedbackCrashPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Dir(crashPath) != filepath.Dir(errorPath) || filepath.Base(crashPath) != "last-crash.json" {
+		t.Fatalf("diagnostic paths = error %q, crash %q", errorPath, crashPath)
+	}
+}
+
 func TestUpdateCachePathIsolatesPreviewChannel(t *testing.T) {
 	t.Setenv("OWA_STATE_DIR", filepath.Join(t.TempDir(), "state"))
 	stable, err := UpdateCachePathForChannel("stable")

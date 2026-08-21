@@ -857,6 +857,7 @@ func TestDialBoundedIMAPCompletesSTARTTLSBeforeLibraryParsing(t *testing.T) {
 func TestIMAPCollectorsDrainHostileExcessResponses(t *testing.T) {
 	t.Parallel()
 	messages, err := collectFetchedMessages(
+		t.Context(),
 		1,
 		func(output chan *imap.Message) error {
 			defer close(output)
@@ -870,6 +871,7 @@ func TestIMAPCollectorsDrainHostileExcessResponses(t *testing.T) {
 	}
 
 	mailboxes, err := collectMailboxes(
+		t.Context(),
 		func(output chan *imap.MailboxInfo) error {
 			defer close(output)
 			for index := range 1025 {

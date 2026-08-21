@@ -16,6 +16,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/panicguard"
 	"github.com/nkiyohara/corresync/internal/settingsstore"
 )
 
@@ -52,7 +53,7 @@ func newSettingsAccessibleReader(
 		requests: make(chan chan settingsAccessibleReadResult),
 		stopped:  make(chan struct{}),
 	}
-	go func() {
+	panicguard.Go(ctx, panicguard.BoundaryBackgroundWork, func() {
 		defer close(accessible.stopped)
 		for {
 			select {
@@ -70,7 +71,7 @@ func newSettingsAccessibleReader(
 				}
 			}
 		}
-	}()
+	})
 	return accessible
 }
 

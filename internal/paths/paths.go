@@ -161,6 +161,15 @@ func FeedbackErrorPath() (string, error) {
 	return filepath.Join(state, "diagnostics", "last-error.json"), nil
 }
 
+// FeedbackCrashPath returns the single replace-in-place sanitized crash record.
+func FeedbackCrashPath() (string, error) {
+	state, err := StateDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(state, "diagnostics", "last-crash.json"), nil
+}
+
 // FeedbackSubmissionDir returns the private directory containing content-free
 // once-per-build/error attempt markers for explicitly enabled public reports.
 func FeedbackSubmissionDir() (string, error) {

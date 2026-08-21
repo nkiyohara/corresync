@@ -294,6 +294,13 @@ helper arguments, browser data, and private paths are excluded by construction.
 The latest error record replaces the previous record rather than appending
 history. Malformed or oversized records become visible degraded sections.
 
+An explicit `corr feedback --last-error` also reviews the separately replaced
+last crash: build and UTC time, fixed process/boundary codes, and a bounded
+Corresync-symbol stack. Panic values, runtime arguments, source paths, request
+data, identifiers, credentials, and provider content are structurally absent.
+Crash recording never continues uncertain state and is excluded from automatic
+public feedback.
+
 Report generation makes no network request. Copy, save, and opening a prefilled
 GitHub page each require an explicit flag after the complete report is shown.
 Opening GitHub never submits an issue automatically.

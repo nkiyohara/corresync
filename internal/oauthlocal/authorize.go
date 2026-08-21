@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nkiyohara/corresync/internal/panicguard"
+
 	"golang.org/x/oauth2"
 
 	"github.com/nkiyohara/corresync/internal/config"
@@ -121,12 +123,12 @@ func (manager *Manager) authorize(
 		}),
 	}
 	serveErrors := make(chan error, 1)
-	go func() {
+	panicguard.Go(ctx, panicguard.BoundaryBackgroundWork, func() {
 		if serveErr := server.Serve(listener); serveErr != nil &&
 			!errors.Is(serveErr, http.ErrServerClosed) {
 			serveErrors <- serveErr
 		}
-	}()
+	})
 	defer func() { _ = server.Close() }()
 
 	oauthConfig := oauthConfig(flowRoute, provider, clientSecret)

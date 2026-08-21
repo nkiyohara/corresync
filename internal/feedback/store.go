@@ -24,13 +24,30 @@ type Store struct {
 	Path string
 }
 
+// CrashStore atomically replaces one bounded content-free crash record.
+type CrashStore struct {
+	Path string
+}
+
 // Save persists record without appending or retaining historical failures.
 func (store Store) Save(record ErrorRecord) error {
-	if !filepath.IsAbs(store.Path) {
-		return errors.New("diagnostic record path must be absolute")
-	}
 	if err := record.validate(); err != nil {
 		return err
+	}
+	return saveDiagnosticRecord(store.Path, ".last-error-*.tmp", record)
+}
+
+// Save persists one crash without appending or retaining historical failures.
+func (store CrashStore) Save(record CrashRecord) error {
+	if err := record.validate(); err != nil {
+		return err
+	}
+	return saveDiagnosticRecord(store.Path, ".last-crash-*.tmp", record)
+}
+
+func saveDiagnosticRecord(path, temporaryPattern string, record any) error {
+	if !filepath.IsAbs(path) {
+		return errors.New("diagnostic record path must be absolute")
 	}
 	encoded, err := json.Marshal(record)
 	if err != nil {
@@ -40,7 +57,7 @@ func (store Store) Save(record ErrorRecord) error {
 	if len(encoded) > maximumRecordBytes {
 		return ErrInvalidRecord
 	}
-	directory := filepath.Dir(store.Path)
+	directory := filepath.Dir(path)
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return fmt.Errorf("create diagnostic directory: %w", err)
 	}
@@ -54,7 +71,7 @@ func (store Store) Save(record ErrorRecord) error {
 	if err := os.Chmod(directory, 0o700); err != nil { // #nosec G302 -- owner-only diagnostic state.
 		return fmt.Errorf("protect diagnostic directory: %w", err)
 	}
-	if info, err := os.Lstat(store.Path); err == nil {
+	if info, err := os.Lstat(path); err == nil {
 		if !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
 			return errors.New("diagnostic record is not an owner-only regular file")
 		}
@@ -62,7 +79,7 @@ func (store Store) Save(record ErrorRecord) error {
 		return fmt.Errorf("inspect diagnostic record: %w", err)
 	}
 
-	temporary, err := os.CreateTemp(directory, ".last-error-*.tmp")
+	temporary, err := os.CreateTemp(directory, temporaryPattern)
 	if err != nil {
 		return fmt.Errorf("create temporary diagnostic record: %w", err)
 	}
@@ -83,7 +100,7 @@ func (store Store) Save(record ErrorRecord) error {
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close temporary diagnostic record: %w", err)
 	}
-	if err := os.Rename(temporaryPath, store.Path); err != nil {
+	if err := os.Rename(temporaryPath, path); err != nil {
 		return fmt.Errorf("replace diagnostic record: %w", err)
 	}
 	return nil
@@ -91,30 +108,49 @@ func (store Store) Save(record ErrorRecord) error {
 
 // Load reads one strictly bounded record and rejects trailing data.
 func (store Store) Load() (ErrorRecord, error) {
-	if !filepath.IsAbs(store.Path) {
-		return ErrorRecord{}, ErrInvalidRecord
-	}
-	file, err := openDiagnosticRecord(store.Path)
-	if err != nil {
-		return ErrorRecord{}, err
-	}
-	defer func() { _ = file.Close() }()
-	encoded, err := io.ReadAll(io.LimitReader(file, maximumRecordBytes+1))
-	if err != nil || len(encoded) > maximumRecordBytes {
-		return ErrorRecord{}, ErrInvalidRecord
-	}
-	decoder := json.NewDecoder(bytes.NewReader(encoded))
-	decoder.DisallowUnknownFields()
 	var record ErrorRecord
-	if err := decoder.Decode(&record); err != nil {
-		return ErrorRecord{}, ErrInvalidRecord
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return ErrorRecord{}, ErrInvalidRecord
+	if err := loadDiagnosticRecord(store.Path, &record); err != nil {
+		return ErrorRecord{}, err
 	}
 	if err := record.validate(); err != nil {
 		return ErrorRecord{}, ErrInvalidRecord
 	}
 	return record, nil
+}
+
+// Load reads one strictly bounded crash record and rejects trailing data.
+func (store CrashStore) Load() (CrashRecord, error) {
+	var record CrashRecord
+	if err := loadDiagnosticRecord(store.Path, &record); err != nil {
+		return CrashRecord{}, err
+	}
+	if err := record.validate(); err != nil {
+		return CrashRecord{}, ErrInvalidRecord
+	}
+	return record, nil
+}
+
+func loadDiagnosticRecord(path string, record any) error {
+	if !filepath.IsAbs(path) {
+		return ErrInvalidRecord
+	}
+	file, err := openDiagnosticRecord(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = file.Close() }()
+	encoded, err := io.ReadAll(io.LimitReader(file, maximumRecordBytes+1))
+	if err != nil || len(encoded) > maximumRecordBytes {
+		return ErrInvalidRecord
+	}
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(record); err != nil {
+		return ErrInvalidRecord
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		return ErrInvalidRecord
+	}
+	return nil
 }
