@@ -484,8 +484,45 @@ func validateProjectionEnvelope(
 		return errors.New("projection completeness is inconsistent")
 	}
 	expectedFailures := projectionFailures(statuses)
-	if !slices.Equal(failures, expectedFailures) {
+	if !slices.EqualFunc(failures, expectedFailures, equalProjectionFailure) {
 		return errors.New("projection failures are inconsistent")
 	}
 	return nil
+}
+
+func equalProjectionFailure(left, right ProjectionFailure) bool {
+	if left.Account != right.Account ||
+		left.Alias != right.Alias ||
+		left.Provider != right.Provider ||
+		left.Service != right.Service ||
+		left.Code != right.Code ||
+		left.Reason != right.Reason {
+		return false
+	}
+	if left.Authentication == nil || right.Authentication == nil {
+		return left.Authentication == nil && right.Authentication == nil
+	}
+	leftAction := left.Authentication
+	rightAction := right.Authentication
+	return leftAction.Version == rightAction.Version &&
+		leftAction.Code == rightAction.Code &&
+		leftAction.Account == rightAction.Account &&
+		leftAction.Alias == rightAction.Alias &&
+		leftAction.Service == rightAction.Service &&
+		leftAction.Provider == rightAction.Provider &&
+		leftAction.Reason == rightAction.Reason &&
+		leftAction.NextAction.Kind == rightAction.NextAction.Kind &&
+		leftAction.NextAction.Command.Executable ==
+			rightAction.NextAction.Command.Executable &&
+		slices.Equal(
+			leftAction.NextAction.Command.Args,
+			rightAction.NextAction.Command.Args,
+		) &&
+		leftAction.NextAction.RequiresUserConsent ==
+			rightAction.NextAction.RequiresUserConsent &&
+		leftAction.NextAction.RequiresHumanInteraction ==
+			rightAction.NextAction.RequiresHumanInteraction &&
+		leftAction.NextAction.SecretsAllowedInMCP ==
+			rightAction.NextAction.SecretsAllowedInMCP &&
+		leftAction.Retry == rightAction.Retry
 }

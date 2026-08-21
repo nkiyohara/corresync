@@ -550,7 +550,8 @@ func (app *runtime) account(
 }
 
 func (app *runtime) authenticate(
-	ctx context.Context,
+	requestContext context.Context,
+	lifecycleContext context.Context,
 	configuration config.Config,
 	accountID domain.AccountID,
 	account config.Account,
@@ -568,7 +569,7 @@ func (app *runtime) authenticate(
 	if _, err := fmt.Fprintf(app.stderr, "Opening Outlook Web for account %q; complete sign-in in the browser.\n", accountID); err != nil {
 		return nil, session.Credentials{}, err
 	}
-	handle, err := app.launch(ctx, browser.Options{
+	handle, err := app.launch(lifecycleContext, browser.Options{
 		Origin:     web.Origin,
 		ProfileDir: profileDirectory,
 		Executable: configuration.Browser.Executable,
@@ -576,7 +577,10 @@ func (app *runtime) authenticate(
 	if err != nil {
 		return nil, session.Credentials{}, err
 	}
-	waitContext, cancel := context.WithTimeout(ctx, time.Duration(configuration.Browser.LoginTimeout))
+	waitContext, cancel := context.WithTimeout(
+		requestContext,
+		time.Duration(configuration.Browser.LoginTimeout),
+	)
 	defer cancel()
 	credentials, err := handle.WaitForSession(waitContext)
 	if err != nil {

@@ -135,11 +135,14 @@ The workflow rejects a tag that is not reachable from the branch assigned to
 its release line or does not match one of those two channel formats. GoReleaser
 creates a draft, injects the version/commit/source date, builds with
 `CGO_ENABLED=0` and `-trimpath`, then an isolated macOS keychain Developer
-ID-signs all four Darwin executables with hardened runtime and secure timestamp.
-Apple notarization must accept those exact binaries before the Darwin archives
-are repacked. The MCPB, Darwin SBOMs, catalogs, and checksum inventory are then
-rebuilt from the signed inputs. The release gate verifies archives, packages,
-the MCPB, catalogs, licenses, checksums, and SBOMs before publication.
+ID-signs each architecture's primary `corr` executable with hardened runtime
+and a secure timestamp. The workflow copies those exact signed bytes to the
+finite `corresync` compatibility entry; it never signs the two filenames
+separately. Apple notarization must accept both archive names before the Darwin
+archives are repacked. The MCPB, Darwin SBOMs, catalogs, and checksum inventory
+are then rebuilt from the signed inputs. The release gate verifies that the two
+command entries are byte-identical along with archives, packages, the MCPB,
+catalogs, licenses, checksums, and SBOMs before publication.
 
 Stable and preview releases pass the same archive, license, SBOM, macOS
 signing/notarization, checksum, and provenance gates. Only the verified

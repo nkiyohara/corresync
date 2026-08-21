@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "sourceVersion": "0.9.0-rc.1",
+  "sourceVersion": "0.9.0-rc.2",
   "id": "corresync",
   "registryName": "io.github.nkiyohara/corresync",
   "displayName": "Corresync — Mail, Calendar & Tasks",

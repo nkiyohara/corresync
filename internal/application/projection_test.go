@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
@@ -397,6 +398,47 @@ func TestProjectionPreservesLiveAuthenticationAction(t *testing.T) {
 		page.Failures[0].Code != string(AuthenticationCodeReauthenticationNeed) ||
 		page.Failures[0].Reason != string(AuthenticationReasonSessionExpired) {
 		t.Fatalf("projection failure = %+v", page.Failures)
+	}
+}
+
+func TestProjectionAuthenticationFailureSurvivesJSONRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	action, err := NewAuthenticationActionRequired(
+		AuthenticationStateReauthenticationNeeded,
+		AuthenticationReasonInteractionRequired,
+		projectionAlpha,
+		"alpha",
+		AuthenticationServiceCalendar,
+		domain.ProviderMicrosoftOWA,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := failProjectionAuthenticationStatus(
+		ProjectionAccountStatus{
+			Account: projectionAlpha, Alias: "alpha",
+			Provider: domain.ProviderMicrosoftOWA,
+			Service:  projectionServiceCalendar,
+		},
+		action,
+	)
+	page := AgendaProjectionPage{
+		Accounts: []ProjectionAccountStatus{status},
+		Failures: projectionFailures([]ProjectionAccountStatus{status}),
+		Start:    "2026-08-20T00:00:00+01:00", End: "2026-08-22T00:00:00+01:00",
+		DisplayTimeZone: "Europe/London", Limit: 10,
+	}
+	encoded, err := json.Marshal(page)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded AgendaProjectionPage
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if err := decoded.Validate(); err != nil {
+		t.Fatalf("agenda projection rejected an equivalent decoded action: %v", err)
 	}
 }
 

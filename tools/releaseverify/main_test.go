@@ -55,6 +55,26 @@ func TestValidateGitHubAssetName(t *testing.T) {
 	}
 }
 
+func TestVerifyCompatibilityHashesRequiresIdenticalExecutables(t *testing.T) {
+	t.Parallel()
+
+	if err := verifyCompatibilityHashes(
+		map[string]string{"corr": "same", "corresync": "same"},
+		"corr",
+		"corresync",
+	); err != nil {
+		t.Fatalf("verifyCompatibilityHashes() rejected identical entries: %v", err)
+	}
+	for name, hashes := range map[string]map[string]string{
+		"missing":    {"corr": "same"},
+		"mismatched": {"corr": "primary", "corresync": "compatibility"},
+	} {
+		if err := verifyCompatibilityHashes(hashes, "corr", "corresync"); err == nil {
+			t.Fatalf("verifyCompatibilityHashes() accepted %s entries", name)
+		}
+	}
+}
+
 func TestPackageInventoryRequiresPublicChangelog(t *testing.T) {
 	t.Parallel()
 
