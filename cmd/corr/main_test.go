@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
+	"github.com/nkiyohara/corresync/internal/feedback"
+	"github.com/nkiyohara/corresync/internal/paths"
 )
 
 func TestRunShowsHelpWithoutArguments(t *testing.T) {
@@ -282,6 +286,73 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "unexpected argument") {
 		t.Fatalf("stderr did not explain parse error: %q", stderr.String())
+	}
+}
+
+func TestRunWithCrashBoundaryPersistsOnlySanitizedEvidence(t *testing.T) {
+	stateDirectory := t.TempDir()
+	t.Setenv("CORRESYNC_STATE_DIR", stateDirectory)
+	privateConfig := filepath.Join(t.TempDir(), "person@example.test", "config.toml")
+	secret := "Bearer synthetic-private-token"
+	var stderr bytes.Buffer
+	code := runWithCrashBoundary(
+		context.Background(),
+		[]string{"--config", privateConfig, "daemon", "serve"},
+		&bytes.Buffer{},
+		&stderr,
+		buildinfo.Info{
+			Version: "v0.9.0-rc.3", Commit: "0123456789abcdef",
+			BuildDate: "2026-08-21T12:00:00Z", GoVersion: "go1.26.0",
+			OS: "linux", Arch: "amd64",
+		},
+		func(context.Context, []string, io.Writer, io.Writer) int {
+			panic(secret)
+		},
+	)
+	if code != 1 || strings.Contains(stderr.String(), secret) {
+		t.Fatalf("panic result = code %d, stderr %q", code, stderr.String())
+	}
+	path, err := paths.FeedbackCrashPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	record, err := (feedback.CrashStore{Path: path}).Load()
+	if err != nil {
+		t.Fatalf("load crash record: %v", err)
+	}
+	if record.ProcessRole != "daemon" || record.Boundary != "process" || len(record.Frames) == 0 {
+		t.Fatalf("crash record = %+v", record)
+	}
+	encoded, err := os.ReadFile(path) // #nosec G304 -- test-owned state path.
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, forbidden := range []string{secret, privateConfig, "person@example.test"} {
+		if bytes.Contains(encoded, []byte(forbidden)) {
+			t.Fatalf("crash record retained %q: %s", forbidden, encoded)
+		}
+	}
+}
+
+func TestCrashProcessRoleUsesOnlyServeProcesses(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		arguments []string
+		want      string
+	}{
+		"daemon serve":  {[]string{"daemon", "serve"}, "daemon"},
+		"daemon status": {[]string{"daemon", "status"}, "cli"},
+		"mcp serve":     {[]string{"--config", "/private", "mcp", "serve"}, "mcp"},
+		"ordinary CLI":  {[]string{"mail", "list"}, "cli"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if got := crashProcessRole(test.arguments); got != test.want {
+				t.Fatalf("crashProcessRole(%q) = %q, want %q", test.arguments, got, test.want)
+			}
+		})
 	}
 }
 

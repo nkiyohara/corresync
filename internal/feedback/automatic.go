@@ -5,7 +5,10 @@ import (
 	"errors"
 )
 
-const maximumAutomaticReportBytes = 8 << 10
+const (
+	automaticReportVersion      = 1
+	maximumAutomaticReportBytes = 8 << 10
+)
 
 // AutomaticInput contains the only values eligible for an explicitly enabled
 // public GitHub issue. It deliberately excludes config, providers, account
@@ -46,7 +49,7 @@ func GenerateAutomatic(input AutomaticInput) ([]byte, error) {
 		return nil, errors.New("automatic feedback record is invalid")
 	}
 	report := AutomaticReport{
-		SchemaVersion: reportVersion,
+		SchemaVersion: automaticReportVersion,
 		Privacy: AutomaticPrivacyStatement{
 			Submission:  "automatic-opt-in",
 			Destination: "public-github-issue",

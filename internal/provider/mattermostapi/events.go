@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nkiyohara/corresync/internal/panicguard"
+
 	"github.com/gorilla/websocket"
 	"github.com/nkiyohara/corresync/internal/application"
 )
@@ -178,14 +180,14 @@ func (stream *EventStream) Next(ctx context.Context) (Invalidation, error) {
 	cancelRead := make(chan struct{})
 	var cancelWait sync.WaitGroup
 	cancelWait.Add(1)
-	go func() {
+	panicguard.Go(ctx, panicguard.BoundaryBackgroundWork, func() {
 		defer cancelWait.Done()
 		select {
 		case <-ctx.Done():
 			_ = connection.SetReadDeadline(time.Now())
 		case <-cancelRead:
 		}
-	}()
+	})
 	defer func() {
 		close(cancelRead)
 		cancelWait.Wait()

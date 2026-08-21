@@ -4,7 +4,7 @@
 
 Canonical source snapshot:
 
-`0.9.0-rc.2`.
+`0.9.0-rc.3`.
 
 Release builds render the exact tag version into every package.
 

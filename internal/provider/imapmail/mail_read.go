@@ -12,6 +12,7 @@ import (
 	imapclient "github.com/emersion/go-imap/client"
 
 	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/panicguard"
 )
 
 var metadataItems = []imap.FetchItem{
@@ -45,7 +46,7 @@ func (client *Client) queryMessages(
 ) (application.MailPage, error) {
 	var page application.MailPage
 	err := client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		mailbox, err := client.resolveMailbox(connection, folder)
+		mailbox, err := client.resolveMailbox(ctx, connection, folder)
 		if err != nil {
 			return err
 		}
@@ -70,7 +71,7 @@ func (client *Client) queryMessages(
 		if start == end {
 			return nil
 		}
-		messages, err := fetchUIDs(connection, uids[start:end], metadataItems)
+		messages, err := fetchUIDs(ctx, connection, uids[start:end], metadataItems)
 		if err != nil {
 			return err
 		}
@@ -150,7 +151,7 @@ func (client *Client) ListMailFolders(
 ) (application.MailFolderPage, error) {
 	var page application.MailFolderPage
 	err := client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		infos, err := listMailboxes(connection)
+		infos, err := listMailboxes(ctx, connection)
 		if err != nil {
 			return err
 		}
@@ -161,7 +162,7 @@ func (client *Client) ListMailFolders(
 				return err
 			}
 		} else if !strings.EqualFold(input.Parent.ID, "msgfolderroot") {
-			parent, err = client.resolveMailbox(connection, input.Parent)
+			parent, err = client.resolveMailbox(ctx, connection, input.Parent)
 			if err != nil {
 				return err
 			}
@@ -221,7 +222,7 @@ func (client *Client) GetMessageBody(
 	}
 	var result application.MailBody
 	err = client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		status, message, raw, err := fetchRawMessage(connection, reference)
+		status, message, raw, err := fetchRawMessage(ctx, connection, reference)
 		if err != nil {
 			return err
 		}
@@ -270,7 +271,7 @@ func (client *Client) GetMailAttachment(
 	}
 	var result application.MailAttachment
 	err = client.withIMAP(ctx, func(connection *imapclient.Client) error {
-		status, message, raw, err := fetchRawMessage(connection, messageReference)
+		status, message, raw, err := fetchRawMessage(ctx, connection, messageReference)
 		if err != nil {
 			return err
 		}
@@ -307,6 +308,7 @@ func (client *Client) GetMailAttachment(
 }
 
 func fetchRawMessage(
+	ctx context.Context,
 	connection *imapclient.Client,
 	reference messageReference,
 ) (*imap.MailboxStatus, *imap.Message, []byte, error) {
@@ -318,7 +320,7 @@ func fetchRawMessage(
 		return nil, nil, nil, errors.New("IMAP UIDVALIDITY changed")
 	}
 	section := &imap.BodySectionName{Peek: true}
-	messages, err := fetchUIDs(connection, []uint32{reference.UID}, append(
+	messages, err := fetchUIDs(ctx, connection, []uint32{reference.UID}, append(
 		append([]imap.FetchItem(nil), metadataItems...),
 		section.FetchItem(),
 	))
@@ -346,6 +348,7 @@ func fetchRawMessage(
 }
 
 func fetchUIDs(
+	ctx context.Context,
 	connection *imapclient.Client,
 	uids []uint32,
 	items []imap.FetchItem,
@@ -354,18 +357,21 @@ func fetchUIDs(
 	for _, uid := range uids {
 		set.AddNum(uid)
 	}
-	return collectFetchedMessages(len(uids), func(messages chan *imap.Message) error {
+	return collectFetchedMessages(ctx, len(uids), func(messages chan *imap.Message) error {
 		return connection.UidFetch(set, items, messages)
 	})
 }
 
 func collectFetchedMessages(
+	ctx context.Context,
 	maximum int,
 	command func(chan *imap.Message) error,
 ) ([]*imap.Message, error) {
 	messages := make(chan *imap.Message)
 	done := make(chan error, 1)
-	go func() { done <- command(messages) }()
+	panicguard.Go(ctx, panicguard.BoundaryBackgroundWork, func() {
+		done <- command(messages)
+	})
 	result := make([]*imap.Message, 0, maximum)
 	var limitErr error
 	for message := range messages {

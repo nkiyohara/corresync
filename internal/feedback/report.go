@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	reportVersion      = 1
-	maximumReportBytes = 16 << 10
+	manualReportVersion = 2
+	maximumReportBytes  = 16 << 10
 )
 
 var (
@@ -53,6 +53,19 @@ type LastErrorStatus struct {
 	Classes []string      `json:"classes,omitempty"`
 }
 
+// LastCrashStatus is either omitted by choice, absent, degraded, or a
+// content-free panic record.
+type LastCrashStatus struct {
+	Status      string       `json:"status"`
+	Reason      string       `json:"reason,omitempty"`
+	ID          string       `json:"id,omitempty"`
+	RecordedAt  string       `json:"recorded_at,omitempty"`
+	ProcessRole string       `json:"process_role,omitempty"`
+	Boundary    string       `json:"boundary,omitempty"`
+	Build       *Build       `json:"build,omitempty"`
+	Frames      []CrashFrame `json:"frames,omitempty"`
+}
+
 // Input consists only of values already reduced to public or allowlisted data.
 type Input struct {
 	Build          Build
@@ -61,6 +74,7 @@ type Input struct {
 	Providers      []Provider
 	ProviderReason string
 	LastError      LastErrorStatus
+	LastCrash      LastCrashStatus
 }
 
 // Report is the deterministic, complete review artifact.
@@ -72,14 +86,17 @@ type Report struct {
 	Config        ConfigStatus     `json:"config"`
 	Providers     ProviderSection  `json:"providers"`
 	LastError     LastErrorStatus  `json:"last_error"`
+	LastCrash     LastCrashStatus  `json:"last_crash"`
 }
 
 // PrivacyStatement documents exactly what producing the report did.
 type PrivacyStatement struct {
-	Generation          string `json:"generation"`
-	AutomaticUpload     bool   `json:"automatic_upload"`
-	ContentIncluded     bool   `json:"mail_or_calendar_content_included"`
-	TaskContentIncluded bool   `json:"task_content_included"`
+	Generation             string `json:"generation"`
+	AutomaticUpload        bool   `json:"automatic_upload"`
+	ContentIncluded        bool   `json:"mail_or_calendar_content_included"`
+	TaskContentIncluded    bool   `json:"task_content_included"`
+	MessageContentIncluded bool   `json:"message_content_included"`
+	RawPanicIncluded       bool   `json:"raw_panic_included"`
 }
 
 // SectionValue reports one bounded scalar collection result.
@@ -100,7 +117,7 @@ type ProviderSection struct {
 // visible degradation markers rather than reflected into output.
 func Generate(input Input) ([]byte, error) {
 	report := Report{
-		SchemaVersion: reportVersion,
+		SchemaVersion: manualReportVersion,
 		Privacy: PrivacyStatement{
 			Generation:      "local-only",
 			AutomaticUpload: false,
@@ -113,6 +130,7 @@ func Generate(input Input) ([]byte, error) {
 		Config:    sanitizeConfig(input.Config),
 		Providers: sanitizeProviders(input.Providers, input.ProviderReason),
 		LastError: sanitizeLastError(input.LastError),
+		LastCrash: sanitizeLastCrash(input.LastCrash),
 	}
 	encoded, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
@@ -283,6 +301,38 @@ func sanitizeLastError(status LastErrorStatus) LastErrorStatus {
 		}
 	}
 	return LastErrorStatus{Status: "degraded", Reason: "collection_failed"}
+}
+
+func sanitizeLastCrash(status LastCrashStatus) LastCrashStatus {
+	switch status.Status {
+	case "not-requested", "absent":
+		return LastCrashStatus{Status: status.Status}
+	case "degraded":
+		if allowedReason(status.Reason) {
+			return LastCrashStatus{Status: "degraded", Reason: status.Reason}
+		}
+	case "ok":
+		if status.Build == nil {
+			break
+		}
+		recordedAt, err := time.Parse(time.RFC3339, status.RecordedAt)
+		if err != nil {
+			break
+		}
+		record := CrashRecord{
+			Version: crashRecordVersion, ID: status.ID, RecordedAt: recordedAt,
+			ProcessRole: status.ProcessRole, Boundary: status.Boundary,
+			Build: *status.Build, Frames: append([]CrashFrame(nil), status.Frames...),
+		}
+		if record.validate() == nil {
+			return LastCrashStatus{
+				Status: "ok", ID: record.ID, RecordedAt: record.RecordedAt.Format(time.RFC3339),
+				ProcessRole: record.ProcessRole, Boundary: record.Boundary,
+				Build: &record.Build, Frames: record.Frames,
+			}
+		}
+	}
+	return LastCrashStatus{Status: "degraded", Reason: "collection_failed"}
 }
 
 func allowedReason(reason string) bool {

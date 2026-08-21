@@ -27,6 +27,7 @@ import (
 	"github.com/emersion/go-smtp"
 
 	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/panicguard"
 )
 
 const (
@@ -151,11 +152,11 @@ func New(ctx context.Context, options Options) (*Client, error) {
 		client.observed = ObservedCapabilities{
 			Move: capabilities["MOVE"], UIDPlus: capabilities["UIDPLUS"],
 		}
-		_, sentErr := client.resolveMailbox(connection, application.MailFolder{
+		_, sentErr := client.resolveMailbox(ctx, connection, application.MailFolder{
 			Kind: application.MailFolderDistinguished, ID: "sentitems",
 		})
 		client.observed.Sent = sentErr == nil
-		_, draftsErr := client.resolveMailbox(connection, application.MailFolder{
+		_, draftsErr := client.resolveMailbox(ctx, connection, application.MailFolder{
 			Kind: application.MailFolderDistinguished, ID: "drafts",
 		})
 		client.observed.Drafts = draftsErr == nil
@@ -478,13 +479,14 @@ func hasFlag(flags []string, expected string) bool {
 }
 
 func (client *Client) resolveMailbox(
+	ctx context.Context,
 	connection *imapclient.Client,
 	folder application.MailFolder,
 ) (string, error) {
 	if folder.Kind == application.MailFolderOpaque {
 		return decodeFolderID(folder.ID)
 	}
-	infos, err := listMailboxes(connection)
+	infos, err := listMailboxes(ctx, connection)
 	if err != nil {
 		return "", err
 	}
@@ -518,18 +520,21 @@ func (client *Client) resolveMailbox(
 	return "", fmt.Errorf("IMAP has no mailbox for distinguished folder %q", folder.ID)
 }
 
-func listMailboxes(connection *imapclient.Client) ([]*imap.MailboxInfo, error) {
-	return collectMailboxes(func(mailboxes chan *imap.MailboxInfo) error {
+func listMailboxes(ctx context.Context, connection *imapclient.Client) ([]*imap.MailboxInfo, error) {
+	return collectMailboxes(ctx, func(mailboxes chan *imap.MailboxInfo) error {
 		return connection.List("", "*", mailboxes)
 	})
 }
 
 func collectMailboxes(
+	ctx context.Context,
 	command func(chan *imap.MailboxInfo) error,
 ) ([]*imap.MailboxInfo, error) {
 	mailboxes := make(chan *imap.MailboxInfo, 32)
 	done := make(chan error, 1)
-	go func() { done <- command(mailboxes) }()
+	panicguard.Go(ctx, panicguard.BoundaryBackgroundWork, func() {
+		done <- command(mailboxes)
+	})
 	result := make([]*imap.MailboxInfo, 0, 32)
 	var limitErr error
 	for mailbox := range mailboxes {

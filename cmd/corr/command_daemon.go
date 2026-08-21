@@ -9,6 +9,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/panicguard"
 )
 
 const (
@@ -89,9 +90,13 @@ func (*daemonServeCommand) Run(app *runtime) (returnErr error) {
 	}
 	defer func() { returnErr = errors.Join(returnErr, credential.Close()) }()
 	server, err := daemonapi.NewServer(backend, daemonapi.ServerOptions{
+		Context: app.context,
 		Version: app.info.Version, ProcessID: app.processID,
 		StartedAt: time.Now(), Credential: credential.Value(), ConfigDigest: configDigest,
 		AllowNoDefaultAccount: len(backend.configuration.Accounts) == 0,
+		RecordPanic: func() {
+			panicguard.Record(app.context, panicguard.BoundaryDaemonRequest)
+		},
 	})
 	if err != nil {
 		return err
@@ -105,7 +110,9 @@ func (*daemonServeCommand) Run(app *runtime) (returnErr error) {
 	}
 
 	serveDone := make(chan error, 1)
-	go func() { serveDone <- server.Serve(listener) }()
+	panicguard.Go(app.context, panicguard.BoundaryDaemonServer, func() {
+		serveDone <- server.Serve(listener)
+	})
 	select {
 	case err := <-serveDone:
 		return err

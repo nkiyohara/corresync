@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -1345,6 +1346,114 @@ func TestProviderNeutralStatusRoundTripOverLocalIPC(t *testing.T) {
 	}
 	if status.DefaultAccount != "" || status.ProtocolVersion != ProtocolVersion {
 		t.Fatalf("provider-neutral Status() = %+v", status)
+	}
+}
+
+func TestServerRecordsRequestPanicWithoutReceivingItsValue(t *testing.T) {
+	t.Parallel()
+
+	recorded := 0
+	token := syntheticCredential("p")
+	server, err := NewServer(&fakeBackend{}, ServerOptions{
+		Version: "dev", ProcessID: 123, StartedAt: time.Unix(1, 0),
+		Credential: token, ConfigDigest: strings.Repeat("a", 64),
+		RecordPanic: func() { recorded++ },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	close(server.slots) // A valid request reaches the deliberately panicking slot send.
+	request := httptest.NewRequestWithContext(
+		t.Context(), http.MethodPost, "http://"+requestHost+requestPath,
+		strings.NewReader(`{"version":23,"id":"test","method":"status","params":{}}`),
+	)
+	request.Host = requestHost
+	request.Header.Set("Authorization", authorizationType+token)
+	request.Header.Set("Content-Type", contentType)
+
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("ServeHTTP() did not preserve panic behavior")
+		}
+		if recorded != 1 {
+			t.Fatalf("panic recorder calls = %d, want 1", recorded)
+		}
+		if !server.failed.Load() {
+			t.Fatal("request panic did not mark the daemon failed")
+		}
+	}()
+	server.ServeHTTP(httptest.NewRecorder(), request)
+}
+
+func TestServerFailsClosedBeforeRecordingRequestPanic(t *testing.T) {
+	t.Parallel()
+
+	token := syntheticCredential("s")
+	server, err := NewServer(&fakeBackend{}, ServerOptions{
+		Version: "dev", ProcessID: 123, StartedAt: time.Unix(1, 0),
+		Credential: token, ConfigDigest: strings.Repeat("a", 64),
+		RecordPanic: func() { panic("synthetic recorder failure") },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	close(server.slots)
+	request := httptest.NewRequestWithContext(
+		t.Context(), http.MethodPost, "http://"+requestHost+requestPath,
+		strings.NewReader(`{"version":23,"id":"test","method":"status","params":{}}`),
+	)
+	request.Host = requestHost
+	request.Header.Set("Authorization", authorizationType+token)
+	request.Header.Set("Content-Type", contentType)
+
+	defer func() {
+		if recovered := recover(); recovered == nil {
+			t.Fatal("ServeHTTP() did not preserve recorder panic behavior")
+		}
+		if !server.failed.Load() {
+			t.Fatal("recorder panic left the daemon in a serving state")
+		}
+	}()
+	server.ServeHTTP(httptest.NewRecorder(), request)
+}
+
+func TestServerBaseContextPreservesProcessDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	type contextKey struct{}
+	base := context.WithValue(t.Context(), contextKey{}, "diagnostics")
+	server, err := NewServer(&fakeBackend{}, ServerOptions{
+		Context: base, Version: "dev", ProcessID: 123, StartedAt: time.Unix(1, 0),
+		Credential: syntheticCredential("q"), ConfigDigest: strings.Repeat("a", 64),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := server.http.BaseContext(nil).Value(contextKey{}); got != "diagnostics" {
+		t.Fatalf("daemon base context value = %v", got)
+	}
+}
+
+func TestServeReturnsFailureAfterInternalPanic(t *testing.T) {
+	t.Parallel()
+
+	server, err := NewServer(&fakeBackend{}, ServerOptions{
+		Version: "dev", ProcessID: 123, StartedAt: time.Unix(1, 0),
+		Credential: syntheticCredential("r"), ConfigDigest: strings.Repeat("a", 64),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := listener.Close(); err != nil {
+		t.Fatal(err)
+	}
+	server.failed.Store(true)
+	if err := server.Serve(listener); err == nil || !strings.Contains(err.Error(), "internal panic") {
+		t.Fatalf("Serve() error = %v, want internal panic failure", err)
 	}
 }
 

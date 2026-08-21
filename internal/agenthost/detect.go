@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/nkiyohara/corresync/internal/panicguard"
 )
 
 const (
@@ -232,7 +234,7 @@ func (detector *Detector) Detect(ctx context.Context, request Request) (Report, 
 	}
 	results := make(chan indexedDetection, len(hosts))
 	for index, host := range hosts {
-		go func(index int, host Host) {
+		panicguard.Go(detectionContext, panicguard.BoundaryBackgroundWork, func() {
 			select {
 			case detector.probeSlots <- struct{}{}:
 			case <-detectionContext.Done():
@@ -244,7 +246,7 @@ func (detector *Detector) Detect(ctx context.Context, request Request) (Report, 
 			case results <- indexedDetection{index: index, result: result, problems: problems}:
 			case <-detectionContext.Done():
 			}
-		}(index, host)
+		})
 	}
 
 	indexed := make([]Detection, len(hosts))

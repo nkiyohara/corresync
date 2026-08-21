@@ -5,6 +5,8 @@
 - Amended: 2026-08-03 by
   [ADR 0025](0025-opt-in-public-error-feedback.md), which adds a separate,
   smaller, explicit opt-in public issue path while preserving this manual flow.
+- Amended: 2026-08-21 to add one bounded local crash record without adding raw
+  panic logging, telemetry, or automatic crash upload.
 
 ## Context
 
@@ -25,6 +27,13 @@ accepts only allowlisted public build atoms, coarse platform and installation
 data, fixed collection states, aggregate provider IDs/capabilities, and an
 optional sanitized last-error record.
 
+The explicitly requested report may also include one sanitized last-crash
+record. That record accepts only public build atoms, a UTC occurrence time,
+fixed process-role and boundary enums, a deterministic local identifier, and
+at most 32 Corresync source symbols with line numbers. Source paths, panic
+values, runtime argument values, arbitrary strings, and non-Corresync frames
+are not representable.
+
 Raw errors, argument values, account IDs/aliases/addresses, endpoints, private
 paths, environment values, queries, mail/calendar/import/event content,
 credential references, helper arguments/results, authorization material,
@@ -38,6 +47,16 @@ The last-error store is:
 - composed from fixed generalized error classes, command/subcommand
   placeholders, flag names without values, and a deterministic local hash;
 - visibly degraded when missing, malformed, oversized, or unsafe.
+
+The separate last-crash store follows the same replace-not-append,
+owner-only, bounded, atomic, and symlink-safe rules. Corresync guards its
+process and owned goroutine boundaries and writes the reduced record. The
+top-level process boundary converts the panic to one fixed diagnostic and an
+immediate nonzero exit; owned goroutines re-raise after recording, and a daemon
+request panic closes every listener before net/http can recover the connection.
+No boundary continues serving uncertain state. The ordinary content-free audit
+remains the operation trail, so crash diagnostics do not introduce a second
+verbose operation log.
 
 Report generation performs no network request and disables automatic update
 discovery. The complete report is printed before any selected external action.
@@ -63,3 +82,7 @@ Adding a report field requires a privacy review, bounded type, deterministic
 serialization, representative-secret tests, and documentation. An arbitrary
 map, raw string catch-all, or automatic upload is an architectural change and
 requires a new ADR.
+
+The last-crash field raises the local feedback report schema from version 1 to
+version 2. It is included only by explicit `--last-error` review and is not
+eligible for the default-off automatic public feedback path.

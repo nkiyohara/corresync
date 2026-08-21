@@ -25,6 +25,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/eventqueue"
 	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/oauthlocal"
+	"github.com/nkiyohara/corresync/internal/panicguard"
 	"github.com/nkiyohara/corresync/internal/paths"
 	caldavprovider "github.com/nkiyohara/corresync/internal/provider/caldav"
 	"github.com/nkiyohara/corresync/internal/provider/googleapi"
@@ -492,7 +493,9 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 		_ = recorder.Close()
 		return nil, err
 	}
-	lifecycle, cancel := context.WithCancel(context.Background())
+	// Keep process-owned crash diagnostics while making backend cancellation
+	// independent from the request that first opened the daemon session.
+	lifecycle, cancel := context.WithCancel(context.WithoutCancel(app.context))
 	backend := &sessionBackend{
 		app:              app,
 		configuration:    configuration,
@@ -3420,6 +3423,7 @@ func (backend *sessionBackend) monitorLoop(
 	lease *sessionLease,
 	done chan<- struct{},
 ) {
+	defer panicguard.Recover(ctx, panicguard.BoundaryMonitor)
 	defer backend.active.Done()
 	defer close(done)
 	poll := func() bool {

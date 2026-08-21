@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alecthomas/kong"
 	kongcompletion "github.com/jotaen/kong-completion"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/feedback"
+	"github.com/nkiyohara/corresync/internal/panicguard"
 	"github.com/nkiyohara/corresync/internal/paths"
 )
 
@@ -246,7 +248,86 @@ func completionEnvironmentActive() bool {
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	code := run(ctx, os.Args[1:], os.Stdout, os.Stderr)
+	code := runWithCrashBoundary(
+		ctx,
+		os.Args[1:],
+		os.Stdout,
+		os.Stderr,
+		buildinfo.Current(),
+		run,
+	)
 	stop()
 	os.Exit(code)
+}
+
+type cliExecutionRunner func(context.Context, []string, io.Writer, io.Writer) int
+
+func runWithCrashBoundary(
+	executionContext context.Context,
+	arguments []string,
+	stdout, stderr io.Writer,
+	info buildinfo.Info,
+	execute cliExecutionRunner,
+) (code int) {
+	role := crashProcessRole(arguments)
+	recorder := panicguard.Recorder(func(boundary panicguard.Boundary, callers []uintptr) {
+		recordProcessCrash(info, role, boundary, callers)
+	})
+	executionContext = panicguard.WithRecorder(executionContext, recorder)
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			panicguard.Record(executionContext, panicguard.BoundaryProcess)
+			_, _ = fmt.Fprintln(
+				stderr,
+				"Corresync stopped unexpectedly. Run `corr feedback --last-error` to review the private, sanitized crash record.",
+			)
+			code = 1
+		}
+	}()
+	return execute(executionContext, arguments, stdout, stderr)
+}
+
+func recordProcessCrash(
+	info buildinfo.Info,
+	role string,
+	boundary panicguard.Boundary,
+	callers []uintptr,
+) {
+	path, err := paths.FeedbackCrashPath()
+	if err != nil {
+		return
+	}
+	record := feedback.NewCrashRecord(
+		feedback.Build{
+			Version: info.Version, Commit: info.Commit, BuildDate: info.BuildDate,
+			GoVersion: info.GoVersion, Platform: info.OS + "/" + info.Arch,
+		},
+		role,
+		string(boundary),
+		time.Now(),
+		callers,
+	)
+	_ = (feedback.CrashStore{Path: path}).Save(record)
+}
+
+func crashProcessRole(arguments []string) string {
+	commands := make([]string, 0, 2)
+	for index := 0; index < len(arguments) && len(commands) < 2; index++ {
+		argument := arguments[index]
+		if argument == "--config" {
+			index++
+			continue
+		}
+		if strings.HasPrefix(argument, "-") {
+			continue
+		}
+		commands = append(commands, argument)
+	}
+	if len(commands) == 2 && commands[0] == "daemon" && commands[1] == "serve" {
+		return "daemon"
+	}
+	if len(commands) == 2 && commands[0] == "mcp" && commands[1] == "serve" {
+		return "mcp"
+	}
+	return "cli"
 }
