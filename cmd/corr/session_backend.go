@@ -1194,7 +1194,7 @@ func (backend *sessionBackend) TerminalLogin(
 	ctx context.Context,
 	input daemonapi.TerminalLoginInput,
 	caller domain.Caller,
-) (daemonapi.TerminalLoginResult, error) {
+) (_ daemonapi.TerminalLoginResult, returnErr error) {
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
@@ -1208,10 +1208,18 @@ func (backend *sessionBackend) TerminalLogin(
 		return authenticatedTerminalResult(input.Account, account.captured), nil
 	}
 
-	interaction, err := backend.terminalInteraction(input, caller)
+	interaction, created, err := backend.terminalInteraction(input, caller)
 	if err != nil {
 		return daemonapi.TerminalLoginResult{}, err
 	}
+	defer func() {
+		if created && returnErr != nil {
+			returnErr = errors.Join(
+				returnErr,
+				backend.dropTerminalInteraction(interaction, true),
+			)
+		}
+	}()
 	if time.Now().After(interaction.deadline) {
 		closeErr := backend.dropTerminalInteraction(interaction, true)
 		return daemonapi.TerminalLoginResult{}, errors.Join(
@@ -1355,53 +1363,53 @@ func terminalLoginViewReady(view daemonapi.TerminalLoginView) bool {
 func (backend *sessionBackend) terminalInteraction(
 	input daemonapi.TerminalLoginInput,
 	caller domain.Caller,
-) (*terminalLoginSession, error) {
+) (*terminalLoginSession, bool, error) {
 	if input.SessionID != "" {
 		interaction, exists := backend.terminalSessions[input.SessionID]
 		if !exists || interaction.account != input.Account || interaction.caller != caller {
-			return nil, errors.New("invalid or expired terminal login session")
+			return nil, false, errors.New("invalid or expired terminal login session")
 		}
-		return interaction, nil
+		return interaction, false, nil
 	}
 	if existingID, exists := backend.terminalAccounts[input.Account]; exists {
 		interaction := backend.terminalSessions[existingID]
 		if interaction == nil || interaction.caller != caller {
-			return nil, errors.New("a terminal login is already active for this account")
+			return nil, false, errors.New("a terminal login is already active for this account")
 		}
-		return interaction, nil
+		return interaction, false, nil
 	}
 	_, configured, exists := backend.configuration.AccountByID(input.Account)
 	if !exists {
-		return nil, fmt.Errorf("account %q is not configured", input.Account)
+		return nil, false, fmt.Errorf("account %q is not configured", input.Account)
 	}
 	if hasGoogleWebRoute(configured) {
-		return nil, errUnsupportedLegacyGoogleRoute
+		return nil, false, errUnsupportedLegacyGoogleRoute
 	}
 	profileDirectory, err := paths.ProfileDir(input.Account)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	web, ok := configured.OutlookWeb()
 	if !ok {
-		return nil, errors.New("terminal login is available only for Outlook Web routes")
+		return nil, false, errors.New("terminal login is available only for Outlook Web routes")
 	}
 	handle, err := backend.app.launch(backend.lifecycle, browser.Options{
 		Origin: web.Origin, ProfileDir: profileDirectory,
 		Executable: backend.configuration.Browser.Executable, Headless: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	terminalHandle, supported := handle.(terminalBrowserHandle)
 	if !supported {
-		return nil, errors.Join(
+		return nil, false, errors.Join(
 			errors.New("configured browser launcher does not support terminal login"),
 			handle.Close(),
 		)
 	}
 	id, err := newTerminalLoginSessionID()
 	if err != nil {
-		return nil, errors.Join(err, handle.Close())
+		return nil, false, errors.Join(err, handle.Close())
 	}
 	interaction := &terminalLoginSession{
 		id: id, account: input.Account, caller: caller, handle: terminalHandle,
@@ -1409,7 +1417,7 @@ func (backend *sessionBackend) terminalInteraction(
 	}
 	backend.terminalSessions[id] = interaction
 	backend.terminalAccounts[input.Account] = id
-	return interaction, nil
+	return interaction, true, nil
 }
 
 func (backend *sessionBackend) dropTerminalInteraction(

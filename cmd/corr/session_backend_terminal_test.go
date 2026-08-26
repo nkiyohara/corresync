@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 
@@ -19,6 +20,8 @@ type fakeTerminalBrowser struct {
 	stageCalls     map[int]int
 	snapshotCalls  int
 	closed         bool
+	credentials    session.Credentials
+	sessionErr     error
 	snapshotErr    error
 	interactionErr error
 }
@@ -34,8 +37,11 @@ func (browser *fakeTerminalBrowser) Close() error {
 	return nil
 }
 
-func (*fakeTerminalBrowser) CurrentSession() (session.Credentials, error) {
-	return session.Credentials{}, session.ErrNotReady
+func (browser *fakeTerminalBrowser) CurrentSession() (session.Credentials, error) {
+	if browser.sessionErr != nil {
+		return session.Credentials{}, browser.sessionErr
+	}
+	return browser.credentials, session.ErrNotReady
 }
 
 func (browserHandle *fakeTerminalBrowser) TerminalSnapshot(context.Context) (browser.TerminalView, error) {
@@ -231,5 +237,69 @@ func TestSessionBackendTerminalLoginStartsHeadlessAndBindsCaller(t *testing.T) {
 	}, caller)
 	if err != nil || result.Status != "cancelled" || !fakeBrowser.closed || len(backend.terminalSessions) != 0 {
 		t.Fatalf("TerminalLogin(cancel) = %+v, %v; closed=%v", result, err, fakeBrowser.closed)
+	}
+}
+
+func TestSessionBackendTerminalLoginDropsFailedNewInteraction(t *testing.T) {
+	t.Setenv("OWA_STATE_DIR", t.TempDir())
+
+	for _, test := range []struct {
+		name      string
+		newHandle func() *fakeTerminalBrowser
+	}{
+		{
+			name: "initial session observation",
+			newHandle: func() *fakeTerminalBrowser {
+				return &fakeTerminalBrowser{sessionErr: errors.New("synthetic observation failure")}
+			},
+		},
+		{
+			name: "initial snapshot",
+			newHandle: func() *fakeTerminalBrowser {
+				return &fakeTerminalBrowser{snapshotErr: errors.New("synthetic snapshot failure")}
+			},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			lifecycle, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			launched := make([]*fakeTerminalBrowser, 0, 2)
+			app := &runtime{launch: func(_ context.Context, _ browser.Options) (browserHandle, error) {
+				handle := test.newHandle()
+				launched = append(launched, handle)
+				return handle, nil
+			}}
+			backend := &sessionBackend{
+				app: app, configuration: config.OutlookDefault(), lifecycle: lifecycle, cancel: cancel,
+				accounts: make(map[domain.AccountID]sessionAccount), previews: make(map[string]sessionPreview),
+				terminalSessions: make(map[string]*terminalLoginSession),
+				terminalAccounts: make(map[domain.AccountID]string),
+			}
+			accountID := backend.configuration.Accounts["work"].ID
+			caller := domain.Caller{Surface: "cli", Instance: "process-1"}
+
+			if _, err := backend.TerminalLogin(
+				t.Context(), daemonapi.TerminalLoginInput{Account: accountID}, caller,
+			); err == nil {
+				t.Fatal("TerminalLogin(start) unexpectedly succeeded")
+			}
+			if len(launched) != 1 || !launched[0].closed ||
+				len(backend.terminalSessions) != 0 || len(backend.terminalAccounts) != 0 {
+				t.Fatalf(
+					"failed interaction retained state: launched=%d closed=%v sessions=%d accounts=%d",
+					len(launched), launched[0].closed,
+					len(backend.terminalSessions), len(backend.terminalAccounts),
+				)
+			}
+
+			if _, err := backend.TerminalLogin(
+				t.Context(), daemonapi.TerminalLoginInput{Account: accountID}, caller,
+			); err == nil {
+				t.Fatal("TerminalLogin(retry) unexpectedly succeeded")
+			}
+			if len(launched) != 2 || launched[0] == launched[1] || !launched[1].closed {
+				t.Fatalf("retry did not create and clean a fresh interaction: %+v", launched)
+			}
+		})
 	}
 }
