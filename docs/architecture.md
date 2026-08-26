@@ -16,7 +16,7 @@ public transports and one authenticated local session owner.
                   ▼
        config-scoped session owner
        ├── Outlook Web browser adapter
-       ├── approval-gated Gmail + Google Calendar + Google Tasks API adapters
+       ├── user-owned OAuth Gmail + Google Calendar + Google Tasks API adapters
        ├── Microsoft Graph OAuth adapter
        ├── JMAP adapter
        ├── IMAP/SMTP adapter
@@ -40,9 +40,9 @@ browser: full address
 
 The Worker receives no address local part, credential, provider content, or
 authentication authority. It cannot connect to a user-derived host and shares
-only the generated provider-signal catalog and approval gate with local
-discovery. It has no dependency on the application core, daemon, provider
-adapters, configuration, keyring, or MCP. See
+only the generated provider-signal catalog and Google route-mode declarations
+with local discovery. It has no dependency on the application core, daemon,
+provider adapters, configuration, keyring, or MCP. See
 [ADR 0027](adr/0027-domain-only-public-compatibility-checker.md).
 
 ## Dependency direction
@@ -137,9 +137,9 @@ handle, which cannot be rebound from another account.
 The session owner creates all authenticated provider clients:
 
 - Outlook Web: dedicated browser profile and in-memory captured session;
-- Google: staged Gmail/Calendar and independent Google Tasks API routes,
-  release-gated before OAuth and network access until approval; normal-browser
-  OAuth and OS-keyring grants after activation;
+- Google: explicit user-owned Desktop OAuth for Gmail/Calendar and an
+  independent Google Tasks grant; normal-browser OAuth, external client
+  credential handle, and OS-keyring grants; managed OAuth remains dormant;
 - Graph: interactive OAuth browser plus grant in OS keyring;
 - Todoist: public-client OAuth with PKCE and an OS-keyring grant;
 - TickTick: documented confidential-client OAuth, an OS-keyring grant, and a
@@ -153,7 +153,7 @@ The session owner creates all authenticated provider clients:
 No application transport accepts a password. Client-secret values in
 configuration, unattended grants, TLS interception, and raw authorization
 injection are unrepresentable. A generated Google Desktop client credential may
-enter only through the daemon's inherited process environment under ADR 0022;
+enter only through the bounded importer or consented external helper under ADR 0036;
 TickTick can name only a separately consented external credential handle. Both
 secret values are absent from configuration, browser URLs, grants, CLI/MCP
 input, and logs. The daemon

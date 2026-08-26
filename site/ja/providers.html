@@ -6,7 +6,7 @@
     <title>対応メール・カレンダー・タスクサービス — Corresync</title>
     <meta
       name="description"
-      content="Outlook、Microsoft 365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP、CalDAVの対応状況を比較。Gmail、Googleカレンダー、Google Tasksは近日対応です。"
+      content="Outlook、Microsoft 365、Gmail、Googleカレンダー、Google Tasks、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP、CalDAVの対応状況と、自分で用意するOAuth設定を比較。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="Todoist、TickTick、iCloud、CalDAV VTODOなど、現在利用可能なメール・カレンダー・タスクの接続経路と、承認待ちのGoogle対応を確認できます。"
+      content="Todoist、TickTick、iCloud、CalDAV VTODOなどの接続経路と、自分のデスクトップOAuthクライアントで使うGoogle対応を確認できます。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -40,7 +40,7 @@
     >
     <meta
       name="twitter:description"
-      content="Outlook、Todoist、TickTick、iCloud、CalDAV VTODOの対応状況と、承認待ちのGoogle経路を確認できます。"
+      content="Outlook、Todoist、TickTick、iCloud、CalDAV VTODOと、自分のデスクトップOAuthクライアントで使うGoogle経路を比較できます。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -165,8 +165,8 @@
       <section class="evidence-banner" aria-label="対応根拠の状態">
         <span class="status-dot" aria-hidden="true"></span><div>
           <strong>v0.8の根拠は、決定的かつ経路別です。</strong><p>
-            以下の利用可能・準備中の経路には、合成データを使ったプロバイダー契約テストとアプリテストがあります。準備中のGoogle
-            API経路は無効で、実環境では未観測です。
+            以下の経路には、合成データを使ったプロバイダー契約テストとアプリテストがあります。Google
+            API経路は合成契約テスト済みで、実環境では未観測です。
           </p>
         </div><a href="features.html#evidence">根拠の読み方<span aria-hidden="true">
             →</span></a>
@@ -302,19 +302,21 @@
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Googleの経路</p>
           <h2 id="google-title">
-            Gmail、Googleカレンダー、Google Tasksは近日対応です。
+            Gmail、Googleカレンダー、Google
+            Tasksは自分のOAuthクライアントで利用できます。
           </h2>
           <p>
-            各連携のコードはRCに含まれ、合成契約テストでも検証済みです。ただしGoogleの承認までは本番OAuthを無効にしているため、サインイン、スコープ要求、キーチェーン参照、API通信は始まりません。Outlook、Microsoft
-            365、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP、CalDAVは現在利用できます。
+            自分のGoogle
+            CloudプロジェクトにデスクトップOAuthクライアントを作り、JSONをガイド付き設定で読み込みます。
+            Corresync管理版OAuthは休眠状態のまま、自分のクライアントでGoogleの通常ブラウザ認証を開きます。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">GA</span><div>
-                <p class="chip">承認待ち · 無効</p>
-                <h3>Corresync Google経路</h3>
+                <p class="chip">設定後に利用可能 · 自分のOAuth</p>
+                <h3>Google API経路</h3>
               </div>
             </header>
             <dl>
@@ -338,13 +340,14 @@
               <div>
                 <dt>サインイン</dt>
                 <dd>
-                  このRCでは無効。承認後は通常ブラウザOAuthとアカウント別認可情報をOSキーチェーンに保存
+                  自分のデスクトップOAuthクライアント。認証情報とアカウント別の認可はOSキーチェーンに保存
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              承認後も、別のレビュー済みリリースで有効化するまで動きません。有効化後は固定したGoogle
+              通常ブラウザがOAuthを担当し、固定したGoogle
               APIへ端末から直接接続します。
+              <a href="google-oauth.html">Google Cloudの画面と全手順を見る</a>。
             </p>
           </article>
           <article class="route-card">
@@ -536,7 +539,8 @@
         <ul>
           <li>制限は型付き機能または機能低下として返します。</li>
           <li>
-            承認待ちのGoogle経路は、ブラウザ、OAuth、キーチェーン、セッション、ネットワークより前で停止します。
+            自動検出からGoogle
+            OAuthを開始せず、明示的なローカルログインのみがブラウザを開きます。
           </li>
           <li>自動検索からGraphの認可を開始しません。</li>
           <li>

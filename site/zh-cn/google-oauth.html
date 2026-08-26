@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>设置 Gmail 与 Google 日历 OAuth — Corresync</title>
+    <meta
+      name="description"
+      content="使用由你管理的 Google 桌面 OAuth 客户端，将 Gmail、Google 日历、Meet 会议链接和 Google Tasks 接入 Corresync。图解 Cloud Console、API、权限范围、安全导入与登录。"
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="设置 Gmail 与 Google 日历 OAuth — Corresync">
+    <meta
+      property="og:description"
+      content="在你自己的 Google Cloud 项目中，清晰、安全地完成 Google OAuth 设置。"
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:locale:alternate" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/zh-cn/google-oauth.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync，本地优先的邮件与日历 CLI 和 MCP 服务器。"
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="设置 Gmail 与 Google 日历 OAuth — Corresync">
+    <meta
+      name="twitter:description"
+      content="使用你自己管理的桌面 OAuth 客户端连接 Google。"
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync，本地优先的邮件与日历 CLI 和 MCP 服务器。"
+    >
+    <link rel="canonical" href="https://corresync.org/zh-cn/google-oauth.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/google-oauth.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/google-oauth.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/google-oauth.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/google-oauth.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/google-oauth.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/google-oauth.html">
+    <link rel="icon" href="../favicon.ico" sizes="any">
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="../favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="stylesheet" href="../styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a><div class="airmail" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync 首页"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><div class="header-navs">
+        <nav class="site-nav" aria-label="主导航">
+          <a href="./">首页</a><a href="getting-started.html">开始使用</a><a
+            href="providers.html"
+          >服务提供商</a><a href="features.html">功能</a><a href="safety.html">安全</a>
+        </nav>
+        <nav class="language-nav" aria-label="语言">
+          <a href="../google-oauth.html" lang="en" hreflang="en">EN</a><a
+            href="../ja/google-oauth.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a
+            href="google-oauth.html"
+            lang="zh-Hans"
+            hreflang="zh-Hans"
+            aria-current="page"
+          >简中</a><a href="../zh-tw/google-oauth.html" lang="zh-Hant" hreflang="zh-Hant"
+          >繁中</a><a href="../ko/google-oauth.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>你的项目，由你授权</p>
+        <h1 id="page-title">
+          无需等待 Corresync 的 OAuth 审核，<em>现在即可连接 Google。</em>
+        </h1>
+        <p class="lede">
+          在你管理的 Google Cloud 项目中创建“桌面应用”OAuth 客户端。Corresync
+          会验证下载文件，把其中生成的凭据存进操作系统钥匙串；登录、MFA
+          与授权仍在日常使用的 Google 浏览器页面中完成。
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#steps">跟着图示开始设置</a><a
+            class="button secondary"
+            href="providers.html#google"
+          >查看支持状态</a>
+        </div>
+      </section>
+      <section class="evidence-banner" aria-label="Google OAuth 状态">
+        <span class="status-dot" aria-hidden="true"></span><div>
+          <strong>自带 OAuth 已可使用；Corresync 托管 OAuth 暂不启用。</strong><p>
+            适配器已有合成契约测试，但当前版本尚无真实环境观测记录。Google
+            项目的受众、配额、警告和组织政策仍然适用。
+          </p>
+        </div>
+      </section>
+      <section id="steps" aria-labelledby="steps-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>四个浏览器页面</p>
+          <h2 id="steps-title">只配置真正需要的 Google 能力。</h2>
+          <p>
+            下面是带标注的页面示意，不包含任何真实账号数据。即使 Google
+            调整菜单名称，需要选择的对象和安全边界也不会改变。
+          </p>
+        </div>
+        <div class="browser-guide">
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">01 · 项目</p>
+              <h3>创建或选择你拥有的项目</h3>
+              <p>
+                打开 Google Cloud
+                Console，用顶部的项目选择器创建或选中项目。不要复用其他应用的客户端或凭据。
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>console.cloud.google.com</code>
+              </div>
+              <div class="browser-content">
+                <strong>选择项目</strong><div class="browser-choice selected">
+                  My Corresync · 由你管理
+                </div>
+                <div class="browser-action">新建项目</div>
+                <figcaption class="browser-note">
+                  授权页身份和配额归这个项目所有。
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">02 · API</p>
+              <h3>只启用已选择的服务</h3>
+              <p>
+                邮件启用 Gmail API；日历与 Meet 会议链接启用 Google Calendar
+                API；只有选择任务时才启用 Google Tasks API。
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar"><i></i><i></i><i></i><code>API 和服务 / 库</code></div>
+              <div class="browser-content">
+                <strong>API 库</strong><div class="browser-choice selected">
+                  Gmail API · Calendar API
+                </div>
+                <div class="browser-choice">Tasks API · 仅在需要时</div>
+                <figcaption class="browser-note">
+                  无需 Chat、Drive、联系人或管理 API。
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">03 · 受众</p>
+              <h3>如实选择受众和权限范围</h3>
+              <p>
+                只有同一个符合条件的 Workspace 组织内部使用时才选
+                Internal，其他情况选 External。处于 Testing
+                时，把要连接的账号加入测试用户；测试授权会在七天后失效。
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>Google Auth Platform / Audience</code>
+              </div>
+              <div class="browser-content">
+                <strong>受众</strong><div class="browser-choice selected">
+                  External · 个人账号等
+                </div>
+                <div class="browser-choice">Internal · 仅限符合条件的组织</div>
+                <figcaption class="browser-note">
+                  Data Access：Gmail 修改；日历列表读取＋事件；选择一个 Tasks
+                  范围。
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">04 · 客户端</p>
+              <h3>创建桌面应用并下载 JSON</h3>
+              <p>
+                在 Clients 中选择“桌面应用”，不要选择 Web 应用、服务账号或
+                API 密钥。下载后请把 JSON 当作私密文件保存。
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>Google Auth Platform / Clients</code>
+              </div>
+              <div class="browser-content">
+                <strong>创建 OAuth 客户端</strong><div class="browser-choice selected">
+                  应用类型 · 桌面应用
+                </div>
+                <div class="browser-action">下载 JSON</div>
+                <figcaption class="browser-note">
+                  每次授权使用 127.0.0.1 上新分配的本地端口。
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+        </div>
+      </section>
+      <section aria-labelledby="connect-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>安全的本地交接</p>
+          <h2 id="connect-title">让引导式设置处理容易出错的细节。</h2>
+          <p>
+            运行 <code>corr setup</code>，选择 Google
+            和所需服务，再选择“导入已下载的客户端 JSON”。核对客户端
+            ID、回环
+            URI、权限范围以及相互分离的钥匙串句柄。添加账号本身不会登录。
+          </p>
+        </div>
+        <pre class="oauth-command" tabindex="0"><code>$ corr setup
+$ corr auth login --account personal
+$ corr doctor --account personal</code></pre>
+        <p class="fine-print">
+          脚本化时，先运行 <code>corr auth google-client import FILE --key
+            HANDLE</code>。不要把生成的凭据粘贴到 TOML、命令参数、MCP、Issue
+          或支持信息中。Corresync 不会擅自删除你提供的下载文件。
+        </p>
+      </section>
+      <section class="honest-edges" aria-labelledby="choices-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>更改发布状态前</p>
+          <h2 id="choices-title">个人使用可能无需审核，但仍有约束。</h2>
+          <p class="fine-print">
+            Google 目前把少于 100
+            名用户的个人用途和符合条件的内部用途列为不强制验证的情形。未验证应用警告、人数上限、受限权限范围政策、组织控制和最新条款仍会适用。
+          </p>
+        </div>
+        <ul>
+          <li>Testing 只允许已登记的测试用户，授权七天后失效。</li>
+          <li>
+            Workspace 管理员可以阻止或要求审核准确的客户端 ID 与权限范围。
+          </li>
+          <li>不要用服务账号、全域委派或削弱安全设置来绕过政策。</li>
+          <li>MCP 可使用已认证会话，但不能启动 Google OAuth。</li>
+        </ul>
+      </section>
+      <section class="final-cta" aria-labelledby="oauth-cta">
+        <p class="eyebrow"><span aria-hidden="true"></span>准备好以后</p>
+        <h2 id="oauth-cta">创建客户端，其余都留在本机。</h2>
+        <p>
+          Google 登录仍由 Google
+          浏览器页面负责；邮件、日历、任务和凭据不会经过 Corresync
+          服务器。
+        </p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">安装 Corresync</a><a
+            class="button secondary"
+            href="https://github.com/nkiyohara/corresync/blob/main/docs/google-oauth-setup.md"
+          >打开技术指南</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="../corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        独立的本地优先工具，与 Google 不存在隶属或背书关系。
+      </p>
+      <nav aria-label="页脚">
+        <a href="getting-started.html">开始使用</a><a href="providers.html"
+        >服务提供商</a><a href="features.html">功能</a><a href="safety.html">安全</a><a
+          href="privacy.html"
+        >隐私</a><a href="terms.html">使用条款</a><a
+          href="https://github.com/nkiyohara/corresync"
+        >GitHub 源码</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >安全报告</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >版本发布</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

@@ -80,10 +80,11 @@ offer recovery, not permission to authenticate automatically.
   never authenticates; the review requires a later explicit local CLI login.
   Removal may delete an unshared Corresync-owned OAuth grant, so present that
   disclosed effect before asking for approval.
-- Check route capabilities before proposing an operation. Gmail and Google
-  Calendar are disabled while production OAuth approval is pending; do not
-  offer Google sign-in or tools as currently available. Provider-specific
-  degradations can make other operations unavailable.
+- Check route capabilities before proposing an operation. Gmail, Google
+  Calendar, and Google Tasks require a user-owned Desktop OAuth client prepared
+  through the local CLI. MCP cannot import that client or begin Google sign-in;
+  it may use only an already authenticated route. Provider-specific
+  degradations can make operations unavailable.
 - Monitoring setup, runner/egress consent, queue purge, authentication, import
   reads, updates, and feedback actions are CLI-only. Do not simulate them with
   other tools.

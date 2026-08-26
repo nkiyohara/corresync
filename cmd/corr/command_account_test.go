@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,7 +14,6 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/microsoftcloud"
 	"github.com/nkiyohara/corresync/internal/paths"
-	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type accountDiscovererStub struct {
@@ -58,7 +56,7 @@ func newAccountCommandRuntime(
 	return app, path, &stdout
 }
 
-func TestSetupCreatesProviderNeutralConfigThenDirectsGoogleToOfficialMCP(
+func TestSetupCreatesProviderNeutralConfigThenRequiresExplicitGoogleSelection(
 	t *testing.T,
 ) {
 	discoverer := &accountDiscovererStub{
@@ -95,15 +93,9 @@ func TestSetupCreatesProviderNeutralConfigThenDirectsGoogleToOfficialMCP(
 		t.Fatal("setup automatically selected a Google route")
 	}
 	for _, expected := range []string{
-		"Gmail was found",
-		"awaiting approval",
-		"includes the Google integration but keeps it disabled",
-		"no Google sign-in was started",
-		"coming soon after approval",
-		"Outlook Web is available now",
-		"Google's official Workspace MCP servers",
-		"Developer Preview",
-		googleWorkspaceMCPGuide,
+		"no automatically selectable provider",
+		"--provider",
+		"explicit endpoint",
 	} {
 		if !strings.Contains(err.Error(), expected) {
 			t.Fatalf("setup error missing %q: %v", expected, err)
@@ -542,7 +534,7 @@ func TestCandidateHTTPSEndpointRejectsUnsafeOrMalformedValues(t *testing.T) {
 	}
 }
 
-func TestAccountAddRejectsExplicitGoogleWhileOAuthApprovalIsPending(t *testing.T) {
+func TestAccountAddPersistsExplicitBYOGoogleWithoutAuthorizing(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{{
@@ -559,25 +551,64 @@ func TestAccountAddRejectsExplicitGoogleWhileOAuthApprovalIsPending(t *testing.T
 	app, path, stdout := newAccountCommandRuntime(t, discoverer)
 	command := accountAddCommand{
 		Address: "reader@gmail.com", Alias: "google",
-		Provider:         string(domain.ProviderGoogle),
-		OAuthClientID:    "synthetic-public-client.apps.googleusercontent.com",
-		OAuthRedirectURI: "http://127.0.0.1:53682/oauth/callback",
-		AuthorizationKey: "google-reader",
-		ApproveOAuth:     true,
+		Provider:                 string(domain.ProviderGoogle),
+		OAuthClientID:            "synthetic-public-client.apps.googleusercontent.com",
+		OAuthRedirectURI:         "http://127.0.0.1:53682/oauth/callback",
+		AuthorizationKey:         "google-reader",
+		ApproveOAuth:             true,
+		OAuthClientSecretKey:     "google-reader-client",
+		ApproveOAuthClientSecret: true,
 	}
-	err := command.Run(app)
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
-		t.Fatalf("account add error = %v", err)
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
 	}
 	configuration, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, exists := configuration.Accounts["google"]; exists {
-		t.Fatalf("pending Google route was persisted: %#v", configuration)
+	account, exists := configuration.Accounts["google"]
+	if !exists || account.Mail == nil || account.Mail.Google == nil ||
+		account.Mail.Google.ClientSecret.Key != "google-reader-client" ||
+		account.Calendar == nil || account.Calendar.Google == nil ||
+		account.Calendar.Google.ClientSecret.Key != "google-reader-client" {
+		t.Fatalf("BYO Google route = %#v", configuration)
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("pending Google output = %q", stdout.String())
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("BYO Google output = %q", stdout.String())
+	}
+}
+
+func TestAccountAddRequiresSeparateConsentForDistinctGoogleCalendarClient(t *testing.T) {
+	discoverer := &accountDiscovererStub{observation: application.AccountDiscoveryObservation{
+		Candidates: []application.ProviderCandidate{{
+			Provider: domain.ProviderGoogle, Confidence: 98,
+			Authentication:            application.DiscoveryExplicitOAuth,
+			RequiresExplicitSelection: true,
+			Evidence: []application.DiscoveryEvidence{{
+				Source: "test", Detail: "synthetic",
+			}},
+		}},
+	}}
+	app, _, _ := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@gmail.com", Alias: "google",
+		Provider:      string(domain.ProviderGoogle),
+		OAuthClientID: "mail-client", OAuthRedirectURI: "http://127.0.0.1:0",
+		AuthorizationKey: "mail-grant", ApproveOAuth: true,
+		OAuthClientSecretKey: "mail-client-credential", ApproveOAuthClientSecret: true,
+		CalendarProvider:             string(domain.ProviderGoogle),
+		CalendarOAuthClientID:        "calendar-client",
+		CalendarAuthorizationKey:     "calendar-grant",
+		CalendarOAuthClientSecretKey: "calendar-client-credential",
+	}
+	if err := command.Run(app); err == nil ||
+		!strings.Contains(err.Error(), "explicit OAuth approval") {
+		t.Fatalf("missing distinct calendar OAuth consent error = %v", err)
+	}
+	command.ApproveCalendarOAuth = true
+	if err := command.Run(app); err == nil ||
+		!strings.Contains(err.Error(), "client-credential approval") {
+		t.Fatalf("missing distinct calendar client consent error = %v", err)
 	}
 }
 
@@ -754,20 +785,21 @@ func TestAccountAddRejectsTickTickWithoutExternalClientSecretConsent(t *testing.
 	}
 }
 
-func TestAccountAddRejectsGoogleTasksWhileApprovalIsPending(t *testing.T) {
+func TestAccountAddPersistsBYOGoogleTasksWithoutAuthorizing(t *testing.T) {
 	discoverer := &accountDiscovererStub{}
 	app, path, stdout := newAccountCommandRuntime(t, discoverer)
 	command := accountAddCommand{
 		Address: "reader@example.test", Alias: "tasks",
-		TaskProvider:         string(domain.ProviderGoogleTasks),
-		TaskOAuthClientID:    "synthetic.apps.googleusercontent.com",
-		TaskOAuthRedirectURI: "http://127.0.0.1:53684/oauth/callback",
-		TaskAuthorizationKey: "google-tasks",
-		ApproveTaskOAuth:     true,
+		TaskProvider:           string(domain.ProviderGoogleTasks),
+		TaskOAuthClientID:      "synthetic.apps.googleusercontent.com",
+		TaskOAuthRedirectURI:   "http://127.0.0.1:53684/oauth/callback",
+		TaskAuthorizationKey:   "google-tasks",
+		ApproveTaskOAuth:       true,
+		TaskOAuthSecretKey:     "google-tasks-client", // #nosec G101 -- synthetic lookup handle, not a credential.
+		ApproveTaskOAuthSecret: true,
 	}
-	err := command.Run(app)
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
-		t.Fatalf("account add error = %v", err)
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
 	}
 	if discoverer.address != "" {
 		t.Fatalf("pending Google Tasks route started discovery for %q", discoverer.address)
@@ -776,15 +808,65 @@ func TestAccountAddRejectsGoogleTasksWhileApprovalIsPending(t *testing.T) {
 	if loadErr != nil {
 		t.Fatal(loadErr)
 	}
-	if _, exists := configuration.Accounts["tasks"]; exists || stdout.Len() != 0 {
-		t.Fatalf("pending Google Tasks route changed state: %#v, %q", configuration, stdout.String())
+	account, exists := configuration.Accounts["tasks"]
+	if !exists || account.Tasks == nil || account.Tasks.GoogleTasks == nil ||
+		account.Tasks.GoogleTasks.OAuth.ClientSecret.Key != "google-tasks-client" {
+		t.Fatalf("BYO Google Tasks route = %#v", configuration)
 	}
-	for _, expected := range []string{
-		"Google Tasks was selected", "awaiting approval", "no Google sign-in was started",
-	} {
-		if !strings.Contains(err.Error(), expected) {
-			t.Fatalf("pending Google Tasks error missing %q: %v", expected, err)
-		}
+	if discoverer.address != "" {
+		t.Fatalf("task-only Google route started discovery for %q", discoverer.address)
+	}
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("BYO Google Tasks output = %q", stdout.String())
+	}
+}
+
+func TestAccountAddRejectsDistinctGoogleTaskClientCredentialWithoutTaskConsent(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, _, _ := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.test", Alias: "tasks",
+		TaskProvider:             string(domain.ProviderGoogleTasks),
+		TaskOAuthClientID:        "synthetic.apps.googleusercontent.com",
+		TaskOAuthRedirectURI:     "http://127.0.0.1:53684/oauth/callback",
+		TaskAuthorizationKey:     "google-tasks",
+		ApproveTaskOAuth:         true,
+		OAuthClientSecretKey:     "shared-google-client", // #nosec G101 -- synthetic lookup handle.
+		ApproveOAuthClientSecret: true,
+		TaskOAuthSecretKey:       "distinct-google-client", // #nosec G101 -- synthetic lookup handle.
+		ApproveTaskOAuthSecret:   false,
+	}
+	err := command.Run(app)
+	if err == nil || !strings.Contains(err.Error(), "--approve-task-oauth-secret") {
+		t.Fatalf("distinct task client-credential error = %v", err)
+	}
+}
+
+func TestAccountAddAllowsGoogleTasksToShareExplicitlyApprovedClientCredential(t *testing.T) {
+	discoverer := &accountDiscovererStub{}
+	app, path, _ := newAccountCommandRuntime(t, discoverer)
+	command := accountAddCommand{
+		Address: "reader@example.test", Alias: "tasks",
+		TaskProvider:             string(domain.ProviderGoogleTasks),
+		TaskOAuthClientID:        "synthetic.apps.googleusercontent.com",
+		TaskOAuthRedirectURI:     "http://127.0.0.1:53684/oauth/callback",
+		TaskAuthorizationKey:     "google-tasks",
+		ApproveTaskOAuth:         true,
+		OAuthClientSecretBackend: "helper",
+		OAuthClientSecretKey:     "shared-google-client", // #nosec G101 -- synthetic lookup handle.
+		ApproveOAuthClientSecret: true,
+	}
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configuration, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference := configuration.Accounts["tasks"].Tasks.GoogleTasks.OAuth.ClientSecret
+	if reference.Backend != config.CredentialHelper ||
+		reference.Key != "shared-google-client" || !reference.Consent {
+		t.Fatalf("shared task client credential = %+v", reference)
 	}
 }
 
@@ -908,7 +990,7 @@ func TestAccountAddRejectsMicrosoftTodoInChinaCloud(t *testing.T) {
 	}
 }
 
-func TestAccountAddRejectsCalendarOnlyGoogleWhileApprovalIsPending(t *testing.T) {
+func TestAccountAddPersistsCalendarOnlyBYOGoogleWithoutAuthorizing(t *testing.T) {
 	discoverer := &accountDiscovererStub{
 		observation: application.AccountDiscoveryObservation{
 			Candidates: []application.ProviderCandidate{{
@@ -926,26 +1008,29 @@ func TestAccountAddRejectsCalendarOnlyGoogleWhileApprovalIsPending(t *testing.T)
 	app, path, stdout := newAccountCommandRuntime(t, discoverer)
 	command := accountAddCommand{
 		Address: "calendar@example.test", Alias: "calendar-only",
-		MailProvider:             "none",
-		CalendarProvider:         string(domain.ProviderGoogle),
-		CalendarOAuthClientID:    "synthetic-calendar-client",
-		CalendarOAuthRedirectURI: "http://127.0.0.1:0/oauth/callback",
-		CalendarAuthorizationKey: "calendar-only-google",
-		ApproveCalendarOAuth:     true,
+		MailProvider:                     "none",
+		CalendarProvider:                 string(domain.ProviderGoogle),
+		CalendarOAuthClientID:            "synthetic-calendar-client",
+		CalendarOAuthRedirectURI:         "http://127.0.0.1:0/oauth/callback",
+		CalendarAuthorizationKey:         "calendar-only-google",
+		ApproveCalendarOAuth:             true,
+		CalendarOAuthClientSecretKey:     "calendar-only-google-client",
+		ApproveCalendarOAuthClientSecret: true,
 	}
-	err := command.Run(app)
-	if !errors.Is(err, rollout.ErrGoogleOAuthPending) {
-		t.Fatalf("account add error = %v", err)
+	if err := command.Run(app); err != nil {
+		t.Fatal(err)
 	}
 	configuration, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, exists := configuration.Accounts["calendar-only"]; exists {
-		t.Fatalf("pending Google route was persisted: %#v", configuration)
+	account, exists := configuration.Accounts["calendar-only"]
+	if !exists || account.Calendar == nil || account.Calendar.Google == nil ||
+		account.Calendar.Google.ClientSecret.Key != "calendar-only-google-client" {
+		t.Fatalf("calendar-only Google route = %#v", configuration)
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("pending Google output = %q", stdout.String())
+	if !strings.Contains(stdout.String(), "authentication has not started") {
+		t.Fatalf("calendar-only Google output = %q", stdout.String())
 	}
 }
 

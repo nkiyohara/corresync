@@ -6,8 +6,62 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/zalando/go-keyring"
+
 	"github.com/nkiyohara/corresync/internal/config"
 )
+
+func TestStoreOSKeyringRequiresExplicitReplacement(t *testing.T) {
+	t.Parallel()
+	setCalls := 0
+	set := func(service, key, value string) error {
+		setCalls++
+		if service != keyringService || key != "google-client" || value != "synthetic-value" {
+			t.Fatalf("keyring set = %q %q %q", service, key, value)
+		}
+		return nil
+	}
+	missing := func(service, key string) (string, error) {
+		if service != keyringService || key != "google-client" {
+			t.Fatalf("keyring get = %q %q", service, key)
+		}
+		return "", keyring.ErrNotFound
+	}
+	if err := storeOSKeyring(
+		"google-client", []byte("synthetic-value"), false, missing, set,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if setCalls != 1 {
+		t.Fatalf("create set calls = %d", setCalls)
+	}
+
+	existing := func(string, string) (string, error) {
+		return "existing-value", nil
+	}
+	err := storeOSKeyring(
+		"google-client", []byte("synthetic-value"), false, existing, set,
+	)
+	if err == nil || !strings.Contains(err.Error(), "--replace") {
+		t.Fatalf("existing handle error = %v", err)
+	}
+	if setCalls != 1 {
+		t.Fatalf("existing handle set calls = %d", setCalls)
+	}
+
+	unexpectedGet := func(string, string) (string, error) {
+		t.Fatal("explicit replacement inspected the old credential")
+		return "", nil
+	}
+	if err := storeOSKeyring(
+		"google-client", []byte("synthetic-value"), true, unexpectedGet, set,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if setCalls != 2 {
+		t.Fatalf("replacement set calls = %d", setCalls)
+	}
+}
 
 func TestResolverReadsExternalBackendsAndZerosOwnedBytes(t *testing.T) {
 	t.Parallel()

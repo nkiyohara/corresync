@@ -59,6 +59,7 @@ func (secret *Secret) Close() error {
 }
 
 type keyringGetter func(service, key string) (string, error)
+type keyringSetter func(service, key, value string) error
 type helperRunner func(context.Context, []string, []byte) ([]byte, error)
 
 // Options supports deterministic adapters and synthetic tests.
@@ -73,6 +74,46 @@ type Resolver struct {
 	helper  []string
 	keyring keyringGetter
 	run     helperRunner
+}
+
+// StoreOSKeyring creates one explicitly supplied external credential in the
+// OS-owned store. It refuses to replace an existing handle. The value is never
+// returned, logged, or written to config.
+func StoreOSKeyring(key string, value []byte) error {
+	return storeOSKeyring(key, value, false, keyring.Get, keyring.Set)
+}
+
+// ReplaceOSKeyring explicitly replaces one external credential in the
+// OS-owned store. Callers must expose that destructive choice to the human.
+func ReplaceOSKeyring(key string, value []byte) error {
+	return storeOSKeyring(key, value, true, keyring.Get, keyring.Set)
+}
+
+func storeOSKeyring(
+	key string,
+	value []byte,
+	replace bool,
+	get keyringGetter,
+	set keyringSetter,
+) error {
+	if key == "" || len(key) > 256 || strings.ContainsAny(key, "\r\n\x00") {
+		return errors.New("credential key is malformed")
+	}
+	if len(value) == 0 || len(value) > maximumSecretBytes ||
+		bytes.ContainsAny(value, "\r\n\x00") {
+		return errors.New("external credential is empty or malformed")
+	}
+	if !replace {
+		if _, err := get(keyringService, key); err == nil {
+			return errors.New("credential handle already exists; choose another handle or pass --replace")
+		} else if !errors.Is(err, keyring.ErrNotFound) {
+			return fmt.Errorf("inspect OS keyring credential: %w", err)
+		}
+	}
+	if err := set(keyringService, key, string(value)); err != nil {
+		return fmt.Errorf("write OS keyring credential: %w", err)
+	}
+	return nil
 }
 
 // New constructs a resolver without reading a credential.

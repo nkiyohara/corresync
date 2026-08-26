@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/nkiyohara/corresync/internal/browser"
-	"github.com/nkiyohara/corresync/internal/rollout"
 )
 
 type loginCommand struct {
@@ -27,9 +26,6 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 		return err
 	}
 	accountID := configured.ID
-	if hasGoogleRoute(configured) && !rollout.GoogleOAuthApproved {
-		return rollout.ErrGoogleOAuthPending
-	}
 	if !command.Terminal && hasOutlookRoute(configured) {
 		if err := browser.RequireGraphicalSession(); err != nil {
 			return fmt.Errorf(

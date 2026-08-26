@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Set up Gmail and Google Calendar OAuth — Corresync</title>
+    <meta
+      name="description"
+      content="Connect Gmail, Google Calendar, Google Meet links, and Google Tasks to Corresync with your own Google Desktop OAuth client. Illustrated setup for Cloud Console, API scopes, secure import, and sign-in."
+    >
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
+    <meta property="og:title" content="Set up Gmail and Google Calendar OAuth — Corresync">
+    <meta
+      property="og:description"
+      content="A clear, illustrated guide to connecting Google with a Desktop OAuth client you control."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="en_GB">
+    <meta property="og:locale:alternate" content="ja_JP">
+    <meta property="og:locale:alternate" content="zh_CN">
+    <meta property="og:locale:alternate" content="zh_TW">
+    <meta property="og:locale:alternate" content="ko_KR">
+    <meta property="og:url" content="https://corresync.org/google-oauth.html">
+    <meta property="og:image" content="https://corresync.org/social-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta
+      property="og:image:alt"
+      content="Corresync, a local-first mail and calendar CLI and MCP server."
+    >
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Set up Gmail and Google Calendar OAuth — Corresync">
+    <meta
+      name="twitter:description"
+      content="Connect Google with a Desktop OAuth client you control."
+    >
+    <meta name="twitter:image" content="https://corresync.org/social-card.png">
+    <meta
+      name="twitter:image:alt"
+      content="Corresync, a local-first mail and calendar CLI and MCP server."
+    >
+    <link rel="canonical" href="https://corresync.org/google-oauth.html">
+    <link rel="alternate" hreflang="en" href="https://corresync.org/google-oauth.html">
+    <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/google-oauth.html">
+    <link rel="alternate" hreflang="zh-Hans" href="https://corresync.org/zh-cn/google-oauth.html">
+    <link rel="alternate" hreflang="zh-Hant" href="https://corresync.org/zh-tw/google-oauth.html">
+    <link rel="alternate" hreflang="ko" href="https://corresync.org/ko/google-oauth.html">
+    <link rel="alternate" hreflang="x-default" href="https://corresync.org/google-oauth.html">
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon-32x32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+    <link rel="manifest" href="site.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a><div class="airmail" aria-hidden="true">
+    </div>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Corresync home"><img
+          class="brand-mark"
+          src="corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a>
+      <div class="header-navs">
+        <nav class="site-nav" aria-label="Primary">
+          <a href="./">Home</a><a href="getting-started.html">Getting started</a><a
+            href="providers.html"
+          >Providers</a><a href="features.html">Features</a><a href="safety.html">Safety</a>
+        </nav>
+        <nav class="language-nav" aria-label="Language">
+          <a href="google-oauth.html" lang="en" hreflang="en" aria-current="page">EN</a><a
+            href="ja/google-oauth.html"
+            lang="ja"
+            hreflang="ja"
+          >日本語</a><a href="zh-cn/google-oauth.html" lang="zh-Hans" hreflang="zh-Hans"
+          >简中</a><a href="zh-tw/google-oauth.html" lang="zh-Hant" hreflang="zh-Hant"
+          >繁中</a><a href="ko/google-oauth.html" lang="ko" hreflang="ko">한국어</a>
+        </nav>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero" aria-labelledby="page-title">
+        <p class="eyebrow"><span aria-hidden="true"></span>Your project, your consent</p>
+        <h1 id="page-title">
+          Connect Google without waiting for <em>Corresync’s OAuth review.</em>
+        </h1>
+        <p class="lede">
+          Create a Desktop OAuth client in a Google Cloud project you control. Corresync validates
+          the downloaded file, stores its generated credential in your OS keyring, and leaves
+          sign-in to Google in your normal browser.
+        </p>
+        <div class="actions">
+          <a class="button primary" href="#steps">Start the illustrated setup</a><a
+            class="button secondary"
+            href="providers.html#google"
+          >Compare providers</a>
+        </div>
+      </section>
+      <section class="evidence-banner" aria-label="Google OAuth status">
+        <span class="status-dot" aria-hidden="true"></span><div>
+          <strong>User-owned OAuth is available; Corresync-managed OAuth is dormant.</strong><p>
+            The adapters have synthetic contract coverage and remain live-unobserved. Your Google
+            project, audience, quota, warnings, and organization policy still apply.
+          </p>
+        </div>
+      </section>
+      <section id="steps" aria-labelledby="steps-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Four browser screens</p>
+          <h2 id="steps-title">Set up the smallest Google project that fits.</h2>
+          <p>
+            These are annotated maps, not screenshots of an account. Google may rename a menu; the
+            destination and security boundary stay the same.
+          </p>
+        </div>
+        <div class="browser-guide">
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">01 · Project</p>
+              <h3>Create or select a project you own</h3>
+              <p>
+                Open Google Cloud Console and use the project picker. Do not borrow another
+                application’s client or secrets.
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>console.cloud.google.com</code>
+              </div>
+              <div class="browser-content">
+                <strong>Select a project</strong><div class="browser-choice selected">
+                  My Corresync · project you control
+                </div>
+                <div class="browser-action">NEW PROJECT</div>
+                <figcaption class="browser-note">
+                  The project owns the consent identity and quota.
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">02 · APIs</p>
+              <h3>Enable only what you selected</h3>
+              <p>
+                Enable Gmail API for mail, Google Calendar API for Calendar and Meet event links,
+                and Google Tasks API only for Tasks.
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>APIs &amp; Services / Library</code>
+              </div>
+              <div class="browser-content">
+                <strong>API Library</strong><div class="browser-choice selected">
+                  Gmail API · Calendar API
+                </div>
+                <div class="browser-choice">Tasks API · only if selected</div>
+                <figcaption class="browser-note">
+                  No Chat, Drive, Contacts, or admin API is needed.
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">03 · Audience</p>
+              <h3>Choose the honest audience and scopes</h3>
+              <p>
+                Use Internal only for an eligible single Workspace organization; otherwise External.
+                In Testing, add your account as a test user. Testing authorizations expire after
+                seven days.
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>Google Auth Platform / Audience</code>
+              </div>
+              <div class="browser-content">
+                <strong>Audience</strong><div class="browser-choice selected">
+                  External · personal and other accounts
+                </div>
+                <div class="browser-choice">Internal · eligible organization only</div>
+                <figcaption class="browser-note">
+                  Data Access: Gmail modify; Calendar list read + events; one Tasks scope.
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+          <article class="browser-step">
+            <div class="browser-step-copy">
+              <p class="chip">04 · Client</p>
+              <h3>Create a Desktop app and download JSON</h3>
+              <p>
+                Under Clients, choose Desktop app—not Web application, service account, or API
+                key. Download the JSON and keep it private.
+              </p>
+            </div>
+            <figure class="browser-shot">
+              <div class="browser-bar">
+                <i></i><i></i><i></i><code>Google Auth Platform / Clients</code>
+              </div>
+              <div class="browser-content">
+                <strong>Create OAuth client</strong><div class="browser-choice selected">
+                  Application type · Desktop app
+                </div>
+                <div class="browser-action">DOWNLOAD JSON</div>
+                <figcaption class="browser-note">
+                  Corresync uses 127.0.0.1 with a fresh random local port.
+                </figcaption>
+              </div>
+            </figure>
+          </article>
+        </div>
+      </section>
+      <section aria-labelledby="connect-title">
+        <div class="section-heading">
+          <p class="eyebrow"><span aria-hidden="true"></span>Secure local handoff</p>
+          <h2 id="connect-title">Let guided setup do the careful part.</h2>
+          <p>
+            Run <code>corr setup</code>, select Google and the services you want, then choose
+            “Import downloaded client JSON”. Review the client ID, loopback URI, scopes, and
+            separate keyring handles. Account setup does not sign in.
+          </p>
+        </div>
+        <pre class="oauth-command" tabindex="0"><code>$ corr setup
+$ corr auth login --account personal
+$ corr doctor --account personal</code></pre>
+        <p class="fine-print">
+          For scripts, use <code>corr auth google-client import FILE --key HANDLE</code> first.
+          Never paste the generated credential into TOML, a shell argument, MCP, an issue, or
+          support output. Corresync deliberately does not delete your downloaded file.
+        </p>
+      </section>
+      <section class="honest-edges" aria-labelledby="choices-title">
+        <div>
+          <p class="eyebrow"><span aria-hidden="true"></span>Before you publish</p>
+          <h2 id="choices-title">
+            Personal use may not require verification—but limits still matter.
+          </h2>
+          <p class="fine-print">
+            Google currently lists personal use under 100 users and qualifying internal use among
+            cases where verification is not mandatory. Unverified warnings, user caps,
+            restricted-scope policy, organization controls, and Google’s current terms still
+            apply. Check Google’s official rules before changing from Testing to production.
+          </p>
+        </div>
+        <ul>
+          <li>
+            Testing accepts only listed test users and authorizations expire after seven days.
+          </li>
+          <li>
+            A Workspace administrator can block or require review of the exact client ID and scopes.
+          </li>
+          <li>
+            Do not use service accounts, domain-wide delegation, or weaker controls as a workaround.
+          </li>
+          <li>MCP can use an authenticated session but cannot initiate Google OAuth.</li>
+        </ul>
+      </section>
+      <section class="final-cta" aria-labelledby="oauth-cta">
+        <p class="eyebrow"><span aria-hidden="true"></span>Ready when you are</p>
+        <h2 id="oauth-cta">Create the client, then keep everything local.</h2>
+        <p>
+          Google sign-in remains in Google’s browser; mail, calendar, tasks, and credentials do
+          not pass through a Corresync server.
+        </p>
+        <div class="actions centered">
+          <a class="button primary" href="getting-started.html">Install Corresync</a><a
+            class="button secondary"
+            href="https://github.com/nkiyohara/corresync/blob/main/docs/google-oauth-setup.md"
+          >Open the technical guide</a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="./"><img
+          class="brand-mark"
+          src="corresync-mark.svg"
+          alt=""
+          width="64"
+          height="64"
+        ><span class="brand-name">corresync</span></a><p>
+        Independent local-first tooling. Not affiliated with or endorsed by Google.
+      </p>
+      <nav aria-label="Footer">
+        <a href="getting-started.html">Getting started</a><a href="providers.html">Providers</a><a
+          href="features.html"
+        >Features</a><a href="safety.html">Safety</a><a href="privacy.html">Privacy</a><a
+          href="terms.html"
+        >Terms</a><a href="https://github.com/nkiyohara/corresync">GitHub source</a><a
+          href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >Security</a><a href="https://github.com/nkiyohara/corresync/releases">Releases</a><a
+          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >Apache-2.0</a>
+      </nav>
+    </footer>
+  </body>
+</html>

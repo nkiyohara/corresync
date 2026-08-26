@@ -249,9 +249,9 @@ scoop install corresync/corresync</code></pre>
                 Corresync。
               </p>
               <p>
-                <strong>使用 Google？</strong>Gmail、Calendar 和 Tasks API 代码已在 RC
-                中，但生产环境 OAuth 等待审批，因此路径完全关闭，Google
-                登录无法启动。暂时请使用 Google 官方 Workspace MCP。
+                <strong>使用 Google？</strong>在你自己管理的 Google Cloud
+                项目中创建桌面 OAuth 客户端。 引导设置会验证下载的
+                JSON，并在明确的浏览器登录前将凭据导入系统钥匙串。
               </p>
               <p class="step-links">
                 <a href="providers.html#check">不发送完整地址即可检查</a> · <a
@@ -294,11 +294,10 @@ corr doctor --account personal</code></pre>
                 </p>
               </div>
               <div class="install-block">
-                <p class="os-label">Google · 审批前的临时方式</p>
+                <p class="os-label">Gmail · Google 日历 · Google Tasks</p>
                 <p class="block-note">
-                  参阅 Google 官方<a
-                    href="https://developers.google.com/workspace/guides/configure-mcp-servers"
-                  >Workspace MCP 设置指南</a>。该服务目前是 Developer Preview。
+                  请参阅<a href="google-oauth.html">Google OAuth 图解指南</a>，
+                  只选需要的 API，并让客户端凭据与账号授权留在本机钥匙串。
                 </p>
               </div>
             </div>

@@ -1,6 +1,6 @@
 // Package googleapi adapts explicitly authorized Gmail and Google Calendar
-// APIs to Corresync's closed application ports. Production Google OAuth stays
-// release-gated until the configured scopes are approved.
+// APIs to Corresync's closed application ports. The route uses a user-owned
+// Desktop OAuth client; Corresync-managed Google OAuth remains disabled.
 package googleapi
 
 import (

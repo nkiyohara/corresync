@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { readFile } = require("node:fs/promises");
+const { readFile, readdir } = require("node:fs/promises");
 const test = require("node:test");
 
 const {
@@ -108,47 +108,106 @@ test("the checker includes copy for every published language", async () => {
   }
 });
 
-test("checker messages are localized and keep Google approval-gated", () => {
+test("checker messages localize the user-owned Google OAuth route", () => {
   const expectations = new Map([
-    ["en", ["Checking the domain’s public provider records…", "Gmail and Google Calendar are coming soon."]],
-    ["ja", ["ドメインの公開情報からプロバイダーを確認しています…", "GmailとGoogleカレンダーは近日対応です。"]],
-    ["zh-Hans", ["正在通过域名的公共记录确认服务提供商…", "Gmail 和 Google 日历即将支持。"]],
-    ["zh-Hant", ["正在從網域的公開記錄確認服務供應商…", "Gmail 和 Google 行事曆即將支援。"]],
-    ["ko", ["도메인의 공개 레코드에서 서비스 제공자를 확인하고 있습니다…", "Gmail과 Google 캘린더는 곧 지원됩니다."]],
+    ["en", ["Checking the domain’s public provider records…", /Desktop OAuth client/]],
+    ["ja", ["ドメインの公開情報からプロバイダーを確認しています…", /デスクトップOAuthクライアント/]],
+    ["zh-Hans", ["正在通过域名的公共记录确认服务提供商…", /桌面 OAuth 客户端/]],
+    ["zh-Hant", ["正在從網域的公開記錄確認服務供應商…", /桌面 OAuth 用戶端/]],
+    ["ko", ["도메인의 공개 레코드에서 서비스 제공자를 확인하고 있습니다…", /데스크톱 OAuth 클라이언트/]],
   ]);
-  for (const [language, [checking, googleTitle]] of expectations) {
+  for (const [language, [checking, googleSignIn]] of expectations) {
     const messages = messagesForLanguage(language);
     assert.equal(messages.checking, checking, language);
-    assert.equal(messages.statusCopy.not_available.title, googleTitle, language);
-    assert.match(messages.statusCopy.not_available.body, /OAuth/, language);
+    assert.match(messages.signInNames.user_owned_oauth, googleSignIn, language);
   }
   assert.equal(messagesForLanguage("constructor"), messagesForLanguage("en"));
 });
 
-test("every localized page keeps the Google route approval-gated", async () => {
+test("every localized page explains the user-owned Google OAuth route", async () => {
   const locales = new Map([
-    ["ja", /承認|無効|開始できません/],
-    ["zh-cn", /审批|关闭|无法启动/],
-    ["zh-tw", /審核|關閉|無法啟動/],
-    ["ko", /승인|꺼져|시작되지|비활성/],
+    ["ja", /自分|デスクトップ|クライアント/],
+    ["zh-cn", /自己|桌面|客户端/],
+    ["zh-tw", /自行|桌面|用戶端/],
+    ["ko", /직접|데스크톱|클라이언트/],
   ]);
   const pages = [
     "index.html",
     "getting-started.html",
     "providers.html",
+    "google-oauth.html",
     "features.html",
     "safety.html",
     "privacy.html",
     "terms.html",
   ];
-  for (const [locale, gate] of locales) {
+  for (const [locale, ownership] of locales) {
     for (const page of pages) {
       const path = `${locale}/${page}`;
       const source = await readFile(new URL(path, `file://${__dirname}/`), "utf8");
       assert.match(source, /Google|Gmail/, path);
       assert.match(source, /OAuth/, path);
-      assert.match(source, gate, path);
+      assert.match(source, ownership, path);
     }
+  }
+});
+
+test("localized homepages present three service domains with local icons", async () => {
+  const homepages = new Map([
+    ["index.html", ["Mail", "Calendar", "Tasks"]],
+    ["ja/index.html", ["メール", "カレンダー", "タスク"]],
+    ["zh-cn/index.html", ["邮件", "日历", "任务"]],
+    ["zh-tw/index.html", ["郵件", "行事曆", "待辦"]],
+    ["ko/index.html", ["메일", "캘린더", "할 일"]],
+  ]);
+  const iconNames = [
+    "outlook.svg",
+    "gmail.svg",
+    "google-calendar.svg",
+    "google-tasks.svg",
+    "microsoft-todo.svg",
+    "todoist.svg",
+    "ticktick.svg",
+    "icloud.svg",
+  ];
+
+  for (const [path, headings] of homepages) {
+    const source = await readFile(new URL(path, `file://${__dirname}/`), "utf8");
+    const iconPrefix = path === "index.html" ? "" : "../";
+    const landscape = source.match(
+      /<section class="service-landscape"[\s\S]*?<\/section>/,
+    )?.[0];
+    assert.ok(landscape, path);
+    assert.equal((landscape.match(/<article class="service-group">/g) || []).length, 3, path);
+    for (const heading of headings) {
+      assert.ok(landscape.includes(`<h3>${heading}</h3>`), `${path}: ${heading}`);
+    }
+    for (const iconName of iconNames) {
+      assert.ok(
+        landscape.includes(`src="${iconPrefix}assets/service-icons/${iconName}"`),
+        `${path}: ${iconName}`,
+      );
+    }
+    assert.doesNotMatch(
+      source,
+      /<img\b[^>]*\b(?:src|srcset)\s*=\s*["']?\s*(?:https?:)?\/\//i,
+      path,
+    );
+  }
+});
+
+test("bundled service icons are inert standalone SVGs", async () => {
+  const iconNames = (await readdir(new URL("assets/service-icons/", `file://${__dirname}/`)))
+    .filter((name) => name.endsWith(".svg"));
+  assert.ok(iconNames.length > 0);
+  for (const iconName of iconNames) {
+    const path = `assets/service-icons/${iconName}`;
+    const source = await readFile(new URL(path, `file://${__dirname}/`), "utf8");
+    assert.match(source, /^<svg\b[^>]*>[\s\S]*<\/svg>\s*$/, path);
+    assert.doesNotMatch(source, /<(?:script|style|foreignObject|image|use)\b/i, path);
+    assert.doesNotMatch(source, /\b(?:href|on\w+)\s*=/i, path);
+    assert.doesNotMatch(source, /\bstyle\s*=/i, path);
+    assert.doesNotMatch(source, /url\(\s*["']?(?:https?:|\/\/|data:)/i, path);
   }
 });
 

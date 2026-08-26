@@ -17,9 +17,10 @@ import (
 const defaultPath = "web/discovery-worker/catalog.json"
 
 type artifact struct {
-	SchemaVersion       int                      `json:"schemaVersion"`
-	GoogleOAuthApproved bool                     `json:"googleOAuthApproved"`
-	Families            []discovery.SignalFamily `json:"families"`
+	SchemaVersion             int                      `json:"schemaVersion"`
+	GoogleBYOOAuthEnabled     bool                     `json:"googleBYOOAuthEnabled"`
+	GoogleManagedOAuthEnabled bool                     `json:"googleManagedOAuthEnabled"`
+	Families                  []discovery.SignalFamily `json:"families"`
 }
 
 func main() {
@@ -45,9 +46,10 @@ func render() ([]byte, error) {
 	encoder.SetIndent("", "  ")
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(artifact{
-		SchemaVersion:       1,
-		GoogleOAuthApproved: rollout.GoogleOAuthApproved,
-		Families:            discovery.SignalCatalog(),
+		SchemaVersion:             2,
+		GoogleBYOOAuthEnabled:     rollout.GoogleBYOOAuthEnabled,
+		GoogleManagedOAuthEnabled: rollout.GoogleManagedOAuthEnabled,
+		Families:                  discovery.SignalCatalog(),
 	}); err != nil {
 		return nil, err
 	}

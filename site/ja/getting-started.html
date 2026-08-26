@@ -304,10 +304,10 @@ corr update</code></pre>
                 >@mac.com</code>、または必要なサービス記録がすべて確認できたカスタムiCloudドメインから、メールとカレンダーをまとめて提案します。アカウント追加後にAppleの2ファクタ認証とアプリ用パスワードを案内し、パスワードはOSの資格情報画面が直接受け取ります。Corresyncには渡りません。
               </p>
               <p>
-                <strong>Googleを使う場合：</strong>Gmail・Googleカレンダー・Google
-                Tasks
-                APIのコードはRCに入っていますが、本番OAuth承認待ちのため完全に無効です。Googleサインインは開始できません。当面はGoogle公式Workspace
-                MCPを利用してください。
+                <strong>Googleを使う場合：</strong>自分で管理するGoogle
+                Cloudプロジェクトに
+                デスクトップOAuthクライアントを作ります。ガイド付き設定がダウンロードしたJSONを検証し、
+                生成された認証情報をOSキーチェーンへ保存します。
               </p>
               <p class="step-links">
                 <a href="providers.html#check">アドレスを送らずに対応確認</a> · <a
@@ -357,12 +357,10 @@ corr doctor --account personal</code></pre>
                 </p>
               </div>
               <div class="install-block">
-                <p class="os-label">Gmail · 承認までの一時的な選択肢</p>
+                <p class="os-label">Gmail · Googleカレンダー · Google Tasks</p>
                 <p class="block-note">
-                  Google公式の<a
-                    href="https://developers.google.com/workspace/guides/configure-mcp-servers"
-                  >Workspace MCP設定ガイド</a>を参照してください。Developer
-                  Previewで、Google CloudとOAuthの設定が別途必要です。
+                  <a href="google-oauth.html">Google OAuthの画面付きガイド</a>で、
+                  必要なAPIだけを選び、認証情報と認可を端末の外へ出さずに設定できます。
                 </p>
               </div>
             </div>
