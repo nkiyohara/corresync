@@ -39,6 +39,7 @@ func run(arguments []string) error {
 	if err != nil {
 		return fmt.Errorf("find syft: %w", err)
 	}
+	arguments = nonInteractiveArguments(arguments)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	// #nosec G204,G702 -- the fixed Syft executable receives validated release basenames.
@@ -52,6 +53,15 @@ func run(arguments []string) error {
 		return err
 	}
 	return nil
+}
+
+func nonInteractiveArguments(arguments []string) []string {
+	for _, argument := range arguments {
+		if argument == "--quiet" || argument == "-q" {
+			return arguments
+		}
+	}
+	return append(append([]string(nil), arguments...), "--quiet")
 }
 
 func outputDocument(arguments []string) (string, string, error) {

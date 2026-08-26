@@ -32,6 +32,18 @@ func TestOutputDocument(t *testing.T) {
 	}
 }
 
+func TestNonInteractiveArgumentsAlwaysDisableTerminalProgress(t *testing.T) {
+	original := []string{"archive.zip", "--output", "spdx-json=archive.spdx.json"}
+	quiet := nonInteractiveArguments(original)
+	if quiet[len(quiet)-1] != "--quiet" || len(original) != 3 {
+		t.Fatalf("nonInteractiveArguments() = %q; original = %q", quiet, original)
+	}
+	alreadyQuiet := append(append([]string(nil), original...), "-q")
+	if got := nonInteractiveArguments(alreadyQuiet); len(got) != len(alreadyQuiet) {
+		t.Fatalf("existing quiet arguments changed: %q", got)
+	}
+}
+
 func TestCanonicalizeSPDXIsStable(t *testing.T) {
 	t.Parallel()
 
