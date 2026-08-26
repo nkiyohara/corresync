@@ -48,6 +48,16 @@ type daemonStopResult struct {
 	Owners   int  `json:"owners,omitempty"`
 }
 
+type daemonUnavailableResult struct {
+	State  string `json:"state"`
+	Reason string `json:"reason"`
+}
+
+type daemonStatusResult struct {
+	State string `json:"state"`
+	daemonapi.Status
+}
+
 func (command *daemonStartCommand) Run(app *runtime) (returnErr error) {
 	client, status, err := app.openDaemon(app.context)
 	if err != nil {
@@ -151,9 +161,35 @@ func (command *daemonStatusCommand) Run(app *runtime) (returnErr error) {
 	defer cancel()
 	status, err := client.Status(ctx, app.caller())
 	if err != nil {
-		return fmt.Errorf("session owner is unavailable: %w", err)
+		reason := daemonUnavailableReason(err)
+		if command.JSON {
+			if writeErr := writeJSON(app.stdout, daemonUnavailableResult{
+				State: "unavailable", Reason: reason,
+			}); writeErr != nil {
+				return writeErr
+			}
+		}
+		return fmt.Errorf("session owner is unavailable (%s)", reason)
 	}
 	return writeDaemonStatus(app, status, command.JSON)
+}
+
+func daemonUnavailableReason(err error) string {
+	if reason, ok := localipc.CredentialLoadFailure(err); ok {
+		return string(reason)
+	}
+	var remoteErr *daemonapi.Error
+	if errors.As(err, &remoteErr) && remoteErr.Code == "unauthorized" {
+		return "authentication_failed"
+	}
+	var versionErr *daemonapi.ProtocolVersionError
+	if errors.As(err, &versionErr) {
+		return "incompatible_protocol"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+	return "unreachable"
 }
 
 func (command *daemonStopCommand) Run(app *runtime) (returnErr error) {
@@ -303,7 +339,9 @@ func waitForDaemon(parent context.Context, app *runtime, client *daemonapi.Clien
 
 func writeDaemonStatus(app *runtime, status daemonapi.Status, jsonOutput bool) error {
 	if jsonOutput {
-		return writeJSON(app.stdout, status)
+		return writeJSON(app.stdout, daemonStatusResult{
+			State: "ready", Status: status,
+		})
 	}
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
 	_, err := view.printf(

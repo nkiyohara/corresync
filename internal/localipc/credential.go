@@ -19,6 +19,83 @@ const (
 	maxCredentialFile = 128
 )
 
+// CredentialLoadReason is a stable, non-secret explanation for why a daemon
+// client could not load the rotating local credential.
+type CredentialLoadReason string
+
+const (
+	CredentialMissing          CredentialLoadReason = "missing_credential" // #nosec G101 -- status category, not a credential.
+	CredentialMalformed        CredentialLoadReason = "invalid_credential" // #nosec G101 -- status category, not a credential.
+	CredentialPermissionDenied CredentialLoadReason = "permission_denied"
+	CredentialUnavailable      CredentialLoadReason = "credential_unavailable" // #nosec G101 -- status category, not a credential.
+)
+
+var (
+	ErrCredentialMissing          = errors.New("daemon IPC credential is missing")
+	ErrCredentialMalformed        = errors.New("daemon IPC credential is invalid")
+	ErrCredentialPermissionDenied = errors.New("daemon IPC credential is not readable")
+	ErrCredentialUnavailable      = errors.New("daemon IPC credential is unavailable")
+)
+
+// CredentialLoadError deliberately omits the credential path and content.
+// Its wrapped cause remains available to errors.Is without entering normal
+// command output.
+type CredentialLoadError struct {
+	Reason CredentialLoadReason
+	cause  error
+}
+
+func (loadErr *CredentialLoadError) Error() string {
+	switch loadErr.Reason {
+	case CredentialMissing:
+		return ErrCredentialMissing.Error()
+	case CredentialMalformed:
+		return ErrCredentialMalformed.Error()
+	case CredentialPermissionDenied:
+		return ErrCredentialPermissionDenied.Error()
+	case CredentialUnavailable:
+		return ErrCredentialUnavailable.Error()
+	default:
+		return "unknown daemon IPC credential failure"
+	}
+}
+
+func (loadErr *CredentialLoadError) Unwrap() error { return loadErr.cause }
+
+func (loadErr *CredentialLoadError) Is(target error) bool {
+	switch loadErr.Reason {
+	case CredentialMissing:
+		return target == ErrCredentialMissing
+	case CredentialMalformed:
+		return target == ErrCredentialMalformed
+	case CredentialPermissionDenied:
+		return target == ErrCredentialPermissionDenied
+	case CredentialUnavailable:
+		return target == ErrCredentialUnavailable
+	default:
+		return false
+	}
+}
+
+// CredentialLoadFailure returns the bounded machine reason for one load
+// failure without exposing the state path or credential bytes.
+func CredentialLoadFailure(err error) (CredentialLoadReason, bool) {
+	var loadErr *CredentialLoadError
+	if !errors.As(err, &loadErr) {
+		return "", false
+	}
+	return loadErr.Reason, true
+}
+
+func credentialLoadFailure(reason CredentialLoadReason, cause error) error {
+	if errors.Is(cause, os.ErrNotExist) {
+		reason = CredentialMissing
+	} else if errors.Is(cause, os.ErrPermission) {
+		reason = CredentialPermissionDenied
+	}
+	return &CredentialLoadError{Reason: reason, cause: cause}
+}
+
 // Credential is the short-lived bearer used in addition to OS peer controls.
 // Its value must never be logged or persisted anywhere except its private file.
 type Credential struct {
@@ -74,23 +151,26 @@ func LoadCredential(endpoint Endpoint) (string, error) {
 
 func loadCredentialPath(path string) (string, error) {
 	if err := validateCredentialFile(path); err != nil {
-		return "", err
+		return "", credentialLoadFailure(CredentialMalformed, err)
 	}
 	file, err := os.Open(path) // #nosec G304 -- derived private state path.
 	if err != nil {
-		return "", err
+		return "", credentialLoadFailure(CredentialUnavailable, err)
 	}
 	defer func() { _ = file.Close() }()
 	data, err := io.ReadAll(io.LimitReader(file, maxCredentialFile+1))
 	if err != nil {
-		return "", fmt.Errorf("read IPC credential: %w", err)
+		return "", credentialLoadFailure(CredentialUnavailable, err)
 	}
 	if len(data) > maxCredentialFile {
-		return "", errors.New("IPC credential file is too large")
+		return "", credentialLoadFailure(
+			CredentialMalformed,
+			errors.New("IPC credential file is too large"),
+		)
 	}
 	value := strings.TrimSuffix(string(data), "\n")
 	if err := ValidateCredential(value); err != nil {
-		return "", err
+		return "", credentialLoadFailure(CredentialMalformed, err)
 	}
 	return value, nil
 }

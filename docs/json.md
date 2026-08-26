@@ -309,8 +309,12 @@ mutating or reading agent conversations, credentials, mail, or calendar data.
 - `auth logout --account work --json`: exact account ID and alias with
   `scope: "account"`; the daemon remains active.
 - `auth logout --json`: whole-owner shutdown result with `scope: "all"`.
-- `daemon status --json`: process/protocol/version/config-digest health; no
-  credential.
+- `daemon status --json`: `state: "ready"` with process/protocol/version and
+  config-digest health, or `state: "unavailable"` with a bounded `reason` such
+  as `missing_credential`, `invalid_credential`, `permission_denied`,
+  `authentication_failed`, `incompatible_protocol`, `timeout`, or
+  `unreachable`. It never returns a credential, credential path, or raw
+  operating-system error.
 - `config validate --json`: validity and local path. The path is private.
 - `config show --json`: complete validated secret-free configuration; still
   private for the reasons above.

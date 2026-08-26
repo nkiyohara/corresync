@@ -659,6 +659,11 @@ sessions and exposes authenticated local IPC only—never TCP. A config digest
 change requires an explicit stop. A compatible old binary can be drained and
 replaced without retrying an application operation.
 
+`daemon status` reports unavailable owners without printing private state
+paths or credential-file details. Its JSON form uses stable `ready` or
+`unavailable` states and a bounded reason; an authorization mismatch remains
+distinct from an owner that is not running.
+
 On Unix, every process derives the same endpoint regardless of
 `XDG_RUNTIME_DIR` or `TMPDIR`. v0.8.6 can authentically drain one owner left at
 an older runtime location. If an installation already has multiple owners at

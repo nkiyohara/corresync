@@ -674,7 +674,7 @@ func TestWaitForDaemonPreservesLastFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 80*time.Millisecond)
 	defer cancel()
 	_, err = waitForDaemon(ctx, app, client, time.Second)
-	if err == nil || !strings.Contains(err.Error(), "invalid IPC credential") {
+	if err == nil || !strings.Contains(err.Error(), "daemon IPC credential is invalid") {
 		t.Fatalf("waitForDaemon() error = %v, want credential cause", err)
 	}
 }
