@@ -431,6 +431,173 @@ func TestDaemonMCPSettingsUseCallerBoundStaleSafePreviewCommit(t *testing.T) {
 	}
 }
 
+func TestDaemonMCPSettingsRemainAvailableWithoutAccounts(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "config.toml")
+	if err := config.Save(path, config.Default()); err != nil {
+		t.Fatal(err)
+	}
+	app := newRuntime(
+		t.Context(), path, &bytes.Buffer{}, &bytes.Buffer{}, buildinfo.Current(),
+	)
+	settings, err := application.NewSettingsService(settingsstore.Store{ConfigPath: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := &daemonMCPAudit{}
+	rules := policy.DefaultRules()
+	rules.PreviewReversibleWrites = true
+	backend := &daemonMCPBackend{
+		app: app, configuration: config.Default(), settings: settings,
+		guard: daemonMCPGuard(t, rules, recorder),
+		settingsMutation: func(
+			ctx context.Context,
+			_ domain.Caller,
+			change func(context.Context) (application.SettingsView, error),
+		) (application.SettingsView, error) {
+			return change(ctx)
+		},
+	}
+	caller := domain.Caller{Surface: "mcp", Instance: "empty-settings-test"}
+	otherCaller := domain.Caller{Surface: "mcp", Instance: "empty-settings-other"}
+	preview, err := backend.PreviewSettingsUpdate(
+		t.Context(),
+		application.SettingsUpdateInput{
+			Key: application.SettingUpdateChannel, Value: "preview",
+		},
+		caller,
+	)
+	if err != nil || preview.Preview == nil || preview.Review == nil {
+		t.Fatalf("settings preview without accounts = %+v error = %v", preview, err)
+	}
+	if preview.Preview.Operation.Scope != domain.OperationScopeGlobal ||
+		preview.Preview.Operation.Account != "" {
+		t.Fatalf("settings preview scope = %+v", preview.Preview.Operation)
+	}
+	if err := config.Update(t.Context(), path, func(current *config.Config) error {
+		outlook := config.OutlookDefault()
+		current.Accounts = outlook.Accounts
+		current.DefaultAccount = outlook.DefaultAccount
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := backend.CommitSettingsUpdate(
+		t.Context(), preview.Preview.Token, otherCaller,
+	); err == nil {
+		t.Fatal("settings update accepted another caller")
+	}
+	committed, err := backend.CommitSettingsUpdate(
+		t.Context(), preview.Preview.Token, caller,
+	)
+	if err != nil || committed.Settings == nil ||
+		committed.Settings.UpdateChannel != "preview" {
+		t.Fatalf("settings commit without accounts = %+v error = %v", committed, err)
+	}
+	if _, err := backend.CommitSettingsUpdate(
+		t.Context(), preview.Preview.Token, caller,
+	); err == nil {
+		t.Fatal("settings update replayed an approval")
+	}
+	if len(recorder.events) != 3 {
+		t.Fatalf("settings audit events = %+v", recorder.events)
+	}
+}
+
+func TestDaemonMCPGlobalSettingsMutationRestartsEmptyAccountOwner(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(root, "state"))
+	configPath := filepath.Join(root, "config.toml")
+	configuration := config.Default()
+	if err := config.Save(configPath, configuration); err != nil {
+		t.Fatal(err)
+	}
+	initialDigest, err := config.Fingerprint(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint, err := localipc.ResolveInState(
+		configPath, filepath.Join(root, "state"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous := startLifecycleTestDaemon(
+		t.Context(), t, endpoint, daemonapi.ProtocolVersion, "dev", 701,
+		initialDigest, "",
+	)
+	t.Cleanup(previous.stop)
+
+	app := newRuntime(
+		t.Context(), configPath, &bytes.Buffer{}, &bytes.Buffer{},
+		buildinfo.Info{Version: "dev", OS: "linux", Arch: "amd64"},
+	)
+	app.endpoint = func(string) (localipc.Endpoint, error) { return endpoint, nil }
+	var starts atomic.Int32
+	var replacement lifecycleTestDaemon
+	app.startDaemon = func(ctx context.Context, path string) error {
+		if path != configPath {
+			t.Fatalf("restart path = %q", path)
+		}
+		digest, fingerprintErr := config.Fingerprint(path)
+		if fingerprintErr != nil {
+			return fingerprintErr
+		}
+		starts.Add(1)
+		replacement = startLifecycleTestDaemon(
+			ctx, t, endpoint, daemonapi.ProtocolVersion, "dev", 702, digest, "",
+		)
+		return nil
+	}
+	client, err := daemonapi.NewClient(endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	settings, err := application.NewSettingsService(
+		settingsstore.Store{ConfigPath: configPath},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := &daemonMCPAudit{}
+	rules := policy.DefaultRules()
+	rules.PreviewReversibleWrites = true
+	backend := &daemonMCPBackend{
+		Client: client, app: app, settings: settings, configuration: configuration,
+		guard: daemonMCPGuard(t, rules, recorder),
+	}
+	caller := domain.Caller{Surface: "mcp", Instance: "settings-restart-test"}
+	preview, err := backend.PreviewSettingsUpdate(
+		t.Context(),
+		application.SettingsUpdateInput{
+			Key: application.SettingUpdateChannel, Value: "preview",
+		},
+		caller,
+	)
+	if err != nil || preview.Preview == nil ||
+		preview.Preview.Operation.Scope != domain.OperationScopeGlobal {
+		t.Fatalf("global settings preview = %+v error = %v", preview, err)
+	}
+	committed, err := backend.CommitSettingsUpdate(
+		t.Context(), preview.Preview.Token, caller,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replacement.stop != nil {
+		t.Cleanup(replacement.stop)
+	}
+	if committed.Settings == nil || committed.Settings.UpdateChannel != "preview" ||
+		starts.Load() != 1 || previous.shutdowns.Load() != 1 ||
+		backend.DefaultAccount() != "" {
+		t.Fatalf(
+			"settings result = %+v starts=%d shutdowns=%d default=%q",
+			committed, starts.Load(), previous.shutdowns.Load(), backend.DefaultAccount(),
+		)
+	}
+}
+
 func TestDaemonMCPAccountLifecycleCommitKeepsPreviewedOpaqueIdentity(t *testing.T) {
 	app, path, _ := newAccountCommandRuntime(t, &accountDiscovererStub{})
 	accounts, _, err := app.accountServices()

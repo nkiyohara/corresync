@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -46,7 +47,8 @@ func TestCredentialLifecycleRejectsNonRegularTarget(t *testing.T) {
 	if err := credential.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	if _, err := LoadCredential(endpoint); !errors.Is(err, os.ErrNotExist) {
+	if _, err := LoadCredential(endpoint); !errors.Is(err, os.ErrNotExist) ||
+		!errors.Is(err, ErrCredentialMissing) {
 		t.Fatalf("LoadCredential() error = %v, want not exist", err)
 	}
 	if err := os.Mkdir(endpoint.CredentialPath, 0o700); err != nil {
@@ -54,6 +56,40 @@ func TestCredentialLifecycleRejectsNonRegularTarget(t *testing.T) {
 	}
 	if _, err := IssueCredential(endpoint); err == nil {
 		t.Fatal("IssueCredential() accepted a directory target")
+	}
+}
+
+func TestCredentialLoadFailuresAreBoundedAndClassified(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "sensitive-name.credential")
+	endpoint := Endpoint{CredentialPath: path}
+
+	_, err := LoadCredential(endpoint)
+	if reason, ok := CredentialLoadFailure(err); !ok || reason != CredentialMissing {
+		t.Fatalf("missing credential failure = %q, %v", reason, err)
+	}
+	if strings.Contains(err.Error(), path) {
+		t.Fatalf("missing credential exposed path: %v", err)
+	}
+
+	if err := os.WriteFile(path, []byte("secret-invalid-value\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = LoadCredential(endpoint)
+	if reason, ok := CredentialLoadFailure(err); !ok || reason != CredentialMalformed {
+		t.Fatalf("malformed credential failure = %q, %v", reason, err)
+	}
+	if strings.Contains(err.Error(), path) || strings.Contains(err.Error(), "secret-invalid-value") {
+		t.Fatalf("malformed credential exposed sensitive data: %v", err)
+	}
+
+	permissionErr := credentialLoadFailure(
+		CredentialUnavailable,
+		&os.PathError{Op: "open", Path: path, Err: os.ErrPermission},
+	)
+	if reason, ok := CredentialLoadFailure(permissionErr); !ok ||
+		reason != CredentialPermissionDenied || strings.Contains(permissionErr.Error(), path) {
+		t.Fatalf("permission credential failure = %q, %v", reason, permissionErr)
 	}
 }
 

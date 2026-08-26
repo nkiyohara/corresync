@@ -66,5 +66,13 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 		view.strong("Authenticated provider routes"),
 		view.muted(fmt.Sprintf("Account %s · captured %s", accountID, result.CapturedAt.UTC().Format("2006-01-02T15:04:05Z"))),
 	)
+	if err == nil && hasOutlookRoute(configured) {
+		_, err = view.printf(
+			"   %s\n",
+			view.muted(
+				"The dedicated Outlook window remains open as this account's browser-owned session; auth logout or daemon shutdown closes it.",
+			),
+		)
+	}
 	return err
 }

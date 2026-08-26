@@ -81,6 +81,13 @@ func (discoverer *Discoverer) Discover(
 	collector := newCandidateCollector()
 	diagnostics := make([]application.DiscoveryDiagnostic, 0, 12)
 
+	if knownDomainFamily(domainName) == familyMicrosoftConsumer {
+		diagnostics = append(diagnostics, diagnostic(
+			"known_domain_owa",
+			"unavailable",
+			"consumer Outlook Web authorization is not supported by this release",
+		))
+	}
 	addKnownDomainCandidates(collector, domainName)
 
 	mxRecords, err := discoverer.resolver.LookupMX(ctx, domainName)
@@ -255,16 +262,6 @@ func addKnownDomainCandidates(collector *candidateCollector, domainName string) 
 	switch knownDomainFamily(domainName) {
 	case familyMicrosoftConsumer:
 		collector.add(candidateInput{
-			provider: domain.ProviderMicrosoftOWA, confidence: 98,
-			authentication: application.DiscoveryBrowserFirstParty,
-			endpoint: application.DiscoveredEndpoint{
-				Kind: "origin", Value: "https://outlook.live.com",
-			},
-			evidence: application.DiscoveryEvidence{
-				Source: "known_domain", Detail: domainName,
-			},
-		})
-		collector.add(candidateInput{
 			provider: domain.ProviderMicrosoftGraph, confidence: 92,
 			authentication: application.DiscoveryExplicitOAuth,
 			explicit:       true,
@@ -319,7 +316,7 @@ func addMXCandidates(collector *candidateCollector, records []*net.MX) {
 				provider: domain.ProviderMicrosoftOWA, confidence: 55,
 				authentication: application.DiscoveryBrowserFirstParty,
 				endpoint: application.DiscoveredEndpoint{
-					Kind: "origin", Value: "https://outlook.office.com",
+					Kind: "origin", Value: "https://outlook.cloud.microsoft",
 				},
 				evidence: application.DiscoveryEvidence{
 					Source: "mx", Detail: "mail.protection.outlook.com",
@@ -494,18 +491,30 @@ func (prober *httpsProber) Probe(ctx context.Context, endpoint string) (ProbeRes
 	defer func() { _ = response.Body.Close() }()
 	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1))
 
-	result := ProbeResult{
-		Status: "observed", Endpoint: response.Request.URL.String(),
-		Detail: "HTTPS endpoint responded",
-	}
+	result := ProbeResult{Endpoint: response.Request.URL.String()}
 	switch response.StatusCode {
 	case http.StatusNotFound, http.StatusGone:
 		result.Status = "not_found"
 		result.Detail = "well-known endpoint not found"
 	default:
-		if response.StatusCode >= 500 {
+		switch {
+		case response.StatusCode >= http.StatusOK &&
+			response.StatusCode < http.StatusMultipleChoices &&
+			!strings.HasPrefix(
+				strings.ToLower(response.Header.Get("Content-Type")),
+				"text/html",
+			):
+			result.Status = "observed"
+			result.Detail = "HTTPS endpoint returned a protocol-capable response"
+		case response.StatusCode >= 500:
 			result.Status = "unavailable"
 			result.Detail = "well-known endpoint returned a server error"
+		case response.StatusCode >= 400:
+			result.Status = "not_found"
+			result.Detail = "well-known endpoint rejected a credential-free request"
+		default:
+			result.Status = "not_found"
+			result.Detail = "well-known endpoint did not return protocol evidence"
 		}
 	}
 	if result.Status == "observed" && response.Request.URL.Scheme != "https" {

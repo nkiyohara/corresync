@@ -381,12 +381,18 @@ func validateTerminalLoginResult(input TerminalLoginInput, result TerminalLoginR
 }
 
 func (client *Client) ListMail(ctx context.Context, input application.MailListInput, caller domain.Caller) (application.MailPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailPage{}, err
+	}
 	var result application.MailPage
 	return result, client.call(ctx, MethodMailList, caller, input, &result)
 }
 
 // SearchMail executes one bounded, read-only AQS search through the session owner.
 func (client *Client) SearchMail(ctx context.Context, input application.MailSearchInput, caller domain.Caller) (application.MailPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailPage{}, err
+	}
 	var result application.MailPage
 	return result, client.call(ctx, MethodMailSearch, caller, input, &result)
 }
@@ -422,11 +428,17 @@ func (client *Client) SearchAllMail(
 
 // ListMailFolders discovers bounded folder metadata through the session owner.
 func (client *Client) ListMailFolders(ctx context.Context, input application.MailFolderListInput, caller domain.Caller) (application.MailFolderPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailFolderPage{}, err
+	}
 	var result application.MailFolderPage
 	return result, client.call(ctx, MethodMailFolders, caller, input, &result)
 }
 
 func (client *Client) GetMailBody(ctx context.Context, input application.MailBodyInput, caller domain.Caller) (application.MailBodyAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailBodyAccess{}, err
+	}
 	var result application.MailBodyAccess
 	return result, client.call(ctx, MethodMailGetBody, caller, input, &result)
 }
@@ -437,6 +449,9 @@ func (client *Client) CommitMailBody(ctx context.Context, token string, caller d
 }
 
 func (client *Client) GetMailAttachment(ctx context.Context, input application.MailAttachmentInput, caller domain.Caller) (application.MailAttachmentAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailAttachmentAccess{}, err
+	}
 	var result application.MailAttachmentAccess
 	return result, client.call(ctx, MethodMailGetAttachment, caller, input, &result)
 }
@@ -447,6 +462,9 @@ func (client *Client) CommitMailAttachment(ctx context.Context, token string, ca
 }
 
 func (client *Client) CreateMailDraft(ctx context.Context, input application.MailDraftInput, caller domain.Caller) (application.MailDraftAccess, error) {
+	if err := input.Validate(application.MaxMailRecipients); err != nil {
+		return application.MailDraftAccess{}, err
+	}
 	var result application.MailDraftAccess
 	return result, client.call(ctx, MethodMailCreateDraft, caller, input, &result)
 }
@@ -457,6 +475,9 @@ func (client *Client) CommitMailDraft(ctx context.Context, token string, caller 
 }
 
 func (client *Client) SendMail(ctx context.Context, input application.MailSendInput, caller domain.Caller) (application.MailSendAccess, error) {
+	if err := input.Validate(application.MaxMailRecipients); err != nil {
+		return application.MailSendAccess{}, err
+	}
 	var result application.MailSendAccess
 	return result, client.call(ctx, MethodMailSend, caller, input, &result)
 }
@@ -467,6 +488,9 @@ func (client *Client) CommitMailSend(ctx context.Context, token string, caller d
 }
 
 func (client *Client) SendMailDraft(ctx context.Context, input application.MailDraftSendInput, caller domain.Caller) (application.MailDraftSendAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailDraftSendAccess{}, err
+	}
 	var result application.MailDraftSendAccess
 	return result, client.call(ctx, MethodMailSendDraft, caller, input, &result)
 }
@@ -477,6 +501,9 @@ func (client *Client) CommitMailSendDraft(ctx context.Context, token string, cal
 }
 
 func (client *Client) MoveMail(ctx context.Context, input application.MailMoveInput, caller domain.Caller) (application.MailMoveAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailMoveAccess{}, err
+	}
 	var result application.MailMoveAccess
 	return result, client.call(ctx, MethodMailMove, caller, input, &result)
 }
@@ -487,6 +514,9 @@ func (client *Client) CommitMailMove(ctx context.Context, token string, caller d
 }
 
 func (client *Client) SetMailReadState(ctx context.Context, input application.MailReadStateInput, caller domain.Caller) (application.MailReadStateAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailReadStateAccess{}, err
+	}
 	var result application.MailReadStateAccess
 	return result, client.call(ctx, MethodMailReadState, caller, input, &result)
 }
@@ -497,6 +527,9 @@ func (client *Client) CommitMailReadState(ctx context.Context, token string, cal
 }
 
 func (client *Client) DeleteMail(ctx context.Context, input application.MailDeleteInput, caller domain.Caller) (application.MailDeleteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailDeleteAccess{}, err
+	}
 	var result application.MailDeleteAccess
 	return result, client.call(ctx, MethodMailDelete, caller, input, &result)
 }
@@ -512,11 +545,17 @@ func (client *Client) ListCalendarFolders(
 	input application.CalendarFolderListInput,
 	caller domain.Caller,
 ) (application.CalendarFolderPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.CalendarFolderPage{}, err
+	}
 	var result application.CalendarFolderPage
 	return result, client.call(ctx, MethodCalendarFolders, caller, input, &result)
 }
 
 func (client *Client) ListCalendar(ctx context.Context, input application.CalendarListInput, caller domain.Caller) (application.CalendarPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.CalendarPage{}, err
+	}
 	var result application.CalendarPage
 	return result, client.call(ctx, MethodCalendarList, caller, input, &result)
 }
@@ -551,6 +590,9 @@ func (client *Client) ListAgenda(
 
 // CreateCalendar prepares an immutable calendar event preview.
 func (client *Client) CreateCalendar(ctx context.Context, input application.CalendarCreateInput, caller domain.Caller) (application.CalendarCreateAccess, error) {
+	if err := input.Validate(application.MaxCalendarAttendees); err != nil {
+		return application.CalendarCreateAccess{}, err
+	}
 	var result application.CalendarCreateAccess
 	return result, client.call(ctx, MethodCalendarCreate, caller, input, &result)
 }
@@ -563,6 +605,9 @@ func (client *Client) CommitCalendarCreate(ctx context.Context, token string, ca
 
 // UpdateCalendar prepares an immutable patch preview for one event version.
 func (client *Client) UpdateCalendar(ctx context.Context, input application.CalendarUpdateInput, caller domain.Caller) (application.CalendarUpdateAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.CalendarUpdateAccess{}, err
+	}
 	var result application.CalendarUpdateAccess
 	return result, client.call(ctx, MethodCalendarUpdate, caller, input, &result)
 }
@@ -575,6 +620,9 @@ func (client *Client) CommitCalendarUpdate(ctx context.Context, token string, ca
 
 // CancelCalendar prepares a destructive preview for one event version.
 func (client *Client) CancelCalendar(ctx context.Context, input application.CalendarCancelInput, caller domain.Caller) (application.CalendarCancelAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.CalendarCancelAccess{}, err
+	}
 	var result application.CalendarCancelAccess
 	return result, client.call(ctx, MethodCalendarCancel, caller, input, &result)
 }

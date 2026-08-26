@@ -5,6 +5,8 @@
 - Amended: 2026-08-14 by
   [ADR 0033](0033-cli-mcp-product-focus.md) to distinguish bounded prompts from
   a persistent TUI
+- Amended: 2026-08-26 to bind settings previews to an explicit global
+  operation scope
 
 ## Context
 
@@ -41,6 +43,12 @@ reviews, writes the validated configuration, records the execution, and
 restarts the sole local session owner. Alias changes remain under
 `account_rename` because they preserve a stable account identity and already
 have a dedicated lifecycle contract.
+
+Settings previews use the domain's explicit `global` operation scope. They
+never borrow the default account and never fabricate an account identity, so
+the tools remain available when the account catalog is empty. The caller,
+normalized review, expected previous value, and operation class remain bound
+to the short-lived single-use approval exactly as for account-scoped writes.
 
 ## Consequences
 

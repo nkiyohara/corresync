@@ -300,9 +300,10 @@ separate external handle for its generated Desktop client credential.
 Standards routes use a keyring entry
 or explicitly approved helper reference. Passwords and tokens never enter
 `config.toml`. See [account and provider configuration](docs/configuration.md).
-The Outlook Web route opens a dedicated visible profile only during the later
-`auth login`; SSO, MFA, Conditional Access, and organization notices remain
-inside the provider-owned flow.
+The Outlook Web route opens a dedicated visible profile during the later
+`auth login`; that window remains the browser-owned session until account
+logout or daemon shutdown. SSO, MFA, Conditional Access, and organization
+notices remain inside the provider-owned flow.
 
 ### 3. Connect an agent
 

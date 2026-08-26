@@ -5,6 +5,41 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.9.0-rc.5 - 2026-08-26
+
+### Authentication and discovery
+
+- Fail closed on generic 4xx and HTML responses during credential-free CalDAV
+  and JMAP discovery, while preserving TLS, redirect, and no-authorization
+  guarantees.
+- Select the live-observed `outlook.cloud.microsoft` Microsoft 365 web origin,
+  stop advertising the unsupported consumer Outlook Web authorization route,
+  and report exact-origin or authorization-scheme mismatches promptly without
+  exposing authorization values.
+- Clean up failed terminal-login startup state so a retry creates a fresh
+  browser interaction. Keep successful Outlook windows explicitly
+  browser-owned, reuse their private provider session on later human-invoked
+  login, and keep signed-out, MFA, consent, cancellation, and failure paths
+  human-owned.
+
+### MCP and configuration safety
+
+- Validate mail, calendar, task, and messaging inputs before authenticated
+  session resolution at both the daemon client and shared session backend.
+- Give everyday settings updates an explicit global operation scope, retaining
+  caller-bound, single-use, audited preview/commit and daemon restart behavior
+  when no account is configured or the account catalog changes concurrently.
+
+### CLI and daemon
+
+- Return stable, path-free daemon status categories for missing, malformed,
+  unreadable, unauthorized, incompatible, timed-out, and unreachable local
+  session owners. JSON now distinguishes `ready` and `unavailable` without
+  exposing IPC credentials or state paths.
+- Fit guided settings forms to narrow, 80-column, 88-column, and wide
+  terminals with a deterministic non-terminal fallback while preserving the
+  accessible line-oriented mode.
+
 ## 0.9.0-rc.4 - 2026-08-21
 
 ### Account lifecycle

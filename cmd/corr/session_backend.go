@@ -1194,7 +1194,7 @@ func (backend *sessionBackend) TerminalLogin(
 	ctx context.Context,
 	input daemonapi.TerminalLoginInput,
 	caller domain.Caller,
-) (daemonapi.TerminalLoginResult, error) {
+) (_ daemonapi.TerminalLoginResult, returnErr error) {
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
@@ -1208,10 +1208,18 @@ func (backend *sessionBackend) TerminalLogin(
 		return authenticatedTerminalResult(input.Account, account.captured), nil
 	}
 
-	interaction, err := backend.terminalInteraction(input, caller)
+	interaction, created, err := backend.terminalInteraction(input, caller)
 	if err != nil {
 		return daemonapi.TerminalLoginResult{}, err
 	}
+	defer func() {
+		if created && returnErr != nil {
+			returnErr = errors.Join(
+				returnErr,
+				backend.dropTerminalInteraction(interaction, true),
+			)
+		}
+	}()
 	if time.Now().After(interaction.deadline) {
 		closeErr := backend.dropTerminalInteraction(interaction, true)
 		return daemonapi.TerminalLoginResult{}, errors.Join(
@@ -1355,53 +1363,53 @@ func terminalLoginViewReady(view daemonapi.TerminalLoginView) bool {
 func (backend *sessionBackend) terminalInteraction(
 	input daemonapi.TerminalLoginInput,
 	caller domain.Caller,
-) (*terminalLoginSession, error) {
+) (*terminalLoginSession, bool, error) {
 	if input.SessionID != "" {
 		interaction, exists := backend.terminalSessions[input.SessionID]
 		if !exists || interaction.account != input.Account || interaction.caller != caller {
-			return nil, errors.New("invalid or expired terminal login session")
+			return nil, false, errors.New("invalid or expired terminal login session")
 		}
-		return interaction, nil
+		return interaction, false, nil
 	}
 	if existingID, exists := backend.terminalAccounts[input.Account]; exists {
 		interaction := backend.terminalSessions[existingID]
 		if interaction == nil || interaction.caller != caller {
-			return nil, errors.New("a terminal login is already active for this account")
+			return nil, false, errors.New("a terminal login is already active for this account")
 		}
-		return interaction, nil
+		return interaction, false, nil
 	}
 	_, configured, exists := backend.configuration.AccountByID(input.Account)
 	if !exists {
-		return nil, fmt.Errorf("account %q is not configured", input.Account)
+		return nil, false, fmt.Errorf("account %q is not configured", input.Account)
 	}
 	if hasGoogleWebRoute(configured) {
-		return nil, errUnsupportedLegacyGoogleRoute
+		return nil, false, errUnsupportedLegacyGoogleRoute
 	}
 	profileDirectory, err := paths.ProfileDir(input.Account)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	web, ok := configured.OutlookWeb()
 	if !ok {
-		return nil, errors.New("terminal login is available only for Outlook Web routes")
+		return nil, false, errors.New("terminal login is available only for Outlook Web routes")
 	}
 	handle, err := backend.app.launch(backend.lifecycle, browser.Options{
 		Origin: web.Origin, ProfileDir: profileDirectory,
 		Executable: backend.configuration.Browser.Executable, Headless: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	terminalHandle, supported := handle.(terminalBrowserHandle)
 	if !supported {
-		return nil, errors.Join(
+		return nil, false, errors.Join(
 			errors.New("configured browser launcher does not support terminal login"),
 			handle.Close(),
 		)
 	}
 	id, err := newTerminalLoginSessionID()
 	if err != nil {
-		return nil, errors.Join(err, handle.Close())
+		return nil, false, errors.Join(err, handle.Close())
 	}
 	interaction := &terminalLoginSession{
 		id: id, account: input.Account, caller: caller, handle: terminalHandle,
@@ -1409,7 +1417,7 @@ func (backend *sessionBackend) terminalInteraction(
 	}
 	backend.terminalSessions[id] = interaction
 	backend.terminalAccounts[input.Account] = id
-	return interaction, nil
+	return interaction, true, nil
 }
 
 func (backend *sessionBackend) dropTerminalInteraction(
@@ -1553,6 +1561,9 @@ func (backend *sessionBackend) ListMail(
 	input application.MailListInput,
 	caller domain.Caller,
 ) (application.MailPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailPage{}, err
+	}
 	return withMailService(
 		backend,
 		ctx,
@@ -1569,6 +1580,9 @@ func (backend *sessionBackend) SearchMail(
 	input application.MailSearchInput,
 	caller domain.Caller,
 ) (application.MailPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailPage{}, err
+	}
 	return withMailService(
 		backend,
 		ctx,
@@ -1585,6 +1599,9 @@ func (backend *sessionBackend) SearchAllMail(
 	input application.MailProjectionInput,
 	caller domain.Caller,
 ) (application.MailProjectionPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailProjectionPage{}, err
+	}
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
@@ -1608,6 +1625,9 @@ func (backend *sessionBackend) ListMailFolders(
 	input application.MailFolderListInput,
 	caller domain.Caller,
 ) (application.MailFolderPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailFolderPage{}, err
+	}
 	return withMailService(
 		backend,
 		ctx,
@@ -1624,6 +1644,9 @@ func (backend *sessionBackend) GetMailBody(
 	input application.MailBodyInput,
 	caller domain.Caller,
 ) (application.MailBodyAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailBodyAccess{}, err
+	}
 	access, err := withMailService(
 		backend,
 		ctx,
@@ -1649,6 +1672,9 @@ func (backend *sessionBackend) GetMailAttachment(
 	input application.MailAttachmentInput,
 	caller domain.Caller,
 ) (application.MailAttachmentAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailAttachmentAccess{}, err
+	}
 	access, err := withMailService(
 		backend,
 		ctx,
@@ -1674,6 +1700,9 @@ func (backend *sessionBackend) CreateMailDraft(
 	input application.MailDraftInput,
 	caller domain.Caller,
 ) (application.MailDraftAccess, error) {
+	if err := input.Validate(backend.configuration.Policy.MaxRecipients); err != nil {
+		return application.MailDraftAccess{}, err
+	}
 	access, err := withMailService(
 		backend,
 		ctx,
@@ -1709,6 +1738,9 @@ func (backend *sessionBackend) SendMail(
 	input application.MailSendInput,
 	caller domain.Caller,
 ) (application.MailSendAccess, error) {
+	if err := input.Validate(backend.configuration.Policy.MaxRecipients); err != nil {
+		return application.MailSendAccess{}, err
+	}
 	access, err := withMailService(
 		backend,
 		ctx,
@@ -1744,6 +1776,9 @@ func (backend *sessionBackend) SendMailDraft(
 	input application.MailDraftSendInput,
 	caller domain.Caller,
 ) (application.MailDraftSendAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailDraftSendAccess{}, err
+	}
 	access, err := withMailService(
 		backend,
 		ctx,
@@ -1779,6 +1814,9 @@ func (backend *sessionBackend) MoveMail(
 	input application.MailMoveInput,
 	caller domain.Caller,
 ) (application.MailMoveAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailMoveAccess{}, err
+	}
 	access, err := withMailService(
 		backend,
 		ctx,
@@ -1814,6 +1852,9 @@ func (backend *sessionBackend) SetMailReadState(
 	input application.MailReadStateInput,
 	caller domain.Caller,
 ) (application.MailReadStateAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailReadStateAccess{}, err
+	}
 	access, err := withMailService(
 		backend,
 		ctx,
@@ -1849,6 +1890,9 @@ func (backend *sessionBackend) DeleteMail(
 	input application.MailDeleteInput,
 	caller domain.Caller,
 ) (application.MailDeleteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MailDeleteAccess{}, err
+	}
 	access, err := withMailService(
 		backend,
 		ctx,
@@ -2012,6 +2056,9 @@ func (backend *sessionBackend) ListCalendar(
 	input application.CalendarListInput,
 	caller domain.Caller,
 ) (application.CalendarPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.CalendarPage{}, err
+	}
 	return withCalendarService(
 		backend,
 		ctx,
@@ -2028,6 +2075,9 @@ func (backend *sessionBackend) ListCalendarFolders(
 	input application.CalendarFolderListInput,
 	caller domain.Caller,
 ) (application.CalendarFolderPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.CalendarFolderPage{}, err
+	}
 	return withCalendarService(
 		backend,
 		ctx,
@@ -2044,6 +2094,9 @@ func (backend *sessionBackend) ListAgenda(
 	input application.AgendaProjectionInput,
 	caller domain.Caller,
 ) (application.AgendaProjectionPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.AgendaProjectionPage{}, err
+	}
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
@@ -2067,6 +2120,9 @@ func (backend *sessionBackend) CreateCalendar(
 	input application.CalendarCreateInput,
 	caller domain.Caller,
 ) (application.CalendarCreateAccess, error) {
+	if err := input.Validate(backend.configuration.Policy.MaxAttendees); err != nil {
+		return application.CalendarCreateAccess{}, err
+	}
 	access, err := withCalendarService(
 		backend,
 		ctx,
@@ -2102,6 +2158,9 @@ func (backend *sessionBackend) UpdateCalendar(
 	input application.CalendarUpdateInput,
 	caller domain.Caller,
 ) (application.CalendarUpdateAccess, error) {
+	if err := input.ValidateWithAttendeeLimit(backend.configuration.Policy.MaxAttendees); err != nil {
+		return application.CalendarUpdateAccess{}, err
+	}
 	access, err := withCalendarService(
 		backend,
 		ctx,
@@ -2137,6 +2196,9 @@ func (backend *sessionBackend) CancelCalendar(
 	input application.CalendarCancelInput,
 	caller domain.Caller,
 ) (application.CalendarCancelAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.CalendarCancelAccess{}, err
+	}
 	access, err := withCalendarService(
 		backend,
 		ctx,
@@ -2225,6 +2287,9 @@ func (backend *sessionBackend) ListTaskLists(
 	input application.TaskListInput,
 	caller domain.Caller,
 ) (application.TaskListPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskListPage{}, err
+	}
 	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskListPage, error) {
 		return tasks.ListLists(ctx, input, caller)
 	})
@@ -2235,6 +2300,9 @@ func (backend *sessionBackend) ListTasks(
 	input application.TaskReadInput,
 	caller domain.Caller,
 ) (application.TaskPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskPage{}, err
+	}
 	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskPage, error) {
 		return tasks.List(ctx, input, caller)
 	})
@@ -2245,6 +2313,9 @@ func (backend *sessionBackend) ListAllTasks(
 	input application.TaskProjectionInput,
 	caller domain.Caller,
 ) (application.TaskProjectionPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskProjectionPage{}, err
+	}
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
@@ -2265,6 +2336,9 @@ func (backend *sessionBackend) GetTask(
 	input application.TaskGetInput,
 	caller domain.Caller,
 ) (application.Task, error) {
+	if err := input.Validate(); err != nil {
+		return application.Task{}, err
+	}
 	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.Task, error) {
 		return tasks.Get(ctx, input, caller)
 	})
@@ -2275,6 +2349,9 @@ func (backend *sessionBackend) SearchTasks(
 	input application.TaskSearchInput,
 	caller domain.Caller,
 ) (application.TaskPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskPage{}, err
+	}
 	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskPage, error) {
 		return tasks.Search(ctx, input, caller)
 	})
@@ -2285,6 +2362,9 @@ func (backend *sessionBackend) SyncTasks(
 	input application.TaskSyncInput,
 	caller domain.Caller,
 ) (application.TaskChangePage, error) {
+	if err := input.ValidateRoute(); err != nil {
+		return application.TaskChangePage{}, err
+	}
 	return withTaskService(backend, ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskChangePage, error) {
 		return tasks.Sync(ctx, input, caller)
 	})
@@ -2295,6 +2375,9 @@ func (backend *sessionBackend) CreateTask(
 	input application.TaskCreateInput,
 	caller domain.Caller,
 ) (application.TaskWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskWriteAccess{}, err
+	}
 	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
 		return tasks.Create(ctx, input, caller)
 	})
@@ -2305,6 +2388,9 @@ func (backend *sessionBackend) UpdateTask(
 	input application.TaskUpdateInput,
 	caller domain.Caller,
 ) (application.TaskWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskWriteAccess{}, err
+	}
 	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
 		return tasks.Update(ctx, input, caller)
 	})
@@ -2315,6 +2401,9 @@ func (backend *sessionBackend) CompleteTask(
 	input application.TaskStateInput,
 	caller domain.Caller,
 ) (application.TaskWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskWriteAccess{}, err
+	}
 	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
 		return tasks.Complete(ctx, input, caller)
 	})
@@ -2325,6 +2414,9 @@ func (backend *sessionBackend) ReopenTask(
 	input application.TaskStateInput,
 	caller domain.Caller,
 ) (application.TaskWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskWriteAccess{}, err
+	}
 	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
 		return tasks.Reopen(ctx, input, caller)
 	})
@@ -2335,6 +2427,9 @@ func (backend *sessionBackend) DeleteTask(
 	input application.TaskDeleteInput,
 	caller domain.Caller,
 ) (application.TaskWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.TaskWriteAccess{}, err
+	}
 	return backend.prepareTaskWrite(ctx, input.Account, caller, func(tasks *application.TaskService) (application.TaskWriteAccess, error) {
 		return tasks.Delete(ctx, input, caller)
 	})
@@ -2424,6 +2519,9 @@ func (backend *sessionBackend) ListConversations(
 	input application.ConversationListInput,
 	caller domain.Caller,
 ) (application.ConversationPage, error) {
+	if err := input.Validate(); err != nil {
+		return application.ConversationPage{}, err
+	}
 	return withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.ConversationPage, error) {
 		return messages.ListConversations(ctx, input, caller)
 	})
@@ -2434,6 +2532,9 @@ func (backend *sessionBackend) ListMessages(
 	input application.MessageListInput,
 	caller domain.Caller,
 ) (application.MessagePage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessagePage{}, err
+	}
 	return withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessagePage, error) {
 		return messages.ListMessages(ctx, input, caller)
 	})
@@ -2444,6 +2545,9 @@ func (backend *sessionBackend) SearchMessages(
 	input application.MessageSearchInput,
 	caller domain.Caller,
 ) (application.MessagePage, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessagePage{}, err
+	}
 	return withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessagePage, error) {
 		return messages.SearchMessages(ctx, input, caller)
 	})
@@ -2454,6 +2558,9 @@ func (backend *sessionBackend) GetMessage(
 	input application.MessageGetInput,
 	caller domain.Caller,
 ) (application.MessageSensitiveAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageSensitiveAccess{}, err
+	}
 	access, err := withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageSensitiveAccess, error) {
 		return messages.GetMessage(ctx, input, caller)
 	})
@@ -2476,6 +2583,9 @@ func (backend *sessionBackend) GetMessageAttachment(
 	input application.MessageAttachmentGetInput,
 	caller domain.Caller,
 ) (application.MessageSensitiveAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageSensitiveAccess{}, err
+	}
 	access, err := withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageSensitiveAccess, error) {
 		return messages.GetAttachment(ctx, input, caller)
 	})
@@ -2498,6 +2608,9 @@ func (backend *sessionBackend) SyncMessages(
 	input application.MessageSyncInput,
 	caller domain.Caller,
 ) (application.MessageChangePage, error) {
+	if err := input.ValidateRoute(); err != nil {
+		return application.MessageChangePage{}, err
+	}
 	return withMessagingService(backend, ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageChangePage, error) {
 		return messages.SyncMessages(ctx, input, caller)
 	})
@@ -2508,6 +2621,9 @@ func (backend *sessionBackend) SendMessage(
 	input application.MessageSendInput,
 	caller domain.Caller,
 ) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
 	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
 		return messages.Send(ctx, input, caller)
 	})
@@ -2528,6 +2644,9 @@ func (backend *sessionBackend) EditMessage(
 	input application.MessageEditInput,
 	caller domain.Caller,
 ) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
 	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
 		return messages.Edit(ctx, input, caller)
 	})
@@ -2548,6 +2667,9 @@ func (backend *sessionBackend) DeleteMessage(
 	input application.MessageDeleteInput,
 	caller domain.Caller,
 ) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
 	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
 		return messages.Delete(ctx, input, caller)
 	})
@@ -2568,6 +2690,9 @@ func (backend *sessionBackend) ReactToMessage(
 	input application.MessageReactionInput,
 	caller domain.Caller,
 ) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
 	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
 		return messages.React(ctx, input, caller)
 	})
@@ -2588,6 +2713,9 @@ func (backend *sessionBackend) CreateConversation(
 	input application.ConversationCreateInput,
 	caller domain.Caller,
 ) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
 	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
 		return messages.CreateConversation(ctx, input, caller)
 	})
@@ -2608,6 +2736,9 @@ func (backend *sessionBackend) ChangeConversationMembership(
 	input application.ConversationMembershipInput,
 	caller domain.Caller,
 ) (application.MessageWriteAccess, error) {
+	if err := input.Validate(); err != nil {
+		return application.MessageWriteAccess{}, err
+	}
 	return backend.prepareMessageWrite(ctx, input.Account, caller, func(messages *application.MessagingService) (application.MessageWriteAccess, error) {
 		return messages.ChangeMembership(ctx, input, caller)
 	})

@@ -12,6 +12,12 @@ import (
 
 var ErrNotReady = errors.New("outlook web session is not ready")
 
+var (
+	ErrAuthorizationMissing = errors.New("observed Outlook Web request has no authorization")
+	ErrAuthorizationScheme  = errors.New("observed Outlook Web request uses an unsupported authorization scheme")
+	ErrAuthorizationInvalid = errors.New("observed Outlook Web authorization is malformed")
+)
+
 var forwardedHeaders = map[string]struct{}{
 	"X-Anchormailbox":          {},
 	"X-Clientid":               {},
@@ -70,11 +76,17 @@ func newCredentials(rawURL string, headers http.Header, now time.Time) (Credenti
 
 	authorization := headers.Get("Authorization")
 	parts := strings.Fields(authorization)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return Credentials{}, errors.New("observed request has no bearer authorization")
+	if authorization == "" {
+		return Credentials{}, ErrAuthorizationMissing
+	}
+	if len(parts) != 2 {
+		return Credentials{}, ErrAuthorizationInvalid
+	}
+	if !strings.EqualFold(parts[0], "Bearer") {
+		return Credentials{}, ErrAuthorizationScheme
 	}
 	if len(parts[1]) < 32 || len(parts[1]) > 16<<10 || strings.ContainsAny(parts[1], "\r\n\x00") {
-		return Credentials{}, errors.New("observed bearer authorization is malformed")
+		return Credentials{}, ErrAuthorizationInvalid
 	}
 
 	selected := make(http.Header)

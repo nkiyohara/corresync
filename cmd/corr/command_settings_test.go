@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"sync/atomic"
@@ -44,6 +45,36 @@ func TestSettingsRenamesAccountInteractively(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Account renamed to office") {
 		t.Fatalf("settings output = %q", stdout.String())
+	}
+}
+
+func TestSettingsFormWidthFollowsTerminalWithoutExceedingDesignWidth(t *testing.T) {
+	tests := []struct {
+		name    string
+		columns int
+		err     error
+		want    int
+	}{
+		{name: "narrow", columns: 40, want: 38},
+		{name: "standard", columns: 80, want: 78},
+		{name: "eighty-eight", columns: 88, want: 86},
+		{name: "design maximum", columns: 90, want: 88},
+		{name: "wide", columns: 160, want: 88},
+		{name: "minimum", columns: 20, want: 24},
+		{name: "unavailable", err: errors.New("not a terminal"), want: 78},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			app := newRuntime(
+				t.Context(), "", &bytes.Buffer{}, &bytes.Buffer{}, buildinfo.Current(),
+			)
+			app.terminalWidth = func(io.Writer) (int, error) {
+				return test.columns, test.err
+			}
+			if got := settingsFormWidth(app); got != test.want {
+				t.Fatalf("settingsFormWidth() = %d, want %d", got, test.want)
+			}
+		})
 	}
 }
 

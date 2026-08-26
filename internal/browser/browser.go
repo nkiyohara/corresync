@@ -44,6 +44,7 @@ type Browser struct {
 	cancelContext   context.CancelFunc
 	cancelAllocator context.CancelFunc
 	sessions        *session.Manager
+	sessionErrors   chan error
 	allowedOrigins  map[string]struct{}
 	interactionMu   sync.Mutex
 	teamsState      *teamsBrowserState
@@ -88,10 +89,11 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 		cancelContext:   cancelContext,
 		cancelAllocator: cancelAllocator,
 		sessions:        manager,
+		sessionErrors:   make(chan error, 1),
 		allowedOrigins:  allowedBrowserOrigins(options),
 	}
 	if manager != nil {
-		observer := newRequestObserver(manager)
+		observer := newRequestObserver(manager, instance.reportSessionError)
 		chromedp.ListenTarget(browserContext, observer.Handle)
 		if err := chromedp.Run(browserContext, network.Enable()); err != nil {
 			_ = instance.Close()
@@ -134,7 +136,26 @@ func (browser *Browser) WaitForSession(ctx context.Context) (session.Credentials
 			"authorization observation is disabled for this browser",
 		)
 	}
-	return browser.sessions.Wait(ctx)
+	select {
+	case <-ctx.Done():
+		return session.Credentials{}, ctx.Err()
+	case <-browser.context.Done():
+		return session.Credentials{}, ErrBrowserSessionUnavailable
+	case failure := <-browser.sessionErrors:
+		return session.Credentials{}, failure
+	case <-browser.sessions.Ready():
+		return browser.sessions.Current()
+	}
+}
+
+func (browser *Browser) reportSessionError(failure error) {
+	if browser == nil || failure == nil {
+		return
+	}
+	select {
+	case browser.sessionErrors <- failure:
+	default:
+	}
 }
 
 // CurrentSession returns the current browser-observed authorization snapshot

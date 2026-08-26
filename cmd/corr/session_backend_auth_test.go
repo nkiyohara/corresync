@@ -37,6 +37,38 @@ func (readyBrowserHandle) Apply(*http.Request) error { return nil }
 
 func (readyBrowserHandle) Close() error { return nil }
 
+type failingBrowserHandle struct {
+	err    error
+	closed bool
+}
+
+type signedOutBrowserHandle struct {
+	closed bool
+}
+
+func (handle *signedOutBrowserHandle) WaitForSession(ctx context.Context) (session.Credentials, error) {
+	<-ctx.Done()
+	return session.Credentials{}, ctx.Err()
+}
+
+func (*signedOutBrowserHandle) Apply(*http.Request) error { return session.ErrNotReady }
+
+func (handle *signedOutBrowserHandle) Close() error {
+	handle.closed = true
+	return nil
+}
+
+func (handle *failingBrowserHandle) WaitForSession(context.Context) (session.Credentials, error) {
+	return session.Credentials{}, handle.err
+}
+
+func (*failingBrowserHandle) Apply(*http.Request) error { return session.ErrNotReady }
+
+func (handle *failingBrowserHandle) Close() error {
+	handle.closed = true
+	return nil
+}
+
 type oauthManagerStub struct {
 	calls              int
 	route              config.OAuthClient
@@ -88,6 +120,53 @@ func TestOutlookBrowserUsesSessionOwnerLifetimeAfterLoginRequest(t *testing.T) {
 	case <-launchedDone:
 	default:
 		t.Fatal("session owner cancellation left browser alive")
+	}
+}
+
+func TestOutlookAuthenticationClosesFailedBrowserObservation(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+
+	configuration := config.OutlookDefault()
+	configured := configuration.Accounts[configuration.DefaultAccount]
+	handle := &failingBrowserHandle{err: session.ErrAuthorizationScheme}
+	app := &runtime{
+		stderr: &strings.Builder{},
+		launch: func(context.Context, browser.Options) (browserHandle, error) {
+			return handle, nil
+		},
+	}
+	_, _, err := app.authenticate(
+		t.Context(), t.Context(), configuration, configured.ID, configured,
+	)
+	if !errors.Is(err, session.ErrAuthorizationScheme) {
+		t.Fatalf("authenticate() error = %v", err)
+	}
+	if !handle.closed {
+		t.Fatal("failed browser observation remained open")
+	}
+}
+
+func TestOutlookAuthenticationKeepsFullySignedOutFlowExplicit(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+
+	configuration := config.OutlookDefault()
+	configuration.Browser.LoginTimeout = config.Duration(5 * time.Millisecond)
+	configured := configuration.Accounts[configuration.DefaultAccount]
+	handle := &signedOutBrowserHandle{}
+	app := &runtime{
+		stderr: &strings.Builder{},
+		launch: func(context.Context, browser.Options) (browserHandle, error) {
+			return handle, nil
+		},
+	}
+	_, _, err := app.authenticate(
+		t.Context(), t.Context(), configuration, configured.ID, configured,
+	)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("authenticate() error = %v, want explicit timeout", err)
+	}
+	if !handle.closed {
+		t.Fatal("fully signed-out browser flow remained owned after timeout")
 	}
 }
 
