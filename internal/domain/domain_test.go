@@ -53,11 +53,36 @@ func TestNewOperationSnapshotsPayload(t *testing.T) {
 	}
 
 	view := operation.View()
-	if view.Name != "mail.send" || view.Effect != EffectExternalWrite || view.Account != "work" {
+	if view.Name != "mail.send" || view.Effect != EffectExternalWrite ||
+		view.Scope != OperationScopeAccount || view.Account != "work" {
 		t.Fatalf("unexpected view: %+v", view)
 	}
 	if len(view.Digest) != 2*32 {
 		t.Fatalf("digest length = %d, want 64", len(view.Digest))
+	}
+}
+
+func TestGlobalOperationHasNoFabricatedAccountBoundary(t *testing.T) {
+	operation, err := NewGlobalOperation(
+		"settings.update",
+		EffectReversibleWrite,
+		map[string]string{"channel": "preview"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	view := operation.View()
+	if operation.Scope() != OperationScopeGlobal || view.Scope != OperationScopeGlobal ||
+		view.Account != "" || view.Target != nil {
+		t.Fatalf("global operation = %+v", view)
+	}
+	if err := view.Validate(); err != nil {
+		t.Fatalf("global operation view validation: %v", err)
+	}
+	fabricated := view
+	fabricated.Account = "work"
+	if err := fabricated.Validate(); err == nil {
+		t.Fatal("global operation view accepted a fabricated account")
 	}
 }
 

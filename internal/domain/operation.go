@@ -22,10 +22,20 @@ var operationNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*
 type Operation struct {
 	name    string
 	effect  Effect
+	scope   OperationScope
 	account AccountID
 	target  TargetRef
 	payload json.RawMessage
 }
+
+// OperationScope distinguishes account-bound provider work from bounded
+// local configuration work that intentionally has no account identity.
+type OperationScope string
+
+const (
+	OperationScopeAccount OperationScope = "account"
+	OperationScopeGlobal  OperationScope = "global"
+)
 
 // TargetKind identifies the exact writable object collection selected by a
 // preview. A commit token is bound to this target independently of payload
@@ -66,16 +76,23 @@ func (target TargetRef) Validate() error {
 
 // OperationView is the non-secret metadata safe to return in a preview.
 type OperationView struct {
-	Name    string     `json:"name"`
-	Effect  Effect     `json:"effect"`
-	Account AccountID  `json:"account"`
-	Target  *TargetRef `json:"target,omitempty"`
-	Digest  string     `json:"digest"`
+	Name    string         `json:"name"`
+	Effect  Effect         `json:"effect"`
+	Scope   OperationScope `json:"scope,omitempty"`
+	Account AccountID      `json:"account,omitempty"`
+	Target  *TargetRef     `json:"target,omitempty"`
+	Digest  string         `json:"digest"`
 }
 
 // NewOperation validates and snapshots a typed operation payload.
 func NewOperation(name string, effect Effect, account AccountID, payload any) (Operation, error) {
-	return newOperation(name, effect, account, TargetRef{}, payload)
+	return newOperation(name, effect, OperationScopeAccount, account, TargetRef{}, payload)
+}
+
+// NewGlobalOperation snapshots bounded local configuration work without
+// fabricating or borrowing an account identity.
+func NewGlobalOperation(name string, effect Effect, payload any) (Operation, error) {
+	return newOperation(name, effect, OperationScopeGlobal, "", TargetRef{}, payload)
 }
 
 // NewTargetedOperation binds a write preview to one exact mailbox, calendar,
@@ -90,12 +107,13 @@ func NewTargetedOperation(
 	if err := target.Validate(); err != nil {
 		return Operation{}, err
 	}
-	return newOperation(name, effect, account, target, payload)
+	return newOperation(name, effect, OperationScopeAccount, account, target, payload)
 }
 
 func newOperation(
 	name string,
 	effect Effect,
+	scope OperationScope,
 	account AccountID,
 	target TargetRef,
 	payload any,
@@ -106,8 +124,17 @@ func newOperation(
 	if err := effect.Validate(); err != nil {
 		return Operation{}, err
 	}
-	if err := account.Validate(); err != nil {
-		return Operation{}, err
+	switch scope {
+	case OperationScopeAccount:
+		if err := account.Validate(); err != nil {
+			return Operation{}, err
+		}
+	case OperationScopeGlobal:
+		if account != "" || target.Kind != "" {
+			return Operation{}, errors.New("global operation cannot select an account or target")
+		}
+	default:
+		return Operation{}, fmt.Errorf("invalid operation scope %q", scope)
 	}
 
 	encoded, err := json.Marshal(payload)
@@ -121,6 +148,7 @@ func newOperation(
 	return Operation{
 		name:    name,
 		effect:  effect,
+		scope:   scope,
 		account: account,
 		target:  target,
 		payload: encoded,
@@ -136,6 +164,10 @@ func (operation Operation) Name() string {
 func (operation Operation) Effect() Effect {
 	return operation.effect
 }
+
+// Scope returns the immutable authorization boundary selected by the
+// operation.
+func (operation Operation) Scope() OperationScope { return operation.scope }
 
 // Account returns the mailbox account boundary for the operation.
 func (operation Operation) Account() AccountID {
@@ -156,6 +188,7 @@ func (operation Operation) View() OperationView {
 	view := OperationView{
 		Name:    operation.name,
 		Effect:  operation.effect,
+		Scope:   operation.scope,
 		Account: operation.account,
 		Digest:  hex.EncodeToString(digest[:]),
 	}
@@ -174,8 +207,17 @@ func (view OperationView) Validate() error {
 	if err := view.Effect.Validate(); err != nil {
 		return err
 	}
-	if err := view.Account.Validate(); err != nil {
-		return err
+	switch view.Scope {
+	case "", OperationScopeAccount:
+		if err := view.Account.Validate(); err != nil {
+			return err
+		}
+	case OperationScopeGlobal:
+		if view.Account != "" || view.Target != nil {
+			return errors.New("global operation view cannot select an account or target")
+		}
+	default:
+		return fmt.Errorf("invalid operation view scope %q", view.Scope)
 	}
 	if view.Target != nil {
 		if err := view.Target.Validate(); err != nil {
@@ -196,13 +238,15 @@ func (operation Operation) digest() [sha256.Size]byte {
 		Version int             `json:"version"`
 		Name    string          `json:"name"`
 		Effect  Effect          `json:"effect"`
+		Scope   OperationScope  `json:"scope"`
 		Account AccountID       `json:"account"`
 		Target  TargetRef       `json:"target,omitempty"`
 		Payload json.RawMessage `json:"payload"`
 	}{
-		Version: 2,
+		Version: 3,
 		Name:    operation.name,
 		Effect:  operation.effect,
+		Scope:   operation.scope,
 		Account: operation.account,
 		Target:  operation.target,
 		Payload: operation.payload,

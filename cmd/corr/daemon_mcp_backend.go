@@ -173,10 +173,9 @@ func (backend *daemonMCPBackend) PreviewSettingsUpdate(
 	if err != nil {
 		return application.SettingsChangeAccess{}, err
 	}
-	operation, err := domain.NewOperation(
+	operation, err := domain.NewGlobalOperation(
 		"settings.update",
 		domain.EffectReversibleWrite,
-		backend.DefaultAccount(),
 		review,
 	)
 	if err != nil {
@@ -211,6 +210,11 @@ func (backend *daemonMCPBackend) CommitSettingsUpdate(
 	)
 	if err != nil {
 		return application.SettingsChangeAccess{}, err
+	}
+	if operation.Scope() != domain.OperationScopeGlobal {
+		return application.SettingsChangeAccess{}, errors.New(
+			"approved settings update has an invalid operation scope",
+		)
 	}
 	var review application.SettingsChangeReview
 	if err := operation.DecodePayload(&review); err != nil {
