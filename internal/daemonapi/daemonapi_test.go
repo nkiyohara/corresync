@@ -1639,6 +1639,85 @@ func TestServerRejectsUnknownEnvelopeFields(t *testing.T) {
 	}
 }
 
+func TestClientRejectsInvalidApplicationInputBeforeLoadingIPCCredential(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(localipc.Endpoint{
+		Address:        filepath.Join(t.TempDir(), "missing.sock"),
+		CredentialPath: filepath.Join(t.TempDir(), "missing.credential"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	caller := domain.Caller{Surface: "mcp", Instance: "validation-test"}
+
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{
+			name: "mail",
+			call: func() error {
+				_, callErr := client.ListMail(t.Context(), application.MailListInput{}, caller)
+				return callErr
+			},
+		},
+		{
+			name: "calendar",
+			call: func() error {
+				_, callErr := client.ListCalendar(t.Context(), application.CalendarListInput{}, caller)
+				return callErr
+			},
+		},
+		{
+			name: "tasks",
+			call: func() error {
+				_, callErr := client.ListTasks(t.Context(), application.TaskReadInput{}, caller)
+				return callErr
+			},
+		},
+		{
+			name: "mail write",
+			call: func() error {
+				_, callErr := client.CreateMailDraft(
+					t.Context(), application.MailDraftInput{}, caller,
+				)
+				return callErr
+			},
+		},
+		{
+			name: "calendar write",
+			call: func() error {
+				_, callErr := client.CreateCalendar(
+					t.Context(), application.CalendarCreateInput{}, caller,
+				)
+				return callErr
+			},
+		},
+		{
+			name: "task write",
+			call: func() error {
+				_, callErr := client.CreateTask(
+					t.Context(), application.TaskCreateInput{}, caller,
+				)
+				return callErr
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.call()
+			if err == nil {
+				t.Fatal("invalid input was accepted")
+			}
+			if strings.Contains(err.Error(), "credential") || errors.Is(err, localipc.ErrCredentialMissing) {
+				t.Fatalf("input validation reached IPC authentication: %v", err)
+			}
+		})
+	}
+}
+
 func newTestServer(t *testing.T, backend Backend, token string) *Server {
 	t.Helper()
 	server, err := NewServer(backend, ServerOptions{
