@@ -28,6 +28,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/rollout"
 	"github.com/nkiyohara/corresync/internal/session"
 	"github.com/nkiyohara/corresync/internal/updatecheck"
+	"golang.org/x/term"
 )
 
 type browserHandle interface {
@@ -82,6 +83,7 @@ type runtime struct {
 	checkUpdateFresh               func(context.Context) (updatecheck.Result, error)
 	installUpdate                  func(context.Context, func(updatecheck.InstallProgress)) (updatecheck.InstallResult, error)
 	installMethod                  func() updatecheck.InstallMethod
+	terminalWidth                  func(io.Writer) (int, error)
 	interactiveOutput              func() bool
 	interactiveInput               func() bool
 	interactiveStdout              func() bool
@@ -159,7 +161,15 @@ func newRuntime(
 			command.Stderr = stderr
 			return command.Run()
 		},
-		processID:                  os.Getpid(),
+		processID: os.Getpid(),
+		terminalWidth: func(output io.Writer) (int, error) {
+			file, ok := output.(*os.File)
+			if !ok {
+				return 0, errors.New("output is not a terminal file")
+			}
+			width, _, err := term.GetSize(int(file.Fd()))
+			return width, err
+		},
 		lookupEnv:                  os.LookupEnv,
 		userHomeDir:                os.UserHomeDir,
 		userConfigDir:              os.UserConfigDir,

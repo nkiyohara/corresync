@@ -1002,7 +1002,31 @@ func settingsForm(app *runtime, fields ...huh.Field) *huh.Form {
 		WithKeyMap(keymap).
 		WithShowHelp(true).
 		WithShowErrors(true).
-		WithWidth(88)
+		WithWidth(settingsFormWidth(app))
+}
+
+func settingsFormWidth(app *runtime) int {
+	const (
+		maximum  = 88
+		fallback = 78
+		minimum  = 24
+		margin   = 2
+	)
+	if app.terminalWidth == nil {
+		return fallback
+	}
+	columns, err := app.terminalWidth(app.stdout)
+	if err != nil || columns <= margin {
+		return fallback
+	}
+	width := columns - margin
+	if width > maximum {
+		return maximum
+	}
+	if width < minimum {
+		return minimum
+	}
+	return width
 }
 
 func settingsAccessible(app *runtime) bool {
