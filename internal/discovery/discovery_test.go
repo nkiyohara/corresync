@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -80,6 +83,12 @@ func TestDiscoverCombinesCredentialFreeEvidence(t *testing.T) {
 	}
 	if providers[domain.ProviderMicrosoftOWA].Confidence != 55 {
 		t.Fatalf("Outlook candidate = %#v", providers[domain.ProviderMicrosoftOWA])
+	}
+	if endpoint := providers[domain.ProviderMicrosoftOWA].Endpoints[0]; endpoint !=
+		(application.DiscoveredEndpoint{
+			Kind: "origin", Value: "https://outlook.cloud.microsoft",
+		}) {
+		t.Fatalf("Outlook endpoint = %#v", endpoint)
 	}
 	graph := providers[domain.ProviderMicrosoftGraph]
 	if graph.Confidence != 50 ||
@@ -377,12 +386,18 @@ func TestDiscoverKnownMicrosoftOffersGraphOnlyByExplicitSelection(t *testing.T) 
 	for _, candidate := range observation.Candidates {
 		providers[candidate.Provider] = candidate
 	}
-	if len(providers) != 2 ||
-		providers[domain.ProviderMicrosoftOWA].RequiresExplicitSelection ||
+	if len(providers) != 1 ||
 		!providers[domain.ProviderMicrosoftGraph].RequiresExplicitSelection ||
 		providers[domain.ProviderMicrosoftGraph].Authentication !=
 			application.DiscoveryExplicitOAuth {
 		t.Fatalf("Microsoft candidates = %#v", providers)
+	}
+	if len(observation.Diagnostics) == 0 ||
+		observation.Diagnostics[0] != (application.DiscoveryDiagnostic{
+			Source: "known_domain_owa", Status: "unavailable",
+			Detail: "consumer Outlook Web authorization is not supported by this release",
+		}) {
+		t.Fatalf("Microsoft diagnostics = %#v", observation.Diagnostics)
 	}
 }
 
@@ -396,5 +411,92 @@ func TestDiscoverFailsOnCancellation(t *testing.T) {
 	})
 	if _, err := discoverer.Discover(ctx, "reader@example.test"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Discover() error = %v", err)
+	}
+}
+
+func TestHTTPSProberAcceptsOnlyCapabilityShapedResponses(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name        string
+		status      int
+		contentType string
+		want        string
+	}{
+		{name: "bad request", status: http.StatusBadRequest, want: "not_found"},
+		{name: "authentication required", status: http.StatusUnauthorized, want: "not_found"},
+		{name: "forbidden", status: http.StatusForbidden, want: "not_found"},
+		{name: "method rejected", status: http.StatusMethodNotAllowed, want: "not_found"},
+		{name: "expectation failed", status: http.StatusExpectationFailed, want: "not_found"},
+		{name: "missing", status: http.StatusNotFound, want: "not_found"},
+		{name: "gone", status: http.StatusGone, want: "not_found"},
+		{name: "server error", status: http.StatusInternalServerError, want: "unavailable"},
+		{name: "JSON success", status: http.StatusOK, contentType: "application/json", want: "observed"},
+		{name: "WebDAV success", status: http.StatusMultiStatus, contentType: "application/xml", want: "observed"},
+		{name: "generic HTML", status: http.StatusOK, contentType: "text/html; charset=utf-8", want: "not_found"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var receivedAuthorization atomic.Bool
+			server := httptest.NewTLSServer(http.HandlerFunc(func(
+				writer http.ResponseWriter,
+				request *http.Request,
+			) {
+				if request.Header.Get("Authorization") != "" {
+					receivedAuthorization.Store(true)
+				}
+				if test.contentType != "" {
+					writer.Header().Set("Content-Type", test.contentType)
+				}
+				writer.WriteHeader(test.status)
+			}))
+			defer server.Close()
+
+			client := server.Client()
+			client.CheckRedirect = newHTTPSProber().client.CheckRedirect
+			prober := &httpsProber{client: client}
+			result, err := prober.Probe(
+				t.Context(), server.URL+"/.well-known/jmap",
+			)
+			if err != nil {
+				t.Fatalf("Probe() error = %v", err)
+			}
+			if result.Status != test.want {
+				t.Fatalf("Probe() = %#v, want status %q", result, test.want)
+			}
+			if receivedAuthorization.Load() {
+				t.Fatal("credential-free probe sent authorization")
+			}
+		})
+	}
+}
+
+func TestHTTPSProberRejectsRedirectToGenericPage(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(
+		writer http.ResponseWriter,
+		request *http.Request,
+	) {
+		if request.URL.Path == "/.well-known/caldav" {
+			http.Redirect(writer, request, "/landing", http.StatusFound)
+			return
+		}
+		writer.Header().Set("Content-Type", "text/html")
+		writer.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := server.Client()
+	client.CheckRedirect = newHTTPSProber().client.CheckRedirect
+	prober := &httpsProber{client: client}
+	result, err := prober.Probe(
+		t.Context(), server.URL+"/.well-known/caldav",
+	)
+	if err != nil {
+		t.Fatalf("Probe() error = %v", err)
+	}
+	if result.Status != "not_found" || result.Endpoint != server.URL+"/landing" {
+		t.Fatalf("Probe() = %#v", result)
 	}
 }

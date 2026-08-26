@@ -43,23 +43,35 @@ func (manager *Manager) Allows(rawURL string) bool {
 	return err == nil && requestOrigin(parsed) == manager.origin
 }
 
+// Origin returns the exact content-free HTTPS boundary this manager accepts.
+func (manager *Manager) Origin() string { return manager.origin }
+
 // Observe updates the in-memory snapshot when a request contains valid bearer
 // authorization for the approved origin. It never retains unrelated headers.
 func (manager *Manager) Observe(rawURL string, headers http.Header) bool {
+	return manager.ObserveAuthorization(rawURL, headers) == nil
+}
+
+// ObserveAuthorization updates the current snapshot or returns a bounded,
+// content-free reason why an eligible request could not establish a session.
+func (manager *Manager) ObserveAuthorization(rawURL string, headers http.Header) error {
 	if !manager.Allows(rawURL) {
-		return false
+		return errors.New("observed Outlook Web request is outside the configured origin")
 	}
 	credentials, err := newCredentials(rawURL, headers, manager.clock())
 	if err != nil {
-		return false
+		return err
 	}
 
 	manager.mu.Lock()
 	manager.current = &credentials
 	manager.mu.Unlock()
 	manager.once.Do(func() { close(manager.ready) })
-	return true
+	return nil
 }
+
+// Ready closes after the first valid authorization snapshot is captured.
+func (manager *Manager) Ready() <-chan struct{} { return manager.ready }
 
 // Current returns a defensive copy of the most recent snapshot.
 func (manager *Manager) Current() (Credentials, error) {

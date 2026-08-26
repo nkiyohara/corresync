@@ -49,9 +49,11 @@ confirmation. It separately offers multi-account continuation and reviewed,
 independently verified agent-host integration. `corr setup ADDRESS` remains deterministic
 and may add only a safely auto-selectable first-party route. `corr account add`
 requires explicit provider selection whenever discovery is ambiguous.
-Microsoft domain or hosted-MX evidence offers both Outlook Web and Microsoft
-Graph, but Graph is always marked as an explicit OAuth choice and is never
-selected as a fallback.
+Microsoft 365 hosted-MX evidence offers Outlook Web at the reviewed
+`outlook.cloud.microsoft` origin and Microsoft Graph as an explicit OAuth
+choice. Consumer Outlook.com-family evidence offers only the explicit Graph
+choice because the observed browser authorization scheme is unsupported.
+Graph is never selected as a fallback.
 Google evidence identifies a route that needs a user-owned Desktop OAuth
 client. Guided setup can validate and import the downloaded client into the OS
 keyring, but discovery and account addition start no sign-in. The routes pin

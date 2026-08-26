@@ -42,11 +42,12 @@ authorized live observations.
 Historical Outlook Web notes were made on 2026-07-18, 2026-07-19, and
 2026-07-25 using synthetic content and no third-party recipient. Those notes did
 not record the exact commit, so they are context only and do not substantiate
-v0.8. Google's retired IMAP/SMTP route has the bounded commit-bound observation
-linked above; it is not evidence for the staged Gmail API route. No current
+the current candidate. Google's retired IMAP/SMTP route has the bounded
+commit-bound observation linked above; it is not evidence for the staged Gmail
+API route. No current
 provider or native-platform boundary has a commit-bound live observation
-for the v0.8 implementation. The explicit marker and required template live in
-the [live evidence index](evidence/README.md).
+for the complete v0.9 candidate. The explicit marker and required template live
+in the [live evidence index](evidence/README.md).
 
 Cross-compilation proves platform-specific code builds; it does not replace
 native browser, keyring, IPC, Gatekeeper, SmartScreen, or package-manager
@@ -55,8 +56,10 @@ evidence.
 ## Provider claims
 
 - `microsoft-owa`: mail and calendar are implemented; historical live notes
-  exist, but v0.8 remains live-unobserved because those notes are not tied to
-  its exact commit.
+  exist. A content-free `v0.9.0-rc.4` observation found that Microsoft 365
+  completes at `outlook.cloud.microsoft`, while the consumer route uses an
+  unsupported authorization scheme. The current candidate therefore keeps
+  consumer discovery closed and remains live-unobserved as a complete build.
 - `google-web`: the legacy parser and synthetic adapter contracts remain for
   safe handling of v0.8.0-v0.8.1 configuration, but runtime sign-in is
   unsupported and stops before browser launch. Google rejected the observed

@@ -25,6 +25,18 @@ remain in that browser. Corresync:
 - leaves browser-managed profile state inside the account's private local
   profile directory.
 
+The visible Outlook window is not a disposable OAuth callback. It remains the
+account's browser-owned session and lets the daemon observe a current,
+exact-origin authorization without copying cookies or browser storage. Account
+logout and daemon shutdown close it. Closing it manually makes the affected
+services require interaction again.
+
+The private browser profile survives that in-memory session. An explicit later
+`corr auth login --account ALIAS` can therefore complete immediately when the
+provider still accepts its browser session; signed-out, MFA, consent, and
+cancellation screens remain visible and human-owned. Ordinary CLI and MCP
+reads never open or focus this flow.
+
 On Linux, visible login checks for an available X11 or Wayland session before
 starting Chromium. If both `DISPLAY` and `WAYLAND_DISPLAY` are unset, Corresync
 stops before launching the browser and prints the exact account-specific

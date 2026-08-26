@@ -104,6 +104,28 @@ func TestManagerRejectsOriginConfusionAndMalformedAuthorization(t *testing.T) {
 	}
 }
 
+func TestManagerClassifiesUnsupportedAuthorizationWithoutRetainingIt(t *testing.T) {
+	t.Parallel()
+
+	manager, err := NewManager("https://outlook.cloud.microsoft")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = manager.ObserveAuthorization(
+		"https://outlook.cloud.microsoft/owa/service.svc",
+		http.Header{"Authorization": {"MSAuth1.0 synthetic-value-that-is-never-retained"}},
+	)
+	if !errors.Is(err, ErrAuthorizationScheme) {
+		t.Fatalf("ObserveAuthorization() error = %v", err)
+	}
+	if strings.Contains(err.Error(), "synthetic-value") {
+		t.Fatal("authorization classification exposed its value")
+	}
+	if _, err := manager.Current(); !errors.Is(err, ErrNotReady) {
+		t.Fatalf("Current() error = %v, want ErrNotReady", err)
+	}
+}
+
 func TestManagerWaitAndCurrentLifecycle(t *testing.T) {
 	t.Parallel()
 

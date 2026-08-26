@@ -8,6 +8,8 @@ The optional domain-only public projection is constrained separately by
 
 - Status: accepted
 - Date: 2026-07-28
+- Amended: 2026-08-26 to require route-specific authentication evidence before
+  automatic Microsoft selection
 - Amended: 2026-08-18
 
 ## Context
@@ -81,13 +83,16 @@ granted. It must never initiate a Microsoft Graph authorization, never initiate
 a managed Google Workspace third-party API authorization, and never submit an
 administrator review or approval request.
 
-Microsoft therefore defaults to the authenticated Outlook Web adapter. Graph is
-used only when a valid Graph authorization is already configured or the user
-explicitly selects it. It is never an implicit dependency, an automatic
-fallback, or a capability probe. Known Microsoft domains and
-Microsoft-hosted MX evidence may advertise Graph as a separate discovery
-candidate, but that candidate is always labelled as requiring explicit OAuth
-selection; merely discovering it never opens a browser or reads a grant.
+Microsoft 365 evidence defaults to the authenticated Outlook Web adapter only
+when the release has a reachable exact-origin authorization contract for the
+selected route. Consumer Microsoft domains whose observed browser scheme is
+unsupported do not advertise that route. Graph is used only when a valid Graph
+authorization is already configured or the user explicitly selects it. It is
+never an implicit dependency, an automatic fallback, or a capability probe.
+Known Microsoft domains and Microsoft-hosted MX evidence may advertise Graph as
+a separate discovery candidate, but that candidate is always labelled as
+requiring explicit OAuth selection; merely discovering it never opens a
+browser or reads a grant.
 
 The former automatic `google-web` decision is superseded by
 [ADR 0018](0018-disable-automated-google-web-sign-in.md). Google consumer

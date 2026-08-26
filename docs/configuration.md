@@ -636,6 +636,14 @@ creates a mail-only account.
 final HTTPS Outlook host used after normal sign-in, with no path. Do not use an
 identity-provider URL or a vanity redirect.
 
+Credential-free Microsoft 365 MX discovery selects
+`https://outlook.cloud.microsoft`. Consumer Outlook.com-family discovery does
+not advertise the browser route because its live-observed authorization scheme
+is not supported; Microsoft Graph remains an explicit user-selected OAuth
+route and is never an automatic fallback. An existing or manually configured
+browser route fails promptly when it observes an unsupported authorization
+scheme or a different final service origin.
+
 An optional bare `mailbox` address routes a shared/delegated mailbox that the
 same signed-in user is already allowed to access. It grants no permission and
 does not manage delegates or folders.

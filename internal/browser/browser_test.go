@@ -74,6 +74,29 @@ func TestBrowserOwnedModeCannotExposeAuthorization(t *testing.T) {
 	}
 }
 
+func TestBrowserWaitForSessionReturnsObservationFailure(t *testing.T) {
+	t.Parallel()
+
+	manager, err := session.NewManager("https://outlook.cloud.microsoft")
+	if err != nil {
+		t.Fatal(err)
+	}
+	browserContext, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	instance := &Browser{
+		context:       browserContext,
+		sessions:      manager,
+		sessionErrors: make(chan error, 1),
+	}
+	instance.reportSessionError(session.ErrAuthorizationScheme)
+	if _, err := instance.WaitForSession(t.Context()); !errors.Is(
+		err,
+		session.ErrAuthorizationScheme,
+	) {
+		t.Fatalf("WaitForSession() error = %v", err)
+	}
+}
+
 func TestBrowserCannotApplyAuthorizationAfterOwnerExit(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	manager, err := session.NewManager("https://outlook.example.invalid")

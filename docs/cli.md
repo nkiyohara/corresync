@@ -215,6 +215,10 @@ corr doctor --online --connection-only --account personal
 open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
 closes the entire local session owner.
+An Outlook Web login keeps its dedicated visible window open because that
+window owns the account session; account logout or daemon shutdown closes it.
+If its private profile still has a provider session, a later explicit login may
+finish without another password, MFA, or consent prompt.
 `--terminal` is an optional Outlook-Web-only browser relay and requires an
 interactive TTY. Google uses normal-browser OAuth and pinned Gmail/Calendar
 APIs; it never automates Google sign-in. Its client credential must already be
