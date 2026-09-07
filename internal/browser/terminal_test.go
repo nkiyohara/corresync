@@ -147,14 +147,7 @@ func TestValidateTerminalAction(t *testing.T) {
 }
 
 func TestTerminalPasswordKeysAndMissingControls(t *testing.T) {
-	executable, err := ResolveExecutable("")
-	if err != nil {
-		t.Skipf("Chromium unavailable: %v", err)
-	}
-	allocator, cancelAllocator := chromedp.NewExecAllocator(t.Context(), allocatorOptions(executable, t.TempDir(), true)...)
-	defer cancelAllocator()
-	ctx, cancel := chromedp.NewContext(allocator)
-	defer cancel()
+	ctx := browserFixtureContext(t, true)
 	html := `<input id="password" type="password" aria-label="Password"><input type="submit" value="Sign in">`
 	if err := chromedp.Run(ctx, chromedp.Navigate("data:text/html;base64,"+base64.StdEncoding.EncodeToString([]byte(html)))); err != nil {
 		t.Fatal(err)

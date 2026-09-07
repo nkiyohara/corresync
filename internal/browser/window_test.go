@@ -11,17 +11,10 @@ import (
 )
 
 func TestMinimizeKeepsBrowserTargetAlive(t *testing.T) {
-	executable, err := ResolveExecutable("")
-	if err != nil {
-		t.Skipf("Chromium unavailable: %v", err)
-	}
 	// Opt-in desktop observation uses only a synthetic data page and a fresh
 	// profile. Default tests remain headless and never contact a provider.
 	headless := os.Getenv("CORRESYNC_TEST_VISIBLE_WINDOW") != "1"
-	allocator, cancelAllocator := chromedp.NewExecAllocator(t.Context(), allocatorOptions(executable, t.TempDir(), headless)...)
-	defer cancelAllocator()
-	ctx, cancel := chromedp.NewContext(allocator)
-	defer cancel()
+	ctx := browserFixtureContext(t, headless)
 	if err := chromedp.Run(ctx, chromedp.Navigate("data:text/html,<title>Corresync synthetic window test</title>")); err != nil {
 		t.Fatal(err)
 	}

@@ -7,13 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/chromedp/chromedp"
 )
 
 func TestTeamsConversationScriptRequiresRenderedIdentity(t *testing.T) {
-	ctx := teamsScriptTestContext(t)
+	ctx := browserFixtureContext(t, true)
 	cases := []struct {
 		name    string
 		html    string
@@ -58,7 +57,7 @@ func TestTeamsConversationScriptRequiresRenderedIdentity(t *testing.T) {
 }
 
 func TestTeamsMessageScriptRequiresConversationAndThreadEvidence(t *testing.T) {
-	ctx := teamsScriptTestContext(t)
+	ctx := browserFixtureContext(t, true)
 	cases := []struct {
 		name    string
 		pane    string
@@ -102,7 +101,7 @@ func TestTeamsMessageScriptRequiresConversationAndThreadEvidence(t *testing.T) {
 }
 
 func TestTeamsScriptsDistinguishUnknownCountsFromObservedZero(t *testing.T) {
-	ctx := teamsScriptTestContext(t)
+	ctx := browserFixtureContext(t, true)
 	cases := []struct {
 		name      string
 		attribute string
@@ -163,19 +162,6 @@ func TestTeamsScriptsDistinguishUnknownCountsFromObservedZero(t *testing.T) {
 			}
 		})
 	}
-}
-
-func teamsScriptTestContext(t *testing.T) context.Context {
-	t.Helper()
-	executable, err := ResolveExecutable("")
-	if err != nil {
-		t.Skipf("Chromium unavailable: %v", err)
-	}
-	timeoutContext, cancelTimeout := context.WithTimeout(t.Context(), 30*time.Second)
-	allocator, cancelAllocator := chromedp.NewExecAllocator(timeoutContext, allocatorOptions(executable, t.TempDir(), true)...)
-	ctx, cancelBrowser := chromedp.NewContext(allocator)
-	t.Cleanup(func() { cancelBrowser(); cancelAllocator(); cancelTimeout() })
-	return ctx
 }
 
 func evaluateTeamsFixture(t *testing.T, ctx context.Context, html, expression string, output any) {
