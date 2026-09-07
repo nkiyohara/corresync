@@ -252,12 +252,9 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	if !strings.Contains(stored, `"observedScopes":["mail.read"]`) {
 		t.Fatalf("stored grant omits observed token scopes: %s", stored)
 	}
-	grant["provider"] = "google-api"
-	legacyStored, err := json.Marshal(grant)
-	if err != nil {
-		t.Fatal(err)
+	if grant["version"] != float64(storedGrantVersion) || grant["profile"] == nil {
+		t.Fatalf("stored grant omits provider binding: %s", stored)
 	}
-	stored = string(legacyStored)
 
 	second, err := manager.AuthorizeWithClientCredential(
 		t.Context(), route.Client(), provider, resolve,
@@ -269,6 +266,20 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 		t.Fatalf("existing grant reopened authorization: %d", openCalls)
 	}
 
+	// An actual legacy grant has neither a durable profile binding nor the
+	// current provider identity. Explicit login must replace it through consent.
+	grant["version"] = float64(1)
+	grant["provider"] = "google-api"
+	delete(grant, "profile")
+	legacyStored, err := json.Marshal(grant)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored = string(legacyStored)
+	if _, err := manager.AuthorizeWithClientCredential(t.Context(), route.Client(), provider, resolve); err != nil || openCalls != 2 {
+		t.Fatalf("legacy grant reauthorization = %v; browser opens = %d", err, openCalls)
+	}
+
 	provider.Scopes = append(provider.Scopes, "calendar.list.read")
 	third, err := manager.AuthorizeWithClientCredential(
 		t.Context(), route.Client(), provider, resolve,
@@ -276,7 +287,7 @@ func TestManagerUsesExplicitPKCEAndPersistsGrantOnlyInKeyring(t *testing.T) {
 	if err != nil || third == nil {
 		t.Fatalf("expanded-scope authorization = %v, %v", third, err)
 	}
-	if openCalls != 2 {
+	if openCalls != 3 {
 		t.Fatalf("expanded scopes did not start fresh explicit authorization: %d", openCalls)
 	}
 }
@@ -736,7 +747,7 @@ func TestRefreshRotationIsAtomicAcrossManagers(t *testing.T) {
 		},
 	}
 	initial, err := json.Marshal(storedGrant{
-		Version: 1, Provider: domain.ProviderTodoist,
+		Version: storedGrantVersion, Provider: domain.ProviderTodoist, Profile: providerGrantProfile(provider),
 		ClientID: route.ClientID, RedirectURI: route.RedirectURI,
 		Scopes:         provider.Scopes,
 		ObservedScopes: []string{"data:read_write"},
@@ -862,7 +873,7 @@ func TestCredentialedDesktopClientResolvesCredentialForRefresh(t *testing.T) {
 		},
 	}
 	stored, err := json.Marshal(storedGrant{
-		Version: 1, Provider: provider.ID, ClientID: route.ClientID,
+		Version: storedGrantVersion, Provider: provider.ID, Profile: providerGrantProfile(provider), ClientID: route.ClientID,
 		RedirectURI: route.RedirectURI, Scopes: provider.Scopes,
 		Token: oauth2.Token{
 			AccessToken: "google-access-1", RefreshToken: "google-refresh",
@@ -905,7 +916,7 @@ func TestObservedOAuthScopesStayBoundedAndNeverFallBackToRequestedScopes(
 
 	requested := []string{"Chat.ReadWrite", "ChatMessage.Send"}
 	grant := storedGrant{
-		Version: 1, Provider: domain.ProviderMicrosoftGraph,
+		Version: storedGrantVersion, Provider: domain.ProviderMicrosoftGraph,
 		ClientID: "synthetic-client", RedirectURI: "http://127.0.0.1:8765/oauth/callback",
 		Scopes: requested,
 		Token: oauth2.Token{

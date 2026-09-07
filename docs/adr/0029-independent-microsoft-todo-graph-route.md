@@ -43,7 +43,11 @@ identity-platform authorization and token endpoints. An omitted cloud preserves
 the historical Global configuration meaning. China is a recognized profile so
 mail/calendar routing remains explicit, but a task route using it is rejected
 before keyring access, browser launch, or OAuth traffic. Arbitrary and cross-
-cloud API bases are invalid.
+cloud API bases are invalid. Persisted grants also bind their provider endpoints,
+OAuth protocol, and exact cloud; GCC High and DoD remain distinct even though
+they share an authority. Grant format v2 enforces this binding on both reuse
+and refresh. Older grants lack sufficient evidence and require fresh explicit
+local authorization, never automatic migration or background authorization.
 
 The adapter implements typed list/task reads, CRUD, completion/reopen,
 checklists, categories, Corresync-owned linked resources, reminders,

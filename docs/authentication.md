@@ -25,8 +25,9 @@ remain in that browser. Corresync:
 - leaves browser-managed profile state inside the account's private local
   profile directory.
 
-The visible Outlook window is not a disposable OAuth callback. It remains the
-account's browser-owned session and lets the daemon observe a current,
+After sign-in, Corresync minimizes the dedicated Outlook window when the window
+manager supports it. The browser remains the account's session owner and lets
+the daemon observe a current,
 exact-origin authorization without copying cookies or browser storage. Account
 logout and daemon shutdown close it. Closing it manually makes the affected
 services require interaction again.
@@ -60,6 +61,12 @@ After an activation or Enter submission, it waits briefly for authentication
 or a changed page before rendering again. If the bounded view remains the same,
 the CLI says so and offers `r` to refresh rather than appearing to ignore the
 selection.
+
+The terminal stays in raw mode throughout the interaction and restores its
+settings on exit. Arrow/function-key sequences are consumed without leaving
+the input field; use Backspace for corrections and Esc to return to the control
+list. Button captions are shown, while editable form values remain excluded.
+An operation failure still cancels the original login session.
 
 Piped input is rejected. CAPTCHA, passkeys, security keys, client
 certificates, native dialogs, and graphical custom login may require the
@@ -114,7 +121,12 @@ provider-specific client-credential exceptions; Microsoft Graph and Todoist
 remain secret-free.
 
 The resulting grant is stored by the operating-system keyring under the
-configured local reference. The TOML contains only that reference and the
+configured local reference. Grant format v2 binds reuse and refresh to the
+provider endpoints, OAuth protocol, and selected Microsoft cloud. Older grants
+lack this binding and require fresh authorization at the next explicit CLI
+login; background refresh never migrates them or opens a browser. OAuth error
+output includes only bounded classifications and HTTP status, never provider
+response bodies or descriptions. The TOML contains only that reference and the
 explicit consent bit. Scopes are selected from the configured mail/calendar/task
 services; choosing Graph or Google is never an automatic fallback. Google mail
 requests only the provider-documented

@@ -170,7 +170,7 @@ func (manager *Manager) authorize(
 	}
 	token, err := oauthConfig.Exchange(exchangeContext, result.code, exchangeOptions...)
 	if err != nil {
-		return storedGrant{}, fmt.Errorf("exchange OAuth authorization code: %w", err)
+		return storedGrant{}, fmt.Errorf("exchange OAuth authorization code: %w", sanitizeOAuthError(err))
 	}
 	if token.AccessToken == "" {
 		return storedGrant{}, errors.New("OAuth token endpoint returned no access token")
@@ -188,7 +188,7 @@ func (manager *Manager) authorize(
 		return storedGrant{}, fmt.Errorf("store OAuth grant: %w", err)
 	}
 	return storedGrant{
-		Version: 1, Provider: provider.ID, ClientID: route.ClientID,
+		Version: storedGrantVersion, Provider: provider.ID, Profile: providerGrantProfile(provider), ClientID: route.ClientID,
 		RedirectURI:    route.RedirectURI,
 		Scopes:         append([]string(nil), provider.Scopes...),
 		ObservedScopes: observedScopes,
