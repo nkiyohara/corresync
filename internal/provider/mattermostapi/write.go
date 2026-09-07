@@ -76,7 +76,7 @@ func (client *Client) EditMessage(
 		return application.Message{}, err
 	}
 	if err := client.requireMessageVersion(
-		ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version,
+		ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version, true,
 	); err != nil {
 		return application.Message{}, err
 	}
@@ -113,7 +113,7 @@ func (client *Client) DeleteMessage(ctx context.Context, input application.Messa
 		return err
 	}
 	if err := client.requireMessageVersion(
-		ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version,
+		ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version, true,
 	); err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (client *Client) SetMessageReaction(
 		return application.MessageReaction{}, errors.New("mattermost reaction name is malformed")
 	}
 	if err := client.requireMessageVersion(
-		ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version,
+		ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version, false,
 	); err != nil {
 		return application.MessageReaction{}, err
 	}
@@ -324,6 +324,7 @@ func (client *Client) ChangeConversationMembership(
 func (client *Client) requireMessageVersion(
 	ctx context.Context,
 	conversationID, threadRootID, messageID, version string,
+	owned bool,
 ) error {
 	post, err := client.getMattermostPost(ctx, conversationID, messageID)
 	if err != nil {
@@ -332,7 +333,7 @@ func (client *Client) requireMessageVersion(
 	if post.RootID != threadRootID || mattermostMessageVersion(post) != version {
 		return restapi.ErrPrecondition
 	}
-	if post.UserID != client.actor.ID {
+	if owned && post.UserID != client.actor.ID {
 		return errors.New("mattermost permits this route to change only its own message")
 	}
 	return nil

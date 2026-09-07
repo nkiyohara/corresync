@@ -70,7 +70,7 @@ func (client *Client) EditMessage(
 	if err := client.requireCapability(client.capabilities.Edit, "message edit"); err != nil {
 		return application.Message{}, err
 	}
-	if err := client.requireMessageVersion(ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version); err != nil {
+	if err := client.requireMessageVersion(ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version, true); err != nil {
 		return application.Message{}, err
 	}
 	text, markdown, err := slackWriteText(input.Content, input.Mentions)
@@ -116,7 +116,7 @@ func (client *Client) DeleteMessage(ctx context.Context, input application.Messa
 	if err := client.requireCapability(client.capabilities.Delete, "message delete"); err != nil {
 		return err
 	}
-	if err := client.requireMessageVersion(ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version); err != nil {
+	if err := client.requireMessageVersion(ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version, true); err != nil {
 		return err
 	}
 	var response slackEnvelope
@@ -138,7 +138,7 @@ func (client *Client) SetMessageReaction(
 	if err := client.requireCapability(client.capabilities.Reactions, "message reactions"); err != nil {
 		return application.MessageReaction{}, err
 	}
-	if err := client.requireMessageVersion(ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version); err != nil {
+	if err := client.requireMessageVersion(ctx, input.ConversationID, input.ThreadRootID, input.MessageID, input.Version, false); err != nil {
 		return application.MessageReaction{}, err
 	}
 	method := "reactions.add"
@@ -293,7 +293,7 @@ func (client *Client) ChangeConversationMembership(
 	}, nil
 }
 
-func (client *Client) requireMessageVersion(ctx context.Context, conversationID, threadRootID, messageID, version string) error {
+func (client *Client) requireMessageVersion(ctx context.Context, conversationID, threadRootID, messageID, version string, owned bool) error {
 	source, err := client.getSlackMessage(ctx, conversationID, threadRootID, messageID)
 	if err != nil {
 		return err
@@ -305,7 +305,7 @@ func (client *Client) requireMessageVersion(ctx context.Context, conversationID,
 	if summary.Version != version {
 		return restapi.ErrPrecondition
 	}
-	if summary.Author.ID != client.actor.ID {
+	if owned && summary.Author.ID != client.actor.ID {
 		return errors.New("slack permits this token to change only its own message")
 	}
 	return nil

@@ -116,22 +116,18 @@ func (client *Client) EditMessage(
 	if err != nil {
 		return application.Message{}, err
 	}
-	var response graphMessage
-	result, err := client.api.DoJSON(ctx, http.MethodPatch, resource, nil, body, &response,
-		true, nil, http.StatusOK, http.StatusTooManyRequests)
+	result, err := client.api.DoJSON(ctx, http.MethodPatch, resource, nil, body, nil,
+		true, nil, http.StatusNoContent, http.StatusTooManyRequests)
 	if err != nil {
 		return application.Message{}, err
 	}
 	if err := validateGraphResult(result); err != nil {
 		return application.Message{}, err
 	}
-	if response.ID != input.MessageID {
-		return application.Message{}, errors.Join(
-			application.ErrWriteOutcomeUnknown,
-			errors.New("the Microsoft Graph response contains a different edited Teams message"),
-		)
-	}
-	if err := validateGraphMessageRoute(response, locator); err != nil {
+	// Delegated edits return 204 without a body. Read back the exact item
+	// through the same account-scoped route to assemble the canonical result.
+	response, err := client.getGraphMessage(ctx, input.ConversationID, input.ThreadRootID, input.MessageID)
+	if err != nil {
 		return application.Message{}, errors.Join(application.ErrWriteOutcomeUnknown, err)
 	}
 	message, err := mapGraphMessage(response, input.ConversationID, client.actor.ID)

@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -409,5 +411,122 @@ func TestMattermostMissingRoleEvidenceNarrowsCapabilities(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("missing role evidence was not reported as a degradation")
+	}
+}
+
+func TestMattermostHistoryPaginationDoesNotSkipPosts(t *testing.T) {
+	posts := make([]mattermostPost, 5)
+	for i := range posts {
+		posts[i] = fixturePost()
+		posts[i].ID = fmt.Sprintf("%026d", i+1)
+	}
+	c := newFixtureClient(t, true, func(r *http.Request, _ []byte) (int, http.Header, []byte) {
+		if r.URL.Path == "/api/v4/channels/"+fixtureChannelID {
+			return 200, nil, fixtureJSON(fixtureChannel())
+		}
+		q := r.URL.Query()
+		page, _ := strconv.Atoi(q.Get("page"))
+		size, _ := strconv.Atoi(q.Get("per_page"))
+		p := mattermostPostList{Posts: map[string]mattermostPost{}}
+		for i := page * size; i < min((page+1)*size, len(posts)); i++ {
+			p.Order = append(p.Order, posts[i].ID)
+			p.Posts[posts[i].ID] = posts[i]
+		}
+		return 200, nil, fixtureJSON(p)
+	})
+	input := application.MessageListInput{Account: fixtureAccountID, WorkspaceID: fixtureTeamID, ConversationID: fixtureChannelID, Limit: 2}
+	ids := []string{}
+	for {
+		p, err := c.ListMessages(t.Context(), input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range p.Messages {
+			ids = append(ids, m.ID)
+		}
+		input.Cursor = p.NextCursor
+		if input.Cursor == "" {
+			break
+		}
+	}
+	if len(ids) != len(posts) {
+		t.Fatalf("lost lookahead post: got %v, want five", ids)
+	}
+}
+
+func TestMattermostReactToAnotherAuthorsPost(t *testing.T) {
+	post := fixturePost()
+	post.UserID = fixtureMemberID
+	writes := 0
+	c := newFixtureClient(t, false, func(r *http.Request, _ []byte) (int, http.Header, []byte) {
+		switch r.URL.Path {
+		case "/api/v4/channels/" + fixtureChannelID:
+			return 200, nil, fixtureJSON(fixtureChannel())
+		case "/api/v4/posts/" + fixturePostID:
+			return 200, nil, fixtureJSON(post)
+		case "/api/v4/reactions":
+			writes++
+			return 201, nil, fixtureJSON(mattermostReaction{UserID: fixtureActorID, PostID: fixturePostID, EmojiName: "thumbsup"})
+		}
+		t.Fatalf("unexpected %s", r.URL.Path)
+		return 0, nil, nil
+	})
+	_, err := c.SetMessageReaction(t.Context(), application.MessageReactionInput{MessageWriteRoute: application.MessageWriteRoute{Account: fixtureAccountID, WorkspaceID: fixtureTeamID, Actor: c.MessageActor()}, ConversationID: fixtureChannelID, MessageID: fixturePostID, Version: mattermostMessageVersion(post), Reaction: "thumbsup"})
+	if err != nil {
+		t.Fatalf("authorized reaction to another author rejected, writes=%d: %v", writes, err)
+	}
+}
+
+func TestMattermostSearchPaginationBindsPageSizeWithoutSkipping(t *testing.T) {
+	posts := make([]mattermostPost, 4)
+	for i := range posts {
+		posts[i] = fixturePost()
+		posts[i].ID = fmt.Sprintf("%026d", i+1)
+	}
+	calls := 0
+	client := newFixtureClient(t, true, func(request *http.Request, body []byte) (int, http.Header, []byte) {
+		if request.URL.Path == "/api/v4/channels/"+fixtureChannelID {
+			return 200, nil, fixtureJSON(fixtureChannel())
+		}
+		calls++
+		var q struct {
+			Page int `json:"page"`
+			Size int `json:"per_page"`
+		}
+		if err := json.Unmarshal(body, &q); err != nil {
+			t.Error(err)
+		}
+		result := mattermostPostList{Posts: map[string]mattermostPost{}}
+		for i := q.Page * q.Size; i < min((q.Page+1)*q.Size, len(posts)); i++ {
+			result.Order = append(result.Order, posts[i].ID)
+			result.Posts[posts[i].ID] = posts[i]
+		}
+		return 200, nil, fixtureJSON(result)
+	})
+	input := application.MessageSearchInput{Account: fixtureAccountID, WorkspaceID: fixtureTeamID, Query: "synthetic", Limit: 2}
+	first, err := client.SearchMessages(t.Context(), input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input.Cursor = first.NextCursor
+	input.Limit = 1
+	if _, err := client.SearchMessages(t.Context(), input); err == nil {
+		t.Fatal("cursor accepted a different page size")
+	}
+	if calls != 1 {
+		t.Fatal("cursor mismatch reached provider")
+	}
+	input.Limit = 2
+	count := len(first.Messages)
+	for input.Cursor != "" {
+		page, err := client.SearchMessages(t.Context(), input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		count += len(page.Messages)
+		input.Cursor = page.NextCursor
+	}
+	if count != len(posts) || calls != 3 {
+		t.Fatalf("count=%d calls=%d, expected complete snapshot with final empty page", count, calls)
 	}
 }
