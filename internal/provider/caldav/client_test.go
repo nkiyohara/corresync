@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -985,5 +986,58 @@ func TestCalDAVEventTimesRequiresIANAZone(t *testing.T) {
 	}
 	if _, _, err := calDAVEventTimes(start, end, "GMT Standard Time"); err == nil {
 		t.Fatal("calDAVEventTimes() accepted a non-IANA zone")
+	}
+}
+
+func TestCalDAVRecurrenceUntilUsesValidMatchingValueType(t *testing.T) {
+	t.Parallel()
+	for _, allDay := range []bool{false, true} {
+		client := &Client{username: "reader@example.invalid"}
+		calendar, err := client.newCalendar("synthetic", application.CalendarCreateInput{Start: "2026-09-01T00:00:00Z", End: "2026-09-02T00:00:00Z", AllDay: allDay, Recurrence: &application.CalendarRecurrence{Pattern: application.CalendarRecurrenceDaily, EndDate: "2026-09-10"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		event := calendar.Events()[0]
+		rule := event.Props.Get(ical.PropRecurrenceRule).Value
+		expected := "FREQ=DAILY;UNTIL=20260910"
+		if !allDay {
+			expected += "T235959Z"
+		}
+		if rule != expected {
+			t.Fatalf("allDay=%v rule=%q, want %q", allDay, rule, expected)
+		}
+		if _, err := event.Props.RecurrenceRule(); err != nil {
+			t.Fatalf("parse generated recurrence: %v", err)
+		}
+	}
+}
+
+func TestCalDAVLocalRecurrenceRejectsLargeExpansionBeforeAllocation(t *testing.T) {
+	t.Parallel()
+	event := fixtureRecurringEvent("synthetic")
+	start, _ := event.DateTimeStart(time.UTC)
+	var hours, minutes []string
+	for i := 0; i < 24; i++ {
+		hours = append(hours, strconv.Itoa(i))
+	}
+	for i := 0; i < 60; i++ {
+		minutes = append(minutes, strconv.Itoa(i))
+	}
+	property := ical.NewProp(ical.PropRecurrenceRule)
+	property.Value = "FREQ=DAILY;BYHOUR=" + strings.Join(hours, ",") + ";BYMINUTE=" + strings.Join(minutes, ",") + ";BYSECOND=" + strings.Join(minutes, ",")
+	event.Props.Set(property)
+	if _, err := expandCalDAVRecurrence(event, start, start.Add(48*time.Hour)); err == nil || !strings.Contains(err.Error(), "time set") {
+		t.Fatalf("large time set: %v", err)
+	}
+	property.Value = "FREQ=DAILY;BYHOUR=" + strings.Join(hours, ",") + ";BYMINUTE=" + strings.Join(minutes, ",")
+	event.Props.Set(property)
+	if _, err := expandCalDAVRecurrence(event, start, start.Add(48*time.Hour)); err == nil || !strings.Contains(err.Error(), "expansion exceeds") {
+		t.Fatalf("large result: %v", err)
+	}
+	property.Value = "FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30"
+	event.Props.Set(property)
+	got, err := expandCalDAVRecurrence(event, start, start.Add(48*time.Hour))
+	if err != nil || len(got) != 0 {
+		t.Fatalf("sparse rule: %v, %v", got, err)
 	}
 }

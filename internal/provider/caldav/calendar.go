@@ -343,6 +343,13 @@ func expandCalDAVRecurrence(
 	if duration <= 0 || duration > application.MaxCalendarWindow {
 		return nil, errors.New("CalDAV recurring event has an invalid duration")
 	}
+	property := event.Props.Get(ical.PropRecurrenceRule)
+	if property == nil || len(property.Value) > 4096 {
+		return nil, errors.New("CalDAV recurrence rule exceeds the configured limit")
+	}
+	if windowEnd.Sub(start) > 100*366*24*time.Hour {
+		return nil, errors.New("CalDAV recurrence history exceeds the local expansion limit")
+	}
 	options, err := event.Props.RecurrenceRule()
 	if err != nil || options == nil {
 		return nil, errors.New("CalDAV recurrence rule is malformed")
@@ -352,7 +359,15 @@ func expandCalDAVRecurrence(
 			"CalDAV recurrence is too frequent for bounded local expansion",
 		)
 	}
+	// DAILY and coarser rules may still expand into a large Cartesian product
+	// of hours, minutes, and seconds before their iterator yields one item.
+	if max(1, len(options.Byhour))*max(1, len(options.Byminute))*max(1, len(options.Bysecond)) > maxCalDAVExpandedEvents {
+		return nil, errors.New("CalDAV recurrence time set exceeds the local expansion limit")
+	}
 	options.Dtstart = start
+	if options.Until.IsZero() || options.Until.After(windowEnd) {
+		options.Until = windowEnd
+	}
 	rule, err := rrule.NewRRule(*options)
 	if err != nil {
 		return nil, fmt.Errorf("parse CalDAV recurrence: %w", err)
@@ -384,19 +399,23 @@ func expandCalDAVRecurrence(
 			set.RDate(value)
 		}
 	}
-	occurrences := set.Between(windowStart.Add(-duration), windowEnd, true)
-	filtered := occurrences[:0]
-	for _, occurrence := range occurrences {
-		if !occurrence.Before(windowEnd) ||
-			!occurrence.Add(duration).After(windowStart) {
+	next := set.Iterator()
+	filtered := make([]time.Time, 0)
+	for examined := 0; ; examined++ {
+		if examined >= 100000 {
+			return nil, errors.New("CalDAV recurrence traversal exceeds the local expansion limit")
+		}
+		occurrence, ok := next()
+		if !ok || !occurrence.Before(windowEnd) {
+			break
+		}
+		if !occurrence.Add(duration).After(windowStart) {
 			continue
 		}
-		filtered = append(filtered, occurrence)
-		if len(filtered) > maxCalDAVExpandedEvents {
-			return nil, errors.New(
-				"CalDAV local recurrence expansion exceeds the configured limit",
-			)
+		if len(filtered) >= maxCalDAVExpandedEvents {
+			return nil, errors.New("CalDAV local recurrence expansion exceeds the configured limit")
 		}
+		filtered = append(filtered, occurrence)
 	}
 	return filtered, nil
 }
@@ -405,6 +424,9 @@ func calDAVRecurrencePropertyTimes(
 	property ical.Prop,
 	location *time.Location,
 ) ([]time.Time, error) {
+	if strings.Count(property.Value, ",") >= maxCalDAVExpandedEvents {
+		return nil, errors.New("CalDAV recurrence date list exceeds the local expansion limit")
+	}
 	rawValues := strings.Split(property.Value, ",")
 	if len(rawValues) == 0 {
 		return nil, errors.New("recurrence date property is empty")
@@ -619,7 +641,7 @@ func (client *Client) newCalendar(
 		addReminder(event, input.Reminder.MinutesBeforeStart)
 	}
 	if input.Recurrence != nil {
-		rule, err := recurrenceRule(*input.Recurrence)
+		rule, err := recurrenceRule(*input.Recurrence, input.AllDay)
 		if err != nil {
 			return nil, err
 		}
@@ -717,6 +739,10 @@ func (client *Client) UpdateCalendarEvent(
 			return application.CalendarUpdateResult{}, err
 		}
 		if allDay {
+			if start.Hour() != 0 || start.Minute() != 0 || start.Second() != 0 || start.Nanosecond() != 0 ||
+				end.Hour() != 0 || end.Minute() != 0 || end.Second() != 0 || end.Nanosecond() != 0 {
+				return application.CalendarUpdateResult{}, errors.New("all-day calendar boundaries must remain midnight in the reviewed time zone; explicitly set allDay=false for timed events")
+			}
 			event.Props.SetDate(ical.PropDateTimeStart, start)
 			event.Props.SetDate(ical.PropDateTimeEnd, end)
 		} else {
@@ -744,7 +770,7 @@ func (client *Client) UpdateCalendarEvent(
 	if input.ReplaceRecurrence {
 		event.Props.Del(ical.PropRecurrenceRule)
 		if input.Recurrence != nil {
-			rule, err := recurrenceRule(*input.Recurrence)
+			rule, err := recurrenceRule(*input.Recurrence, allDay)
 			if err != nil {
 				return application.CalendarUpdateResult{}, err
 			}
@@ -1319,7 +1345,7 @@ func removeAlarms(event *ical.Event) {
 	event.Children = children
 }
 
-func recurrenceRule(recurrence application.CalendarRecurrence) (string, error) {
+func recurrenceRule(recurrence application.CalendarRecurrence, allDay bool) (string, error) {
 	parts := []string{}
 	switch recurrence.Pattern {
 	case application.CalendarRecurrenceDaily:
@@ -1372,7 +1398,11 @@ func recurrenceRule(recurrence application.CalendarRecurrence) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		parts = append(parts, "UNTIL="+end.UTC().Format("20060102T235959Z"))
+		until := end.Format("20060102")
+		if !allDay {
+			until += "T235959Z"
+		}
+		parts = append(parts, "UNTIL="+until)
 	}
 	return strings.Join(parts, ";"), nil
 }
