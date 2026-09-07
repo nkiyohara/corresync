@@ -90,20 +90,13 @@ have also produced no incremental output for minutes; time-box a silent run,
 interrupt it when it stops the critical path, and continue from executable
 evidence rather than waiting indefinitely.
 
-Use Fable through `claude -p` as the independent final security reviewer after
-the candidate is clean and `mise exec -- task verify` passes. Ask it to inspect
-the complete candidate diff and threat boundaries, with emphasis on
-authentication ownership, secret handling, account isolation, preview/commit
-binding, provider write outcomes, SSRF/redirect controls, bounded parsing, and
-live-test isolation. Fable is deliberately the last adversarial pass, not the
-implementation driver: it may lack product history or mistake an explicitly
-documented provider limitation for a bypass. Require severity, file/line
-evidence, an exploit or failure path, and a clear final verdict. The primary
-agent must validate and fix confirmed findings, rerun verification, and repeat
-the Fable review until there are no unresolved critical, high, or medium
-findings.
+For a final security review, inspect the complete candidate diff and threat
+boundaries, with emphasis on authentication ownership, secret handling, account
+isolation, preview/commit binding, provider write outcomes, SSRF/redirect
+controls, bounded parsing, and live-test isolation. Codex may perform this
+review; no specific external model is required. Validate findings against the
+current tree, fix confirmed issues, and rerun verification before release.
 
-Keep these roles distinct. Opus broadens discovery before and during
-implementation; Codex implements and integrates; Fable challenges the finished
-security posture. None of them may override repository scope, accepted ADRs,
+Opus may broaden discovery; Codex owns implementation, integration, and the
+final decision. Model output never overrides repository scope, accepted ADRs,
 provider primary sources, or executable evidence.
