@@ -67,7 +67,46 @@ const teamsObservationScript = `(() => {
   };
 })()`
 
-const teamsConversationSnapshotScript = `async section => {
+// These helpers consume only the current DOM. Requested locators and absent
+// attributes must never stand in for observed identity or count evidence.
+const teamsObservedCountScript = `
+  const observedCount = raw => {
+    const text = raw === null ? "" : String(raw).trim();
+    const value = Number(text);
+    const known = /^\d{1,7}$/.test(text) && Number.isInteger(value) && value <= 1000000;
+    return {value: known ? value : 0, known};
+  };
+`
+
+const teamsRenderedIdentityScript = `
+  const visible = node => node.getClientRects().length > 0 &&
+    window.getComputedStyle(node).visibility !== "hidden";
+  const surface = (primary, fallback) => {
+    const matches = Array.from(document.querySelectorAll(primary)).filter(visible);
+    const candidates = matches.length ? matches : Array.from(document.querySelectorAll(fallback)).filter(visible);
+    return candidates.length === 1 ? candidates[0] : null;
+  };
+  const observedIdentity = node => {
+    let result = null;
+    for (let current = node; current; current = current.parentElement) {
+      if (!current.matches("[data-chat-id], [data-channel-id]")) continue;
+      const chatId = current.getAttribute("data-chat-id") || "";
+      const team = current.getAttribute("data-team-id") || "";
+      const group = current.getAttribute("data-group-id") || "";
+      const channelId = current.getAttribute("data-channel-id") || "";
+      if (team && group && team !== group) return null;
+      const teamId = team || group;
+      if (!(chatId && !teamId && !channelId || !chatId && teamId && channelId)) return null;
+      if (result && (result.chatId !== chatId || result.teamId !== teamId || result.channelId !== channelId)) return null;
+      result = {chatId, teamId, channelId};
+    }
+    return result;
+  };
+  const matchesIdentity = identity => identity && identity.chatId === chatId &&
+    identity.teamId === teamId && identity.channelId === channelId;
+`
+
+const teamsConversationSnapshotScript = `async section => {` + teamsObservedCountScript + `
   const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
   const navSelectors = section === "chat"
     ? ["[data-tid='app-bar-chat']", "button[data-tid='app-bar-chat']"]
@@ -121,7 +160,7 @@ const teamsConversationSnapshotScript = `async section => {
     const row = node.closest("[data-tid*='chat-list-item'], [data-tid*='channel-list-item']") || node;
     const type = clean(row.getAttribute("data-conversation-type"), 32).toLowerCase();
     const membership = clean(row.getAttribute("data-membership-type"), 32).toLowerCase();
-    const count = Number(row.getAttribute("data-member-count"));
+    const count = observedCount(row.getAttribute("data-member-count"));
     const time = row.querySelector("time[datetime]");
     rows.push({
       chatId, teamId, channelId,
@@ -129,8 +168,8 @@ const teamsConversationSnapshotScript = `async section => {
       visibility: channelId ? membership === "private" ? "private" : membership === "shared" ? "shared" : membership === "standard" || membership === "public" ? "public" : "unknown" : "private",
       name: clean(row.getAttribute("aria-label") || (row.querySelector("[data-tid*='title']") || {}).textContent || row.textContent, 4097),
       topic: clean(row.getAttribute("data-topic"), 8193),
-      memberCount: Number.isInteger(count) && count >= 0 ? count : 0,
-      memberCountKnown: Number.isInteger(count) && count >= 0,
+      memberCount: count.value,
+      memberCountKnown: count.known,
       lastActivityAt: clean(time && time.dateTime, 64)
     });
     if (rows.length > 256) return {state: "overflow", rows};
@@ -138,34 +177,38 @@ const teamsConversationSnapshotScript = `async section => {
   return {state: rows.length ? "rows" : "empty", rows};
 }`
 
-const teamsCurrentConversationScript = `(chatId, teamId, channelId) => {
-  const main = document.querySelector(
-    "[data-tid='chat-pane-header'], [data-tid='channel-header'], [data-tid='app-layout-area--main']"
+const teamsCurrentConversationScript = `(chatId, teamId, channelId) => {` + teamsObservedCountScript + teamsRenderedIdentityScript + `
+  const main = surface(
+    "[data-tid='chat-pane-header'], [data-tid='channel-header']",
+    "[data-tid='app-layout-area--main']"
   );
-  if (!main) return {state: "unknown", rows: []};
+  const identity = main && observedIdentity(main);
+  if (!matchesIdentity(identity)) return {state: "unknown", rows: []};
   const clean = (value, maximum) => String(value || "")
     .replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, maximum);
   const type = clean(main.getAttribute("data-conversation-type"), 32).toLowerCase();
   const membership = clean(main.getAttribute("data-membership-type"), 32).toLowerCase();
-  const count = Number(main.getAttribute("data-member-count"));
+  const count = observedCount(main.getAttribute("data-member-count"));
   const time = main.querySelector("time[datetime]");
   return {state: "rows", rows: [{
-    chatId, teamId, channelId,
+    ...identity,
     kind: channelId ? "channel" : type === "oneonone" || type === "direct" ? "direct" : type === "meeting" ? "meeting" : "group",
     visibility: channelId ? membership === "private" ? "private" : membership === "shared" ? "shared" : membership === "standard" || membership === "public" ? "public" : "unknown" : "private",
     name: clean(main.getAttribute("aria-label") || (main.querySelector("[data-tid*='title']") || {}).textContent, 4097),
     topic: clean(main.getAttribute("data-topic"), 8193),
-    memberCount: Number.isInteger(count) && count >= 0 ? count : 0,
-    memberCountKnown: Number.isInteger(count) && count >= 0,
+    memberCount: count.value,
+    memberCountKnown: count.known,
     lastActivityAt: clean(time && time.dateTime, 64)
   }]};
 }`
 
-const teamsMessageSnapshotScript = `(sensitive, chatId, teamId, channelId, threadRootId, selectedId) => {
-  const pane = document.querySelector(
-    "[data-tid='chat-pane-list'], [data-tid='channel-posts-container'], [data-tid='message-pane'], [role='main']"
+const teamsMessageSnapshotScript = `(sensitive, chatId, teamId, channelId, threadRootId, selectedId) => {` + teamsObservedCountScript + teamsRenderedIdentityScript + `
+  const pane = surface(
+    "[data-tid='chat-pane-list'], [data-tid='channel-posts-container'], [data-tid='message-pane']",
+    "[role='main']"
   );
-  if (!pane) return {state: "unknown", rows: []};
+  const identity = pane && observedIdentity(pane);
+  if (!matchesIdentity(identity)) return {state: "unknown", rows: []};
   const clean = (value, maximum) => String(value || "")
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, " ").trim().slice(0, maximum);
   const nodes = Array.from(pane.querySelectorAll(
@@ -176,6 +219,11 @@ const teamsMessageSnapshotScript = `(sensitive, chatId, teamId, channelId, threa
   for (const node of nodes) {
     const id = clean(node.getAttribute("data-message-id") || node.getAttribute("data-mid"), 1025);
     if (!id || seen.has(id) || (selectedId && id !== selectedId)) continue;
+    if (!matchesIdentity(observedIdentity(node))) return {state: "unknown", rows: []};
+    const observedThreadRoot = clean(node.getAttribute("data-parent-message-id"), 1025);
+    if (threadRootId && id !== threadRootId && observedThreadRoot !== threadRootId) {
+      return {state: "unknown", rows: []};
+    }
     seen.add(id);
     const body = node.querySelector(
       "[data-tid='message-body'], [data-tid='chat-pane-message-body'], [data-tid='post-message-content']"
@@ -197,11 +245,11 @@ const teamsMessageSnapshotScript = `(sensitive, chatId, teamId, channelId, threa
       })).filter(mention => mention.id) : [];
     const reactions = sensitive ? Array.from(node.querySelectorAll("[data-tid='reaction-pill'], [data-reaction-type]"))
       .slice(0, 257).map(reaction => {
-        const rawCount = Number(reaction.getAttribute("data-count"));
+        const count = observedCount(reaction.getAttribute("data-count"));
         return {
           name: clean(reaction.getAttribute("data-reaction-type") || reaction.getAttribute("aria-label"), 257),
-          count: Number.isInteger(rawCount) && rawCount >= 0 ? rawCount : 0,
-          countKnown: Number.isInteger(rawCount) && rawCount >= 0,
+          count: count.value,
+          countKnown: count.known,
           reactedByActor: reaction.getAttribute("aria-pressed") === "true" || reaction.getAttribute("data-reacted") === "true"
         };
       }).filter(reaction => reaction.name) : [];
@@ -214,8 +262,8 @@ const teamsMessageSnapshotScript = `(sensitive, chatId, teamId, channelId, threa
     const text = clean(body && body.innerText, 1048577);
     const deleted = node.getAttribute("data-deleted") === "true" || !!node.querySelector("[data-tid='deleted-message']");
     rows.push({
-      id, chatId, teamId, channelId,
-      threadRootId: clean(node.getAttribute("data-parent-message-id") || threadRootId, 1025),
+      id, ...identity,
+      threadRootId: observedThreadRoot,
       authorId: clean(author && (author.getAttribute("data-author-id") || author.getAttribute("data-user-id")), 1025),
       authorName: clean(author && author.textContent, 1025),
       createdAt: clean(created && created.dateTime, 64),

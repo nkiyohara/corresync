@@ -842,7 +842,7 @@ func (command accountAddCommand) routes(
 			&application.AccountCalendarRouteInput{
 				Provider: domain.ProviderMicrosoftGraph,
 				MicrosoftGraph: &application.AccountOAuthInput{
-					APIBase: oauth.APIBase, ClientID: oauth.ClientID,
+					APIBase: oauth.APIBase, MicrosoftCloud: oauth.MicrosoftCloud, ClientID: oauth.ClientID,
 					RedirectURI: oauth.RedirectURI, Authorization: oauth.Authorization,
 				},
 			},

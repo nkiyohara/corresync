@@ -535,7 +535,9 @@ func (service *MessagingService) CommitReact(ctx context.Context, token string, 
 	}
 	reaction, callErr := service.port.SetMessageReaction(ctx, input)
 	if callErr == nil {
-		callErr = reaction.Validate()
+		if err := reaction.Validate(); err != nil {
+			callErr = errors.Join(ErrWriteOutcomeUnknown, err)
+		}
 	}
 	if callErr == nil && (reaction.Name != input.Reaction ||
 		reaction.ReactedByActor != !input.Remove) {
@@ -559,7 +561,9 @@ func (service *MessagingService) CommitCreateConversation(ctx context.Context, t
 	conversation, callErr := service.port.CreateConversation(ctx, input)
 	if callErr == nil {
 		conversation.Provenance = service.itemProvenance(conversation.ID, conversation.ID)
-		callErr = conversation.Validate()
+		if err := conversation.Validate(); err != nil {
+			callErr = errors.Join(ErrWriteOutcomeUnknown, err)
+		}
 	}
 	expectedContainerID := input.ContainerID
 	if input.Kind == ConversationChannel && expectedContainerID == "" {
@@ -674,7 +678,7 @@ func (service *MessagingService) finishMessageAudit(ctx context.Context, operati
 		Phase: AuditPhaseExecuted, Outcome: outcome, Reason: reason,
 		Caller: caller, Operation: operation.View(),
 	})
-	return errors.Join(callErr, auditErr)
+	return providerWriteErrors(callErr, auditErr)
 }
 
 func (service *MessagingService) decorateMessageReview(review MessageWriteReview) MessageWriteReview {

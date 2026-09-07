@@ -44,6 +44,23 @@ would violate a permanent invariant or cause an unreviewed effect. It must
 name the affected versions, explain recovery or migration, and must not emulate
 the unsafe behavior behind a compatibility flag.
 
+### 0.9.0-rc.6 recipient-review correctness exception
+
+Versions through 0.9.0-rc.5 accepted direct `mail send` / `mail_send` operations
+in `reply` and `reply_all` modes while recipients were derived only by the
+provider after approval. Those recipients could exceed `policy.max_recipients`
+and were absent from the exact send review. Starting with 0.9.0-rc.6, direct
+reply submissions fail before preview or provider dispatch, including commits
+of previously prepared direct-reply payloads.
+
+Reply composition remains available through save-only `mail draft` /
+`mail_create_draft`. Where the account supports exact-version draft sending,
+use the returned draft ID/version with `mail send-draft` / `mail_send_draft`;
+the snapshot exposes all resolved recipients and enforces the configured bound
+before approval. Otherwise, review and send the saved draft in the provider's
+own interface. New-message and forward sends with explicit recipients remain
+available. No compatibility flag restores the unreviewed recipient behavior.
+
 ### Surface inventory
 
 The release candidate maintains one reviewed inventory with these classes:

@@ -56,7 +56,7 @@ func (client *Client) CreateTask(
 	if err != nil {
 		return application.Task{}, taskAssemblyError(err)
 	}
-	return graphTaskView(input.ListID, current)
+	return writtenGraphTaskView(input.ListID, current)
 }
 
 func (client *Client) UpdateTask(
@@ -130,7 +130,7 @@ func (client *Client) UpdateTask(
 	if err != nil {
 		return application.Task{}, taskAssemblyError(err)
 	}
-	return graphTaskView(input.ListID, current)
+	return writtenGraphTaskView(input.ListID, current)
 }
 
 func (client *Client) CompleteTask(
@@ -184,7 +184,7 @@ func (client *Client) setGraphTaskStatus(
 	if err != nil {
 		return application.Task{}, taskAssemblyError(err)
 	}
-	return graphTaskView(input.ListID, current)
+	return writtenGraphTaskView(input.ListID, current)
 }
 
 func (client *Client) DeleteTask(ctx context.Context, input application.TaskDeleteInput) error {
@@ -411,8 +411,12 @@ func graphWriteTaskTime(value *application.TaskTemporal) (graphDateTimeZone, err
 	if err != nil {
 		return graphDateTimeZone{}, errors.New("task time zone is not an installed IANA name")
 	}
+	local := instant.In(location)
+	if err := rejectGraphTimeFold(local); err != nil {
+		return graphDateTimeZone{}, err
+	}
 	return graphDateTimeZone{
-		DateTime: instant.In(location).Format("2006-01-02T15:04:05"),
+		DateTime: local.Format("2006-01-02T15:04:05"),
 		TimeZone: value.TimeZone,
 	}, nil
 }
@@ -863,4 +867,12 @@ func taskAssemblyError(err error) error {
 func graphTaskTombstoneVersion(id string) string {
 	digest := sha256.Sum256([]byte(id))
 	return encodeETag("deleted:" + hex.EncodeToString(digest[:]))
+}
+
+func writtenGraphTaskView(listID string, current graphTask) (application.Task, error) {
+	result, err := graphTaskView(listID, current)
+	if err != nil {
+		return application.Task{}, taskAssemblyError(err)
+	}
+	return result, nil
 }

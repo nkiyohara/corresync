@@ -597,6 +597,12 @@ func (app *runtime) authenticate(
 		closeErr := handle.Close()
 		return nil, session.Credentials{}, errors.Join(err, closeErr)
 	}
+	if window, ok := handle.(interface{ Minimize(context.Context) error }); ok {
+		if err := window.Minimize(waitContext); err != nil {
+			// A window-manager limitation must not discard a valid session.
+			_, _ = fmt.Fprintln(app.stderr, "Sign-in completed, but the dedicated browser window could not be minimized.")
+		}
+	}
 	return handle, credentials, nil
 }
 

@@ -200,8 +200,19 @@ func buildCalendarCreateEnvelope(
 	if err := input.Validate(application.MaxCalendarAttendees); err != nil {
 		return calendarCreateEnvelope{}, err
 	}
-	start, _ := time.Parse(time.RFC3339, input.Start)
-	end, _ := time.Parse(time.RFC3339, input.End)
+	start, err := calendarWriteTime(input.Start, input.TimeZone)
+	if err != nil {
+		return calendarCreateEnvelope{}, err
+	}
+	end, err := calendarWriteTime(input.End, input.TimeZone)
+	if err != nil {
+		return calendarCreateEnvelope{}, err
+	}
+	// Recheck all-day and recurrence constraints against the actual local dates.
+	input.Start, input.End = start.Format(time.RFC3339Nano), end.Format(time.RFC3339Nano)
+	if err := input.Validate(application.MaxCalendarAttendees); err != nil {
+		return calendarCreateEnvelope{}, err
+	}
 	folderType := "FolderId:#Exchange"
 	if input.Calendar.Kind == application.CalendarFolderDistinguished {
 		folderType = "DistinguishedFolderId:#Exchange"
@@ -237,8 +248,8 @@ func buildCalendarCreateEnvelope(
 			ReminderIsSet:              reminderIsSet,
 			ReminderMinutesBeforeStart: reminderMinutes,
 			IsAllDayEvent:              input.AllDay,
-			Start:                      formatCalendarBoundaryForZone(start, input.TimeZone),
-			End:                        formatCalendarBoundaryForZone(end, input.TimeZone),
+			Start:                      formatCalendarLocalBoundary(start),
+			End:                        formatCalendarLocalBoundary(end),
 			FreeBusyType:               "Busy",
 			RequiredAttendees:          calendarAttendees(input.RequiredAttendees),
 			OptionalAttendees:          calendarAttendees(input.OptionalAttendees),

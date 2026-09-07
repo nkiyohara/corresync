@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/windowszone"
 )
 
 const maxCalendarEvents = 5000
@@ -234,10 +235,45 @@ func formatCalendarBoundary(value time.Time) string {
 	return value.UTC().Format("2006-01-02T15:04:05.000")
 }
 
-func formatCalendarBoundaryForZone(value time.Time, zone string) string {
-	if zone == "" || zone == defaultZone {
-		return formatCalendarBoundary(value)
+// calendarWriteTime converts an absolute input into the Exchange zone before
+// the request serializes its local clock without an offset.
+func calendarWriteTime(value, zone string) (time.Time, error) {
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return time.Time{}, errors.New("calendar time must be RFC3339")
 	}
+	if zone == "" || zone == defaultZone {
+		return parsed.UTC(), nil
+	}
+	iana, ok := windowszone.IANA(zone)
+	if !ok {
+		return time.Time{}, errors.New("outlook web calendar time zone must be a known Exchange/Windows identifier")
+	}
+	location, err := time.LoadLocation(iana)
+	if err != nil {
+		return time.Time{}, errors.New("outlook web calendar time zone is unavailable")
+	}
+	local := parsed.In(location)
+	// The offset-less OWA wire shape cannot distinguish the two occurrences
+	// of a repeated local clock during a backward time-zone transition.
+	_, offset := local.Zone()
+	zoneStart, zoneEnd := local.ZoneBounds()
+	if !zoneStart.IsZero() {
+		_, previousOffset := zoneStart.Add(-time.Nanosecond).Zone()
+		if previousOffset > offset && local.Before(zoneStart.Add(time.Duration(previousOffset-offset)*time.Second)) {
+			return time.Time{}, errors.New("outlook web calendar time is ambiguous in the selected time zone; use UTC")
+		}
+	}
+	if !zoneEnd.IsZero() {
+		_, nextOffset := zoneEnd.Zone()
+		if nextOffset < offset && !local.Before(zoneEnd.Add(-time.Duration(offset-nextOffset)*time.Second)) {
+			return time.Time{}, errors.New("outlook web calendar time is ambiguous in the selected time zone; use UTC")
+		}
+	}
+	return local, nil
+}
+
+func formatCalendarLocalBoundary(value time.Time) string {
 	return value.Format("2006-01-02T15:04:05.000")
 }
 

@@ -116,7 +116,7 @@ func (client *Client) ListMessages(
 	if input.Cursor != "" {
 		cursor, err := decodeMattermostCursor(input.Cursor, mattermostCursor{
 			Kind: kind, Account: input.Account, WorkspaceID: input.WorkspaceID,
-			ConversationID: input.ConversationID, ThreadRootID: input.ThreadRootID,
+			ConversationID: input.ConversationID, ThreadRootID: input.ThreadRootID, PageSize: input.Limit,
 		})
 		if err != nil {
 			return application.MessagePage{}, err
@@ -125,8 +125,8 @@ func (client *Client) ListMessages(
 	}
 	limit := min(input.Limit, application.MaxMessagePageSize)
 	posts, err := client.getPostPage(ctx, resource, url.Values{
-		"page": {strconv.Itoa(page)}, "per_page": {strconv.Itoa(limit + 1)},
-	}, limit+1)
+		"page": {strconv.Itoa(page)}, "per_page": {strconv.Itoa(limit)},
+	}, limit)
 	if err != nil {
 		return application.MessagePage{}, err
 	}
@@ -137,10 +137,9 @@ func (client *Client) ListMessages(
 			}
 		}
 	}
-	hasMore := len(posts) > limit
-	if hasMore {
-		posts = posts[:limit]
-	}
+	// Page numbers advance by the requested page size. A full page may
+	// require one final empty request, but no lookahead post is discarded.
+	hasMore := len(posts) == limit
 	messages := make([]application.MessageSummary, 0, len(posts))
 	for _, post := range posts {
 		summary, err := mapMattermostSummary(post, input.ConversationID)
@@ -153,7 +152,7 @@ func (client *Client) ListMessages(
 	if hasMore {
 		next, err = encodeMattermostCursor(mattermostCursor{
 			Version: 1, Kind: kind, Account: input.Account, WorkspaceID: input.WorkspaceID,
-			ConversationID: input.ConversationID, ThreadRootID: input.ThreadRootID, Page: page + 1,
+			ConversationID: input.ConversationID, ThreadRootID: input.ThreadRootID, Page: page + 1, PageSize: input.Limit,
 		})
 		if err != nil {
 			return application.MessagePage{}, err
@@ -179,7 +178,7 @@ func (client *Client) SearchMessages(
 		cursor, err := decodeMattermostCursor(input.Cursor, mattermostCursor{
 			Kind: mattermostCursorSearch, Account: input.Account,
 			WorkspaceID: input.WorkspaceID, ConversationID: input.ConversationID,
-			QuerySHA256: queryDigest,
+			QuerySHA256: queryDigest, PageSize: input.Limit,
 		})
 		if err != nil {
 			return application.MessagePage{}, err
@@ -194,21 +193,18 @@ func (client *Client) SearchMessages(
 			Terms   string `json:"terms"`
 			Page    int    `json:"page"`
 			PerPage int    `json:"per_page"`
-		}{Terms: input.Query, Page: page, PerPage: limit + 1},
+		}{Terms: input.Query, Page: page, PerPage: limit},
 		&response, false, http.StatusOK,
 	); err != nil {
 		return application.MessagePage{}, err
 	}
-	posts, err := orderedMattermostPosts(response, limit+1)
+	posts, err := orderedMattermostPosts(response, limit)
 	if err != nil {
 		return application.MessagePage{}, err
 	}
 	messages := make([]application.MessageSummary, 0, min(len(posts), limit))
 	conversationCache := make(map[string]struct{})
-	providerHasMore := len(posts) > limit
-	if providerHasMore {
-		posts = posts[:limit]
-	}
+	providerHasMore := len(posts) == limit
 	for _, post := range posts {
 		if input.ConversationID != "" && post.ChannelID != input.ConversationID {
 			continue
@@ -230,7 +226,7 @@ func (client *Client) SearchMessages(
 		next, err = encodeMattermostCursor(mattermostCursor{
 			Version: 1, Kind: mattermostCursorSearch, Account: input.Account,
 			WorkspaceID: input.WorkspaceID, ConversationID: input.ConversationID,
-			QuerySHA256: queryDigest, Page: page + 1,
+			QuerySHA256: queryDigest, Page: page + 1, PageSize: input.Limit,
 		})
 		if err != nil {
 			return application.MessagePage{}, err

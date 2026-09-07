@@ -58,9 +58,11 @@ Corresync exposes one current Google provider ID: `google`.
   `calendar.google_api` with `calendar.google`. A schema-v3 `google-api`
   account is migrated in memory without changing its stable account ID,
   public-client metadata, authorization key, policy, or source file.
-- A matching legacy `google-api` OS-keyring grant may be reused because its
-  required mail scope was already `https://mail.google.com/`. Any scope or
-  public-client mismatch starts a fresh explicit authorization instead.
+- Legacy grant reuse is superseded by provider-profile binding in grant format
+  v2. Version-1 grants, including `google-api` grants, do not prove their
+  original OAuth endpoints and protocol and require fresh authorization at
+  the next explicit local login. Configuration migration preserves account
+  identity and metadata but never upgrades an unbound token.
 
 The remaining `internal/provider/googleapi` adapter is calendar-only.
 Historical Google Web parser code may remain solely for bounded inspection,

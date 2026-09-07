@@ -109,6 +109,26 @@ func buildCalendarUpdateEnvelope(
 	if err := input.Validate(); err != nil {
 		return calendarUpdateEnvelope{}, err
 	}
+	if input.Start != nil {
+		zone := defaultZone
+		if input.TimeZone != nil {
+			zone = *input.TimeZone
+		}
+		start, err := calendarWriteTime(*input.Start, zone)
+		if err != nil {
+			return calendarUpdateEnvelope{}, err
+		}
+		end, err := calendarWriteTime(*input.End, zone)
+		if err != nil {
+			return calendarUpdateEnvelope{}, err
+		}
+		// Clone the pointers so normalization cannot mutate the reviewed input.
+		localStart, localEnd := start.Format(time.RFC3339Nano), end.Format(time.RFC3339Nano)
+		input.Start, input.End = &localStart, &localEnd
+		if err := input.Validate(); err != nil {
+			return calendarUpdateEnvelope{}, err
+		}
+	}
 	updates := make([]calendarSetItemField, 0, 13)
 	if input.Subject != nil {
 		updates = append(updates, calendarUpdateField("Subject", calendarUpdateItem{
@@ -128,8 +148,8 @@ func buildCalendarUpdateEnvelope(
 		if input.TimeZone != nil {
 			zone = *input.TimeZone
 		}
-		startValue := formatCalendarBoundaryForZone(start, zone)
-		endValue := formatCalendarBoundaryForZone(end, zone)
+		startValue := formatCalendarLocalBoundary(start)
+		endValue := formatCalendarLocalBoundary(end)
 		updates = append(updates,
 			calendarUpdateField("Start", calendarUpdateItem{
 				Type: "CalendarItem:#Exchange", Start: &startValue,

@@ -641,3 +641,38 @@ func (function slackRoundTripperFunc) RoundTrip(
 ) (*http.Response, error) {
 	return function(request)
 }
+
+func TestSlackReactionsDoNotRequireMessageAuthorship(t *testing.T) {
+	writes := 0
+	server := newSlackServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("X-OAuth-Scopes", syntheticSlackScopes)
+		switch request.URL.Path {
+		case "/api/auth.test":
+			writeSlackFixture(t, writer, "slack-auth-v1.json")
+		case "/api/conversations.history":
+			writeSlackJSON(t, writer, map[string]any{"ok": true, "messages": []slackMessage{{TS: "1723636900.000001", User: "UOTHER", Text: "Synthetic"}}})
+		case "/api/reactions.add", "/api/reactions.remove":
+			writes++
+			writeSlackJSON(t, writer, map[string]any{"ok": true})
+		default:
+			t.Errorf("unexpected provider write %s", request.URL.Path)
+			http.NotFound(writer, request)
+		}
+	})
+	defer server.Close()
+	client := newTestSlackClient(t, server)
+	defer func() { _ = client.Close() }()
+	route := application.MessageWriteRoute{Account: "acc_11111111111111111111111111111111", WorkspaceID: "TSYNTHETIC", Actor: client.MessageActor()}
+	for _, remove := range []bool{false, true} {
+		_, err := client.SetMessageReaction(t.Context(), application.MessageReactionInput{MessageWriteRoute: route, ConversationID: "CSYNTHETIC", MessageID: "1723636900.000001", Version: "slmv1_1723636900.000001", Reaction: "thumbsup", Remove: remove})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if writes != 2 {
+		t.Fatalf("reaction writes=%d", writes)
+	}
+	if err := client.DeleteMessage(t.Context(), application.MessageDeleteInput{MessageWriteRoute: route, ConversationID: "CSYNTHETIC", MessageID: "1723636900.000001", Version: "slmv1_1723636900.000001"}); err == nil {
+		t.Fatal("deletion bypassed authorship")
+	}
+}

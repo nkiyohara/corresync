@@ -33,6 +33,7 @@ type mattermostCursor struct {
 	QuerySHA256    string               `json:"querySha256,omitempty"`
 	SnapshotSHA256 string               `json:"snapshotSha256,omitempty"`
 	Offset         int                  `json:"offset,omitempty"`
+	PageSize       int                  `json:"pageSize,omitempty"`
 	Page           int                  `json:"page,omitempty"`
 	Before         string               `json:"before,omitempty"`
 }
@@ -78,7 +79,7 @@ func decodeMattermostCursor(value string, expected mattermostCursor) (mattermost
 		cursor.WorkspaceID != expected.WorkspaceID ||
 		cursor.ConversationID != expected.ConversationID ||
 		cursor.ThreadRootID != expected.ThreadRootID ||
-		cursor.QuerySHA256 != expected.QuerySHA256 {
+		cursor.QuerySHA256 != expected.QuerySHA256 || cursor.PageSize != expected.PageSize {
 		return mattermostCursor{}, errors.New("mattermost cursor does not match the selected route")
 	}
 	return cursor, nil
@@ -106,6 +107,16 @@ func (cursor mattermostCursor) validate() error {
 	for _, digest := range []string{cursor.QuerySHA256, cursor.SnapshotSHA256} {
 		if digest != "" && (len(digest) != 64 || !hexDigest(digest)) {
 			return errors.New("mattermost cursor digest is malformed")
+		}
+	}
+	switch cursor.Kind {
+	case mattermostCursorMessages, mattermostCursorThread, mattermostCursorSearch:
+		if cursor.PageSize < 1 || cursor.PageSize > application.MaxMessagePageSize {
+			return errors.New("mattermost cursor page size is malformed")
+		}
+	case mattermostCursorConversations, mattermostCursorSync:
+		if cursor.PageSize != 0 {
+			return errors.New("mattermost cursor has an unexpected page size")
 		}
 	}
 	if cursor.Offset < 0 || cursor.Offset > maximumMattermostItems || cursor.Page < 0 || cursor.Page > 1_000_000 {

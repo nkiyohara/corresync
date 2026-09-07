@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
 	"mime/multipart"
 	"mime/quotedprintable"
@@ -724,7 +725,8 @@ func (client *Client) buildMessage(
 		)
 		writer := quotedprintable.NewWriter(&body)
 		_, err := writer.Write([]byte(composition.Body))
-		return body.Bytes(), messageID, errors.Join(err, writer.Close())
+		closeErr := writer.Close()
+		return body.Bytes(), messageID, errors.Join(err, closeErr)
 	}
 	multipartWriter := multipart.NewWriter(&body)
 	_, _ = fmt.Fprintf(
@@ -764,7 +766,7 @@ func (client *Client) buildMessage(
 		if err != nil {
 			return nil, "", err
 		}
-		encoder := base64.NewEncoder(base64.StdEncoding, part)
+		encoder := base64.NewEncoder(base64.StdEncoding, &mimeLineWriter{writer: part})
 		if _, err := encoder.Write(attachment.Content); err != nil {
 			return nil, "", err
 		}
@@ -877,4 +879,35 @@ func inheritValidReferences(existing, current string) string {
 		}
 	}
 	return strings.Join(references, " ")
+}
+
+// mimeLineWriter wraps base64 output at RFC 2045's 76-character bound before
+// handing it to multipart framing or the SMTP DATA writer.
+type mimeLineWriter struct {
+	writer io.Writer
+	column int
+}
+
+func (writer *mimeLineWriter) Write(content []byte) (int, error) {
+	written := 0
+	for len(content) > 0 {
+		if writer.column == 76 {
+			if _, err := io.WriteString(writer.writer, "\r\n"); err != nil {
+				return written, err
+			}
+			writer.column = 0
+		}
+		count := min(len(content), 76-writer.column)
+		n, err := writer.writer.Write(content[:count])
+		written += n
+		writer.column += n
+		content = content[n:]
+		if err != nil {
+			return written, err
+		}
+		if n != count {
+			return written, io.ErrShortWrite
+		}
+	}
+	return written, nil
 }

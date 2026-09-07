@@ -4,6 +4,7 @@ const test = require("node:test");
 
 const {
   buildLookupRequest,
+  enhance,
   messagesForLanguage,
   normalizeDomain,
   normalizeEmailDomain,
@@ -242,4 +243,52 @@ test("localized setup guides keep the verified install and MCP commands", async 
     }
     assert.doesNotMatch(source, /corr mcp setup (?:cursor|vscode|opencode)/, path);
   }
+});
+
+
+test("the browser renders the current Worker response contract", async () => {
+  const { handleRequest } = await import("../web/discovery-worker/src/worker.mjs");
+  const makeNode = () => ({
+    children: [],
+    hidden: true,
+    append(...children) { this.children.push(...children); },
+    focus() {},
+    setAttribute() {},
+    removeAttribute() {},
+  });
+  const nodes = Object.fromEntries([
+    "compatibility-form", "compatibility-email", "compatibility-submit",
+    "compatibility-validation", "compatibility-live", "compatibility-result",
+  ].map(id => [id, makeNode()]));
+  let submit;
+  nodes["compatibility-form"].addEventListener = (event, handler) => {
+    assert.equal(event, "submit");
+    submit = handler;
+  };
+  nodes["compatibility-email"].value = "synthetic-private@gmail.com";
+  const document = {
+    documentElement: { lang: "en" },
+    getElementById: id => nodes[id],
+    createElement: makeNode,
+  };
+  enhance(document, async (url, options) => {
+    assert.deepEqual(JSON.parse(options.body), { domain: "gmail.com" });
+    const headers = new Headers(options.headers);
+    headers.set("Origin", "https://corresync.org");
+    const response = await handleRequest(
+      new Request(url, { ...options, headers }),
+      { RATE_LIMITER: { limit: async () => ({ success: true }) } },
+      async () => new Response(JSON.stringify({ Status: 0, Answer: [] }), {
+        headers: { "Content-Type": "application/dns-json" },
+      }),
+    );
+    assert.equal(response.status, 200);
+    return response;
+  });
+  await submit({ preventDefault() {} });
+  assert.equal(nodes["compatibility-email"].value, "");
+  assert.equal(nodes["compatibility-result"].hidden, false);
+  assert.equal(nodes["compatibility-submit"].disabled, false);
+  assert.equal(nodes["compatibility-live"].textContent, "Compatibility result ready.");
+  assert.equal(nodes["compatibility-result"].children[2].textContent, "Gmail · High confidence");
 });

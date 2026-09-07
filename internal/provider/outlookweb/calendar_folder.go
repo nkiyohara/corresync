@@ -21,7 +21,7 @@ func (client *Client) ListCalendarFolders(
 	}
 	calendars := []application.CalendarFolderSummary{{
 		ID: "calendar", DisplayName: "Calendar",
-		IsDefault: true, CanEdit: true, AccessRole: "owner",
+		IsDefault: true, AccessRole: "unknown",
 	}}
 	seen := map[string]struct{}{"calendar": {}}
 	const providerPageSize = application.MaxCalendarFolderPageSize
@@ -70,8 +70,12 @@ func (client *Client) ListCalendarFolders(
 					err,
 				)
 			}
-			if !strings.EqualFold(folder.FolderClass, "IPF.Appointment") ||
-				strings.EqualFold(folder.DistinguishedID, "calendar") {
+			if !strings.EqualFold(folder.FolderClass, "IPF.Appointment") {
+				continue
+			}
+			if strings.EqualFold(folder.DistinguishedID, "calendar") {
+				calendars[0].DisplayName = folder.DisplayName
+				calendars[0].CanEdit, calendars[0].AccessRole = calendarFolderAccess(folder)
 				continue
 			}
 			if _, exists := seen[folder.FolderID.ID]; exists {
@@ -80,14 +84,7 @@ func (client *Client) ListCalendarFolders(
 				)
 			}
 			seen[folder.FolderID.ID] = struct{}{}
-			canEdit := folder.EffectiveRights.CreateContents &&
-				folder.EffectiveRights.Modify
-			accessRole := "unknown"
-			if canEdit {
-				accessRole = "writer"
-			} else if folder.EffectiveRights.Read {
-				accessRole = "reader"
-			}
+			canEdit, accessRole := calendarFolderAccess(folder)
 			calendars = append(
 				calendars,
 				application.CalendarFolderSummary{
@@ -120,4 +117,15 @@ func (client *Client) ListCalendarFolders(
 		TotalCalendars:   len(calendars),
 		IncludesLastItem: end == len(calendars),
 	}, nil
+}
+
+func calendarFolderAccess(folder findFolderItem) (bool, string) {
+	canEdit := folder.EffectiveRights.CreateContents && folder.EffectiveRights.Modify
+	if canEdit {
+		return true, "writer"
+	}
+	if folder.EffectiveRights.Read {
+		return false, "reader"
+	}
+	return false, "unknown"
 }

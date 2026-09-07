@@ -108,6 +108,7 @@ type sessionAccount struct {
 	usage              *accountUsage
 	borrowedLease      *sessionLease
 	borrowedService    application.AuthenticationService
+	borrowedRelease    func()
 }
 
 type sessionServiceSet uint8
@@ -351,6 +352,14 @@ func (usage *accountUsage) closeAfterActive() <-chan struct{} {
 		}
 	}
 	return usage.done
+}
+
+// releaseBorrowedUsage is bound to one borrowing operation, not the shared
+// lease. Both normal completion and panic unwinding may call it safely.
+func (account sessionAccount) releaseBorrowedUsage() {
+	if account.borrowedRelease != nil {
+		account.borrowedRelease()
+	}
 }
 
 func (account sessionAccount) mailService() (*application.MailService, error) {
@@ -1062,6 +1071,9 @@ func (backend *sessionBackend) Logout(
 
 	backend.activationMu.Lock()
 	defer backend.activationMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return daemonapi.LogoutResult{}, err
+	}
 
 	backend.mu.Lock()
 	if backend.closed {
@@ -1195,17 +1207,88 @@ func (backend *sessionBackend) TerminalLogin(
 	input daemonapi.TerminalLoginInput,
 	caller domain.Caller,
 ) (_ daemonapi.TerminalLoginResult, returnErr error) {
+	if err := caller.Validate(); err != nil {
+		return daemonapi.TerminalLoginResult{}, err
+	}
+	if caller.Surface != "cli" {
+		return daemonapi.TerminalLoginResult{}, errors.New(
+			"authentication can only be started by an explicit local CLI command",
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return daemonapi.TerminalLoginResult{}, err
+	}
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
 		return daemonapi.TerminalLoginResult{}, errors.New("session backend is closed")
 	}
 	backend.active.Add(1)
+	backend.mu.Unlock()
 	defer backend.active.Done()
-	defer backend.mu.Unlock()
+	backend.activationMu.Lock()
+	defer backend.activationMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return daemonapi.TerminalLoginResult{}, err
+	}
 
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	if backend.closed {
+		return daemonapi.TerminalLoginResult{}, errors.New("session backend is closed")
+	}
+	_, configured, exists := backend.configuration.AccountByID(input.Account)
+	if !exists {
+		return daemonapi.TerminalLoginResult{}, fmt.Errorf("account %q is not configured", input.Account)
+	}
+	activeRoutes, routeDegradations, err := releasedSessionRoutes(configured)
+	if err != nil {
+		return daemonapi.TerminalLoginResult{}, err
+	}
 	if account, exists := backend.accounts[input.Account]; exists {
-		return authenticatedTerminalResult(input.Account, account.captured), nil
+		if sessionAccountComplete(configured, account) {
+			return authenticatedTerminalResult(input.Account, account.captured), nil
+		}
+		if input.SessionID != "" {
+			return daemonapi.TerminalLoginResult{}, errors.New("invalid or expired terminal login session")
+		}
+		if _, supported := configured.OutlookWeb(); !supported {
+			return daemonapi.TerminalLoginResult{}, errors.New("terminal login is available only for Outlook Web routes")
+		}
+		// Detach this exact incomplete account before starting its replacement.
+		// Existing borrowers drain without backend.mu; no new call can borrow
+		// these leases, and no replacement browser overlaps their profile.
+		delete(backend.accounts, input.Account)
+		for token, preview := range backend.previews {
+			if preview.account == input.Account {
+				delete(backend.previews, token)
+			}
+		}
+		monitorCancel := backend.monitorCancel[input.Account]
+		monitorDone := backend.monitorDone[input.Account]
+		delete(backend.monitorCancel, input.Account)
+		delete(backend.monitorDone, input.Account)
+		delete(backend.monitorStarted, input.Account)
+		backend.mu.Unlock()
+		closeErr := func() error {
+			defer backend.mu.Lock()
+			if monitorCancel != nil {
+				monitorCancel()
+			}
+			if monitorDone != nil {
+				<-monitorDone
+			}
+			return closeSessionAccount(account)
+		}()
+		if closeErr != nil {
+			return daemonapi.TerminalLoginResult{}, closeErr
+		}
+		if backend.closed {
+			return daemonapi.TerminalLoginResult{}, errors.New("session backend is closed")
+		}
+		if err := ctx.Err(); err != nil {
+			return daemonapi.TerminalLoginResult{}, err
+		}
 	}
 
 	interaction, created, err := backend.terminalInteraction(input, caller)
@@ -1257,20 +1340,13 @@ func (backend *sessionBackend) TerminalLogin(
 
 	credentials, credentialsErr := interaction.handle.CurrentSession()
 	if credentialsErr == nil {
-		_, configured, exists := backend.configuration.AccountByID(input.Account)
-		if !exists {
-			return daemonapi.TerminalLoginResult{}, fmt.Errorf(
-				"account %q is not configured",
-				input.Account,
-			)
-		}
 		account, err := backend.outlookAccount(configured, interaction.handle, credentials)
 		if err != nil {
 			return daemonapi.TerminalLoginResult{}, errors.Join(
 				err, backend.dropTerminalInteraction(interaction, true),
 			)
 		}
-		standards, err := backend.nonOutlookAccount(ctx, configured)
+		standards, err := backend.nonOutlookAccount(ctx, activeRoutes)
 		if err != nil {
 			return daemonapi.TerminalLoginResult{}, errors.Join(
 				err,
@@ -1278,8 +1354,17 @@ func (backend *sessionBackend) TerminalLogin(
 				backend.dropTerminalInteraction(interaction, false),
 			)
 		}
-		account = mergeSessionAccounts(account, standards)
+		account = withRouteDegradations(mergeSessionAccounts(account, standards), routeDegradations)
+		if err := ctx.Err(); err != nil {
+			// The acquired account owns the browser now. Remove the interaction
+			// without closing that handle a second time during error unwinding.
+			created = false
+			return daemonapi.TerminalLoginResult{}, errors.Join(
+				err, closeSessionAccount(account), backend.dropTerminalInteraction(interaction, false),
+			)
+		}
 		backend.accounts[input.Account] = account
+		backend.clearAuthenticationReasonsLocked(input.Account, account)
 		// The monitor belongs to the daemon lifecycle, not this login request.
 		backend.startMonitorLocked(input.Account, account) //nolint:contextcheck
 		_ = backend.dropTerminalInteraction(interaction, false)
@@ -1528,6 +1613,7 @@ func withSessionService[T, S any](
 	if err != nil {
 		return zero, err
 	}
+	defer account.releaseBorrowedUsage()
 	selected, err := selectService(account)
 	if err != nil {
 		return finishSessionCall(backend, accountID, account, zero, err)
@@ -1959,9 +2045,10 @@ func commitMailPreview[T any](
 	defer backend.active.Done()
 
 	account, preview, exists := backend.accountForPreview(token)
+	defer account.releaseBorrowedUsage()
 	if !exists || preview.service != application.AuthenticationServiceMail || account.mail == nil {
 		if exists {
-			account.usage.end()
+			account.releaseBorrowedUsage()
 		}
 		return zero, errors.New("invalid or expired approval token")
 	}
@@ -2021,6 +2108,7 @@ func (backend *sessionBackend) accountForPreview(
 	}
 	account.usage = lease.usage
 	account.borrowedLease = lease
+	account.borrowedRelease = sync.OnceFunc(lease.usage.end)
 	account.borrowedService = preview.service
 	return account, preview, true
 }
@@ -2245,9 +2333,10 @@ func commitCalendarPreview[T any](
 	defer backend.active.Done()
 
 	account, preview, exists := backend.accountForPreview(token)
+	defer account.releaseBorrowedUsage()
 	if !exists || preview.service != application.AuthenticationServiceCalendar || account.calendar == nil {
 		if exists {
-			account.usage.end()
+			account.releaseBorrowedUsage()
 		}
 		return zero, errors.New("invalid or expired approval token")
 	}
@@ -2497,9 +2586,10 @@ func (backend *sessionBackend) commitTaskWrite(
 	defer backend.active.Done()
 
 	account, preview, exists := backend.accountForPreview(token)
+	defer account.releaseBorrowedUsage()
 	if !exists || preview.service != application.AuthenticationServiceTasks || account.tasks == nil {
 		if exists {
-			account.usage.end()
+			account.releaseBorrowedUsage()
 		}
 		return application.TaskWriteAccess{}, errors.New("invalid or expired approval token")
 	}
@@ -2835,14 +2925,15 @@ func commitMessagingPreview[T any](
 	defer backend.active.Done()
 
 	account, preview, exists := backend.accountForPreview(token)
+	defer account.releaseBorrowedUsage()
 	if !exists || preview.service != application.AuthenticationServiceMessages || account.messages == nil {
 		if exists {
-			account.usage.end()
+			account.releaseBorrowedUsage()
 		}
 		return zero, errors.New("invalid or expired approval token")
 	}
 	if err := backend.requireMessagingRoute(preview.account); err != nil {
-		account.usage.end()
+		account.releaseBorrowedUsage()
 		return zero, err
 	}
 	access, callErr := commit(account.messages)
@@ -2932,6 +3023,7 @@ func (backend *sessionBackend) accountServices(
 		}
 		account.usage = lease.usage
 		account.borrowedLease = lease
+		account.borrowedRelease = sync.OnceFunc(lease.usage.end)
 		account.borrowedService = service
 		return account, nil
 	}
@@ -2951,7 +3043,7 @@ func (backend *sessionBackend) finishServiceUse(
 		return callErr
 	}
 	if callErr == nil || errors.Is(callErr, application.ErrWriteOutcomeUnknown) {
-		lease.usage.end()
+		account.releaseBorrowedUsage()
 		return callErr
 	}
 	reason, authenticationFailure := application.ProviderAuthenticationReason(callErr)
@@ -2960,7 +3052,7 @@ func (backend *sessionBackend) finishServiceUse(
 		authenticationFailure = true
 	}
 	if !authenticationFailure {
-		lease.usage.end()
+		account.releaseBorrowedUsage()
 		return callErr
 	}
 
@@ -2973,7 +3065,7 @@ func (backend *sessionBackend) finishServiceUse(
 	)
 	backend.mu.Unlock()
 
-	lease.usage.end()
+	account.releaseBorrowedUsage()
 	if invalidation.monitorCancel != nil {
 		invalidation.monitorCancel()
 	}
@@ -3086,6 +3178,9 @@ func (backend *sessionBackend) activateAccount(
 ) (sessionAccount, error) {
 	backend.activationMu.Lock()
 	defer backend.activationMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return sessionAccount{}, err
+	}
 
 	backend.mu.Lock()
 	if backend.closed {
@@ -3108,14 +3203,7 @@ func (backend *sessionBackend) activateAccount(
 	}
 	backend.mu.Unlock()
 
-	if hasGoogleWebRoute(configured) {
-		return sessionAccount{}, errUnsupportedLegacyGoogleRoute
-	}
-	taskDegradation, err := inactiveTaskRoute(configured)
-	if err != nil {
-		return sessionAccount{}, err
-	}
-	messagingDegradation, err := inactiveMessagingRoute(configured)
+	activeRoutes, routeDegradations, err := releasedSessionRoutes(configured)
 	if err != nil {
 		return sessionAccount{}, err
 	}
@@ -3139,10 +3227,6 @@ func (backend *sessionBackend) activateAccount(
 		}
 		services = mergeSessionAccounts(services, web)
 	}
-	activeRoutes := configured
-	if messagingDegradation != nil {
-		activeRoutes.Messages = nil
-	}
 	standards, err := backend.nonOutlookAccount(ctx, activeRoutes)
 	if err != nil {
 		return sessionAccount{}, errors.Join(err, closeSessionAccount(services))
@@ -3155,19 +3239,9 @@ func (backend *sessionBackend) activateAccount(
 		}
 		services = mergeSessionAccounts(services, teams)
 	}
-	if taskDegradation != nil {
-		services.degradations = append(services.degradations, *taskDegradation)
-		services.staticDegradations = append(
-			services.staticDegradations,
-			*taskDegradation,
-		)
-	}
-	if messagingDegradation != nil {
-		services.degradations = append(services.degradations, *messagingDegradation)
-		services.staticDegradations = append(
-			services.staticDegradations,
-			*messagingDegradation,
-		)
+	services = withRouteDegradations(services, routeDegradations)
+	if err := ctx.Err(); err != nil {
+		return sessionAccount{}, errors.Join(err, closeSessionAccount(services))
 	}
 
 	backend.mu.Lock()
@@ -3217,11 +3291,47 @@ func (backend *sessionBackend) activateAccount(
 			closeSessionAccount(services),
 		)
 	}
+	if err := ctx.Err(); err != nil {
+		return sessionAccount{}, errors.Join(err, closeSessionAccount(services))
+	}
 	backend.accounts[accountID] = services
 	backend.clearAuthenticationReasonsLocked(accountID, services)
 	// The monitor belongs to the daemon lifecycle, not this login request.
 	backend.startMonitorLocked(accountID, services) //nolint:contextcheck
 	return services, nil
+}
+
+// releasedSessionRoutes is shared by visible and terminal authentication so
+// dormant selections cannot resolve credentials, authorize, or probe providers.
+func releasedSessionRoutes(configured config.Account) (config.Account, []domain.Degradation, error) {
+	if hasGoogleWebRoute(configured) {
+		return config.Account{}, nil, errUnsupportedLegacyGoogleRoute
+	}
+	taskDegradation, err := inactiveTaskRoute(configured)
+	if err != nil {
+		return config.Account{}, nil, err
+	}
+	messagingDegradation, err := inactiveMessagingRoute(configured)
+	if err != nil {
+		return config.Account{}, nil, err
+	}
+	active := configured
+	var degradations []domain.Degradation
+	if taskDegradation != nil {
+		active.Tasks = nil
+		degradations = append(degradations, *taskDegradation)
+	}
+	if messagingDegradation != nil {
+		active.Messages = nil
+		degradations = append(degradations, *messagingDegradation)
+	}
+	return active, degradations, nil
+}
+
+func withRouteDegradations(account sessionAccount, degradations []domain.Degradation) sessionAccount {
+	account.degradations = append(account.degradations, degradations...)
+	account.staticDegradations = append(account.staticDegradations, degradations...)
+	return account
 }
 
 // inactiveTaskRoute keeps a staged task selection from granting authority or

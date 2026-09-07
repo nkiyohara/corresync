@@ -27,7 +27,7 @@ type mailCommand struct {
 	Mark       mailMarkCommand       `cmd:"" help:"Review and mark one versioned message read or unread."`
 	Delete     mailDeleteCommand     `cmd:"" help:"Review and permanently delete one versioned message."`
 	Draft      mailDraftCommand      `cmd:"" help:"Review and save a new, reply, or forward draft without sending."`
-	Send       mailSendCommand       `cmd:"" help:"Review and send one new message, reply, or forward."`
+	Send       mailSendCommand       `cmd:"" help:"Review and send one new message or forward; replies use draft then send-draft."`
 	SendDraft  mailSendDraftCommand  `cmd:"" help:"Review and send one exact saved draft version."`
 }
 
@@ -50,7 +50,7 @@ type mailSendCommand struct {
 	Subject            string   `help:"Message subject; CR/LF are rejected."`
 	BodyFile           string   `name:"body-file" help:"Text or HTML body file, or - for stdin."`
 	BodyFormat         string   `name:"body-format" default:"text" enum:"text,html" help:"Message body format."`
-	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"Composition mode."`
+	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"Use new or forward; reply and reply-all require draft then send-draft."`
 	ReferenceMessageID string   `name:"reference-message-id" help:"Exact source message ID for replies or forwards."`
 	ReferenceChangeKey string   `name:"reference-change-key" help:"Exact source change key for replies or forwards."`
 	Attachments        []string `name:"attachment" type:"path" help:"File to attach; repeat as needed."`
@@ -933,9 +933,9 @@ func writeSendDraftReview(
 		action,
 		sanitizeCell(review.DraftID, 4096),
 		sanitizeCell(review.DraftChangeKey, 4096),
-		sanitizeCell(strings.Join(review.To, ", "), 512),
-		sanitizeCell(strings.Join(review.CC, ", "), 512),
-		sanitizeCell(strings.Join(review.BCC, ", "), 512),
+		mailReviewRecipients(review.To),
+		mailReviewRecipients(review.CC),
+		mailReviewRecipients(review.BCC),
 		sanitizeCell(review.Subject, 998),
 		sanitizeCell(string(review.BodyFormat), 16),
 		review.BodyBytes,
@@ -970,9 +970,9 @@ func writeMailContentReview(
 		"%s\nMode: %s\nTo: %s\nCc: %s\nBcc: %s\nSubject: %s\nBody format: %s\nBody (%d bytes, SHA-256 %s):\n%s\n",
 		action,
 		sanitizeCell(string(review.ComposeMode), 16),
-		sanitizeCell(strings.Join(review.To, ", "), 512),
-		sanitizeCell(strings.Join(review.CC, ", "), 512),
-		sanitizeCell(strings.Join(review.BCC, ", "), 512),
+		mailReviewRecipients(review.To),
+		mailReviewRecipients(review.CC),
+		mailReviewRecipients(review.BCC),
 		sanitizeCell(review.Subject, 998), sanitizeCell(string(review.BodyFormat), 16), review.BodyBytes,
 		sanitizeCell(review.BodySHA256, 64), sanitizeTerminalText(review.BodyPreview),
 	)
@@ -989,6 +989,13 @@ func writeMailContentReview(
 		}
 	}
 	return nil
+}
+
+// Recipient lists are already bounded by the application contract. Preserve
+// every reviewed destination while neutralizing terminal controls.
+func mailReviewRecipients(recipients []string) string {
+	value := strings.Join(recipients, ", ")
+	return sanitizeCell(value, len(value)+1)
 }
 
 func parseMailComposeMode(value string) application.MailComposeMode {

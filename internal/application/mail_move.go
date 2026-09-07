@@ -136,7 +136,7 @@ func (service *MailService) executeMove(
 		Caller: caller, Operation: operation.View(),
 	})
 	if callErr != nil || auditErr != nil {
-		return MailMoveResult{}, errors.Join(callErr, auditErr)
+		return MailMoveResult{}, providerWriteErrors(callErr, auditErr)
 	}
 	if service.provenance.AccountID != "" {
 		moved.Provenance = service.mailProvenance(moved.ID)

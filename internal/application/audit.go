@@ -62,3 +62,15 @@ type MonitorAudit struct {
 type AuditRecorder interface {
 	Record(context.Context, AuditEvent) error
 }
+
+// providerWriteErrors preserves no-replay guidance if a confirmed provider
+// write cannot be reported because its execution audit failed. The stable
+// access contracts return no result on error, so classify this conservatively
+// with the existing outcome-unknown sentinel rather than a retryable failure.
+func providerWriteErrors(callErr, auditErr error) error {
+	if callErr == nil && auditErr != nil {
+		return errors.Join(ErrWriteOutcomeUnknown,
+			errors.New("provider write completed but execution audit failed"), auditErr)
+	}
+	return errors.Join(callErr, auditErr)
+}

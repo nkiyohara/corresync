@@ -105,7 +105,7 @@ func (service *MailService) CommitDelete(
 		Caller: caller, Operation: operation.View(),
 	})
 	if callErr != nil || auditErr != nil {
-		return MailDeleteAccess{}, errors.Join(callErr, auditErr)
+		return MailDeleteAccess{}, providerWriteErrors(callErr, auditErr)
 	}
 	return MailDeleteAccess{
 		Status: "deleted",

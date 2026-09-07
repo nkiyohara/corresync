@@ -287,6 +287,7 @@ func TestSessionBackendConcurrentInvalidationClosesSharedLeaseOnce(t *testing.T)
 		}
 		borrowed[index] = account
 		borrowed[index].borrowedLease = lease
+		borrowed[index].borrowedRelease = sync.OnceFunc(lease.usage.end)
 		borrowed[index].borrowedService = service
 		borrowed[index].usage = lease.usage
 	}
@@ -335,7 +336,7 @@ func TestSessionBackendKeepsUnknownWriteOutcomeDistinctFromAuthentication(t *tes
 	}
 	account := sessionAccount{
 		mail: new(application.MailService), mailLease: lease,
-		borrowedLease: lease, borrowedService: application.AuthenticationServiceMail,
+		borrowedLease: lease, borrowedRelease: sync.OnceFunc(lease.usage.end), borrowedService: application.AuthenticationServiceMail,
 	}
 	backend := &sessionBackend{accounts: map[domain.AccountID]sessionAccount{
 		accountID: account,

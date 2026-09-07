@@ -208,6 +208,8 @@ func TestTeamsGraphWritesRevalidateAndPreserveUnknownOutcomes(t *testing.T) {
 				if body.Body.Content != "Edited synthetic" {
 					t.Errorf("edit body = %+v", body)
 				}
+				writer.WriteHeader(http.StatusNoContent)
+				return
 			}
 			writeGraphFixture(t, writer, "teams-graph-message-v1.json")
 		case "/v1.0/chats/chat-synthetic/messages":
@@ -449,5 +451,55 @@ func decodeGraphRequest(t *testing.T, request *http.Request, destination any) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(destination); err != nil {
 		t.Fatalf("decode Graph request: %v (%s)", err, data)
+	}
+}
+
+func TestTeamsGraphDelegatedEditAcceptsDocumented204(t *testing.T) {
+	writes := 0
+	s := newGraphServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1.0/me" {
+			writeGraphFixture(t, w, "teams-graph-identity-v1.json")
+			return
+		}
+		if r.Method == http.MethodPatch {
+			writes++
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		writeGraphFixture(t, w, "teams-graph-message-v1.json")
+	})
+	defer s.Close()
+	c := newTestGraphClient(t, s)
+	chat, _ := encodeGraphChatID("chat-synthetic")
+	_, err := c.EditMessage(t.Context(), application.MessageEditInput{MessageWriteRoute: application.MessageWriteRoute{Account: syntheticGraphAccount, WorkspaceID: "workspace-synthetic", Actor: c.MessageActor()}, ConversationID: chat, MessageID: "message-synthetic", Version: graphMessageVersion(readGraphMessageFixture(t)), Content: application.MessageContent{Format: application.MessageFormatPlain, Text: "Synthetic"}})
+	if err != nil {
+		t.Fatalf("documented successful edit response rejected after %d write: %v", writes, err)
+	}
+}
+
+func TestTeamsGraphDelegatedEditReadbackFailureIsUnknown(t *testing.T) {
+	writes := 0
+	server := newGraphServer(t, func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/v1.0/me" {
+			writeGraphFixture(t, writer, "teams-graph-identity-v1.json")
+			return
+		}
+		if request.Method == http.MethodPatch {
+			writes++
+			writer.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if writes != 0 {
+			writer.WriteHeader(http.StatusNotFound)
+			return
+		}
+		writeGraphFixture(t, writer, "teams-graph-message-v1.json")
+	})
+	defer server.Close()
+	client := newTestGraphClient(t, server)
+	chat, _ := encodeGraphChatID("chat-synthetic")
+	_, err := client.EditMessage(t.Context(), application.MessageEditInput{MessageWriteRoute: application.MessageWriteRoute{Account: syntheticGraphAccount, WorkspaceID: "workspace-synthetic", Actor: client.MessageActor()}, ConversationID: chat, MessageID: "message-synthetic", Version: graphMessageVersion(readGraphMessageFixture(t)), Content: application.MessageContent{Format: application.MessageFormatPlain, Text: "Synthetic"}})
+	if writes != 1 || !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+		t.Fatalf("writes=%d error=%v", writes, err)
 	}
 }

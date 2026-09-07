@@ -5,6 +5,77 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.9.0-rc.6 - 2026-09-07
+
+### Authentication usability
+
+- Minimize the dedicated Outlook window after successful browser login when
+  supported, retaining the same browser-owned session for CLI and MCP use.
+- Keep terminal login input in raw mode throughout the interaction, restore
+  terminal settings on exit, and render newlines correctly. Arrow and function
+  keys no longer unexpectedly leave password input or contaminate the menu.
+- Show native button captions such as Next and Sign in instead of internal DOM
+  IDs, while keeping editable form values out of the terminal projection.
+- Fail promptly when a selected browser control has disappeared, and cancel
+  the original terminal login session even when an action returns an error.
+- Handle concurrent creation of an authentication lock on macOS without
+  dropping either operation or weakening file-identity checks.
+- Preserve the real terminal through accessible settings, repair incomplete
+  account sessions, and retain existing sessions when queued login/logout is
+  cancelled. Provider panics no longer leak active session leases.
+
+### Authentication boundaries
+
+- Apply the same release gates to ordinary and terminal authentication; private
+  IPC callers cannot start terminal login from an MCP surface.
+- Bind persisted OAuth grants to their exact provider endpoints, protocol, and
+  Microsoft cloud, and suppress provider response content in OAuth errors.
+  Grants saved by rc.5 and earlier require fresh explicit CLI authorization;
+  background refresh never opens a browser or migrates an unbound grant.
+
+### Mail, calendar, and tasks
+
+- Preserve complete MIME bodies when flushing quoted-printable encoding,
+  decode declared text charsets, and wrap base64 attachment lines correctly.
+- Handle JMAP submission's implicit draft update, selected sender identity,
+  and uploaded attachment shape; reject truncated JMAP body reads explicitly.
+- Decode padded Gmail base64url, fetch external text bodies, and obtain label
+  counts from the provider's detail response instead of inventing zero counts.
+- Preserve approved calendar instants across timezone conversion and use
+  observed Outlook calendar permissions. Outlook and Graph reject repeated
+  local times that their offset-free write shape cannot disambiguate; use UTC
+  for those instants. Correct CalDAV recurrence end dates and bound expansion.
+- Refuse an Outlook attachment response that substitutes a different draft.
+  Keep every recipient visible in terminal send and saved-draft reviews.
+- Require reply/reply-all to be saved as drafts before sending, so resolved
+  recipients are reviewed and the configured recipient limit is enforced.
+  Use exact-version `mail send-draft` where supported, or the provider's UI.
+- Enumerate complete bounded mail/task sources before global pagination,
+  avoiding omissions and duplicates caused by provider-specific ordering.
+- Preserve Google subtask parents on order-only moves, bind Todoist reminders
+  into task versions, and implement bounded TickTick cross-list reads.
+- Preserve no-replay error classification after a completed write when result
+  assembly or execution-audit recording fails.
+
+### Local tools and distribution
+
+- Update the transitive gRPC dependency to 1.83.1, including the fix for
+  excessive HTTP/2 receive-buffer memory overhead (GHSA-vp52-pcj8-j9qc).
+- Avoid provider-neutral config nil dereferences and preserve sovereign cloud
+  selection when cloning the default Graph calendar route.
+- Quote printed shell commands literally, inspect exact Codex/Claude scoped
+  launch arguments, and report uncertain host mutations accurately. Hosts
+  exposing only ambiguous text cannot trigger automatic setup/repair.
+- Enforce cumulative mixed-MBOX scan budgets and preserve original calendar
+  timezone/context data in staged ICS objects. Rescanning an older staged ICS
+  may conservatively report a changed object or identity conflict.
+- Accept the public discovery Worker's current response schema in the browser.
+- Allow successful Windows installer blank-line output and enforce download
+  deadlines through response-body reads. Reject unsafe paths, links, duplicate
+  entries, and invalid executable entries during release archive verification.
+- Harden dormant messaging identity evidence, pagination, reactions, and
+  delegated edit outcomes. Messaging release gates remain closed.
+
 ## 0.9.0-rc.5 - 2026-08-26
 
 ### Authentication and discovery

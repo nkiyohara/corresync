@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -540,14 +541,10 @@ func TestGuidedSetupConnectsSelectedDetectedAgentThroughReviewedPlan(t *testing.
 		switch arguments[1] {
 		case "get":
 			if !registered {
-				return errors.New("not found")
+				_, _ = io.WriteString(output, "Error: No MCP server named 'corresync' found.\n")
+				return errors.New("exit status 1")
 			}
-			_, _ = fmt.Fprintf(
-				output,
-				"corresync\n command: %s\n args: --config %s mcp serve\n",
-				executable,
-				path,
-			)
+			_ = json.NewEncoder(output).Encode(map[string]any{"name": "corresync", "enabled": true, "transport": map[string]any{"type": "stdio", "command": executable, "args": []string{"--config", path, "mcp", "serve"}}})
 			return nil
 		case "add":
 			registered = true

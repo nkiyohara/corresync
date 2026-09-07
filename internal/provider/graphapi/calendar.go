@@ -367,8 +367,16 @@ func graphWriteTime(value, zone string) (map[string]string, error) {
 			"timeZone": "UTC",
 		}, nil
 	}
+	_, location, err := canonicalGraphTaskZone(zone)
+	if err != nil {
+		return nil, err
+	}
+	local := parsed.In(location)
+	if err := rejectGraphTimeFold(local); err != nil {
+		return nil, err
+	}
 	return map[string]string{
-		"dateTime": parsed.Format("2006-01-02T15:04:05"),
+		"dateTime": local.Format("2006-01-02T15:04:05"),
 		"timeZone": zone,
 	}, nil
 }
@@ -431,6 +439,15 @@ func graphRecurrence(
 	startTime, err := time.Parse(time.RFC3339, start)
 	if err != nil {
 		return nil, err
+	}
+	if zone == "" {
+		startTime = startTime.UTC()
+	} else {
+		_, location, err := canonicalGraphTaskZone(zone)
+		if err != nil {
+			return nil, err
+		}
+		startTime = startTime.In(location)
 	}
 	rangeValue := map[string]any{
 		"startDate": startTime.Format("2006-01-02"),
@@ -656,4 +673,24 @@ func validJoinURL(value string) (string, error) {
 		return "", errors.New("graph returned a malformed online-meeting join URL")
 	}
 	return value, nil
+}
+
+// The named-zone Graph wire shape does not identify which occurrence of a
+// repeated local clock was approved. Reject either occurrence before dispatch.
+func rejectGraphTimeFold(local time.Time) error {
+	_, offset := local.Zone()
+	zoneStart, zoneEnd := local.ZoneBounds()
+	if !zoneStart.IsZero() {
+		_, previousOffset := zoneStart.Add(-time.Nanosecond).Zone()
+		if previousOffset > offset && local.Before(zoneStart.Add(time.Duration(previousOffset-offset)*time.Second)) {
+			return errors.New("graph time is ambiguous in the selected time zone; use UTC")
+		}
+	}
+	if !zoneEnd.IsZero() {
+		_, nextOffset := zoneEnd.Zone()
+		if nextOffset < offset && !local.Before(zoneEnd.Add(-time.Duration(offset-nextOffset)*time.Second)) {
+			return errors.New("graph time is ambiguous in the selected time zone; use UTC")
+		}
+	}
+	return nil
 }

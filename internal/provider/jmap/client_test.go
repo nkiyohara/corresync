@@ -24,6 +24,10 @@ type syntheticJMAP struct {
 	ifState             string
 	requests            []string
 	created             [][]emailAddress
+	createdFrom         [][]emailAddress
+	identities          []identity
+	submittedIdentity   string
+	createdParts        []map[string]any
 	submit              bool
 	readOnly            bool
 	draftFailure        bool
@@ -31,6 +35,7 @@ type syntheticJMAP struct {
 	brokenWriteResponse bool
 	writeStatus         int
 	uploads             int
+	submissionResponses []any
 	unauthorized        bool
 }
 
@@ -210,7 +215,23 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 					emailAddress{Name: name, Email: emailValue},
 				)
 			}
+			rawFrom, _ := draft["from"].([]any)
+			createdFrom := make([]emailAddress, 0, len(rawFrom))
+			for _, rawAddress := range rawFrom {
+				address, _ := rawAddress.(map[string]any)
+				name, _ := address["name"].(string)
+				emailValue, _ := address["email"].(string)
+				createdFrom = append(createdFrom, emailAddress{Name: name, Email: emailValue})
+			}
+			structure, _ := draft["bodyStructure"].(map[string]any)
+			rawParts, _ := structure["subParts"].([]any)
+			parts := make([]map[string]any, 0, len(rawParts))
+			for _, part := range rawParts {
+				parts = append(parts, part.(map[string]any))
+			}
 			fixture.mu.Lock()
+			fixture.createdFrom = append(fixture.createdFrom, createdFrom)
+			fixture.createdParts = parts
 			fixture.created = append(fixture.created, createdTo)
 			fixture.mu.Unlock()
 			if draftFailure {
@@ -235,6 +256,10 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 			}
 		}
 	case "Identity/get":
+		if fixture.identities != nil {
+			result = map[string]any{"accountId": "account-1", "state": "identities-1", "list": fixture.identities}
+			break
+		}
 		result = map[string]any{
 			"accountId": "account-1", "state": "identities-1",
 			"list": []map[string]any{{
@@ -244,6 +269,15 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 			"notFound": []string{},
 		}
 	case "EmailSubmission/set":
+		createdSubmissions, _ := arguments["create"].(map[string]any)
+		submission, _ := createdSubmissions["send"].(map[string]any)
+		fixture.mu.Lock()
+		fixture.submittedIdentity, _ = submission["identityId"].(string)
+		fixture.mu.Unlock()
+		if fixture.submissionResponses != nil {
+			fixture.writeJSON(writer, map[string]any{"methodResponses": fixture.submissionResponses})
+			return
+		}
 		if submissionFailure {
 			result = map[string]any{
 				"accountId": "account-1", "oldState": "submissions-1",
@@ -261,7 +295,7 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 				"newState": "submissions-2",
 				"created": map[string]any{
 					"send": map[string]any{
-						"id": "submission-1", "emailId": "draft-1",
+						"id": "submission-1",
 					},
 				},
 			}
@@ -279,9 +313,14 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 		writer.WriteHeader(writeStatus)
 		return
 	}
-	fixture.writeJSON(writer, map[string]any{
-		"methodResponses": []any{[]any{method, result, "c1"}},
-	})
+	responses := []any{[]any{method, result, "c1"}}
+	if method == "EmailSubmission/set" && !submissionFailure {
+		responses = append(responses, []any{"Email/set", map[string]any{
+			"accountId": "account-1", "oldState": "state-2", "newState": "state-3",
+			"updated": map[string]any{"draft-1": nil},
+		}, "c1"})
+	}
+	fixture.writeJSON(writer, map[string]any{"methodResponses": responses})
 }
 
 func TestClientClassifiesRuntimeUnauthorizedResponse(t *testing.T) {
@@ -414,7 +453,7 @@ func TestClientReadsAndConditionallyUpdatesSyntheticJMAP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sent.ID != "draft-1" || sent.ChangeKey != "state-2" {
+	if sent.ID != "draft-1" || sent.ChangeKey != "state-3" {
 		t.Fatalf("sent = %#v", sent)
 	}
 	reply, err := client.CreateMailDraft(t.Context(), application.MailDraftInput{
@@ -811,5 +850,168 @@ func TestBoundedBodyTextRejectsOversizedUTF8WithoutTruncating(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "exceeds") {
 		t.Fatalf("boundedBodyText() error = %v", err)
+	}
+}
+
+func TestJMAPSubmissionValidatesImplicitUpdate(t *testing.T) {
+	t.Parallel()
+	success := func() []any {
+		return []any{
+			[]any{"EmailSubmission/set", map[string]any{"accountId": "account-1", "created": map[string]any{"send": map[string]any{"id": "submission-1"}}}, "c1"},
+			[]any{"Email/set", map[string]any{"accountId": "account-1", "newState": "state-3", "updated": map[string]any{"draft-1": nil}}, "c1"},
+		}
+	}
+	cases := []struct {
+		name   string
+		mutate func([]any) []any
+	}{
+		{"missing update", func(v []any) []any { return v[:1] }},
+		{"extra response", func(v []any) []any { return append(v, v[1]) }},
+		{"wrong first call ID", func(v []any) []any { v[0].([]any)[2] = "other"; return v }},
+		{"wrong update call ID", func(v []any) []any { v[1].([]any)[2] = "other"; return v }},
+		{"wrong update method", func(v []any) []any { v[1].([]any)[0] = "Mailbox/set"; return v }},
+		{"wrong submission account", func(v []any) []any { v[0].([]any)[1].(map[string]any)["accountId"] = "other"; return v }},
+		{"wrong update account", func(v []any) []any { v[1].([]any)[1].(map[string]any)["accountId"] = "other"; return v }},
+		{"wrong target", func(v []any) []any {
+			v[1].([]any)[1].(map[string]any)["updated"] = map[string]any{"other": nil}
+			return v
+		}},
+		{"failed update", func(v []any) []any {
+			m := v[1].([]any)[1].(map[string]any)
+			delete(m, "updated")
+			m["notUpdated"] = map[string]any{"draft-1": map[string]any{"type": "forbidden"}}
+			return v
+		}},
+		{"contradictory update", func(v []any) []any {
+			v[1].([]any)[1].(map[string]any)["notUpdated"] = map[string]any{"draft-1": map[string]any{"type": "forbidden"}}
+			return v
+		}},
+		{"missing state", func(v []any) []any { delete(v[1].([]any)[1].(map[string]any), "newState"); return v }},
+		{"missing submission ID", func(v []any) []any {
+			v[0].([]any)[1].(map[string]any)["created"] = map[string]any{"send": map[string]any{}}
+			return v
+		}},
+		{"wrong echoed email", func(v []any) []any {
+			v[0].([]any)[1].(map[string]any)["created"] = map[string]any{"send": map[string]any{"id": "submission-1", "emailId": "other"}}
+			return v
+		}},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newSyntheticJMAP(t)
+			fixture.submissionResponses = tt.mutate(success())
+			client, err := New(t.Context(), Options{SessionURL: fixture.server.URL + "/session", Username: "reader@example.invalid", Password: []byte("synthetic-secret"), Client: fixture.server.Client()})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = client.Close() })
+			_, err = client.SendMail(t.Context(), application.MailSendInput{To: []string{"recipient@example.invalid"}, Body: "Synthetic body"})
+			if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+				t.Fatalf("error=%v; want outcome unknown", err)
+			}
+		})
+	}
+}
+
+func TestBoundedBodyTextRejectsIncompleteProviderValues(t *testing.T) {
+	t.Parallel()
+	for _, value := range []bodyValue{{Value: "partial", IsTruncated: true}, {Value: "broken", IsEncodingProblem: true}} {
+		for _, html := range []bool{false, true} {
+			item := email{BodyValues: map[string]bodyValue{"body": value}}
+			if html {
+				item.HTMLBody = []emailPart{{PartID: "body"}}
+			} else {
+				item.TextBody = []emailPart{{PartID: "body"}}
+			}
+			if _, err := boundedBodyText(item); err == nil {
+				t.Fatal("incomplete provider body was silently accepted")
+			}
+		}
+	}
+	if _, err := boundedBodyText(email{TextBody: []emailPart{{PartID: "missing"}}}); err == nil {
+		t.Fatal("missing provider body was silently accepted")
+	}
+}
+
+func TestJMAPSendUsesSelectedIdentityFrom(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name       string
+		identities []identity
+		want       identity
+	}{
+		{"matching address", []identity{{ID: "alias", Name: "Alias", Email: "alias@example.invalid"}, {ID: "reader", Name: "Reader", Email: "reader@example.invalid"}}, identity{ID: "reader", Name: "Reader", Email: "reader@example.invalid"}},
+		{"fallback address", []identity{{ID: "alias", Name: "Alias", Email: "alias@example.invalid"}}, identity{ID: "alias", Name: "Alias", Email: "alias@example.invalid"}},
+		{"matching wildcard", []identity{{ID: "domain", Name: "Domain", Email: "*@example.invalid"}}, identity{ID: "domain", Name: "Domain", Email: "reader@example.invalid"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			fixture := newSyntheticJMAP(t)
+			fixture.identities = tt.identities
+			client, err := New(t.Context(), Options{SessionURL: fixture.server.URL + "/session", Username: "reader@example.invalid", Password: []byte("synthetic-secret"), Client: fixture.server.Client()})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = client.Close() })
+			if _, err := client.SendMail(t.Context(), application.MailSendInput{To: []string{"recipient@example.invalid"}, Body: "Synthetic body"}); err != nil {
+				t.Fatal(err)
+			}
+			fixture.mu.Lock()
+			defer fixture.mu.Unlock()
+			if len(fixture.createdFrom) != 1 || len(fixture.createdFrom[0]) != 1 || fixture.createdFrom[0][0] != (emailAddress{Name: tt.want.Name, Email: tt.want.Email}) || fixture.submittedIdentity != tt.want.ID {
+				t.Fatalf("created From=%#v, submission identity=%q, want %#v", fixture.createdFrom, fixture.submittedIdentity, tt.want)
+			}
+		})
+	}
+}
+
+func TestJMAPSendRejectsInvalidIdentityBeforeCreatingEmail(t *testing.T) {
+	t.Parallel()
+	for _, sender := range []identity{{ID: "bad", Email: "bad address"}, {Email: "reader@example.invalid"}, {ID: "wrong-domain", Email: "*@other.invalid"}} {
+		fixture := newSyntheticJMAP(t)
+		fixture.identities = []identity{sender}
+		client, err := New(t.Context(), Options{SessionURL: fixture.server.URL + "/session", Username: "reader@example.invalid", Password: []byte("synthetic-secret"), Client: fixture.server.Client()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = client.Close() })
+		if _, err := client.SendMail(t.Context(), application.MailSendInput{To: []string{"recipient@example.invalid"}, Body: "Synthetic body"}); err == nil {
+			t.Fatal("invalid selected identity was accepted")
+		}
+		fixture.mu.Lock()
+		created := len(fixture.created)
+		submitted := fixture.submittedIdentity
+		fixture.mu.Unlock()
+		if created != 0 || submitted != "" {
+			t.Fatal("invalid identity caused a provider write")
+		}
+	}
+}
+
+func TestJMAPUploadedAttachmentUsesOnlyBlobID(t *testing.T) {
+	t.Parallel()
+	fixture := newSyntheticJMAP(t)
+	client, err := New(t.Context(), Options{SessionURL: fixture.server.URL + "/session", Username: "reader@example.invalid", Password: []byte("synthetic-secret"), Client: fixture.server.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = client.Close() })
+	_, err = client.CreateMailDraft(t.Context(), application.MailDraftInput{To: []string{"recipient@example.invalid"}, Body: "Synthetic body", Attachments: []application.MailFileAttachment{{Name: "synthetic.txt", ContentType: "text/plain", Content: []byte("synthetic attachment")}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	if len(fixture.createdParts) != 2 {
+		t.Fatalf("parts=%#v", fixture.createdParts)
+	}
+	for _, part := range fixture.createdParts {
+		_, hasPart := part["partId"]
+		_, hasBlob := part["blobId"]
+		if hasPart == hasBlob {
+			t.Fatalf("body part must specify exactly one partId or blobId: %#v", part)
+		}
+	}
+	if fixture.createdParts[1]["blobId"] != "uploaded-blob-1" {
+		t.Fatalf("attachment=%#v", fixture.createdParts[1])
 	}
 }

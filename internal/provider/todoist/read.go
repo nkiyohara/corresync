@@ -330,13 +330,13 @@ func decodeRoute(listValue, taskValue string) (string, string, error) {
 func (client *Client) exactTask(
 	ctx context.Context,
 	projectID, taskID, version string,
-) (task, error) {
+) (task, []reminder, error) {
 	expected, err := decodeVersion(version)
 	if err != nil {
-		return task{}, err
+		return task{}, nil, err
 	}
 	if expected.ID != taskID || expected.ProjectID != projectID {
-		return task{}, restapi.ErrPrecondition
+		return task{}, nil, restapi.ErrPrecondition
 	}
 	var current task
 	if expected.Checked || expected.CompletedAt != "" {
@@ -345,16 +345,24 @@ func (client *Client) exactTask(
 		current, err = client.getActiveTask(ctx, projectID, taskID)
 	}
 	if err != nil {
-		return task{}, err
+		return task{}, nil, err
 	}
-	actual, err := encodeVersion(current)
+	var reminders []reminder
+	if !current.Checked && current.CompletedAt == "" {
+		byTask, err := client.remindersByTask(ctx, taskID)
+		if err != nil {
+			return task{}, nil, err
+		}
+		reminders = byTask[taskID]
+	}
+	actual, err := encodeVersion(current, reminders)
 	if err != nil {
-		return task{}, err
+		return task{}, nil, err
 	}
 	if actual != version {
-		return task{}, restapi.ErrPrecondition
+		return task{}, nil, restapi.ErrPrecondition
 	}
-	return current, nil
+	return current, reminders, nil
 }
 
 func (client *Client) getCompletedTask(

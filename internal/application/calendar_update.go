@@ -163,7 +163,7 @@ func (service *CalendarService) executeUpdate(
 		Caller: caller, Operation: operation.View(),
 	})
 	if callErr != nil || auditErr != nil {
-		return CalendarUpdateResult{}, errors.Join(callErr, auditErr)
+		return CalendarUpdateResult{}, providerWriteErrors(callErr, auditErr)
 	}
 	if service.provenance.AccountID != "" {
 		updated.Provenance = service.calendarProvenance(updated.ID)
@@ -238,13 +238,20 @@ func (input CalendarUpdateInput) ValidateWithAttendeeLimit(maxAttendees int) err
 		if duration > MaxCalendarEventDuration {
 			return fmt.Errorf("calendar event duration must not exceed %s", MaxCalendarEventDuration)
 		}
+		zone := ""
+		if input.TimeZone != nil {
+			zone = *input.TimeZone
+		}
+		boundaryStart, err := CalendarTimeInZone(start, zone)
+		if err != nil {
+			return err
+		}
+		boundaryEnd, err := CalendarTimeInZone(end, zone)
+		if err != nil {
+			return err
+		}
 		if input.AllDay != nil && *input.AllDay {
-			zone := ""
-			if input.TimeZone != nil {
-				zone = *input.TimeZone
-			}
-			if !isCalendarMidnight(calendarBoundaryForTimeZone(start, zone)) ||
-				!isCalendarMidnight(calendarBoundaryForTimeZone(end, zone)) {
+			if !isCalendarMidnight(boundaryStart) || !isCalendarMidnight(boundaryEnd) {
 				return errors.New("all-day calendar start and end must be midnight boundaries in the reviewed time zone")
 			}
 		}
@@ -275,9 +282,11 @@ func (input CalendarUpdateInput) ValidateWithAttendeeLimit(maxAttendees int) err
 		if input.TimeZone != nil {
 			zone = *input.TimeZone
 		}
-		if err := input.Recurrence.Validate(
-			calendarBoundaryForTimeZone(start, zone),
-		); err != nil {
+		boundaryStart, err := CalendarTimeInZone(start, zone)
+		if err != nil {
+			return err
+		}
+		if err := input.Recurrence.Validate(boundaryStart); err != nil {
 			return err
 		}
 	}

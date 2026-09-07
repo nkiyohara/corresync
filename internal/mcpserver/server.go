@@ -264,7 +264,7 @@ type MailDraftInput struct {
 	Attachments        []MailFileAttachmentInput `json:"attachments,omitempty" jsonschema:"Bounded file attachments for a saved draft"`
 }
 
-// MailSendInput prepares one new message or response; it never sends directly.
+// MailSendInput prepares one new message or forward; it never sends directly.
 type MailSendInput struct {
 	Account            string                    `json:"account,omitempty" jsonschema:"Configured account alias; omit to use default_account"`
 	To                 []string                  `json:"to,omitempty" jsonschema:"Bare To recipient addresses"`
@@ -273,9 +273,9 @@ type MailSendInput struct {
 	Subject            string                    `json:"subject,omitempty" jsonschema:"Message subject"`
 	Body               string                    `json:"body,omitempty" jsonschema:"Text or HTML message body"`
 	BodyFormat         string                    `json:"bodyFormat,omitempty" jsonschema:"Body format: text or html; omit for text"`
-	ComposeMode        string                    `json:"composeMode,omitempty" jsonschema:"Composition mode: new, reply, reply_all, or forward; omit for new"`
-	ReferenceMessageID string                    `json:"referenceMessageId,omitempty" jsonschema:"Exact source message ID for reply or forward"`
-	ReferenceChangeKey string                    `json:"referenceChangeKey,omitempty" jsonschema:"Exact source change key for reply or forward"`
+	ComposeMode        string                    `json:"composeMode,omitempty" jsonschema:"Direct send mode: new or forward; omit for new. reply and reply_all require mail_create_draft then mail_send_draft"`
+	ReferenceMessageID string                    `json:"referenceMessageId,omitempty" jsonschema:"Exact source message ID for forward"`
+	ReferenceChangeKey string                    `json:"referenceChangeKey,omitempty" jsonschema:"Exact source change key for forward"`
 	Attachments        []MailFileAttachmentInput `json:"attachments,omitempty" jsonschema:"Bounded file attachments to send"`
 }
 
@@ -1145,7 +1145,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mail_create_draft",
 		Title:       "Create a mail draft",
-		Description: "Create one save-only text or HTML draft through the configured mail route, including a reply, reply-all, forward, and bounded attachments. This tool never sends mail. The exact source version, recipients, content, and attachment hashes are bound to the returned review.",
+		Description: "Create one save-only text or HTML draft through the configured mail route, including a reply, reply-all, forward, and bounded attachments. This tool never sends mail. The exact source version, supplied recipients, content, and attachment hashes are bound to the returned review. For replies, use mail_send_draft to review resolved recipients before sending where exact-version draft send is supported.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Create a mail draft",
 			ReadOnlyHint:    false,
@@ -1197,7 +1197,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mail_send",
 		Title:       "Review a new message send",
-		Description: "Prepare an exact new text or HTML message, reply, reply-all, or forward for mandatory review. This tool never sends; it returns a caller-bound approval token.",
+		Description: "Prepare an exact new text or HTML message or forward with explicit recipients for mandatory review. Replies and reply-all require mail_create_draft, then mail_send_draft where exact-version draft sending is supported; otherwise review and send the saved draft in the provider UI. This tool never sends; it returns a caller-bound approval token.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Review a new message send",
 			ReadOnlyHint:    false,

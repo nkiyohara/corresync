@@ -1,9 +1,12 @@
 package browser
 
 import (
+	"context"
 	"encoding/base64"
+	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/chromedp/chromedp"
 )
@@ -72,9 +75,9 @@ func TestTerminalSnapshotScriptClassifiesAndTogglesCheckboxes(t *testing.T) {
 	defer cancelBrowser()
 
 	html := `<html><head><title>Sign in</title></head><body>
-		<input aria-label="Code" type="text">
+		<input aria-label="Code" type="text" value="synthetic-editable-value">
 		<label><input type="checkbox">Don't ask again</label>
-		<input aria-label="Continue" type="submit">
+		<input id="idSIButton9" value="Sign in" type="submit">
 		<div aria-checked="false" aria-label="Remember this device" role="checkbox" tabindex="0">Remember</div>
 	</body></html>`
 	dataURL := "data:text/html;base64," + base64.StdEncoding.EncodeToString([]byte(html))
@@ -87,12 +90,15 @@ func TestTerminalSnapshotScriptClassifiesAndTogglesCheckboxes(t *testing.T) {
 		t.Fatal(err)
 	}
 	view := normalizeTerminalSnapshot(snapshot)
+	if strings.Contains(view.Text+view.Controls[0].Name, "synthetic-editable-value") {
+		t.Fatal("editable value leaked")
+	}
 	if len(view.Controls) != 4 {
 		t.Fatalf("Controls = %+v", view.Controls)
 	}
 	if view.Controls[0].Kind != "input" || view.Controls[1].Kind != "activate" ||
 		view.Controls[1].Name != "Don't ask again [not checked]" ||
-		view.Controls[2].Kind != "activate" ||
+		view.Controls[2].Kind != "activate" || view.Controls[2].Name != "Sign in" ||
 		view.Controls[3].Name != "Remember this device [not checked]" {
 		t.Fatalf("Controls = %+v", view.Controls)
 	}
@@ -137,5 +143,47 @@ func TestValidateTerminalAction(t *testing.T) {
 		if err := validateTerminalAction(action); err == nil {
 			t.Fatalf("validateTerminalAction(%+v) unexpectedly succeeded", action)
 		}
+	}
+}
+
+func TestTerminalPasswordKeysAndMissingControls(t *testing.T) {
+	ctx := browserFixtureContext(t, true)
+	html := `<input id="password" type="password" aria-label="Password"><input type="submit" value="Sign in">`
+	if err := chromedp.Run(ctx, chromedp.Navigate("data:text/html;base64,"+base64.StdEncoding.EncodeToString([]byte(html)))); err != nil {
+		t.Fatal(err)
+	}
+	instance := &Browser{context: ctx}
+	view, err := instance.TerminalSnapshot(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(view.Controls) != 2 || !view.Controls[0].Sensitive || view.Controls[1].Name != "Sign in" {
+		t.Fatalf("view=%+v", view)
+	}
+	for _, key := range []string{"A", "!", "9", "Backspace", "Z"} {
+		if err := instance.TerminalAct(t.Context(), TerminalAction{Kind: TerminalKey, ElementID: view.Controls[0].ID, Key: key}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Synthetic-only browser assertion; never read a live credential value.
+	var matches bool
+	if err := chromedp.Run(ctx, chromedp.Evaluate(`document.getElementById("password").value === "A!Z"`, &matches)); err != nil || !matches {
+		t.Fatalf("password input failed: %v", err)
+	}
+	view, err = instance.TerminalSnapshot(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(view.Text+view.Controls[0].Name, "A!Z") {
+		t.Fatal("password leaked into view")
+	}
+	if err := chromedp.Run(ctx, chromedp.Evaluate(`document.getElementById("password").remove()`, nil)); err != nil {
+		t.Fatal(err)
+	}
+	actionContext, stop := context.WithTimeout(t.Context(), time.Second)
+	defer stop()
+	err = instance.TerminalAct(actionContext, TerminalAction{Kind: TerminalFocus, ElementID: "control-1"})
+	if err == nil || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("missing control waited instead of failing: %v", err)
 	}
 }

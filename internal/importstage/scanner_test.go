@@ -446,3 +446,101 @@ func equalStrings(left, right []string) bool {
 	}
 	return true
 }
+
+func TestMixedMBOXScanEnforcesCumulativeBudgets(t *testing.T) {
+	const message = "From sender@example.test Mon Jan 1 00:00:00 2024\nSubject: Synthetic\n\nbody\n"
+	t.Run("item budget", func(t *testing.T) {
+		root := t.TempDir()
+		for _, name := range []string{"a.mbox", "b.mbox", "c.mbox"} {
+			writeFixture(t, filepath.Join(root, name), []byte(strings.Repeat(message, 5001)))
+		}
+		if _, err := scanMixed(t.Context(), root); err == nil || !strings.Contains(err.Error(), "too many messages") {
+			t.Fatalf("mixed MBOX scan did not stop at the cumulative item bound: %v", err)
+		}
+	})
+	t.Run("remaining byte budget", func(t *testing.T) {
+		root := t.TempDir()
+		writeFixture(t, filepath.Join(root, "a.mbox"), []byte(message))
+		writeFixture(t, filepath.Join(root, "b.mbox"), []byte(message))
+		// Both archives fit the total budget individually; together they exceed it.
+		if _, err := scanMixedWithin(t.Context(), root, 10, int64(2*len(message)-1)); err == nil || !strings.Contains(err.Error(), "byte limit") {
+			t.Fatalf("mixed MBOX scan did not enforce the remaining byte budget: %v", err)
+		}
+	})
+	t.Run("exhausted budget before next archive", func(t *testing.T) {
+		root := t.TempDir()
+		writeFixture(t, filepath.Join(root, "a.mbox"), []byte(message))
+		writeFixture(t, filepath.Join(root, "b.mbox"), []byte("invalid archive must not be parsed\n"))
+		if _, err := scanMixedWithin(t.Context(), root, 1, int64(10*len(message))); err == nil || !strings.Contains(err.Error(), "mixed import source exceeds scan bounds") {
+			t.Fatalf("mixed scan parsed another archive after exhausting the item budget: %v", err)
+		}
+	})
+}
+
+func TestICSScanPreservesCalendarContextAndHashesTimezoneChanges(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+	source := filepath.Join(t.TempDir(), "calendar.ics")
+	const calendar = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Synthetic//Calendar//EN\r\nMETHOD:PUBLISH\r\n" +
+		"BEGIN:VTIMEZONE\r\nTZID:Synthetic-Custom\r\nBEGIN:STANDARD\r\nDTSTART:19700101T000000\r\nTZOFFSETFROM:+0200\r\nTZOFFSETTO:+0200\r\nEND:STANDARD\r\nEND:VTIMEZONE\r\n" +
+		"BEGIN:VEVENT\r\nUID:synthetic-one\r\nDTSTART;TZID=Synthetic-Custom:20260907T120000\r\nDTEND;TZID=Synthetic-Custom:20260907T130000\r\nEND:VEVENT\r\n" +
+		"BEGIN:VEVENT\r\nUID:synthetic-two\r\nDTSTART;TZID=Synthetic-Custom:20260908T120000\r\nDTEND;TZID=Synthetic-Custom:20260908T130000\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+	writeFixture(t, source, []byte(calendar))
+	scanner := New()
+	first := scanFixture(t, scanner, source, application.ImportFormatICS)
+	if first.StagedItems != 2 || len(first.Items) != 2 || first.DuplicateItems != 0 {
+		t.Fatalf("events were not independently staged: %+v", first)
+	}
+	if first.Items[0].CalendarUID != "synthetic-one" || first.Items[1].CalendarUID != "synthetic-two" ||
+		first.Items[0].Source.Ordinal != 1 || first.Items[1].Source.Ordinal != 2 {
+		t.Fatalf("event identities or provenance changed: %+v", first.Items)
+	}
+	if first.Items[0].ObjectSHA256 != first.Items[1].ObjectSHA256 || countObjectFiles(t) != 1 {
+		t.Fatal("events did not share the preserved calendar object")
+	}
+	if !bytes.Equal(readObject(t, first.Items[0].ObjectSHA256), []byte(calendar)) {
+		t.Fatal("staging changed or dropped calendar context")
+	}
+	repeated := scanFixture(t, scanner, source, application.ImportFormatICS)
+	if repeated.ID != first.ID || repeated.DuplicateItems != 2 || !repeated.ExistingPlan {
+		t.Fatalf("repeat calendar scan was not idempotent: %+v", repeated)
+	}
+	changed := strings.ReplaceAll(calendar, "+0200", "+0300")
+	writeFixture(t, source, []byte(changed))
+	second := scanFixture(t, scanner, source, application.ImportFormatICS)
+	if second.ID == first.ID || second.StagedItems != 2 || second.DuplicateItems != 0 || second.Conflicts != 2 ||
+		second.Items[0].ObjectSHA256 == first.Items[0].ObjectSHA256 {
+		t.Fatalf("timezone change was treated as an exact duplicate: %+v", second)
+	}
+	if !bytes.Equal(readObject(t, second.Items[0].ObjectSHA256), []byte(changed)) {
+		t.Fatal("changed calendar context was not retained")
+	}
+}
+
+func TestICSScanKeepsDistinctEventsWithoutUID(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+	source := filepath.Join(t.TempDir(), "calendar.ics")
+	writeFixture(t, source, []byte("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"+
+		"BEGIN:VEVENT\r\nSUMMARY:First synthetic event\r\nEND:VEVENT\r\n"+
+		"BEGIN:VEVENT\r\nSUMMARY:Second synthetic event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"))
+	plan := scanFixture(t, New(), source, application.ImportFormatICS)
+	if plan.StagedItems != 2 || plan.DuplicateItems != 0 || plan.Items[0].DedupeKey == plan.Items[1].DedupeKey {
+		t.Fatalf("shared source object collapsed distinct UID-less events: %+v", plan)
+	}
+}
+
+func TestICSScanReportsConflictingIdentityWithinOneSource(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+	source := filepath.Join(t.TempDir(), "calendar.ics")
+	writeFixture(t, source, []byte("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"+
+		"BEGIN:VEVENT\r\nUID:synthetic-same\r\nSUMMARY:First synthetic event\r\nEND:VEVENT\r\n"+
+		"BEGIN:VEVENT\r\nUID:synthetic-same\r\nSUMMARY:Changed synthetic event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"))
+	plan := scanFixture(t, New(), source, application.ImportFormatICS)
+	if plan.StagedItems != 2 || plan.DuplicateItems != 0 || plan.Conflicts != 1 || plan.Items[1].Status != "conflict" ||
+		!hasDegradation(plan.Items[1].Degradations, "import.deduplication") {
+		t.Fatalf("shared source object hid conflicting event identities: %+v", plan)
+	}
+	repeated := scanFixture(t, New(), source, application.ImportFormatICS)
+	if repeated.ID != plan.ID || repeated.DuplicateItems != 2 {
+		t.Fatalf("repeat conflict scan was not idempotent: %+v", repeated)
+	}
+}

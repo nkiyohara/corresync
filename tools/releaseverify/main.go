@@ -764,7 +764,7 @@ func validateMCPBEntry(file *zip.File) error {
 func hashZipEntry(file *zip.File) (string, error) {
 	const maximumBinaryBytes = 256 * 1024 * 1024
 
-	if file.UncompressedSize64 > maximumBinaryBytes {
+	if file.UncompressedSize64 == 0 || file.UncompressedSize64 > maximumBinaryBytes {
 		return "", fmt.Errorf("entry %q exceeds %d bytes", file.Name, maximumBinaryBytes)
 	}
 	reader, err := file.Open()
@@ -870,6 +870,32 @@ func equalStringLists(left, right []string) bool {
 	return slices.Equal(left, right)
 }
 
+func validateReleaseEntry(name string, mode os.FileMode, seen map[string]bool) error {
+	clean := strings.TrimSuffix(name, "/")
+	if name == "" || clean == "." || clean == ".." || pathpkg.Clean(clean) != clean ||
+		pathpkg.IsAbs(clean) || strings.HasPrefix(clean, "../") ||
+		strings.ContainsAny(name, "\\:\x00\r\n") {
+		return fmt.Errorf("unsafe release entry path %q", name)
+	}
+	if seen[clean] {
+		return fmt.Errorf("duplicate release entry %q", name)
+	}
+	seen[clean] = true
+	if mode.IsDir() {
+		if clean != strings.TrimSuffix(licensePrefix, "/") && !strings.HasPrefix(clean, licensePrefix) {
+			return fmt.Errorf("unexpected release directory %q", name)
+		}
+		return nil
+	}
+	if strings.HasSuffix(name, "/") || !mode.IsRegular() {
+		return fmt.Errorf("release entry %q is not a regular file", name)
+	}
+	if (name == "corr" || name == "corresync") && mode.Perm()&0o111 != 0o111 {
+		return fmt.Errorf("release binary %q is not executable by every user", name)
+	}
+	return nil
+}
+
 func verifyZip(path string, want []string, version string) error {
 	archive, err := zip.OpenReader(path)
 	if err != nil {
@@ -877,9 +903,13 @@ func verifyZip(path string, want []string, version string) error {
 	}
 	defer func() { _ = archive.Close() }()
 	names := make([]string, 0, len(archive.File))
+	seen := make(map[string]bool)
 	versioned := make(map[string][]byte)
 	compatibilityHashes := make(map[string]string, 2)
 	for _, file := range archive.File {
+		if err := validateReleaseEntry(file.Name, file.Mode(), seen); err != nil {
+			return fmt.Errorf("archive %q: %w", filepath.Base(path), err)
+		}
 		names = append(names, file.Name)
 		if file.Name == "corr.exe" || file.Name == "corresync.exe" {
 			hash, hashErr := hashZipEntry(file)
@@ -922,6 +952,7 @@ func verifyTarGzip(path string, want []string, version string) error {
 	defer func() { _ = gzipReader.Close() }()
 	tarReader := tar.NewReader(gzipReader)
 	var names []string
+	seen := make(map[string]bool)
 	versioned := make(map[string][]byte)
 	compatibilityHashes := make(map[string]string, 2)
 	for {
@@ -931,6 +962,12 @@ func verifyTarGzip(path string, want []string, version string) error {
 		}
 		if err != nil {
 			return fmt.Errorf("read tarball %q: %w", filepath.Base(path), err)
+		}
+		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeDir {
+			return fmt.Errorf("archive %q entry %q has unsupported type %d", filepath.Base(path), header.Name, header.Typeflag)
+		}
+		if err := validateReleaseEntry(header.Name, header.FileInfo().Mode(), seen); err != nil {
+			return fmt.Errorf("archive %q: %w", filepath.Base(path), err)
 		}
 		names = append(names, header.Name)
 		if header.Name == "corr" || header.Name == "corresync" {
@@ -972,7 +1009,7 @@ func verifyTarGzip(path string, want []string, version string) error {
 func hashTarEntry(reader io.Reader, header *tar.Header) (string, error) {
 	const maximumBinaryBytes = 256 * 1024 * 1024
 
-	if header.Size < 0 || header.Size > maximumBinaryBytes {
+	if header.Size <= 0 || header.Size > maximumBinaryBytes {
 		return "", fmt.Errorf("entry %q exceeds %d bytes", header.Name, maximumBinaryBytes)
 	}
 	hash := sha256.New()
@@ -1066,9 +1103,18 @@ func requireReleaseFiles(archive string, got, want []string) error {
 	for _, name := range want {
 		required[name] = false
 	}
+	seen := make(map[string]bool, len(got))
 	licenseFiles := 0
 	var unexpected []string
 	for _, name := range got {
+		clean := strings.TrimSuffix(name, "/")
+		if seen[clean] {
+			return fmt.Errorf("archive %q contains duplicate entry %q", archive, name)
+		}
+		seen[clean] = true
+		if name == licensePrefix {
+			continue
+		}
 		if _, exists := required[name]; exists {
 			required[name] = true
 		}

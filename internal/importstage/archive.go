@@ -238,6 +238,15 @@ func scanHomogeneous(
 }
 
 func scanMixed(ctx context.Context, root string) (scanResult, error) {
+	return scanMixedWithin(ctx, root, application.MaxImportPlanItems, application.MaxImportSourceBytes)
+}
+
+func scanMixedWithin(
+	ctx context.Context,
+	root string,
+	maximumItems int,
+	maximumBytes int64,
+) (scanResult, error) {
 	result := scanResult{format: application.ImportFormatMixed}
 	paths, err := collectFiles(ctx, root, func(path string) bool {
 		switch strings.ToLower(filepath.Ext(path)) {
@@ -272,8 +281,13 @@ func scanMixed(ctx context.Context, root string) (scanResult, error) {
 			}
 			continue
 		}
+		remainingItems := maximumItems - len(result.candidates)
+		remainingBytes := maximumBytes - result.bytesRead
+		if remainingItems <= 0 || remainingBytes <= 0 {
+			return scanResult{}, errors.New("mixed import source exceeds scan bounds")
+		}
 		if format == application.ImportFormatMBOX {
-			items, bytesRead, err := scanMBOX(ctx, path)
+			items, bytesRead, err := scanMBOXWithin(ctx, path, remainingItems, remainingBytes)
 			if err != nil {
 				return scanResult{}, err
 			}
@@ -281,7 +295,7 @@ func scanMixed(ctx context.Context, root string) (scanResult, error) {
 			result.bytesRead += bytesRead
 			continue
 		}
-		content, err := readSourceFile(path, application.MaxImportItemBytes)
+		content, err := readSourceFile(path, int(min(int64(application.MaxImportItemBytes), remainingBytes)))
 		if err != nil {
 			return scanResult{}, err
 		}
@@ -329,8 +343,8 @@ func scanMixed(ctx context.Context, root string) (scanResult, error) {
 		default:
 			return scanResult{}, errors.New("unknown mixed import member format")
 		}
-		if len(result.candidates) > application.MaxImportPlanItems ||
-			result.bytesRead > application.MaxImportSourceBytes {
+		if len(result.candidates) > maximumItems ||
+			result.bytesRead > maximumBytes {
 			return scanResult{}, errors.New("mixed import source exceeds scan bounds")
 		}
 	}
@@ -341,15 +355,27 @@ func scanMBOX(
 	ctx context.Context,
 	path string,
 ) ([]candidate, int64, error) {
+	return scanMBOXWithin(ctx, path, application.MaxImportPlanItems, application.MaxImportSourceBytes)
+}
+
+func scanMBOXWithin(
+	ctx context.Context,
+	path string,
+	maximumItems int,
+	maximumBytes int64,
+) ([]candidate, int64, error) {
+	if maximumItems <= 0 || maximumBytes <= 0 {
+		return nil, 0, errors.New("mbox source exceeds the remaining scan budget")
+	}
 	file, size, err := openSourceFile(path)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer func() { _ = file.Close() }()
-	if size > application.MaxImportSourceBytes {
+	if size > maximumBytes {
 		return nil, 0, errors.New("mbox source exceeds the total byte limit")
 	}
-	reader := bufio.NewReader(file)
+	reader := bufio.NewReader(io.LimitReader(file, maximumBytes+1))
 	var current bytes.Buffer
 	result := make([]candidate, 0, 128)
 	foundDelimiter := false
@@ -358,6 +384,9 @@ func scanMBOX(
 	finalize := func() error {
 		if current.Len() == 0 {
 			return nil
+		}
+		if len(result) >= maximumItems {
+			return errors.New("mbox source contains too many messages for the remaining scan budget")
 		}
 		ordinal++
 		degradations := []domain.Degradation(nil)
@@ -380,9 +409,6 @@ func scanMBOX(
 		))
 		current.Reset()
 		fromEscaping = false
-		if len(result) > application.MaxImportPlanItems {
-			return errors.New("mbox source contains too many messages")
-		}
 		return nil
 	}
 	var bytesRead int64
@@ -392,7 +418,7 @@ func scanMBOX(
 		}
 		line, readErr := reader.ReadBytes('\n')
 		bytesRead += int64(len(line))
-		if bytesRead > application.MaxImportSourceBytes {
+		if bytesRead > maximumBytes {
 			return nil, 0, errors.New("mbox source exceeds the total byte limit")
 		}
 		if isMBOXDelimiter(line) {
@@ -626,14 +652,30 @@ func componentCandidates(
 	path, component string,
 	format application.ImportFormat,
 ) ([]candidate, error) {
+	if len(raw) > application.MaxImportItemBytes {
+		return nil, errors.New("component source exceeds the item byte limit")
+	}
 	components, err := extractComponents(raw, component)
 	if err != nil {
 		return nil, fmt.Errorf("scan %s source: %w", format, err)
 	}
+	sourceDigest := ""
+	if component == "VEVENT" {
+		sourceDigest = contentDigest(raw)
+	}
 	result := make([]candidate, 0, len(components))
 	for index, content := range components {
 		properties := componentProperties(content)
-		object := contentDigest(content)
+		componentDigest := contentDigest(content)
+		object := componentDigest
+		objectContent := content
+		if component == "VEVENT" {
+			// Keep the complete original calendar, including VTIMEZONE and
+			// calendar properties. Source.Ordinal identifies this event within
+			// the shared source object without losing its enclosing context.
+			objectContent = raw
+			object = sourceDigest
+		}
 		item := application.ImportItem{
 			ObjectSHA256: object,
 			Source: application.ImportSourceProvenance{
@@ -668,8 +710,16 @@ func componentCandidates(
 			}
 		}
 		item.DedupeKey = dedupeDigest(item.Kind, identity, object)
+		identityRevision := ""
+		if component == "VEVENT" {
+			item.DedupeKey = dedupeDigest(item.Kind, identity, object, componentDigest)
+			// Different events can share one source object. Compare the
+			// component as well when detecting conflicting UID/recurrence IDs.
+			identityRevision = dedupeDigest(object, componentDigest)
+		}
 		result = append(result, candidate{
-			item: item, raw: content, identity: identity,
+			item: item, raw: objectContent, identity: identity,
+			identityRevision: identityRevision,
 		})
 	}
 	return result, nil

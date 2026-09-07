@@ -69,6 +69,7 @@ All strings must be valid UTF-8 and contain no NUL. Important limits are:
 | Cursor or URL | 8,192 bytes |
 | CLI canonical JSON document | 4 MiB |
 | Encoded single-account result page | 8 MiB |
+| Per-account cross-account projection item count | 5,000 |
 | Per-account cross-account projection workset | 2 MiB |
 | Encoded cross-account result page | 12 MiB |
 <!-- markdownlint-enable MD013 -->
@@ -304,6 +305,11 @@ Project permission is rechecked before mutation. Project/list mutation,
 comments, focus, habits, columns, groups, and unrelated provider APIs are
 outside the shared application boundary.
 
+Cross-list listing enumerates the selected account's task projects and Inbox
+through the documented project-scoped filter. It requires a complete snapshot
+of fewer than 200 tasks across at most 64 projects; larger snapshots fail
+explicitly. Every task retains its own list identity.
+
 Filter and search responses are capped at 200 with no documented continuation.
 Polling therefore uses a bounded full snapshot, retains account/list-bound
 membership for tombstones, and fails closed when a complete result or canonical
@@ -315,7 +321,10 @@ contracts and an opt-in read-only harness, but no recorded live observation.
 `corr tasks lists/list/get/search/sync` and the corresponding MCP tools route to
 one account. `corr tasks list --all-accounts` and `task_list_all` fan out over
 isolated services, retain provenance, and return explicit per-account partial
-failures. They create no merged writable store.
+failures. They create no merged writable store. Each account is enumerated
+before global due-date sorting, up to 5,000 tasks and 2 MiB of encoded tasks.
+An account that exceeds either bound contributes an explicit failure and no
+partial prefix; use a narrower status filter or read that account separately.
 
 Create and update accept the strict canonical JSON fixture shape. Complete,
 reopen, and delete require list ID, task ID, and provider version. All five

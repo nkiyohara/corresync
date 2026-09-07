@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
+	"net/textproto"
 	"slices"
 	"strconv"
 	"strings"
@@ -1060,5 +1063,102 @@ func TestSMTPAuthenticationRejectionUsesSharedClassification(t *testing.T) {
 	if !ok || reason != application.AuthenticationReasonCredentialRejected ||
 		strings.Contains(err.Error(), "private provider detail") {
 		t.Fatalf("classification = %q, error = %v", reason, err)
+	}
+}
+
+func TestBuildMessageFlushesQuotedPrintableBeforeReturning(t *testing.T) {
+	t.Parallel()
+	client := &Client{sender: "reader@example.invalid"}
+	for _, body := range []string{"Synthetic final line", "First line\nFinal line", strings.Repeat("界", 100) + " final"} {
+		for _, format := range []application.MailBodyFormat{application.MailBodyText, application.MailBodyHTML} {
+			raw, _, err := client.buildMessage(mailComposition{To: []string{"recipient@example.invalid"}, Body: body, BodyFormat: format}, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			message, err := mail.ReadMessage(bytes.NewReader(raw))
+			if err != nil {
+				t.Fatal(err)
+			}
+			decoded, err := readDecodedPart(textproto.MIMEHeader(message.Header), message.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.ReplaceAll(string(decoded), "\r\n", "\n") != body {
+				t.Fatalf("body=%q, want %q", decoded, body)
+			}
+		}
+	}
+}
+
+func TestBuildMessageWrapsBase64Attachments(t *testing.T) {
+	t.Parallel()
+	client := &Client{sender: "reader@example.invalid"}
+	for _, size := range []int{1, 57, 58, 1024} {
+		content := bytes.Repeat([]byte("x"), size)
+		raw, _, err := client.buildMessage(mailComposition{To: []string{"recipient@example.invalid"}, Body: "Body", Attachments: []application.MailFileAttachment{{Name: "synthetic.bin", Content: content}}}, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		message, err := mail.ReadMessage(bytes.NewReader(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, params, err := mime.ParseMediaType(message.Header.Get("Content-Type"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := multipart.NewReader(message.Body, params["boundary"])
+		body, err := reader.NextPart()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = body.Close()
+		attachment, err := reader.NextPart()
+		if err != nil {
+			t.Fatal(err)
+		}
+		encoded, err := io.ReadAll(attachment)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range bytes.Split(encoded, []byte("\r\n")) {
+			if len(line) > 76 {
+				t.Fatalf("base64 line has %d bytes", len(line))
+			}
+		}
+		parsed, err := parseMIME(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(parsed.Attachments) != 1 || !bytes.Equal(parsed.Attachments[0].Content, content) {
+			t.Fatalf("attachment did not round-trip size %d", size)
+		}
+	}
+}
+
+func TestParseMIMEDecodesDeclaredTextCharset(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct{ charset, encoded, want string }{
+		{"iso-8859-1", "caf=E9", "café"},
+		{"shift_jis", "=93=FA=96=7B=8C=EA", "日本語"},
+		{"utf-8", "caf=C3=A9", "café"},
+	} {
+		raw := "Content-Type: text/plain; charset=" + tt.charset + "\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" + tt.encoded
+		parsed, err := parseMIME([]byte(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if parsed.Text != tt.want {
+			t.Fatalf("charset %s: body=%q, want %q", tt.charset, parsed.Text, tt.want)
+		}
+	}
+	for _, raw := range []string{
+		"Content-Type: text/plain; charset=not-a-charset\r\n\r\ntext",
+		"Content-Type: text/plain; charset=utf-8\r\n\r\n\xff",
+		"Content-Type: text/plain; charset=us-ascii\r\n\r\n\xff",
+	} {
+		if _, err := parseMIME([]byte(raw)); err == nil {
+			t.Fatal("invalid text charset was silently accepted")
+		}
 	}
 }

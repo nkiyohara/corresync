@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -11,36 +10,61 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/muesli/cancelreader"
 	"golang.org/x/term"
 
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 )
 
+type terminalLoginClient interface {
+	TerminalLogin(context.Context, daemonapi.TerminalLoginInput, domain.Caller) (daemonapi.TerminalLoginResult, error)
+}
+
 func runTerminalLogin(
 	app *runtime,
-	client *daemonapi.Client,
+	client terminalLoginClient,
 	account domain.AccountID,
-) error {
+) (returnErr error) {
 	input, err := interactiveTerminalInput(app)
 	if err != nil {
 		return err
 	}
-	reader := bufio.NewReader(input)
+	state, err := term.MakeRaw(int(input.Fd()))
+	if err != nil {
+		return fmt.Errorf("enable terminal key relay: %w", err)
+	}
+	defer func() { returnErr = errors.Join(returnErr, term.Restore(int(input.Fd()), state)) }()
+	ctx, cancel := context.WithCancel(app.context)
+	defer cancel()
+	cancellable, err := cancelreader.NewReader(input)
+	if err != nil {
+		return err
+	}
+	reader, closeReader := startTerminalInput(cancellable, cancel)
+	defer func() { returnErr = errors.Join(returnErr, closeReader()) }()
+	terminalApp := &runtime{
+		context: ctx, stdin: input, stdout: terminalOutput{app.stdout}, processID: app.processID,
+	}
+	return runTerminalLoginLoop(terminalApp, client, account, reader)
+}
+
+func runTerminalLoginLoop(app *runtime, client terminalLoginClient, account domain.AccountID, reader *terminalInput) error {
 	result, err := client.TerminalLogin(app.context, daemonapi.TerminalLoginInput{
 		Account: account,
 	}, app.caller())
 	if err != nil {
 		return err
 	}
+	sessionID := result.SessionID
 	defer func() {
-		if result.Status != "pending" || result.SessionID == "" {
+		if sessionID == "" {
 			return
 		}
 		cleanupContext, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_, _ = client.TerminalLogin(cleanupContext, daemonapi.TerminalLoginInput{
-			Account: account, SessionID: result.SessionID,
+			Account: account, SessionID: sessionID,
 			Action: &daemonapi.TerminalLoginAction{Type: "cancel"},
 		}, app.caller())
 	}()
@@ -65,6 +89,7 @@ func runTerminalLogin(
 			if err != nil {
 				return err
 			}
+			sessionID = ""
 			_, err = fmt.Fprintln(app.stdout, "Terminal login cancelled.")
 			return err
 		case "r", "refresh":
@@ -120,12 +145,21 @@ func runTerminalLogin(
 	if result.Status != "authenticated" {
 		return fmt.Errorf("terminal login ended in unexpected state %q", result.Status)
 	}
+	sessionID = ""
 	_, err = fmt.Fprintf(app.stdout, "Authenticated Outlook Web account %q.\n", account)
 	return err
 }
 
 func interactiveTerminalInput(app *runtime) (*os.File, error) {
-	input, ok := app.stdin.(*os.File)
+	source := app.stdin
+	for {
+		accessible, ok := source.(*settingsAccessibleReader)
+		if !ok {
+			break
+		}
+		source = accessible.source
+	}
+	input, ok := source.(*os.File)
 	if !ok || !term.IsTerminal(int(input.Fd())) {
 		return nil, errors.New("terminal login requires an interactive TTY; piped input is not accepted")
 	}
@@ -166,38 +200,55 @@ func writeTerminalLoginView(app *runtime, view daemonapi.TerminalLoginView) erro
 	return nil
 }
 
-func readTerminalSelection(app *runtime, reader *bufio.Reader) (string, error) {
+func readTerminalSelection(app *runtime, reader *terminalInput) (string, error) {
 	if _, err := fmt.Fprint(app.stdout, "> "); err != nil {
 		return "", err
 	}
-	line, err := reader.ReadString('\n')
-	if err != nil {
-		return "", fmt.Errorf("read terminal login selection: %w", err)
+	var selection []rune
+	for {
+		character, err := reader.readKey(app.context)
+		if err != nil {
+			return "", fmt.Errorf("read terminal login selection: %w", err)
+		}
+		switch character {
+		case 3, 4:
+			return "", context.Canceled
+		case '\r', '\n':
+			_, err := fmt.Fprintln(app.stdout)
+			return strings.ToLower(string(selection)), err
+		case '\b', 127:
+			if len(selection) > 0 {
+				selection = selection[:len(selection)-1]
+				if _, err := fmt.Fprint(app.stdout, "\b \b"); err != nil {
+					return "", err
+				}
+			}
+		default:
+			// The menu accepts only digits or its named commands. Do not echo arbitrary
+			// input left over from a field or paste when the page changes.
+			if len(selection) < 16 && strings.ContainsRune("0123456789rRefFshHqQuiItT", character) {
+				selection = append(selection, character)
+				if _, err := fmt.Fprint(app.stdout, string(character)); err != nil {
+					return "", err
+				}
+			}
+		}
 	}
-	return strings.ToLower(strings.TrimSpace(line)), nil
 }
 
 func relayTerminalKeys(
 	app *runtime,
-	client *daemonapi.Client,
+	client terminalLoginClient,
 	control daemonapi.TerminalLoginControl,
-	reader *bufio.Reader,
+	reader *terminalInput,
 	result *daemonapi.TerminalLoginResult,
 ) (returnErr error) {
-	input := app.stdin.(*os.File)
-	state, err := term.MakeRaw(int(input.Fd()))
-	if err != nil {
-		return fmt.Errorf("enable terminal key relay: %w", err)
-	}
-	defer func() {
-		returnErr = errors.Join(returnErr, term.Restore(int(input.Fd()), state))
-	}()
-	if _, err := fmt.Fprintln(app.stdout, "Type into the browser field; Enter submits, Esc returns to the control list."); err != nil {
+	if _, err := fmt.Fprintln(app.stdout, "Type into the browser field; Enter submits, Esc returns to the control list. Use Backspace to correct input."); err != nil {
 		return err
 	}
 	visibleCharacters := 0
 	for result.Status == "pending" {
-		character, _, err := reader.ReadRune()
+		character, err := reader.readKey(app.context)
 		if err != nil {
 			return fmt.Errorf("read terminal browser key: %w", err)
 		}
@@ -270,7 +321,7 @@ func writeTerminalProgressHint(app *runtime) error {
 
 func advanceTerminalLogin(
 	app *runtime,
-	client *daemonapi.Client,
+	client terminalLoginClient,
 	current daemonapi.TerminalLoginResult,
 	action daemonapi.TerminalLoginAction,
 ) (daemonapi.TerminalLoginResult, error) {

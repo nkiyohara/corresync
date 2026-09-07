@@ -57,6 +57,9 @@ func (service *MailService) Send(
 	if err := input.Validate(service.maxRecipients); err != nil {
 		return MailSendAccess{}, err
 	}
+	if err := input.validateDirectSendRecipients(); err != nil {
+		return MailSendAccess{}, err
+	}
 	operation, err := domain.NewTargetedOperation(
 		"mail.send",
 		domain.EffectExternalWrite,
@@ -104,6 +107,9 @@ func (service *MailService) CommitSend(
 	if err := input.Validate(service.maxRecipients); err != nil {
 		return MailSendAccess{}, err
 	}
+	if err := input.validateDirectSendRecipients(); err != nil {
+		return MailSendAccess{}, err
+	}
 	sent, err := service.executeSend(ctx, input, caller, operation)
 	if err != nil {
 		return MailSendAccess{}, err
@@ -138,7 +144,7 @@ func (service *MailService) executeSend(
 		Caller: caller, Operation: operation.View(),
 	})
 	if callErr != nil || auditErr != nil {
-		return MailSendResult{}, errors.Join(callErr, auditErr)
+		return MailSendResult{}, providerWriteErrors(callErr, auditErr)
 	}
 	if service.provenance.AccountID != "" {
 		sent.Provenance = service.mailProvenance(sent.ID)
@@ -170,4 +176,15 @@ func (input MailSendInput) asDraftInput() MailDraftInput {
 		ReferenceChangeKey: input.ReferenceChangeKey,
 		Attachments:        append([]MailFileAttachment(nil), input.Attachments...),
 	}
+}
+
+// validateDirectSendRecipients keeps provider-derived recipient sets out of a
+// direct external-send preview. Saved drafts expose the resolved recipients
+// through the existing exact-version snapshot contract before submission.
+func (input MailSendInput) validateDirectSendRecipients() error {
+	mode := input.asDraftInput().EffectiveComposeMode()
+	if mode == MailComposeReply || mode == MailComposeReplyAll {
+		return errors.New("reply and reply-all sends require a saved draft recipient review; create a draft, then use mail send-draft or send it in the provider UI")
+	}
+	return nil
 }

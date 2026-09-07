@@ -14,6 +14,7 @@ const (
 	MaxTaskProjectionPageSize    = 50
 	MaxTaskProjectionResultBytes = 12 << 20
 	maxTaskProjectionSourceBytes = 2 << 20
+	maxTaskProjectionSourceItems = 5000
 )
 
 // TaskProjectionInput selects a bounded global page without merging provider
@@ -138,13 +139,14 @@ func (service *ProjectionService) listProjectionAccountTasks(
 	if !account.ServiceAuthenticated(projectionServiceTasks) {
 		return taskProjectionSource{status: projectionUnavailableStatus(account, projectionServiceTasks)}
 	}
-	target := input.Offset + input.Limit + 1
-	tasks := make([]ProjectedTask, 0, target)
-	seen := make(map[string]bool, target)
+	// Source order is provider-defined, so a prefix cannot prove the globally
+	// earliest tasks. Read one complete bounded source before sorting.
+	tasks := make([]ProjectedTask, 0, MaxTaskPageSize)
+	seen := make(map[string]bool)
 	sourceOffset := 0
 	sourceBytes := 0
-	for len(tasks) < target {
-		limit := min(MaxTaskPageSize, target-len(tasks))
+	for {
+		limit := min(MaxTaskPageSize, maxTaskProjectionSourceItems-len(tasks))
 		page, err := service.reader.ListTasks(ctx, TaskReadInput{
 			Account: account.Account, Status: input.Status, Offset: sourceOffset, Limit: limit,
 		}, caller)
@@ -183,6 +185,12 @@ func (service *ProjectionService) listProjectionAccountTasks(
 		if !page.HasMore {
 			status.Exhausted = true
 			break
+		}
+		if len(tasks) == maxTaskProjectionSourceItems {
+			status.FetchedItems = len(tasks)
+			return taskProjectionSource{status: failProjectionStatus(
+				status, "invalid_result", "the account exceeded the bounded task projection item count",
+			)}
 		}
 		if len(page.Tasks) == 0 {
 			status.FetchedItems = len(tasks)

@@ -7,9 +7,33 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/chromedp/chromedp"
 
 	"github.com/nkiyohara/corresync/internal/session"
 )
+
+func browserFixtureContext(t *testing.T, headless bool) context.Context {
+	t.Helper()
+	executable, err := ResolveExecutable("")
+	if err != nil {
+		t.Skipf("Chromium unavailable: %v", err)
+	}
+	// testing cancels t.Context before cleanup. Keep the bounded browser owner
+	// alive until Browser.close drains Chromium's profile writers, then remove
+	// the temporary profile. Killing only the parent races writers on Linux.
+	owner, cancelOwner := context.WithTimeout(context.WithoutCancel(t.Context()), 30*time.Second)
+	allocator, cancelAllocator := chromedp.NewExecAllocator(owner, allocatorOptions(executable, t.TempDir(), headless)...)
+	ctx, cancelBrowser := chromedp.NewContext(allocator)
+	t.Cleanup(func() {
+		_ = chromedp.Cancel(ctx)
+		cancelBrowser()
+		cancelAllocator()
+		cancelOwner()
+	})
+	return ctx
+}
 
 func TestRequireGraphicalSession(t *testing.T) {
 	t.Parallel()

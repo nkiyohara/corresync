@@ -441,7 +441,7 @@ func boundedBodyText(item email) (string, error) {
 	for _, part := range item.TextBody {
 		value, exists := item.BodyValues[part.PartID]
 		if !exists || value.IsEncodingProblem || value.IsTruncated {
-			continue
+			return "", errors.New("JMAP text body is missing, truncated, or has an encoding problem")
 		}
 		if err := appendBodyText(
 			&builder,
@@ -455,7 +455,7 @@ func boundedBodyText(item email) (string, error) {
 		for _, part := range item.HTMLBody {
 			value, exists := item.BodyValues[part.PartID]
 			if !exists || value.IsEncodingProblem || value.IsTruncated {
-				continue
+				return "", errors.New("JMAP HTML body is missing, truncated, or has an encoding problem")
 			}
 			plain, err := htmlText(value.Value)
 			if err != nil {

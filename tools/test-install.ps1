@@ -1,11 +1,6 @@
 Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 
-if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-  Write-Output "PowerShell installer tests skipped: Windows-only installer"
-  exit 0
-}
-
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $installer = Join-Path $repositoryRoot "site\install.ps1"
 . $installer -NoRun
@@ -43,6 +38,136 @@ function Assert-BytesEqual {
   $expectedHash = Get-CorresyncSha256 -Path $Expected
   $actualHash = Get-CorresyncSha256 -Path $Actual
   Assert-True -Condition ($expectedHash -ceq $actualHash) -Message $Message
+}
+
+# These tests use an in-memory HTTP handler and temporary files only. They can
+# run on any PowerShell platform before the Windows lifecycle tests below.
+Add-Type -AssemblyName System.Net.Http
+Add-Type -TypeDefinition @'
+using System;
+using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+
+public sealed class CorresyncFixtureHandler : HttpMessageHandler {
+  public readonly CorresyncFixtureContent Content;
+  public CorresyncFixtureHandler(string mode, byte[] bytes) {
+    Content = new CorresyncFixtureContent(mode, bytes);
+  }
+  protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) {
+    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
+      RequestMessage = request, Content = Content
+    });
+  }
+}
+
+public sealed class CorresyncFixtureContent : HttpContent {
+  private readonly string mode;
+  private readonly CorresyncFixtureStream stream;
+  private readonly TaskCompletionSource<Stream> pending = new TaskCompletionSource<Stream>();
+  public bool Disposed;
+  public CorresyncFixtureContent(string mode, byte[] bytes) {
+    this.mode = mode;
+    stream = new CorresyncFixtureStream(mode == "stall-body", bytes);
+  }
+  protected override bool TryComputeLength(out long length) { length = 0; return false; }
+  protected override Task SerializeToStreamAsync(Stream target, TransportContext context) {
+    throw new InvalidOperationException("The fixture must be read as a stream.");
+  }
+  protected override Task<Stream> CreateContentReadStreamAsync() {
+    return mode == "stall-stream" ? pending.Task : Task.FromResult<Stream>(stream);
+  }
+  protected override void Dispose(bool disposing) {
+    Disposed = true;
+    pending.TrySetCanceled();
+    stream.Dispose();
+    base.Dispose(disposing);
+  }
+}
+
+public sealed class CorresyncFixtureStream : Stream {
+  private readonly bool stall;
+  private readonly byte[] bytes;
+  private int offset;
+  private readonly TaskCompletionSource<int> pending = new TaskCompletionSource<int>();
+  public CorresyncFixtureStream(bool stall, byte[] bytes) { this.stall = stall; this.bytes = bytes; }
+  public override bool CanRead { get { return true; } }
+  public override bool CanSeek { get { return false; } }
+  public override bool CanWrite { get { return false; } }
+  public override long Length { get { throw new NotSupportedException(); } }
+  public override long Position { get { throw new NotSupportedException(); } set { throw new NotSupportedException(); } }
+  public override int Read(byte[] buffer, int start, int count) { throw new InvalidOperationException("Use bounded async reads."); }
+  public override Task<int> ReadAsync(byte[] buffer, int start, int count, CancellationToken token) {
+    if (offset < bytes.Length) {
+      int copied = Math.Min(count, bytes.Length - offset);
+      Array.Copy(bytes, offset, buffer, start, copied);
+      offset += copied;
+      return Task.FromResult(copied);
+    }
+    // Deliberately ignore token: the caller's wait must still have a deadline.
+    return stall ? pending.Task : Task.FromResult(0);
+  }
+  protected override void Dispose(bool disposing) { pending.TrySetCanceled(); base.Dispose(disposing); }
+  public override void Flush() { }
+  public override long Seek(long offset, SeekOrigin origin) { throw new NotSupportedException(); }
+  public override void SetLength(long value) { throw new NotSupportedException(); }
+  public override void Write(byte[] buffer, int start, int count) { throw new NotSupportedException(); }
+}
+'@
+
+$blankMessage = @(Write-CorresyncMessage "")
+Assert-True -Condition ($blankMessage.Count -eq 1 -and $blankMessage[0] -ceq "") `
+  -Message "message output rejected the blank lines used by successful installations"
+
+$httpTestRoot = Join-Path ([IO.Path]::GetTempPath()) "corresync-http-test-$([Guid]::NewGuid().ToString('N'))"
+[IO.Directory]::CreateDirectory($httpTestRoot) | Out-Null
+try {
+  foreach ($mode in @("bytes", "oversized", "stall-stream", "stall-body")) {
+    $payload = [Text.Encoding]::UTF8.GetBytes("synthetic download")
+    $fixtureHandler = [CorresyncFixtureHandler]::new($mode, $payload)
+    $fixtureClient = [Net.Http.HttpClient]::new($fixtureHandler)
+    $destination = Join-Path $httpTestRoot "$mode.bin"
+    $maximum = if ($mode -eq "oversized") { 4 } else { 1024 }
+    $elapsed = [Diagnostics.Stopwatch]::StartNew()
+    try {
+      $download = {
+        Save-CorresyncBoundedDownload `
+          -Client $fixtureClient `
+          -Uri ([Uri]"https://github.com/nkiyohara/corresync/releases/download/v9.8.7/synthetic") `
+          -Destination $destination -MaximumBytes $maximum -TimeoutSeconds 1
+      }
+      if ($mode -eq "bytes") {
+        & $download
+        Assert-True `
+          -Condition ([Convert]::ToBase64String([IO.File]::ReadAllBytes($destination)) -ceq
+            [Convert]::ToBase64String($payload)) `
+          -Message "bounded download did not preserve the synthetic bytes"
+      } else {
+        Assert-Throw -Action $download -Message "$mode download unexpectedly succeeded"
+        Assert-True -Condition (-not (Test-Path -LiteralPath $destination)) `
+          -Message "$mode download left a partial output"
+      }
+      if ($mode.StartsWith("stall-", [StringComparison]::Ordinal)) {
+        Assert-True -Condition ($elapsed.Elapsed.TotalMilliseconds -ge 800 -and
+          $elapsed.Elapsed.TotalSeconds -lt 5) `
+          -Message "$mode download did not honor its one-second deadline"
+      }
+      Assert-True -Condition $fixtureHandler.Content.Disposed `
+        -Message "$mode download did not dispose the HTTP response content"
+    } finally {
+      $fixtureClient.Dispose()
+    }
+  }
+  Write-Output "PowerShell installer HTTP and message tests passed"
+} finally {
+  Remove-Item -LiteralPath $httpTestRoot -Recurse -Force
+}
+
+if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+  Write-Output "PowerShell installer lifecycle tests skipped: Windows-only installation"
+  exit 0
 }
 
 $testRoot = Initialize-CorresyncPrivateDirectory `

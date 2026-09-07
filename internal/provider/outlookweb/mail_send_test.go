@@ -180,3 +180,39 @@ func TestSendMailRejectsChangeKeyWithoutSentCopyID(t *testing.T) {
 		t.Fatalf("SendMail() error = %v, want ErrWriteOutcomeUnknown", err)
 	}
 }
+
+func TestAttachmentParentMismatchStopsDraftAndSend(t *testing.T) {
+	t.Parallel()
+	for _, send := range []bool{false, true} {
+		t.Run(map[bool]string{false: "draft", true: "send"}[send], func(t *testing.T) {
+			var calls atomic.Int32
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				switch r.URL.Query().Get("action") {
+				case "CreateItem":
+					_, _ = w.Write(readFixture(t, "create_draft_response.json"))
+				case "CreateAttachment":
+					_, _ = w.Write([]byte(`{"Body":{"ResponseMessages":{"Items":[{"ResponseClass":"Success","ResponseCode":"NoError","Attachments":[{"AttachmentId":{"Id":"attachment-1"}}],"RootItemId":"different-draft","RootItemChangeKey":"different-version"}]}}}`))
+				default:
+					t.Error("mismatched attachment response reached SendItem")
+				}
+			}))
+			defer server.Close()
+			client := testClient(t, server, nil)
+			input := testSendInput()
+			input.Attachments = []application.MailFileAttachment{{Name: "fixture.txt", Content: []byte("fixture")}}
+			var err error
+			if send {
+				_, err = client.SendMail(t.Context(), input)
+			} else {
+				_, err = client.CreateMailDraft(t.Context(), application.MailDraftInput(input))
+			}
+			if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+				t.Fatalf("error = %v; want unknown outcome", err)
+			}
+			if calls.Load() != 2 {
+				t.Fatalf("calls = %d; want create and attachment only", calls.Load())
+			}
+		})
+	}
+}

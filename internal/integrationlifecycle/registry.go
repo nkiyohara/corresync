@@ -23,7 +23,7 @@ var commandAdapters = map[agenthost.ID]commandAdapter{
 		add: func(r Request) []string {
 			return append([]string{"mcp", "add", r.ServerName, "--", r.Executable}, r.Arguments...)
 		},
-		inspect: func(r Request) []string { return []string{"mcp", "get", r.ServerName} },
+		inspect: func(r Request) []string { return []string{"mcp", "get", r.ServerName, "--json"} },
 		remove:  func(r Request) []string { return []string{"mcp", "remove", r.ServerName} },
 	},
 	agenthost.IDClaudeCode: {

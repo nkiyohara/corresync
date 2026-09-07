@@ -33,6 +33,7 @@ import (
 
 const (
 	keyringService        = "corresync/oauth"
+	storedGrantVersion    = 2
 	maximumGrantBytes     = 64 << 10
 	maximumClientSecret   = 4 << 10
 	maximumObservedScopes = 128
@@ -52,6 +53,8 @@ type Provider struct {
 	TokenURL   string
 	Scopes     []string
 	AuthParams map[string]string
+	// MicrosoftCloud distinguishes deployments that share an OAuth authority.
+	MicrosoftCloud microsoftcloud.ID
 	// ScopeSeparator overrides oauth2's space-separated authorization query.
 	// Stored grants retain the individual scope strings.
 	ScopeSeparator string
@@ -120,10 +123,11 @@ func ProviderFor(
 			return Provider{}, errors.New("the Microsoft To Do API is unavailable in the selected Microsoft cloud")
 		}
 		result = Provider{
-			ID:       provider,
-			AuthURL:  cloud.AuthorizationURL,
-			TokenURL: cloud.TokenURL,
-			Scopes:   []string{"offline_access", "User.Read"},
+			ID:             provider,
+			MicrosoftCloud: cloud.ID,
+			AuthURL:        cloud.AuthorizationURL,
+			TokenURL:       cloud.TokenURL,
+			Scopes:         []string{"offline_access", "User.Read"},
 			AuthParams: map[string]string{
 				"prompt": "select_account",
 			},
@@ -333,13 +337,39 @@ func New(options Options) (*Manager, error) {
 }
 
 type storedGrant struct {
-	Version        int               `json:"version"`
-	Provider       domain.ProviderID `json:"provider"`
-	ClientID       string            `json:"clientId"`
-	RedirectURI    string            `json:"redirectUri"`
-	Scopes         []string          `json:"scopes"`
-	ObservedScopes []string          `json:"observedScopes,omitempty"`
-	Token          oauth2.Token      `json:"token"`
+	Version        int                  `json:"version"`
+	Provider       domain.ProviderID    `json:"provider"`
+	Profile        grantProviderProfile `json:"profile"`
+	ClientID       string               `json:"clientId"`
+	RedirectURI    string               `json:"redirectUri"`
+	Scopes         []string             `json:"scopes"`
+	ObservedScopes []string             `json:"observedScopes,omitempty"`
+	Token          oauth2.Token         `json:"token"`
+}
+
+// grantProviderProfile binds a persisted grant to the authority and OAuth
+// protocol that created it. Scopes remain separate so narrowing a selected
+// service set does not invalidate an otherwise matching grant.
+type grantProviderProfile struct {
+	AuthURL          string            `json:"authUrl"`
+	TokenURL         string            `json:"tokenUrl"`
+	MicrosoftCloud   microsoftcloud.ID `json:"microsoftCloud,omitempty"`
+	ScopeSeparator   string            `json:"scopeSeparator,omitempty"`
+	Confidential     bool              `json:"confidential,omitempty"`
+	ClientCredential bool              `json:"clientCredential,omitempty"`
+	ExchangeScope    bool              `json:"exchangeScope,omitempty"`
+	DisablePKCE      bool              `json:"disablePKCE,omitempty"`
+	DisableRefresh   bool              `json:"disableRefresh,omitempty"`
+}
+
+func providerGrantProfile(provider Provider) grantProviderProfile {
+	return grantProviderProfile{
+		AuthURL: provider.AuthURL, TokenURL: provider.TokenURL,
+		MicrosoftCloud: provider.MicrosoftCloud, ScopeSeparator: provider.ScopeSeparator,
+		Confidential: provider.Confidential, ClientCredential: provider.ClientCredential,
+		ExchangeScope: provider.ExchangeScope, DisablePKCE: provider.DisablePKCE,
+		DisableRefresh: provider.DisableRefresh,
+	}
 }
 
 // Authorization is one account-scoped, refreshable grant projection. The
@@ -393,25 +423,58 @@ func (source classifyingTokenSource) Token() (*oauth2.Token, error) {
 	if err == nil {
 		return token, nil
 	}
+	return nil, sanitizeOAuthError(err)
+}
+
+// sanitizeOAuthError is shared by authorization-code exchange and refresh.
+// Provider response bodies, descriptions, and transport details stay internal.
+func sanitizeOAuthError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, context.Canceled) {
+		return context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
+	if errors.Is(err, errStoredGrantMismatch) {
+		return application.NewProviderAuthenticationFailure(application.AuthenticationReasonInteractionRequired, err)
+	}
+	if reason, ok := application.ProviderAuthenticationReason(err); ok {
+		return application.NewProviderAuthenticationFailure(reason, err)
+	}
 	var retrieval *oauth2.RetrieveError
 	if errors.As(err, &retrieval) {
 		switch retrieval.ErrorCode {
 		case "invalid_grant", "invalid_token", "unauthorized_client":
-			return nil, application.NewProviderAuthenticationFailure(
-				application.AuthenticationReasonGrantRevoked,
-				err,
-			)
+			return application.NewProviderAuthenticationFailure(application.AuthenticationReasonGrantRevoked, err)
 		}
-		if retrieval.Response != nil &&
-			retrieval.Response.StatusCode == http.StatusUnauthorized {
-			return nil, application.NewProviderAuthenticationFailure(
-				application.AuthenticationReasonCredentialRejected,
-				err,
-			)
+		if retrieval.Response != nil {
+			if retrieval.Response.StatusCode == http.StatusUnauthorized {
+				return application.NewProviderAuthenticationFailure(application.AuthenticationReasonCredentialRejected, err)
+			}
+			if retrieval.Response.StatusCode >= 100 && retrieval.Response.StatusCode <= 599 {
+				return &oauthRequestFailure{status: retrieval.Response.StatusCode, cause: err}
+			}
 		}
 	}
-	return nil, err
+	return &oauthRequestFailure{cause: err}
 }
+
+type oauthRequestFailure struct {
+	status int
+	cause  error
+}
+
+func (failure *oauthRequestFailure) Error() string {
+	if failure.status != 0 {
+		return fmt.Sprintf("OAuth token request failed (HTTP %d)", failure.status)
+	}
+	return "OAuth token request failed"
+}
+
+func (failure *oauthRequestFailure) Unwrap() error { return failure.cause }
 
 func (authorization *authorization) HTTPClient() *http.Client {
 	return authorization.http
@@ -662,11 +725,11 @@ func (manager *Manager) load(
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return storedGrant{}, errors.New("stored OAuth grant has trailing content")
 	}
-	providerMatches := grant.Provider == provider.ID ||
-		provider.ID == domain.ProviderGoogle &&
-			grant.Provider == domain.ProviderID("google-api")
-	if grant.Version != 1 ||
-		!providerMatches ||
+	// Version 1 did not record the authority/cloud. Never migrate its token
+	// into the currently selected profile: only explicit login can reauthorize.
+	if grant.Version != storedGrantVersion ||
+		grant.Provider != provider.ID ||
+		grant.Profile != providerGrantProfile(provider) ||
 		grant.ClientID != route.ClientID ||
 		grant.RedirectURI != route.RedirectURI ||
 		grant.Token.AccessToken == "" ||
@@ -674,7 +737,7 @@ func (manager *Manager) load(
 		return storedGrant{}, fmt.Errorf(
 			"%w: %s",
 			errStoredGrantMismatch,
-			"stored OAuth grant does not match the configured public client and scopes",
+			"stored OAuth grant does not match the configured provider profile, public client, and scopes",
 		)
 	}
 	if !grant.Token.Valid() && grant.Token.RefreshToken == "" {
@@ -825,7 +888,7 @@ func (manager *Manager) save(
 		return err
 	}
 	grant := storedGrant{
-		Version: 1, Provider: provider.ID, ClientID: route.ClientID,
+		Version: storedGrantVersion, Provider: provider.ID, Profile: providerGrantProfile(provider), ClientID: route.ClientID,
 		RedirectURI:    route.RedirectURI,
 		Scopes:         append([]string(nil), provider.Scopes...),
 		ObservedScopes: normalizedScopes,

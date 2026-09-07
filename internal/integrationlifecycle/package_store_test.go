@@ -235,7 +235,7 @@ func TestEngineAppliesAndVerifiesMCPWithNativeSkillPackage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	absentMCP := Execution{Started: true, ExitCode: 1, Output: []byte("not found")}
+	absentMCP := Execution{Started: true, ExitCode: 1, Output: []byte("Error: No MCP server named 'corresync' found.")}
 	absentPackage := Execution{Started: true, Output: []byte(`{"installed":[]}`)}
 	absentSource := Execution{Started: true, Output: []byte(`{"marketplaces":[]}`)}
 	healthyMCP := Execution{Started: true, Output: healthyCommandOutput(request)}

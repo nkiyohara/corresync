@@ -3,6 +3,7 @@ package filelock
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,4 +98,30 @@ func TestAcquireRejectsSymlinkDirectoryWithoutChangingTargetMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertDirectoryMode(t, info, 0o755)
+}
+
+func TestAcquireConcurrentFreshLock(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	for round := range 16 {
+		path := filepath.Join(root, fmt.Sprintf("fresh-%d.lock", round))
+		start := make(chan struct{})
+		results := make(chan error, 2)
+		for range 2 {
+			go func() {
+				<-start
+				lock, err := Acquire(t.Context(), path)
+				if err == nil {
+					err = lock.Close()
+				}
+				results <- err
+			}()
+		}
+		close(start)
+		for range 2 {
+			if err := <-results; err != nil {
+				t.Errorf("concurrent fresh lock: %v", err)
+			}
+		}
+	}
 }
