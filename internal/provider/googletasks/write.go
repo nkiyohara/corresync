@@ -58,7 +58,7 @@ func (client *Client) CreateTask(
 	if err != nil {
 		return application.Task{}, writeAssemblyError(err)
 	}
-	return client.taskView(input.ListID, current)
+	return client.writtenTaskView(input.ListID, current)
 }
 
 func createPayload(input application.TaskCreateInput) (map[string]any, error) {
@@ -158,7 +158,7 @@ func (client *Client) UpdateTask(
 	if err != nil {
 		return application.Task{}, writeAssemblyError(err)
 	}
-	return client.taskView(input.ListID, current)
+	return client.writtenTaskView(input.ListID, current)
 }
 
 func updatePayload(input application.TaskUpdateInput, current task) (map[string]any, error) {
@@ -225,9 +225,11 @@ func (client *Client) moveTask(
 			return errors.New("the selected Google task cannot be a parent")
 		}
 		effectiveParent = parentID
-		query.Set("parent", parentID)
 	} else if input.ParentID != nil {
 		effectiveParent = ""
+	}
+	if effectiveParent != "" {
+		query.Set("parent", effectiveParent)
 	}
 	if input.Order != nil && *input.Order != "" {
 		if current.Hidden {
@@ -314,7 +316,7 @@ func (client *Client) setStatus(
 	if err != nil {
 		return application.Task{}, writeAssemblyError(err)
 	}
-	return client.taskView(input.ListID, current)
+	return client.writtenTaskView(input.ListID, current)
 }
 
 func (client *Client) DeleteTask(ctx context.Context, input application.TaskDeleteInput) error {
@@ -355,4 +357,12 @@ func (client *Client) exactTask(
 		return task{}, restapi.ErrPrecondition
 	}
 	return current, nil
+}
+
+func (client *Client) writtenTaskView(listID string, current task) (application.Task, error) {
+	result, err := client.taskView(listID, current)
+	if err != nil {
+		return application.Task{}, writeAssemblyError(err)
+	}
+	return result, nil
 }

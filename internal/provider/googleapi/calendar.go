@@ -562,10 +562,17 @@ func googleMeetStatus(event googleEvent) (string, string, error) {
 func googleCreateEvent(
 	input application.CalendarCreateInput,
 ) (map[string]any, error) {
+	start, err := googleWriteTime(input.Start, input.TimeZone, input.AllDay)
+	if err != nil {
+		return nil, err
+	}
+	end, err := googleWriteTime(input.End, input.TimeZone, input.AllDay)
+	if err != nil {
+		return nil, err
+	}
 	event := map[string]any{
 		"summary": input.Subject, "description": input.Body, "location": input.Location,
-		"start": googleWriteTime(input.Start, input.TimeZone, input.AllDay),
-		"end":   googleWriteTime(input.End, input.TimeZone, input.AllDay),
+		"start": start, "end": end,
 	}
 	attendees := googleAttendees(input.RequiredAttendees, input.OptionalAttendees)
 	if len(attendees) != 0 {
@@ -598,16 +605,26 @@ func googleCreateEvent(
 	return event, nil
 }
 
-func googleWriteTime(value, zone string, allDay bool) map[string]any {
-	parsed, _ := time.Parse(time.RFC3339, value)
+func googleWriteTime(value, zone string, allDay bool) (map[string]any, error) {
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, errors.New("google calendar time must be RFC3339")
+	}
 	if allDay {
-		return map[string]any{"date": parsed.Format("2006-01-02")}
+		parsed, err = application.CalendarTimeInZone(parsed, zone)
+		if err != nil {
+			return nil, err
+		}
+		if parsed.Hour() != 0 || parsed.Minute() != 0 || parsed.Second() != 0 || parsed.Nanosecond() != 0 {
+			return nil, errors.New("all-day calendar boundaries must remain midnight in the reviewed time zone; explicitly set allDay=false for timed events")
+		}
+		return map[string]any{"date": parsed.Format("2006-01-02")}, nil
 	}
 	result := map[string]any{"dateTime": value}
 	if zone != "" {
 		result["timeZone"] = zone
 	}
-	return result
+	return result, nil
 }
 
 func googleAttendees(required, optional []string) []map[string]any {
@@ -660,8 +677,15 @@ func (client *Client) UpdateCalendarEvent(
 		if input.TimeZone != nil {
 			zone = *input.TimeZone
 		}
-		patch["start"] = googleWriteTime(*input.Start, zone, allDay)
-		patch["end"] = googleWriteTime(*input.End, zone, allDay)
+		start, err := googleWriteTime(*input.Start, zone, allDay)
+		if err != nil {
+			return application.CalendarUpdateResult{}, err
+		}
+		end, err := googleWriteTime(*input.End, zone, allDay)
+		if err != nil {
+			return application.CalendarUpdateResult{}, err
+		}
+		patch["start"], patch["end"] = start, end
 	} else if existing.Start.Date != "" && !allDay {
 		patch["start"] = map[string]any{
 			"dateTime": existing.Start.Date + "T00:00:00Z",

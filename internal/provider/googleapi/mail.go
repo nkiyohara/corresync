@@ -328,7 +328,18 @@ func (client *Client) GetMessageBody(
 				"<>",
 			)
 			inline := strings.HasPrefix(disposition, "inline")
-			if part.Filename != "" || part.Body.AttachmentID != "" {
+			bodyType := strings.ToLower(part.MimeType)
+			externalBody := part.Body.AttachmentID != "" && part.Filename == "" &&
+				!strings.HasPrefix(disposition, "attachment") &&
+				(bodyType == "text/plain" || bodyType == "text/html")
+			if externalBody {
+				var readErr error
+				content, readErr = client.gmailExternalBody(ctx, message.ID, part.Body)
+				if readErr != nil {
+					return readErr
+				}
+			}
+			if !externalBody && (part.Filename != "" || part.Body.AttachmentID != "") {
 				if len(body.Attachments) >= application.MaxMailAttachmentMetadata {
 					return errors.New("gmail attachment metadata count exceeds the limit")
 				}
@@ -417,7 +428,7 @@ func walkGmailParts(
 		}
 		var content []byte
 		if current.Body.Data != "" {
-			decoded, err := base64.RawURLEncoding.DecodeString(current.Body.Data)
+			decoded, err := decodeGmailData(current.Body.Data)
 			if err != nil {
 				return errors.New("gmail MIME part data is malformed")
 			}
@@ -473,7 +484,7 @@ func (client *Client) GetMailAttachment(
 		); err != nil {
 			return application.MailAttachment{}, err
 		}
-		content, err = base64.RawURLEncoding.DecodeString(response.Data)
+		content, err = decodeGmailData(response.Data)
 	} else {
 		message, fullErr := client.getMessage(ctx, reference.MessageID, "full")
 		if fullErr != nil {
@@ -557,8 +568,7 @@ func (client *Client) ListMailFolders(
 	}
 	for _, label := range response.Labels[input.Offset:end] {
 		if !validGmailID(label.ID) || len(label.Name) > 1024 ||
-			!utf8.ValidString(label.Name) || strings.ContainsAny(label.Name, "\r\n\x00") ||
-			label.MessagesTotal < 0 || label.MessagesUnread < 0 {
+			!utf8.ValidString(label.Name) || strings.ContainsAny(label.Name, "\r\n\x00") {
 			return application.MailFolderPage{}, errors.New(
 				"gmail returned malformed label metadata",
 			)
@@ -566,6 +576,10 @@ func (client *Client) ListMailFolders(
 		id, err := encodeReference("ggl1_", struct {
 			ID string `json:"id"`
 		}{ID: label.ID})
+		if err != nil {
+			return application.MailFolderPage{}, err
+		}
+		label.MessagesTotal, label.MessagesUnread, err = client.gmailLabelCounts(ctx, label.ID)
 		if err != nil {
 			return application.MailFolderPage{}, err
 		}
@@ -622,4 +636,45 @@ func gmailDistinguishedLabel(id string) string {
 	default:
 		return ""
 	}
+}
+
+// decodeGmailData accepts both padded and unpadded RFC 4648 base64url data.
+func decodeGmailData(value string) ([]byte, error) {
+	if strings.Contains(value, "=") {
+		return base64.URLEncoding.DecodeString(value)
+	}
+	return base64.RawURLEncoding.DecodeString(value)
+}
+
+func (client *Client) gmailExternalBody(ctx context.Context, messageID string, body gmailBody) ([]byte, error) {
+	if !validGmailID(body.AttachmentID) || body.Size < 0 || body.Size > application.MaxMailBodyBytes {
+		return nil, errors.New("gmail external body metadata is malformed or exceeds the limit")
+	}
+	var response gmailBody
+	if _, err := client.api.DoJSON(ctx, http.MethodGet,
+		"gmail/v1/users/me/messages/"+escaped(messageID)+"/attachments/"+escaped(body.AttachmentID),
+		nil, nil, &response, false, nil, http.StatusOK); err != nil {
+		return nil, err
+	}
+	content, err := decodeGmailData(response.Data)
+	if err != nil || len(content) != body.Size || response.Size != body.Size || len(content) > application.MaxMailBodyBytes {
+		return nil, errors.New("gmail external body content did not match its metadata")
+	}
+	return content, nil
+}
+
+func (client *Client) gmailLabelCounts(ctx context.Context, id string) (int, int, error) {
+	var detail struct {
+		ID     string `json:"id"`
+		Total  *int   `json:"messagesTotal"`
+		Unread *int   `json:"messagesUnread"`
+	}
+	if _, err := client.api.DoJSON(ctx, http.MethodGet, "gmail/v1/users/me/labels/"+escaped(id),
+		url.Values{"fields": {"id,messagesTotal,messagesUnread"}}, nil, &detail, false, nil, http.StatusOK); err != nil {
+		return 0, 0, err
+	}
+	if detail.ID != id || detail.Total == nil || detail.Unread == nil || *detail.Total < 0 || *detail.Unread < 0 || *detail.Unread > *detail.Total {
+		return 0, 0, errors.New("gmail returned malformed label counts")
+	}
+	return *detail.Total, *detail.Unread, nil
 }

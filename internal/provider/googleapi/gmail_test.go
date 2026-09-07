@@ -55,8 +55,11 @@ func TestGmailAPIContractUsesBoundedNativeOperations(t *testing.T) {
 			writeGoogleJSON(t, writer, map[string]any{
 				"labels": []map[string]any{{
 					"id": "INBOX", "name": "Inbox", "type": "system",
-					"messagesTotal": 1, "messagesUnread": 1,
 				}},
+			})
+		case "GET /gmail/v1/users/me/labels/INBOX":
+			writeGoogleJSON(t, writer, map[string]any{
+				"id": "INBOX", "messagesTotal": 1, "messagesUnread": 1,
 			})
 		case "POST /gmail/v1/users/me/drafts":
 			drafts = append(drafts, gmailTestRaw(t, request))
