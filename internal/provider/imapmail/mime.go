@@ -13,8 +13,10 @@ import (
 	"net/mail"
 	"net/textproto"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/net/html"
+	"golang.org/x/net/html/charset"
 
 	"github.com/nkiyohara/corresync/internal/application"
 )
@@ -134,10 +136,15 @@ func walkMIME(
 		return nil
 	}
 	switch strings.ToLower(mediaType) {
-	case "text/plain":
-		return appendMIMEText(plain, string(content))
-	case "text/html":
-		return appendMIMEText(htmlBody, string(content))
+	case "text/plain", "text/html":
+		text, err := decodeMIMEText(content, parameters["charset"])
+		if err != nil {
+			return err
+		}
+		if strings.EqualFold(mediaType, "text/html") {
+			return appendMIMEText(htmlBody, text)
+		}
+		return appendMIMEText(plain, text)
 	default:
 		return nil
 	}
@@ -250,4 +257,36 @@ func decodeAttachmentID(value string) (attachmentReference, error) {
 
 func encodeBase64(value []byte) string {
 	return base64.StdEncoding.EncodeToString(value)
+}
+
+func decodeMIMEText(content []byte, label string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(label)) {
+	case "", "us-ascii", "ascii":
+		for _, value := range content {
+			if value > 0x7f {
+				return "", errors.New("MIME ASCII text contains non-ASCII bytes")
+			}
+		}
+		return string(content), nil
+	case "utf-8", "utf8":
+		if !utf8.Valid(content) {
+			return "", errors.New("MIME UTF-8 text is malformed")
+		}
+		return string(content), nil
+	}
+	reader, err := charset.NewReaderLabel(label, bytes.NewReader(content))
+	if err != nil {
+		return "", fmt.Errorf("decode MIME charset: %w", err)
+	}
+	decoded, err := io.ReadAll(io.LimitReader(reader, application.MaxMailBodyBytes+1))
+	if err != nil {
+		return "", fmt.Errorf("decode MIME text: %w", err)
+	}
+	if len(decoded) > application.MaxMailBodyBytes {
+		return "", fmt.Errorf("mail body exceeds %d bytes", application.MaxMailBodyBytes)
+	}
+	if !utf8.Valid(decoded) {
+		return "", errors.New("decoded MIME text is not valid UTF-8")
+	}
+	return string(decoded), nil
 }
