@@ -70,7 +70,7 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 		_, err = view.printf(
 			"   %s\n",
 			view.muted(
-				"The dedicated Outlook window remains open as this account's browser-owned session; auth logout or daemon shutdown closes it.",
+				"The dedicated Outlook browser maintains this account's session, with its window minimized when supported; auth logout or daemon shutdown closes it.",
 			),
 		)
 	}

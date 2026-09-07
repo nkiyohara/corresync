@@ -24,8 +24,9 @@ The CLI requires an interactive TTY. It renders numbered controls and relays
 activations or individual key events to the selected browser element. It does
 not accept piped input, a username or password flag, a complete form value, or
 arbitrary JavaScript. Sensitive fields are not echoed. Page paths, queries,
-form values, selectors, cookies, and authorization material do not cross the
-IPC boundary.
+editable form values, selectors, cookies, and authorization material do not
+cross the IPC boundary. The visible captions of native submit, button, and reset
+inputs may be projected as control names; their editable counterparts may not.
 
 The user still completes every identity-provider decision, MFA challenge,
 Conditional Access prompt, and organization notice. The relay does not attempt

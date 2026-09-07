@@ -105,10 +105,15 @@ func TestEndpointOwnerSignalHelper(t *testing.T) {
 	defer signal.Stop(signals)
 	// #nosec G703 -- the parent supplies a path confined to its t.TempDir.
 	if err := os.WriteFile(
-		readyPath,
+		readyPath+".tmp",
 		[]byte(strconv.Itoa(os.Getpid())),
 		0o600,
 	); err != nil {
+		t.Fatal(err)
+	}
+	// Publish readiness only after the full PID is visible to the parent.
+	// #nosec G703 -- both paths are confined to the parent's t.TempDir.
+	if err := os.Rename(readyPath+".tmp", readyPath); err != nil {
 		t.Fatal(err)
 	}
 	select {

@@ -106,9 +106,9 @@ func (browser *Browser) TerminalAct(ctx context.Context, action TerminalAction) 
 	var run chromedp.Action
 	switch action.Kind {
 	case TerminalActivate:
-		run = chromedp.Click(selector, chromedp.ByQuery)
+		run = chromedp.Click(selector, chromedp.ByQuery, chromedp.AtLeast(0))
 	case TerminalFocus:
-		run = chromedp.Focus(selector, chromedp.ByQuery)
+		run = chromedp.Focus(selector, chromedp.ByQuery, chromedp.AtLeast(0))
 	case TerminalKey:
 		key := action.Key
 		switch key {
@@ -120,7 +120,7 @@ func (browser *Browser) TerminalAct(ctx context.Context, action TerminalAction) 
 			key = kb.Tab
 		}
 		run = chromedp.Tasks{
-			chromedp.Focus(selector, chromedp.ByQuery),
+			chromedp.Focus(selector, chromedp.ByQuery, chromedp.AtLeast(0)),
 			chromedp.KeyEvent(key),
 		}
 	default:
@@ -264,6 +264,12 @@ const terminalSnapshotScript = `(() => {
     if (node.labels && node.labels.length) {
       const joined = Array.from(node.labels).map((item) => clean(item.innerText || item.textContent)).filter(Boolean).join(" ");
       if (joined) return joined;
+    }
+    // Only button inputs use their value as a visible caption. Editable form
+    // values (especially passwords) must never enter the terminal projection.
+    if (node.tagName === "INPUT" && ["submit", "button", "reset"].includes(node.type)) {
+      const caption = clean(node.value);
+      if (caption) return caption;
     }
     return clean(node.getAttribute("placeholder") || node.innerText || node.textContent || node.getAttribute("title") || node.getAttribute("name") || node.id);
   };

@@ -9,6 +9,7 @@ require (
 	github.com/alecthomas/kong v1.16.0
 	github.com/chromedp/cdproto v0.0.0-20260714215040-dc233986426f
 	github.com/chromedp/chromedp v0.16.0
+	github.com/creack/pty v1.1.24
 	github.com/emersion/go-ical v0.0.0-20240127095438-fc1c9d8fb2b6
 	github.com/emersion/go-imap v1.2.1
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
@@ -21,6 +22,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.14
 	github.com/minio/selfupdate v0.6.0
 	github.com/modelcontextprotocol/go-sdk v1.7.0
+	github.com/muesli/cancelreader v0.2.2
 	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/posener/complete v1.2.3
 	github.com/sigstore/sigstore-go v1.3.0
@@ -104,7 +106,6 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-runewidth v0.0.23 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
-	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

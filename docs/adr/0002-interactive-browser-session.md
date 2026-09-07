@@ -14,7 +14,10 @@ Conditional Access requirements. TLS interception expands the trust boundary.
 Launch or attach to an isolated Chromium profile and let the user complete the
 normal interactive flow. Do not request the password and do not intercept TLS.
 Keep authorization material in the session owner and prefer execution inside
-the browser security context when practical.
+the browser security context when practical. After successful authentication,
+minimize the dedicated window when supported while retaining the same browser
+process and target. A window-manager failure must not discard authentication.
+Do not restart into another profile or copy browser storage to hide the window.
 
 ## Consequences
 

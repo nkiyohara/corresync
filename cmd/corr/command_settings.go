@@ -29,6 +29,7 @@ const (
 
 type settingsAccessibleReader struct {
 	context    context.Context
+	source     io.Reader
 	reader     *bufio.Reader
 	requests   chan chan settingsAccessibleReadResult
 	stopped    chan struct{}
@@ -49,6 +50,7 @@ func newSettingsAccessibleReader(
 ) *settingsAccessibleReader {
 	accessible := &settingsAccessibleReader{
 		context:  ctx,
+		source:   input,
 		reader:   bufio.NewReader(io.LimitReader(input, maximumSettingsInputBytes+1)),
 		requests: make(chan chan settingsAccessibleReadResult),
 		stopped:  make(chan struct{}),
@@ -435,11 +437,6 @@ func runAccountSettings(
 }
 
 func runSettingsTerminalLogin(app *runtime, alias string) error {
-	originalInput := app.stdin
-	if accessible, ok := app.stdin.(*settingsAccessibleReader); ok {
-		app.stdin = accessible.reader
-		defer func() { app.stdin = originalInput }()
-	}
 	return (&loginCommand{Account: alias, Terminal: true}).Run(app)
 }
 

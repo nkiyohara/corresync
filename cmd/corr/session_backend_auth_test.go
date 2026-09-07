@@ -1497,3 +1497,32 @@ func writeSessionJSON(t *testing.T, writer http.ResponseWriter, value any) {
 		t.Error(err)
 	}
 }
+
+type minimizableBrowserHandle struct {
+	readyBrowserHandle
+	minimized bool
+	err       error
+}
+
+func (handle *minimizableBrowserHandle) Minimize(context.Context) error {
+	handle.minimized = true
+	return handle.err
+}
+
+func TestOutlookAuthenticationMinimizesWindowWithoutEndingSession(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+	configuration := config.OutlookDefault()
+	configured := configuration.Accounts[configuration.DefaultAccount]
+	for _, failure := range []error{nil, errors.New("synthetic window-manager failure")} {
+		handle := &minimizableBrowserHandle{err: failure}
+		var stderr strings.Builder
+		app := &runtime{stderr: &stderr, launch: func(context.Context, browser.Options) (browserHandle, error) { return handle, nil }}
+		result, _, err := app.authenticate(t.Context(), t.Context(), configuration, configured.ID, configured)
+		if err != nil || result != handle || !handle.minimized {
+			t.Fatalf("minimize lost session: err=%v minimized=%v", err, handle.minimized)
+		}
+		if failure != nil && !strings.Contains(stderr.String(), "could not be minimized") {
+			t.Fatal("window-manager failure was not reported")
+		}
+	}
+}

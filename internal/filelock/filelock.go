@@ -80,7 +80,22 @@ func acquire(ctx context.Context, path string, protectDirectory bool) (*Lock, er
 		return nil, fmt.Errorf("inspect lock path: %w", err)
 	}
 
-	file, err := root.OpenFile(name, os.O_CREATE|os.O_RDWR, 0o600)
+	flags := os.O_RDWR
+	if expected == nil {
+		// Exclusive creation avoids a concurrent O_CREATE open returning ENOENT
+		// on macOS. If another owner wins, inspect and open that exact file.
+		flags |= os.O_CREATE | os.O_EXCL
+	}
+	file, err := root.OpenFile(name, flags, 0o600)
+	if expected == nil && errors.Is(err, os.ErrExist) {
+		info, inspectErr := root.Lstat(name)
+		if inspectErr != nil || !info.Mode().IsRegular() || isLinkLike(info) {
+			_ = root.Close()
+			return nil, errors.New("concurrently created lock path is not a regular file")
+		}
+		expected = info
+		file, err = root.OpenFile(name, os.O_RDWR, 0o600)
+	}
 	if err != nil {
 		_ = root.Close()
 		return nil, fmt.Errorf("open lock file: %w", err)
