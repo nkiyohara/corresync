@@ -59,6 +59,8 @@ All notable user-facing changes are recorded here. The project follows
 
 ### Local tools and distribution
 
+- Update the transitive gRPC dependency to 1.83.1, including the fix for
+  excessive HTTP/2 receive-buffer memory overhead (GHSA-vp52-pcj8-j9qc).
 - Avoid provider-neutral config nil dereferences and preserve sovereign cloud
   selection when cloning the default Graph calendar route.
 - Quote printed shell commands literally, inspect exact Codex/Claude scoped
