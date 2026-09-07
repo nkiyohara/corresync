@@ -54,7 +54,8 @@ func (client *Client) CreateTask(
 	if err != nil {
 		return application.Task{}, writeAssemblyError(err)
 	}
-	return client.taskView(input.ListID, current)
+	view, err := client.taskView(input.ListID, current)
+	return view, writeAssemblyError(err)
 }
 
 func (client *Client) createPayload(input application.TaskCreateInput, projectID string) (map[string]any, error) {
@@ -170,7 +171,8 @@ func (client *Client) UpdateTask(
 	if err != nil {
 		return application.Task{}, writeAssemblyError(err)
 	}
-	return client.taskView(input.ListID, current)
+	view, err := client.taskView(input.ListID, current)
+	return view, writeAssemblyError(err)
 }
 
 func (client *Client) updatePayload(input application.TaskUpdateInput, current task) (map[string]any, bool, error) {
@@ -403,7 +405,8 @@ func (client *Client) CompleteTask(
 	if current.Status != 2 {
 		return application.Task{}, fmt.Errorf("%w: TickTick did not expose the completed task state", application.ErrWriteOutcomeUnknown)
 	}
-	return client.taskView(input.ListID, current)
+	view, err := client.taskView(input.ListID, current)
+	return view, writeAssemblyError(err)
 }
 
 func (client *Client) ReopenTask(context.Context, application.TaskStateInput) (application.Task, error) {

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/provider/restapi"
 )
 
 const (
@@ -344,7 +345,7 @@ func TestTodoistUpdateRejectsClearingStartWithoutRemovingRecurrence(t *testing.T
 	client := openFixtureClient(t, server)
 	_, err := client.updateCommands(t.Context(), application.TaskUpdateInput{
 		ReplaceStart: true,
-	}, fixture.task)
+	}, fixture.task, fixture.reminders)
 	if err == nil || !strings.Contains(err.Error(), "explicit recurrence removal") {
 		t.Fatalf("updateCommands() error = %v", err)
 	}
@@ -362,7 +363,7 @@ func TestTodoistUpdateEncodesAnEmptyLabelReplacementAsAnArray(t *testing.T) {
 	client := openFixtureClient(t, server)
 	commands, err := client.updateCommands(t.Context(), application.TaskUpdateInput{
 		ReplaceLabels: true,
-	}, fixture.task)
+	}, fixture.task, fixture.reminders)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -595,4 +596,48 @@ func mustEncodeID(t *testing.T, prefix, value string) string {
 		t.Fatal(err)
 	}
 	return encoded
+}
+
+func TestTodoistReminderChangeInvalidatesVersion(t *testing.T) {
+	f, s := newFixture(t)
+	defer s.Close()
+	c := openFixtureClient(t, s)
+	list, _ := encodeID("tdl1_", testProject)
+	id, _ := encodeID("tdt1_", testTaskID)
+	before, err := c.GetTask(t.Context(), application.TaskGetInput{Account: testAccount, ListID: list, TaskID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	f.reminders = append(f.reminders, reminder{ID: "newReminder", ItemID: testTaskID, Type: "relative", MinuteOffset: 10})
+	f.mu.Unlock()
+	after, err := c.GetTask(t.Context(), application.TaskGetInput{Account: testAccount, ListID: list, TaskID: id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if before.Version == after.Version {
+		t.Fatal("changed reminders retained the stale task version")
+	}
+	_, err = c.UpdateTask(t.Context(), application.TaskUpdateInput{Account: testAccount, ListID: list, TaskID: id, Version: before.Version, ReplaceReminders: true})
+	if !errors.Is(err, restapi.ErrPrecondition) {
+		t.Fatalf("stale reminder replacement should fail before writes: err=%v commands=%+v", err, f.commandLog)
+	}
+}
+
+func TestTodoistReminderVersionIgnoresProviderOrder(t *testing.T) {
+	fixture, server := newFixture(t)
+	defer server.Close()
+	first := reminder{ID: "first", ItemID: testTaskID, Type: "relative", MinuteOffset: 10}
+	second := reminder{ID: "second", ItemID: testTaskID, Type: "relative", MinuteOffset: 20}
+	a, err := encodeVersion(fixture.task, []reminder{first, second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := encodeVersion(fixture.task, []reminder{second, first})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Fatal("provider reminder order changed task version")
+	}
 }

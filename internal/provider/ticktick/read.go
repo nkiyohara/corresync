@@ -5,15 +5,17 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 
 	"github.com/nkiyohara/corresync/internal/application"
 )
 
 const (
-	projectPageSize  = 200
-	maximumPageCalls = 64
-	providerTaskCap  = 200
+	projectPageSize          = 200
+	maximumPageCalls         = 64
+	providerTaskCap          = 200
+	maximumCrossListProjects = 64
 )
 
 func (client *Client) ListTaskLists(
@@ -118,6 +120,9 @@ func (client *Client) ListTasks(
 	}
 	if input.Status == application.TaskStatusInProgress {
 		return application.TaskPage{Offset: input.Offset, Limit: input.Limit}, nil
+	}
+	if input.ListID == "" {
+		return client.listAcrossProjects(ctx, input)
 	}
 	projectID, err := decodeID("ttl1_", input.ListID)
 	if err != nil {
@@ -275,4 +280,51 @@ func (client *Client) getTask(ctx context.Context, projectID, taskID string) (ta
 		return task{}, errors.New("ticktick returned a task outside the selected route")
 	}
 	return remote, nil
+}
+
+// listAcrossProjects uses only documented project-scoped filter requests.
+// It returns a complete bounded snapshot or fails without returning a partial page.
+func (client *Client) listAcrossProjects(ctx context.Context, input application.TaskReadInput) (application.TaskPage, error) {
+	projects, err := client.projects(ctx, maximumCrossListProjects+1)
+	if err != nil {
+		return application.TaskPage{}, err
+	}
+	if !containsProject(projects, "inbox") {
+		projects = append(projects, project{ID: "inbox"})
+	}
+	if len(projects) > maximumCrossListProjects {
+		return application.TaskPage{}, errors.New("ticktick cross-list read exceeds the bounded project count")
+	}
+	sort.Slice(projects, func(i, j int) bool { return projects[i].ID < projects[j].ID })
+	remotes := make([]task, 0)
+	seen := make(map[string]bool)
+	for index, project := range projects {
+		if index > 0 && projects[index-1].ID == project.ID {
+			return application.TaskPage{}, errors.New("ticktick returned duplicate projects")
+		}
+		body := map[string]any{"projectIds": []string{project.ID}}
+		if input.Status != "" {
+			status, err := writeStatus(input.Status)
+			if err != nil {
+				return application.TaskPage{}, err
+			}
+			body["status"] = []int{status}
+		}
+		page, err := client.filterTasks(ctx, "open/v1/task/filter", body)
+		if err != nil {
+			return application.TaskPage{}, err
+		}
+		if len(page) >= providerTaskCap || len(remotes)+len(page) >= providerTaskCap {
+			return application.TaskPage{}, errors.New("ticktick cross-list read cannot prove a complete result below the 200-task bound")
+		}
+		for _, remote := range page {
+			if remote.ProjectID != project.ID || seen[remote.ID] {
+				return application.TaskPage{}, errors.New("ticktick cross-list result escaped its project or duplicated a task")
+			}
+			seen[remote.ID] = true
+			remotes = append(remotes, remote)
+		}
+	}
+	sort.Slice(remotes, func(i, j int) bool { return remotes[i].ID < remotes[j].ID })
+	return client.taskPage("", remotes, input.Offset, input.Limit)
 }

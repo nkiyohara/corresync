@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -147,7 +148,7 @@ func (client *Client) taskView(
 			ID: assigneeID, Self: remote.ResponsibleUID == client.userID,
 		}}
 	}
-	version, err := encodeVersion(remote)
+	version, err := encodeVersion(remote, reminders)
 	if err != nil {
 		return application.Task{}, err
 	}
@@ -457,11 +458,28 @@ type versionEnvelope struct {
 	Digest      string `json:"d"`
 }
 
-func encodeVersion(value task) (string, error) {
+func encodeVersion(value task, reminders []reminder) (string, error) {
 	if !validTask(value) {
 		return "", errors.New("cannot version malformed Todoist task")
 	}
-	snapshot, err := json.Marshal(value)
+	// Reminder resources are independently mutable and are part of the
+	// canonical task snapshot. Provider ordering must not change its version.
+	active := make([]reminder, 0, len(reminders))
+	for _, value := range reminders {
+		if !value.Deleted {
+			active = append(active, value)
+		}
+	}
+	sort.Slice(active, func(i, j int) bool { return active[i].ID < active[j].ID })
+	for i := 1; i < len(active); i++ {
+		if active[i-1].ID == active[i].ID {
+			return "", errors.New("cannot version duplicate Todoist reminders")
+		}
+	}
+	snapshot, err := json.Marshal(struct {
+		Task      task       `json:"task"`
+		Reminders []reminder `json:"reminders"`
+	}{value, active})
 	if err != nil {
 		return "", err
 	}

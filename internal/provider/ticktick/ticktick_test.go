@@ -3,10 +3,12 @@ package ticktick
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -85,7 +87,21 @@ func (fixture *tickTickFixture) serveHTTP(writer http.ResponseWriter, request *h
 		if request.URL.Path == "/api/open/v1/task/search" && len(body["keywords"]) == 0 {
 			fixture.t.Error("search omitted keywords")
 		}
-		writeTickTickJSON(fixture.t, writer, fixture.filteredTasks())
+		values := fixture.filteredTasks()
+		var selected []string
+		if raw := body["projectIds"]; len(raw) != 0 {
+			if err := json.Unmarshal(raw, &selected); err != nil {
+				fixture.t.Fatal(err)
+			}
+			filtered := make([]task, 0, len(values))
+			for _, task := range values {
+				if slices.Contains(selected, task.ProjectID) {
+					filtered = append(filtered, task)
+				}
+			}
+			values = filtered
+		}
+		writeTickTickJSON(fixture.t, writer, values)
 	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/api/open/v1/project/"):
 		projectID, taskID, ok := parseTaskPath(request.URL.Path)
 		if !ok {
@@ -594,5 +610,146 @@ func writeTickTickJSON(t *testing.T, writer io.Writer, value any) {
 	t.Helper()
 	if err := json.NewEncoder(writer).Encode(value); err != nil {
 		t.Error(err)
+	}
+}
+
+func TestTickTickMalformedPostWriteMapping(t *testing.T) {
+	f, s := newTickTickFixture(t)
+	defer s.Close()
+	proxy := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/task/created-1") {
+			f.mu.Lock()
+			v := f.tasks["created-1"]
+			v.Priority = 999
+			f.tasks[v.ID] = v
+			f.mu.Unlock()
+		}
+		f.serveHTTP(w, r)
+	}))
+	defer proxy.Close()
+	c := openTickTickClient(t, proxy, false)
+	list, _ := encodeID("ttl1_", testProject)
+	_, err := c.CreateTask(t.Context(), application.TaskCreateInput{Account: testAccount, ListID: list, Title: "Synthetic", Priority: application.TaskPriorityNone})
+	if f.mutations != 1 || err == nil {
+		t.Fatalf("mutations=%d err=%v", f.mutations, err)
+	}
+	if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+		t.Fatalf("accepted create wrongly classified as ordinary failure: %v", err)
+	}
+}
+
+func TestTickTickAdvertisedCrossListRead(t *testing.T) {
+	_, s := newTickTickFixture(t)
+	defer s.Close()
+	c := openTickTickClient(t, s, false)
+	if !c.TaskCapabilities().CrossListRead {
+		t.Skip("not advertised")
+	}
+	_, err := c.ListTasks(t.Context(), application.TaskReadInput{Account: testAccount, Limit: 10})
+	if err != nil {
+		t.Fatalf("advertised cross-list read fails: %v", err)
+	}
+}
+
+func TestTickTickCrossListSnapshotBoundsAndProvenance(t *testing.T) {
+	for _, count := range []int{2, providerTaskCap} {
+		t.Run(strconv.Itoa(count), func(t *testing.T) {
+			fixture, server := newTickTickFixture(t)
+			defer server.Close()
+			fixture.mu.Lock()
+			fixture.tasks = map[string]task{}
+			for i := 0; i < count; i++ {
+				projectID := testProject
+				if i%2 == 0 {
+					projectID = "inbox"
+				}
+				id := fmt.Sprintf("task-%03d", i)
+				fixture.tasks[id] = task{ID: id, ProjectID: projectID, Title: "Synthetic", Kind: "TEXT"}
+			}
+			fixture.mu.Unlock()
+			client := openTickTickClient(t, server, false)
+			page, err := client.ListTasks(t.Context(), application.TaskReadInput{Account: testAccount, Limit: 10})
+			if count == providerTaskCap {
+				if err == nil {
+					t.Fatal("unbounded cross-list snapshot accepted")
+				}
+				return
+			}
+			if err != nil || len(page.Tasks) != 2 {
+				t.Fatalf("cross-list page=%+v err=%v", page, err)
+			}
+			lists := map[string]bool{}
+			for _, item := range page.Tasks {
+				lists[item.ListID] = true
+			}
+			if len(lists) != 2 {
+				t.Fatal("cross-list results lost list provenance")
+			}
+		})
+	}
+}
+
+func TestTickTickMalformedMappingAfterUpdateAndCompleteIsUnknown(t *testing.T) {
+	for _, action := range []string{"update", "complete"} {
+		t.Run(action, func(t *testing.T) {
+			fixture, original := newTickTickFixture(t)
+			defer original.Close()
+			fixture.mu.Lock()
+			remote := fixture.tasks[testTask]
+			remote.RepeatFlag = ""
+			fixture.tasks[testTask] = remote
+			fixture.mu.Unlock()
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fixture.mu.Lock()
+				if fixture.mutations > 0 && r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/task/"+testTask) {
+					current := fixture.tasks[testTask]
+					current.Priority = 999
+					fixture.tasks[testTask] = current
+				}
+				fixture.mu.Unlock()
+				fixture.serveHTTP(w, r)
+			}))
+			defer server.Close()
+			client := openTickTickClient(t, server, false)
+			list, _ := encodeID("ttl1_", testProject)
+			id, _ := encodeID("ttt1_", testTask)
+			current, err := client.GetTask(t.Context(), application.TaskGetInput{Account: testAccount, ListID: list, TaskID: id})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if action == "update" {
+				title := "Synthetic update"
+				_, err = client.UpdateTask(t.Context(), application.TaskUpdateInput{Account: testAccount, ListID: list, TaskID: id, Version: current.Version, Title: &title})
+			} else {
+				_, err = client.CompleteTask(t.Context(), application.TaskStateInput{Account: testAccount, ListID: list, TaskID: id, Version: current.Version})
+			}
+			if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+				t.Fatalf("post-%s mapping error=%v", action, err)
+			}
+		})
+	}
+}
+
+func TestTickTickCrossListRejectsExcessProjectsBeforeTaskReads(t *testing.T) {
+	fixture, original := newTickTickFixture(t)
+	defer original.Close()
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path == "/api/open/v1/project" {
+			projects := make([]project, maximumCrossListProjects)
+			for i := range projects {
+				projects[i] = project{ID: fmt.Sprintf("project-%d", i), Name: "Synthetic", Kind: "TASK", Permission: "read"}
+			}
+			writeTickTickJSON(t, writer, projects)
+			return
+		}
+		if request.URL.Path == "/api/open/v1/task/filter" {
+			t.Error("excess-project snapshot reached task filter")
+		}
+		fixture.serveHTTP(writer, request)
+	}))
+	defer server.Close()
+	client := openTickTickClient(t, server, true)
+	if _, err := client.ListTasks(t.Context(), application.TaskReadInput{Account: testAccount, Limit: 10}); err == nil {
+		t.Fatal("cross-list accepted more than 64 projects including Inbox")
 	}
 }

@@ -154,7 +154,7 @@ func (client *Client) UpdateTask(
 	if err != nil {
 		return application.Task{}, err
 	}
-	current, err := client.exactTask(ctx, projectID, taskID, input.Version)
+	current, currentReminders, err := client.exactTask(ctx, projectID, taskID, input.Version)
 	if err != nil {
 		return application.Task{}, err
 	}
@@ -166,7 +166,7 @@ func (client *Client) UpdateTask(
 			return application.Task{}, err
 		}
 	}
-	commands, err := client.updateCommands(ctx, input, current)
+	commands, err := client.updateCommands(ctx, input, current, currentReminders)
 	if err != nil {
 		return application.Task{}, err
 	}
@@ -199,6 +199,7 @@ func (client *Client) updateCommands(
 	ctx context.Context,
 	input application.TaskUpdateInput,
 	current task,
+	currentReminders []reminder,
 ) ([]syncCommand, error) {
 	args := map[string]any{"id": current.ID}
 	if input.Title != nil {
@@ -284,12 +285,8 @@ func (client *Client) updateCommands(
 	reminderDeletes := make([]syncCommand, 0)
 	reminderAdds := make([]syncCommand, 0, len(input.Reminders))
 	if input.ReplaceReminders {
-		existing, err := client.remindersByTask(ctx, current.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, value := range existing[current.ID] {
-			if value.Type == "relative" || value.Type == "absolute" {
+		for _, value := range currentReminders {
+			if !value.Deleted && (value.Type == "relative" || value.Type == "absolute") {
 				reminderDeletes = append(reminderDeletes, newCommand(
 					"reminder_delete", "", map[string]any{"id": value.ID},
 				))
@@ -307,11 +304,7 @@ func (client *Client) updateCommands(
 	}
 	if input.ReplaceStart && !input.ReplaceReminders &&
 		(input.Start == nil || input.Start.Kind == application.TaskTemporalDate) {
-		existing, err := client.remindersByTask(ctx, current.ID)
-		if err != nil {
-			return nil, err
-		}
-		for _, value := range existing[current.ID] {
+		for _, value := range currentReminders {
 			if value.Type == "relative" && !value.Deleted {
 				return nil, errors.New("clearing a todoist reminder time requires explicit reminder replacement")
 			}
@@ -335,7 +328,7 @@ func (client *Client) CompleteTask(
 	if err != nil {
 		return application.Task{}, err
 	}
-	current, err := client.exactTask(ctx, projectID, taskID, input.Version)
+	current, _, err := client.exactTask(ctx, projectID, taskID, input.Version)
 	if err != nil {
 		return application.Task{}, err
 	}
@@ -374,7 +367,7 @@ func (client *Client) ReopenTask(
 	if err != nil {
 		return application.Task{}, err
 	}
-	current, err := client.exactTask(ctx, projectID, taskID, input.Version)
+	current, _, err := client.exactTask(ctx, projectID, taskID, input.Version)
 	if err != nil {
 		return application.Task{}, err
 	}
@@ -412,7 +405,7 @@ func (client *Client) DeleteTask(
 	if err != nil {
 		return err
 	}
-	if _, err := client.exactTask(ctx, projectID, taskID, input.Version); err != nil {
+	if _, _, err := client.exactTask(ctx, projectID, taskID, input.Version); err != nil {
 		return err
 	}
 	_, err = client.runCommands(ctx, []syncCommand{
