@@ -37,9 +37,10 @@ func New() *Scanner {
 }
 
 type candidate struct {
-	item     application.ImportItem
-	raw      []byte
-	identity string
+	item             application.ImportItem
+	raw              []byte
+	identity         string
+	identityRevision string
 }
 
 type scanResult struct {
@@ -118,6 +119,10 @@ func (scanner *Scanner) Scan(
 			return application.ImportPlan{}, err
 		}
 		current := source.item
+		identityRevision := source.identityRevision
+		if identityRevision == "" {
+			identityRevision = current.ObjectSHA256
+		}
 		current.Status = "staged"
 		if existing, duplicate := index.Exact[current.DedupeKey]; duplicate {
 			if existing != current.ObjectSHA256 {
@@ -129,9 +134,9 @@ func (scanner *Scanner) Scan(
 			plan.DuplicateItems++
 		} else {
 			if source.identity != "" &&
-				identityHasDifferentObject(
+				identityHasDifferentRevision(
 					index.Identities[source.identity],
-					current.ObjectSHA256,
+					identityRevision,
 				) {
 				current.Status = "conflict"
 				current.Degradations = append(
@@ -147,7 +152,7 @@ func (scanner *Scanner) Scan(
 			if source.identity != "" {
 				index.Identities[source.identity] = append(
 					index.Identities[source.identity],
-					current.ObjectSHA256,
+					identityRevision,
 				)
 				slices.Sort(index.Identities[source.identity])
 				index.Identities[source.identity] = slices.Compact(
@@ -189,9 +194,13 @@ func (scanner *Scanner) Scan(
 	if _, err := encodePrivateJSON(index, maximumIndexBytes); err != nil {
 		return application.ImportPlan{}, err
 	}
+	writtenObjects := make(map[string]struct{}, len(result.candidates))
 	for _, source := range result.candidates {
 		if err := ctx.Err(); err != nil {
 			return application.ImportPlan{}, err
+		}
+		if _, written := writtenObjects[source.item.ObjectSHA256]; written {
+			continue
 		}
 		if err := writeObject(
 			root,
@@ -200,6 +209,7 @@ func (scanner *Scanner) Scan(
 		); err != nil {
 			return application.ImportPlan{}, err
 		}
+		writtenObjects[source.item.ObjectSHA256] = struct{}{}
 	}
 	if !plan.ExistingPlan {
 		if err := writePrivateJSON(planPath, plan, maximumPlanBytes); err != nil {
@@ -457,9 +467,9 @@ func decodeStrictJSON(data []byte, target any) error {
 	return nil
 }
 
-func identityHasDifferentObject(objects []string, current string) bool {
-	for _, object := range objects {
-		if object != current {
+func identityHasDifferentRevision(revisions []string, current string) bool {
+	for _, revision := range revisions {
+		if revision != current {
 			return true
 		}
 	}
