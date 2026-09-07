@@ -398,7 +398,7 @@ func TestMCPSetupDryRunDoesNotInvokeClient(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("run() code = %d, stderr = %q", code, stderr.String())
 	}
-	if got := stdout.String(); !strings.Contains(got, "codex mcp add work_mail -- \"") || !strings.Contains(got, "mcp serve") {
+	if got := stdout.String(); !strings.Contains(got, "work_mail") || !strings.Contains(got, "mcp serve") {
 		t.Fatalf("dry-run output = %q", got)
 	}
 }

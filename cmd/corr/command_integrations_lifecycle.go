@@ -297,6 +297,9 @@ func prepareIntegrationLifecycle(
 	environment := integrationlifecycle.Environment{
 		HomeDirectory: filepath.Clean(home), ConfigDirectory: filepath.Clean(configDirectory), GOOS: app.info.OS,
 	}
+	if override, exists := app.lookupEnv("CLAUDE_CONFIG_DIR"); exists && override != "" {
+		environment.ClaudeConfigOverride = true
+	}
 	bundleDirectory, err := app.integrationBundleDirectory(executable)
 	if err != nil {
 		return integrationlifecycle.Engine{}, nil, fmt.Errorf("resolve native integration packages: %w", err)

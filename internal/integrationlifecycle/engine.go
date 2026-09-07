@@ -11,7 +11,6 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/nkiyohara/corresync/internal/agenthost"
 )
@@ -98,6 +97,9 @@ func (engine Engine) Inspect(ctx context.Context, request Request) (Inspection, 
 }
 
 func (engine Engine) inspectMCP(ctx context.Context, request Request) (Inspection, error) {
+	if request.Host == agenthost.IDClaudeCode {
+		return inspectClaudeRegistration(engine.Environment, request)
+	}
 	_, inspect, _, list, ok, err := OfficialCommands(request)
 	if err != nil {
 		return Inspection{}, err
@@ -215,9 +217,12 @@ func classifyCommandInspection(request Request, execution Execution, list bool) 
 		case containsAny(lower, "malformed", "parse error", "invalid config", "invalid json", "invalid toml"):
 			inspection.State = StateMalformed
 			inspection.Detail = "The host rejected its integration configuration as malformed."
-		default:
+		case knownMissingRegistration(request, output):
 			inspection.State = StateAbsent
 			inspection.Detail = "The named Corresync integration is not registered."
+		default:
+			inspection.State = StateUnavailable
+			inspection.Detail = "The host command failed without establishing whether the named registration exists."
 		}
 		return inspection
 	}
@@ -234,7 +239,11 @@ func classifyCommandInspection(request Request, execution Execution, list bool) 
 			return inspection
 		}
 		output = record
-		lower = strings.ToLower(record)
+	}
+	if !inspectionScopeMatches(request, output) {
+		inspection.State = StateUnavailable
+		inspection.Detail = "The host did not establish the registration in the requested scope; inspect that scope in the host before retrying."
+		return inspection
 	}
 	if state, handled := classifyJSONCommandRecord(output, request); handled {
 		inspection.State = state
@@ -250,49 +259,9 @@ func classifyCommandInspection(request Request, execution Execution, list bool) 
 		}
 		return inspection
 	}
-	staleCommand := !containsExactTextValue(output, request.Executable)
-	if staleCommand && !outputMentionsOwnedExecutable(output) {
-		inspection.State = StateNameConflict
-		inspection.Detail = "The requested name belongs to a different host integration."
-		return inspection
-	}
-	if containsExactTextValue(lower, "disabled") || containsAny(lower, "enabled: false", `"enabled":false`, `"enabled": false`) {
-		inspection.State = StateDisabled
-		inspection.Detail = "The named Corresync integration is present but disabled."
-		return inspection
-	}
-	if staleCommand {
-		inspection.State = StateStalePath
-		inspection.Detail = "The named Corresync integration uses a different executable path."
-		return inspection
-	}
-	if containsAny(lower, "alwaysallow", "always_allow", "always-allow", "autoapprove", "auto_approve", "auto-approve") {
-		inspection.State = StateStalePath
-		inspection.Detail = "The named Corresync integration contains a host auto-approval setting."
-		return inspection
-	}
-	for _, argument := range request.Arguments {
-		if argument != "" && !containsRenderedArgument(output, argument) {
-			inspection.State = StateStalePath
-			inspection.Detail = "The named Corresync integration uses stale launch arguments."
-			return inspection
-		}
-	}
-	inspection.State = StateHealthy
-	inspection.Detail = "The host reports the expected absolute Corresync launch contract."
+	inspection.State = StateUnavailable
+	inspection.Detail = "The host returned text that cannot establish exact launch arguments. Inspect the registration in the host; no automatic repair will be attempted."
 	return inspection
-}
-
-func containsRenderedArgument(output, argument string) bool {
-	if containsExactTextValue(output, argument) {
-		return true
-	}
-	escaped := strings.NewReplacer(
-		`\`, `\\`,
-		" ", `\ `,
-		"\t", `\`+"\t",
-	).Replace(argument)
-	return escaped != argument && containsExactTextValue(output, escaped)
 }
 
 func selectNamedCommandRecord(output, name string) (record string, found, valid bool) {
@@ -305,33 +274,7 @@ func selectNamedCommandRecord(output, name string) (record string, found, valid 
 		encoded, err := json.Marshal(entry)
 		return string(encoded), true, err == nil
 	}
-	lines := strings.Split(output, "\n")
-	match := -1
-	for index, line := range lines {
-		if !containsName(line, name) {
-			continue
-		}
-		if match >= 0 {
-			return "", false, false
-		}
-		match = index
-	}
-	if match < 0 {
-		return "", false, true
-	}
-	selected := []string{lines[match]}
-	indent := leadingWhitespace(lines[match])
-	for index := match + 1; index < len(lines); index++ {
-		line := lines[index]
-		if strings.TrimSpace(line) == "" {
-			break
-		}
-		if leadingWhitespace(line) <= indent {
-			break
-		}
-		selected = append(selected, line)
-	}
-	return strings.Join(selected, "\n"), true, true
+	return "", false, false
 }
 
 func selectNamedJSONEntry(document any, name string) (any, bool, bool) {
@@ -390,6 +333,23 @@ func classifyJSONCommandRecord(output string, request Request) (State, bool) {
 	if json.Unmarshal([]byte(output), &entry) != nil || entry == nil {
 		return "", false
 	}
+	if request.Host == agenthost.IDCodex {
+		if raw, exists := entry["transport"]; exists {
+			transport, ok := raw.(map[string]any)
+			if !ok || entry["name"] != request.ServerName || transport["type"] != "stdio" {
+				return StateMalformed, true
+			}
+			// The official get --json shape separates enabled state from the
+			// exact stdio transport. Keep policy fields visible to classification.
+			transport["enabled"] = entry["enabled"]
+			for _, name := range hostAutoApprovalFields {
+				if value, exists := entry[name]; exists {
+					transport[name] = value
+				}
+			}
+			entry = transport
+		}
+	}
 	command, ok := entry["command"].(string)
 	if !ok {
 		return StateNameConflict, true
@@ -413,45 +373,6 @@ func classifyJSONCommandRecord(output string, request Request) (State, bool) {
 	return StateHealthy, true
 }
 
-func leadingWhitespace(value string) int {
-	return len(value) - len(strings.TrimLeft(value, " \t"))
-}
-
-func containsExactTextValue(output, value string) bool {
-	if value == "" {
-		return true
-	}
-	for offset := 0; ; {
-		index := strings.Index(output[offset:], value)
-		if index < 0 {
-			return false
-		}
-		index += offset
-		beforeOK := index == 0 || !textValueRune(output[index-1])
-		after := index + len(value)
-		afterOK := after == len(output) || !textValueRune(output[after])
-		if beforeOK && afterOK {
-			return true
-		}
-		offset = index + 1
-	}
-}
-
-func textValueRune(value byte) bool {
-	return value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' || value >= '0' && value <= '9' ||
-		strings.ContainsRune("_./\\-", rune(value))
-}
-
-func outputMentionsOwnedExecutable(output string) bool {
-	for _, field := range strings.Fields(output) {
-		candidate := strings.Trim(field, "\"'`,;:[]{}()")
-		if strings.ContainsAny(candidate, `/\\`) && ownedExecutable(candidate) {
-			return true
-		}
-	}
-	return false
-}
-
 func inspectionFingerprint(execution Execution, output string) string {
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%t\x00%d\x00%t\x00%s", execution.Started, execution.ExitCode, execution.Truncated, output)))
 	return hex.EncodeToString(sum[:])
@@ -460,17 +381,6 @@ func inspectionFingerprint(execution Execution, output string) string {
 func containsAny(value string, candidates ...string) bool {
 	for _, candidate := range candidates {
 		if strings.Contains(value, candidate) {
-			return true
-		}
-	}
-	return false
-}
-
-func containsName(output, name string) bool {
-	for _, field := range strings.FieldsFunc(output, func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' && r != '-'
-	}) {
-		if field == name {
 			return true
 		}
 	}
@@ -521,9 +431,12 @@ func (engine Engine) planFromInspection(request Request, previous Inspection) (P
 		mcpPrevious.State = component.State
 		mcpPrevious.Detail = component.Detail
 	}
-	if commandOK {
+	switch {
+	case request.Host == agenthost.IDClaudeCode:
+		plan.Verification = []Action{fileAction(ActionJSON, "verify_registration", previous.Path, request.ServerName)}
+	case commandOK:
 		plan.Verification = []Action{commandAction("verify_registration", inspect)}
-	} else if fileOK || yamlOK {
+	case fileOK || yamlOK:
 		plan.Verification = []Action{fileAction(fileKind, "verify_registration", path, request.ServerName)}
 	}
 	switch mcpPrevious.State {
@@ -601,9 +514,12 @@ func (engine Engine) planFromInspection(request Request, previous Inspection) (P
 				plan.Actions = []Action{fileAction(fileKind, "remove_corresync", path, request.ServerName)}
 			}
 		}
-		if commandOK {
+		switch {
+		case request.Host == agenthost.IDClaudeCode:
+			plan.Verification = []Action{fileAction(ActionJSON, "verify_absence", previous.Path, request.ServerName)}
+		case commandOK:
 			plan.Verification = []Action{commandAction("verify_absence", inspect)}
-		} else {
+		default:
 			plan.Verification = []Action{fileAction(fileKind, "verify_absence", path, request.ServerName)}
 		}
 	}
@@ -706,12 +622,14 @@ func (engine Engine) Apply(ctx context.Context, request Request, plan Plan) (Res
 	changed := false
 	for _, action := range plan.Actions {
 		var actionErr error
+		mayHaveChanged := false
 		switch action.Kind {
 		case ActionCommand:
 			if action.Command == nil || engine.Executor == nil {
 				return Result{}, errors.New("command action is missing its executor or argv")
 			}
 			execution, runErr := engine.Executor.Run(ctx, *action.Command, maximumInspectionBytes)
+			mayHaveChanged = execution.Started
 			if runErr != nil {
 				actionErr = runErr
 			} else if !execution.Started || execution.ExitCode != 0 {
@@ -732,6 +650,7 @@ func (engine Engine) Apply(ctx context.Context, request Request, plan Plan) (Res
 				if store == nil {
 					store = &JSONStore{}
 				}
+				mayHaveChanged = true
 				actionErr = store.Apply(
 					ctx, path, adapter, request, engine.Environment, mcpInspectionFingerprint(plan.Previous),
 					request.Operation == OperationRemove,
@@ -748,6 +667,7 @@ func (engine Engine) Apply(ctx context.Context, request Request, plan Plan) (Res
 			case !ok || path != action.File.Path || action.File.Entry != request.ServerName:
 				actionErr = errors.New("YAML action does not match the reviewed adapter target")
 			default:
+				mayHaveChanged = true
 				actionErr = (YAMLStore{}).Apply(
 					ctx, path, request, engine.Environment, mcpInspectionFingerprint(plan.Previous),
 					request.Operation == OperationRemove,
@@ -764,8 +684,10 @@ func (engine Engine) Apply(ctx context.Context, request Request, plan Plan) (Res
 			case bindingErr != nil:
 				actionErr = bindingErr
 			case action.Package.Remove:
+				mayHaveChanged = true
 				actionErr = (PackageStore{}).Remove(ctx, descriptor, action.Package.PreviousSHA256)
 			default:
+				mayHaveChanged = true
 				actionErr = (PackageStore{}).Stage(
 					ctx, descriptor, action.Package.SourceSHA256, action.Package.PreviousSHA256,
 				)
@@ -781,14 +703,17 @@ func (engine Engine) Apply(ctx context.Context, request Request, plan Plan) (Res
 			case bindingErr != nil:
 				actionErr = bindingErr
 			case action.Package.Remove:
+				mayHaveChanged = true
 				actionErr = (SkillStore{}).Remove(ctx, descriptor, action.Package.PreviousSHA256)
 			default:
+				mayHaveChanged = true
 				actionErr = (SkillStore{}).Install(ctx, descriptor, action.Package.PreviousSHA256)
 			}
 		default:
 			return Result{}, errors.New("unsupported integration plan action")
 		}
 		if actionErr != nil {
+			changed = changed || mayHaveChanged
 			status := ResultFailedPreserved
 			if changed {
 				status = ResultFailedChanged
@@ -862,7 +787,7 @@ func requestBinding(request Request) string {
 
 func failureMessage(changed bool, purpose string) string {
 	if changed {
-		return fmt.Sprintf("The %s step failed after an earlier change; rerun doctor for recovery guidance.", purpose)
+		return fmt.Sprintf("The %s step failed after a mutation was attempted; host state may have changed. Rerun doctor for recovery guidance.", purpose)
 	}
 	return fmt.Sprintf("The %s step failed before host state changed.", purpose)
 }

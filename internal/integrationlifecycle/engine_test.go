@@ -2,6 +2,7 @@ package integrationlifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,11 +40,14 @@ func lifecycleRequest(operation Operation) Request {
 }
 
 func healthyCommandOutput(request Request) []byte {
-	return []byte(fmt.Sprintf(
-		"corresync\n command: %s\n args: %s\n",
-		request.Executable,
-		strings.Join(request.Arguments, " "),
-	))
+	encoded, err := json.Marshal(map[string]any{
+		"name": request.ServerName, "enabled": true,
+		"transport": map[string]any{"type": "stdio", "command": request.Executable, "args": request.Arguments},
+	})
+	if err != nil {
+		panic(err)
+	}
+	return encoded
 }
 
 func TestPlanBindsInspectionAndUsesRemoveThenAddForStalePath(t *testing.T) {
@@ -52,7 +56,7 @@ func TestPlanBindsInspectionAndUsesRemoveThenAddForStalePath(t *testing.T) {
 	staleConfig := testAbsolutePath("old", "config.toml")
 	executor := &scriptedExecutor{executions: []Execution{{
 		Started: true, Output: []byte(fmt.Sprintf(
-			"corresync\n command: %s\n args: --config %s mcp serve\n",
+			`{"command":%q,"args":["--config",%q,"mcp","serve"]}`,
 			staleExecutable,
 			staleConfig,
 		)),
@@ -78,7 +82,7 @@ func TestPlanBlocksNameConflictWithoutRemoval(t *testing.T) {
 	t.Parallel()
 	executor := &scriptedExecutor{executions: []Execution{{
 		Started: true, Output: []byte(fmt.Sprintf(
-			"corresync\n command: %s\n enabled: false\n",
+			`{"command":%q,"enabled":false,"args":[]}`,
 			testAbsolutePath("other", "server"),
 		)),
 	}}}
@@ -102,7 +106,7 @@ func TestUnsafePackageSourceBecomesBlockedHostState(t *testing.T) {
 		t.Fatal(err)
 	}
 	executor := &scriptedExecutor{executions: []Execution{{
-		Started: true, ExitCode: 1, Output: []byte("not found"),
+		Started: true, ExitCode: 1, Output: []byte("Error: No MCP server named 'corresync' found."),
 	}}}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Executor: executor, Environment: environment}
 	plan, err := engine.Plan(t.Context(), lifecycleRequest(OperationSetup))
@@ -141,11 +145,11 @@ func TestUnsafePortableSkillPathBecomesBlockedHostState(t *testing.T) {
 func TestApplyFailsClosedWhenStateChangesAfterPreview(t *testing.T) {
 	t.Parallel()
 	request := lifecycleRequest(OperationSetup)
-	absent := Execution{Started: true, ExitCode: 1, Output: []byte("not found")}
+	absent := Execution{Started: true, ExitCode: 1, Output: []byte("Error: No MCP server named 'corresync' found.")}
 	executor := &scriptedExecutor{executions: []Execution{
 		absent,
 		{Started: true, Output: []byte(fmt.Sprintf(
-			"corresync\n command: %s\n",
+			`{"command":%q,"args":[]}`,
 			testAbsolutePath("other", "server"),
 		))},
 	}}
@@ -167,7 +171,7 @@ func TestApplyRechecksNoopPlanAfterPreview(t *testing.T) {
 	t.Parallel()
 	request := lifecycleRequest(OperationSetup)
 	healthy := Execution{Started: true, Output: healthyCommandOutput(request)}
-	absent := Execution{Started: true, ExitCode: 1, Output: []byte("not found")}
+	absent := Execution{Started: true, ExitCode: 1, Output: []byte("Error: No MCP server named 'corresync' found.")}
 	executor := &scriptedExecutor{executions: []Execution{healthy, absent}}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Executor: executor}
 	plan, err := engine.Plan(t.Context(), request)
@@ -189,7 +193,7 @@ func TestApplyRechecksNoopPlanAfterPreview(t *testing.T) {
 func TestApplyReportsIndependentReloadAfterVerification(t *testing.T) {
 	t.Parallel()
 	request := lifecycleRequest(OperationSetup)
-	absent := Execution{Started: true, ExitCode: 1, Output: []byte("not found")}
+	absent := Execution{Started: true, ExitCode: 1, Output: []byte("Error: No MCP server named 'corresync' found.")}
 	healthy := Execution{Started: true, Output: healthyCommandOutput(request)}
 	executor := &scriptedExecutor{executions: []Execution{absent, absent, {Started: true}, healthy}}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Executor: executor}
@@ -220,7 +224,7 @@ func TestCommandInspectionNeverCopiesHostOutputIntoDetail(t *testing.T) {
 func TestApplyRejectsTamperedPlanAction(t *testing.T) {
 	t.Parallel()
 	request := lifecycleRequest(OperationSetup)
-	executor := &scriptedExecutor{executions: []Execution{{Started: true, ExitCode: 1, Output: []byte("not found")}}}
+	executor := &scriptedExecutor{executions: []Execution{{Started: true, ExitCode: 1, Output: []byte("Error: No MCP server named 'corresync' found.")}}}
 	engine := Engine{Catalog: agenthost.DefaultCatalog(), Executor: executor}
 	plan, err := engine.Plan(t.Context(), request)
 	if err != nil {
@@ -281,7 +285,7 @@ func TestListInspectionParsesOneExactJSONEntry(t *testing.T) {
 	}
 }
 
-func TestListInspectionAcceptsShellEscapedArgument(t *testing.T) {
+func TestListInspectionRejectsTextWithoutArgumentBoundaryEvidence(t *testing.T) {
 	t.Parallel()
 	request := lifecycleRequest(OperationSetup)
 	request.Arguments[1] = "/Users/test/Library/Application Support/corresync/config.toml"
@@ -292,7 +296,7 @@ func TestListInspectionAcceptsShellEscapedArgument(t *testing.T) {
 			request.Executable,
 		)),
 	}, true)
-	if inspection.State != StateHealthy {
+	if inspection.State != StateMalformed {
 		t.Fatalf("inspection = %+v", inspection)
 	}
 }

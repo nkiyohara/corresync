@@ -70,9 +70,10 @@ func TestIntegrationsSetupAppliesAndVerifiesIndependentHosts(t *testing.T) {
 		}
 		if len(arguments) >= 2 && arguments[0] == "mcp" && arguments[1] == "get" {
 			if !codexRegistered {
-				return errors.New("not found")
+				_, _ = io.WriteString(output, "Error: No MCP server named 'corresync' found.\n")
+				return errors.New("exit status 1")
 			}
-			_, _ = io.WriteString(output, "corresync\n command: "+executable+"\n args: --config "+configPath+" mcp serve\n")
+			_ = json.NewEncoder(output).Encode(map[string]any{"name": "corresync", "enabled": true, "transport": map[string]any{"type": "stdio", "command": executable, "args": []string{"--config", configPath, "mcp", "serve"}}})
 			return nil
 		}
 		if len(arguments) >= 2 && arguments[0] == "mcp" && arguments[1] == "add" {
@@ -109,11 +110,12 @@ func TestIntegrationsJSONIsPreviewOnly(t *testing.T) {
 	t.Parallel()
 	app, executable, _, stdout := integrationCommandRuntime(t)
 	mutated := false
-	app.runCommand = func(_ context.Context, _ io.Writer, _ io.Writer, _ string, arguments ...string) error {
+	app.runCommand = func(_ context.Context, output io.Writer, _ io.Writer, _ string, arguments ...string) error {
 		if len(arguments) > 1 && arguments[1] == "add" {
 			mutated = true
 		}
-		return errors.New("not found")
+		_, _ = io.WriteString(output, "Error: No MCP server named 'corresync' found.\n")
+		return errors.New("exit status 1")
 	}
 	command := integrationsSetupCommand{integrationMutationFlags: integrationMutationFlags{
 		integrationTargetFlags: integrationTargetFlags{Hosts: []string{"codex"}, Name: "corresync", Executable: executable, Scope: "user"},
@@ -137,8 +139,9 @@ func TestIntegrationsJSONIsPreviewOnly(t *testing.T) {
 func TestIntegrationsMutationRequiresConfirmation(t *testing.T) {
 	t.Parallel()
 	app, executable, _, _ := integrationCommandRuntime(t)
-	app.runCommand = func(context.Context, io.Writer, io.Writer, string, ...string) error {
-		return errors.New("not found")
+	app.runCommand = func(_ context.Context, output, _ io.Writer, _ string, _ ...string) error {
+		_, _ = io.WriteString(output, "Error: No MCP server named 'corresync' found.\n")
+		return errors.New("exit status 1")
 	}
 	command := integrationsSetupCommand{integrationMutationFlags: integrationMutationFlags{
 		integrationTargetFlags: integrationTargetFlags{Hosts: []string{"codex"}, Name: "corresync", Executable: executable, Scope: "user"},
@@ -153,7 +156,7 @@ func TestIntegrationsYesReturnsErrorForBlockedHost(t *testing.T) {
 	t.Parallel()
 	app, executable, _, stdout := integrationCommandRuntime(t)
 	app.runCommand = func(_ context.Context, output, _ io.Writer, _ string, _ ...string) error {
-		_, _ = io.WriteString(output, "corresync\n command: /usr/bin/other-server\n")
+		_, _ = io.WriteString(output, `{"command":"/usr/bin/other-server","args":[]}`)
 		return nil
 	}
 	command := integrationsSetupCommand{integrationMutationFlags: integrationMutationFlags{
@@ -204,9 +207,10 @@ func TestIntegrationsSetupContinuesAfterHostFailureAndRerunResumes(t *testing.T)
 		switch arguments[1] {
 		case "get":
 			if !codexRegistered {
-				return errors.New("not found")
+				_, _ = io.WriteString(output, "Error: No MCP server named 'corresync' found.\n")
+				return errors.New("exit status 1")
 			}
-			_, _ = io.WriteString(output, "corresync\n command: "+executable+"\n args: --config "+configPath+" mcp serve\n")
+			_ = json.NewEncoder(output).Encode(map[string]any{"name": "corresync", "enabled": true, "transport": map[string]any{"type": "stdio", "command": executable, "args": []string{"--config", configPath, "mcp", "serve"}}})
 			return nil
 		case "add":
 			if failCodex {
@@ -233,7 +237,7 @@ func TestIntegrationsSetupContinuesAfterHostFailureAndRerunResumes(t *testing.T)
 	if data, readErr := os.ReadFile(cursorPath); readErr != nil || !integrationConfigUsesExecutable(data, executable) {
 		t.Fatalf("later Cursor host was not applied: %s, error %v", data, readErr)
 	}
-	if !strings.Contains(stdout.String(), "failed_previous_state_preserved") ||
+	if !strings.Contains(stdout.String(), "failed_after_change") ||
 		!strings.Contains(stdout.String(), "applied_reload_required") {
 		t.Fatalf("first-run results = %s", stdout.String())
 	}

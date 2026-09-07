@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
-	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/nkiyohara/corresync/internal/agenthost"
@@ -306,22 +304,6 @@ func applyMCPSetup(app *runtime, client mcpSetupClient, name string, arguments [
 		client.Label,
 	)
 	return err
-}
-
-func formatCommand(name string, arguments []string) string {
-	parts := make([]string, 0, len(arguments)+1)
-	parts = append(parts, quoteCommandArgument(name))
-	for _, argument := range arguments {
-		parts = append(parts, quoteCommandArgument(argument))
-	}
-	return strings.Join(parts, " ")
-}
-
-func quoteCommandArgument(value string) string {
-	if value != "" && !strings.ContainsAny(value, " \t\r\n\\\"'") {
-		return value
-	}
-	return strconv.Quote(value)
 }
 
 func resolveMCPClientConfig(app *runtime, name, executable string) (string, string, []string, error) {

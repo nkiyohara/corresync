@@ -102,6 +102,14 @@ corr integrations repair codex
 corr integrations remove codex
 ```
 
+Printed commands use POSIX shell syntax on Unix and PowerShell syntax on Windows.
+
+Codex registration checks use structured JSON. Claude checks read the exact
+user/local/project configuration with bounded, read-only file access; a custom
+`CLAUDE_CONFIG_DIR` requires manual management. Hosts that expose only ambiguous
+text cannot prove argument boundaries and are reported unavailable for automatic
+setup or repair. Inspect those registrations in the host before proceeding.
+
 `plan` and `doctor` are read-only. Setup, repair, and removal print one plan
 grouped by host and require a terminal confirmation; automation must pass the
 explicit `--yes` flag. `--json` is always preview-only and is rejected with
@@ -114,7 +122,8 @@ Each host completes independently. A later failure does not undo an earlier
 verified host, and rerunning resumes only absent or stale components. Results
 distinguish applied-and-verified, reload-required, already-current,
 user-skipped, blocked-before-change, failed-with-previous-state-preserved, and
-failed-after-change. A new host session or reload is normally required even
+failed-after-change (including an attempted mutation whose outcome is uncertain).
+A new host session or reload is normally required even
 after structural verification.
 
 Inspection classifies the exact named registration and managed package as

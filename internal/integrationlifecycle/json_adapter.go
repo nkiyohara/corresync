@@ -12,11 +12,12 @@ import (
 )
 
 type Environment struct {
-	HomeDirectory    string
-	ConfigDirectory  string
-	BundleDirectory  string
-	ManagedDirectory string
-	GOOS             string
+	ClaudeConfigOverride bool
+	HomeDirectory        string
+	ConfigDirectory      string
+	BundleDirectory      string
+	ManagedDirectory     string
+	GOOS                 string
 }
 
 type jsonShape string
