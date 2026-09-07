@@ -132,7 +132,7 @@ func (service *CalendarService) executeCancel(
 		Phase: AuditPhaseExecuted, Outcome: outcome, Reason: reason,
 		Caller: caller, Operation: operation.View(),
 	})
-	return errors.Join(callErr, auditErr)
+	return providerWriteErrors(callErr, auditErr)
 }
 
 // Validate requires the exact event version returned by calendar list.

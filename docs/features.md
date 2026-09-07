@@ -83,7 +83,7 @@ the fuller local discovery command. See
 | Read body | `corr mail body` | `mail_get_body` + optional commit | Explicit sensitive read |
 | Retrieve attachment | `corr mail attachment` | `mail_get_attachment` + optional commit | One bounded file |
 | Save draft | `corr mail draft` | `mail_create_draft` + optional commit | Save-only; never sends |
-| Send/reply/forward | `corr mail send` | `mail_send` + `mail_send_commit` | Exact preview and commit |
+| Send new/forward | `corr mail send` | `mail_send` + `mail_send_commit` | Exact preview and commit |
 | Send saved draft | `corr mail send-draft` | `mail_send_draft` + `mail_send_draft_commit` | Exact provider draft ID and version |
 | Move | `corr mail move` | `mail_move` + optional commit | Exact source version where provider supports it |
 | Read/unread state | `corr mail mark` | `mail_set_read_state` + optional commit | Reviewed versioned update |
@@ -92,8 +92,12 @@ the fuller local discovery command. See
 
 Lists exclude body and attachment content. Attachment reads are separately
 bounded. Compose supports text or HTML, new/reply/reply-all/forward modes, and
-bounded file attachments. Every write is attempted once; an unknown outcome is
-reported and never automatically retried.
+bounded file attachments. Reply and reply-all composition uses save-only drafts;
+sending requires the resolved recipient review in `mail send-draft` where the
+account supports exact-version draft sending. Otherwise, review and send the
+saved draft in the provider's own interface. Direct `mail send` accepts new
+messages and forwards with explicit recipients. Every write is attempted once;
+an unknown outcome is reported and never automatically retried.
 
 Provider differences remain visible:
 

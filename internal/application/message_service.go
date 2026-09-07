@@ -200,6 +200,9 @@ func (service *MessagingService) GetMessage(
 	if err := input.Validate(); err != nil {
 		return MessageSensitiveAccess{}, err
 	}
+	if err := service.validateRoute(input.Account, input.WorkspaceID); err != nil {
+		return MessageSensitiveAccess{}, err
+	}
 	if !service.capabilities.SensitiveRead {
 		return MessageSensitiveAccess{}, errors.New("the selected messaging route does not support message body reads")
 	}
@@ -214,6 +217,9 @@ func (service *MessagingService) GetAttachment(
 	caller domain.Caller,
 ) (MessageSensitiveAccess, error) {
 	if err := input.Validate(); err != nil {
+		return MessageSensitiveAccess{}, err
+	}
+	if err := service.validateRoute(input.Account, input.WorkspaceID); err != nil {
 		return MessageSensitiveAccess{}, err
 	}
 	if !service.capabilities.AttachmentReads {

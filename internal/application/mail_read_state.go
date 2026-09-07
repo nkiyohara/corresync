@@ -145,7 +145,7 @@ func (service *MailService) executeReadState(
 		Caller: caller, Operation: operation.View(),
 	})
 	if callErr != nil || auditErr != nil {
-		return MailReadStateResult{}, errors.Join(callErr, auditErr)
+		return MailReadStateResult{}, providerWriteErrors(callErr, auditErr)
 	}
 	if service.provenance.AccountID != "" {
 		updated.Provenance = service.mailProvenance(updated.ID)

@@ -478,7 +478,7 @@ func (service *TaskService) finishWriteAudit(
 		Phase: AuditPhaseExecuted, Outcome: outcome, Reason: reason,
 		Caller: caller, Operation: operation.View(),
 	})
-	return errors.Join(callErr, auditErr)
+	return providerWriteErrors(callErr, auditErr)
 }
 
 func (service *TaskService) validateWrite(account domain.AccountID, action string, input any) error {

@@ -207,7 +207,7 @@ func (service *MailService) executeDraft(
 		Operation: operation.View(),
 	})
 	if callErr != nil || auditErr != nil {
-		return MailDraft{}, errors.Join(callErr, auditErr)
+		return MailDraft{}, providerWriteErrors(callErr, auditErr)
 	}
 	if service.provenance.AccountID != "" {
 		draft.Provenance = service.mailProvenance(draft.ID)

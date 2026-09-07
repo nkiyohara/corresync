@@ -300,8 +300,11 @@ corr agenda list --all-accounts \
 These are read-only fan-outs across isolated account services. Results are
 normalized, deterministically sorted, globally bounded, and tagged with account
 alias and provider provenance. Unsupported accounts and provider failures are
-reported explicitly alongside successful results. No cross-account write
-exists.
+reported explicitly alongside successful results. Mail search and task listing
+read each available source before applying the global page, up to 5,000 matches
+and 2 MiB per account. An account that exceeds either bound contributes a
+failure and no partial prefix. Narrow the mail query or task status filter, or
+read that account separately. No cross-account write exists.
 
 ## Mail drafts and sends
 
@@ -345,10 +348,20 @@ corr mail send-draft \
   --approve
 ```
 
-Compose supports new, reply, reply-all, and forward modes; text or HTML; and
+Save-only draft composition supports new, reply, reply-all, and forward modes;
+text or HTML; and
 bounded repeatable attachments. Review output includes normalized source
 version, recipients, subject, body format/size/digest, and attachment
 size/digest. It does not print the body.
+
+Reply and reply-all must be saved as drafts before sending, so the send preview
+can show the resolved recipients and enforce `policy.max_recipients`. Create
+one with `corr mail draft --mode reply-all` (or `reply`) and the exact
+reference message ID/version, then use the returned draft ID/version with
+`corr mail send-draft`. Review every recipient before approving. If the account
+does not support exact-version saved-draft sending, review and send the saved
+draft in the provider's own interface. Direct new-message and forward sends
+continue to accept explicit recipients.
 
 A draft always uses save-only semantics. Every external send requires exact
 commit. Changing any input after preview invalidates the approval. Existing-
@@ -384,6 +397,13 @@ version precondition is unavailable. Corresync never treats that limitation as
 permission to retry an ambiguous request.
 
 ## Calendar
+
+Start/end values identify absolute RFC3339 instants. Calendar boundaries use
+the selected installed IANA or known Windows timezone, defaulting to UTC.
+All-day start/end must be midnight in that zone, including updates that retain
+an existing all-day setting; explicitly disable all-day for timed events.
+Outlook and Graph reject repeated local clock times that their write formats
+cannot distinguish. Specify UTC to preserve either instant in such an interval.
 
 ```console
 corr calendar folders --account work

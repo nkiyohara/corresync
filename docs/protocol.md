@@ -44,7 +44,8 @@ The closed application surface covers:
 
 - bounded folder discovery, mail list/search, explicit body and attachment
   reads;
-- save-only drafts, reviewed send/reply/forward, move, read state, and reviewed
+- save-only drafts including replies, reviewed new/forward and exact saved-draft
+  sends, move, read state, and reviewed
   permanent deletion;
 - bounded selectable-calendar discovery and calendar list, reviewed
   create/update/cancel, and provider-supported online-meeting creation;

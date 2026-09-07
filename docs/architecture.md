@@ -205,6 +205,15 @@ They fan out to isolated services, normalize results, merge them
 deterministically, apply global pagination/bounds, and preserve per-account
 failures. They never share a provider client or create a broadcast write.
 
+Mail and task projections enumerate each available source before sorting and
+applying the requested global page. Each account is limited to 5,000 matching
+items and 2 MiB of encoded source items. A source that exceeds either bound
+returns an explicit per-account failure and contributes no partial prefix.
+These bounds apply even when the requested page is small. Provider degradations
+remain visible.
+Pagination is deterministic for unchanged source data, without a persistent
+cross-request snapshot.
+
 ## Preview and commit
 
 Consequential writes use one protocol in every adapter:

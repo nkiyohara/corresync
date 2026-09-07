@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -13,6 +14,11 @@ import (
 )
 
 const MaxMailProjectionPageSize = 50
+
+const (
+	maxMailProjectionSourceItems = 5000
+	maxMailProjectionSourceBytes = 2 << 20
+)
 
 // MailProjectionInput selects one stable global page over isolated account
 // searches. Opaque account-specific folder IDs are intentionally unavailable.
@@ -136,12 +142,14 @@ func (service *ProjectionService) searchProjectionAccount(
 			),
 		}
 	}
-	target := input.Offset + input.Limit + 1
-	messages := make([]ProjectedMail, 0, target)
-	seenObjects := make(map[string]struct{}, target)
+	// Provider order can differ from received-time order, including timestamp
+	// ties. A complete bounded source is required before global sorting.
+	messages := make([]ProjectedMail, 0, MaxMailSearchPageSize)
+	seenObjects := make(map[string]struct{})
 	sourceOffset := 0
-	for len(messages) < target {
-		limit := min(MaxMailSearchPageSize, target-len(messages))
+	sourceBytes := 0
+	for {
+		limit := min(MaxMailSearchPageSize, maxMailProjectionSourceItems-len(messages))
 		page, err := service.reader.SearchMail(ctx, MailSearchInput{
 			Account: account.Account, Folder: input.Folder, Query: input.Query,
 			Offset: sourceOffset, Limit: limit, TimeZone: input.TimeZone,
@@ -175,6 +183,14 @@ func (service *ProjectionService) searchProjectionAccount(
 					"the account returned duplicate message identities across pages",
 				)}
 			}
+			encoded, err := json.Marshal(message)
+			if err != nil || sourceBytes+len(encoded) > maxMailProjectionSourceBytes {
+				status.FetchedItems = len(messages)
+				return mailProjectionSource{status: failProjectionStatus(
+					status, "invalid_result", "the account exceeded the bounded mail projection size",
+				)}
+			}
+			sourceBytes += len(encoded)
 			seenObjects[message.Provenance.SourceObjectID] = struct{}{}
 			messages = append(messages, ProjectedMail{
 				AccountAlias: account.Alias,
@@ -194,6 +210,12 @@ func (service *ProjectionService) searchProjectionAccount(
 			// not proof of the remote mailbox's terminal page.
 			status.Exhausted = true
 			break
+		}
+		if len(messages) == maxMailProjectionSourceItems {
+			status.FetchedItems = len(messages)
+			return mailProjectionSource{status: failProjectionStatus(
+				status, "invalid_result", "the account exceeded the bounded mail projection item count",
+			)}
 		}
 		if len(page.Messages) == 0 {
 			status.FetchedItems = len(messages)

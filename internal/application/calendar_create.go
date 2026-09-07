@@ -14,6 +14,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/approval"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/policy"
+	"github.com/nkiyohara/corresync/internal/windowszone"
 )
 
 const (
@@ -248,7 +249,7 @@ func (service *CalendarService) executeCreate(
 		Caller: caller, Operation: operation.View(),
 	})
 	if callErr != nil || auditErr != nil {
-		return CalendarCreateResult{}, errors.Join(callErr, auditErr)
+		return CalendarCreateResult{}, providerWriteErrors(callErr, auditErr)
 	}
 	if service.provenance.AccountID != "" {
 		created.Provenance = service.calendarProvenance(created.ID)
@@ -340,9 +341,15 @@ func (input CalendarCreateInput) Validate(maxAttendees int) error {
 	if len(input.TimeZone) > 128 || strings.TrimSpace(input.TimeZone) != input.TimeZone || strings.ContainsAny(input.TimeZone, "\r\n\x00") {
 		return errors.New("calendar time zone is malformed")
 	}
+	boundaryStart, err := CalendarTimeInZone(start, input.TimeZone)
+	if err != nil {
+		return err
+	}
+	boundaryEnd, err := CalendarTimeInZone(end, input.TimeZone)
+	if err != nil {
+		return err
+	}
 	if input.AllDay {
-		boundaryStart := calendarBoundaryForTimeZone(start, input.TimeZone)
-		boundaryEnd := calendarBoundaryForTimeZone(end, input.TimeZone)
 		if !isCalendarMidnight(boundaryStart) || !isCalendarMidnight(boundaryEnd) {
 			return errors.New("all-day calendar start and end must be midnight boundaries in the reviewed time zone")
 		}
@@ -356,7 +363,7 @@ func (input CalendarCreateInput) Validate(maxAttendees int) error {
 		}
 	}
 	if input.Recurrence != nil {
-		if err := input.Recurrence.Validate(calendarBoundaryForTimeZone(start, input.TimeZone)); err != nil {
+		if err := input.Recurrence.Validate(boundaryStart); err != nil {
 			return err
 		}
 	}
@@ -489,11 +496,23 @@ func effectiveCalendarTimeZone(zone string) string {
 	return zone
 }
 
-func calendarBoundaryForTimeZone(value time.Time, zone string) time.Time {
-	if effectiveCalendarTimeZone(zone) == "UTC" {
-		return value.UTC()
+// CalendarTimeInZone preserves an absolute instant while resolving its calendar
+// boundary in the reviewed IANA or territory-neutral Windows time zone.
+func CalendarTimeInZone(value time.Time, zone string) (time.Time, error) {
+	zone = effectiveCalendarTimeZone(zone)
+	if zone == "Local" {
+		return time.Time{}, errors.New("calendar time zone must be explicit, not machine-local")
 	}
-	return value
+	location, err := time.LoadLocation(zone)
+	if err != nil {
+		if iana, ok := windowszone.IANA(zone); ok {
+			location, err = time.LoadLocation(iana)
+		}
+	}
+	if err != nil {
+		return time.Time{}, errors.New("calendar time zone must be an installed IANA or known Windows identifier")
+	}
+	return value.In(location), nil
 }
 
 func isCalendarMidnight(value time.Time) bool {

@@ -500,7 +500,7 @@ func TestTaskProjectionKeepsAccountsIsolatedAndOrdersDueValues(t *testing.T) {
 		t.Fatalf("task projection = %+v", page)
 	}
 	for _, call := range reader.taskCalls {
-		if call.Account == "" || call.ListID != "" || call.Offset != 0 || call.Limit != 3 {
+		if call.Account == "" || call.ListID != "" || call.Offset != 0 || call.Limit != MaxTaskPageSize {
 			t.Fatalf("unscoped projection call = %+v", call)
 		}
 	}
