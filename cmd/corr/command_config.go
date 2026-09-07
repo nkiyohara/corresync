@@ -520,26 +520,58 @@ func setConfigValue(configuration *config.Config, key, value string) error {
 		case "address":
 			account.Address = value
 		case "origin":
-			ensureOutlookRoutes(&account)
-			account.Mail.OutlookWeb.Origin = value
-			account.Calendar.OutlookWeb.Origin = value
+			if !exists {
+				ensureOutlookRoutes(&account)
+			}
+			routes, err := outlookConfigRoutes(account)
+			if err != nil {
+				return fmt.Errorf("account %q: %w", alias, err)
+			}
+			for _, route := range routes {
+				route.Origin = value
+			}
 		case "mailbox":
 			if !exists {
 				return fmt.Errorf("set accounts.%s.origin before its mailbox", alias)
 			}
-			web, ok := account.OutlookWeb()
-			if !ok {
+			routes, err := outlookConfigRoutes(account)
+			if err != nil {
+				return fmt.Errorf("account %q: %w", alias, err)
+			}
+			if _, ok := account.OutlookWeb(); !ok {
 				return fmt.Errorf("account %q does not use one Outlook Web route", alias)
 			}
-			web.Mailbox = value
-			account.Mail.OutlookWeb.Mailbox = value
-			account.Calendar.OutlookWeb.Mailbox = value
+			for _, route := range routes {
+				route.Mailbox = value
+			}
 		default:
 			return fmt.Errorf("unsupported configuration key %q", key)
 		}
 		configuration.Accounts[alias] = account
 	}
 	return configuration.Validate()
+}
+
+// Legacy origin/mailbox keys may update only configured Outlook services.
+// They never replace another provider or add a missing service to an account.
+func outlookConfigRoutes(account config.Account) ([]*config.OutlookWebRoute, error) {
+	routes := make([]*config.OutlookWebRoute, 0, 2)
+	if account.Mail != nil {
+		if account.Mail.Provider != domain.ProviderMicrosoftOWA || account.Mail.OutlookWeb == nil {
+			return nil, errors.New("origin and mailbox keys require Outlook Web mail/calendar routes")
+		}
+		routes = append(routes, account.Mail.OutlookWeb)
+	}
+	if account.Calendar != nil {
+		if account.Calendar.Provider != domain.ProviderMicrosoftOWA || account.Calendar.OutlookWeb == nil {
+			return nil, errors.New("origin and mailbox keys require Outlook Web mail/calendar routes")
+		}
+		routes = append(routes, account.Calendar.OutlookWeb)
+	}
+	if len(routes) == 0 {
+		return nil, errors.New("origin and mailbox keys require a configured Outlook Web service")
+	}
+	return routes, nil
 }
 
 func ensureOutlookRoutes(account *config.Account) {
