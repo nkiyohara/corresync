@@ -1,8 +1,13 @@
 package main
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -113,8 +118,8 @@ func TestArchiveInventoryAcceptsChangelogAndRejectsExtras(t *testing.T) {
 
 	want := []string{"CHANGELOG.md", "LICENSE", "README.md"}
 	got := append([]string(nil), want...)
-	for range minimumLicenses {
-		got = append(got, licensePrefix+"example.invalid/dependency/LICENSE")
+	for i := range minimumLicenses {
+		got = append(got, fmt.Sprintf("%sexample.invalid/dependency-%d/LICENSE", licensePrefix, i))
 	}
 	if err := requireReleaseFiles("synthetic.zip", got, want); err != nil {
 		t.Fatalf("requireReleaseFiles() error = %v", err)
@@ -172,5 +177,211 @@ func TestMCPBManifestRequiresLocalLaunchersAndNoUserConfig(t *testing.T) {
 	)
 	if err := verifyMCPBManifest([]byte(remote), "1.2.3"); err == nil {
 		t.Fatal("verifyMCPBManifest() accepted a remote launcher")
+	}
+}
+
+func TestReleaseArchivesRejectUnsafeEntries(t *testing.T) {
+	t.Parallel()
+	for _, format := range []string{"tar", "zip"} {
+		for _, invalid := range []struct {
+			name      string
+			mode      os.FileMode
+			duplicate bool
+		}{
+			{name: "third_party_licenses/../../escaped", mode: 0o644},
+			{name: "/absolute", mode: 0o644},
+			{name: `third_party_licenses/..\escaped`, mode: 0o644},
+			{name: "third_party_licenses/C:escaped", mode: 0o644},
+			{name: "third_party_licenses/link", mode: os.ModeSymlink | 0o777},
+			{name: "corr", mode: os.ModeSymlink | 0o777},
+			{name: "corr", mode: os.ModeDir | 0o755},
+			{name: "corr", mode: 0o644},
+			{name: "third_party_licenses/duplicate", mode: 0o644, duplicate: true},
+		} {
+			if format == "zip" && invalid.name == "corr" {
+				if invalid.mode == 0o644 {
+					continue
+				} // Windows does not use Unix executable mode bits.
+				invalid.name += ".exe"
+			}
+			t.Run(format+"/"+invalid.name+"/"+invalid.mode.String(), func(t *testing.T) {
+				path, want := writeReleaseArchiveFixture(t, format, func(entries []releaseTestEntry) []releaseTestEntry {
+					// Change both command entries so hash equality cannot hide a type/mode bug.
+					if invalid.name == "corr" || invalid.name == "corr.exe" {
+						for i := range entries {
+							if strings.HasPrefix(entries[i].name, "corr") {
+								entries[i].mode = invalid.mode
+							}
+						}
+						return entries
+					}
+					entry := releaseTestEntry{name: invalid.name, mode: invalid.mode, content: "synthetic"}
+					entries = append(entries, entry)
+					if invalid.duplicate {
+						entries = append(entries, entry)
+					}
+					return entries
+				})
+				var err error
+				if format == "zip" {
+					err = verifyZip(path, want, "1.2.3")
+				} else {
+					err = verifyTarGzip(path, want, "1.2.3")
+				}
+				if err == nil {
+					t.Fatal("unsafe release archive was accepted")
+				}
+			})
+		}
+	}
+}
+
+func TestReleaseArchivesAcceptRegularExecutablesAndDistinctLicenses(t *testing.T) {
+	t.Parallel()
+	for _, format := range []string{"tar", "zip"} {
+		t.Run(format, func(t *testing.T) {
+			path, want := writeReleaseArchiveFixture(t, format, nil)
+			var err error
+			if format == "zip" {
+				err = verifyZip(path, want, "1.2.3")
+			} else {
+				err = verifyTarGzip(path, want, "1.2.3")
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+type releaseTestEntry struct {
+	typeflag byte
+	name     string
+	mode     os.FileMode
+	content  string
+}
+
+func writeReleaseArchiveFixture(t *testing.T, format string, mutate func([]releaseTestEntry) []releaseTestEntry) (string, []string) {
+	t.Helper()
+	entries := []releaseTestEntry{
+		{name: ".claude-plugin/marketplace.json", mode: 0o644, content: `{"version":"1.2.3","plugins":[{"version":"1.2.3"}]}`},
+		{name: "docs/generated/integration-bundles.md", mode: 0o644, content: "Canonical source snapshot:\n\n`1.2.3`."},
+		{name: "docs/generated/publication-channels.md", mode: 0o644, content: "Canonical source snapshot: `1.2.3`."},
+		{name: "integrations/kiro/corresync/POWER.md", mode: 0o644, content: "Version: 1.2.3"},
+	}
+	for _, name := range []string{"integrations/config-hosts.json", "integrations/gemini-cli/corresync/gemini-extension.json", "plugins/corresync/.claude-plugin/plugin.json", "plugins/corresync/.codex-plugin/plugin.json"} {
+		entries = append(entries, releaseTestEntry{name: name, mode: 0o644, content: `{"version":"1.2.3"}`})
+	}
+	for _, name := range []string{"corr", "corresync"} {
+		if format == "zip" {
+			name += ".exe"
+		}
+		entries = append(entries, releaseTestEntry{name: name, mode: 0o755, content: "synthetic identical executable"})
+	}
+	want := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		want = append(want, entry.name)
+	}
+	for i := range minimumLicenses {
+		entries = append(entries, releaseTestEntry{name: fmt.Sprintf("%sexample.invalid/dep-%d/LICENSE", licensePrefix, i), mode: 0o644, content: "synthetic license"})
+	}
+	if mutate != nil {
+		entries = mutate(entries)
+	}
+	path := filepath.Join(t.TempDir(), "fixture."+format)
+	out, err := os.Create(path) // #nosec G304 -- Synthetic archive path under the test's private temporary directory.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if format == "zip" {
+		writer := zip.NewWriter(out)
+		for _, entry := range entries {
+			header := &zip.FileHeader{Name: entry.name, Method: zip.Deflate}
+			header.SetMode(entry.mode)
+			sink, err := writer.CreateHeader(header)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := sink.Write([]byte(entry.content)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		compressed := gzip.NewWriter(out)
+		writer := tar.NewWriter(compressed)
+		for _, entry := range entries {
+			header := &tar.Header{Name: entry.name, Mode: int64(entry.mode.Perm()), Typeflag: tar.TypeReg, Size: int64(len(entry.content))}
+			if entry.typeflag != 0 {
+				header.Typeflag = entry.typeflag
+				header.Linkname = "/nonexistent"
+				header.Size = 0
+			}
+			if entry.mode&os.ModeSymlink != 0 {
+				header.Typeflag = tar.TypeSymlink
+				header.Linkname = "/nonexistent"
+				header.Size = 0
+			}
+			if entry.mode.IsDir() {
+				header.Typeflag = tar.TypeDir
+				header.Size = 0
+			}
+			if err := writer.WriteHeader(header); err != nil {
+				t.Fatal(err)
+			}
+			if header.Typeflag == tar.TypeReg {
+				if _, err := writer.Write([]byte(entry.content)); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := compressed.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := out.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return path, want
+}
+
+func TestReleaseTarRejectsHardlinkedBinary(t *testing.T) {
+	path, want := writeReleaseArchiveFixture(t, "tar", func(entries []releaseTestEntry) []releaseTestEntry {
+		for i := range entries {
+			if entries[i].name == "corr" || entries[i].name == "corresync" {
+				entries[i].typeflag = tar.TypeLink
+			}
+		}
+		return entries
+	})
+	if err := verifyTarGzip(path, want, "1.2.3"); err == nil {
+		t.Fatal("hard-linked executables were accepted")
+	}
+}
+
+func TestReleaseArchivesRejectEmptyBinary(t *testing.T) {
+	for _, format := range []string{"tar", "zip"} {
+		path, want := writeReleaseArchiveFixture(t, format, func(entries []releaseTestEntry) []releaseTestEntry {
+			for i := range entries {
+				if strings.HasPrefix(entries[i].name, "corr") {
+					entries[i].content = ""
+				}
+			}
+			return entries
+		})
+		var err error
+		if format == "zip" {
+			err = verifyZip(path, want, "1.2.3")
+		} else {
+			err = verifyTarGzip(path, want, "1.2.3")
+		}
+		if err == nil {
+			t.Fatalf("%s accepted empty executables", format)
+		}
 	}
 }

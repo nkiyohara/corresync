@@ -15,7 +15,7 @@ Set-StrictMode -Version 3.0
 $ErrorActionPreference = "Stop"
 
 function Write-CorresyncMessage {
-  param([Parameter(Mandatory = $true)][string]$Message)
+  param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Message)
   Write-Output $Message
 }
 
@@ -68,10 +68,22 @@ function Get-CorresyncHttpClient {
   return $client
 }
 
+function Wait-CorresyncTask {
+  param(
+    [Parameter(Mandatory = $true)][Threading.Tasks.Task]$Task,
+    [Parameter(Mandatory = $true)][Threading.CancellationToken]$CancellationToken
+  )
+
+  # The wait is bounded even if a stream ignores its ReadAsync token.
+  $Task.Wait($CancellationToken)
+  return $Task.GetAwaiter().GetResult()
+}
+
 function Get-CorresyncHttpsResponse {
   param(
     [Parameter(Mandatory = $true)][System.Net.Http.HttpClient]$Client,
-    [Parameter(Mandatory = $true)][Uri]$Uri
+    [Parameter(Mandatory = $true)][Uri]$Uri,
+    [Threading.CancellationToken]$CancellationToken = [Threading.CancellationToken]::None
   )
 
   $current = $Uri
@@ -82,10 +94,12 @@ function Get-CorresyncHttpsResponse {
       $current
     )
     try {
-      $response = $Client.SendAsync(
+      $responseTask = $Client.SendAsync(
         $request,
-        [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead
-      ).GetAwaiter().GetResult()
+        [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead,
+        $CancellationToken
+      )
+      $response = Wait-CorresyncTask -Task $responseTask -CancellationToken $CancellationToken
     } finally {
       $request.Dispose()
     }
@@ -141,15 +155,25 @@ function Save-CorresyncBoundedDownload {
     [Parameter(Mandatory = $true)][System.Net.Http.HttpClient]$Client,
     [Parameter(Mandatory = $true)][Uri]$Uri,
     [Parameter(Mandatory = $true)][string]$Destination,
-    [Parameter(Mandatory = $true)][long]$MaximumBytes
+    [Parameter(Mandatory = $true)][long]$MaximumBytes,
+    [ValidateRange(1, 300)][int]$TimeoutSeconds = 90
   )
 
   if (Test-Path -LiteralPath $Destination) {
     throw "download destination already exists: $Destination"
   }
 
-  $result = Get-CorresyncHttpsResponse -Client $Client -Uri $Uri
+  # HttpClient.Timeout covers only headers with ResponseHeadersRead. Keep one
+  # deadline across redirects, stream acquisition, and every body read.
+  $deadline = New-Object Threading.CancellationTokenSource
+  $deadline.CancelAfter([TimeSpan]::FromSeconds($TimeoutSeconds))
+  $result = $null
+  $inputStream = $null
+  $outputStream = $null
+  $succeeded = $false
   try {
+    $result = Get-CorresyncHttpsResponse `
+      -Client $Client -Uri $Uri -CancellationToken $deadline.Token
     if ([int]$result.Response.StatusCode -ne 200) {
       throw "release download returned HTTP $([int]$result.Response.StatusCode)"
     }
@@ -158,33 +182,46 @@ function Save-CorresyncBoundedDownload {
       throw "release download exceeds the $MaximumBytes-byte limit"
     }
 
-    $inputStream = $result.Response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+    $inputStream = Wait-CorresyncTask `
+      -Task ($result.Response.Content.ReadAsStreamAsync()) `
+      -CancellationToken $deadline.Token
     $outputStream = New-Object System.IO.FileStream(
       $Destination,
       [System.IO.FileMode]::CreateNew,
       [System.IO.FileAccess]::Write,
       [System.IO.FileShare]::None
     )
-    try {
-      $buffer = New-Object byte[] 65536
-      [long]$written = 0
-      while (($read = $inputStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
-        $written += $read
-        if ($written -gt $MaximumBytes) {
-          throw "release download exceeds the $MaximumBytes-byte limit"
-        }
-        $outputStream.Write($buffer, 0, $read)
+    $buffer = New-Object byte[] 65536
+    [long]$written = 0
+    while ($true) {
+      $read = Wait-CorresyncTask `
+        -Task ($inputStream.ReadAsync($buffer, 0, $buffer.Length, $deadline.Token)) `
+        -CancellationToken $deadline.Token
+      if ($read -eq 0) {
+        break
       }
-      $outputStream.Flush($true)
-    } finally {
+      $written += $read
+      if ($written -gt $MaximumBytes) {
+        throw "release download exceeds the $MaximumBytes-byte limit"
+      }
+      $outputStream.Write($buffer, 0, $read)
+    }
+    $outputStream.Flush($true)
+    $succeeded = $true
+  } finally {
+    if ($null -ne $outputStream) {
       $outputStream.Dispose()
+    }
+    if ($null -ne $inputStream) {
       $inputStream.Dispose()
     }
-  } catch {
-    Remove-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue
-    throw
-  } finally {
-    $result.Response.Dispose()
+    if ($null -ne $result) {
+      $result.Response.Dispose()
+    }
+    $deadline.Dispose()
+    if (-not $succeeded) {
+      Remove-Item -LiteralPath $Destination -Force -ErrorAction SilentlyContinue
+    }
   }
 }
 

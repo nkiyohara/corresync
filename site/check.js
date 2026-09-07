@@ -770,7 +770,7 @@
   }
 
   function validateResult(value, copy = englishCopy) {
-    if (!plainObject(value) || value.schemaVersion !== 1 ||
+    if (!plainObject(value) || value.schemaVersion !== 2 ||
       normalizeDomain(value.normalizedDomain) !== value.normalizedDomain ||
       !plainObject(value.classification) || typeof value.classification.conflict !== "boolean" ||
       !Object.hasOwn(familyNames, value.classification.variant) ||
