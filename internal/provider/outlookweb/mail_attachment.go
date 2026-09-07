@@ -85,7 +85,11 @@ func (client *Client) createFileAttachments(
 		if err := validateOpaqueID("attachment parent", message.RootItemID); err != nil {
 			return application.MailDraft{}, attachmentOutcomeUnknown(err)
 		}
-		draft.ID = message.RootItemID
+		if message.RootItemID != draft.ID {
+			return application.MailDraft{}, attachmentOutcomeUnknown(
+				errors.New("OWA CreateAttachment returned a different parent draft"),
+			)
+		}
 	}
 	if message.RootItemChangeKey != "" {
 		if err := validateOpaqueID("attachment parent change key", message.RootItemChangeKey); err != nil {
