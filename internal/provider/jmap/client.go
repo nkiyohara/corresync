@@ -251,6 +251,7 @@ func (client *Client) call(
 		arguments,
 		result,
 		false,
+		nil,
 	)
 }
 
@@ -268,6 +269,26 @@ func (client *Client) callWrite(
 		arguments,
 		result,
 		true,
+		nil,
+	)
+}
+
+// callSubmission accepts the one implicit Email/set response required by RFC
+// 8621 section 7.5 when onSuccessUpdateEmail changes the submitted draft.
+func (client *Client) callSubmission(
+	ctx context.Context,
+	arguments any,
+	result any,
+	implicit *setResponse,
+) error {
+	return client.callWithEffect(
+		ctx,
+		[]string{mailCapability, submissionCapability},
+		"EmailSubmission/set",
+		arguments,
+		result,
+		true,
+		implicit,
 	)
 }
 
@@ -278,6 +299,7 @@ func (client *Client) callWithEffect(
 	arguments any,
 	result any,
 	write bool,
+	implicit *setResponse,
 ) error {
 	document := requestDocument{
 		Using: append([]string{coreCapability}, capabilities...),
@@ -343,7 +365,8 @@ func (client *Client) callWithEffect(
 	if err := decodeBoundedJSON(response.Body, maximumResponseBytes, &decoded); err != nil {
 		return unverifiableJMAPResponse(write, method, err)
 	}
-	if len(decoded.MethodResponses) != 1 {
+	if len(decoded.MethodResponses) != 1 &&
+		(implicit == nil || len(decoded.MethodResponses) != 2) {
 		return unverifiableJMAPResponse(
 			write,
 			method,
@@ -361,14 +384,21 @@ func (client *Client) callWithEffect(
 			errors.New("returned a malformed method response"),
 		)
 	}
+	var responseCallID string
+	if err := json.Unmarshal(envelope[2], &responseCallID); err != nil || responseCallID != "c1" {
+		return unverifiableJMAPResponse(write, method, errors.New("returned an unexpected method call ID"))
+	}
 	var responseMethod string
 	if err := json.Unmarshal(envelope[0], &responseMethod); err != nil {
 		return unverifiableJMAPResponse(write, method, err)
 	}
 	if responseMethod == "error" {
+		if len(decoded.MethodResponses) != 1 {
+			return unverifiableJMAPResponse(write, method, errors.New("returned extra responses after a method error"))
+		}
 		var methodErr methodError
 		if err := json.Unmarshal(envelope[1], &methodErr); err != nil {
-			return fmt.Errorf("JMAP %s failed with a malformed error", method)
+			return unverifiableJMAPResponse(write, method, errors.New("returned a malformed method error"))
 		}
 		return fmt.Errorf("JMAP %s failed: %s", method, sanitizeProviderError(methodErr))
 	}
@@ -381,6 +411,22 @@ func (client *Client) callWithEffect(
 	}
 	if err := json.Unmarshal(envelope[1], result); err != nil {
 		return unverifiableJMAPResponse(write, method, err)
+	}
+	if implicit != nil && len(decoded.MethodResponses) == 2 {
+		var update []json.RawMessage
+		if err := json.Unmarshal(decoded.MethodResponses[1], &update); err != nil || len(update) != 3 {
+			return unverifiableJMAPResponse(write, method, errors.New("returned a malformed implicit Email/set response"))
+		}
+		var updateMethod, updateCallID string
+		if err := json.Unmarshal(update[0], &updateMethod); err != nil || updateMethod != "Email/set" {
+			return unverifiableJMAPResponse(write, method, errors.New("returned an unexpected implicit method"))
+		}
+		if err := json.Unmarshal(update[2], &updateCallID); err != nil || updateCallID != "c1" {
+			return unverifiableJMAPResponse(write, method, errors.New("returned an unexpected implicit method call ID"))
+		}
+		if err := json.Unmarshal(update[1], implicit); err != nil {
+			return unverifiableJMAPResponse(write, method, err)
+		}
 	}
 	return nil
 }

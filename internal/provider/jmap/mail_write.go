@@ -67,11 +67,11 @@ func (client *Client) SendMail(
 		ReferenceChangeKey: input.ReferenceChangeKey,
 		Attachments:        append([]application.MailFileAttachment(nil), input.Attachments...),
 	}
-	identityID, err := client.defaultIdentity(ctx)
+	sender, err := client.defaultIdentity(ctx)
 	if err != nil {
 		return application.MailSendResult{}, err
 	}
-	draft, err := client.createDraft(ctx, draftInput)
+	draft, err := client.createDraftFrom(ctx, draftInput, &sender)
 	if err != nil {
 		return application.MailSendResult{}, err
 	}
@@ -82,15 +82,14 @@ func (client *Client) SendMail(
 		Created    map[string]submission `json:"created"`
 		NotCreated map[string]setError   `json:"notCreated"`
 	}
-	err = client.callWrite(
+	var implicit setResponse
+	err = client.callSubmission(
 		ctx,
-		[]string{mailCapability, submissionCapability},
-		"EmailSubmission/set",
 		map[string]any{
 			"accountId": client.accountID,
 			"create": map[string]any{
 				"send": map[string]any{
-					"identityId": identityID,
+					"identityId": sender.ID,
 					"emailId":    draft.ID,
 				},
 			},
@@ -99,9 +98,16 @@ func (client *Client) SendMail(
 			},
 		},
 		&response,
+		&implicit,
 	)
 	if err != nil {
 		return application.MailSendResult{}, jmapDraftSubmissionError(err)
+	}
+	if response.AccountID != client.accountID ||
+		len(response.Created) != 0 && len(response.NotCreated) != 0 {
+		return application.MailSendResult{}, jmapDraftSubmissionError(
+			errors.New("JMAP submission response has inconsistent account or creation results"),
+		)
 	}
 	if failure, exists := response.NotCreated["send"]; exists {
 		return application.MailSendResult{}, jmapDraftSubmissionError(
@@ -112,13 +118,24 @@ func (client *Client) SendMail(
 		)
 	}
 	created, exists := response.Created["send"]
-	if !exists || created.EmailID != draft.ID {
+	if !exists || created.ID == "" || len(response.Created) != 1 ||
+		created.EmailID != "" && created.EmailID != draft.ID {
 		return application.MailSendResult{}, fmt.Errorf(
 			"%w: JMAP submission response did not confirm the email",
 			application.ErrWriteOutcomeUnknown,
 		)
 	}
-	return application.MailSendResult{ID: draft.ID, ChangeKey: draft.ChangeKey}, nil
+	_, updated := implicit.Updated[draft.ID]
+	if implicit.AccountID != client.accountID || implicit.NewState == "" ||
+		!updated || len(implicit.Updated) != 1 ||
+		len(implicit.Created) != 0 || len(implicit.Destroyed) != 0 ||
+		len(implicit.NotCreated) != 0 || len(implicit.NotUpdated) != 0 ||
+		len(implicit.NotDestroyed) != 0 {
+		return application.MailSendResult{}, jmapDraftSubmissionError(
+			errors.New("JMAP submission did not confirm the exact draft update"),
+		)
+	}
+	return application.MailSendResult{ID: draft.ID, ChangeKey: implicit.NewState}, nil
 }
 
 func jmapDraftSubmissionError(err error) error {
@@ -218,6 +235,14 @@ func (client *Client) createDraft(
 	ctx context.Context,
 	input application.MailDraftInput,
 ) (application.MailDraft, error) {
+	return client.createDraftFrom(ctx, input, nil)
+}
+
+func (client *Client) createDraftFrom(
+	ctx context.Context,
+	input application.MailDraftInput,
+	sender *identity,
+) (application.MailDraft, error) {
 	mailboxes, err := client.getMailboxes(ctx)
 	if err != nil {
 		return application.MailDraft{}, err
@@ -238,6 +263,9 @@ func (client *Client) createDraft(
 		"bcc":        composition.BCC,
 		"subject":    composition.Subject,
 	}
+	if sender != nil {
+		create["from"] = []emailAddress{{Name: sender.Name, Email: sender.Email}}
+	}
 	if len(composition.InReplyTo) != 0 {
 		create["inReplyTo"] = composition.InReplyTo
 	}
@@ -253,7 +281,7 @@ func (client *Client) createDraft(
 	}
 	parts := []any{bodyPart}
 	uploadedParts := 0
-	for index, attachment := range input.Attachments {
+	for _, attachment := range input.Attachments {
 		uploaded, err := client.upload(
 			ctx,
 			attachment.Name,
@@ -275,7 +303,6 @@ func (client *Client) createDraft(
 			contentType = "application/octet-stream"
 		}
 		parts = append(parts, map[string]any{
-			"partId":      fmt.Sprintf("attachment-%d", index+1),
 			"blobId":      uploaded.BlobID,
 			"type":        contentType,
 			"name":        attachment.Name,
@@ -487,7 +514,7 @@ func (client *Client) updateEmail(
 	return response.NewState, nil
 }
 
-func (client *Client) defaultIdentity(ctx context.Context) (string, error) {
+func (client *Client) defaultIdentity(ctx context.Context) (identity, error) {
 	var response getResponse[identity]
 	if err := client.call(
 		ctx,
@@ -499,17 +526,42 @@ func (client *Client) defaultIdentity(ctx context.Context) (string, error) {
 		},
 		&response,
 	); err != nil {
-		return "", err
+		return identity{}, err
+	}
+	if response.AccountID != client.accountID || len(response.NotFound) != 0 {
+		return identity{}, errors.New("JMAP identity response does not match the selected account")
 	}
 	if len(response.List) == 0 {
-		return "", errors.New("JMAP submission has no identity")
+		return identity{}, errors.New("JMAP submission has no identity")
 	}
+	selected := response.List[0]
 	for _, item := range response.List {
 		if strings.EqualFold(item.Email, client.username) {
-			return item.ID, nil
+			selected = item
+			break
 		}
 	}
-	return response.List[0].ID, nil
+	if selected.ID == "" || strings.ContainsAny(selected.Name, "\r\n\x00") {
+		return identity{}, errors.New("JMAP selected identity is malformed")
+	}
+	parsed, err := mail.ParseAddress(selected.Email)
+	if err != nil || parsed.Address != selected.Email ||
+		strings.ContainsAny(selected.Email, "\r\n\x00") {
+		return identity{}, errors.New("JMAP selected identity has a malformed From address")
+	}
+	// A domain-wide identity still needs one concrete sender address. Use the
+	// configured username only if it is a valid address in that same domain.
+	if domainName, wildcard := strings.CutPrefix(selected.Email, "*@"); wildcard {
+		username, parseErr := mail.ParseAddress(client.username)
+		_, usernameDomain, found := strings.Cut(client.username, "@")
+		if parseErr != nil || username.Address != client.username ||
+			!found || !strings.EqualFold(usernameDomain, domainName) ||
+			strings.HasPrefix(client.username, "*@") {
+			return identity{}, errors.New("JMAP wildcard identity has no concrete configured sender address")
+		}
+		selected.Email = client.username
+	}
+	return selected, nil
 }
 
 func addresses(values []string) []emailAddress {
