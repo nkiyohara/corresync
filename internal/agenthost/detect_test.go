@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -237,23 +238,29 @@ func TestDetectorCacheRefreshSelectionAndContextAreExplicit(t *testing.T) {
 
 func TestDetectorReportsTimeoutWithoutCachingPartialResults(t *testing.T) {
 	t.Parallel()
-
-	filesystem := newSyntheticFS()
-	filesystem.setDelay(25 * time.Millisecond)
-	detector := testDetector(t, testCatalog(t, testHost("codex", SupportVerified, []string{"codex"}, nil)), Options{
-		GOOS: "linux", GOARCH: "amd64", HomeDir: "/home/person", ConfigDir: "/home/person/.config",
-		WorkingDirectory: "/work", SearchPath: "/tools", FileSystem: filesystem, Timeout: time.Millisecond,
+	// Advance synthetic filesystem delays and deadlines on a fake clock so
+	// scheduler load cannot turn the successful retry into another timeout.
+	synctest.Test(t, func(t *testing.T) {
+		filesystem := newSyntheticFS()
+		filesystem.setDelay(25 * time.Millisecond)
+		detector := testDetector(t, testCatalog(t, testHost("codex", SupportVerified, []string{"codex"}, nil)), Options{
+			GOOS: "linux", GOARCH: "amd64", HomeDir: "/home/person", ConfigDir: "/home/person/.config",
+			WorkingDirectory: "/work", SearchPath: "/tools", FileSystem: filesystem, Timeout: time.Millisecond,
+		})
+		report, err := detector.Detect(t.Context(), Request{})
+		if !errors.Is(err, ErrDetectionTimeout) || report.Failure == nil || report.Failure.Code != "timeout" {
+			t.Fatalf("Detect() = %+v, %v", report, err)
+		}
+		filesystem.setDelay(0)
+		// Let the timed-out probe finish before leaving the synctest bubble.
+		time.Sleep(25 * time.Millisecond)
+		synctest.Wait()
+		filesystem.addFile("/tools/codex", true)
+		retry, err := detector.Detect(t.Context(), Request{})
+		if err != nil || retry.Cache != CacheFresh || retry.Hosts[0].Status != StatusConfirmed {
+			t.Fatalf("retry = %+v, %v", retry, err)
+		}
 	})
-	report, err := detector.Detect(t.Context(), Request{})
-	if !errors.Is(err, ErrDetectionTimeout) || report.Failure == nil || report.Failure.Code != "timeout" {
-		t.Fatalf("Detect() = %+v, %v", report, err)
-	}
-	filesystem.setDelay(0)
-	filesystem.addFile("/tools/codex", true)
-	retry, err := detector.Detect(t.Context(), Request{})
-	if err != nil || retry.Cache != CacheFresh || retry.Hosts[0].Status != StatusConfirmed {
-		t.Fatalf("retry = %+v, %v", retry, err)
-	}
 }
 
 func TestDetectorBoundsFilesystemWorkAcrossRepeatedTimeouts(t *testing.T) {
