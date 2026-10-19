@@ -45,7 +45,7 @@ jobs:
         run: go test -shuffle=on -coverprofile=coverage.out ./...
 
       - name: Install locked shell quality tools
-        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         with:
           version: 2026.7.7
           experimental: true
@@ -196,7 +196,7 @@ jobs:
             #.git
 
       - name: Install locked structured-file formatter
-        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         with:
           version: 2026.7.7
           experimental: true
@@ -218,7 +218,7 @@ jobs:
           persist-credentials: false
 
       - name: Install locked Gitleaks
-        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         with:
           version: 2026.7.7
           experimental: true
@@ -269,7 +269,7 @@ jobs:
           persist-credentials: false
 
       - name: Install the locked release toolchain
-        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         with:
           version: 2026.7.7
           experimental: true
