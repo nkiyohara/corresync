@@ -192,6 +192,12 @@ export or rollback tool, but it cannot discard fields it does not understand.
 
 ### Daemon IPC and replacement
 
+The 30 MiB Outlook Web attachment read raises the response bound to 48 MiB.
+The 0.8 release line advances its private protocol from 23 to 25. Version 24
+is already used by the 0.9 release candidates. Exact-version
+replacement prevents an older daemon from rejecting a read that the updated
+client accepts.
+
 Daemon IPC is authenticated private local IPC, not a remotely supported API.
 Every envelope carries one exact integer protocol version. Any method,
 request/response shape, bound, or semantic change increments it, including an

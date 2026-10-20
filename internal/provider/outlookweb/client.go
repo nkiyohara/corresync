@@ -23,7 +23,7 @@ import (
 const (
 	defaultTimeout          = 30 * time.Second
 	defaultMaxRequestBytes  = 8 << 20
-	defaultMaxResponseBytes = 16 << 20
+	defaultMaxResponseBytes = 48 << 20
 	defaultReadAttempts     = 3
 	loginTimeoutStatus      = 440
 )

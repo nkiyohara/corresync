@@ -89,7 +89,9 @@ the fuller local discovery command. See
 <!-- markdownlint-enable MD013 -->
 
 Lists exclude body and attachment content. Attachment reads are separately
-bounded. Compose supports text or HTML, new/reply/reply-all/forward modes, and
+bounded: Outlook Web reads that the CLI saves to a file accept up to 30 MiB,
+while MCP reads, which return content inline, and every other provider stay at
+2 MiB. Compose supports text or HTML, new/reply/reply-all/forward modes, and
 bounded file attachments. Every write is attempted once; an unknown outcome is
 reported and never automatically retried.
 

@@ -1,10 +1,14 @@
 package outlookweb
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -93,5 +97,60 @@ func TestGetMailAttachmentReturnsBoundedDecodedContent(t *testing.T) {
 	}
 	if attachment.Name != "fixture.txt" || attachment.ContentBase64 != "Zml4dHVyZQ==" || attachment.Size != 7 {
 		t.Fatalf("unexpected attachment: %+v", attachment)
+	}
+}
+
+func TestGetMailAttachmentReadsAboveTheSendBound(t *testing.T) {
+	t.Parallel()
+
+	// 13 MiB of content encodes to about 17.3 MiB of base64, which exceeds both
+	// the 2 MiB send bound and the previous 16 MiB OWA response bound.
+	content := bytes.Repeat([]byte("a"), 13<<20)
+	encoded := base64.StdEncoding.EncodeToString(content)
+	response := fmt.Sprintf(`{"Body":{"ResponseMessages":{"Items":[{
+		"ResponseClass":"Success","ResponseCode":"NoError","Attachments":[{
+			"__type":"FileAttachment:#Exchange","AttachmentId":{"Id":"attachment-1"},
+			"Name":"fixture.pdf","ContentType":"application/pdf","Size":%d,
+			"IsInline":false,"Content":%q
+		}]
+	}]}}}`, len(content), encoded)
+	if len(response) <= 16<<20 {
+		t.Fatalf("fixture response is %d bytes; it must exceed the previous 16 MiB bound", len(response))
+	}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte(response))
+	}))
+	defer server.Close()
+
+	attachment, err := testClient(t, server, nil).GetMailAttachment(t.Context(), application.MailAttachmentInput{
+		Account: "work", AttachmentID: "attachment-1",
+	})
+	if err != nil {
+		t.Fatalf("GetMailAttachment() error = %v", err)
+	}
+	if attachment.Size != len(content) || attachment.ContentBase64 != encoded {
+		t.Fatalf("unexpected attachment: size=%d content=%d bytes", attachment.Size, len(attachment.ContentBase64))
+	}
+}
+
+func TestGetMailAttachmentRejectsAboveTheReadBound(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = fmt.Fprintf(writer, `{"Body":{"ResponseMessages":{"Items":[{
+			"ResponseClass":"Success","ResponseCode":"NoError","Attachments":[{
+				"__type":"FileAttachment:#Exchange","AttachmentId":{"Id":"attachment-1"},
+				"Name":"fixture.bin","ContentType":"application/octet-stream","Size":%d,
+				"IsInline":false,"Content":"Zml4dHVyZQ=="
+			}]
+		}]}}}`, application.MaxMailAttachmentReadBytes+1)
+	}))
+	defer server.Close()
+
+	_, err := testClient(t, server, nil).GetMailAttachment(t.Context(), application.MailAttachmentInput{
+		Account: "work", AttachmentID: "attachment-1",
+	})
+	if err == nil || !strings.Contains(err.Error(), "mail attachment exceeds") {
+		t.Fatalf("GetMailAttachment() error = %v, want the read bound", err)
 	}
 }

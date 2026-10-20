@@ -679,7 +679,7 @@ func (command *mailAttachmentCommand) Run(app *runtime) (returnErr error) {
 		return writeJSON(app.stdout, access)
 	}
 	content, err := base64.StdEncoding.DecodeString(access.Attachment.ContentBase64)
-	if err != nil || len(content) > application.MaxMailAttachmentBytes {
+	if err != nil || len(content) > application.MaxMailAttachmentReadBytes {
 		return errors.New("mail attachment response contained malformed base64 content")
 	}
 	file, err := os.OpenFile(command.Output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) // #nosec G304 -- explicit CLI output.

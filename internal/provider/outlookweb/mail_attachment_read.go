@@ -67,10 +67,10 @@ func (client *Client) GetMailAttachment(
 	if attachment.AttachmentID.ID != "" && attachment.AttachmentID.ID != input.AttachmentID {
 		return application.MailAttachment{}, errors.New("OWA GetAttachment returned a different attachment")
 	}
-	if len(attachment.Content) > application.MaxMailAttachmentBytes ||
-		attachment.Size > application.MaxMailAttachmentBytes {
+	if len(attachment.Content) > application.MaxMailAttachmentReadBytes ||
+		attachment.Size > application.MaxMailAttachmentReadBytes {
 		return application.MailAttachment{}, fmt.Errorf(
-			"mail attachment exceeds %d bytes", application.MaxMailAttachmentBytes,
+			"mail attachment exceeds %d bytes", application.MaxMailAttachmentReadBytes,
 		)
 	}
 	if attachment.Size != 0 && attachment.Size != len(attachment.Content) {
