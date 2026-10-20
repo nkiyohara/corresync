@@ -81,7 +81,7 @@ func (browser *Browser) WaitForGoogleWeb(
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
 	for _, origin := range expected {
-		if err := chromedp.Run(
+		if err := chromedp.Do(
 			operationContext,
 			chromedp.Navigate(googleWebLandingURL(origin)),
 		); err != nil {
@@ -91,11 +91,11 @@ func (browser *Browser) WaitForGoogleWeb(
 		for {
 			var location, ready string
 			var applicationShell bool
-			if err := chromedp.Run(
+			if err := chromedp.Do(
 				operationContext,
-				chromedp.Location(&location),
-				chromedp.Evaluate(`document.readyState`, &ready),
-				chromedp.Evaluate(
+				storeAction(chromedp.Location(), &location),
+				evaluateInto(`document.readyState`, &ready),
+				evaluateInto(
 					`document.querySelector("[role='main']") !== null`,
 					&applicationShell,
 				),
@@ -158,11 +158,11 @@ func (browser *Browser) GoogleIdentity(
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
 	var address string
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		operationContext,
 		chromedp.Navigate(target),
-		chromedp.WaitReady("[role='main']", chromedp.ByQuery),
-		chromedp.Evaluate(googleIdentityScript, &address),
+		chromedp.WaitReady(chromedp.CSS("[role='main']")),
+		evaluateInto(googleIdentityScript, &address),
 	); err != nil {
 		return "", err
 	}
@@ -189,11 +189,11 @@ func (browser *Browser) GoogleMailRows(
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
 	var snapshot GoogleMailSnapshot
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		operationContext,
 		chromedp.Navigate(target),
-		chromedp.WaitReady("[role='main']", chromedp.ByQuery),
-		chromedp.Evaluate(googleMailRowsScript, &snapshot),
+		chromedp.WaitReady(chromedp.CSS("[role='main']")),
+		evaluateInto(googleMailRowsScript, &snapshot),
 	); err != nil {
 		return GoogleMailSnapshot{}, err
 	}
@@ -238,11 +238,11 @@ func (browser *Browser) GoogleMailBody(
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
 	var body string
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		operationContext,
 		chromedp.Navigate(target),
-		chromedp.WaitReady("[role='main']", chromedp.ByQuery),
-		chromedp.Evaluate(googleMailBodyScript, &body),
+		chromedp.WaitReady(chromedp.CSS("[role='main']")),
+		evaluateInto(googleMailBodyScript, &body),
 	); err != nil {
 		return "", err
 	}
@@ -266,11 +266,11 @@ func (browser *Browser) GoogleCalendarRows(
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
 	var snapshot GoogleCalendarSnapshot
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		operationContext,
 		chromedp.Navigate(target),
-		chromedp.WaitReady("[role='main']", chromedp.ByQuery),
-		chromedp.Evaluate(googleCalendarRowsScript, &snapshot),
+		chromedp.WaitReady(chromedp.CSS("[role='main']")),
+		evaluateInto(googleCalendarRowsScript, &snapshot),
 	); err != nil {
 		return GoogleCalendarSnapshot{}, err
 	}

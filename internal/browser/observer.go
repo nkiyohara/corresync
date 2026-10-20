@@ -40,6 +40,9 @@ func (observer *requestObserver) Handle(event any) {
 }
 
 func (observer *requestObserver) request(event *network.EventRequestWillBeSent) {
+	if event.Request == nil {
+		return
+	}
 	rawURL := event.Request.URL
 	if !observer.sessions.Allows(rawURL) {
 		return
@@ -49,6 +52,9 @@ func (observer *requestObserver) request(event *network.EventRequestWillBeSent) 
 
 	observer.mu.Lock()
 	defer observer.mu.Unlock()
+	if len(observer.eligible) >= maximumPendingExtraHeaders {
+		clear(observer.eligible)
+	}
 	observer.eligible[event.RequestID] = rawURL
 	if extra, exists := observer.early[event.RequestID]; exists {
 		observer.sessions.Observe(rawURL, extra)

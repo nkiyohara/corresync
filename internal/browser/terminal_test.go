@@ -79,10 +79,9 @@ func TestTerminalSnapshotScriptClassifiesAndTogglesCheckboxes(t *testing.T) {
 	</body></html>`
 	dataURL := "data:text/html;base64," + base64.StdEncoding.EncodeToString([]byte(html))
 	var snapshot terminalSnapshot
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		browserContext,
-		chromedp.Navigate(dataURL),
-		chromedp.Evaluate(terminalSnapshotScript, &snapshot),
+		chromedp.Navigate(dataURL), evaluateInto(terminalSnapshotScript, &snapshot),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -97,10 +96,9 @@ func TestTerminalSnapshotScriptClassifiesAndTogglesCheckboxes(t *testing.T) {
 		t.Fatalf("Controls = %+v", view.Controls)
 	}
 
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		browserContext,
-		chromedp.Click(`[data-corresync-terminal-control="control-2"]`, chromedp.ByQuery),
-		chromedp.Evaluate(terminalSnapshotScript, &snapshot),
+		chromedp.Click(chromedp.CSS(`[data-corresync-terminal-control="control-2"]`)), evaluateInto(terminalSnapshotScript, &snapshot),
 	); err != nil {
 		t.Fatal(err)
 	}
