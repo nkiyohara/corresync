@@ -201,9 +201,9 @@ Supported route payloads are:
 | tasks | `google-tasks` | `tasks.google_tasks` and `tasks.google_tasks.oauth`; user-owned Desktop OAuth |
 | tasks | `ticktick` | `tasks.ticktick` and `tasks.ticktick.oauth` |
 | tasks | `microsoft-web-tasks`, `apple-reminders`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
-| messages | `microsoft-teams` | exactly one of `messages.teams_graph` or `messages.teams_web`; v0.9 release-gated |
-| messages | `slack` | `messages.slack`; v0.9 release-gated |
-| messages | `mattermost` | `messages.mattermost`; v0.9 release-gated |
+| messages | `microsoft-teams` | exactly one of `messages.teams_graph` or `messages.teams_web`; deferred; release-gated |
+| messages | `slack` | `messages.slack`; deferred; release-gated |
+| messages | `mattermost` | `messages.mattermost`; deferred; release-gated |
 <!-- markdownlint-enable MD013 -->
 
 The payload must match the provider exactly. A Google mail-and-calendar route

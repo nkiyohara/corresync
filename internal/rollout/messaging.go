@@ -11,7 +11,7 @@ import (
 // provider traffic, or capability probing while the release-owned manifest is
 // incomplete. There is deliberately no environment, flag, config, or MCP
 // override.
-var ErrMessagingPending = errors.New("v0.9 messaging is not release-enabled")
+var ErrMessagingPending = errors.New("messaging is not release-enabled")
 
 // MessagingGateStatus is content-free release evidence for one exact route.
 // Missing contains only fixed gate names, never paths, credentials, or account
@@ -74,7 +74,8 @@ func RequireMessaging(provider domain.MessagingProviderID, route domain.Messagin
 // cohort has satisfied the same immutable source-owned release manifest. MCP
 // and other discoverable surfaces use this aggregate gate so a partial route
 // cannot make unfinished messaging tools visible. There is deliberately no
-// runtime override.
+// runtime override. Slack is deferred outside this cohort; its own route gate
+// remains closed.
 func MessagingCatalogEnabled() bool {
 	routes := []struct {
 		provider domain.MessagingProviderID
@@ -82,7 +83,6 @@ func MessagingCatalogEnabled() bool {
 	}{
 		{domain.MessagingProviderMicrosoftTeams, domain.MessagingRouteTeamsGraph},
 		{domain.MessagingProviderMicrosoftTeams, domain.MessagingRouteTeamsWeb},
-		{domain.MessagingProviderSlack, domain.MessagingRouteSlackAPI},
 		{domain.MessagingProviderMattermost, domain.MessagingRouteMattermost},
 	}
 	for _, candidate := range routes {

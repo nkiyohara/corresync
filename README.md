@@ -236,7 +236,7 @@ missing or repairable steps.
 After choosing a connection route, the wizard presents a service checklist.
 For a Microsoft account, Outlook Mail and Calendar are preselected and can be
 changed independently; Microsoft To Do is an optional, explicit Graph
-authorization. Teams messaging is shown as coming soon while the v0.9 release
+authorization. Teams messaging is shown as coming soon while the messaging release
 gate is closed and cannot be selected, persisted, or opened. Discovery is only
 route evidence: it never proves that any checked service is enabled for the
 account, and it never triggers a Graph fallback.

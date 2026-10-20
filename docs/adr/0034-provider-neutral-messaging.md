@@ -16,12 +16,10 @@ delivery, and write outcomes. Treating those differences as arbitrary
 provider actions would bypass the product's account isolation and
 preview/commit guarantees.
 
-The first release cohort has three independently selected providers:
+The first planned messaging cohort has two independently selected providers:
 
 - Microsoft Teams through delegated Microsoft Graph and through an
-  interactive, browser-owned Teams Web session;
-- Slack through supported Slack app APIs and provider-owned installation
-  authorization; and
+  interactive, browser-owned Teams Web session; and
 - Mattermost through its supported v4 REST API and WebSocket event contract.
 
 Microsoft documents delegated chat and channel message operations as typed
@@ -32,6 +30,22 @@ documents a bearer-authenticated v4 REST API and `/api/v4/websocket` event
 stream. Those are distinct contracts; branding alone proves none of them.
 
 ## Decision
+
+### 2026-10-20 release scope amendment
+
+The 0.9 release line remains in preview pending maintainer testing on macOS
+and a separate final-release decision. All messaging routes remain unreachable
+until their existing evidence requirements pass. A stable product tag never
+opens a provider gate. Planned Teams live observations are not evidence until
+recorded against the tested revision.
+
+Slack is removed from the planned messaging cohort and from v0.9 completion
+criteria. Users should use the existing Slack-provided connectors in their
+agent host. The synthetic Slack adapter remains dormant for a future explicit
+scope decision; its inclusion is not a support claim. Teams Graph/Web parity
+and Mattermost evidence remain required for the future messaging cohort.
+
+### Shared contracts
 
 Add a provider-neutral messaging domain. CLI, MCP, and the daemon call the same
 closed application use cases for conversations, messages, threads,
@@ -130,8 +144,7 @@ until one release manifest proves all of the following:
    throttling, permission-loss, and ambiguous-write tests;
 3. the Graph/Teams Web parity intersection and separate content-free live
    observations;
-4. provider-specific live evidence for every advertised Slack and Mattermost
-   route; and
+4. provider-specific live evidence for every advertised Mattermost route; and
 5. a clean final security review with no unresolved critical, high, or medium
    finding.
 
