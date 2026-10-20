@@ -18,9 +18,9 @@ import (
 )
 
 const (
-	ProtocolVersion   = 24
+	ProtocolVersion   = 26
 	maxRequestBytes   = 8 << 20
-	maxResponseBytes  = 16 << 20
+	maxResponseBytes  = 48 << 20
 	contentType       = "application/json"
 	requestPath       = "/v1/call"
 	requestHost       = "corresync.local"

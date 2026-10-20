@@ -12,6 +12,11 @@ import (
 
 const MaxMailAttachmentMetadata = 100
 
+// MaxMailAttachmentReadBytes bounds one attachment read that the CLI writes to
+// a local file. The MCP surface returns content inline and stays bounded by
+// MaxMailAttachmentBytes.
+const MaxMailAttachmentReadBytes = 30 << 20
+
 // MailAttachmentMetadata is bounded attachment metadata returned with an
 // explicitly requested message body.
 type MailAttachmentMetadata struct {

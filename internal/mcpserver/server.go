@@ -1122,7 +1122,13 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 		access, err := backend.GetMailAttachment(ctx, application.MailAttachmentInput{
 			Account: account, AttachmentID: input.AttachmentID,
 		}, caller)
-		return nil, access, err
+		if err != nil {
+			return nil, access, err
+		}
+		if err := boundInlineAttachment(access); err != nil {
+			return nil, application.MailAttachmentAccess{}, err
+		}
+		return nil, access, nil
 	})
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mail_get_attachment_commit",
@@ -1140,7 +1146,13 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input ApprovalInput) (*mcp.CallToolResult, application.MailAttachmentAccess, error) {
 		access, err := backend.CommitMailAttachment(ctx, input.Token, caller)
-		return nil, access, err
+		if err != nil {
+			return nil, access, err
+		}
+		if err := boundInlineAttachment(access); err != nil {
+			return nil, application.MailAttachmentAccess{}, err
+		}
+		return nil, access, nil
 	})
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mail_create_draft",
@@ -1600,6 +1612,22 @@ func applicationCalendarRecurrence(input *CalendarRecurrenceInput) *application.
 		Month: input.Month, EndDate: input.EndDate,
 		NumberOfOccurrences: input.NumberOfOccurrences,
 	}
+}
+
+// boundInlineAttachment keeps MCP attachment content at the inline bound. The
+// CLI saves larger reads to a file and never returns them to a model context.
+func boundInlineAttachment(access application.MailAttachmentAccess) error {
+	if access.Attachment == nil {
+		return nil
+	}
+	if access.Attachment.Size > application.MaxMailAttachmentBytes ||
+		len(access.Attachment.ContentBase64) > base64.StdEncoding.EncodedLen(application.MaxMailAttachmentBytes) {
+		return fmt.Errorf(
+			"mail attachment exceeds the %d-byte MCP bound; save it with corr mail attachment --output",
+			application.MaxMailAttachmentBytes,
+		)
+	}
+	return nil
 }
 
 func decodeMailAttachments(inputs []MailFileAttachmentInput) ([]application.MailFileAttachment, error) {

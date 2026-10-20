@@ -1558,6 +1558,46 @@ func TestMailAttachmentToolsUseBoundedSensitiveRead(t *testing.T) {
 	}
 }
 
+func TestMailAttachmentToolsRejectContentAboveTheInlineBound(t *testing.T) {
+	t.Parallel()
+
+	content := strings.Repeat("a", application.MaxMailAttachmentBytes+1)
+	encoded := base64.StdEncoding.EncodeToString([]byte(content))
+	attachment := application.MailAttachment{
+		MailAttachmentMetadata: application.MailAttachmentMetadata{
+			ID: "attachment-1", Name: "fixture.pdf", Size: len(content),
+		},
+		ContentBase64: encoded,
+	}
+	backend := &fakeBackend{attachmentAccess: application.MailAttachmentAccess{
+		Status: "completed", Attachment: &attachment,
+	}}
+	server, err := New(backend, Options{Version: "dev", Instance: "test-server"})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	clientSession := connectTestClient(t, server)
+	for _, call := range []*mcp.CallToolParams{
+		{Name: "mail_get_attachment", Arguments: map[string]any{"attachmentId": "attachment-1"}},
+		{Name: "mail_get_attachment_commit", Arguments: map[string]any{"token": "opv1_synthetic"}}, // gitleaks:allow -- synthetic fixture
+	} {
+		result, err := clientSession.CallTool(t.Context(), call)
+		if err != nil {
+			t.Fatalf("%s error = %v", call.Name, err)
+		}
+		if !result.IsError || result.StructuredContent != nil {
+			t.Fatalf("%s returned content above the inline bound: %+v", call.Name, result)
+		}
+		raw, err := json.Marshal(result)
+		if err != nil {
+			t.Fatalf("marshal %s result: %v", call.Name, err)
+		}
+		if strings.Contains(string(raw), encoded[:64]) || !strings.Contains(string(raw), "corr mail attachment --output") {
+			t.Fatalf("%s result leaked content or omitted the CLI route: %s", call.Name, raw[:min(len(raw), 512)])
+		}
+	}
+}
+
 func TestMailDraftToolsAreSaveOnlyWrites(t *testing.T) {
 	t.Parallel()
 
