@@ -164,7 +164,7 @@ func TestTeamsScriptsDistinguishUnknownCountsFromObservedZero(t *testing.T) {
 	}
 }
 
-func evaluateTeamsFixture(t *testing.T, ctx context.Context, html, expression string, output any) {
+func evaluateTeamsFixture[T any](t *testing.T, ctx context.Context, html, expression string, output *T) {
 	t.Helper()
 	// A synthetic loopback origin keeps URL parsing realistic without any
 	// navigation or request to Teams. Fixture links are never activated.
@@ -173,7 +173,7 @@ func evaluateTeamsFixture(t *testing.T, ctx context.Context, html, expression st
 		_, _ = io.WriteString(writer, html)
 	}))
 	defer server.Close()
-	if err := chromedp.Run(ctx, chromedp.Navigate(server.URL), chromedp.Evaluate(expression, output, teamsAwaitPromise)); err != nil {
+	if err := chromedp.Do(ctx, chromedp.Navigate(server.URL), evaluateInto(expression, output, teamsAwaitPromise)); err != nil {
 		t.Fatal(err)
 	}
 }

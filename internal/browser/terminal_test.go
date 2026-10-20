@@ -82,10 +82,9 @@ func TestTerminalSnapshotScriptClassifiesAndTogglesCheckboxes(t *testing.T) {
 	</body></html>`
 	dataURL := "data:text/html;base64," + base64.StdEncoding.EncodeToString([]byte(html))
 	var snapshot terminalSnapshot
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		browserContext,
-		chromedp.Navigate(dataURL),
-		chromedp.Evaluate(terminalSnapshotScript, &snapshot),
+		chromedp.Navigate(dataURL), evaluateInto(terminalSnapshotScript, &snapshot),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -103,10 +102,9 @@ func TestTerminalSnapshotScriptClassifiesAndTogglesCheckboxes(t *testing.T) {
 		t.Fatalf("Controls = %+v", view.Controls)
 	}
 
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		browserContext,
-		chromedp.Click(`[data-corresync-terminal-control="control-2"]`, chromedp.ByQuery),
-		chromedp.Evaluate(terminalSnapshotScript, &snapshot),
+		chromedp.Click(chromedp.CSS(`[data-corresync-terminal-control="control-2"]`)), evaluateInto(terminalSnapshotScript, &snapshot),
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +147,7 @@ func TestValidateTerminalAction(t *testing.T) {
 func TestTerminalPasswordKeysAndMissingControls(t *testing.T) {
 	ctx := browserFixtureContext(t, true)
 	html := `<input id="password" type="password" aria-label="Password"><input type="submit" value="Sign in">`
-	if err := chromedp.Run(ctx, chromedp.Navigate("data:text/html;base64,"+base64.StdEncoding.EncodeToString([]byte(html)))); err != nil {
+	if err := chromedp.Do(ctx, chromedp.Navigate("data:text/html;base64,"+base64.StdEncoding.EncodeToString([]byte(html)))); err != nil {
 		t.Fatal(err)
 	}
 	instance := &Browser{context: ctx}
@@ -167,7 +165,7 @@ func TestTerminalPasswordKeysAndMissingControls(t *testing.T) {
 	}
 	// Synthetic-only browser assertion; never read a live credential value.
 	var matches bool
-	if err := chromedp.Run(ctx, chromedp.Evaluate(`document.getElementById("password").value === "A!Z"`, &matches)); err != nil || !matches {
+	if err := chromedp.Do(ctx, evaluateInto(`document.getElementById("password").value === "A!Z"`, &matches)); err != nil || !matches {
 		t.Fatalf("password input failed: %v", err)
 	}
 	view, err = instance.TerminalSnapshot(t.Context())
@@ -177,7 +175,7 @@ func TestTerminalPasswordKeysAndMissingControls(t *testing.T) {
 	if strings.Contains(view.Text+view.Controls[0].Name, "A!Z") {
 		t.Fatal("password leaked into view")
 	}
-	if err := chromedp.Run(ctx, chromedp.Evaluate(`document.getElementById("password").remove()`, nil)); err != nil {
+	if err := chromedp.Do(ctx, chromedp.Evaluate[chromedp.Void](`document.getElementById("password").remove()`)); err != nil {
 		t.Fatal(err)
 	}
 	actionContext, stop := context.WithTimeout(t.Context(), time.Second)

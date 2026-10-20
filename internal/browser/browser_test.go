@@ -32,6 +32,9 @@ func browserFixtureContext(t *testing.T, headless bool) context.Context {
 		cancelAllocator()
 		cancelOwner()
 	})
+	if err := chromedp.Do(ctx); err != nil {
+		t.Fatalf("start synthetic browser fixture: %v", err)
+	}
 	return ctx
 }
 

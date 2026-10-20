@@ -5,7 +5,6 @@ import (
 	"time"
 
 	cdpbrowser "github.com/chromedp/cdproto/browser"
-	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/chromedp"
 )
 
@@ -16,18 +15,24 @@ func (browser *Browser) Minimize(ctx context.Context) error {
 	defer cancel()
 	operationContext, timeout := context.WithTimeout(operationContext, 2*time.Second)
 	defer timeout()
-	return chromedp.Run(operationContext, chromedp.ActionFunc(func(ctx context.Context) error {
+	return chromedp.Do(operationContext, chromedp.Func(func(ctx context.Context, _ *chromedp.Target) error {
 		state := chromedp.FromContext(ctx)
-		executor := cdp.WithExecutor(ctx, state.Browser)
-		window, bounds, err := cdpbrowser.GetWindowForTarget().WithTargetID(state.Target.TargetID).Do(executor)
+		window, err := chromedp.CallBrowser(ctx, cdpbrowser.GetWindowForTarget, cdpbrowser.GetWindowForTargetParams{TargetID: state.Target.TargetID})
 		if err != nil {
 			return err
 		}
-		if bounds.WindowState == cdpbrowser.WindowStateFullscreen || bounds.WindowState == cdpbrowser.WindowStateMaximized {
-			if err := cdpbrowser.SetWindowBounds(window, &cdpbrowser.Bounds{WindowState: cdpbrowser.WindowStateNormal}).Do(executor); err != nil {
+		if window.Bounds.WindowState == cdpbrowser.WindowStateFullscreen || window.Bounds.WindowState == cdpbrowser.WindowStateMaximized {
+			if err := setWindowState(ctx, window.WindowID, cdpbrowser.WindowStateNormal); err != nil {
 				return err
 			}
 		}
-		return cdpbrowser.SetWindowBounds(window, &cdpbrowser.Bounds{WindowState: cdpbrowser.WindowStateMinimized}).Do(executor)
+		return setWindowState(ctx, window.WindowID, cdpbrowser.WindowStateMinimized)
 	}))
+}
+
+func setWindowState(ctx context.Context, window cdpbrowser.WindowID, state cdpbrowser.WindowState) error {
+	_, err := chromedp.CallBrowser(ctx, cdpbrowser.SetWindowBounds, cdpbrowser.SetWindowBoundsParams{
+		WindowID: window, Bounds: &cdpbrowser.Bounds{WindowState: state},
+	})
+	return err
 }

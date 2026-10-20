@@ -15,6 +15,7 @@ import (
 
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/chromedp"
+	"github.com/chromedp/chromedp/remote"
 
 	"github.com/nkiyohara/corresync/internal/session"
 )
@@ -82,6 +83,10 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 		}
 	}
 	execOptions := allocatorOptions(executable, options.ProfileDir, options.Headless)
+	observation := &networkObservation{}
+	if manager != nil {
+		execOptions = append(execOptions, chromedp.WithDialer(observation.dial))
+	}
 	allocatorContext, cancelAllocator := chromedp.NewExecAllocator(parent, execOptions...)
 	browserContext, cancelContext := chromedp.NewContext(allocatorContext)
 	instance := &Browser{
@@ -93,9 +98,13 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 		allowedOrigins:  allowedBrowserOrigins(options),
 	}
 	if manager != nil {
-		observer := newRequestObserver(manager, instance.reportSessionError)
-		chromedp.ListenTarget(browserContext, observer.Handle)
-		if err := chromedp.Run(browserContext, network.Enable()); err != nil {
+		observation.observer = newRequestObserver(manager, instance.reportSessionError)
+		if err := chromedp.Do(browserContext); err != nil {
+			_ = instance.Close()
+			return nil, fmt.Errorf("start browser network observer: %w", err)
+		}
+		observation.bind(chromedp.FromContext(browserContext).Target.SessionID)
+		if _, err := chromedp.Call(browserContext, network.Enable, network.EnableParams{}); err != nil {
 			_ = instance.Close()
 			return nil, fmt.Errorf("start browser network observer: %w", err)
 		}
@@ -104,7 +113,7 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 	if loginURL == "" {
 		loginURL = strings.TrimSuffix(options.Origin, "/") + "/mail/"
 	}
-	if err := chromedp.Run(browserContext, chromedp.Navigate(loginURL)); err != nil {
+	if err := chromedp.Do(browserContext, chromedp.Navigate(loginURL)); err != nil {
 		_ = instance.Close()
 		return nil, fmt.Errorf("navigate to Outlook Web: %w", err)
 	}
@@ -118,6 +127,9 @@ func allocatorOptions(executable, profileDirectory string, headless bool) []chro
 	)
 	return append(
 		options,
+		// Preserve the existing loopback transport across the API migration.
+		remote.WebSocket,
+		chromedp.Flag("remote-debugging-address", "127.0.0.1"),
 		chromedp.ExecPath(executable),
 		// chromedp otherwise adds --no-sandbox implicitly for root processes.
 		chromedp.Flag("no-sandbox", false),

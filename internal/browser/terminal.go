@@ -85,7 +85,8 @@ func (browser *Browser) TerminalSnapshot(ctx context.Context) (TerminalView, err
 	defer cancel()
 
 	var snapshot terminalSnapshot
-	if err := chromedp.Run(operationContext, chromedp.Evaluate(terminalSnapshotScript, &snapshot)); err != nil {
+	if err := chromedp.Do(operationContext,
+		evaluateInto(terminalSnapshotScript, &snapshot)); err != nil {
 		return TerminalView{}, fmt.Errorf("read terminal login page: %w", err)
 	}
 	return normalizeTerminalSnapshot(snapshot), nil
@@ -103,12 +104,12 @@ func (browser *Browser) TerminalAct(ctx context.Context, action TerminalAction) 
 	defer cancel()
 
 	selector := `[data-corresync-terminal-control="` + action.ElementID + `"]`
-	var run chromedp.Action
+	var run chromedp.Action[chromedp.Void]
 	switch action.Kind {
 	case TerminalActivate:
-		run = chromedp.Click(selector, chromedp.ByQuery, chromedp.AtLeast(0))
+		run = chromedp.Click(chromedp.CSS(selector), chromedp.AtLeast(0))
 	case TerminalFocus:
-		run = chromedp.Focus(selector, chromedp.ByQuery, chromedp.AtLeast(0))
+		run = chromedp.Focus(chromedp.CSS(selector), chromedp.AtLeast(0))
 	case TerminalKey:
 		key := action.Key
 		switch key {
@@ -119,14 +120,14 @@ func (browser *Browser) TerminalAct(ctx context.Context, action TerminalAction) 
 		case "Tab":
 			key = kb.Tab
 		}
-		run = chromedp.Tasks{
-			chromedp.Focus(selector, chromedp.ByQuery, chromedp.AtLeast(0)),
+		run = chromedp.Steps(
+			chromedp.Focus(chromedp.CSS(selector), chromedp.AtLeast(0)),
 			chromedp.KeyEvent(key),
-		}
+		)
 	default:
 		return errors.New("unsupported terminal browser action")
 	}
-	if err := chromedp.Run(operationContext, run); err != nil {
+	if err := chromedp.Do(operationContext, run); err != nil {
 		return fmt.Errorf("apply terminal login action: %w", err)
 	}
 	return nil

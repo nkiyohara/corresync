@@ -50,9 +50,9 @@ func (browser *Browser) TeamsSendMessage(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(
+		return chromedp.Do(
 			operationContext,
-			chromedp.Evaluate(expression, &signal, teamsAwaitPromise),
+			evaluateInto(expression, &signal, teamsAwaitPromise),
 		)
 	})
 	if err != nil {
@@ -98,9 +98,9 @@ func (browser *Browser) TeamsEditMessage(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(
+		return chromedp.Do(
 			operationContext,
-			chromedp.Evaluate(expression, &signal, teamsAwaitPromise),
+			evaluateInto(expression, &signal, teamsAwaitPromise),
 		)
 	})
 	if err != nil {
@@ -144,9 +144,9 @@ func (browser *Browser) TeamsDeleteMessage(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(
+		return chromedp.Do(
 			operationContext,
-			chromedp.Evaluate(expression, &signal, teamsAwaitPromise),
+			evaluateInto(expression, &signal, teamsAwaitPromise),
 		)
 	})
 	if err != nil {
@@ -190,9 +190,9 @@ func (browser *Browser) TeamsSetReaction(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(
+		return chromedp.Do(
 			operationContext,
-			chromedp.Evaluate(expression, &signal, teamsAwaitPromise),
+			evaluateInto(expression, &signal, teamsAwaitPromise),
 		)
 	})
 	if err != nil {
@@ -250,9 +250,9 @@ func (browser *Browser) TeamsCreateConversation(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(
+		return chromedp.Do(
 			operationContext,
-			chromedp.Evaluate(expression, &signal, teamsAwaitPromise),
+			evaluateInto(expression, &signal, teamsAwaitPromise),
 		)
 	})
 	if err != nil {
@@ -308,9 +308,9 @@ func (browser *Browser) TeamsChangeMembership(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(
+		return chromedp.Do(
 			operationContext,
-			chromedp.Evaluate(expression, &signal, teamsAwaitPromise),
+			evaluateInto(expression, &signal, teamsAwaitPromise),
 		)
 	})
 	if err != nil {

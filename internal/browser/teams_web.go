@@ -63,7 +63,7 @@ func (browser *Browser) ObserveTeams(
 	defer browser.interactionMu.Unlock()
 	operationContext, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
-	if err := chromedp.Run(operationContext, chromedp.Navigate(teamsWebOrigin+"/v2/")); err != nil {
+	if err := chromedp.Do(operationContext, chromedp.Navigate(teamsWebOrigin+"/v2/")); err != nil {
 		return teamscontract.Observation{}, err
 	}
 
@@ -71,15 +71,16 @@ func (browser *Browser) ObserveTeams(
 	defer ticker.Stop()
 	for {
 		var location string
-		if err := chromedp.Run(operationContext, chromedp.Location(&location)); err != nil {
+		if err := chromedp.Do(operationContext,
+			storeAction(chromedp.Location(), &location)); err != nil {
 			return teamscontract.Observation{}, err
 		}
 		target, _ := url.Parse(location)
 		if browserRequestOrigin(target) == teamsWebOrigin && teamsApplicationPath(target.Path) {
 			var snapshot teamsObservationSnapshot
-			if err := chromedp.Run(
+			if err := chromedp.Do(
 				operationContext,
-				chromedp.Evaluate(teamsObservationScript, &snapshot),
+				evaluateInto(teamsObservationScript, &snapshot),
 			); err != nil {
 				return teamscontract.Observation{}, err
 			}
@@ -139,7 +140,7 @@ func (browser *Browser) navigateTeamsApplication(ctx context.Context, target str
 		return errors.New("the Teams Web navigation target is malformed")
 	}
 	var location string
-	if err := chromedp.Run(ctx, chromedp.Navigate(target), chromedp.Location(&location)); err != nil {
+	if err := chromedp.Do(ctx, chromedp.Navigate(target), storeAction(chromedp.Location(), &location)); err != nil {
 		return err
 	}
 	finalTarget, _ := url.Parse(location)
@@ -171,11 +172,11 @@ func (browser *Browser) currentTeamsObservation(
 ) (teamscontract.Observation, error) {
 	var before, after string
 	var snapshot teamsObservationSnapshot
-	if err := chromedp.Run(
+	if err := chromedp.Do(
 		ctx,
-		chromedp.Location(&before),
-		chromedp.Evaluate(teamsObservationScript, &snapshot),
-		chromedp.Location(&after),
+		storeAction(chromedp.Location(), &before),
+		evaluateInto(teamsObservationScript, &snapshot),
+		storeAction(chromedp.Location(), &after),
 	); err != nil {
 		return teamscontract.Observation{}, err
 	}
@@ -325,9 +326,9 @@ func (browser *Browser) TeamsListConversations(
 				return err
 			}
 			var snapshot teamsConversationSnapshot
-			if err := chromedp.Run(
+			if err := chromedp.Do(
 				operationContext,
-				chromedp.Evaluate(expression, &snapshot, teamsAwaitPromise),
+				evaluateInto(expression, &snapshot, teamsAwaitPromise),
 			); err != nil {
 				return err
 			}
@@ -392,9 +393,9 @@ func (browser *Browser) TeamsGetConversation(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(
+		return chromedp.Do(
 			operationContext,
-			chromedp.Evaluate(expression, &snapshot, teamsAwaitPromise),
+			evaluateInto(expression, &snapshot, teamsAwaitPromise),
 		)
 	})
 	if err != nil {
@@ -468,7 +469,8 @@ func (browser *Browser) TeamsListMessages(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(operationContext, chromedp.Evaluate(expression, &snapshot))
+		return chromedp.Do(operationContext,
+			evaluateInto(expression, &snapshot))
 	})
 	if err != nil {
 		return application.MessagePage{}, err
@@ -529,7 +531,8 @@ func (browser *Browser) TeamsGetMessage(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(operationContext, chromedp.Evaluate(expression, &snapshot))
+		return chromedp.Do(operationContext,
+			evaluateInto(expression, &snapshot))
 	})
 	if err != nil {
 		return application.Message{}, err
@@ -570,9 +573,9 @@ func (browser *Browser) TeamsSearchMessages(
 		if err != nil {
 			return err
 		}
-		return chromedp.Run(
+		return chromedp.Do(
 			operationContext,
-			chromedp.Evaluate(expression, &snapshot, teamsAwaitPromise),
+			evaluateInto(expression, &snapshot, teamsAwaitPromise),
 		)
 	})
 	if err != nil {
@@ -943,6 +946,7 @@ func marshalScriptArgument(value any) (string, error) {
 	return string(encoded), nil
 }
 
-func teamsAwaitPromise(parameters *runtime.EvaluateParams) *runtime.EvaluateParams {
-	return parameters.WithAwaitPromise(true).WithUserGesture(true)
+func teamsAwaitPromise(parameters *runtime.EvaluateParams) {
+	parameters.AwaitPromise = new(true)
+	parameters.UserGesture = new(true)
 }

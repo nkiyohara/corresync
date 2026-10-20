@@ -50,7 +50,7 @@ func Probe(ctx context.Context, configured string) (string, error) {
 	browserContext, cancelBrowser := chromedp.NewContext(allocatorContext)
 	defer cancelBrowser()
 	var ready bool
-	if err := chromedp.Run(browserContext, chromedp.Evaluate("true", &ready)); err != nil {
+	if err := chromedp.Do(browserContext, evaluateInto("true", &ready)); err != nil {
 		return "", classifyProbeError(ctx, err, runtime.GOOS)
 	}
 	if !ready {
