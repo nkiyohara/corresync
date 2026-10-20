@@ -5,6 +5,32 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+## 0.8.8 - 2026-10-20
+
+### Outlook Web attachment reads
+
+- Allow `corr mail attachment --output` to save one Outlook Web attachment of
+  up to 30 MiB. The previous 2 MiB bound, shared with sends, rejected ordinary
+  decks and PDFs.
+- Raise the Outlook Web response bound and the daemon IPC response bound to
+  48 MiB so a 30 MiB attachment fits after base64 encoding.
+- Keep sends, drafts and the MCP `mail_get_attachment` tools at 2 MiB, since
+  MCP returns attachment content inline to the calling model. A larger MCP read
+  fails with an error that names the CLI route and returns no content.
+- Other providers keep the 2 MiB read bound.
+- Advance the private daemon protocol so older session owners are replaced
+  before serving the larger attachment reads.
+
+### Dependencies
+
+- Refresh compatible Go dependencies and the pinned mise GitHub Action.
+- Upgrade chromedp to 0.21.0 and cdproto to 0.158.0 with typed browser actions
+  and selectors. Preserve sandboxed browser-owned sessions and the existing
+  loopback transport.
+- Keep Outlook network observations synchronous and bound to the owned tab,
+  without unbounded event subscription queues. Bound event parsing and pending
+  request state; other provider sessions never install the observer.
+
 ## 0.8.7 - 2026-10-16
 
 ### Outlook saved drafts and security
