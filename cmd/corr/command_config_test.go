@@ -64,6 +64,7 @@ func TestConfigGetAndSetAutomaticInstall(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.toml")
 	configuration := config.OutlookDefault()
 	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Updates.AutoInstall = false
 	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +90,9 @@ func TestConfigGetAndSetFriendlyAutomaticChecks(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := config.Save(path, config.OutlookDefault()); err != nil {
+	configuration := config.OutlookDefault()
+	configuration.Updates.AutoInstall = false
+	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)
 	}
 	app := newRuntime(

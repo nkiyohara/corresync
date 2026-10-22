@@ -12,6 +12,7 @@ func TestStoreProjectsAndAtomicallyUpdatesSettings(t *testing.T) {
 	path := t.TempDir() + "/config.toml"
 	configuration := config.OutlookDefault()
 	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Updates.AutoInstall = false
 	configuration.Feedback.AutoSubmit = true
 	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)

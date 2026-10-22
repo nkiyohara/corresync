@@ -173,7 +173,7 @@ func Default() Config {
 			MaxAttendees:  50,
 		},
 		Browser: Browser{LoginTimeout: Duration(5 * time.Minute)},
-		Updates: Updates{Channel: UpdateChannelStable},
+		Updates: Updates{AutoInstall: true, Channel: UpdateChannelStable},
 	}
 }
 

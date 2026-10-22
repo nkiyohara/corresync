@@ -7,6 +7,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/credential"
+	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/googleoauthclient"
 )
@@ -236,11 +237,15 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 }
 
 type authLogoutCommand struct {
-	Account string `help:"Close only this configured account alias or ID."`
-	JSON    bool   `help:"Write machine-readable JSON."`
+	ClearBrowser bool   `help:"Also remove this account’s dedicated browser sign-in storage; requires --account. OS or provider SSO may still sign you in."`
+	Account      string `help:"Close only this configured account alias or ID."`
+	JSON         bool   `help:"Write machine-readable JSON."`
 }
 
 func (command *authLogoutCommand) Run(app *runtime) (returnErr error) {
+	if command.ClearBrowser && command.Account == "" {
+		return errors.New("--clear-browser requires one explicit --account")
+	}
 	if command.Account != "" {
 		configuration, _, err := app.loadConfig()
 		if err != nil {
@@ -255,29 +260,34 @@ func (command *authLogoutCommand) Run(app *runtime) (returnErr error) {
 			return err
 		}
 		defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
-		if _, err := client.Logout(app.context, account.ID, app.caller()); err != nil {
+		if _, err := client.LogoutWithOptions(app.context, daemonapi.LogoutInput{Account: account.ID, ClearBrowser: command.ClearBrowser}, app.caller()); err != nil {
 			return fmt.Errorf("clear account session: %w", err)
 		}
 		report := struct {
-			LoggedOut bool   `json:"loggedOut"`
-			Scope     string `json:"scope"`
-			Account   string `json:"account"`
-			Alias     string `json:"alias"`
+			BrowserSignInCleared bool   `json:"browserSignInCleared"`
+			LoggedOut            bool   `json:"loggedOut"`
+			Scope                string `json:"scope"`
+			Account              string `json:"account"`
+			Alias                string `json:"alias"`
 		}{
-			LoggedOut: true,
-			Scope:     "account",
-			Account:   string(account.ID),
-			Alias:     alias,
+			LoggedOut: true, BrowserSignInCleared: command.ClearBrowser,
+			Scope:   "account",
+			Account: string(account.ID),
+			Alias:   alias,
 		}
 		if command.JSON {
 			return writeJSON(app.stdout, report)
+		}
+		storageNotice := "Saved browser sign-in remains. Use --account " + sanitizeCell(alias, 64) + " --clear-browser to remove it."
+		if command.ClearBrowser {
+			storageNotice = "Dedicated browser storage removed. OS/provider SSO may still sign you in. Other accounts are unchanged."
 		}
 		view := newConsoleView(app, app.stdout, app.interactiveStdout())
 		_, err = view.printf(
 			"%s  %s\n   %s\n",
 			view.success(),
 			view.strong("Local session cleared for "+sanitizeCell(alias, 64)),
-			view.muted("Other account sessions and the local session owner remain active."),
+			view.muted(storageNotice),
 		)
 		return err
 	}

@@ -59,7 +59,7 @@ type daemonStatusResult struct {
 }
 
 func (command *daemonStartCommand) Run(app *runtime) (returnErr error) {
-	client, status, err := app.openDaemon(app.context)
+	client, status, err := app.openDaemonForMCP(app.context)
 	if err != nil {
 		return err
 	}
@@ -68,6 +68,9 @@ func (command *daemonStartCommand) Run(app *runtime) (returnErr error) {
 }
 
 func (*daemonServeCommand) Run(app *runtime) (returnErr error) {
+	if err := app.requireCurrentExecutable(); err != nil {
+		return err
+	}
 	configPath, err := app.resolvedConfigPath()
 	if err != nil {
 		return err
@@ -123,15 +126,28 @@ func (*daemonServeCommand) Run(app *runtime) (returnErr error) {
 	panicguard.Go(app.context, panicguard.BoundaryDaemonServer, func() {
 		serveDone <- server.Serve(listener)
 	})
-	select {
-	case err := <-serveDone:
-		return err
-	case <-app.context.Done():
-	case <-server.Done():
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+running:
+	for {
+		select {
+		case err := <-serveDone:
+			return err
+		case <-app.context.Done():
+			break running
+		case <-server.Done():
+			break running
+		case <-ticker.C:
+			if app.executableGeneration.changed() {
+				break running
+			}
+		}
 	}
+
 	// Close the application boundary and its browsers before Shutdown releases
 	// the singleton listener. A replacement daemon must never overlap ownership
 	// of the same protected browser profile.
+	server.Drain()
 	backendErr := backend.Close()
 	shutdownContext, cancel := context.WithTimeout(context.Background(), daemonShutdownTimeout)
 	defer cancel()

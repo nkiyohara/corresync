@@ -82,6 +82,15 @@ Protocol version 18 adds the provider-neutral online-meeting creation field and
 provider-bound review result without reinterpreting the v0.7 Teams-only field.
 Protocol version 19 adds a CLI-only, account-targeted logout method that closes
 one account's in-memory sessions without stopping or exposing the session owner.
+Protocol version 28 extends the CLI-only, exact-account logout input with an
+explicit `clearBrowser` selection and reports `browserSignInCleared`. Normal
+logout retains browser storage. Explicit clearing waits for active account
+operations and browser shutdown, then removes only the generated Outlook/Teams
+profile directories for that opaque account. Browser lifetime and clearing
+share a sidecar lock. Linked profile paths and remaining Chromium singleton
+markers are refused. This does not remove OS credentials, account caches, other
+accounts, or revoke provider-side sessions; OS/provider SSO may still apply.
+MCP cannot initiate logout or browser-storage clearing.
 Protocol versions 20 and 21 add the integration and settings lifecycle methods.
 Protocol version 22 adds closed task list/read/search/sync and mandatory-preview
 create/update/complete/reopen/delete methods. It does not add a generic task or

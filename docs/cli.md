@@ -204,6 +204,7 @@ other unavailable task provider IDs remain unavailable.
 corr auth login --account work
 corr auth status
 corr auth logout --account work
+corr auth logout --account work --clear-browser
 corr auth logout
 
 corr doctor
@@ -214,7 +215,17 @@ corr doctor --online --connection-only --account personal
 `auth login` displays the exact OAuth scope set before any provider page can
 open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
-closes the entire local session owner.
+closes the entire local session owner. These operations keep saved browser
+sign-in, so a later explicit login can reopen the mailbox without a password.
+Use `corr auth logout --account work --clear-browser` to also remove only that
+account's dedicated Outlook/Teams browser storage. It requires an explicit
+account, waits for account operations and browsers to close, and refuses busy
+or linked profiles. Other accounts, caches, and OS-keyring entries remain.
+OS or provider SSO can still sign you in; this is not remote token revocation.
+Authentication observation failures (for example, a service request on a
+mismatched exact origin) are reported in terminal and graphical login instead
+of remaining pending. A displayed page origin alone does not prove the service
+request origin; review the error and configured route before changing it.
 An Outlook Web login keeps its dedicated visible window open because that
 window owns the account session; account logout or daemon shutdown closes it.
 If its private profile still has a provider session, a later explicit login may
@@ -757,8 +768,9 @@ verify Sigstore identity, checksum, version, OS, and architecture before a
 rollback-capable replacement. No ambiguous update is retried.
 
 Eligible interactive CLI starts perform a bounded, 24-hour-cached check and
-show a short installation-specific notice. Direct installs may opt in to the
-same verified replacement path:
+show a short installation-specific notice. New standalone configurations enable
+the verified replacement path by default; existing preferences are preserved.
+Enable it explicitly for an existing configuration:
 
 ```console
 corr config set updates.auto_install true
@@ -777,11 +789,15 @@ Use `corr config set updates.channel stable` to return. Channel changes never
 downgrade. Package-manager catalogs are stable-only, so a managed preview check
 shows the direct release URL instead of an owner command.
 
-The update becomes active on the next process start. Package-managed binaries
-continue to receive only their exact owner command. MCP, configuration
+After verified installation, the existing config-scoped session owner restarts
+and the requested interactive command runs with the updated executable. Owners
+from 0.9.2 also detect external executable replacement and retire after admitted
+requests finish. Disable installation with `corr config set
+updates.auto_install false`. Package-managed binaries continue to receive only
+their exact owner command. MCP, configuration
 management, daemon, completion, feedback, JSON, pipes, and non-interactive paths
-never attempt an update, so an MCP tool call cannot be interrupted by
-installation.
+never trigger installation. Retirement drains admitted operations before
+closing browser state.
 
 ## Exit behavior
 

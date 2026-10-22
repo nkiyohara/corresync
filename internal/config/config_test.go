@@ -65,8 +65,8 @@ func TestDefaultRoundTripIsProviderNeutral(t *testing.T) {
 	if loaded.DefaultAccount != "" || len(loaded.Accounts) != 0 {
 		t.Fatalf("round trip selected a provider route: %+v", loaded)
 	}
-	if loaded.Updates.AutoInstall {
-		t.Fatal("fresh configuration enabled automatic installation")
+	if !loaded.Updates.AutoInstall {
+		t.Fatal("fresh configuration disabled automatic installation")
 	}
 	if loaded.Feedback.AutoSubmit {
 		t.Fatal("fresh configuration enabled automatic public feedback")
@@ -1691,5 +1691,26 @@ func TestLoadMissingFilePreservesCause(t *testing.T) {
 	_, err := Load(filepath.Join(t.TempDir(), "missing.toml"))
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("Load() error = %v, want os.ErrNotExist", err)
+	}
+}
+
+func TestExistingConfigDoesNotOptIntoNewAutomaticInstallDefault(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := Default()
+	configuration.Updates.AutoInstall = false
+	if err := Save(path, configuration); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path) // #nosec G304 -- fixed filename inside a test-owned temporary directory.
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = bytes.ReplaceAll(data, []byte("auto_install = false\n"), nil)
+	if err := os.WriteFile(path, data, 0600); err != nil { // #nosec G703 -- test-owned config path; bytes come from the same synthetic config.
+		t.Fatal(err)
+	}
+	loaded, err := Load(path)
+	if err != nil || loaded.Updates.AutoInstall {
+		t.Fatalf("legacy omission gained auto-install: %+v %v", loaded.Updates, err)
 	}
 }

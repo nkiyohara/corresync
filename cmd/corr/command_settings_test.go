@@ -80,6 +80,14 @@ func TestSettingsFormWidthFollowsTerminalWithoutExceedingDesignWidth(t *testing.
 
 func TestSettingsChangesEverydayConfiguration(t *testing.T) {
 	path := saveSettingsFixture(t)
+	configurationBefore, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	configurationBefore.Updates.AutoInstall = false
+	if err := config.Save(path, configurationBefore); err != nil {
+		t.Fatal(err)
+	}
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
 	app.stdin = strings.NewReader(
@@ -116,6 +124,7 @@ func TestSettingsEnablingAutomaticInstallAlsoEnablesChecks(t *testing.T) {
 		t.Fatal(err)
 	}
 	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Updates.AutoInstall = false
 	if err := config.Save(path, configuration); err != nil {
 		t.Fatal(err)
 	}

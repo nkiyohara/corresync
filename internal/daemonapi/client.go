@@ -82,6 +82,12 @@ func (client *Client) Logout(
 	account domain.AccountID,
 	caller domain.Caller,
 ) (LogoutResult, error) {
+	return client.LogoutWithOptions(ctx, LogoutInput{Account: account}, caller)
+}
+
+// LogoutWithOptions explicitly selects whether the account browser storage is cleared.
+func (client *Client) LogoutWithOptions(ctx context.Context, input LogoutInput, caller domain.Caller) (LogoutResult, error) {
+	account := input.Account
 	if err := account.ValidateOpaque(); err != nil {
 		return LogoutResult{}, err
 	}
@@ -90,12 +96,12 @@ func (client *Client) Logout(
 		ctx,
 		MethodLogout,
 		caller,
-		LogoutInput{Account: account},
+		input,
 		&result,
 	); err != nil {
 		return LogoutResult{}, err
 	}
-	if result.Account != account || !result.LoggedOut {
+	if result.Account != account || !result.LoggedOut || result.BrowserSignInCleared != input.ClearBrowser {
 		return LogoutResult{}, errors.New("daemon returned invalid logout state")
 	}
 	return result, nil

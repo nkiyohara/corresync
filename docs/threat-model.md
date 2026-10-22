@@ -298,11 +298,24 @@ single-user tool, not a remote gateway or tenant administration service.
 - Keep automatic update checks bounded, unauthenticated, cached, and free of
   account or machine identifiers. Disable them in MCP, daemon, completion,
   feedback, pipes, and JSON output.
-- Keep automatic installation default-off and direct-install-only. Reuse the
+- Enable automatic installation only for direct installs, defaulting on in new
+  configurations while preserving existing opt-outs. Reuse the
   complete verified self-update path, never invoke a package manager, never run
   on an MCP, configuration-management, or machine-output path, and let
   verification failure leave both the executable and requested provider
   operation unchanged.
+- Serialize direct installers and verify before stopping a generation-bound,
+  authenticated owner. Wait for its singleton lock to be released before
+  replacement; defer on ambiguity. Drain admitted operations before closing
+  browser state, restart existing owners from the installed path, and never
+  resume the requested operation on the old CLI image after replacement.
+
+Browser sign-in clearing is an explicit local CLI action for one configured
+opaque account. It closes account sessions and drains active operations before
+removing only dedicated browser profiles under the state root. Sidecar ownership,
+rooted removal, linked-path rejection, and Chromium singleton checks prevent
+clearing an active or unrelated profile. OS credentials and provider sessions
+outside these profiles remain outside the operation.
 
 ## Explicitly unsupported
 

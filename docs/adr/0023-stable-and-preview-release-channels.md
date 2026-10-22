@@ -30,8 +30,10 @@ malformed tags, and GitHub prerelease flags inconsistent with the tag are
 ineligible.
 
 Checks and verified direct self-update read `updates.channel`. Cache files are
-isolated by channel. `updates.auto_install` remains separate, default-off
-consent and never changes when the channel changes. Version comparison follows
+isolated by channel. `updates.auto_install` remains a separate setting and
+never changes when the channel changes. ADR 0007 enables it for newly generated
+configurations from 0.9.2 while preserving existing preferences. Version
+comparison follows
 SemVer precedence and every update path refuses a downgrade. Thus a preview
 user can move to a newer final release, while switching back to stable waits if
 the installed preview is newer than the current stable release.

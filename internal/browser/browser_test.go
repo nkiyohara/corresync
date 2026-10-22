@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -246,5 +247,30 @@ func TestResolveExecutableDoesNotFallbackFromExplicitPath(t *testing.T) {
 	_, err := ResolveExecutable(filepath.Join(t.TempDir(), "missing-chromium"))
 	if err == nil {
 		t.Fatal("ResolveExecutable() unexpectedly accepted a missing explicit path")
+	}
+}
+
+func TestCurrentSessionObservationFailureRemainsVisibleAcrossPolls(t *testing.T) {
+	manager, err := session.NewManager("https://outlook.office.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance := &Browser{context: t.Context(), sessions: manager, sessionErrors: make(chan error, 1)}
+	failure := &sessionOriginMismatchError{configured: "https://outlook.office.com", observed: "https://outlook.cloud.microsoft"}
+	instance.reportSessionError(failure)
+	for range 3 {
+		if _, err := instance.CurrentSession(); !errors.Is(err, failure) {
+			t.Fatalf("observation failure became pending: %v", err)
+		}
+	}
+	if _, err := instance.WaitForSession(t.Context()); !errors.Is(err, failure) {
+		t.Fatalf("blocking observer lost failure: %v", err)
+	}
+}
+
+func TestSessionOriginMismatchDiagnosticIsBounded(t *testing.T) {
+	failure := &sessionOriginMismatchError{configured: "https://outlook.office.com", observed: "https://" + strings.Repeat("synthetic", 1000)}
+	if len(failure.Error()) > 256 || strings.Contains(failure.Error(), "synthetic") {
+		t.Fatal("unbounded observed origin escaped into diagnostics")
 	}
 }

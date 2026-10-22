@@ -1057,6 +1057,11 @@ func (backend *sessionBackend) Logout(
 	accountID domain.AccountID,
 	caller domain.Caller,
 ) (daemonapi.LogoutResult, error) {
+	return backend.LogoutWithOptions(ctx, daemonapi.LogoutInput{Account: accountID}, caller)
+}
+
+func (backend *sessionBackend) LogoutWithOptions(ctx context.Context, input daemonapi.LogoutInput, caller domain.Caller) (daemonapi.LogoutResult, error) {
+	accountID := input.Account
 	if err := ctx.Err(); err != nil {
 		return daemonapi.LogoutResult{}, err
 	}
@@ -1155,8 +1160,13 @@ func (backend *sessionBackend) Logout(
 	if err := errors.Join(closeErrors...); err != nil {
 		return daemonapi.LogoutResult{}, err
 	}
+	if input.ClearBrowser {
+		if err := browser.ClearAccountProfiles(ctx, accountID); err != nil {
+			return daemonapi.LogoutResult{}, err
+		}
+	}
 	return daemonapi.LogoutResult{
-		Account: accountID, LoggedOut: true,
+		Account: accountID, LoggedOut: true, BrowserSignInCleared: input.ClearBrowser,
 	}, nil
 }
 
@@ -1329,7 +1339,11 @@ func (backend *sessionBackend) TerminalLogin(
 		if !supported {
 			return daemonapi.TerminalLoginResult{}, errors.New("browser does not support graphical login")
 		}
-		if _, err := interaction.handle.CurrentSession(); errors.Is(err, session.ErrNotReady) {
+		_, observationErr := interaction.handle.CurrentSession()
+		if observationErr != nil && !errors.Is(observationErr, session.ErrNotReady) {
+			return daemonapi.TerminalLoginResult{}, errors.Join(observationErr, backend.dropTerminalInteraction(interaction, true))
+		}
+		if errors.Is(observationErr, session.ErrNotReady) {
 			action := application.GraphicalLoginAction{Type: "refresh"}
 			if input.GraphicalAction != nil {
 				action = *input.GraphicalAction
@@ -1344,7 +1358,7 @@ func (backend *sessionBackend) TerminalLogin(
 	progressChecked := false
 	if input.Action == nil && !input.Graphical {
 		if err := awaitTerminalLoginProgress(ctx, interaction); err != nil {
-			return daemonapi.TerminalLoginResult{}, err
+			return daemonapi.TerminalLoginResult{}, errors.Join(err, backend.dropTerminalInteraction(interaction, true))
 		}
 		progressChecked = true
 	}
@@ -1358,7 +1372,7 @@ func (backend *sessionBackend) TerminalLogin(
 		}
 		if terminalActionWaitsForProgress(*input.Action) {
 			if err := awaitTerminalLoginProgress(ctx, interaction); err != nil {
-				return daemonapi.TerminalLoginResult{}, err
+				return daemonapi.TerminalLoginResult{}, errors.Join(err, backend.dropTerminalInteraction(interaction, true))
 			}
 			progressChecked = true
 		}
@@ -1397,7 +1411,7 @@ func (backend *sessionBackend) TerminalLogin(
 		return authenticatedTerminalResult(input.Account, account.captured), nil
 	}
 	if !errors.Is(credentialsErr, session.ErrNotReady) {
-		return daemonapi.TerminalLoginResult{}, credentialsErr
+		return daemonapi.TerminalLoginResult{}, errors.Join(credentialsErr, backend.dropTerminalInteraction(interaction, true))
 	}
 
 	if input.Graphical {

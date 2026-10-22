@@ -62,7 +62,7 @@ func (view updateView) writeAutomaticInstallResult(result updatecheck.InstallRes
 			"%s  %s\n",
 			view.success(),
 			view.strong("Corresync "+strings.TrimPrefix(result.CurrentVersion, "v")+
-				" installed")+" · active on the next corr start",
+				" installed")+" · switching to the updated command",
 		)
 		return err
 	case updatecheck.InstallStatusRepaired:
@@ -70,7 +70,7 @@ func (view updateView) writeAutomaticInstallResult(result updatecheck.InstallRes
 			"%s  %s\n",
 			view.success(),
 			view.strong("corr "+strings.TrimPrefix(result.CurrentVersion, "v")+
-				" installed")+" · active on the next corr start",
+				" installed")+" · switching to the updated command",
 		)
 		return err
 	case updatecheck.InstallStatusCurrent:

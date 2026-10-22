@@ -123,7 +123,7 @@ login_timeout = "5m0s"
 [updates]
 channel = "stable"
 disable_automatic_checks = false
-auto_install = false
+auto_install = true
 
 [feedback]
 auto_submit = false
@@ -164,7 +164,7 @@ login_timeout = "5m0s"
 [updates]
 channel = "stable"
 disable_automatic_checks = false
-auto_install = false
+auto_install = true
 
 [feedback]
 auto_submit = false
@@ -697,7 +697,9 @@ Switching channels never causes a downgrade. Preview releases are not placed
 in Homebrew, Scoop, WinGet, APT, DNF, or APK catalogs; a package-managed binary
 can report a preview but will not mix ownership by installing it.
 
-Opt in to verified automatic installation for a standalone/direct binary with:
+Newly generated configurations enable verified automatic installation for
+standalone/direct binaries. Existing files retain their saved setting (an
+omitted `auto_install` remains false). Enable it for an existing installation:
 
 ```console
 corr config set updates.auto_install true
@@ -705,7 +707,8 @@ corr config set updates.auto_install true
 
 or set `updates.auto_install = true` in TOML. Corresync never runs Homebrew,
 Scoop, WinGet, or a system package manager: managed installations still show
-their exact owner command. Automatic installation is default-off and never
+their exact owner command. Disable installation with `corr config set
+updates.auto_install false`. Automatic installation never
 runs on MCP, daemon, completion, feedback, JSON, piped, or non-interactive
 paths. Configuration commands are also excluded so consent can always be
 revoked before another update attempt. `disable_automatic_checks` and
