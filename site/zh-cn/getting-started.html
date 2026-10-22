@@ -202,7 +202,7 @@ scoop install corresync/corresync</code></pre>
             </div>
           </div>
           <div class="install-block verify-block">
-            <p class="os-label" id="gs-updates">可选 · 自动更新独立安装版</p>
+            <p class="os-label" id="gs-updates">自动更新 · 为现有配置启用</p>
             <div class="cmd" data-copy data-copy-label="启用已验证自动更新">
               <pre
                 tabindex="0"
@@ -211,8 +211,8 @@ scoop install corresync/corresync</code></pre>
               ><code>corr config set updates.auto_install true</code></pre>
             </div>
             <p class="block-note">
-              只自动安装已签名并验证的独立安装版；MCP
-              调用或机器可读输出期间不会更新。
+              从0.9.2起，新配置默认启用已签名、已验证的自动更新，现有设置保持不变。此命令可为现有配置启用更新。MCP或机器可读输出不会触发安装。关闭命令：<code
+              >corr config set updates.auto_install false</code>。
             </p>
           </div>
         </li>

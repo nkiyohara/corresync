@@ -576,10 +576,12 @@
               Corresync release exists in the stable or user-selected preview channel. The request
               contains the current Corresync version in its user agent, not your account address,
               mailbox data, or a persistent device identifier. The result is cached locally by
-              channel. Package-manager update paths are handled by their respective providers. If a
-              standalone user explicitly enables automatic installation, Corresync also downloads
-              the public release artifact, checksums, and provenance needed to verify and replace
-              that executable; this never runs during an MCP tool call.
+              channel. Package-manager update paths are handled by their respective providers. From
+              0.9.2, new standalone configurations enable verified automatic installation; existing
+              preferences are preserved. When enabled, Corresync also downloads the public release
+              artifact, checksums, and provenance needed to verify and replace the executable. MCP
+              and machine-readable commands never trigger installation. You can disable it with
+              <code>corr config set updates.auto_install false</code>.
             </p>
             <p>
               <code>corr feedback</code> creates an allowlisted, redacted report locally and never
@@ -670,9 +672,12 @@
               </li>
             </ol>
             <p>
-              <code>corr auth logout</code> closes local sessions but intentionally preserves
-              keyring grants for later sign-in. Use account removal and provider-side revocation
-              when you want the authorization deleted.
+              <code>corr auth logout</code> closes local sessions but preserves dedicated browser
+              sign-in and keyring grants for later sign-in. From 0.9.2,
+              <code>corr auth logout --account ALIAS --clear-browser</code> also removes that
+              account's dedicated browser storage after closing its sessions. Other accounts and
+              OS-keyring grants remain; OS/provider SSO may still sign you in. Use account removal
+              and provider-side revocation when you want the authorization deleted.
             </p>
             <p>
               Depending on where you live, applicable law may provide rights to access, correct,
