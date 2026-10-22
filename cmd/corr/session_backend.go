@@ -3455,7 +3455,7 @@ func (backend *sessionBackend) messagingSessionAccount(
 	degradations := client.MessageDegradations()
 	status, err := rollout.MessagingStatus(provider, route)
 	if err != nil || !status.Enabled {
-		return sessionAccount{}, errors.Join(rollout.ErrMessagingPending, err)
+		return sessionAccount{}, errors.Join(rollout.ErrMessagingPending, err, closeSessionAccount(sessionAccount{closers: closers}))
 	}
 	if status.Preview {
 		degradations = append(degradations, domain.Degradation{

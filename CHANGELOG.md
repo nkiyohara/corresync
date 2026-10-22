@@ -3,7 +3,11 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.9.0 - 2026-10-22
+
+The 0.9 line is stable; future development and releases use main. The 0.8
+maintenance line is closed. See the [release notes](docs/releases/v0.9.0.md)
+for upgrade guidance, preview verification limits, and contributor credits.
 
 ### Remote graphical login
 

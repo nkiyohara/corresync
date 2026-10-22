@@ -37,8 +37,8 @@ type messagingEvidence struct {
 
 // MessagingStatus returns the immutable source-owned gate for one route. Each
 // literal is changed only by a reviewed release commit that carries the
-// corresponding repository evidence. The 0.9 Teams preview is explicitly
-// and Mattermost preview are enabled without claiming the outstanding stable-release evidence is complete.
+// corresponding repository evidence. Teams and Mattermost previews are enabled
+// without claiming that outstanding stable-release evidence is complete.
 func MessagingStatus(provider domain.MessagingProviderID, route domain.MessagingRouteKind) (MessagingGateStatus, error) {
 	if err := validateMessagingRoute(provider, route); err != nil {
 		return MessagingGateStatus{}, err

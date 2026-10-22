@@ -33,9 +33,6 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	if command.Host != "" {
 		return runSSHGraphicalLogin(app, command.Host, command.Account, command.WebPort)
 	}
-	if command.Terminal && command.JSON {
-		return errors.New("--terminal and --json cannot be used together")
-	}
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
