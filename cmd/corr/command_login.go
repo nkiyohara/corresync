@@ -44,6 +44,7 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	if err != nil {
 		return err
 	}
+	configured = configured.ActiveServices()
 	accountID := configured.ID
 	if !command.Terminal && !command.Web && !command.WebStdio && hasOutlookRoute(configured) {
 		if err := browser.RequireGraphicalSession(); err != nil {

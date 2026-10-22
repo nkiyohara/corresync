@@ -621,7 +621,7 @@ func TestResolveAccountSupportsAliasAndStableID(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ResolveAccount(%q) error = %v", reference, err)
 		}
-		if alias != "work" || got != want {
+		if alias != "work" || !reflect.DeepEqual(got, want) {
 			t.Fatalf("ResolveAccount(%q) = %q, %+v", reference, alias, got)
 		}
 	}

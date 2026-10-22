@@ -508,7 +508,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 	lifecycle, cancel := context.WithCancel(context.WithoutCancel(app.context))
 	backend := &sessionBackend{
 		app:              app,
-		configuration:    configuration,
+		configuration:    configuration.ActiveServices(),
 		guard:            guard,
 		recorder:         recorder,
 		credentials:      credentials,
@@ -598,6 +598,7 @@ func configuredServiceProvider(
 	account config.Account,
 	service application.AuthenticationService,
 ) domain.ProviderID {
+	account = account.ActiveServices()
 	switch service {
 	case application.AuthenticationServiceMail:
 		return account.MailProvider()
@@ -3219,6 +3220,11 @@ func (backend *sessionBackend) activateAccount(
 		backend.mu.Unlock()
 		return sessionAccount{}, fmt.Errorf("account %q is not configured", accountID)
 	}
+	configured = configured.ActiveServices()
+	if configured.Mail == nil && configured.Calendar == nil && configured.Tasks == nil && configured.Messages == nil {
+		backend.mu.Unlock()
+		return sessionAccount{}, errors.New("all services for this account are disabled; enable a service in corr settings")
+	}
 	if account, active := backend.accounts[accountID]; active &&
 		sessionAccountComplete(configured, account) {
 		backend.mu.Unlock()
@@ -3331,6 +3337,7 @@ func (backend *sessionBackend) activateAccount(
 // releasedSessionRoutes is shared by visible and terminal authentication so
 // dormant selections cannot resolve credentials, authorize, or probe providers.
 func releasedSessionRoutes(configured config.Account) (config.Account, []domain.Degradation, error) {
+	configured = configured.ActiveServices()
 	if hasGoogleWebRoute(configured) {
 		return config.Account{}, nil, errUnsupportedLegacyGoogleRoute
 	}

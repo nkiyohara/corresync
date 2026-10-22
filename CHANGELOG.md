@@ -21,6 +21,15 @@ All notable user-facing changes are recorded here. The project follows
 - Keep missing release evidence visible and preserve the fixed Teams
   capability intersection, exact-account checks, and approval-bound writes.
 
+||||||| parent of 79d98f6 (feat(settings): add per-account service switches)
+
+### Per-account services
+
+- Enable or disable each configured Mail, Calendar, Tasks, or Messaging service
+  in account settings. Defaults remain enabled; disabled routes retain their
+  settings but cannot authenticate or dispatch operations. Changes stop existing
+  sessions and invalidate pending approvals. Schema v11 migrates to v12.
+
 ### Outlook Web attachment sends
 
 - Accept the one response message per attachment that Outlook Web returns when

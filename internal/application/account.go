@@ -47,14 +47,15 @@ type AccountMessagingRouteView struct {
 // AccountView is the secret-free account lifecycle contract shared by CLI and
 // MCP. Every service route is independently selected.
 type AccountView struct {
-	ID        domain.AccountID           `json:"id"`
-	Alias     string                     `json:"alias"`
-	Address   string                     `json:"address,omitempty"`
-	Mail      *AccountRouteView          `json:"mail,omitempty"`
-	Calendar  *AccountRouteView          `json:"calendar,omitempty"`
-	Tasks     *AccountRouteView          `json:"tasks,omitempty"`
-	Messages  *AccountMessagingRouteView `json:"messages,omitempty"`
-	IsDefault bool                       `json:"isDefault"`
+	DisabledServices []string                   `json:"disabledServices,omitempty"`
+	ID               domain.AccountID           `json:"id"`
+	Alias            string                     `json:"alias"`
+	Address          string                     `json:"address,omitempty"`
+	Mail             *AccountRouteView          `json:"mail,omitempty"`
+	Calendar         *AccountRouteView          `json:"calendar,omitempty"`
+	Tasks            *AccountRouteView          `json:"tasks,omitempty"`
+	Messages         *AccountMessagingRouteView `json:"messages,omitempty"`
+	IsDefault        bool                       `json:"isDefault"`
 }
 
 // AccountCatalog is a deterministic snapshot of configured accounts.

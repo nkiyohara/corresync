@@ -361,3 +361,9 @@ provider route is already proven live-compatible.
 
 Private daemon protocol v27 adds caller-bound graphical login fields (ADR 0038).
 The SSH helper independently negotiates graphical wire v1 and refuses mismatches.
+||||||| parent of 79d98f6 (feat(settings): add per-account service switches)
+
+## 2026-10-22: Account service switches
+
+Schema v12 adds per-account disabled services (ADR 0037). Strict v11 migration
+keeps every previously configured route enabled; downgrades refuse the new schema.

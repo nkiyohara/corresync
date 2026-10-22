@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/mattn/go-shellwords"
+	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/policy"
+	"github.com/nkiyohara/corresync/internal/settingsstore"
 )
 
 type configCommand struct {
@@ -183,6 +185,26 @@ type configGetCommand struct {
 }
 
 func (command *configGetCommand) Run(app *runtime) error {
+	if strings.HasPrefix(command.Key, "accounts.") && strings.HasSuffix(command.Key, ".services") {
+		path, err := app.resolvedConfigPath()
+		if err != nil {
+			return err
+		}
+		settings, err := (settingsstore.Store{ConfigPath: path}).GetSettings(app.context)
+		if err != nil {
+			return err
+		}
+		value, err := application.SettingsValue(settings, command.Key)
+		if err != nil {
+			return err
+		}
+		if command.JSON {
+			return writeJSON(app.stdout, map[string]any{"key": command.Key, "value": value})
+		}
+		_, err = fmt.Fprintln(app.stdout, value)
+		return err
+	}
+
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
@@ -215,6 +237,32 @@ type configSetCommand struct {
 }
 
 func (command *configSetCommand) Run(app *runtime) error {
+	if strings.HasPrefix(command.Key, "accounts.") && strings.HasSuffix(command.Key, ".services") {
+		path, err := app.resolvedConfigPath()
+		if err != nil {
+			return err
+		}
+		service, err := application.NewSettingsService(settingsstore.Store{ConfigPath: path})
+		if err != nil {
+			return err
+		}
+		review, err := service.Review(app.context, application.SettingsUpdateInput{Key: command.Key, Value: command.Value})
+		if err != nil {
+			return err
+		}
+		updated, err := service.Apply(app.context, review)
+		if err != nil {
+			return err
+		}
+		if err := stopServiceSettingsOwner(app); err != nil {
+			return err
+		}
+		if command.JSON {
+			return writeJSON(app.stdout, updated)
+		}
+		return writeConfigUpdated(app, command.Key+" = "+review.Value)
+	}
+
 	configuration, path, err := app.loadConfig()
 	if err != nil {
 		return err

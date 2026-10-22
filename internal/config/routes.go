@@ -288,6 +288,17 @@ type MessagingRoute struct {
 }
 
 func (account Account) validate() error {
+	seen := make(map[string]bool)
+	for _, service := range account.DisabledServices {
+		if service != "mail" && service != "calendar" && service != "tasks" && service != "messages" {
+			return errors.New("disabled_services must contain only mail, calendar, tasks, or messages")
+		}
+		if seen[service] {
+			return errors.New("disabled_services contains a duplicate")
+		}
+		seen[service] = true
+	}
+
 	if account.Mail == nil && account.Calendar == nil && account.Tasks == nil && account.Messages == nil {
 		return errors.New("at least one mail, calendar, task, or messaging route is required")
 	}

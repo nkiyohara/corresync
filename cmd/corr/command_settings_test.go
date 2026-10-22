@@ -25,7 +25,7 @@ func TestSettingsRenamesAccountInteractively(t *testing.T) {
 	path := saveSettingsFixture(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n2\n3\noffice\n3\n8\n")
+	app.stdin = strings.NewReader("1\n2\n4\noffice\n3\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -175,7 +175,7 @@ func TestSettingsRepromptsInvalidAliasAndLoginTimeout(t *testing.T) {
 	path := saveSettingsFixture(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n2\n3\n \noffice\n3\n4\nsoon\n10m\n8\n")
+	app.stdin = strings.NewReader("1\n2\n4\n \noffice\n3\n4\nsoon\n10m\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -235,7 +235,7 @@ func TestSettingsRemovesNonDefaultAccountAfterConfirmation(t *testing.T) {
 	path := saveSettingsFixtureWithSecondAccount(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n3\n5\ny\n3\n8\n")
+	app.stdin = strings.NewReader("1\n3\n6\ny\n3\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -308,7 +308,7 @@ func TestSettingsRemovesFinalAccountAfterConfirmation(t *testing.T) {
 		)
 		return nil
 	}
-	app.stdin = strings.NewReader("1\n2\n4\ny\n2\n8\n")
+	app.stdin = strings.NewReader("1\n2\n5\ny\n2\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment
@@ -343,7 +343,7 @@ func TestSettingsRequiresReplacementBeforeRemovingDefault(t *testing.T) {
 	path := saveSettingsFixtureWithSecondAccount(t)
 	var stdout bytes.Buffer
 	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
-	app.stdin = strings.NewReader("1\n2\n4\n1\ny\n3\n8\n")
+	app.stdin = strings.NewReader("1\n2\n5\n1\ny\n3\n8\n")
 	app.interactiveInput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
 	app.lookupEnv = settingsTestEnvironment

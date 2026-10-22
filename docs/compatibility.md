@@ -9,7 +9,7 @@ authorized live observations.
 <!-- markdownlint-disable MD013 -->
 | Boundary | Deterministic evidence | Recorded live evidence | v0.9 status |
 | --- | --- | --- | --- |
-| CLI, stable JSON, configuration schema v11 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
+| CLI, stable JSON, configuration schema v12 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
 | Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
 | Public domain-only compatibility checker | Browser privacy/source checks; DNS, CORS, bounds, redirect, failure, and SSRF fixtures | Not run | Deterministic only; no provider authentication |
 | Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
