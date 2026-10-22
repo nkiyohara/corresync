@@ -451,3 +451,5 @@ mise exec -- task verify
 
 Please report vulnerabilities through
 [GitHub private vulnerability reporting](SECURITY.md), never a public issue.
+
+For remote terminals, see [graphical login over SSH](docs/remote-login.md).

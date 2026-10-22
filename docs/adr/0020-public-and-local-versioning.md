@@ -356,3 +356,8 @@ executing a new write contract.
 The 1.0 milestone remains blocked on implementation and platform evidence for
 these policies. Accepting the policy does not claim that every pre-1.0 shape or
 provider route is already proven live-compatible.
+
+## 2026-10-22: Graphical login protocol
+
+Private daemon protocol v27 adds caller-bound graphical login fields (ADR 0038).
+The SSH helper independently negotiates graphical wire v1 and refuses mismatches.

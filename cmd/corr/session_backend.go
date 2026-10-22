@@ -397,12 +397,13 @@ type sessionPreview struct {
 }
 
 type terminalLoginSession struct {
-	id       string
-	account  domain.AccountID
-	caller   domain.Caller
-	handle   terminalBrowserHandle
-	deadline time.Time
-	view     daemonapi.TerminalLoginView
+	graphical bool
+	id        string
+	account   domain.AccountID
+	caller    domain.Caller
+	handle    terminalBrowserHandle
+	deadline  time.Time
+	view      daemonapi.TerminalLoginView
 }
 
 const (
@@ -1309,14 +1310,34 @@ func (backend *sessionBackend) TerminalLogin(
 			errors.New("terminal login expired; start it again"), closeErr,
 		)
 	}
-	if input.Action != nil && input.Action.Type == "cancel" {
+	if input.Action != nil && input.Action.Type == "cancel" || input.GraphicalAction != nil && input.GraphicalAction.Type == "cancel" {
 		return daemonapi.TerminalLoginResult{
 			Account: input.Account, Status: "cancelled",
 		}, backend.dropTerminalInteraction(interaction, true)
 	}
 
+	var frame *application.GraphicalLoginFrame
+	if input.Graphical {
+		handle, supported := interaction.handle.(interface {
+			GraphicalLogin(context.Context, application.GraphicalLoginAction) (application.GraphicalLoginFrame, error)
+		})
+		if !supported {
+			return daemonapi.TerminalLoginResult{}, errors.New("browser does not support graphical login")
+		}
+		if _, err := interaction.handle.CurrentSession(); errors.Is(err, session.ErrNotReady) {
+			action := application.GraphicalLoginAction{Type: "refresh"}
+			if input.GraphicalAction != nil {
+				action = *input.GraphicalAction
+			}
+			observed, err := handle.GraphicalLogin(ctx, action)
+			if err != nil {
+				return daemonapi.TerminalLoginResult{}, err
+			}
+			frame = &observed
+		}
+	}
 	progressChecked := false
-	if input.Action == nil {
+	if input.Action == nil && !input.Graphical {
 		if err := awaitTerminalLoginProgress(ctx, interaction); err != nil {
 			return daemonapi.TerminalLoginResult{}, err
 		}
@@ -1374,6 +1395,9 @@ func (backend *sessionBackend) TerminalLogin(
 		return daemonapi.TerminalLoginResult{}, credentialsErr
 	}
 
+	if input.Graphical {
+		return daemonapi.TerminalLoginResult{Account: input.Account, SessionID: interaction.id, Status: "pending", Frame: frame}, nil
+	}
 	refreshView := input.Action == nil || input.Action.Type == "refresh" ||
 		input.Action.Type == "activate" || input.Action.Key == "enter"
 	if refreshView && !progressChecked {
@@ -1451,14 +1475,14 @@ func (backend *sessionBackend) terminalInteraction(
 ) (*terminalLoginSession, bool, error) {
 	if input.SessionID != "" {
 		interaction, exists := backend.terminalSessions[input.SessionID]
-		if !exists || interaction.account != input.Account || interaction.caller != caller {
+		if !exists || interaction.account != input.Account || interaction.caller != caller || interaction.graphical != input.Graphical {
 			return nil, false, errors.New("invalid or expired terminal login session")
 		}
 		return interaction, false, nil
 	}
 	if existingID, exists := backend.terminalAccounts[input.Account]; exists {
 		interaction := backend.terminalSessions[existingID]
-		if interaction == nil || interaction.caller != caller {
+		if interaction == nil || interaction.caller != caller || interaction.graphical != input.Graphical {
 			return nil, false, errors.New("a terminal login is already active for this account")
 		}
 		return interaction, false, nil
@@ -1497,7 +1521,7 @@ func (backend *sessionBackend) terminalInteraction(
 		return nil, false, errors.Join(err, handle.Close())
 	}
 	interaction := &terminalLoginSession{
-		id: id, account: input.Account, caller: caller, handle: terminalHandle,
+		id: id, account: input.Account, caller: caller, handle: terminalHandle, graphical: input.Graphical,
 		deadline: time.Now().Add(time.Duration(backend.configuration.Browser.LoginTimeout)),
 	}
 	backend.terminalSessions[id] = interaction

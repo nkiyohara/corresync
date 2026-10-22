@@ -5,6 +5,14 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Remote graphical login
+
+- Use `corr auth login --host HOST --account ALIAS` on your local computer, or
+  `--web` on the remote host with the printed SSH forwarding instructions, to
+  operate the dedicated Outlook Web browser graphically. The temporary UI is
+  loopback-only, paired, bounded, and human-operated. The authenticated session
+  stays remote. Real Mac-to-Linux provider login remains live-unobserved.
+
 ### Messaging previews
 
 - Enable explicitly selected Teams Graph, Teams Web, and Mattermost routes

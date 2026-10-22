@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Corresync sign-in</title>
+  <style>
+  body {
+    font: 16px system-ui;
+    margin: 1rem;
+    background: #f6f7fb;
+    color: #18202d;
+  }
+  header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  button {
+    padding: 0.6rem 1rem;
+  }
+  #screen {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #aab;
+    cursor: default;
+  }
+  #keys {
+    position: fixed;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+  }
+  #status {
+    min-height: 1.5em;
+  }
+  #origin {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  </style>
+  <header>
+    <strong>Corresync sign-in</strong><button id="refresh">Refresh view</button>
+    <button id="cancel">Cancel login</button>
+  </header>
+  <p>
+    Click the remote screen, then type or paste normally. Passwords and MFA stay in the remote
+    browser. This page does not save screen images or typed input.
+  </p>
+  <p id="origin"></p>
+  <p id="status" role="status">Connecting…</p>
+  <img id="screen" alt="Remote sign-in screen" draggable="false">
+  <textarea
+    id="keys"
+    aria-label="Keyboard input for the remote login"
+    autocomplete="off"
+    autocapitalize="off"
+    spellcheck="false"
+  ></textarea>
+  <p>
+    Touch ID, local passkeys, USB security keys, and client certificates are not forwarded. Closing
+    this tab does not cancel immediately; use Cancel or wait for the login timeout.
+  </p>
+  <script src="/client.js" defer></script>
+</html>
