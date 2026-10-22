@@ -21,6 +21,8 @@ import (
 	"strings"
 
 	binaryupdate "github.com/minio/selfupdate"
+
+	"github.com/nkiyohara/corresync/internal/filelock"
 )
 
 const (
@@ -80,15 +82,17 @@ type InstallProgress struct {
 // Network, platform, and verification seams are injectable for deterministic
 // synthetic tests.
 type Installer struct {
-	CurrentVersion   string
-	Channel          Channel
-	Executable       string
-	TrustCachePath   string
-	Endpoint         string
-	Client           *http.Client
-	GOOS             string
-	GOARCH           string
-	Progress         func(InstallProgress)
+	CurrentVersion string
+	Channel        Channel
+	Executable     string
+	TrustCachePath string
+	Endpoint       string
+	Client         *http.Client
+	GOOS           string
+	GOARCH         string
+	Progress       func(InstallProgress)
+	// BeforeReplace runs only after all verification and permission checks.
+	BeforeReplace    func(context.Context) error
 	VerifyProvenance func(
 		context.Context,
 		string,
@@ -131,6 +135,15 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	executable, info, err := installer.validateExecutable(ctx)
 	if err != nil {
 		return InstallResult{}, err
+	}
+	lock, err := filelock.AcquireSidecar(ctx, executable+".update.lock")
+	if err != nil {
+		return InstallResult{}, fmt.Errorf("lock executable update: %w", err)
+	}
+	defer func() { _ = lock.Close() }()
+	currentInfo, err := os.Lstat(executable)
+	if err != nil || !os.SameFile(info, currentInfo) {
+		return InstallResult{}, errors.New("executable changed while waiting for update; restart corr")
 	}
 	goos, goarch := installer.platform()
 	canonicalPath, installCanonical, err := canonicalCommandTarget(executable, goos)
@@ -297,6 +310,11 @@ func (installer Installer) Install(ctx context.Context) (InstallResult, error) {
 	}
 	if err := checkUpdatePermissions(executable, info.Mode().Perm()); err != nil {
 		return InstallResult{}, fmt.Errorf("self-update requires write access to %q: %w", filepath.Dir(executable), err)
+	}
+	if !repairOnly && installer.BeforeReplace != nil {
+		if err := installer.BeforeReplace(ctx); err != nil {
+			return InstallResult{}, fmt.Errorf("prepare session owner for update: %w", err)
+		}
 	}
 	if installCanonical {
 		if err := installCanonicalCommand(

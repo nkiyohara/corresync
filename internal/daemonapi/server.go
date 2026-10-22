@@ -46,6 +46,9 @@ type Server struct {
 	http        *http.Server
 	recordPanic func()
 	failed      atomic.Bool
+	drainMu     sync.Mutex
+	draining    bool
+	active      sync.WaitGroup
 }
 
 // NewServer constructs a fail-closed handler with bounded concurrency.
@@ -126,6 +129,15 @@ func (server *Server) Serve(listener net.Listener) error {
 // Shutdown drains active requests within the caller's deadline.
 func (server *Server) Shutdown(ctx context.Context) error { return server.http.Shutdown(ctx) }
 
+// Drain refuses new operations and waits for admitted requests before browsers
+// and preview state are closed. The listener's singleton lock remains held.
+func (server *Server) Drain() {
+	server.drainMu.Lock()
+	server.draining = true
+	server.drainMu.Unlock()
+	server.active.Wait()
+}
+
 // Done closes after an authenticated local client requests shutdown.
 func (server *Server) Done() <-chan struct{} { return server.stop }
 
@@ -155,6 +167,15 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		server.writeFailure(writer, http.StatusUnauthorized, "", "unauthorized", "daemon authorization failed")
 		return
 	}
+	server.drainMu.Lock()
+	if server.draining {
+		server.drainMu.Unlock()
+		server.writeFailure(writer, http.StatusServiceUnavailable, "", "stopping", "session owner is draining; retry with the current corr executable")
+		return
+	}
+	server.active.Add(1)
+	server.drainMu.Unlock()
+	defer server.active.Done()
 	mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
 	if err != nil || mediaType != contentType {
 		server.writeFailure(writer, http.StatusUnsupportedMediaType, "", "invalid_request", "content type must be application/json")

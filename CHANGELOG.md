@@ -3,6 +3,19 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.2 - 2026-10-22
+
+- Enable verified automatic installation for new standalone configurations,
+  including interactive bare `corr`; preserve existing preferences.
+- Coordinate verified replacement with config-scoped daemon shutdown/restart
+  and run the requested command in the updated executable.
+- Drain admitted requests before retiring obsolete daemon images; serialize
+  installers and prevent an older CLI from replacing a newer owner.
+- Preserve package-manager ownership and non-interactive/MCP exclusions.
+
+See the [release notes](docs/releases/v0.9.2.md) for upgrade instructions and
+compatibility limits.
+
 ## 0.9.1 - 2026-10-22
 
 The 0.9 line is stable; future development and releases use main. The 0.8
@@ -27,8 +40,6 @@ abandoned login browsers even after an abrupt CLI disconnect.
   with live compatibility still unverified; Slack remains disabled.
 - Keep missing release evidence visible and preserve the fixed Teams
   capability intersection, exact-account checks, and approval-bound writes.
-
-||||||| parent of 79d98f6 (feat(settings): add per-account service switches)
 
 ### Per-account services
 

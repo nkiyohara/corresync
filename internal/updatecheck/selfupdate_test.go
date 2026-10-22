@@ -30,6 +30,7 @@ func TestInstallerVerifiesAndReplacesDirectRelease(t *testing.T) {
 
 	var verifiedIdentity string
 	var progress []InstallStage
+	prepared := false
 	installer := Installer{
 		CurrentVersion: "1.0.0",
 		Executable:     target,
@@ -38,6 +39,13 @@ func TestInstallerVerifiesAndReplacesDirectRelease(t *testing.T) {
 		Client:         release.server.Client(),
 		GOOS:           "linux",
 		GOARCH:         "amd64",
+		BeforeReplace: func(context.Context) error {
+			if verifiedIdentity == "" || len(progress) != 5 {
+				t.Fatal("daemon stopped before complete verification")
+			}
+			prepared = true
+			return nil
+		},
 		Progress: func(item InstallProgress) {
 			progress = append(progress, item.Stage)
 		},
@@ -65,6 +73,9 @@ func TestInstallerVerifiesAndReplacesDirectRelease(t *testing.T) {
 	result, err := installer.Install(t.Context())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !prepared {
+		t.Fatal("daemon preparation skipped")
 	}
 	if result.Status != InstallStatusUpdated ||
 		result.PreviousVersion != "1.0.0" ||
@@ -133,6 +144,7 @@ func TestInstallerFailsClosedBeforeReplacement(t *testing.T) {
 			)
 			defer release.server.Close()
 			installer := Installer{
+				BeforeReplace:  func(context.Context) error { t.Fatal("verification failure stopped a daemon"); return nil },
 				CurrentVersion: "1.0.0",
 				Executable:     target,
 				Endpoint:       release.server.URL + "/latest",
@@ -697,5 +709,31 @@ func TestPreviewInstallerSelectsHighestEligibleSignedRelease(t *testing.T) {
 			err,
 			requests,
 		)
+	}
+}
+
+func TestInstallerDefersReplacementWhenOwnerCannotStop(t *testing.T) {
+	target := filepath.Join(secureTempDir(t), "corr")
+	old := []byte("#!/bin/sh\nprintf old\n")
+	if err := os.WriteFile(target, old, 0700); err != nil { // #nosec G306 -- synthetic executable fixture.
+		t.Fatal(err)
+	}
+	release := newSyntheticUpdateRelease(t, syntheticCandidate(), "")
+	defer release.server.Close()
+	busy := errors.New("owner is draining an admitted write")
+	_, err := (Installer{
+		CurrentVersion: "1.0.0", Executable: target, Endpoint: release.server.URL + "/latest", Client: release.server.Client(), GOOS: "linux", GOARCH: "amd64",
+		VerifyProvenance: func(context.Context, string, string, string, string) error { return nil },
+		BeforeReplace:    func(context.Context) error { return busy },
+	}).Install(t.Context())
+	if !errors.Is(err, busy) {
+		t.Fatalf("Install = %v", err)
+	}
+	got, err := os.ReadFile(target) // #nosec G304 -- test-controlled executable path.
+	if err != nil || !bytes.Equal(got, old) {
+		t.Fatalf("busy owner did not preserve executable: %q %v", got, err)
+	}
+	if _, err := os.Stat(target + ".backup-1.0.0"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("unexpected backup: %v", err)
 	}
 }

@@ -265,6 +265,7 @@ func TestDoctorConnectionOnlyReportsServicesWithoutRemoteItemReads(t *testing.T)
 	root := t.TempDir()
 	configuration := config.OutlookDefault()
 	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Updates.AutoInstall = false
 	account := configuration.Accounts[configuration.DefaultAccount]
 	account.Address = "reader@icloud.com"
 	shared := config.CredentialRef{
@@ -356,6 +357,7 @@ func TestDoctorOnlineValidatesTaskListContractWithoutEmittingProviderData(t *tes
 	configuration := config.Default()
 	configuration.DefaultAccount = "tasks"
 	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Updates.AutoInstall = false
 	configuration.Accounts["tasks"] = config.Account{
 		ID: doctorTaskAccountID,
 		Tasks: &config.TaskRoute{
@@ -594,6 +596,7 @@ func TestDoctorOnlineRequiresAnExistingSessionWithoutStartingLogin(t *testing.T)
 	configuration := config.OutlookDefault()
 	configuration.Browser.Executable = executable
 	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Updates.AutoInstall = false
 	configPath := filepath.Join(root, "config.toml")
 	if err := config.Save(configPath, configuration); err != nil {
 		t.Fatal(err)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -230,6 +231,12 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 	app.stderr = &stderr
 	app.interactiveOutput = func() bool { return true }
 	app.interactiveStdout = func() bool { return true }
+	noticeConfig := config.OutlookDefault()
+	noticeConfig.Updates.AutoInstall = false
+	app.configPath = filepath.Join(t.TempDir(), "notice.toml")
+	if err := config.Save(app.configPath, noticeConfig); err != nil {
+		t.Fatal(err)
+	}
 	app.installMethod = func() updatecheck.InstallMethod { return updatecheck.InstallDirect }
 	app.installUpdate = func(
 		context.Context,
@@ -238,7 +245,9 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 		t.Fatal("default update check attempted automatic installation")
 		return updatecheck.InstallResult{}, nil
 	}
-	app.maybeHandleAutomaticUpdate(t.Context())
+	if _, err := app.maybeHandleAutomaticUpdate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(stderr.String(), "Update available") ||
 		!strings.Contains(stderr.String(), "Run corr update") {
 		t.Fatalf("TTY notice missing: %q", stderr.String())
@@ -246,13 +255,17 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 
 	stderr.Reset()
 	app.interactiveOutput = func() bool { return false }
-	app.maybeHandleAutomaticUpdate(t.Context())
+	if _, err := app.maybeHandleAutomaticUpdate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	if stderr.Len() != 0 {
 		t.Fatalf("non-TTY emitted notice: %q", stderr.String())
 	}
 	app.interactiveOutput = func() bool { return true }
 	app.interactiveStdout = func() bool { return false }
-	app.maybeHandleAutomaticUpdate(t.Context())
+	if _, err := app.maybeHandleAutomaticUpdate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	if stderr.Len() != 0 {
 		t.Fatalf("piped stdout emitted notice: %q", stderr.String())
 	}
@@ -260,13 +273,16 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 
 	configuration := config.OutlookDefault()
 	configuration.Updates.DisableAutomaticChecks = true
+	configuration.Updates.AutoInstall = false
 	configPath := filepath.Join(t.TempDir(), "config.toml")
 	if err := config.Save(configPath, configuration); err != nil {
 		t.Fatal(err)
 	}
 	app.configPath = configPath
 	stderr.Reset()
-	app.maybeHandleAutomaticUpdate(t.Context())
+	if _, err := app.maybeHandleAutomaticUpdate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	if stderr.Len() != 0 {
 		t.Fatalf("config opt-out emitted notice: %q", stderr.String())
 	}
@@ -281,7 +297,9 @@ func TestAutomaticUpdateNoticeIsTTYOnlyAndHonorsOptOuts(t *testing.T) {
 		}
 		return "", false
 	}
-	app.maybeHandleAutomaticUpdate(t.Context())
+	if _, err := app.maybeHandleAutomaticUpdate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	if stderr.Len() != 0 {
 		t.Fatalf("environment opt-out emitted notice: %q", stderr.String())
 	}
@@ -323,12 +341,14 @@ func TestAutomaticUpdateInstallsOnlyAnOptedInDirectBinary(t *testing.T) {
 		}, nil
 	}
 
-	app.maybeHandleAutomaticUpdate(t.Context())
+	if _, err := app.maybeHandleAutomaticUpdate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 
 	if installCalls != 1 ||
 		!strings.Contains(stderr.String(), "installing verified standalone update") ||
 		!strings.Contains(stderr.String(), "Corresync 0.8.2 installed") ||
-		!strings.Contains(stderr.String(), "active on the next corr start") {
+		!strings.Contains(stderr.String(), "switching to the updated command") {
 		t.Fatalf("automatic direct update = calls %d, output %q", installCalls, stderr.String())
 	}
 }
@@ -359,7 +379,9 @@ func TestAutomaticUpdateNeverRunsAPackageManager(t *testing.T) {
 		return updatecheck.InstallResult{}, nil
 	}
 
-	app.maybeHandleAutomaticUpdate(t.Context())
+	if _, err := app.maybeHandleAutomaticUpdate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 
 	if !strings.Contains(stderr.String(), "Update available") ||
 		!strings.Contains(stderr.String(), "brew upgrade nkiyohara/corresync/corresync") ||
@@ -393,7 +415,9 @@ func TestAutomaticUpdateFailureDoesNotBlockTheRequestedCommand(t *testing.T) {
 		return updatecheck.InstallResult{}, context.DeadlineExceeded
 	}
 
-	app.maybeHandleAutomaticUpdate(t.Context())
+	if _, err := app.maybeHandleAutomaticUpdate(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 
 	if !strings.Contains(stderr.String(), "Automatic update failed") ||
 		!strings.Contains(stderr.String(), "continuing with 0.8.1") ||
@@ -414,6 +438,7 @@ func TestMachineSurfacesNeverHandleAutomaticUpdates(t *testing.T) {
 		{"integrations", "detect", "--json"},
 		{"update", "check"},
 		{"config", "set", "updates.auto_install", "false"},
+		{"settings"},
 		{"daemon", "run"},
 	}
 	for _, arguments := range tests {
@@ -483,4 +508,21 @@ func updateTestRuntime(t *testing.T, stdout *bytes.Buffer, result updatecheck.Re
 	app.checkUpdateFresh = func(context.Context) (updatecheck.Result, error) { return result, nil }
 	app.installMethod = func() updatecheck.InstallMethod { return updatecheck.InstallHomebrew }
 	return app
+}
+
+func TestAutomaticUpdateDoesNotContinueOldCLIWhenRestartFails(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	app := updateTestRuntime(t, &stdout, updatecheck.Result{Status: updatecheck.StatusAvailable, CurrentVersion: "0.9.1", LatestVersion: "v0.9.2"})
+	app.stderr = &stderr
+	app.interactiveOutput = func() bool { return true }
+	app.interactiveStdout = func() bool { return true }
+	app.installMethod = func() updatecheck.InstallMethod { return updatecheck.InstallDirect }
+	failure := errors.New("synthetic restart failure")
+	app.installUpdate = func(context.Context, func(updatecheck.InstallProgress)) (updatecheck.InstallResult, error) {
+		return updatecheck.InstallResult{Status: updatecheck.InstallStatusUpdated}, failure
+	}
+	result, err := app.maybeHandleAutomaticUpdate(t.Context())
+	if !errors.Is(err, failure) || result.Status != updatecheck.InstallStatusUpdated || strings.Contains(stderr.String(), "continuing with") {
+		t.Fatalf("replacement failure was swallowed: %+v %v %s", result, err, stderr.String())
+	}
 }

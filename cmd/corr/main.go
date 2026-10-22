@@ -20,6 +20,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/feedback"
 	"github.com/nkiyohara/corresync/internal/panicguard"
 	"github.com/nkiyohara/corresync/internal/paths"
+	"github.com/nkiyohara/corresync/internal/updatecheck"
 )
 
 type cli struct {
@@ -89,6 +90,20 @@ func (command *versionCommand) Run(app *runtime) error {
 func run(executionContext context.Context, arguments []string, stdout, stderr io.Writer) int {
 	arguments = normalizeHelpArguments(arguments)
 	if !completionEnvironmentActive() && len(arguments) == 0 {
+		app := newRuntime(executionContext, "", stdout, stderr, buildinfo.Current())
+		if path := os.Getenv("CORRESYNC_CONFIG"); path != "" {
+			app.configPath = path
+		} else {
+			app.configPath = os.Getenv("OWA_CONFIG")
+		}
+		result, updateErr := app.maybeHandleAutomaticUpdate(executionContext)
+		if updateErr != nil {
+			_, _ = fmt.Fprintln(stderr, updateErr)
+			return 1
+		}
+		if result.Status == updatecheck.InstallStatusUpdated {
+			return app.runUpdatedCommand(executionContext, nil, result)
+		}
 		arguments = []string{"--help"}
 	}
 
@@ -140,7 +155,14 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 	}
 	app := newRuntime(executionContext, configPath, stdout, stderr, info)
 	if shouldHandleAutomaticUpdate(arguments) {
-		app.maybeHandleAutomaticUpdate(executionContext)
+		result, updateErr := app.maybeHandleAutomaticUpdate(executionContext)
+		if updateErr != nil {
+			_, _ = fmt.Fprintln(stderr, updateErr)
+			return 1
+		}
+		if result.Status == updatecheck.InstallStatusUpdated {
+			return app.runUpdatedCommand(executionContext, arguments, result)
+		}
 	}
 	if err := parsed.Run(app); err != nil {
 		root := rootCommand(arguments)

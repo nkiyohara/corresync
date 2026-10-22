@@ -757,8 +757,9 @@ verify Sigstore identity, checksum, version, OS, and architecture before a
 rollback-capable replacement. No ambiguous update is retried.
 
 Eligible interactive CLI starts perform a bounded, 24-hour-cached check and
-show a short installation-specific notice. Direct installs may opt in to the
-same verified replacement path:
+show a short installation-specific notice. New standalone configurations enable
+the verified replacement path by default; existing preferences are preserved.
+Enable it explicitly for an existing configuration:
 
 ```console
 corr config set updates.auto_install true
@@ -777,11 +778,15 @@ Use `corr config set updates.channel stable` to return. Channel changes never
 downgrade. Package-manager catalogs are stable-only, so a managed preview check
 shows the direct release URL instead of an owner command.
 
-The update becomes active on the next process start. Package-managed binaries
-continue to receive only their exact owner command. MCP, configuration
+After verified installation, the existing config-scoped session owner restarts
+and the requested interactive command runs with the updated executable. Owners
+from 0.9.2 also detect external executable replacement and retire after admitted
+requests finish. Disable installation with `corr config set
+updates.auto_install false`. Package-managed binaries continue to receive only
+their exact owner command. MCP, configuration
 management, daemon, completion, feedback, JSON, pipes, and non-interactive paths
-never attempt an update, so an MCP tool call cannot be interrupted by
-installation.
+never trigger installation. Retirement drains admitted operations before
+closing browser state.
 
 ## Exit behavior
 

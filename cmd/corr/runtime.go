@@ -74,6 +74,8 @@ type runtime struct {
 	previousEndpoints              func(string) ([]localipc.Endpoint, error)
 	stopEndpointOwner              func(context.Context, localipc.Endpoint) (int, error)
 	startDaemon                    func(context.Context, string) error
+	executablePath                 string
+	executableGeneration           executableGeneration
 	runCommand                     commandRunner
 	runIntegrationCommand          commandRunner
 	runIntegrationDirectoryCommand directoryCommandRunner
@@ -105,14 +107,17 @@ func newRuntime(
 	stdout, stderr io.Writer,
 	info buildinfo.Info,
 ) *runtime {
+	executablePath, _ := os.Executable()
 	agentHosts := agenthost.DefaultCatalog()
 	app := &runtime{
-		context:    ctx,
-		configPath: configPath,
-		info:       info,
-		stdin:      os.Stdin,
-		stdout:     stdout,
-		stderr:     stderr,
+		executablePath:       executablePath,
+		executableGeneration: captureExecutableGeneration(executablePath),
+		context:              ctx,
+		configPath:           configPath,
+		info:                 info,
+		stdin:                os.Stdin,
+		stdout:               stdout,
+		stderr:               stderr,
 		launch: func(ctx context.Context, options browser.Options) (browserHandle, error) {
 			return browser.Launch(ctx, options)
 		},
@@ -229,6 +234,9 @@ func newRuntime(
 		ctx context.Context,
 		progress func(updatecheck.InstallProgress),
 	) (updatecheck.InstallResult, error) {
+		if err := app.requireCurrentExecutable(); err != nil {
+			return updatecheck.InstallResult{}, err
+		}
 		channel, err := app.updateChannel(ctx)
 		if err != nil {
 			return updatecheck.InstallResult{}, err
@@ -241,23 +249,13 @@ func newRuntime(
 		if err != nil {
 			return updatecheck.InstallResult{}, err
 		}
-		return (updatecheck.Installer{
-			CurrentVersion: app.info.Version,
-			Channel:        channel,
-			Executable:     executable,
-			TrustCachePath: trustCachePath,
-			Client:         &http.Client{Timeout: 2 * time.Minute},
-			GOOS:           app.info.OS,
-			GOARCH:         app.info.Arch,
-			Progress:       progress,
-		}).Install(ctx)
+		return app.installWithDaemonLifecycle(ctx, executable, progress, channel, trustCachePath)
 	}
 	app.installMethod = func() updatecheck.InstallMethod {
-		executable, err := os.Executable()
-		if err != nil {
+		if app.executablePath == "" {
 			return updatecheck.InstallDirect
 		}
-		return updatecheck.DetectInstallation(executable)
+		return updatecheck.DetectInstallationContext(ctx, app.executablePath)
 	}
 	app.interactiveOutput = func() bool { return outputIsTerminal(app.stderr) }
 	app.interactiveInput = func() bool { return inputIsTerminal(app.stdin) }
@@ -396,6 +394,9 @@ func (app *runtime) openDaemonWithOptions(
 	ctx context.Context,
 	allowNoAccounts bool,
 ) (*daemonapi.Client, daemonapi.Status, error) {
+	if err := app.requireCurrentExecutable(); err != nil {
+		return nil, daemonapi.Status{}, err
+	}
 	configuration, _, err := app.loadConfigContext(ctx)
 	if err != nil {
 		return nil, daemonapi.Status{}, err

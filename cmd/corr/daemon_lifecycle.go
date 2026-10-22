@@ -16,6 +16,9 @@ func (app *runtime) replaceDaemon(
 	configPath string,
 	configDigest string,
 ) (daemonapi.Status, error) {
+	if err := rejectNewerOwner(app.info.Version, previous.Status().Version); err != nil {
+		return daemonapi.Status{}, err
+	}
 	shutdownContext, cancel := context.WithTimeout(ctx, daemonControlTimeout)
 	shutdownErr := client.ShutdownOwner(shutdownContext, app.caller(), previous)
 	cancel()

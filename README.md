@@ -207,15 +207,20 @@ Switch back with `corr config set updates.channel stable`; Corresync never
 downgrades the running binary. Preview releases do not enter package-manager
 catalogs.
 
-Standalone users can opt in to verified automatic installation:
+New standalone configurations enable verified automatic installation. Existing
+configurations retain their preference; enable it explicitly with:
 
 ```console
 corr config set updates.auto_install true
 ```
 
 It never runs during MCP tool calls, configuration changes, daemon work, JSON
-output, pipes, or other non-interactive paths. The current command continues
-normally and the new binary is active on the next `corr` start.
+output, pipes, or other non-interactive paths. Bare `corr` also checks when
+interactive. After verification, the updater stops and restarts the current
+session owner and runs the requested command with the updated executable.
+Owners from 0.9.2 also retire after an external executable replacement, once
+admitted operations finish. Disable installation with
+`corr config set updates.auto_install false`.
 
 ### 2. Add and sign in to your account
 

@@ -169,14 +169,14 @@ type automaticUpdateSettings struct {
 	autoInstall   bool
 }
 
-func (app *runtime) maybeHandleAutomaticUpdate(parent context.Context) {
+func (app *runtime) maybeHandleAutomaticUpdate(parent context.Context) (updatecheck.InstallResult, error) {
 	if app.interactiveOutput == nil || !app.interactiveOutput() ||
 		app.interactiveStdout == nil || !app.interactiveStdout() {
-		return
+		return updatecheck.InstallResult{}, nil
 	}
 	settings := app.automaticUpdateSettings(parent, nil)
 	if !settings.checksEnabled {
-		return
+		return updatecheck.InstallResult{}, nil
 	}
 	checkTimeout := 750 * time.Millisecond
 	if settings.autoInstall {
@@ -186,22 +186,26 @@ func (app *runtime) maybeHandleAutomaticUpdate(parent context.Context) {
 	defer cancel()
 	report, err := app.updateReport(ctx)
 	if err != nil || report.Status != updatecheck.StatusAvailable {
-		return
+		return updatecheck.InstallResult{}, nil
 	}
 	view := newUpdateView(app, app.stderr, true)
 	if !settings.autoInstall || report.InstallMethod != updatecheck.InstallDirect {
 		_ = view.writeNotice(report)
-		return
+		return updatecheck.InstallResult{}, nil
 	}
 	_ = view.writeAutomaticInstallStart(report.CurrentVersion, report.LatestVersion)
 	installContext, cancelInstall := context.WithTimeout(parent, 2*time.Minute)
 	defer cancelInstall()
 	result, err := app.installUpdate(installContext, nil)
 	if err != nil {
+		if result.Status == updatecheck.InstallStatusUpdated {
+			return result, err
+		}
 		_ = view.writeAutomaticInstallFailure(report.CurrentVersion)
-		return
+		return updatecheck.InstallResult{}, nil
 	}
 	_ = view.writeAutomaticInstallResult(result)
+	return result, nil
 }
 
 func effectiveUpdateChannel(channel updatecheck.Channel) updatecheck.Channel {
@@ -245,7 +249,7 @@ func (app *runtime) automaticUpdateSettings(
 		}
 	}
 	if errors.Is(err, os.ErrNotExist) {
-		return automaticUpdateSettings{checksEnabled: true}
+		return automaticUpdateSettings{checksEnabled: true, autoInstall: true}
 	}
 	return automaticUpdateSettings{}
 }
@@ -267,7 +271,7 @@ func shouldHandleAutomaticUpdate(arguments []string) bool {
 	}
 	command := rootCommand(arguments)
 	switch command {
-	case "", "completion", "config", "daemon", "doctor", "feedback", "integrations", "mcp", "update":
+	case "completion", "config", "settings", "daemon", "doctor", "feedback", "integrations", "mcp", "update":
 		return false
 	default:
 		return !completionEnvironmentActive()
