@@ -30,7 +30,7 @@ authorized live observations.
 | Canonical task model, CLI, MCP, IPC, and cross-account projection | Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests | Not run | Implemented; Microsoft Graph adapter enabled separately |
 | Private saved mail/calendar queries and no-content-cache decision | Account isolation, strict bounded store, revision race, corrupt purge, CLI/MCP schema, live freshness, and resource-bound tests | Not run | Implemented; definitions only, provider results never persisted |
 | Account/service recovery and provider drift | Per-lease invalidation, concurrency/drain, preview/monitor cleanup, stateless API retry/circuit, throttle, browser-owner loss, and content-free error tests | Not run | Deterministic only; live-unobserved |
-| Provider-neutral messaging model, Teams Graph/Web, Slack API, and Mattermost REST/WebSocket adapters, schema, and release gate | Shared synthetic fixtures; account/workspace/actor isolation, Graph/Web parity, role/scope capability observation, semantic DOM bounds, SSRF/DNS pinning, redirect/compression/event bounds, cursor binding, malformed result, and preview/commit tests | Not run | All routes disabled; live evidence pending; Slack outside the planned cohort |
+| Provider-neutral messaging model, Teams Graph/Web, Slack API, and Mattermost REST/WebSocket adapters, schema, and release gate | Shared synthetic fixtures; account/workspace/actor isolation, Graph/Web parity, role/scope capability observation, semantic DOM bounds, SSRF/DNS pinning, redirect/compression/event bounds, cursor binding, malformed result, and preview/commit tests | Not run | Teams and Mattermost enabled as previews; live evidence pending; Slack disabled |
 | Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
 | Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
 | Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
@@ -83,7 +83,7 @@ evidence.
   and actor confirmation, observed installation scopes, bounded cursors and
   file reads, rate-limit preservation, and outcome-unknown writes. Attachment
   writes remain unavailable because upload and message creation are not one
-  atomic reviewed commit. The route is release-disabled and live-unobserved.
+  atomic reviewed commit. The route is a live-unverified preview.
 - `mattermost`: supported v4 REST translation and an explicitly opened,
   content-free WebSocket invalidation stream are implemented for one selected
   public HTTPS origin and team. DNS answers are validated and pinned before
@@ -93,7 +93,7 @@ evidence.
   role definitions. REST sync uses reset snapshots, and WebSocket events only
   request an earlier snapshot. Attachment sends and ID-bound mention writes
   remain unavailable because the provider contracts cannot preserve one atomic
-  reviewed payload. The route is release-disabled and live-unobserved.
+  reviewed payload. The route is a live-unverified preview.
 - `todoist`: task lists, typed task CRUD/state, plan-sensitive metadata,
   reminders, exact provider recurrence, and sync-token changes are implemented
   through a BYO public client and PKCE. The API v1 route has synthetic evidence

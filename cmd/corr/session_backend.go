@@ -2962,12 +2962,15 @@ func (backend *sessionBackend) requireAnyMessagingRoute() error {
 	if len(routes) == 0 {
 		return errors.New("no messaging route is configured")
 	}
+	var gateErr error
 	for _, route := range routes {
-		if err := rollout.RequireMessaging(route.Provider, route.Kind()); err != nil {
-			return err
+		if err := rollout.RequireMessaging(route.Provider, route.Kind()); err == nil {
+			return nil
+		} else {
+			gateErr = err
 		}
 	}
-	return nil
+	return gateErr
 }
 
 func (backend *sessionBackend) commitMessageWrite(
@@ -3376,8 +3379,8 @@ func inactiveTaskRoute(configured config.Account) (*domain.Degradation, error) {
 	}, nil
 }
 
-// inactiveMessagingRoute keeps the complete v0.9 implementation dormant
-// until release-owned evidence is accepted. The check happens before browser
+// inactiveMessagingRoute keeps routes outside the reviewed release or preview
+// cohort dormant. The check happens before browser
 // launch, credential resolution, OAuth, or provider traffic. A mixed account
 // retains its already released services with an explicit degradation; a
 // messaging-only account cannot be mistaken for an authenticated empty
@@ -3418,6 +3421,17 @@ func (backend *sessionBackend) messagingSessionAccount(
 	closers ...sessionCloser,
 ) (sessionAccount, error) {
 	capabilities := client.MessageCapabilities()
+	degradations := client.MessageDegradations()
+	status, err := rollout.MessagingStatus(provider, route)
+	if err != nil || !status.Enabled {
+		return sessionAccount{}, errors.Join(rollout.ErrMessagingPending, err)
+	}
+	if status.Preview {
+		degradations = append(degradations, domain.Degradation{
+			Feature: "messages.preview",
+			Reason:  "Messaging is a preview; live compatibility and stable-release evidence remain incomplete",
+		})
+	}
 	messages, err := application.NewMessagingService(
 		backend.guard,
 		client,
@@ -3427,7 +3441,7 @@ func (backend *sessionBackend) messagingSessionAccount(
 				WorkspaceID: workspaceID, Actor: client.MessageActor(),
 			},
 			Capabilities: capabilities,
-			Degradations: client.MessageDegradations(),
+			Degradations: degradations,
 		},
 	)
 	result := sessionAccount{
@@ -3437,7 +3451,7 @@ func (backend *sessionBackend) messagingSessionAccount(
 			AttachmentReads:  capabilities.AttachmentReads,
 			AttachmentWrites: capabilities.AttachmentWrites,
 		},
-		degradations: client.MessageDegradations(),
+		degradations: degradations,
 	}
 	if err != nil {
 		return sessionAccount{}, errors.Join(err, closeSessionAccount(result))

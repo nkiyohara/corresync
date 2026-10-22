@@ -847,8 +847,8 @@ func configureOnboardingMessagingRoute(
 	}
 	route, selected, err := runOnboardingSelect(
 		app,
-		"Teams connection",
-		"Choose one explicit transport. Corresync never probes or falls back to Microsoft Graph automatically.",
+		"Teams connection (preview)",
+		"Teams is a preview with live compatibility still unverified. Choose one explicit transport; there is no automatic Graph authorization or fallback.",
 		[]huh.Option[domain.MessagingRouteKind]{
 			huh.NewOption(
 				"Teams Web · provider-owned browser session",

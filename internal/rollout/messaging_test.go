@@ -8,17 +8,14 @@ import (
 	"github.com/nkiyohara/corresync/internal/domain"
 )
 
-func TestMessagingRoutesRemainReleaseClosed(t *testing.T) {
+func TestSlackMessagingRemainsReleaseClosed(t *testing.T) {
 	t.Parallel()
 
 	routes := []struct {
 		provider domain.MessagingProviderID
 		route    domain.MessagingRouteKind
 	}{
-		{domain.MessagingProviderMicrosoftTeams, domain.MessagingRouteTeamsGraph},
-		{domain.MessagingProviderMicrosoftTeams, domain.MessagingRouteTeamsWeb},
 		{domain.MessagingProviderSlack, domain.MessagingRouteSlackAPI},
-		{domain.MessagingProviderMattermost, domain.MessagingRouteMattermost},
 	}
 	for _, item := range routes {
 		status, err := MessagingStatus(item.provider, item.route)
@@ -47,10 +44,26 @@ func TestMessagingGateRejectsCrossProviderRoutes(t *testing.T) {
 	}
 }
 
-func TestMessagingCatalogRemainsClosedUntilEveryRouteIsReleaseEnabled(t *testing.T) {
+func TestTeamsPreviewRetainsMissingStableEvidence(t *testing.T) {
 	t.Parallel()
+	for _, route := range []domain.MessagingRouteKind{domain.MessagingRouteTeamsGraph, domain.MessagingRouteTeamsWeb} {
+		status, err := MessagingStatus(domain.MessagingProviderMicrosoftTeams, route)
+		if err != nil || !status.Enabled || !status.Preview || !slices.Contains(status.Missing, "live_observation") {
+			t.Fatalf("Teams preview status = %+v, %v", status, err)
+		}
+		if err := RequireMessaging(domain.MessagingProviderMicrosoftTeams, route); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !MessagingCatalogEnabled() {
+		t.Fatal("Teams preview catalog is hidden")
+	}
+}
 
-	if MessagingCatalogEnabled() {
-		t.Fatal("incomplete messaging cohort became discoverable")
+func TestMattermostPreviewRetainsMissingStableEvidence(t *testing.T) {
+	t.Parallel()
+	status, err := MessagingStatus(domain.MessagingProviderMattermost, domain.MessagingRouteMattermost)
+	if err != nil || !status.Enabled || !status.Preview || !slices.Contains(status.Missing, "live_observation") {
+		t.Fatalf("Mattermost preview = %+v, %v", status, err)
 	}
 }

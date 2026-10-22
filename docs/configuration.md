@@ -201,9 +201,9 @@ Supported route payloads are:
 | tasks | `google-tasks` | `tasks.google_tasks` and `tasks.google_tasks.oauth`; user-owned Desktop OAuth |
 | tasks | `ticktick` | `tasks.ticktick` and `tasks.ticktick.oauth` |
 | tasks | `microsoft-web-tasks`, `apple-reminders`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
-| messages | `microsoft-teams` | exactly one of `messages.teams_graph` or `messages.teams_web`; deferred; release-gated |
+| messages | `microsoft-teams` | exactly one of `messages.teams_graph` or `messages.teams_web`; preview; live-unverified |
 | messages | `slack` | `messages.slack`; deferred; release-gated |
-| messages | `mattermost` | `messages.mattermost`; deferred; release-gated |
+| messages | `mattermost` | `messages.mattermost`; preview; live-unverified |
 <!-- markdownlint-enable MD013 -->
 
 The payload must match the provider exactly. A Google mail-and-calendar route
@@ -292,10 +292,11 @@ key = "messages-mattermost"
 consent = true
 ```
 
-These are schema examples, not activation instructions. Until the v0.9
-manifest records both Teams routes at parity, all provider live observations,
-surface contracts, documentation, and a clean final security review, every
-messaging route stops before any external effect.
+Teams and Mattermost are available as preview features. Configure only a route
+and workspace you control, then explicitly run `corr auth login --account ALIAS`.
+Live compatibility remains unverified; provider permissions and observed
+capabilities can narrow the available operations. Slack remains disabled.
+Teams Web requires a visible browser and does not support `--terminal`.
 
 The task route remains closed and secret-free. An implemented Microsoft To
 Do task-only route looks like:

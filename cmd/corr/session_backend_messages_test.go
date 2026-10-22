@@ -107,3 +107,28 @@ func dormantSlackAccount() config.Account {
 		},
 	}
 }
+
+func TestTeamsPreviewDoesNotActivateDormantSiblingRoute(t *testing.T) {
+	t.Parallel()
+	teamsID := domain.AccountID("acc_00000000000000000000000000000902")
+	teams := config.Account{ID: teamsID, Messages: &config.MessagingRoute{
+		Provider: domain.MessagingProviderMicrosoftTeams,
+		TeamsWeb: &config.TeamsWebMessagingRoute{WorkspaceID: "tenant-synthetic"},
+	}}
+	backend := &sessionBackend{configuration: config.Config{Accounts: map[string]config.Account{
+		"teams": teams, "slack": dormantSlackAccount(),
+	}}}
+	if err := backend.requireAnyMessagingRoute(); err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.requireMessagingRoute(teamsID); err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.requireMessagingRoute(dormantMessagingAccountID); !errors.Is(err, rollout.ErrMessagingPending) {
+		t.Fatalf("dormant sibling route = %v", err)
+	}
+	active, degradation, err := releasedSessionRoutes(teams)
+	if err != nil || active.Messages == nil || len(degradation) != 0 {
+		t.Fatalf("Teams preview route was removed: %+v, %v", degradation, err)
+	}
+}

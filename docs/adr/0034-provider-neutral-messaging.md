@@ -31,6 +31,26 @@ stream. Those are distinct contracts; branding alone proves none of them.
 
 ## Decision
 
+### 2026-10-22 maintainer release decision
+
+Supersedes the release timing and all-or-nothing activation policy below.
+The maintainer explicitly authorizes Teams Graph, Teams Web, and Mattermost
+as usable preview features, including in the forthcoming stable 0.9 product.
+Missing live observations remain missing; product stability is not a claim
+of provider compatibility. The source-owned status records `preview` and
+outstanding evidence separately from route availability. Slack stays disabled.
+
+This permits explicit setup, authentication, and guarded use of the existing
+bounded adapters without requiring a completed live-evidence manifest first.
+The fixed Teams capability intersection remains unchanged. Runtime account,
+workspace, actor, origin, permission, bounds, and preview/commit checks remain
+mandatory; neither user configuration nor MCP can bypass them. The CLI/MCP
+catalog advertises only the enabled cohort, and each operation still checks
+its exact route. An unavailable sibling route cannot block an enabled account.
+
+Full live observations and final provider qualification remain tracked in
+issues #146, #148, and #149. No evidence flag is set merely to enable the preview.
+
 ### 2026-10-20 release scope amendment
 
 The 0.9 release line remains in preview pending maintainer testing on macOS

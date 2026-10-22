@@ -5,6 +5,14 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Messaging previews
+
+- Enable explicitly selected Teams Graph, Teams Web, and Mattermost routes
+  through the existing guarded CLI/MCP contracts. These are preview features
+  with live compatibility still unverified; Slack remains disabled.
+- Keep missing release evidence visible and preserve the fixed Teams
+  capability intersection, exact-account checks, and approval-bound writes.
+
 ### Outlook Web attachment sends
 
 - Accept the one response message per attachment that Outlook Web returns when

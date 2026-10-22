@@ -249,3 +249,22 @@ func (backend *fakeMessagingBackend) ChangeConversationMembership(context.Contex
 func (backend *fakeMessagingBackend) CommitConversationMembership(context.Context, string, domain.Caller) (application.MessageWriteAccess, error) {
 	return application.MessageWriteAccess{}, nil
 }
+
+func TestTeamsPreviewUsesProductionMCPRegistration(t *testing.T) {
+	t.Parallel()
+	backend := &fakeMessagingBackend{fakeBackend: &fakeBackend{}}
+	server, err := New(backend, Options{Version: "0.9.0-rc", Instance: "teams-preview"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := connectTestClient(t, server)
+	listed, err := client.ListTools(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range expectedMessagingToolNames {
+		if toolNamed(listed.Tools, name) == nil {
+			t.Errorf("missing preview tool %s", name)
+		}
+	}
+}

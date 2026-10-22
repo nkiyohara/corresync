@@ -389,16 +389,12 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 
 	title := "Corresync — Mail, Calendar & Tasks"
 	instructions := serverInstructions
-	messagingEnabled := rollout.MessagingCatalogEnabled()
-	var messages MessagingBackend
+	messages, supportsMessaging := backend.(MessagingBackend)
+	messagingEnabled := rollout.MessagingCatalogEnabled() && supportsMessaging
 	if messagingEnabled {
-		var ok bool
-		messages, ok = backend.(MessagingBackend)
-		if !ok {
-			return nil, errors.New("release-enabled messaging requires a messaging backend")
-		}
 		title = "Corresync — Mail, Calendar, Tasks & Messaging"
 		instructions += messagingServerInstructions
+		instructions += " Teams and Mattermost messaging are preview features with live compatibility still unverified; Slack remains unavailable."
 	}
 
 	server := mcp.NewServer(
