@@ -5,6 +5,22 @@ All notable user-facing changes are recorded here. The project follows
 
 ## Unreleased
 
+### Outlook Web attachment sends
+
+- Accept the one response message per attachment that Outlook Web returns when
+  `corr mail send` or `corr mail draft` attaches several files in one request.
+  A send with more than one attachment previously stopped with an unknown
+  outcome after the draft and all of its attachments were saved.
+- Read the draft's new change key from the attachment identity in the last
+  response message. A draft saved with attachments previously returned the
+  change key from before attaching, which `corr mail send-draft` rejects as a
+  changed draft and which a send would submit as a stale version.
+- Reject attachment responses with a missing parent identity or change key, or
+  a parent other than the exact draft being composed, before attempting send.
+- A short, extra, partial, or mixed-parent attachment response still stops
+  before the send with an unknown outcome; this does not add a new
+  live-compatibility claim.
+
 ## 0.8.8 - 2026-10-20
 
 ### Outlook Web attachment reads
