@@ -204,6 +204,7 @@ other unavailable task provider IDs remain unavailable.
 corr auth login --account work
 corr auth status
 corr auth logout --account work
+corr auth logout --account work --clear-browser
 corr auth logout
 
 corr doctor
@@ -214,7 +215,17 @@ corr doctor --online --connection-only --account personal
 `auth login` displays the exact OAuth scope set before any provider page can
 open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
-closes the entire local session owner.
+closes the entire local session owner. These operations keep saved browser
+sign-in, so a later explicit login can reopen the mailbox without a password.
+Use `corr auth logout --account work --clear-browser` to also remove only that
+account's dedicated Outlook/Teams browser storage. It requires an explicit
+account, waits for account operations and browsers to close, and refuses busy
+or linked profiles. Other accounts, caches, and OS-keyring entries remain.
+OS or provider SSO can still sign you in; this is not remote token revocation.
+Authentication observation failures (for example, a service request on a
+mismatched exact origin) are reported in terminal and graphical login instead
+of remaining pending. A displayed page origin alone does not prove the service
+request origin; review the error and configured route before changing it.
 An Outlook Web login keeps its dedicated visible window open because that
 window owns the account session; account logout or daemon shutdown closes it.
 If its private profile still has a provider session, a later explicit login may

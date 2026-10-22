@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -183,5 +185,34 @@ func TestGraphicalLoginExpiresWithoutAnotherCLIRequest(t *testing.T) {
 	backend.expireTerminalInteraction(interaction)
 	if handles[1].closed {
 		t.Fatal("completed login was closed by expiry")
+	}
+}
+
+func TestInteractiveLoginDropsExistingObservationFailure(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+	for _, graphical := range []bool{false, true} {
+		t.Run(strconv.FormatBool(graphical), func(t *testing.T) {
+			lifecycle, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			handle := &fakeGraphicalBrowser{}
+			app := &runtime{launch: func(context.Context, browser.Options) (browserHandle, error) { return handle, nil }}
+			backend := &sessionBackend{app: app, configuration: config.OutlookDefault(), lifecycle: lifecycle, cancel: cancel, accounts: make(map[domain.AccountID]sessionAccount), previews: make(map[string]sessionPreview), terminalSessions: make(map[string]*terminalLoginSession), terminalAccounts: make(map[domain.AccountID]string)}
+			account := backend.configuration.Accounts["work"].ID
+			caller := domain.Caller{Surface: "cli", Instance: "observer-test"}
+			start, err := backend.TerminalLogin(t.Context(), daemonapi.TerminalLoginInput{Account: account, Graphical: graphical}, caller)
+			if err != nil {
+				t.Fatal(err)
+			}
+			failure := errors.New("synthetic exact-origin observation failure")
+			handle.sessionErr = failure
+			input := daemonapi.TerminalLoginInput{Account: account, SessionID: start.SessionID, Graphical: graphical}
+			if !graphical {
+				input.Action = &daemonapi.TerminalLoginAction{Type: "refresh"}
+			}
+			result, err := backend.TerminalLogin(t.Context(), input, caller)
+			if !errors.Is(err, failure) || result.Status == "pending" || !handle.closed || len(backend.terminalAccounts) != 0 || len(backend.terminalSessions) != 0 {
+				t.Fatalf("observation failure retained pending login: %+v %v", result, err)
+			}
+		})
 	}
 }

@@ -248,3 +248,21 @@ func TestResolveExecutableDoesNotFallbackFromExplicitPath(t *testing.T) {
 		t.Fatal("ResolveExecutable() unexpectedly accepted a missing explicit path")
 	}
 }
+
+func TestCurrentSessionObservationFailureRemainsVisibleAcrossPolls(t *testing.T) {
+	manager, err := session.NewManager("https://outlook.office.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	instance := &Browser{context: t.Context(), sessions: manager, sessionErrors: make(chan error, 1)}
+	failure := &sessionOriginMismatchError{configured: "https://outlook.office.com", observed: "https://outlook.cloud.microsoft"}
+	instance.reportSessionError(failure)
+	for range 3 {
+		if _, err := instance.CurrentSession(); !errors.Is(err, failure) {
+			t.Fatalf("observation failure became pending: %v", err)
+		}
+	}
+	if _, err := instance.WaitForSession(t.Context()); !errors.Is(err, failure) {
+		t.Fatalf("blocking observer lost failure: %v", err)
+	}
+}

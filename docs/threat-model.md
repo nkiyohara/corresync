@@ -310,6 +310,13 @@ single-user tool, not a remote gateway or tenant administration service.
   browser state, restart existing owners from the installed path, and never
   resume the requested operation on the old CLI image after replacement.
 
+Browser sign-in clearing is an explicit local CLI action for one configured
+opaque account. It closes account sessions and drains active operations before
+removing only dedicated browser profiles under the state root. Sidecar ownership,
+rooted removal, linked-path rejection, and Chromium singleton checks prevent
+clearing an active or unrelated profile. OS credentials and provider sessions
+outside these profiles remain outside the operation.
+
 ## Explicitly unsupported
 
 - unattended or password-based login;

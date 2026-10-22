@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -15,6 +17,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/localipc"
+	"github.com/nkiyohara/corresync/internal/paths"
 )
 
 type logoutTestCloser struct {
@@ -417,5 +420,45 @@ func TestSessionBackendLogoutDrainsActiveAccountOperation(t *testing.T) {
 	}
 	if closer.calls.Load() != 1 {
 		t.Fatalf("account closer calls = %d, want 1", closer.calls.Load())
+	}
+}
+
+func TestLogoutPreservesBrowserStorageUnlessExplicitlyCleared(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
+	configuration := config.OutlookDefault()
+	account := configuration.Accounts["work"].ID
+	profile, err := paths.ProfileDir(account)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(profile, 0700); err != nil {
+		t.Fatal(err)
+	}
+	marker := filepath.Join(profile, "synthetic")
+	if err := os.WriteFile(marker, []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	backend := &sessionBackend{configuration: configuration}
+	caller := domain.Caller{Surface: "cli", Instance: "logout-test"}
+	result, err := backend.Logout(t.Context(), account, caller)
+	if err != nil || result.BrowserSignInCleared {
+		t.Fatalf("ordinary logout: %+v %v", result, err)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatal("ordinary logout removed saved browser sign-in")
+	}
+	input := daemonapi.LogoutInput{Account: account, ClearBrowser: true}
+	if _, err := backend.LogoutWithOptions(t.Context(), input, domain.Caller{Surface: "mcp", Instance: "client"}); err == nil {
+		t.Fatal("MCP cleared browser storage")
+	}
+	result, err = backend.LogoutWithOptions(t.Context(), input, caller)
+	if err != nil || !result.BrowserSignInCleared {
+		t.Fatalf("explicit clear: %+v %v", result, err)
+	}
+	if _, err := os.Stat(profile); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("profile remained: %v", err)
+	}
+	if err := (&authLogoutCommand{ClearBrowser: true}).Run(&runtime{}); err == nil {
+		t.Fatal("untargeted browser clearing accepted")
 	}
 }

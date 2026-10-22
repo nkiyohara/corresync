@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -17,6 +16,7 @@ import (
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/remote"
 
+	"github.com/nkiyohara/corresync/internal/filelock"
 	"github.com/nkiyohara/corresync/internal/session"
 )
 
@@ -46,11 +46,14 @@ type Browser struct {
 	cancelAllocator context.CancelFunc
 	sessions        *session.Manager
 	sessionErrors   chan error
+	sessionErrorMu  sync.Mutex
+	sessionError    error
 	allowedOrigins  map[string]struct{}
 	interactionMu   sync.Mutex
 	teamsState      *teamsBrowserState
 	closeOnce       sync.Once
 	closeErr        error
+	profileLock     *filelock.Lock
 }
 
 // Launch opens a visible, isolated browser and navigates to Outlook Web. It
@@ -68,12 +71,6 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(options.ProfileDir, 0o700); err != nil {
-		return nil, fmt.Errorf("create browser profile: %w", err)
-	}
-	if err := os.Chmod(options.ProfileDir, 0o700); err != nil { // #nosec G302 -- private directories require owner execute.
-		return nil, fmt.Errorf("protect browser profile: %w", err)
-	}
 
 	var manager *session.Manager
 	if !options.BrowserOwnedOnly {
@@ -81,6 +78,10 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+	profileLock, err := prepareProfile(parent, options.ProfileDir)
+	if err != nil {
+		return nil, err
 	}
 	execOptions := allocatorOptions(executable, options.ProfileDir, options.Headless)
 	observation := &networkObservation{}
@@ -90,6 +91,7 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 	allocatorContext, cancelAllocator := chromedp.NewExecAllocator(parent, execOptions...)
 	browserContext, cancelContext := chromedp.NewContext(allocatorContext)
 	instance := &Browser{
+		profileLock:     profileLock,
 		context:         browserContext,
 		cancelContext:   cancelContext,
 		cancelAllocator: cancelAllocator,
@@ -143,6 +145,12 @@ func allocatorOptions(executable, profileDirectory string, headless bool) []chro
 
 // WaitForSession waits for an authorized first-party Outlook Web request.
 func (browser *Browser) WaitForSession(ctx context.Context) (session.Credentials, error) {
+	if err := ctx.Err(); err != nil {
+		return session.Credentials{}, err
+	}
+	if current, err := browser.CurrentSession(); !errors.Is(err, session.ErrNotReady) {
+		return current, err
+	}
 	if browser.sessions == nil {
 		return session.Credentials{}, errors.New(
 			"authorization observation is disabled for this browser",
@@ -156,7 +164,7 @@ func (browser *Browser) WaitForSession(ctx context.Context) (session.Credentials
 	case failure := <-browser.sessionErrors:
 		return session.Credentials{}, failure
 	case <-browser.sessions.Ready():
-		return browser.sessions.Current()
+		return browser.CurrentSession()
 	}
 }
 
@@ -164,6 +172,11 @@ func (browser *Browser) reportSessionError(failure error) {
 	if browser == nil || failure == nil {
 		return
 	}
+	browser.sessionErrorMu.Lock()
+	if browser.sessionError == nil {
+		browser.sessionError = failure
+	}
+	browser.sessionErrorMu.Unlock()
 	select {
 	case browser.sessionErrors <- failure:
 	default:
@@ -173,6 +186,12 @@ func (browser *Browser) reportSessionError(failure error) {
 // CurrentSession returns the current browser-observed authorization snapshot
 // without waiting for a new request.
 func (browser *Browser) CurrentSession() (session.Credentials, error) {
+	browser.sessionErrorMu.Lock()
+	failure := browser.sessionError
+	browser.sessionErrorMu.Unlock()
+	if failure != nil {
+		return session.Credentials{}, failure
+	}
 	if browser.sessions == nil {
 		return session.Credentials{}, errors.New(
 			"authorization observation is disabled for this browser",
@@ -206,6 +225,9 @@ func (browser *Browser) Close() error {
 		browser.closeErr = chromedp.Cancel(browser.context)
 		browser.cancelContext()
 		browser.cancelAllocator()
+		if browser.profileLock != nil {
+			browser.closeErr = errors.Join(browser.closeErr, browser.profileLock.Close())
+		}
 	})
 	return browser.closeErr
 }

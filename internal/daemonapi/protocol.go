@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 27
+	ProtocolVersion   = 28
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 48 << 20
 	contentType       = "application/json"
@@ -223,14 +223,16 @@ type LoginResult struct {
 
 // LogoutInput selects one configured account whose in-memory session closes.
 type LogoutInput struct {
-	Account domain.AccountID `json:"account"`
+	Account      domain.AccountID `json:"account"`
+	ClearBrowser bool             `json:"clearBrowser,omitempty"`
 }
 
 // LogoutResult confirms the exact account boundary without exposing session
 // or credential material.
 type LogoutResult struct {
-	Account   domain.AccountID `json:"account"`
-	LoggedOut bool             `json:"loggedOut"`
+	Account              domain.AccountID `json:"account"`
+	LoggedOut            bool             `json:"loggedOut"`
+	BrowserSignInCleared bool             `json:"browserSignInCleared"`
 }
 
 // SessionStatus is the application-owned, content-free session status schema.
@@ -366,7 +368,7 @@ func (action TerminalLoginAction) validate() error {
 type Backend interface {
 	DefaultAccount() domain.AccountID
 	Login(context.Context, domain.AccountID, domain.Caller) (LoginResult, error)
-	Logout(context.Context, domain.AccountID, domain.Caller) (LogoutResult, error)
+	LogoutWithOptions(context.Context, LogoutInput, domain.Caller) (LogoutResult, error)
 	SessionStatus(context.Context, domain.Caller) (SessionStatusResult, error)
 	ListMailFolders(context.Context, application.MailFolderListInput, domain.Caller) (application.MailFolderPage, error)
 	ListMail(context.Context, application.MailListInput, domain.Caller) (application.MailPage, error)

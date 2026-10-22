@@ -148,13 +148,10 @@ func monitorTestEvent(state string) application.MonitorEvent {
 func (*fakeBackend) Login(_ context.Context, account domain.AccountID, _ domain.Caller) (LoginResult, error) {
 	return LoginResult{Account: account, Authenticated: true, CapturedAt: time.Unix(2, 0)}, nil
 }
-func (*fakeBackend) Logout(
-	_ context.Context,
-	account domain.AccountID,
-	_ domain.Caller,
-) (LogoutResult, error) {
-	return LogoutResult{Account: account, LoggedOut: true}, nil
+func (*fakeBackend) LogoutWithOptions(_ context.Context, input LogoutInput, _ domain.Caller) (LogoutResult, error) {
+	return LogoutResult{Account: input.Account, LoggedOut: true, BrowserSignInCleared: input.ClearBrowser}, nil
 }
+
 func (backend *fakeBackend) TerminalLogin(_ context.Context, input TerminalLoginInput, caller domain.Caller) (TerminalLoginResult, error) {
 	backend.terminalInput, backend.caller = input, caller
 	if input.SessionID == "" {

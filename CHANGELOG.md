@@ -12,6 +12,10 @@ All notable user-facing changes are recorded here. The project follows
 - Drain admitted requests before retiring obsolete daemon images; serialize
   installers and prevent an older CLI from replacing a newer owner.
 - Preserve package-manager ownership and non-interactive/MCP exclusions.
+- Report browser authorization observation failures in terminal and graphical
+  login rather than leaving them pending (#202).
+- Distinguish local logout from explicit account-scoped saved-browser storage
+  clearing with `auth logout --account ALIAS --clear-browser` (#202).
 
 See the [release notes](docs/releases/v0.9.2.md) for upgrade instructions and
 compatibility limits.
