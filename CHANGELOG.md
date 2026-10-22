@@ -3,11 +3,14 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.9.0 - 2026-10-22
+## 0.9.1 - 2026-10-22
 
 The 0.9 line is stable; future development and releases use main. The 0.8
-maintenance line is closed. See the [release notes](docs/releases/v0.9.0.md)
+maintenance line is closed. See the [release notes](docs/releases/v0.9.1.md)
 for upgrade guidance, preview verification limits, and contributor credits.
+
+The 0.9.0 tag was reserved but not published. Daemon-owned expiry now closes
+abandoned login browsers even after an abrupt CLI disconnect.
 
 ### Remote graphical login
 

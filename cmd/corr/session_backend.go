@@ -402,6 +402,7 @@ type terminalLoginSession struct {
 	account   domain.AccountID
 	caller    domain.Caller
 	handle    terminalBrowserHandle
+	expiry    *time.Timer
 	deadline  time.Time
 	view      daemonapi.TerminalLoginView
 }
@@ -1117,6 +1118,9 @@ func (backend *sessionBackend) Logout(
 	var terminal *terminalLoginSession
 	if terminalID, exists := backend.terminalAccounts[accountID]; exists {
 		terminal = backend.terminalSessions[terminalID]
+		if terminal != nil && terminal.expiry != nil {
+			terminal.expiry.Stop()
+		}
 		delete(backend.terminalSessions, terminalID)
 		delete(backend.terminalAccounts, accountID)
 	}
@@ -1527,13 +1531,28 @@ func (backend *sessionBackend) terminalInteraction(
 	}
 	backend.terminalSessions[id] = interaction
 	backend.terminalAccounts[input.Account] = id
+	interaction.expiry = time.AfterFunc(time.Until(interaction.deadline), func() { backend.expireTerminalInteraction(interaction) })
 	return interaction, true, nil
+}
+
+// Expiry belongs to the daemon, so an abruptly disconnected CLI cannot retain
+// an unfinished browser or block a later human login indefinitely.
+func (backend *sessionBackend) expireTerminalInteraction(interaction *terminalLoginSession) {
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	if backend.closed || backend.terminalSessions[interaction.id] != interaction {
+		return
+	}
+	_ = backend.dropTerminalInteraction(interaction, true)
 }
 
 func (backend *sessionBackend) dropTerminalInteraction(
 	interaction *terminalLoginSession,
 	closeHandle bool,
 ) error {
+	if interaction.expiry != nil {
+		interaction.expiry.Stop()
+	}
 	delete(backend.terminalSessions, interaction.id)
 	delete(backend.terminalAccounts, interaction.account)
 	if closeHandle {
@@ -5195,6 +5214,9 @@ func (backend *sessionBackend) Close() error {
 			closeErrors = append(closeErrors, closeSessionAccount(account))
 		}
 		for _, interaction := range backend.terminalSessions {
+			if interaction.expiry != nil {
+				interaction.expiry.Stop()
+			}
 			closeErrors = append(closeErrors, interaction.handle.Close())
 		}
 		closeErrors = append(closeErrors, backend.recorder.Close())

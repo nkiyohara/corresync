@@ -14,8 +14,11 @@ rename.
 
 Scope is not capability. Development-route claims require synthetic fixture
 contract tests and remain live-unobserved until a documented opt-in live
-observation exists. A route that lacks the complete release evidence remains
-unreachable even when its adapter code is present.
+observation exists. A route that lacks complete release evidence remains
+unreachable unless the maintainer explicitly enabled its source-owned preview
+under ADR 0034. Teams
+Graph/Web and Mattermost are such previews; missing evidence remains missing
+and must be reported. Slack stays disabled.
 
 Teams calls, recordings, presence surveillance, and meeting lifecycle
 management stay out of scope. Provider-neutral chat and channel messaging is

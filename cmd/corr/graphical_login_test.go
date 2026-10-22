@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/browser"
@@ -119,5 +120,68 @@ func TestGraphicalLoginAccountCallerAndModeIsolation(t *testing.T) {
 	}
 	if _, err := backend.TerminalLogin(t.Context(), input, caller); err == nil {
 		t.Fatal("expired replay accepted")
+	}
+}
+
+func TestGraphicalLoginExpiresWithoutAnotherCLIRequest(t *testing.T) {
+	t.Setenv("OWA_STATE_DIR", t.TempDir())
+	lifecycle, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	handles := []*fakeGraphicalBrowser{}
+	app := &runtime{launch: func(context.Context, browser.Options) (browserHandle, error) {
+		handle := &fakeGraphicalBrowser{}
+		handles = append(handles, handle)
+		return handle, nil
+	}}
+	configuration := config.OutlookDefault()
+	configuration.Browser.LoginTimeout = config.Duration(100 * time.Millisecond)
+	backend := &sessionBackend{app: app, configuration: configuration, lifecycle: lifecycle, cancel: cancel, accounts: make(map[domain.AccountID]sessionAccount), previews: make(map[string]sessionPreview), terminalSessions: make(map[string]*terminalLoginSession), terminalAccounts: make(map[domain.AccountID]string)}
+	account := configuration.Accounts["work"].ID
+	first, err := backend.TerminalLogin(t.Context(), daemonapi.TerminalLoginInput{Account: account, Graphical: true}, domain.Caller{Surface: "cli", Instance: "disconnected-cli"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend.mu.Lock()
+	old := backend.terminalSessions[first.SessionID]
+	backend.mu.Unlock()
+	deadline := time.After(3 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		backend.mu.Lock()
+		expired := len(backend.terminalSessions) == 0 && handles[0].closed
+		backend.mu.Unlock()
+		if expired {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("daemon retained abandoned login")
+		case <-ticker.C:
+		}
+	}
+	backend.configuration.Browser.LoginTimeout = config.Duration(time.Minute)
+	next, err := backend.TerminalLogin(t.Context(), daemonapi.TerminalLoginInput{Account: account, Graphical: true}, domain.Caller{Surface: "cli", Instance: "new-cli"})
+	if err != nil || next.SessionID == first.SessionID {
+		t.Fatalf("replacement=%+v %v", next, err)
+	}
+	// An already queued old expiry cannot close the replacement interaction.
+	backend.expireTerminalInteraction(old)
+	backend.mu.Lock()
+	if handles[1].closed {
+		t.Error("old timer closed replacement")
+	}
+	interaction := backend.terminalSessions[next.SessionID]
+	if interaction == nil {
+		backend.mu.Unlock()
+		t.Fatal("replacement disappeared")
+	}
+	if err := backend.dropTerminalInteraction(interaction, false); err != nil {
+		t.Error(err)
+	}
+	backend.mu.Unlock()
+	backend.expireTerminalInteraction(interaction)
+	if handles[1].closed {
+		t.Fatal("completed login was closed by expiry")
 	}
 }
