@@ -123,7 +123,14 @@ jobs:
           echo "CORRESYNC_KEYCHAIN_PATH=$keychain_path" >>"$GITHUB_ENV"
 
       - name: Build SBOM-bearing draft release
-        run: goreleaser release --clean
+        shell: bash
+        run: |
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          if [[ -f "$notes" ]]; then
+            goreleaser release --clean --release-notes "$notes"
+          else
+            goreleaser release --clean
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

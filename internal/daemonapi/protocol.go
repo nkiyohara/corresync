@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 26
+	ProtocolVersion   = 27
 	maxRequestBytes   = 8 << 20
 	maxResponseBytes  = 48 << 20
 	contentType       = "application/json"
@@ -248,9 +248,11 @@ type MonitorStatusInput struct {
 // interaction. A start request has only Account; subsequent requests include a
 // SessionID and one bounded action.
 type TerminalLoginInput struct {
-	Account   domain.AccountID     `json:"account"`
-	SessionID string               `json:"sessionId,omitempty"`
-	Action    *TerminalLoginAction `json:"action,omitempty"`
+	Graphical       bool                              `json:"graphical,omitempty"`
+	GraphicalAction *application.GraphicalLoginAction `json:"graphicalAction,omitempty"`
+	Account         domain.AccountID                  `json:"account"`
+	SessionID       string                            `json:"sessionId,omitempty"`
+	Action          *TerminalLoginAction              `json:"action,omitempty"`
 }
 
 // TerminalLoginAction is one browser control activation, focus request, key,
@@ -283,16 +285,35 @@ type TerminalLoginView struct {
 // TerminalLoginResult reports either the next text interaction or completed
 // authentication without exposing authorization material.
 type TerminalLoginResult struct {
-	Account    domain.AccountID   `json:"account"`
-	SessionID  string             `json:"sessionId,omitempty"`
-	Status     string             `json:"status"`
-	CapturedAt time.Time          `json:"capturedAt,omitempty"`
-	View       *TerminalLoginView `json:"view,omitempty"`
+	Frame      *application.GraphicalLoginFrame `json:"frame,omitempty"`
+	Account    domain.AccountID                 `json:"account"`
+	SessionID  string                           `json:"sessionId,omitempty"`
+	Status     string                           `json:"status"`
+	CapturedAt time.Time                        `json:"capturedAt,omitempty"`
+	View       *TerminalLoginView               `json:"view,omitempty"`
 }
 
 func (input TerminalLoginInput) validate() error {
 	if err := input.Account.Validate(); err != nil {
 		return err
+	}
+	if input.Graphical {
+		if input.Action != nil {
+			return errors.New("graphical login cannot include a terminal action")
+		}
+		if input.SessionID == "" {
+			if input.GraphicalAction != nil {
+				return errors.New("graphical login start cannot include an action")
+			}
+			return nil
+		}
+		if !terminalSessionIDPattern.MatchString(input.SessionID) || input.GraphicalAction == nil {
+			return errors.New("invalid graphical login continuation")
+		}
+		return input.GraphicalAction.Validate()
+	}
+	if input.GraphicalAction != nil {
+		return errors.New("graphical input requires graphical mode")
 	}
 	if input.SessionID == "" {
 		if input.Action != nil {

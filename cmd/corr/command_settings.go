@@ -15,6 +15,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
+	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/panicguard"
 	"github.com/nkiyohara/corresync/internal/settingsstore"
@@ -366,6 +367,7 @@ func runAccountSettings(
 		return fmt.Errorf("account %q is no longer configured", alias)
 	}
 	options := []huh.Option[string]{
+		huh.NewOption("Services · enable or disable Mail, Calendar, Tasks, and Messaging", "services"),
 		huh.NewOption(
 			"Sign in · corr auth login --account "+alias,
 			"login",
@@ -400,6 +402,8 @@ func runAccountSettings(
 		return err
 	}
 	switch action {
+	case "services":
+		return runAccountServiceSettings(app, service, account)
 	case "login":
 		return (&loginCommand{Account: alias}).Run(app)
 	case "login_terminal":
@@ -833,6 +837,9 @@ func applyLocalSetting(
 	if len(review.RelatedChanges) > 0 {
 		_, err = view.printf("   %s\n", view.muted("Automatic checks were also enabled because installation depends on them."))
 	}
+	if err == nil && strings.HasPrefix(review.Key, "accounts.") && strings.HasSuffix(review.Key, ".services") {
+		return stopServiceSettingsOwner(app)
+	}
 	if err == nil && review.RestartsSessions {
 		_, err = view.printf(
 			"   %s\n",
@@ -1120,4 +1127,63 @@ func safetySummary(mode string) string {
 		return "all writes blocked"
 	}
 	return "writes use normal approval policy"
+}
+
+func runAccountServiceSettings(app *runtime, service *application.SettingsService, account application.SettingsAccount) error {
+	options := make([]huh.Option[string], 0, len(account.Services))
+	for _, item := range account.Services {
+		options = append(options, huh.NewOption(item.Label, item.Name).Selected(item.Enabled))
+	}
+	values, selected, err := runSettingsMultiSelect(app, "Services · "+account.Alias,
+		"Configured services default to on. Turning one off retains its settings and blocks its authentication and operations. Add missing routes through setup; changing this selection does not sign in.", options, nil)
+	if err != nil || !selected {
+		return err
+	}
+	value := strings.Join(values, ",")
+	if value == "" {
+		value = "none"
+	}
+	key := application.AccountServicesSettingKey(account.ID)
+	settings, err := service.Show(app.context)
+	if err != nil {
+		return err
+	}
+	previous, err := application.SettingsValue(settings, key)
+	if err != nil {
+		return err
+	}
+	if value == previous {
+		return nil
+	}
+	return applyLocalSetting(app, service, application.SettingsUpdateInput{Key: key, Value: value})
+}
+
+// A service switch must also stop monitoring and invalidate old approvals.
+// No owner is started, and only the authenticated owner for this config stops.
+func stopServiceSettingsOwner(app *runtime) (returnErr error) {
+	path, err := app.resolvedConfigPath()
+	if err != nil {
+		return err
+	}
+	endpoints, err := app.activeDaemonEndpoints(path)
+	if err != nil {
+		return err
+	}
+	if len(endpoints) == 0 {
+		return nil
+	}
+	if len(endpoints) != 1 {
+		return errors.New("multiple session owners exist; run corr daemon stop before using the changed services")
+	}
+	client, err := daemonapi.NewClient(endpoints[0])
+	if err != nil {
+		return err
+	}
+	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
+	ctx, cancel := context.WithTimeout(app.context, daemonShutdownTimeout)
+	defer cancel()
+	if err := client.Shutdown(ctx, app.caller()); err != nil {
+		return fmt.Errorf("services saved but session shutdown failed: %w", err)
+	}
+	return waitForSettingsDaemonStop(app)
 }

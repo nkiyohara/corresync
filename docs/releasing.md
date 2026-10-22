@@ -6,25 +6,13 @@ compatibility evidence.
 
 ## Release lines
 
-`main` is the integration branch for the next minor release. While v0.9 is in
-development, `release/0.8` is the protected maintenance branch for v0.8 stable
-and preview releases. Short-lived feature branches target `main`; only bug,
-security, compatibility, documentation, and release-engineering fixes for
-already shipped behavior target `release/0.8`.
+`main` is the sole development and release branch from v0.9.0 onward.
+`release/0.8` is frozen; routine backports and v0.8 releases have ended. Users
+should upgrade to v0.9 as described in `SECURITY.md`. The release workflow
+rejects new v0.8 tags once the stable v0.9.0 tag exists. Earlier lines remain closed.
 
-This is a finite transition, not a second long-term support line. Publish v0.8
-releases from the maintenance branch while v0.9 develops concurrently on
-`main`. Once v0.9.0 is published as stable, freeze `release/0.8`, stop routine
-v0.8 releases, and update `SECURITY.md` so users are directed to v0.9. All new
-development and releases then continue from `main` on the v0.9 line. The
-release workflow enforces this cutoff: after the stable `v0.9.0` tag exists, it
-rejects every new `v0.8.*` tag. Release lines earlier than v0.8 are closed.
-
-Develop a fix against the oldest affected supported line. After it is reviewed
-and merged there, forward-port the exact change to `main` through a separate
-pull request, normally with `git cherry-pick -x`. Never merge `main` into a
-maintenance branch, and do not add a new command, MCP tool, schema, provider,
-or capability to v0.8.
+Short-lived feature and fix branches target `main`. Keep historical maintenance
+branches for traceability, without continuing dual development.
 
 The release workflow binds each tag to its protected source branch:
 
@@ -253,3 +241,12 @@ new SemVer release, mark the affected release appropriately, and document
 security/compatibility impact without exposing private reporter or mailbox
 data. Package catalogs must converge on the new immutable release rather than a
 mutated old one.
+
+## Authored release notes and credits
+
+When `docs/releases/vX.Y.Z.md` exists, the release workflow passes that file to
+GoReleaser before creating the verified draft. Otherwise it uses generated notes.
+Mention merged contributors as `@username` beside their PR links, group paired
+backports/forward-ports, and verify prior contributions before labeling anyone
+as a first-time contributor. Include provider verification limits and upgrade
+steps; a stable product tag never supplies missing live evidence.

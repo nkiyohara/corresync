@@ -149,7 +149,7 @@ func TestGuidedSetupLetsOutlookServicesBeSelectedIndependently(t *testing.T) {
 	for _, expected := range []string{
 		"Services to configure",
 		"Microsoft To Do · separate, explicit Graph authorization",
-		"Teams messaging · coming soon",
+		"Teams messaging · choose Teams Web or Microsoft Graph next",
 		"Tasks            not configured",
 	} {
 		if !strings.Contains(stdout.String(), expected) {

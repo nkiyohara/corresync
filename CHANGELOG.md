@@ -3,7 +3,36 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.9.0 - 2026-10-22
+
+The 0.9 line is stable; future development and releases use main. The 0.8
+maintenance line is closed. See the [release notes](docs/releases/v0.9.0.md)
+for upgrade guidance, preview verification limits, and contributor credits.
+
+### Remote graphical login
+
+- Use `corr auth login --host HOST --account ALIAS` on your local computer, or
+  `--web` on the remote host with the printed SSH forwarding instructions, to
+  operate the dedicated Outlook Web browser graphically. The temporary UI is
+  loopback-only, paired, bounded, and human-operated. The authenticated session
+  stays remote. Real Mac-to-Linux provider login remains live-unobserved.
+
+### Messaging previews
+
+- Enable explicitly selected Teams Graph, Teams Web, and Mattermost routes
+  through the existing guarded CLI/MCP contracts. These are preview features
+  with live compatibility still unverified; Slack remains disabled.
+- Keep missing release evidence visible and preserve the fixed Teams
+  capability intersection, exact-account checks, and approval-bound writes.
+
+||||||| parent of 79d98f6 (feat(settings): add per-account service switches)
+
+### Per-account services
+
+- Enable or disable each configured Mail, Calendar, Tasks, or Messaging service
+  in account settings. Defaults remain enabled; disabled routes retain their
+  settings but cannot authenticate or dispatch operations. Changes stop existing
+  sessions and invalidate pending approvals. Schema v11 migrates to v12.
 
 ### Outlook Web attachment sends
 

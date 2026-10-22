@@ -9,8 +9,8 @@ import (
 
 // ErrMessagingPending is returned before credential access, browser launch,
 // provider traffic, or capability probing while the release-owned manifest is
-// incomplete. There is deliberately no environment, flag, config, or MCP
-// override.
+// incomplete and no source-owned preview is enabled. There is deliberately
+// no environment, flag, config, or MCP override.
 var ErrMessagingPending = errors.New("messaging is not release-enabled")
 
 // MessagingGateStatus is content-free release evidence for one exact route.
@@ -20,6 +20,7 @@ type MessagingGateStatus struct {
 	Provider domain.MessagingProviderID `json:"provider"`
 	Route    domain.MessagingRouteKind  `json:"route"`
 	Enabled  bool                       `json:"enabled"`
+	Preview  bool                       `json:"preview,omitempty"`
 	Missing  []string                   `json:"missing,omitempty"`
 }
 
@@ -36,7 +37,8 @@ type messagingEvidence struct {
 
 // MessagingStatus returns the immutable source-owned gate for one route. Each
 // literal is changed only by a reviewed release commit that carries the
-// corresponding repository evidence.
+// corresponding repository evidence. Teams and Mattermost previews are enabled
+// without claiming that outstanding stable-release evidence is complete.
 func MessagingStatus(provider domain.MessagingProviderID, route domain.MessagingRouteKind) (MessagingGateStatus, error) {
 	if err := validateMessagingRoute(provider, route); err != nil {
 		return MessagingGateStatus{}, err
@@ -53,12 +55,15 @@ func MessagingStatus(provider domain.MessagingProviderID, route domain.Messaging
 	}
 	missing := evidence.missing()
 	return MessagingGateStatus{
-		Provider: provider, Route: route, Enabled: len(missing) == 0, Missing: missing,
+		Provider: provider, Route: route,
+		Enabled: len(missing) == 0 || (provider == domain.MessagingProviderMicrosoftTeams || provider == domain.MessagingProviderMattermost),
+		Preview: (provider == domain.MessagingProviderMicrosoftTeams || provider == domain.MessagingProviderMattermost) && len(missing) != 0,
+		Missing: missing,
 	}, nil
 }
 
 // RequireMessaging fails closed before any external effect while a route's
-// complete release manifest is not satisfied.
+// release manifest is not satisfied and no reviewed preview is enabled.
 func RequireMessaging(provider domain.MessagingProviderID, route domain.MessagingRouteKind) error {
 	status, err := MessagingStatus(provider, route)
 	if err != nil {
@@ -70,12 +75,9 @@ func RequireMessaging(provider domain.MessagingProviderID, route domain.Messagin
 	return fmt.Errorf("%w: %s is awaiting %v", ErrMessagingPending, route, status.Missing)
 }
 
-// MessagingCatalogEnabled reports whether every route in the first release
-// cohort has satisfied the same immutable source-owned release manifest. MCP
-// and other discoverable surfaces use this aggregate gate so a partial route
-// cannot make unfinished messaging tools visible. There is deliberately no
-// runtime override. Slack is deferred outside this cohort; its own route gate
-// remains closed.
+// MessagingCatalogEnabled exposes the typed surface when the Teams preview
+// cohort and Mattermost are available. Every operation still checks its exact provider route;
+// Slack remains closed independently of this catalog.
 func MessagingCatalogEnabled() bool {
 	routes := []struct {
 		provider domain.MessagingProviderID

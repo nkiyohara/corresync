@@ -15,7 +15,7 @@ import (
 	"github.com/nkiyohara/corresync/internal/policy"
 )
 
-const CurrentVersion = 11
+const CurrentVersion = 12
 
 const defaultAccountID domain.AccountID = "acc_00000000000000000000000000000001"
 
@@ -36,13 +36,14 @@ type Config struct {
 // Config.Accounts is its mutable local alias; ID is an opaque, stable storage
 // and policy key that does not change when the alias or address changes.
 type Account struct {
-	ID       domain.AccountID `json:"id" toml:"id"`
-	Address  string           `json:"address,omitempty" toml:"address,omitempty"`
-	Mail     *MailRoute       `json:"mail,omitempty" toml:"mail,omitempty"`
-	Calendar *CalendarRoute   `json:"calendar,omitempty" toml:"calendar,omitempty"`
-	Tasks    *TaskRoute       `json:"tasks,omitempty" toml:"tasks,omitempty"`
-	Messages *MessagingRoute  `json:"messages,omitempty" toml:"messages,omitempty"`
-	Monitor  *Monitor         `json:"monitor,omitempty" toml:"monitor,omitempty"`
+	DisabledServices []string         `json:"disabledServices,omitempty" toml:"disabled_services,omitempty"`
+	ID               domain.AccountID `json:"id" toml:"id"`
+	Address          string           `json:"address,omitempty" toml:"address,omitempty"`
+	Mail             *MailRoute       `json:"mail,omitempty" toml:"mail,omitempty"`
+	Calendar         *CalendarRoute   `json:"calendar,omitempty" toml:"calendar,omitempty"`
+	Tasks            *TaskRoute       `json:"tasks,omitempty" toml:"tasks,omitempty"`
+	Messages         *MessagingRoute  `json:"messages,omitempty" toml:"messages,omitempty"`
+	Monitor          *Monitor         `json:"monitor,omitempty" toml:"monitor,omitempty"`
 }
 
 // Monitor is an explicit, account-local consent record. A nil value is always

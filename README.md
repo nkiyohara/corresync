@@ -236,8 +236,9 @@ missing or repairable steps.
 After choosing a connection route, the wizard presents a service checklist.
 For a Microsoft account, Outlook Mail and Calendar are preselected and can be
 changed independently; Microsoft To Do is an optional, explicit Graph
-authorization. Teams messaging is shown as coming soon while the messaging release
-gate is closed and cannot be selected, persisted, or opened. Discovery is only
+authorization. Teams messaging is selectable as a preview through Teams Web
+or explicitly authorized Graph. Mattermost is also available as a preview;
+these routes still lack complete live compatibility evidence. Discovery is only
 route evidence: it never proves that any checked service is enabled for the
 account, and it never triggers a Graph fallback.
 
@@ -386,7 +387,7 @@ agent.
   reports native support.
 - Cross-compilation and synthetic fixtures do not prove native browser,
   keyring, IPC, provider, package-manager, Gatekeeper, or SmartScreen behavior.
-- Teams chat, channels, calls, recordings, and meeting lifecycle management;
+- Teams calls, recordings, and meeting lifecycle management;
   tenant-wide access; unattended login; TLS interception; arbitrary provider
   actions; automatic telemetry; and raw crash upload are outside scope.
 
@@ -450,3 +451,5 @@ mise exec -- task verify
 
 Please report vulnerabilities through
 [GitHub private vulnerability reporting](SECURITY.md), never a public issue.
+
+For remote terminals, see [graphical login over SSH](docs/remote-login.md).

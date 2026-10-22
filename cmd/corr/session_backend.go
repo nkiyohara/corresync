@@ -397,12 +397,13 @@ type sessionPreview struct {
 }
 
 type terminalLoginSession struct {
-	id       string
-	account  domain.AccountID
-	caller   domain.Caller
-	handle   terminalBrowserHandle
-	deadline time.Time
-	view     daemonapi.TerminalLoginView
+	graphical bool
+	id        string
+	account   domain.AccountID
+	caller    domain.Caller
+	handle    terminalBrowserHandle
+	deadline  time.Time
+	view      daemonapi.TerminalLoginView
 }
 
 const (
@@ -507,7 +508,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 	lifecycle, cancel := context.WithCancel(context.WithoutCancel(app.context))
 	backend := &sessionBackend{
 		app:              app,
-		configuration:    configuration,
+		configuration:    configuration.ActiveServices(),
 		guard:            guard,
 		recorder:         recorder,
 		credentials:      credentials,
@@ -597,6 +598,7 @@ func configuredServiceProvider(
 	account config.Account,
 	service application.AuthenticationService,
 ) domain.ProviderID {
+	account = account.ActiveServices()
 	switch service {
 	case application.AuthenticationServiceMail:
 		return account.MailProvider()
@@ -1309,14 +1311,34 @@ func (backend *sessionBackend) TerminalLogin(
 			errors.New("terminal login expired; start it again"), closeErr,
 		)
 	}
-	if input.Action != nil && input.Action.Type == "cancel" {
+	if input.Action != nil && input.Action.Type == "cancel" || input.GraphicalAction != nil && input.GraphicalAction.Type == "cancel" {
 		return daemonapi.TerminalLoginResult{
 			Account: input.Account, Status: "cancelled",
 		}, backend.dropTerminalInteraction(interaction, true)
 	}
 
+	var frame *application.GraphicalLoginFrame
+	if input.Graphical {
+		handle, supported := interaction.handle.(interface {
+			GraphicalLogin(context.Context, application.GraphicalLoginAction) (application.GraphicalLoginFrame, error)
+		})
+		if !supported {
+			return daemonapi.TerminalLoginResult{}, errors.New("browser does not support graphical login")
+		}
+		if _, err := interaction.handle.CurrentSession(); errors.Is(err, session.ErrNotReady) {
+			action := application.GraphicalLoginAction{Type: "refresh"}
+			if input.GraphicalAction != nil {
+				action = *input.GraphicalAction
+			}
+			observed, err := handle.GraphicalLogin(ctx, action)
+			if err != nil {
+				return daemonapi.TerminalLoginResult{}, err
+			}
+			frame = &observed
+		}
+	}
 	progressChecked := false
-	if input.Action == nil {
+	if input.Action == nil && !input.Graphical {
 		if err := awaitTerminalLoginProgress(ctx, interaction); err != nil {
 			return daemonapi.TerminalLoginResult{}, err
 		}
@@ -1374,6 +1396,9 @@ func (backend *sessionBackend) TerminalLogin(
 		return daemonapi.TerminalLoginResult{}, credentialsErr
 	}
 
+	if input.Graphical {
+		return daemonapi.TerminalLoginResult{Account: input.Account, SessionID: interaction.id, Status: "pending", Frame: frame}, nil
+	}
 	refreshView := input.Action == nil || input.Action.Type == "refresh" ||
 		input.Action.Type == "activate" || input.Action.Key == "enter"
 	if refreshView && !progressChecked {
@@ -1451,14 +1476,14 @@ func (backend *sessionBackend) terminalInteraction(
 ) (*terminalLoginSession, bool, error) {
 	if input.SessionID != "" {
 		interaction, exists := backend.terminalSessions[input.SessionID]
-		if !exists || interaction.account != input.Account || interaction.caller != caller {
+		if !exists || interaction.account != input.Account || interaction.caller != caller || interaction.graphical != input.Graphical {
 			return nil, false, errors.New("invalid or expired terminal login session")
 		}
 		return interaction, false, nil
 	}
 	if existingID, exists := backend.terminalAccounts[input.Account]; exists {
 		interaction := backend.terminalSessions[existingID]
-		if interaction == nil || interaction.caller != caller {
+		if interaction == nil || interaction.caller != caller || interaction.graphical != input.Graphical {
 			return nil, false, errors.New("a terminal login is already active for this account")
 		}
 		return interaction, false, nil
@@ -1497,7 +1522,7 @@ func (backend *sessionBackend) terminalInteraction(
 		return nil, false, errors.Join(err, handle.Close())
 	}
 	interaction := &terminalLoginSession{
-		id: id, account: input.Account, caller: caller, handle: terminalHandle,
+		id: id, account: input.Account, caller: caller, handle: terminalHandle, graphical: input.Graphical,
 		deadline: time.Now().Add(time.Duration(backend.configuration.Browser.LoginTimeout)),
 	}
 	backend.terminalSessions[id] = interaction
@@ -2962,12 +2987,15 @@ func (backend *sessionBackend) requireAnyMessagingRoute() error {
 	if len(routes) == 0 {
 		return errors.New("no messaging route is configured")
 	}
+	var gateErr error
 	for _, route := range routes {
-		if err := rollout.RequireMessaging(route.Provider, route.Kind()); err != nil {
-			return err
+		if err := rollout.RequireMessaging(route.Provider, route.Kind()); err == nil {
+			return nil
+		} else {
+			gateErr = err
 		}
 	}
-	return nil
+	return gateErr
 }
 
 func (backend *sessionBackend) commitMessageWrite(
@@ -3192,6 +3220,11 @@ func (backend *sessionBackend) activateAccount(
 		backend.mu.Unlock()
 		return sessionAccount{}, fmt.Errorf("account %q is not configured", accountID)
 	}
+	configured = configured.ActiveServices()
+	if configured.Mail == nil && configured.Calendar == nil && configured.Tasks == nil && configured.Messages == nil {
+		backend.mu.Unlock()
+		return sessionAccount{}, errors.New("all services for this account are disabled; enable a service in corr settings")
+	}
 	if account, active := backend.accounts[accountID]; active &&
 		sessionAccountComplete(configured, account) {
 		backend.mu.Unlock()
@@ -3304,6 +3337,7 @@ func (backend *sessionBackend) activateAccount(
 // releasedSessionRoutes is shared by visible and terminal authentication so
 // dormant selections cannot resolve credentials, authorize, or probe providers.
 func releasedSessionRoutes(configured config.Account) (config.Account, []domain.Degradation, error) {
+	configured = configured.ActiveServices()
 	if hasGoogleWebRoute(configured) {
 		return config.Account{}, nil, errUnsupportedLegacyGoogleRoute
 	}
@@ -3376,8 +3410,8 @@ func inactiveTaskRoute(configured config.Account) (*domain.Degradation, error) {
 	}, nil
 }
 
-// inactiveMessagingRoute keeps the complete v0.9 implementation dormant
-// until release-owned evidence is accepted. The check happens before browser
+// inactiveMessagingRoute keeps routes outside the reviewed release or preview
+// cohort dormant. The check happens before browser
 // launch, credential resolution, OAuth, or provider traffic. A mixed account
 // retains its already released services with an explicit degradation; a
 // messaging-only account cannot be mistaken for an authenticated empty
@@ -3418,6 +3452,17 @@ func (backend *sessionBackend) messagingSessionAccount(
 	closers ...sessionCloser,
 ) (sessionAccount, error) {
 	capabilities := client.MessageCapabilities()
+	degradations := client.MessageDegradations()
+	status, err := rollout.MessagingStatus(provider, route)
+	if err != nil || !status.Enabled {
+		return sessionAccount{}, errors.Join(rollout.ErrMessagingPending, err, closeSessionAccount(sessionAccount{closers: closers}))
+	}
+	if status.Preview {
+		degradations = append(degradations, domain.Degradation{
+			Feature: "messages.preview",
+			Reason:  "Messaging is a preview; live compatibility and stable-release evidence remain incomplete",
+		})
+	}
 	messages, err := application.NewMessagingService(
 		backend.guard,
 		client,
@@ -3427,7 +3472,7 @@ func (backend *sessionBackend) messagingSessionAccount(
 				WorkspaceID: workspaceID, Actor: client.MessageActor(),
 			},
 			Capabilities: capabilities,
-			Degradations: client.MessageDegradations(),
+			Degradations: degradations,
 		},
 	)
 	result := sessionAccount{
@@ -3437,7 +3482,7 @@ func (backend *sessionBackend) messagingSessionAccount(
 			AttachmentReads:  capabilities.AttachmentReads,
 			AttachmentWrites: capabilities.AttachmentWrites,
 		},
-		degradations: client.MessageDegradations(),
+		degradations: degradations,
 	}
 	if err != nil {
 		return sessionAccount{}, errors.Join(err, closeSessionAccount(result))

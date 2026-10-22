@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/approval"
+	"github.com/nkiyohara/corresync/internal/domain"
 )
 
 const (
@@ -21,7 +22,17 @@ const (
 )
 
 // SettingsAccount is the bounded account information needed by settings UIs.
+type SettingsAccountService struct {
+	Name    string `json:"name"`
+	Label   string `json:"label"`
+	Enabled bool   `json:"enabled"`
+}
+
 type SettingsAccount struct {
+	Revision string                   `json:"revision"`
+	ID       domain.AccountID         `json:"id"`
+	Services []SettingsAccountService `json:"services,omitempty"`
+
 	Alias     string `json:"alias"`
 	Address   string `json:"address,omitempty"`
 	IsDefault bool   `json:"isDefault"`
@@ -54,6 +65,7 @@ type SettingsValueChange struct {
 
 // SettingsChangeReview is an optimistic, approval-bindable settings mutation.
 type SettingsChangeReview struct {
+	AccountRevision  string                `json:"accountRevision,omitempty"`
 	Key              string                `json:"key"`
 	Previous         string                `json:"previous"`
 	Value            string                `json:"value"`
@@ -119,6 +131,10 @@ func (service *SettingsService) Review(
 		Command:          fmt.Sprintf("corr config set %s %s", key, value),
 		RestartsSessions: true,
 	}
+	if account, ok := settingsServiceAccount(settings, key); ok {
+		review.AccountRevision = account.Revision
+		review.Description = "Enable only " + value + " for account " + account.Alias + "; keep route settings and stop existing sessions. Sign in explicitly afterward."
+	}
 	if key == SettingUpdateInstall && value == "true" && !settings.AutomaticChecks {
 		review.RelatedChanges = []SettingsValueChange{{
 			Key: SettingUpdateChecks, Previous: "false", Value: "true",
@@ -153,6 +169,19 @@ func (service *SettingsService) Apply(
 
 // SettingsValue returns the canonical string form used for optimistic writes.
 func SettingsValue(settings SettingsView, key string) (string, error) {
+	if account, ok := settingsServiceAccount(settings, key); ok {
+		var enabled []string
+		for _, service := range account.Services {
+			if service.Enabled {
+				enabled = append(enabled, service.Name)
+			}
+		}
+		if len(enabled) == 0 {
+			return "none", nil
+		}
+		return strings.Join(enabled, ","), nil
+	}
+
 	switch key {
 	case SettingDefaultAccount:
 		return settings.DefaultAccount, nil
@@ -173,6 +202,29 @@ func SettingsValue(settings SettingsView, key string) (string, error) {
 
 func normalizeSettingValue(settings SettingsView, key, raw string) (string, error) {
 	value := strings.TrimSpace(raw)
+	if account, ok := settingsServiceAccount(settings, key); ok {
+		if value == "none" {
+			return value, nil
+		}
+		selected := make(map[string]bool)
+		for _, name := range strings.Split(value, ",") {
+			if selected[name] {
+				return "", errors.New("duplicate service selection")
+			}
+			selected[name] = true
+		}
+		var canonical []string
+		for _, service := range account.Services {
+			if selected[service.Name] {
+				canonical = append(canonical, service.Name)
+				delete(selected, service.Name)
+			}
+		}
+		if len(selected) != 0 || len(canonical) == 0 {
+			return "", errors.New("select configured services only; use setup for a missing service")
+		}
+		return strings.Join(canonical, ","), nil
+	}
 	switch key {
 	case SettingDefaultAccount:
 		for _, account := range settings.Accounts {
@@ -254,4 +306,18 @@ func settingDescription(key, value string) string {
 	default:
 		return "Update one everyday setting."
 	}
+}
+
+// AccountServicesSettingKey binds a review to stable identity, not a renameable alias.
+func AccountServicesSettingKey(id domain.AccountID) string {
+	return "accounts." + string(id) + ".services"
+}
+
+func settingsServiceAccount(settings SettingsView, key string) (SettingsAccount, bool) {
+	for _, account := range settings.Accounts {
+		if account.ID.ValidateOpaque() == nil && key == AccountServicesSettingKey(account.ID) {
+			return account, true
+		}
+	}
+	return SettingsAccount{}, false
 }

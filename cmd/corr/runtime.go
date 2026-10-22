@@ -311,7 +311,6 @@ func (app *runtime) accountServices() (
 		messagingAvailable = []domain.MessagingRouteKind{
 			domain.MessagingRouteTeamsGraph,
 			domain.MessagingRouteTeamsWeb,
-			domain.MessagingRouteSlackAPI,
 			domain.MessagingRouteMattermost,
 		}
 	}

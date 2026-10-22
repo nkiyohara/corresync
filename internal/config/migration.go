@@ -1015,3 +1015,30 @@ func acquireMigrationLock(
 	}
 	return nil, false, errors.New("timed out waiting for config migration lock")
 }
+
+// MigrateV11 preserves every existing route and defaults it to enabled. It
+// never creates routes or expands authorization. Older binaries reject v12.
+func MigrateV11(data []byte) (Config, error) {
+	if len(data) > maximumConfigBytes {
+		return Config{}, fmt.Errorf("config exceeds %d bytes", maximumConfigBytes)
+	}
+	var configuration Config
+	decoder := toml.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&configuration); err != nil {
+		return Config{}, fmt.Errorf("decode v11 config: %w", err)
+	}
+	if configuration.Version != 11 {
+		return Config{}, errors.New("expected config version 11")
+	}
+	for _, account := range configuration.Accounts {
+		if account.DisabledServices != nil {
+			return Config{}, errors.New("v11 cannot contain disabled_services")
+		}
+	}
+	configuration.Version = CurrentVersion
+	if err := configuration.Validate(); err != nil {
+		return Config{}, err
+	}
+	return configuration, nil
+}

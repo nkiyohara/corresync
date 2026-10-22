@@ -9,8 +9,9 @@ reproduce them.
 
 | Version | Security support |
 | --- | --- |
-| 0.8.x | Supported |
-| 0.7.x | Upgrade to 0.8.x |
+| 0.9.x | Supported |
+| 0.8.x | Upgrade to 0.9.x |
+| 0.7.x | Upgrade to 0.9.x |
 | 0.6.2 | Migration bridge only |
 | Earlier releases | Unsupported |
 
@@ -19,7 +20,8 @@ The latest stable release is available from
 The v0.6.2 bridge exists only to establish trust for the coordinated v0.7
 rename; it does not receive general feature or compatibility fixes. Version
 0.7 remains a supported upgrade source but no longer receives fixes after the
-v0.8 release.
+v0.8 release. The 0.8 maintenance line closes with v0.9.0; fixes and future
+releases continue on main.
 
 ## Report a vulnerability
 

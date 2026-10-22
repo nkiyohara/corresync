@@ -32,11 +32,12 @@ func (store Store) ListAccounts(context.Context) (application.AccountCatalog, er
 	for alias, account := range configuration.Accounts {
 		accounts = append(accounts, application.AccountView{
 			ID: account.ID, Alias: alias, Address: account.Address,
-			Mail:      mailRouteView(account.Mail),
-			Calendar:  calendarRouteView(account.Calendar),
-			Tasks:     taskRouteView(account.Tasks),
-			Messages:  messagingRouteView(account.Messages),
-			IsDefault: alias == configuration.DefaultAccount,
+			DisabledServices: append([]string(nil), account.DisabledServices...),
+			Mail:             mailRouteView(account.Mail),
+			Calendar:         calendarRouteView(account.Calendar),
+			Tasks:            taskRouteView(account.Tasks),
+			Messages:         messagingRouteView(account.Messages),
+			IsDefault:        alias == configuration.DefaultAccount,
 		})
 	}
 	return application.AccountCatalog{Accounts: accounts}, nil

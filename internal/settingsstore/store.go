@@ -3,9 +3,15 @@ package settingsstore
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -42,6 +48,23 @@ func (store Store) UpdateSettings(
 				"%s changed after review: expected %s, found %s; review it again",
 				review.Key, review.Previous, current,
 			)
+		}
+		for alias, account := range configuration.Accounts {
+			if review.Key != application.AccountServicesSettingKey(account.ID) {
+				continue
+			}
+			if review.AccountRevision == "" || review.AccountRevision != accountRevision(account) {
+				return errors.New("account configuration changed after service review; review it again")
+			}
+			selected := strings.Split(review.Value, ",")
+			account.DisabledServices = nil
+			for _, item := range projectServices(account) {
+				if !slices.Contains(selected, item.Name) {
+					account.DisabledServices = append(account.DisabledServices, item.Name)
+				}
+			}
+			configuration.Accounts[alias] = account
+			return nil
 		}
 		switch review.Key {
 		case application.SettingDefaultAccount:
@@ -87,7 +110,10 @@ func project(configuration config.Config) application.SettingsView {
 	accounts := make([]application.SettingsAccount, 0, len(aliases))
 	for _, alias := range aliases {
 		accounts = append(accounts, application.SettingsAccount{
-			Alias: alias, Address: configuration.Accounts[alias].Address,
+			ID:       configuration.Accounts[alias].ID,
+			Revision: accountRevision(configuration.Accounts[alias]),
+			Services: projectServices(configuration.Accounts[alias]),
+			Alias:    alias, Address: configuration.Accounts[alias].Address,
 			IsDefault: alias == configuration.DefaultAccount,
 		})
 	}
@@ -100,4 +126,26 @@ func project(configuration config.Config) application.SettingsView {
 		SafetyMode:         string(configuration.Policy.Mode),
 		LoginTimeout:       time.Duration(configuration.Browser.LoginTimeout).String(),
 	}
+}
+
+func projectServices(account config.Account) []application.SettingsAccountService {
+	var result []application.SettingsAccountService
+	for _, item := range []struct {
+		name, label string
+		configured  bool
+	}{
+		{"mail", "Mail", account.Mail != nil}, {"calendar", "Calendar", account.Calendar != nil},
+		{"tasks", "To Do / Tasks", account.Tasks != nil}, {"messages", "Teams / Messaging", account.Messages != nil},
+	} {
+		if item.configured {
+			result = append(result, application.SettingsAccountService{Name: item.name, Label: item.label, Enabled: account.ServiceEnabled(item.name)})
+		}
+	}
+	return result
+}
+
+func accountRevision(account config.Account) string {
+	encoded, _ := json.Marshal(account)
+	digest := sha256.Sum256(encoded)
+	return hex.EncodeToString(digest[:])
 }

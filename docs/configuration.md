@@ -39,7 +39,7 @@ attention / Optional later summary. Use `corr settings` to open the same
 account registration flow alongside everyday settings. The settings
 form is organized around accounts, updates, safety, and browser login. It can
 add an account from the nested Accounts category, whose account list leads to
-either login mode, rename, default, and removal actions for one account.
+service checkboxes, login modes, rename, default, and removal actions for one account.
 Its top-level Setup guide entry resumes the same complete coordinator used by
 `corr setup`; it does not duplicate completion or agent-host lifecycle logic.
 Removing an account requires an explicit local-state review. Removing the
@@ -107,7 +107,7 @@ initialized provider-neutral configuration contains no account and has an
 empty `default_account`. The first account added becomes the default:
 
 ```toml
-version = 11
+version = 12
 default_account = ""
 
 [policy]
@@ -132,7 +132,7 @@ auto_submit = false
 A configured Outlook Web account then looks like:
 
 ```toml
-version = 11
+version = 12
 default_account = "work"
 
 [accounts.work]
@@ -201,9 +201,9 @@ Supported route payloads are:
 | tasks | `google-tasks` | `tasks.google_tasks` and `tasks.google_tasks.oauth`; user-owned Desktop OAuth |
 | tasks | `ticktick` | `tasks.ticktick` and `tasks.ticktick.oauth` |
 | tasks | `microsoft-web-tasks`, `apple-reminders`, `anydo-mcp`, `things`, `omnifocus` | provider only; adapter unavailable |
-| messages | `microsoft-teams` | exactly one of `messages.teams_graph` or `messages.teams_web`; deferred; release-gated |
+| messages | `microsoft-teams` | exactly one of `messages.teams_graph` or `messages.teams_web`; preview; live-unverified |
 | messages | `slack` | `messages.slack`; deferred; release-gated |
-| messages | `mattermost` | `messages.mattermost`; deferred; release-gated |
+| messages | `mattermost` | `messages.mattermost`; preview; live-unverified |
 <!-- markdownlint-enable MD013 -->
 
 The payload must match the provider exactly. A Google mail-and-calendar route
@@ -292,10 +292,11 @@ key = "messages-mattermost"
 consent = true
 ```
 
-These are schema examples, not activation instructions. Until the v0.9
-manifest records both Teams routes at parity, all provider live observations,
-surface contracts, documentation, and a clean final security review, every
-messaging route stops before any external effect.
+Teams and Mattermost are available as preview features. Configure only a route
+and workspace you control, then explicitly run `corr auth login --account ALIAS`.
+Live compatibility remains unverified; provider permissions and observed
+capabilities can narrow the available operations. Slack remains disabled.
+Teams Web requires a visible browser and does not support `--terminal`.
 
 The task route remains closed and secret-free. An implemented Microsoft To
 Do task-only route looks like:
@@ -756,3 +757,24 @@ then retry so the new owner starts with the new policy.
 Older schema files are migrated without changing stable account identity or
 moving credentials into configuration. See the
 [migration guide](migration-v0.7.md) for version-specific details.
+
+## Enable or disable account services
+
+Open `corr settings` → Accounts → your account → Services. All configured
+services default to enabled. Uncheck Mail, Calendar, To Do / Tasks, or
+Teams / Messaging to retain its connection settings while blocking its
+authentication and operations. Changing services stops existing sessions and
+invalidates pending approvals; sign in explicitly afterward. All services may
+be off. Adding an unconfigured provider still requires setup and explicit consent.
+
+For scripts, use the opaque ID from `corr account show work`:
+
+```console
+corr config get accounts.ACCOUNT_ID.services
+corr config set accounts.ACCOUNT_ID.services mail,calendar,tasks
+corr config set accounts.ACCOUNT_ID.services none
+```
+
+The TOML equivalent is an account-level `disabled_services = ["messages"]`.
+Direct file edits require `corr daemon stop` before they take effect. Schema v12
+migrates v11 without changing any service selection.
