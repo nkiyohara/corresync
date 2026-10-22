@@ -30,6 +30,12 @@ func (app *runtime) installWithDaemonLifecycle(ctx context.Context, executable s
 		TrustCachePath: trustCache, Client: &http.Client{Timeout: 2 * time.Minute},
 		GOOS: app.info.OS, GOARCH: app.info.Arch, Progress: progress,
 		BeforeReplace: func(ctx context.Context) error {
+			// Another installer or package manager may have replaced the path
+			// while verification was running. Never update the rollback image
+			// or stop an owner for a stale executable generation.
+			if err := app.requireCurrentExecutable(); err != nil {
+				return err
+			}
 			var stopErr error
 			restart, stopErr = app.stopUpdateOwner(ctx, configPath)
 			return stopErr

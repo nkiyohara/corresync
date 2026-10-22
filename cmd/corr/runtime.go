@@ -241,9 +241,9 @@ func newRuntime(
 		if err != nil {
 			return updatecheck.InstallResult{}, err
 		}
-		executable, err := os.Executable()
-		if err != nil {
-			return updatecheck.InstallResult{}, fmt.Errorf("resolve running executable: %w", err)
+		executable := app.executablePath
+		if executable == "" {
+			return updatecheck.InstallResult{}, errors.New("running executable path is unavailable")
 		}
 		trustCachePath, err := paths.UpdateTrustCachePath()
 		if err != nil {
