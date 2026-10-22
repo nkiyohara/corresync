@@ -113,6 +113,10 @@ type sessionOriginMismatchError struct {
 }
 
 func (failure *sessionOriginMismatchError) Error() string {
+	// Keep interactive/IPC diagnostics bounded even for malformed browser URLs.
+	if len(failure.configured) > 512 || len(failure.observed) > 512 {
+		return "Outlook Web used a service origin outside the configured exact origin"
+	}
 	return "Outlook Web used service origin " + failure.observed +
 		" instead of the configured exact origin " + failure.configured
 }

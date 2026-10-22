@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -264,5 +265,12 @@ func TestCurrentSessionObservationFailureRemainsVisibleAcrossPolls(t *testing.T)
 	}
 	if _, err := instance.WaitForSession(t.Context()); !errors.Is(err, failure) {
 		t.Fatalf("blocking observer lost failure: %v", err)
+	}
+}
+
+func TestSessionOriginMismatchDiagnosticIsBounded(t *testing.T) {
+	failure := &sessionOriginMismatchError{configured: "https://outlook.office.com", observed: "https://" + strings.Repeat("synthetic", 1000)}
+	if len(failure.Error()) > 256 || strings.Contains(failure.Error(), "synthetic") {
+		t.Fatal("unbounded observed origin escaped into diagnostics")
 	}
 }
