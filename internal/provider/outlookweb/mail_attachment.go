@@ -33,24 +33,29 @@ type createAttachmentResponseBody struct {
 }
 
 type createAttachmentResponseMessage struct {
-	ResponseClass     string                   `json:"ResponseClass"`
-	ResponseCode      string                   `json:"ResponseCode"`
-	Attachments       []createAttachmentResult `json:"Attachments"`
-	RootItemID        string                   `json:"RootItemId"`
-	RootItemChangeKey string                   `json:"RootItemChangeKey"`
+	ResponseClass string                   `json:"ResponseClass"`
+	ResponseCode  string                   `json:"ResponseCode"`
+	Attachments   []createAttachmentResult `json:"Attachments"`
 }
 
 type createAttachmentResult struct {
 	AttachmentID attachmentID `json:"AttachmentId"`
 }
 
+// attachmentID carries the parent item identity as EWS AttachmentIdType does:
+// RootItemId and RootItemChangeKey describe the item after this attachment.
 type attachmentID struct {
-	ID string `json:"Id"`
+	ID                string `json:"Id"`
+	RootItemID        string `json:"RootItemId"`
+	RootItemChangeKey string `json:"RootItemChangeKey"`
 }
 
 // createFileAttachments attaches one bounded batch to a draft that was just
-// created. Any failure is an unknown overall draft outcome because the parent
-// draft already exists and may contain a partial attachment set.
+// created. Exchange answers with one response message per attachment, in
+// request order, and the RootItemChangeKey in the last message identifies the
+// draft version that carries the whole batch. Any failure is an unknown
+// overall draft outcome because the parent draft already exists and may
+// contain a partial attachment set.
 func (client *Client) createFileAttachments(
 	ctx context.Context,
 	draft application.MailDraft,
@@ -61,41 +66,43 @@ func (client *Client) createFileAttachments(
 	if err := client.Call(ctx, CreateAttachment, payload, &response); err != nil {
 		return application.MailDraft{}, attachmentOutcomeUnknown(err)
 	}
-	if len(response.Body.ResponseMessages.Items) != 1 {
-		return application.MailDraft{}, attachmentOutcomeUnknown(
-			errors.New("OWA CreateAttachment returned an unexpected response count"),
-		)
-	}
-	message := response.Body.ResponseMessages.Items[0]
-	if err := checkWriteResponse(CreateAttachment, message.ResponseClass, message.ResponseCode); err != nil {
-		return application.MailDraft{}, attachmentOutcomeUnknown(err)
-	}
-	if len(message.Attachments) != len(attachments) {
+	messages := response.Body.ResponseMessages.Items
+	if len(messages) != len(attachments) {
 		return application.MailDraft{}, attachmentOutcomeUnknown(fmt.Errorf(
-			"OWA CreateAttachment returned %d attachments; expected %d",
-			len(message.Attachments), len(attachments),
+			"OWA CreateAttachment returned %d response messages; expected %d",
+			len(messages), len(attachments),
 		))
 	}
-	for _, attachment := range message.Attachments {
-		if err := validateOpaqueID("attachment", attachment.AttachmentID.ID); err != nil {
+	var parentChangeKey string
+	for _, message := range messages {
+		if err := checkWriteResponse(CreateAttachment, message.ResponseClass, message.ResponseCode); err != nil {
 			return application.MailDraft{}, attachmentOutcomeUnknown(err)
 		}
-	}
-	if message.RootItemID != "" {
-		if err := validateOpaqueID("attachment parent", message.RootItemID); err != nil {
+		if len(message.Attachments) != 1 {
+			return application.MailDraft{}, attachmentOutcomeUnknown(fmt.Errorf(
+				"OWA CreateAttachment returned %d attachments in one response message; expected 1",
+				len(message.Attachments),
+			))
+		}
+		created := message.Attachments[0].AttachmentID
+		if err := validateOpaqueID("attachment", created.ID); err != nil {
 			return application.MailDraft{}, attachmentOutcomeUnknown(err)
 		}
-		if message.RootItemID != draft.ID {
+		if err := validateOpaqueID("attachment parent", created.RootItemID); err != nil {
+			return application.MailDraft{}, attachmentOutcomeUnknown(err)
+		}
+		if created.RootItemID != draft.ID {
 			return application.MailDraft{}, attachmentOutcomeUnknown(
 				errors.New("OWA CreateAttachment returned a different parent draft"),
 			)
 		}
-	}
-	if message.RootItemChangeKey != "" {
-		if err := validateOpaqueID("attachment parent change key", message.RootItemChangeKey); err != nil {
+		if err := validateOpaqueID("attachment parent change key", created.RootItemChangeKey); err != nil {
 			return application.MailDraft{}, attachmentOutcomeUnknown(err)
 		}
-		draft.ChangeKey = message.RootItemChangeKey
+		parentChangeKey = created.RootItemChangeKey
+	}
+	if parentChangeKey != "" {
+		draft.ChangeKey = parentChangeKey
 	}
 	return draft, nil
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -39,11 +40,9 @@ func TestCreateMailDraftAddsBoundedAttachmentAndRefreshesChangeKey(t *testing.T)
 				string(payload.Body.Attachments[0].Content) != "fixture" {
 				t.Errorf("unexpected attachments: %+v", payload.Body.Attachments)
 			}
-			_, _ = writer.Write([]byte(`{"Body":{"ResponseMessages":{"Items":[{
-				"ResponseClass":"Success","ResponseCode":"NoError",
-				"Attachments":[{"AttachmentId":{"Id":"attachment-1"}}],
-				"RootItemId":"synthetic-draft-1","RootItemChangeKey":"synthetic-change-2"
-			}]}}}`))
+			_, _ = writer.Write(createAttachmentResponse(
+				createAttachmentMessage("attachment-1", "synthetic-draft-1", "synthetic-change-2"),
+			))
 		default:
 			t.Errorf("unexpected action %q", httpRequest.URL.Query().Get("action"))
 		}
@@ -152,5 +151,121 @@ func TestGetMailAttachmentRejectsAboveTheReadBound(t *testing.T) {
 	})
 	if err == nil || !strings.Contains(err.Error(), "mail attachment exceeds") {
 		t.Fatalf("GetMailAttachment() error = %v, want the read bound", err)
+	}
+}
+
+// createAttachmentMessage builds one synthetic CreateAttachment response
+// message in the documented EWS shape: one created attachment whose
+// AttachmentId carries the parent draft identity.
+func createAttachmentMessage(attachmentID, rootItemID, rootChangeKey string) string {
+	return fmt.Sprintf(`{
+		"__type":"CreateAttachmentResponseMessage:#Exchange",
+		"ResponseClass":"Success","ResponseCode":"NoError",
+		"Attachments":[{"__type":"FileAttachment:#Exchange","AttachmentId":{
+			"__type":"AttachmentId:#Exchange","Id":%q,
+			"RootItemId":%q,"RootItemChangeKey":%q
+		}}]
+	}`, attachmentID, rootItemID, rootChangeKey)
+}
+
+func createAttachmentResponse(messages ...string) []byte {
+	return []byte(`{"Body":{"ResponseMessages":{"Items":[` + strings.Join(messages, ",") + `]}}}`)
+}
+
+func threeTestAttachments() []application.MailFileAttachment {
+	return []application.MailFileAttachment{
+		{Name: "one.txt", ContentType: "text/plain", Content: []byte("one")},
+		{Name: "two.pdf", ContentType: "application/pdf", Content: []byte("two")},
+		{Name: "three.csv", ContentType: "text/csv", Content: []byte("three")},
+	}
+}
+
+func TestAttachmentBatchMalformedResponseStopsDraftAndSend(t *testing.T) {
+	t.Parallel()
+
+	first := createAttachmentMessage("attachment-1", "synthetic-draft-1", "synthetic-change-2")
+	second := createAttachmentMessage("attachment-2", "synthetic-draft-1", "synthetic-change-3")
+	third := createAttachmentMessage("attachment-3", "synthetic-draft-1", "synthetic-change-4")
+	responses := map[string][]byte{
+		"fewer messages than attachments": createAttachmentResponse(first, second),
+		"more messages than attachments": createAttachmentResponse(
+			first, second, third,
+			createAttachmentMessage("attachment-4", "synthetic-draft-1", "synthetic-change-5"),
+		),
+		"one message carrying every attachment": []byte(`{"Body":{"ResponseMessages":{"Items":[{
+			"ResponseClass":"Success","ResponseCode":"NoError","Attachments":[
+				{"AttachmentId":{"Id":"attachment-1"}},
+				{"AttachmentId":{"Id":"attachment-2"}},
+				{"AttachmentId":{"Id":"attachment-3"}}
+			]
+		}]}}}`),
+		"message without an attachment": createAttachmentResponse(
+			first, `{"ResponseClass":"Success","ResponseCode":"NoError","Attachments":[]}`, third,
+		),
+		"message with two attachments": createAttachmentResponse(first, `{
+			"ResponseClass":"Success","ResponseCode":"NoError","Attachments":[
+				{"AttachmentId":{"Id":"attachment-2"}},{"AttachmentId":{"Id":"attachment-4"}}
+			]
+		}`, third),
+		"explicit failure after a partial set": createAttachmentResponse(first, `{
+			"ResponseClass":"Error","ResponseCode":"ErrorAttachmentSizeLimitExceeded","Attachments":[]
+		}`, third),
+		"missing attachment ID": createAttachmentResponse(
+			first, createAttachmentMessage("", "synthetic-draft-1", "synthetic-change-3"), third,
+		),
+		"parent drafts disagree": createAttachmentResponse(
+			first, createAttachmentMessage("attachment-2", "different-draft", "synthetic-change-3"), third,
+		),
+		"all responses name another draft": createAttachmentResponse(
+			createAttachmentMessage("attachment-1", "different-draft", "synthetic-change-2"),
+			createAttachmentMessage("attachment-2", "different-draft", "synthetic-change-3"),
+			createAttachmentMessage("attachment-3", "different-draft", "synthetic-change-4"),
+		),
+		"missing parent identity": createAttachmentResponse(
+			first, second, createAttachmentMessage("attachment-3", "", "synthetic-change-4"),
+		),
+		"missing final parent change key": createAttachmentResponse(
+			first, second, createAttachmentMessage("attachment-3", "synthetic-draft-1", ""),
+		),
+		"invalid parent change key": createAttachmentResponse(
+			first, second, createAttachmentMessage("attachment-3", "synthetic-draft-1", " synthetic-change-4"),
+		),
+	}
+	for name, response := range responses {
+		for _, send := range []bool{false, true} {
+			t.Run(name+map[bool]string{false: "/draft", true: "/send"}[send], func(t *testing.T) {
+				t.Parallel()
+
+				var calls atomic.Int32
+				server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					calls.Add(1)
+					switch request.URL.Query().Get("action") {
+					case "CreateItem":
+						_, _ = writer.Write(readFixture(t, "create_draft_response.json"))
+					case "CreateAttachment":
+						_, _ = writer.Write(response)
+					default:
+						t.Errorf("malformed attachment response reached %q", request.URL.Query().Get("action"))
+					}
+				}))
+				defer server.Close()
+
+				client := testClient(t, server, nil)
+				input := testSendInput()
+				input.Attachments = threeTestAttachments()
+				var err error
+				if send {
+					_, err = client.SendMail(t.Context(), input)
+				} else {
+					_, err = client.CreateMailDraft(t.Context(), application.MailDraftInput(input))
+				}
+				if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
+					t.Fatalf("error = %v; want unknown outcome", err)
+				}
+				if calls.Load() != 2 {
+					t.Fatalf("calls = %d; want create and attachment only", calls.Load())
+				}
+			})
+		}
 	}
 }
