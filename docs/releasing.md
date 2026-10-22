@@ -6,7 +6,7 @@ compatibility evidence.
 
 ## Release lines
 
-`main` is the sole development and release branch from v0.9.0 onward.
+`main` is the sole development and release branch from v0.9.1 onward.
 `release/0.8` is frozen; routine backports and v0.8 releases have ended. Users
 should upgrade to v0.9 as described in `SECURITY.md`. The release workflow
 rejects new v0.8 tags once the stable v0.9.0 tag exists. Earlier lines remain closed.

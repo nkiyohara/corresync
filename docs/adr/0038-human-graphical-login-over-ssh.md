@@ -32,8 +32,11 @@ selector, clipboard read, or browser storage API is available. The viewport has
 fixed logical dimensions and scales to the local window. Origins omit URL paths,
 queries, and fragments. Non-HTTPS pages cannot receive input or produce frames.
 
-The UI expires after ten minutes; the configured browser login timeout may end
-it earlier. Completion, cancellation, disconnect, and command exit clean up only
+The daemon independently expires unfinished browser interactions, including
+after abrupt CLI termination. Completed sessions cancel this timer and remain
+owned by the daemon. The UI expires after ten minutes; the configured browser
+login timeout may end it earlier. Completion, cancellation, disconnect, and
+command exit clean up only
 this invocation's UI and unfinished interaction. Successful authentication
 preserves the daemon-owned browser. Unknown input outcomes are never replayed.
 Reload is limited to the same tab/controller and lifetime. Closing a tab alone
