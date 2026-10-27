@@ -111,3 +111,24 @@ func TestMailProjectionRejectsOversizedSourceWithoutReturningItsPrefix(t *testin
 		})
 	}
 }
+
+func TestTaskProjectionContinuesBeyondFormerOffsetLimit(t *testing.T) {
+	tasks := make([]Task, 502)
+	for i := range tasks {
+		tasks[i] = projectionTask(projectionAlpha, domain.ProviderCalDAV, fmt.Sprintf("task-%04d", i), "2026-09-30")
+	}
+	reader := &projectionReaderStub{accounts: []ProjectionAccount{projectionTaskAccount(projectionAlpha, "alpha", domain.ProviderCalDAV, true)}, tasks: map[domain.AccountID][]Task{projectionAlpha: tasks}}
+	service, err := NewProjectionService(reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caller := domain.Caller{Surface: "cli", Instance: "pagination"}
+	first, err := service.ListAllTasks(t.Context(), TaskProjectionInput{Offset: 400, Limit: 50}, caller)
+	if err != nil || !first.HasMore || first.NextOffset != 450 {
+		t.Fatalf("page=%+v err=%v", first, err)
+	}
+	next, err := service.ListAllTasks(t.Context(), TaskProjectionInput{Offset: first.NextOffset, Limit: 50}, caller)
+	if err != nil || len(next.Tasks) != 50 || next.Tasks[0].Task.ID != "task-0450" {
+		t.Fatalf("next page failed: %v", err)
+	}
+}

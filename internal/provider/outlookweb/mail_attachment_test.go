@@ -269,3 +269,48 @@ func TestAttachmentBatchMalformedResponseStopsDraftAndSend(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateMailDraftAddsTwentyMiBAttachment(t *testing.T) {
+
+	var calls atomic.Int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, httpRequest *http.Request) {
+		call := calls.Add(1)
+		switch httpRequest.URL.Query().Get("action") {
+		case "CreateItem":
+			if call != 1 {
+				t.Errorf("CreateItem call = %d", call)
+			}
+			_, _ = writer.Write(readFixture(t, "create_draft_response.json"))
+		case "CreateAttachment":
+			if call != 2 {
+				t.Errorf("CreateAttachment call = %d", call)
+			}
+			var payload createAttachmentEnvelope
+			if err := json.NewDecoder(httpRequest.Body).Decode(&payload); err != nil {
+				t.Errorf("decode request: %v", err)
+			}
+			if len(payload.Body.Attachments) != 1 || payload.Body.Attachments[0].Name != "fixture.txt" ||
+				len(payload.Body.Attachments[0].Content) != application.MaxMailSendAttachmentBytes {
+				t.Error("attachment bytes did not survive the transport")
+			}
+			_, _ = writer.Write(createAttachmentResponse(
+				createAttachmentMessage("attachment-1", "synthetic-draft-1", "synthetic-change-2"),
+			))
+		default:
+			t.Errorf("unexpected action %q", httpRequest.URL.Query().Get("action"))
+		}
+	}))
+	defer server.Close()
+
+	input := testDraftInput()
+	input.Attachments = []application.MailFileAttachment{{
+		Name: "fixture.txt", ContentType: "text/plain", Content: make([]byte, application.MaxMailSendAttachmentBytes),
+	}}
+	draft, err := testClient(t, server, nil).CreateMailDraft(context.Background(), input)
+	if err != nil {
+		t.Fatalf("CreateMailDraft() error = %v", err)
+	}
+	if draft.ID != "synthetic-draft-1" || draft.ChangeKey != "synthetic-change-2" || calls.Load() != 2 {
+		t.Fatalf("unexpected result: draft=%+v calls=%d", draft, calls.Load())
+	}
+}

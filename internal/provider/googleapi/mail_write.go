@@ -38,6 +38,9 @@ func (client *Client) CreateMailDraft(
 	ctx context.Context,
 	input application.MailDraftInput,
 ) (application.MailDraft, error) {
+	if err := application.ValidateSmallMailAttachments(input.Attachments); err != nil {
+		return application.MailDraft{}, err
+	}
 	composition, err := client.composition(ctx, input)
 	if err != nil {
 		return application.MailDraft{}, err
@@ -84,6 +87,9 @@ func (client *Client) SendMail(
 	ctx context.Context,
 	input application.MailSendInput,
 ) (application.MailSendResult, error) {
+	if err := application.ValidateSmallMailAttachments(input.Attachments); err != nil {
+		return application.MailSendResult{}, err
+	}
 	composition, err := client.composition(ctx, application.MailDraftInput{
 		Account: input.Account, To: input.To, CC: input.CC, BCC: input.BCC,
 		Subject: input.Subject, Body: input.Body, BodyFormat: input.BodyFormat,

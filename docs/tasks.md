@@ -61,7 +61,7 @@ All strings must be valid UTF-8 and contain no NUL. Important limits are:
 | --- | ---: |
 | Provider page | 100 entries |
 | Provider offset | 10,000 |
-| Cross-account page | 50 entries; offset 400 |
+| Cross-account page | 50 entries; offset 160,000 |
 | Title | 4,096 bytes |
 | Notes | 1 MiB |
 | List name or search query | 1,024 bytes |

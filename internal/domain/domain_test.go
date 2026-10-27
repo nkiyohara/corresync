@@ -101,7 +101,7 @@ func TestNewOperationRejectsInvalidBoundaries(t *testing.T) {
 		{"mail.send", EffectExternalWrite, " work", nil},
 		{"mail.send", EffectExternalWrite, "work\nother", nil},
 		{"mail.send", EffectExternalWrite, "work", func() {}},
-		{"mail.send", EffectExternalWrite, "work", strings.Repeat("x", maximumPayloadBytes+1)},
+		{"mail.delete", EffectExternalWrite, "work", strings.Repeat("x", maximumPayloadBytes+1)},
 	}
 
 	for _, test := range tests {
@@ -278,5 +278,12 @@ func TestCallerValidation(t *testing.T) {
 		if err := caller.Validate(); err == nil {
 			t.Fatalf("invalid caller unexpectedly accepted: %+v", caller)
 		}
+	}
+}
+
+func TestOperationAllowsWorstCaseJSONEscapingOfOneMiBBody(t *testing.T) {
+	_, err := NewOperation("calendar.create", EffectExternalWrite, "work", map[string]string{"body": strings.Repeat("<", 1<<20)})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

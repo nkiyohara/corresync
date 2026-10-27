@@ -165,7 +165,7 @@ func TestUpdateDirectInstallProducesStableJSON(t *testing.T) {
 	}
 }
 
-func TestUpdateMessageExplainsLegacyDuplicateRecovery(t *testing.T) {
+func TestUpdateMessageExplainsCoordinatedOwnerRestart(t *testing.T) {
 	var stdout bytes.Buffer
 	app := updateTestRuntime(t, &stdout, updatecheck.Result{})
 	view := newUpdateView(app, &stdout, false)
@@ -178,8 +178,8 @@ func TestUpdateMessageExplainsLegacyDuplicateRecovery(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stdout.String(), "corr daemon stop") ||
-		!strings.Contains(stdout.String(), "doctor reports duplicates") {
+	if !strings.Contains(stdout.String(), "session owner for this configuration was restarted") ||
+		!strings.Contains(stdout.String(), "Restart connected MCP hosts") {
 		t.Fatalf("update recovery guidance = %q", stdout.String())
 	}
 }
@@ -524,5 +524,35 @@ func TestAutomaticUpdateDoesNotContinueOldCLIWhenRestartFails(t *testing.T) {
 	result, err := app.maybeHandleAutomaticUpdate(t.Context())
 	if !errors.Is(err, failure) || result.Status != updatecheck.InstallStatusUpdated || strings.Contains(stderr.String(), "continuing with") {
 		t.Fatalf("replacement failure was swallowed: %+v %v %s", result, err, stderr.String())
+	}
+}
+
+func TestPreviewChannelStableReleaseUsesPackageManagerAndClearLabel(t *testing.T) {
+	for _, method := range []updatecheck.InstallMethod{updatecheck.InstallHomebrew, updatecheck.InstallScoop, updatecheck.InstallWinGet} {
+		t.Run(string(method), func(t *testing.T) {
+			result := updatecheck.Result{Channel: updatecheck.ChannelPreview, Status: updatecheck.StatusAvailable, CurrentVersion: "0.9.2", LatestVersion: "v0.9.3", UpdateAvailable: true}
+			var stdout bytes.Buffer
+			app := updateTestRuntime(t, &stdout, result)
+			app.installMethod = func() updatecheck.InstallMethod { return method }
+			if err := (&updateApplyCommand{}).Run(app); err != nil {
+				t.Fatal(err)
+			}
+			output := stdout.String()
+			if strings.Contains(output, "Preview available") || !strings.Contains(output, "Release: stable") || !strings.Contains(output, "No newer preview") || !strings.Contains(output, updatecheck.UpgradeAdvice(method, result.LatestVersion)) {
+				t.Fatalf("output=%q", output)
+			}
+		})
+	}
+}
+
+func TestPreviewChannelCurrentStableReleaseDoesNotClaimLatestPreview(t *testing.T) {
+	var stdout bytes.Buffer
+	result := updatecheck.Result{Channel: updatecheck.ChannelPreview, Status: updatecheck.StatusCurrent, CurrentVersion: "0.9.3", LatestVersion: "v0.9.3"}
+	app := updateTestRuntime(t, &stdout, result)
+	if err := (&updateCheckCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stdout.String(), "Latest preview") || !strings.Contains(stdout.String(), "Latest stable") || !strings.Contains(stdout.String(), "No newer preview") {
+		t.Fatalf("output=%q", stdout.String())
 	}
 }

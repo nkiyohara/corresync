@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	maximumPayloadBytes = 4 << 20
+	maximumPayloadBytes = 8 << 20
 	// A composite target may contain two independently bounded 4096-byte
 	// provider IDs plus a four-digit length and separator.
 	maximumTargetIDBytes = 2*4096 + 5
@@ -141,8 +141,12 @@ func newOperation(
 	if err != nil {
 		return Operation{}, fmt.Errorf("encode operation payload: %w", err)
 	}
-	if len(encoded) > maximumPayloadBytes {
-		return Operation{}, fmt.Errorf("operation payload exceeds %d bytes", maximumPayloadBytes)
+	limit := maximumPayloadBytes
+	if name == "mail.send" || name == "mail.create_draft" {
+		limit = 40 << 20 // Base64 attachments plus worst-case JSON-escaped body.
+	}
+	if len(encoded) > limit {
+		return Operation{}, fmt.Errorf("operation payload exceeds %d bytes", limit)
 	}
 
 	return Operation{
@@ -256,3 +260,6 @@ func (operation Operation) digest() [sha256.Size]byte {
 	}
 	return sha256.Sum256(encoded)
 }
+
+// PayloadBytes reports the immutable encoded size without copying its content.
+func (operation Operation) PayloadBytes() int { return len(operation.payload) }

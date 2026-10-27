@@ -1633,14 +1633,14 @@ func decodeMailAttachments(inputs []MailFileAttachmentInput) ([]application.Mail
 	attachments := make([]application.MailFileAttachment, 0, len(inputs))
 	totalBytes := 0
 	for _, input := range inputs {
-		if len(input.ContentBase64) > base64.StdEncoding.EncodedLen(application.MaxMailAttachmentBytes) {
+		if len(input.ContentBase64) > base64.StdEncoding.EncodedLen(application.MaxMailSendAttachmentBytes) {
 			return nil, fmt.Errorf("mail attachment %q base64 content is too large", input.Name)
 		}
 		content, err := base64.StdEncoding.DecodeString(input.ContentBase64)
 		if err != nil {
 			return nil, fmt.Errorf("decode mail attachment %q: %w", input.Name, err)
 		}
-		if len(content) > application.MaxMailAttachmentBytes {
+		if len(content) > application.MaxMailSendAttachmentBytes {
 			return nil, fmt.Errorf("mail attachment %q content is too large", input.Name)
 		}
 		totalBytes += len(content)

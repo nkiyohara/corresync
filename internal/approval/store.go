@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	defaultTTL        = 2 * time.Minute
-	defaultMaxPending = 128
-	tokenBytes        = 32
-	tokenPrefix       = "opv1_"
+	defaultTTL             = 2 * time.Minute
+	defaultMaxPending      = 128
+	maxPendingPayloadBytes = 512 << 20
+	tokenBytes             = 32
+	tokenPrefix            = "opv1_"
 )
 
 var (
@@ -115,7 +116,13 @@ func (store *Store) Issue(operation domain.Operation, caller domain.Caller) (Pre
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	store.pruneExpired(now)
-	if len(store.pending) >= store.maxPending {
+	// Preserve the previous default worst-case payload budget as individual
+	// mail operations grow. Count existing immutable payloads without copies.
+	payloadBytes := operation.PayloadBytes()
+	for _, entry := range store.pending {
+		payloadBytes += entry.operation.PayloadBytes()
+	}
+	if len(store.pending) >= store.maxPending || payloadBytes > maxPendingPayloadBytes {
 		return Preview{}, ErrCapacity
 	}
 	if _, exists := store.pending[token]; exists {

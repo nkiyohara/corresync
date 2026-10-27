@@ -337,3 +337,14 @@ outside these profiles remain outside the operation.
 
 Report suspected vulnerabilities privately as described in
 [SECURITY.md](../SECURITY.md).
+
+### Larger mail compositions (0.9.3)
+
+Outlook Web attachment sends remain bounded to 20 MiB per file and in total.
+The authenticated request and mail operation bounds account for Base64 and JSON
+escaping. Other operations and OWA actions retain smaller transport bounds.
+The approval store enforces a 512 MiB combined encoded-payload budget as well
+as count and expiry limits; it never logs or returns attachment contents in
+reviews. Other adapters reject unsupported sizes before any remote write.
+Exact account/target/content approval binding and no-retry write semantics
+remain unchanged. Large-upload validation uses synthetic fixtures only.

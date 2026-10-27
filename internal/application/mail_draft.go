@@ -21,7 +21,8 @@ const (
 	MaxMailDraftBodyBytes       = 1 << 20
 	MaxMailAttachments          = 10
 	MaxMailAttachmentBytes      = 2 << 20
-	MaxMailAttachmentTotalBytes = 3 << 20
+	MaxMailSendAttachmentBytes  = 20 << 20
+	MaxMailAttachmentTotalBytes = 20 << 20
 	mailDraftPreviewRunes       = 500
 )
 
@@ -287,8 +288,8 @@ func (input MailDraftInput) Validate(maxRecipients int) error {
 			return fmt.Errorf("mail attachment %q appears more than once", attachment.Name)
 		}
 		seenAttachmentNames[strings.ToLower(attachment.Name)] = struct{}{}
-		if len(attachment.Content) == 0 || len(attachment.Content) > MaxMailAttachmentBytes {
-			return fmt.Errorf("mail attachment %q must contain between 1 and %d bytes", attachment.Name, MaxMailAttachmentBytes)
+		if len(attachment.Content) == 0 || len(attachment.Content) > MaxMailSendAttachmentBytes {
+			return fmt.Errorf("mail attachment %q must contain between 1 and %d bytes", attachment.Name, MaxMailSendAttachmentBytes)
 		}
 		if len(attachment.ContentType) > 255 || strings.TrimSpace(attachment.ContentType) != attachment.ContentType ||
 			strings.ContainsAny(attachment.ContentType, "\r\n\x00") {
@@ -363,4 +364,21 @@ func (input MailDraftInput) EffectiveBodyFormat() MailBodyFormat {
 		return MailBodyText
 	}
 	return input.BodyFormat
+}
+
+// ValidateSmallMailAttachments preserves the supported bounds of adapters that
+// have not implemented and verified large attachment uploads yet. Call before
+// creating a remote draft or uploading any attachment.
+func ValidateSmallMailAttachments(attachments []MailFileAttachment) error {
+	total := 0
+	for _, attachment := range attachments {
+		total += len(attachment.Content)
+		if len(attachment.Content) > MaxMailAttachmentBytes {
+			return errors.New("this mail route supports attachments up to 2 MiB each; large uploads are currently supported only by Outlook Web")
+		}
+	}
+	if total > 3<<20 {
+		return errors.New("this mail route supports up to 3 MiB of attachments in total; large uploads are currently supported only by Outlook Web")
+	}
+	return nil
 }

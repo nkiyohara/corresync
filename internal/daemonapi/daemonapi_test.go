@@ -980,7 +980,8 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 		t.Fatalf("CommitMailAttachment() = %+v, %v; token=%q", attachment, err, backend.commitToken)
 	}
 	draft, err := client.CreateMailDraft(t.Context(), application.MailDraftInput{
-		Account: testAccountID, To: []string{"reader@example.test"}, Subject: "Synthetic draft", Body: "Synthetic body",
+		Account: testAccountID, To: []string{"reader@example.test"}, Subject: "Synthetic draft", Body: strings.Repeat("<", application.MaxMailDraftBodyBytes),
+		Attachments: []application.MailFileAttachment{{Name: "large.bin", Content: make([]byte, application.MaxMailSendAttachmentBytes)}},
 	}, caller)
 	if err != nil || draft.Draft == nil || draft.Draft.ID != "draft-1" || backend.draftInput.Subject != "Synthetic draft" {
 		t.Fatalf("CreateMailDraft() = %+v, %v; backend input=%+v", draft, err, backend.draftInput)

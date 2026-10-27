@@ -812,3 +812,13 @@ last-error shape for a later explicit `corr feedback --last-error`. When the
 signed-in human separately enabled `feedback.auto_submit`, an eligible
 interactive failure may also submit the smaller allowlist-only public issue
 described above; the original exit code and error do not change.
+
+### Attachment send limits (0.9.3)
+
+Outlook Web draft/send accepts up to 20 MiB per file and 20 MiB combined,
+with at most 10 files. Use the existing repeatable `--attach` option.
+CLI and MCP share the same reviewed write contract; attachment content remains
+bound to the exact approval. Other mail routes retain 2 MiB per file and
+3 MiB combined and reject larger inputs before creating a remote draft.
+Provider/tenant message-size limits still apply, including encoding overhead.
+Attachment download limits are unchanged.

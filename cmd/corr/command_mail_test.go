@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -156,5 +158,29 @@ func TestMailApprovalReviewsExposeExactSanitizedScope(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "unread") || !strings.Contains(output.String(), "change-1") {
 		t.Fatalf("incomplete read-state review: %q", output.String())
+	}
+}
+
+func TestReadMailAttachmentAcceptsTwentyMiBAndRejectsLarger(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "large.bin")
+	file, err := os.Create(path) // #nosec G304 -- fixed synthetic filename within t.TempDir; no user input.
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(application.MaxMailSendAttachmentBytes); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	attachments, err := readMailAttachments([]string{path})
+	if err != nil || len(attachments) != 1 || len(attachments[0].Content) != application.MaxMailSendAttachmentBytes {
+		t.Fatalf("read: %v", err)
+	}
+	if err := os.Truncate(path, application.MaxMailSendAttachmentBytes+1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readMailAttachments([]string{path}); err == nil {
+		t.Fatal("accepted oversized file")
 	}
 }

@@ -282,3 +282,51 @@ func TestAttachmentParentMismatchStopsDraftAndSend(t *testing.T) {
 		})
 	}
 }
+
+func TestSendMailWithTwentyMiBAttachmentUsesExactDraftVersion(t *testing.T) {
+
+	var calls atomic.Int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		call := calls.Add(1)
+		switch request.URL.Query().Get("action") {
+		case "CreateItem":
+			if call != 1 {
+				t.Errorf("CreateItem call = %d", call)
+			}
+			_, _ = writer.Write(readFixture(t, "create_draft_response.json"))
+		case "CreateAttachment":
+			if call != 2 {
+				t.Errorf("CreateAttachment call = %d", call)
+			}
+			_, _ = writer.Write(createAttachmentResponse(
+				createAttachmentMessage("attachment-1", "synthetic-draft-1", "synthetic-change-2"),
+			))
+		case "UpdateItem":
+			if call != 3 {
+				t.Errorf("UpdateItem call = %d", call)
+			}
+			body, err := io.ReadAll(request.Body)
+			if err != nil {
+				t.Errorf("ReadAll() error = %v", err)
+			}
+			if !containsBytes(body, []byte(`"Id":"synthetic-draft-1"`), []byte(`"ChangeKey":"synthetic-change-2"`)) {
+				t.Errorf("UpdateItem did not use refreshed draft identity: %s", body)
+			}
+			_, _ = writer.Write([]byte(`{"Body":{"ResponseMessages":{"Items":[{
+				"ResponseClass":"Success","ResponseCode":"NoError"
+			}]}}}`))
+		default:
+			t.Errorf("unexpected action %q", request.URL.Query().Get("action"))
+		}
+	}))
+	defer server.Close()
+
+	input := testSendInput()
+	input.Attachments = []application.MailFileAttachment{{Name: "fixture.txt", Content: make([]byte, application.MaxMailSendAttachmentBytes)}}
+	if _, err := testClient(t, server, nil).SendMail(t.Context(), input); err != nil {
+		t.Fatalf("SendMail() error = %v", err)
+	}
+	if calls.Load() != 3 {
+		t.Fatalf("write calls = %d, want 3", calls.Load())
+	}
+}

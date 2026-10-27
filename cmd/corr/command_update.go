@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/mod/semver"
+
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/updatecheck"
 )
@@ -154,7 +156,7 @@ func (app *runtime) updateReportWith(
 	report := updateReport{Result: result}
 	if result.Status == updatecheck.StatusAvailable {
 		report.InstallMethod = app.installMethod()
-		if result.Channel == updatecheck.ChannelPreview &&
+		if releaseChannel(result.LatestVersion) == updatecheck.ChannelPreview &&
 			report.InstallMethod != updatecheck.InstallDirect {
 			report.DirectOnly = true
 		} else {
@@ -291,4 +293,17 @@ func rootCommand(arguments []string) string {
 		return argument
 	}
 	return ""
+}
+
+// Release identity is independent of the configured discovery channel: preview
+// tracks both stable and prerelease tags and must preserve package ownership.
+func releaseChannel(version string) updatecheck.Channel {
+	version = "v" + strings.TrimPrefix(version, "v")
+	if !semver.IsValid(version) {
+		return ""
+	}
+	if semver.Prerelease(version) != "" {
+		return updatecheck.ChannelPreview
+	}
+	return updatecheck.ChannelStable
 }

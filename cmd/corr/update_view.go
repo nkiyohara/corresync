@@ -17,6 +17,9 @@ func newUpdateView(app *runtime, writer io.Writer, interactive bool) updateView 
 }
 
 func (view updateView) writeNotice(report updateReport) error {
+	if err := view.writeReleaseSelection(report.Channel, report.LatestVersion); err != nil {
+		return err
+	}
 	if report.DirectOnly {
 		_, err := view.printf(
 			"\n%s  %s\n   %s\n",
@@ -93,6 +96,11 @@ func (view updateView) writeProgress(progress updatecheck.InstallProgress) {
 }
 
 func (view updateView) writeCheck(report updateReport) error {
+	if report.Status == updatecheck.StatusAvailable || report.Status == updatecheck.StatusCurrent {
+		if err := view.writeReleaseSelection(report.Channel, report.LatestVersion); err != nil {
+			return err
+		}
+	}
 	switch report.Status {
 	case updatecheck.StatusAvailable:
 		if report.DirectOnly {
@@ -102,7 +110,7 @@ func (view updateView) writeCheck(report updateReport) error {
 				view.strong("Preview available"),
 				"Version",
 				versionPair(report.CurrentVersion, report.LatestVersion),
-				"Channel",
+				"Tracking",
 				report.Channel,
 				"Managed by",
 				installationLabel(report.InstallMethod),
@@ -118,7 +126,7 @@ func (view updateView) writeCheck(report updateReport) error {
 			view.strong("Update available"),
 			"Version",
 			versionPair(report.CurrentVersion, report.LatestVersion),
-			"Channel",
+			"Tracking",
 			report.Channel,
 			"Managed by",
 			installationLabel(report.InstallMethod),
@@ -133,7 +141,7 @@ func (view updateView) writeCheck(report updateReport) error {
 			"%s  %s\n   %s\n",
 			view.success(),
 			view.strong("corr "+strings.TrimPrefix(report.CurrentVersion, "v")+" is up to date"),
-			view.muted("Latest "+string(report.Channel)+" "+strings.TrimPrefix(report.LatestVersion, "v")+" · checked "+report.CheckedAt),
+			view.muted("Latest "+string(releaseChannel(report.LatestVersion))+" "+strings.TrimPrefix(report.LatestVersion, "v")+" · checked "+report.CheckedAt),
 		)
 		return err
 	case updatecheck.StatusDevelopment:
@@ -156,6 +164,15 @@ func (view updateView) writeCheck(report updateReport) error {
 }
 
 func (view updateView) writeAction(report updateActionReport) error {
+	version := report.LatestVersion
+	if version == "" {
+		version = report.CurrentVersion
+	}
+	if report.Status != string(updatecheck.StatusUnavailable) && report.Status != string(updatecheck.StatusDevelopment) {
+		if err := view.writeReleaseSelection(report.Channel, version); err != nil {
+			return err
+		}
+	}
 	switch report.Status {
 	case string(updatecheck.InstallStatusUpdated):
 		_, err := view.printf(
@@ -164,13 +181,13 @@ func (view updateView) writeAction(report updateActionReport) error {
 			view.strong("Corresync updated"),
 			"Version",
 			versionPair(report.PreviousVersion, report.CurrentVersion),
-			"Channel",
+			"Tracking",
 			report.Channel,
 			"Verified",
 			"Sigstore identity · SHA-256 · version · platform",
 			"Backup",
 			report.BackupPath,
-			view.muted("Running session owners switch on the next provider command. If doctor reports duplicates, run `corr daemon stop` once."),
+			view.muted("Any running session owner for this configuration was restarted. Restart connected MCP hosts to load the updated command."),
 		)
 		return err
 	case string(updatecheck.InstallStatusCurrent):
@@ -258,4 +275,12 @@ func installationLabel(method updatecheck.InstallMethod) string {
 	default:
 		return string(method)
 	}
+}
+
+func (view updateView) writeReleaseSelection(channel updatecheck.Channel, version string) error {
+	if channel != updatecheck.ChannelPreview || releaseChannel(version) != updatecheck.ChannelStable {
+		return nil
+	}
+	_, err := view.printf("%s\n", view.muted("Release: stable (tracking preview). No newer preview was found in the checked releases."))
+	return err
 }

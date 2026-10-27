@@ -42,6 +42,9 @@ func (client *Client) CreateMailDraft(
 	ctx context.Context,
 	input application.MailDraftInput,
 ) (application.MailDraft, error) {
+	if err := application.ValidateSmallMailAttachments(input.Attachments); err != nil {
+		return application.MailDraft{}, err
+	}
 	if err := client.requireWrite("draft creation"); err != nil {
 		return application.MailDraft{}, err
 	}
@@ -52,6 +55,9 @@ func (client *Client) SendMail(
 	ctx context.Context,
 	input application.MailSendInput,
 ) (application.MailSendResult, error) {
+	if err := application.ValidateSmallMailAttachments(input.Attachments); err != nil {
+		return application.MailSendResult{}, err
+	}
 	if err := client.requireWrite("submission"); err != nil {
 		return application.MailSendResult{}, err
 	}

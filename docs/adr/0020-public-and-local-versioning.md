@@ -367,3 +367,25 @@ The SSH helper independently negotiates graphical wire v1 and refuses mismatches
 
 Schema v12 adds per-account disabled services (ADR 0037). Strict v11 migration
 keeps every previously configured route enabled; downgrades refuse the new schema.
+
+### 0.9.3 bounded input compatibility
+
+The public patch release expands Outlook Web send attachments to 20 MiB per
+file and in aggregate without changing input fields, approval binding, or
+configuration schema v12. Other providers retain their implemented small-upload
+bounds and fail before side effects. Protocol 29 replaces protocol 28 because
+the request bound grows to 40 MiB.
+
+Immutable operation payloads allow 40 MiB only for `mail.send` and
+`mail.create_draft`; other operations allow 8 MiB so a valid 1 MiB body remains
+representable after JSON escaping. Pending approvals retain a combined 512 MiB
+payload budget in addition to count and expiry bounds.
+
+Cross-account pagination admits offsets throughout the existing bounded
+32-account by 5,000-item workset. It no longer stops at offset 400. Per-source
+item/byte bounds and per-page response bounds remain unchanged, and allocations
+no longer scale with the requested offset.
+
+The shared REST request ceiling is 12 MiB so existing small-mail inputs fit
+after MIME, quoted-printable, and Base64 expansion. This does not increase
+other providers' attachment input limits or their response limits.
