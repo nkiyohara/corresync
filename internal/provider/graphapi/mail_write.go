@@ -14,6 +14,9 @@ func (client *Client) CreateMailDraft(
 	ctx context.Context,
 	input application.MailDraftInput,
 ) (application.MailDraft, error) {
+	if err := application.ValidateSmallMailAttachments(input.Attachments); err != nil {
+		return application.MailDraft{}, err
+	}
 	var response graphMessage
 	var err error
 	if input.EffectiveComposeMode() != application.MailComposeNew {
@@ -130,6 +133,9 @@ func (client *Client) SendMail(
 	ctx context.Context,
 	input application.MailSendInput,
 ) (application.MailSendResult, error) {
+	if err := application.ValidateSmallMailAttachments(input.Attachments); err != nil {
+		return application.MailSendResult{}, err
+	}
 	draftInput := application.MailDraftInput(input)
 	if input.ComposeMode != "" &&
 		input.ComposeMode != application.MailComposeNew {

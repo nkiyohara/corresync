@@ -3,6 +3,7 @@ package approval
 import (
 	"errors"
 	"io"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -218,5 +219,37 @@ func TestStoreAllowsExactlyOneConcurrentConsumer(t *testing.T) {
 	wait.Wait()
 	if got := successes.Load(); got != 1 {
 		t.Fatalf("successful consumers = %d, want 1", got)
+	}
+}
+
+func TestApprovalByteBudgetIsReleasedAfterConsume(t *testing.T) {
+	store, err := NewStore(Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	operation, err := domain.NewOperation("mail.send", domain.EffectExternalWrite, "work", strings.Repeat("x", 32<<20))
+	if err != nil {
+		t.Fatal(err)
+	}
+	caller := domain.Caller{Surface: "cli", Instance: "budget"}
+	var first Preview
+	count := maxPendingPayloadBytes / operation.PayloadBytes()
+	for i := 0; i < count; i++ {
+		preview, err := store.Issue(operation, caller)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 0 {
+			first = preview
+		}
+	}
+	if _, err := store.Issue(operation, caller); !errors.Is(err, ErrCapacity) {
+		t.Fatalf("budget: %v", err)
+	}
+	if _, err := store.Consume(first.Token, caller); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Issue(operation, caller); err != nil {
+		t.Fatal(err)
 	}
 }

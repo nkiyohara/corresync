@@ -22,7 +22,7 @@ import (
 
 const (
 	defaultTimeout          = 30 * time.Second
-	defaultMaxRequestBytes  = 8 << 20
+	defaultMaxRequestBytes  = 40 << 20
 	defaultMaxResponseBytes = 48 << 20
 	defaultReadAttempts     = 3
 	loginTimeoutStatus      = 440
@@ -138,8 +138,12 @@ func (client *Client) Call(ctx context.Context, action Action, requestBody, resp
 	if err != nil {
 		return fmt.Errorf("encode OWA request: %w", err)
 	}
-	if len(payload) > client.maxRequestBytes {
-		return fmt.Errorf("OWA request exceeds %d bytes", client.maxRequestBytes)
+	limit := client.maxRequestBytes
+	if action != CreateAttachment && limit > 8<<20 {
+		limit = 8 << 20
+	}
+	if len(payload) > limit {
+		return fmt.Errorf("OWA request exceeds %d bytes", limit)
 	}
 
 	attempts := 1

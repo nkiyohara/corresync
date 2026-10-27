@@ -99,7 +99,7 @@ func (service *ProjectionService) ListAllTasks(
 	}
 
 	statuses := make([]ProjectionAccountStatus, 0, len(sources))
-	tasks := make([]ProjectedTask, 0, len(sources)*(input.Offset+input.Limit+1))
+	tasks := make([]ProjectedTask, 0)
 	sourceHasMore := false
 	for _, source := range sources {
 		statuses = append(statuses, source.status)

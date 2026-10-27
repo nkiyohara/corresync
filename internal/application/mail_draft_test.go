@@ -107,7 +107,7 @@ func TestMailDraftRejectsAmbiguousResponseModesAndAttachments(t *testing.T) {
 		{Account: "work", ComposeMode: MailComposeForward, ReferenceMessageID: "message-1", ReferenceChangeKey: "change-1"},
 		{Account: "work", To: []string{"a@example.invalid"}, BodyFormat: "markdown"},
 		{Account: "work", To: []string{"a@example.invalid"}, Attachments: []MailFileAttachment{{Name: "../fixture.txt", Content: []byte("x")}}},
-		{Account: "work", To: []string{"a@example.invalid"}, Attachments: []MailFileAttachment{{Name: "fixture", Content: make([]byte, MaxMailAttachmentBytes+1)}}},
+		{Account: "work", To: []string{"a@example.invalid"}, Attachments: []MailFileAttachment{{Name: "fixture", Content: make([]byte, MaxMailSendAttachmentBytes+1)}}},
 	}
 	for _, input := range tests {
 		if err := input.Validate(20); err == nil {
@@ -148,5 +148,37 @@ func TestMailDraftApprovalCannotBeConsumedByBodyTool(t *testing.T) {
 	}
 	if committed.Draft == nil || committed.Draft.ID != "draft-1" || reader.calls != 1 {
 		t.Fatalf("unexpected draft commit: %+v calls=%d", committed, reader.calls)
+	}
+}
+
+func TestLargeMailDraftBindsFullAttachmentThroughApproval(t *testing.T) {
+	store, err := approval.NewStore(approval.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard, err := NewGuard(policy.Rules{Mode: policy.ModeGuarded, PreviewReversibleWrites: true}, store, &memoryAudit{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := &fakeMailReader{}
+	service, err := NewMailService(guard, reader, testMailOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := validDraftInput()
+	input.Body = strings.Repeat("<", MaxMailDraftBodyBytes)
+	input.Attachments = []MailFileAttachment{{Name: "large.bin", Content: make([]byte, MaxMailSendAttachmentBytes)}}
+	caller := domain.Caller{Surface: "cli", Instance: "large"}
+	preview, err := service.CreateDraft(t.Context(), input, caller)
+	if err != nil || preview.Preview == nil {
+		t.Fatalf("preview: %v", err)
+	}
+	committed, err := service.CommitDraft(t.Context(), preview.Preview.Token, caller)
+	if err != nil || committed.Review.Attachments[0].SHA256 != preview.Review.Attachments[0].SHA256 {
+		t.Fatalf("commit: %v", err)
+	}
+	input.Attachments[0].Content = append(input.Attachments[0].Content, 1)
+	if err := input.Validate(MaxMailRecipients); err == nil {
+		t.Fatal("accepted oversized attachment")
 	}
 }

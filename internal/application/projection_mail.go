@@ -94,7 +94,7 @@ func (service *ProjectionService) SearchAllMail(
 	}
 
 	statuses := make([]ProjectionAccountStatus, 0, len(sources))
-	messages := make([]ProjectedMail, 0, len(sources)*(input.Offset+input.Limit+1))
+	messages := make([]ProjectedMail, 0)
 	sourceHasMore := false
 	for _, source := range sources {
 		statuses = append(statuses, source.status)

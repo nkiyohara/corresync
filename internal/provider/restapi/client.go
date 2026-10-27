@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	maximumRequestBytes  = 4 << 20
+	// Allow bounded mail bodies and small attachments after MIME and Base64 expansion.
+	maximumRequestBytes  = 12 << 20
 	maximumResponseBytes = 8 << 20
 	defaultReadAttempts  = 3
 )

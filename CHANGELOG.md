@@ -3,6 +3,18 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.3 - 2026-10-27
+
+- Expand Outlook Web draft/send attachments to 20 MiB per file and in total.
+- Align approval and daemon payload bounds with encoded attachment/body sizes;
+  retain aggregate approval memory bounds and exact preview/commit binding.
+- Allow cross-account pagination beyond offset 400 within the existing workset.
+- Distinguish stable releases from preview tracking and preserve package-manager
+  upgrade guidance when preview selects a stable release.
+- Keep unsupported upload routes explicit and reject large inputs before writes.
+
+See the [release notes](docs/releases/v0.9.3.md) for limits and upgrade guidance.
+
 ## 0.9.2 - 2026-10-22
 
 - Enable verified automatic installation for new standalone configurations,

@@ -257,7 +257,7 @@ func validateDraftAttachmentSnapshots(attachments []MailDraftAttachmentSnapshot)
 			len(attachment.ContentType) > 255 ||
 			strings.TrimSpace(attachment.ContentType) != attachment.ContentType ||
 			strings.ContainsAny(attachment.ContentType, "\r\n\x00") ||
-			attachment.Bytes < 0 || attachment.Bytes > MaxMailAttachmentBytes {
+			attachment.Bytes < 0 || attachment.Bytes > MaxMailSendAttachmentBytes {
 			return errors.New("saved draft attachment metadata is malformed or too large")
 		}
 		total += attachment.Bytes

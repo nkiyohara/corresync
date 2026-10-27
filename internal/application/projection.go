@@ -12,7 +12,9 @@ import (
 
 const (
 	MaxProjectionAccounts = 32
-	MaxProjectionOffset   = 400
+	// Every item in the existing bounded 32-account, 5,000-item workset
+	// must remain reachable through pagination.
+	MaxProjectionOffset = MaxProjectionAccounts * 5000
 )
 
 const (

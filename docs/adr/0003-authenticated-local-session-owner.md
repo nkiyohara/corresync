@@ -144,3 +144,11 @@ generation or bypasses local IPC authentication.
 - Installing a newer binary does not leave an incompatible owner blocking the
   next command. Automatic replacement drains active calls but intentionally
   discards release-bound in-memory sessions and previews.
+
+## Protocol 29: larger bounded mail compositions
+
+Version 29 raises the authenticated request envelope to 40 MiB to carry up to
+20 MiB of Base64-encoded mail attachments and a worst-case JSON-escaped 1 MiB
+body. Responses retain their 48 MiB bound. Only Outlook Web attachment uploads
+use the larger provider request bound; other OWA actions retain 8 MiB.
+Read limits do not change. Exact-version owner replacement remains mandatory.

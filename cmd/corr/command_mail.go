@@ -1021,9 +1021,9 @@ func readMailAttachments(paths []string) ([]application.MailFileAttachment, erro
 			_ = file.Close()
 			return nil, fmt.Errorf("inspect mail attachment %q: %w", path, statErr)
 		}
-		if !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > application.MaxMailAttachmentBytes {
+		if !info.Mode().IsRegular() || info.Size() < 1 || info.Size() > application.MaxMailSendAttachmentBytes {
 			_ = file.Close()
-			return nil, fmt.Errorf("mail attachment %q must be a regular file between 1 and %d bytes", path, application.MaxMailAttachmentBytes)
+			return nil, fmt.Errorf("mail attachment %q must be a regular file between 1 and %d bytes", path, application.MaxMailSendAttachmentBytes)
 		}
 		totalBytes += info.Size()
 		if totalBytes > application.MaxMailAttachmentTotalBytes {
@@ -1033,7 +1033,7 @@ func readMailAttachments(paths []string) ([]application.MailFileAttachment, erro
 				totalBytes, application.MaxMailAttachmentTotalBytes,
 			)
 		}
-		content, readErr := io.ReadAll(io.LimitReader(file, application.MaxMailAttachmentBytes+1))
+		content, readErr := io.ReadAll(io.LimitReader(file, application.MaxMailSendAttachmentBytes+1))
 		closeErr := file.Close()
 		if readErr != nil {
 			return nil, fmt.Errorf("read mail attachment %q: %w", path, readErr)

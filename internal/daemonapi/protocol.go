@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	ProtocolVersion   = 28
-	maxRequestBytes   = 8 << 20
+	ProtocolVersion   = 29
+	maxRequestBytes   = 40 << 20
 	maxResponseBytes  = 48 << 20
 	contentType       = "application/json"
 	requestPath       = "/v1/call"
