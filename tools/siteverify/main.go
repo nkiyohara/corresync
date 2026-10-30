@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -679,6 +680,16 @@ func verifyLocalReferences(root string, item page, pages map[string]page) error 
 			strings.HasPrefix(rawReference, "mailto:") {
 			continue
 		}
+		if strings.HasPrefix(rawReference, "codex:") || strings.HasPrefix(rawReference, "claude:") {
+			prompt, err := os.ReadFile(filepath.Join(root, "setup-request.txt")) // #nosec G304 -- repository-owned site root and fixed filename.
+			if err != nil {
+				return err
+			}
+			if !validSetupDeepLink(rawReference, string(prompt)) {
+				return fmt.Errorf("%s contains an invalid agent setup link", item.path)
+			}
+			continue
+		}
 		if strings.HasPrefix(rawReference, "//") {
 			return fmt.Errorf("%s contains scheme-relative reference %q", item.path, rawReference)
 		}
@@ -999,4 +1010,25 @@ func textContent(node *html.Node) string {
 	}
 	walk(node)
 	return builder.String()
+}
+
+// Only allow composer links with the reviewed setup request. Never allow
+// file/folder targeting, automatic submission, or arbitrary custom protocols.
+func validSetupDeepLink(raw, prompt string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.User != nil || u.Fragment != "" || u.Opaque != "" {
+		return false
+	}
+	key := ""
+	switch {
+	case u.Scheme == "codex" && u.Host == "new" && u.Path == "":
+		key = "prompt"
+	case u.Scheme == "claude" && u.Host == "code" && u.Path == "/new":
+		key = "q"
+	default:
+		return false
+	}
+	query, err := url.ParseQuery(u.RawQuery)
+	return err == nil && len(query) == 1 && len(query[key]) == 1 &&
+		prompt != "" && len(prompt) <= 14000 && query.Get(key) == prompt
 }

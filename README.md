@@ -129,7 +129,33 @@ live-unobserved. Other provider and platform implementations remain
 the exact commit. See [compatibility evidence](docs/compatibility.md) before
 connecting a sensitive account.
 
-## From install to a first read
+## Set up Corresync
+
+The setup buttons on the Corresync website open your desktop agent with a
+request already filled in. The request installs Corresync or updates an existing
+install. Nothing is sent until you review it and send it yourself. Manual
+commands, package managers and downloads are still available below as optional
+alternatives.
+
+[**Set up with ChatGPT**](https://corresync.org/#setup-chatgpt) ·
+[**Set up with Claude**](https://corresync.org/#setup-claude)
+
+Recommended: the standalone CLI. New setups turn on verified automatic updates.
+If Corresync is already installed, setup keeps your package manager,
+configuration and update setting unless you choose to change them.
+
+You need the ChatGPT Codex or Claude Code desktop app with local access to this
+computer. Approve each permission prompt when it appears. You don't need
+administrator rights. Sign in to your accounts and complete MFA yourself. Never
+paste passwords or codes into the chat.
+
+If you're on a phone, open this page on the computer you want to set up or copy
+the instructions to it.
+
+<!-- markdownlint-disable MD033 -->
+<details>
+<summary>Optional: manual installation and later setup steps</summary>
+<!-- markdownlint-enable MD033 -->
 
 Prefer a guided page? Follow
 [getting started on the website](https://corresync.org/getting-started.html).
@@ -321,6 +347,8 @@ Use `corr mcp --help` for Claude Code, GitHub Copilot CLI, Gemini CLI, Qwen
 Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 45
 narrow tools and two read-only monitor resources; there is no HTTP, SSE,
 remote MCP endpoint, or hosted relay.
+
+</details>
 
 ## Nothing sends on the first attempt
 
