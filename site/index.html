@@ -139,7 +139,7 @@
             <a href="providers.html">explore the provider details</a>.
           </p>
           <div class="actions">
-            <a class="button primary" href="getting-started.html">Get set up in four steps</a>
+            <a class="button primary" href="#install">Set up with your AI agent</a>
             <a class="button secondary" href="providers.html#check">Check my email provider</a>
           </div>
           <p class="hero-note">
@@ -151,58 +151,116 @@
 
         <div class="install-panel" id="install" aria-labelledby="install-title">
           <div class="install-head">
-            <h2 id="install-title">Install now</h2>
-            <p>One command per platform. Then connect the agent you already use.</p>
+            <h2 id="install-title">Set up Corresync</h2>
+            <p>
+              Use the AI agent you already have to install or update Corresync on this computer. You
+              review each step.
+            </p>
           </div>
-          <div class="install-block">
-            <p class="os-label" id="install-unix">macOS · Linux</p>
-            <div class="cmd" data-copy data-copy-label="macOS and Linux install command">
-              <pre
-                tabindex="0"
-                role="region"
-                aria-labelledby="install-unix"
-              ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
+          <div class="agent-setup">
+            <p>
+              Recommended: the standalone CLI. New setups turn on verified automatic updates. If
+              Corresync is already installed, setup keeps your package manager, configuration and
+              update setting unless you choose to change them.
+            </p>
+            <div class="actions">
+              <a
+                id="setup-chatgpt"
+                class="button primary"
+                href="codex://new?prompt=Help%20me%20install%20or%20update%20Corresync%20and%20connect%20it%20to%20this%20local%20desktop%20agent.%20First%20confirm%20that%20your%20command%20execution%20targets%20the%20computer%20I%20want%20to%20set%20up%3B%20do%20not%20install%20into%20a%20cloud%20sandbox%20or%20a%20remote%20server%20by%20mistake.%20If%20you%20cannot%20run%20local%20commands%2C%20explain%20how%20I%20can%20continue%20in%20a%20desktop%20agent.%0A%0ARead%20https%3A%2F%2Fcorresync.org%2Fgetting-started.html%20and%20the%20official%20documentation%20linked%20there.%20Inspect%20the%20OS%2C%20architecture%2C%20existing%20corr%20installation%20and%20its%20installation%20owner.%20For%20a%20new%20installation%2C%20use%20the%20official%20stable%20standalone%20installer%20for%20the%20current%20user%2C%20without%20administrator%20privileges%2C%20preserving%20its%20checksum%20and%20signature%20verification.%20For%20an%20existing%20standalone%20installation%20use%20corr%20update%3B%20for%20a%20package-managed%20installation%20use%20its%20package%20manager.%20Do%20not%20silently%20replace%20a%20package-managed%20installation.%0A%0AUse%20corr%20setup%20and%20the%20installed%20CLI%20help%20to%20guide%20configuration%20and%20agent%20integration.%20For%20a%20new%20configuration%2C%20use%20the%20stable%20update%20channel%20and%20ensure%20automatic%20checks%20and%20verified%20automatic%20installation%20are%20enabled.%20Verify%20updates.auto_install%20is%20true%20%28corr%20config%20set%20updates.auto_install%20true%20is%20the%20supported%20opt-in%29.%20Preserve%20existing%20account%2C%20agent%20and%20update%20settings%3B%20if%20automatic%20updates%20were%20disabled%2C%20ask%20before%20enabling%20them.%20Explain%20that%20automatic%20update%20checks%20happen%20on%20eligible%20interactive%20corr%20invocations%2C%20not%20as%20a%20continuous%20background%20updater.%0A%0APreview%20configuration%20changes%20and%20let%20me%20approve%20permissions%20and%20consequential%20actions.%20I%20will%20handle%20browser%20sign-in%20and%20MFA%20myself.%20Never%20request%20passwords%2C%20tokens%2C%20cookies%20or%20verification%20codes%20in%20chat.%20Do%20not%20enable%20provider%20authorization%2C%20administrator%20consent%2C%20monitoring%20or%20message%20sending%20without%20my%20explicit%20choice.%20Verify%20the%20installed%20version%2C%20update%20settings%20and%20daemon%20state%20using%20the%20supported%20CLI%20commands.%20Ensure%20any%20daemon%20running%20an%20old%20version%20is%20updated%20through%20the%20supported%20update%20flow.%20Do%20not%20read%20or%20send%20live%20account%20content%20just%20to%20test%20installation.%20Report%20what%20succeeded%20and%20anything%20I%20still%20need%20to%20do.%0A"
+              >Set up with ChatGPT</a>
+              <a
+                id="setup-claude"
+                class="button secondary"
+                href="claude://code/new?q=Help%20me%20install%20or%20update%20Corresync%20and%20connect%20it%20to%20this%20local%20desktop%20agent.%20First%20confirm%20that%20your%20command%20execution%20targets%20the%20computer%20I%20want%20to%20set%20up%3B%20do%20not%20install%20into%20a%20cloud%20sandbox%20or%20a%20remote%20server%20by%20mistake.%20If%20you%20cannot%20run%20local%20commands%2C%20explain%20how%20I%20can%20continue%20in%20a%20desktop%20agent.%0A%0ARead%20https%3A%2F%2Fcorresync.org%2Fgetting-started.html%20and%20the%20official%20documentation%20linked%20there.%20Inspect%20the%20OS%2C%20architecture%2C%20existing%20corr%20installation%20and%20its%20installation%20owner.%20For%20a%20new%20installation%2C%20use%20the%20official%20stable%20standalone%20installer%20for%20the%20current%20user%2C%20without%20administrator%20privileges%2C%20preserving%20its%20checksum%20and%20signature%20verification.%20For%20an%20existing%20standalone%20installation%20use%20corr%20update%3B%20for%20a%20package-managed%20installation%20use%20its%20package%20manager.%20Do%20not%20silently%20replace%20a%20package-managed%20installation.%0A%0AUse%20corr%20setup%20and%20the%20installed%20CLI%20help%20to%20guide%20configuration%20and%20agent%20integration.%20For%20a%20new%20configuration%2C%20use%20the%20stable%20update%20channel%20and%20ensure%20automatic%20checks%20and%20verified%20automatic%20installation%20are%20enabled.%20Verify%20updates.auto_install%20is%20true%20%28corr%20config%20set%20updates.auto_install%20true%20is%20the%20supported%20opt-in%29.%20Preserve%20existing%20account%2C%20agent%20and%20update%20settings%3B%20if%20automatic%20updates%20were%20disabled%2C%20ask%20before%20enabling%20them.%20Explain%20that%20automatic%20update%20checks%20happen%20on%20eligible%20interactive%20corr%20invocations%2C%20not%20as%20a%20continuous%20background%20updater.%0A%0APreview%20configuration%20changes%20and%20let%20me%20approve%20permissions%20and%20consequential%20actions.%20I%20will%20handle%20browser%20sign-in%20and%20MFA%20myself.%20Never%20request%20passwords%2C%20tokens%2C%20cookies%20or%20verification%20codes%20in%20chat.%20Do%20not%20enable%20provider%20authorization%2C%20administrator%20consent%2C%20monitoring%20or%20message%20sending%20without%20my%20explicit%20choice.%20Verify%20the%20installed%20version%2C%20update%20settings%20and%20daemon%20state%20using%20the%20supported%20CLI%20commands.%20Ensure%20any%20daemon%20running%20an%20old%20version%20is%20updated%20through%20the%20supported%20update%20flow.%20Do%20not%20read%20or%20send%20live%20account%20content%20just%20to%20test%20installation.%20Report%20what%20succeeded%20and%20anything%20I%20still%20need%20to%20do.%0A"
+              >Set up with Claude</a>
             </div>
+            <p>
+              Choose your desktop app. It opens with a setup request already filled in. Review the
+              request, then send it yourself.
+            </p>
+            <p class="install-note">
+              You need the ChatGPT Codex or Claude Code desktop app with local access to this
+              computer. Approve each permission prompt when it appears. You don&#x27;t need
+              administrator rights. Sign in to your accounts and complete MFA yourself. Never paste
+              passwords or codes into the chat.
+            </p>
+            <p class="install-note">
+              If you&#x27;re on a phone, open this page on the computer you want to set up or copy
+              the instructions to it.
+            </p>
+            <details class="setup-request">
+              <summary>
+                If the desktop app doesn&#x27;t open, copy the setup request below and paste it into
+                your agent.
+              </summary>
+              <div class="cmd" data-copy data-copy-label="Corresync setup request">
+                <pre
+                  tabindex="0"
+                  aria-label="Corresync setup request"
+                ><code>Help me install or update Corresync and connect it to this local desktop agent. First confirm that your command execution targets the computer I want to set up; do not install into a cloud sandbox or a remote server by mistake. If you cannot run local commands, explain how I can continue in a desktop agent.
+
+Read https://corresync.org/getting-started.html and the official documentation linked there. Inspect the OS, architecture, existing corr installation and its installation owner. For a new installation, use the official stable standalone installer for the current user, without administrator privileges, preserving its checksum and signature verification. For an existing standalone installation use corr update; for a package-managed installation use its package manager. Do not silently replace a package-managed installation.
+
+Use corr setup and the installed CLI help to guide configuration and agent integration. For a new configuration, use the stable update channel and ensure automatic checks and verified automatic installation are enabled. Verify updates.auto_install is true (corr config set updates.auto_install true is the supported opt-in). Preserve existing account, agent and update settings; if automatic updates were disabled, ask before enabling them. Explain that automatic update checks happen on eligible interactive corr invocations, not as a continuous background updater.
+
+Preview configuration changes and let me approve permissions and consequential actions. I will handle browser sign-in and MFA myself. Never request passwords, tokens, cookies or verification codes in chat. Do not enable provider authorization, administrator consent, monitoring or message sending without my explicit choice. Verify the installed version, update settings and daemon state using the supported CLI commands. Ensure any daemon running an old version is updated through the supported update flow. Do not read or send live account content just to test installation. Report what succeeded and anything I still need to do.
+</code></pre>
+              </div>
+            </details>
           </div>
-          <div class="install-block">
-            <p class="os-label" id="install-windows">Windows · PowerShell</p>
-            <div class="cmd" data-copy data-copy-label="Windows PowerShell install command">
-              <pre
-                tabindex="0"
-                role="region"
-                aria-labelledby="install-windows"
-              ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
+          <details class="manual-setup">
+            <summary>Optional: manual installation and later setup steps</summary>
+            <div class="install-block">
+              <p class="os-label" id="install-unix">macOS · Linux</p>
+              <div class="cmd" data-copy data-copy-label="macOS and Linux install command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="install-unix"
+                ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
+              </div>
             </div>
-          </div>
-          <div class="install-block">
-            <p class="os-label" id="install-winget">Windows · WinGet alternative</p>
-            <div class="cmd" data-copy data-copy-label="Windows WinGet install command">
-              <pre
-                tabindex="0"
-                role="region"
-                aria-labelledby="install-winget"
-              ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
+            <div class="install-block">
+              <p class="os-label" id="install-windows">Windows · PowerShell</p>
+              <div class="cmd" data-copy data-copy-label="Windows PowerShell install command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="install-windows"
+                ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
+              </div>
             </div>
-          </div>
-          <div class="install-block">
-            <p class="os-label" id="install-connect">Next · finish guided setup</p>
-            <div class="cmd" data-copy data-copy-label="account setup command">
-              <pre
-                tabindex="0"
-                role="region"
-                aria-labelledby="install-connect"
-              ><code>corr setup</code></pre>
+            <div class="install-block">
+              <p class="os-label" id="install-winget">Windows · WinGet alternative</p>
+              <div class="cmd" data-copy data-copy-label="Windows WinGet install command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="install-winget"
+                ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
+              </div>
             </div>
-          </div>
-          <p class="install-note">
-            Setup resumes from current local state, discovers account routes without credentials,
-            and previews both account and agent-host changes before applying them. Sign-in remains a
-            separate choice. Prefer to read before you run? Review <a href="install.sh"
-            >install.sh</a> or
-            <a href="install.ps1">install.ps1</a> first. Homebrew, Scoop, native Linux packages, and
-            direct downloads are listed in
-            <a href="getting-started.html#other-install-methods">getting started</a>.
-          </p>
+            <div class="install-block">
+              <p class="os-label" id="install-connect">Next · finish guided setup</p>
+              <div class="cmd" data-copy data-copy-label="account setup command">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="install-connect"
+                ><code>corr setup</code></pre>
+              </div>
+            </div>
+            <p class="install-note">
+              Setup resumes from current local state, discovers account routes without credentials,
+              and previews both account and agent-host changes before applying them. Sign-in remains
+              a separate choice. Prefer to read before you run? Review <a href="install.sh"
+              >install.sh</a> or
+              <a href="install.ps1">install.ps1</a> first. Homebrew, Scoop, native Linux packages,
+              and direct downloads are listed in
+              <a href="getting-started.html#other-install-methods">getting started</a>.
+            </p>
+          </details>
         </div>
       </section>
 

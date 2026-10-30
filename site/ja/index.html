@@ -140,7 +140,7 @@
             >サービス別の詳細を見る</a>。
           </p>
           <div class="actions">
-            <a class="button primary" href="getting-started.html">4ステップではじめる</a>
+            <a class="button primary" href="#install">AI エージェントでセットアップ</a>
             <a class="button secondary" href="providers.html#check"
             >メールアドレスで対応状況を確認</a>
           </div>
@@ -152,67 +152,117 @@
 
         <div class="install-panel" id="install" aria-labelledby="install-title">
           <div class="install-head">
-            <h2 id="install-title">今すぐインストール</h2>
+            <h2 id="install-title">Corresync をセットアップ</h2>
             <p>
-              OSに合うコマンドをひとつ実行し、いつものエージェントにつなぎます。
+              いつもの AI エージェントで、このコンピューターに Corresync
+              をインストールまたは更新できます。各手順はご自身で確認できます。
             </p>
           </div>
-          <div class="install-block">
-            <p class="os-label" id="install-unix">macOS · Linux</p>
-            <div
-              class="cmd"
-              data-copy
-              data-copy-label="macOS・Linux用インストールコマンド"
-            >
-              <pre
-                tabindex="0"
-                role="region"
-                aria-labelledby="install-unix"
-              ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
+          <div class="agent-setup">
+            <p>
+              おすすめはスタンドアロン版 CLI
+              です。新規セットアップでは、検証済みの自動更新をオンにします。インストール済みの場合は、ご自身で変更しない限り、パッケージマネージャーでの管理、既存の設定、自動更新の設定をそのまま引き継ぎます。
+            </p>
+            <div class="actions">
+              <a
+                id="setup-chatgpt"
+                class="button primary"
+                href="codex://new?prompt=Help%20me%20install%20or%20update%20Corresync%20and%20connect%20it%20to%20this%20local%20desktop%20agent.%20First%20confirm%20that%20your%20command%20execution%20targets%20the%20computer%20I%20want%20to%20set%20up%3B%20do%20not%20install%20into%20a%20cloud%20sandbox%20or%20a%20remote%20server%20by%20mistake.%20If%20you%20cannot%20run%20local%20commands%2C%20explain%20how%20I%20can%20continue%20in%20a%20desktop%20agent.%0A%0ARead%20https%3A%2F%2Fcorresync.org%2Fgetting-started.html%20and%20the%20official%20documentation%20linked%20there.%20Inspect%20the%20OS%2C%20architecture%2C%20existing%20corr%20installation%20and%20its%20installation%20owner.%20For%20a%20new%20installation%2C%20use%20the%20official%20stable%20standalone%20installer%20for%20the%20current%20user%2C%20without%20administrator%20privileges%2C%20preserving%20its%20checksum%20and%20signature%20verification.%20For%20an%20existing%20standalone%20installation%20use%20corr%20update%3B%20for%20a%20package-managed%20installation%20use%20its%20package%20manager.%20Do%20not%20silently%20replace%20a%20package-managed%20installation.%0A%0AUse%20corr%20setup%20and%20the%20installed%20CLI%20help%20to%20guide%20configuration%20and%20agent%20integration.%20For%20a%20new%20configuration%2C%20use%20the%20stable%20update%20channel%20and%20ensure%20automatic%20checks%20and%20verified%20automatic%20installation%20are%20enabled.%20Verify%20updates.auto_install%20is%20true%20%28corr%20config%20set%20updates.auto_install%20true%20is%20the%20supported%20opt-in%29.%20Preserve%20existing%20account%2C%20agent%20and%20update%20settings%3B%20if%20automatic%20updates%20were%20disabled%2C%20ask%20before%20enabling%20them.%20Explain%20that%20automatic%20update%20checks%20happen%20on%20eligible%20interactive%20corr%20invocations%2C%20not%20as%20a%20continuous%20background%20updater.%0A%0APreview%20configuration%20changes%20and%20let%20me%20approve%20permissions%20and%20consequential%20actions.%20I%20will%20handle%20browser%20sign-in%20and%20MFA%20myself.%20Never%20request%20passwords%2C%20tokens%2C%20cookies%20or%20verification%20codes%20in%20chat.%20Do%20not%20enable%20provider%20authorization%2C%20administrator%20consent%2C%20monitoring%20or%20message%20sending%20without%20my%20explicit%20choice.%20Verify%20the%20installed%20version%2C%20update%20settings%20and%20daemon%20state%20using%20the%20supported%20CLI%20commands.%20Ensure%20any%20daemon%20running%20an%20old%20version%20is%20updated%20through%20the%20supported%20update%20flow.%20Do%20not%20read%20or%20send%20live%20account%20content%20just%20to%20test%20installation.%20Report%20what%20succeeded%20and%20anything%20I%20still%20need%20to%20do.%0A"
+              >ChatGPT でセットアップ</a>
+              <a
+                id="setup-claude"
+                class="button secondary"
+                href="claude://code/new?q=Help%20me%20install%20or%20update%20Corresync%20and%20connect%20it%20to%20this%20local%20desktop%20agent.%20First%20confirm%20that%20your%20command%20execution%20targets%20the%20computer%20I%20want%20to%20set%20up%3B%20do%20not%20install%20into%20a%20cloud%20sandbox%20or%20a%20remote%20server%20by%20mistake.%20If%20you%20cannot%20run%20local%20commands%2C%20explain%20how%20I%20can%20continue%20in%20a%20desktop%20agent.%0A%0ARead%20https%3A%2F%2Fcorresync.org%2Fgetting-started.html%20and%20the%20official%20documentation%20linked%20there.%20Inspect%20the%20OS%2C%20architecture%2C%20existing%20corr%20installation%20and%20its%20installation%20owner.%20For%20a%20new%20installation%2C%20use%20the%20official%20stable%20standalone%20installer%20for%20the%20current%20user%2C%20without%20administrator%20privileges%2C%20preserving%20its%20checksum%20and%20signature%20verification.%20For%20an%20existing%20standalone%20installation%20use%20corr%20update%3B%20for%20a%20package-managed%20installation%20use%20its%20package%20manager.%20Do%20not%20silently%20replace%20a%20package-managed%20installation.%0A%0AUse%20corr%20setup%20and%20the%20installed%20CLI%20help%20to%20guide%20configuration%20and%20agent%20integration.%20For%20a%20new%20configuration%2C%20use%20the%20stable%20update%20channel%20and%20ensure%20automatic%20checks%20and%20verified%20automatic%20installation%20are%20enabled.%20Verify%20updates.auto_install%20is%20true%20%28corr%20config%20set%20updates.auto_install%20true%20is%20the%20supported%20opt-in%29.%20Preserve%20existing%20account%2C%20agent%20and%20update%20settings%3B%20if%20automatic%20updates%20were%20disabled%2C%20ask%20before%20enabling%20them.%20Explain%20that%20automatic%20update%20checks%20happen%20on%20eligible%20interactive%20corr%20invocations%2C%20not%20as%20a%20continuous%20background%20updater.%0A%0APreview%20configuration%20changes%20and%20let%20me%20approve%20permissions%20and%20consequential%20actions.%20I%20will%20handle%20browser%20sign-in%20and%20MFA%20myself.%20Never%20request%20passwords%2C%20tokens%2C%20cookies%20or%20verification%20codes%20in%20chat.%20Do%20not%20enable%20provider%20authorization%2C%20administrator%20consent%2C%20monitoring%20or%20message%20sending%20without%20my%20explicit%20choice.%20Verify%20the%20installed%20version%2C%20update%20settings%20and%20daemon%20state%20using%20the%20supported%20CLI%20commands.%20Ensure%20any%20daemon%20running%20an%20old%20version%20is%20updated%20through%20the%20supported%20update%20flow.%20Do%20not%20read%20or%20send%20live%20account%20content%20just%20to%20test%20installation.%20Report%20what%20succeeded%20and%20anything%20I%20still%20need%20to%20do.%0A"
+              >Claude でセットアップ</a>
             </div>
+            <p>
+              お使いのデスクトップアプリを選ぶと、セットアップ依頼が入力された状態で開きます。内容を確認してから、ご自身で送信してください。
+            </p>
+            <p class="install-note">
+              このコンピューターを操作できる ChatGPT Codex または Claude Code
+              のデスクトップアプリが必要です。権限の確認が表示されたら承認してください。管理者権限は不要です。アカウントへのサインインと多要素認証はご自身で行ってください。パスワードや確認コードをチャットに貼り付けないでください。
+            </p>
+            <p class="install-note">
+              スマートフォンでご覧の場合は、セットアップするコンピューターでこのページを開くか、手順をコピーしてそのコンピューターに送ってください。
+            </p>
+            <details class="setup-request">
+              <summary>
+                アプリが開かない場合は、下のセットアップ依頼をコピーしてエージェントに貼り付けてください。
+              </summary>
+              <div class="cmd" data-copy data-copy-label="Corresync setup request">
+                <pre
+                  tabindex="0"
+                  aria-label="Corresync setup request"
+                ><code>Help me install or update Corresync and connect it to this local desktop agent. First confirm that your command execution targets the computer I want to set up; do not install into a cloud sandbox or a remote server by mistake. If you cannot run local commands, explain how I can continue in a desktop agent.
+
+Read https://corresync.org/getting-started.html and the official documentation linked there. Inspect the OS, architecture, existing corr installation and its installation owner. For a new installation, use the official stable standalone installer for the current user, without administrator privileges, preserving its checksum and signature verification. For an existing standalone installation use corr update; for a package-managed installation use its package manager. Do not silently replace a package-managed installation.
+
+Use corr setup and the installed CLI help to guide configuration and agent integration. For a new configuration, use the stable update channel and ensure automatic checks and verified automatic installation are enabled. Verify updates.auto_install is true (corr config set updates.auto_install true is the supported opt-in). Preserve existing account, agent and update settings; if automatic updates were disabled, ask before enabling them. Explain that automatic update checks happen on eligible interactive corr invocations, not as a continuous background updater.
+
+Preview configuration changes and let me approve permissions and consequential actions. I will handle browser sign-in and MFA myself. Never request passwords, tokens, cookies or verification codes in chat. Do not enable provider authorization, administrator consent, monitoring or message sending without my explicit choice. Verify the installed version, update settings and daemon state using the supported CLI commands. Ensure any daemon running an old version is updated through the supported update flow. Do not read or send live account content just to test installation. Report what succeeded and anything I still need to do.
+</code></pre>
+              </div>
+            </details>
           </div>
-          <div class="install-block">
-            <p class="os-label" id="install-windows">Windows · PowerShell</p>
-            <div
-              class="cmd"
-              data-copy
-              data-copy-label="Windows PowerShell用インストールコマンド"
-            >
-              <pre
-                tabindex="0"
-                role="region"
-                aria-labelledby="install-windows"
-              ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
+          <details class="manual-setup">
+            <summary>任意：手動インストールとその後の設定手順</summary>
+            <div class="install-block">
+              <p class="os-label" id="install-unix">macOS · Linux</p>
+              <div
+                class="cmd"
+                data-copy
+                data-copy-label="macOS・Linux用インストールコマンド"
+              >
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="install-unix"
+                ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
+              </div>
             </div>
-          </div>
-          <div class="install-block">
-            <p class="os-label" id="install-winget">Windows · WinGet</p>
-            <div
-              class="cmd"
-              data-copy
-              data-copy-label="Windows WinGet用インストールコマンド"
-            >
-              <pre
-                tabindex="0"
-                role="region"
-                aria-labelledby="install-winget"
-              ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
+            <div class="install-block">
+              <p class="os-label" id="install-windows">Windows · PowerShell</p>
+              <div
+                class="cmd"
+                data-copy
+                data-copy-label="Windows PowerShell用インストールコマンド"
+              >
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="install-windows"
+                ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
+              </div>
             </div>
-          </div>
-          <div class="install-block">
-            <p class="os-label" id="install-connect">次にガイド付き設定を完了</p>
-            <div class="cmd" data-copy data-copy-label="アカウント設定コマンド">
-              <pre
-                tabindex="0"
-                role="region"
-                aria-labelledby="install-connect"
-              ><code>corr setup</code></pre>
+            <div class="install-block">
+              <p class="os-label" id="install-winget">Windows · WinGet</p>
+              <div
+                class="cmd"
+                data-copy
+                data-copy-label="Windows WinGet用インストールコマンド"
+              >
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="install-winget"
+                ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
+              </div>
             </div>
-          </div>
-          <p class="install-note">
-            現在のローカル状態から再開し、認証情報なしでアカウント候補を探します。アカウントとエージェントの変更は適用前に確認でき、サインインは別の操作です。その他の導入方法やMCPクライアントごとの設定は
-            <a href="getting-started.html">スタートガイド</a>にまとめています。
-          </p>
+            <div class="install-block">
+              <p class="os-label" id="install-connect">次にガイド付き設定を完了</p>
+              <div class="cmd" data-copy data-copy-label="アカウント設定コマンド">
+                <pre
+                  tabindex="0"
+                  role="region"
+                  aria-labelledby="install-connect"
+                ><code>corr setup</code></pre>
+              </div>
+            </div>
+            <p class="install-note">
+              現在のローカル状態から再開し、認証情報なしでアカウント候補を探します。アカウントとエージェントの変更は適用前に確認でき、サインインは別の操作です。その他の導入方法やMCPクライアントごとの設定は
+              <a href="getting-started.html">スタートガイド</a>にまとめています。
+            </p>
+          </details>
         </div>
       </section>
 
