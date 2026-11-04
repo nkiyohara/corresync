@@ -153,6 +153,7 @@ tasks:
   actions:
     desc: Lint GitHub Actions workflows
     cmds:
+      - node --test tools/dependabot/*.test.cjs
       - actionlint
       - zizmor --pedantic .github/workflows
 

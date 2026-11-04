@@ -178,3 +178,49 @@ documentation, and security review are complete.
 
 Pull requests close or reference their tracking issue. A standalone maintenance
 pull request explains why no issue or release milestone is needed.
+
+## Dependency updates
+
+Dependabot checks Go modules and GitHub Actions weekly. Normal version updates
+have a seven-day release cooldown. Security updates remain enabled and bypass
+that cooldown; they stay individual so unrelated fixes cannot block each other.
+Routine patches, browser dependencies, security-sensitive libraries, other
+patches, minor updates, and major updates are grouped separately.
+
+After the `CI` workflow succeeds, dependency automation may squash-merge a
+same-repository Dependabot PR targeting `main`. All of these conditions apply:
+
+- Only `go.mod` and `go.sum` may change.
+- Every version change must be an increasing stable patch of a module explicitly
+  listed in `tools/dependabot/policy.cjs`. Keep the `routine-go-patches` group in
+  `.github/dependabot.yml` aligned with this list.
+- Go/toolchain directives, new or removed dependencies, v0 releases,
+  prereleases, minor/major updates and changes outside that list require review.
+- Checksum changes must belong to the exact module versions being replaced.
+  Existing checksums cannot be rewritten; transitive dependency churn needs
+  review even when the direct dependency is allowlisted.
+- CI must have succeeded on the current PR head. The merge API is bound to that
+  exact SHA, and branch protection still requires an up-to-date branch, all
+  required checks (including macOS and Windows tests), and resolved discussions.
+
+GitHub Actions, browser, authentication, credential-store, protocol and release
+verification dependencies require maintainer review unless explicitly added to
+that allowlist. Security updates use the same merge policy; urgent fixes outside
+it need prompt review, not an automatic bypass. Human and fork PRs never qualify.
+
+The privileged workflow runs only trusted default-branch policy code. It reads
+candidate manifests through the API as data and never executes PR code or uses
+PR-produced artifacts or caches. It merges only after verification instead of
+arming GitHub's queued auto-merge for later revisions. Repository-wide native
+`Allow auto-merge` is not needed for this workflow.
+
+To inspect an existing PR, run the **Dependabot auto-merge** workflow manually
+on `main`, supplying its number and leaving `dry_run` enabled. Disable `dry_run`
+only to apply the same policy and merge checks. A rejected candidate remains
+open for normal review; workflow failures appear in Actions.
+
+Merging dependency updates does not update installed Corresync binaries.
+Runtime security fixes need a verified release through
+[the release process](docs/releasing.md), followed by client updates. This
+workflow creates no release tags. Bot-token merges may not trigger additional
+push workflows; the required PR checks are the merge gate.

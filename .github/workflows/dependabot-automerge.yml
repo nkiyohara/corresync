@@ -1,0 +1,52 @@
+name: Dependabot auto-merge
+
+on: # zizmor: ignore[dangerous-triggers] -- Only trusted default-branch policy runs; no PR checkout, artifacts, caches or code execution.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Dependabot PR number to evaluate
+        required: true
+        type: string
+      dry_run:
+        description: Report eligibility without merging
+        default: true
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: dependabot-automerge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    name: Merge eligible dependency patches
+    if: >-
+      github.repository == 'nkiyohara/corresync' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read # Verify CI on the exact candidate revision.
+      contents: write # Merge only policy-approved dependency patches.
+      pull-requests: write # Read PR metadata and request the protected merge.
+    steps:
+      - name: Check out trusted policy only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # workflow_run uses the default branch, never the PR head or artifacts.
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: tools/dependabot
+
+      - name: Evaluate and merge the tested revision
+        run: node tools/dependabot/automerge.cjs
+        env:
+          GH_TOKEN: ${{ github.token }}
