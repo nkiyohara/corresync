@@ -7,12 +7,47 @@ updates:
       day: monday
       time: "06:00"
       timezone: Europe/London
-    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 8
     groups:
+      # Only these modules' stable patch updates are eligible for auto-merge.
+      # The policy also checks every manifest/checksum change, not group names.
+      routine-go-patches:
+        patterns:
+          - charm.land/huh/v2
+          - charm.land/lipgloss/v2
+          - github.com/alecthomas/kong
+          - github.com/google/uuid
+          - github.com/mattn/go-shellwords
+          - github.com/pelletier/go-toml/v2
+          - github.com/posener/complete
+          - github.com/teambition/rrule-go
+          - go.yaml.in/yaml/v3
+        update-types: [patch]
       browser-dependencies:
         patterns: ["github.com/chromedp/*"]
-      go-dependencies:
+      security-sensitive-dependencies:
+        patterns:
+          - "github.com/sigstore/*"
+          - "github.com/minio/selfupdate"
+          - "github.com/zalando/go-keyring"
+          - "github.com/emersion/*"
+          - "github.com/modelcontextprotocol/*"
+          - "golang.org/x/crypto"
+          - "golang.org/x/oauth2"
+          - "golang.org/x/net"
+      other-go-patches:
         patterns: ["*"]
+        update-types: [patch]
+      go-minor-updates:
+        patterns: ["*"]
+        update-types: [minor]
+      go-major-updates:
+        patterns: ["*"]
+        update-types: [major]
+      # Security updates are not delayed by the version-update cooldown.
+      # Keep them individual so unrelated fixes do not block one another.
 
   - package-ecosystem: github-actions
     directory: /
@@ -21,7 +56,14 @@ updates:
       day: monday
       time: "06:15"
       timezone: Europe/London
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     groups:
-      actions:
+      # Workflow changes always need maintainer review, even patch updates.
+      actions-nonmajor:
         patterns: ["*"]
+        update-types: [minor, patch]
+      actions-major:
+        patterns: ["*"]
+        update-types: [major]

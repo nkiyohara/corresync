@@ -74,6 +74,9 @@ jobs:
       - name: Test with race detector
         run: go test -race ./...
 
+      - name: Test dependency automation policy
+        run: node --test tools/dependabot/*.test.cjs
+
       - name: Check reachable vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
 
