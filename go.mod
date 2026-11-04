@@ -7,7 +7,7 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/alecthomas/kong v1.16.1
-	github.com/chromedp/cdproto v0.158.0
+	github.com/chromedp/cdproto v0.158.6
 	github.com/chromedp/chromedp v0.21.0
 	github.com/creack/pty v1.1.24
 	github.com/emersion/go-ical v0.0.0-20240127095438-fc1c9d8fb2b6
