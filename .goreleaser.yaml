@@ -5,6 +5,7 @@ project_name: corresync
 before:
   hooks:
     - go mod vendor
+    - go run ./tools/licenseexceptions
     - >-
       go run ./tools/integrationbundle
       --output-root .release/integrationbundle
@@ -17,11 +18,14 @@ before:
     - >-
       go-licenses check ./cmd/corr
       --ignore github.com/nkiyohara/corresync
+      --ignore github.com/segmentio/asm
     - >-
       go-licenses save ./cmd/corr
       --ignore github.com/nkiyohara/corresync
+      --ignore github.com/segmentio/asm
       --save_path .release/third_party_licenses
       --force
+    - go run ./tools/licenseexceptions --save
     - >-
       go run ./tools/normalizefiles
       --root .release/third_party_licenses

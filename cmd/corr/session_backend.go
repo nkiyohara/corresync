@@ -3719,7 +3719,7 @@ func (backend *sessionBackend) startMonitorLocked(
 	}
 	backend.monitorStarted[accountID] = true
 	// Logout retains and calls cancel; daemon shutdown cancels the parent.
-	monitorContext, cancel := context.WithCancel(backend.lifecycle) //nolint:gosec
+	monitorContext, cancel := context.WithCancel(backend.lifecycle)
 	done := make(chan struct{})
 	backend.monitorCancel[accountID] = cancel
 	backend.monitorDone[accountID] = done

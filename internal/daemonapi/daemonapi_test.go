@@ -827,7 +827,9 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 		_ = server.Shutdown(shutdownCtx)
 		_ = listener.Close()
 		_ = credential.Close()
-		<-serveDone
+		if err := <-serveDone; err != nil && !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("Serve() during shutdown: %v", err)
+		}
 	})
 
 	client, err := NewClient(endpoint)
@@ -1328,7 +1330,9 @@ func TestProviderNeutralStatusRoundTripOverLocalIPC(t *testing.T) {
 		_ = server.Shutdown(shutdownCtx)
 		_ = listener.Close()
 		_ = credential.Close()
-		<-serveDone
+		if err := <-serveDone; err != nil && !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("Serve() during shutdown: %v", err)
+		}
 	})
 
 	client, err := NewClient(endpoint)
@@ -1540,7 +1544,9 @@ func TestClientInspectsAndStopsIncompatibleDaemon(t *testing.T) {
 		_ = server.Close()
 		_ = listener.Close()
 		_ = credential.Close()
-		<-serveDone
+		if err := <-serveDone; err != nil && !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, net.ErrClosed) {
+			t.Errorf("Serve() during shutdown: %v", err)
+		}
 	})
 
 	client, err := NewClient(endpoint)

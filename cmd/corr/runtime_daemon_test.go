@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -734,7 +735,9 @@ func startLifecycleTestDaemon(
 			cancel()
 			_ = listener.Close()
 			_ = credential.Close()
-			<-serveDone
+			if err := <-serveDone; err != nil && !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, net.ErrClosed) {
+				t.Errorf("Serve() during shutdown: %v", err)
+			}
 			close(stopped)
 		})
 	}

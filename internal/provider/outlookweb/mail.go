@@ -232,6 +232,15 @@ func (client *Client) SearchMessages(
 		}
 		return application.MailPage{}, err
 	}
+	// A terminal flag cannot override evidence of matches beyond this page.
+	// TotalItemsInView may describe only the capped search window, so it is
+	// a lower bound rather than a promise of the mailbox's total match count.
+	if page.TotalItemsInView > input.Offset+len(page.Messages) {
+		page.IncludesLastItem = false
+	}
+	if len(page.Messages) == 0 && !page.IncludesLastItem {
+		return application.MailPage{}, errors.New("outlook web search made no progress; narrow the query and retry")
+	}
 	return normalizeMailPage(page), nil
 }
 
@@ -303,8 +312,8 @@ func buildFindItemEnvelope(input listMessagesRequest) (findItemEnvelope, error) 
 	if input.Folder.kind != folderDistinguished && input.Folder.kind != folderOpaque {
 		return findItemEnvelope{}, errors.New("mail folder is required")
 	}
-	if input.Offset < 0 {
-		return findItemEnvelope{}, errors.New("mail offset must not be negative")
+	if input.Offset < 0 || input.Offset > application.MaxMailOffset {
+		return findItemEnvelope{}, fmt.Errorf("mail offset must be between 0 and %d", application.MaxMailOffset)
 	}
 	if input.Limit < 1 || input.Limit > application.MaxMailPageSize {
 		return findItemEnvelope{}, fmt.Errorf("mail limit must be between 1 and %d", application.MaxMailPageSize)
@@ -378,9 +387,12 @@ func buildFindItemEnvelope(input listMessagesRequest) (findItemEnvelope, error) 
 		envelope.Body.ItemShape.AdditionalProperties = nil
 		envelope.Body.IsWarmUpSearch = &warmUp
 		envelope.Body.QueryString = &queryString{
-			Type:                  "QueryStringType:#Exchange",
-			Value:                 input.Query,
-			MaxResultsCount:       input.Limit,
+			Type:  "QueryStringType:#Exchange",
+			Value: input.Query,
+			// This caps the search result set, not the returned page. Include
+			// the skipped prefix and one lookahead match so reaching our own
+			// cap cannot masquerade as exhaustion of the provider's results.
+			MaxResultsCount:       input.Offset + input.Limit + 1,
 			ResetCache:            true,
 			ReturnDeletedItems:    false,
 			ReturnHighlightTerms:  false,

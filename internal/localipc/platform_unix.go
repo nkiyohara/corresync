@@ -304,7 +304,9 @@ func suitableLegacyRuntimeBase(path string, effectiveUID uint32) (bool, error) {
 	if !filepath.IsAbs(path) {
 		return false, errors.New("runtime base must be absolute")
 	}
-	info, err := os.Lstat(filepath.Clean(path))
+	// Inspect the human-selected absolute runtime base itself. No file content
+	// is read or written; ownership, mode, and symlink checks below gate its use.
+	info, err := os.Lstat(filepath.Clean(path)) // #nosec G703 -- validated local runtime-base metadata only.
 	if err != nil {
 		return false, err
 	}

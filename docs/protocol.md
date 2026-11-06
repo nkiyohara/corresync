@@ -89,6 +89,33 @@ filters exact calendar folder classes, and reports effective read/write rights.
 Shared/delegated mailbox headers are added only for an explicitly configured
 route and never broaden the signed-in user's existing permissions.
 
+Mail search keeps `Paging.MaxEntriesReturned` at the requested page size and
+sets the separate `QueryString.MaxResultsCount` to offset + page size + one.
+This covers the skipped prefix and a lookahead match when each request creates
+a fresh search. The offset remains bounded to 10,000 and the returned page to
+50 items. `TotalItemsInView` can describe that capped search window; it is not
+a guaranteed total for the mailbox. A terminal flag that contradicts that
+count is treated as non-terminal, and an empty non-terminal page fails visibly.
+
+This correction is based on the content-free observations in
+[#195](https://github.com/nkiyohara/corresync/issues/195) and synthetic capped-set
+tests, including shrinking pages and the cross-account projection. Microsoft's
+[EWS paging documentation](https://learn.microsoft.com/en-us/exchange/client-developer/exchange-web-services/how-to-perform-paged-searches-by-using-ews-in-exchange)
+describes the distinction between a page and the result set; it does not
+document or guarantee the private OWA search-cache contract. The corrected OWA
+request still needs a revision-bound opt-in live observation. Search pages are
+not an immutable snapshot: concurrent mailbox changes and provider indexing,
+ordering, or server-side caps can affect results. Cross-account search rejects
+duplicate identities and incomplete sources rather than declaring them complete.
+
+Search covers the exact selected folder with shallow traversal. `archive` does
+not request recursive archive subfolders or an online archive mailbox. Select
+an exact discovered folder ID to search that folder. Queries, including
+Japanese text, ASCII phrase quotes, and date ranges, are passed through without
+translation or a client-side age cutoff. Provider tokenization, indexing and
+archive coverage remain live-unobserved; the older-mail/archive and Japanese
+phrase observations are not established as the same defect as #195.
+
 OWA can provision a Teams join URL as a provider-native calendar-event creation
 property. Teams chat, channels, calls, recordings, and meeting lifecycle
 management are not exposed.

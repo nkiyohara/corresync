@@ -275,7 +275,7 @@ func TestSearchMessagesUsesBoundedTypedContract(t *testing.T) {
 	}
 	if request.Body.ShapeName != "MailListItem" || !validUUID(request.Body.SearchFolderIdentity) ||
 		request.Body.QueryString.Value != `subject:"Quarterly plan" from:alice` ||
-		request.Body.QueryString.MaxResultsCount != 25 || !request.Body.QueryString.WaitForSearchComplete ||
+		request.Body.QueryString.MaxResultsCount != 26 || !request.Body.QueryString.WaitForSearchComplete ||
 		request.Body.QueryString.ReturnDeletedItems || request.Body.QueryString.ReturnHighlightTerms {
 		t.Fatalf("unexpected search request: %+v", request.Body)
 	}

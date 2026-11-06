@@ -13,7 +13,8 @@ finite v0.8–v0.9 command-transition window also contain the identical
 curl -LsSf https://corresync.org/install.sh | sh
 ```
 
-The shell installer supports macOS and Linux on amd64 and arm64. It:
+The shell installer supports macOS and Linux on amd64 and arm64. From v0.9.4,
+macOS binaries require macOS 13 Ventura or later. The installer:
 
 - resolves only a stable tag from the canonical GitHub repository;
 - downloads the exact archive, checksum inventory, and Sigstore bundle over

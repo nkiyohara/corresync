@@ -150,7 +150,10 @@ func TestMattermostCloseInterruptsABlockedRead(t *testing.T) {
 	closeDone := make(chan error, 1)
 	go func() { closeDone <- stream.Close() }()
 	select {
-	case <-closeDone:
+	case err := <-closeDone:
+		if err != nil {
+			t.Fatalf("Close(): %v", err)
+		}
 	case <-time.After(time.Second):
 		t.Fatal("Close blocked behind the active WebSocket read")
 	}
