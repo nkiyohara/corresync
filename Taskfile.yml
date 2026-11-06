@@ -115,6 +115,9 @@ tasks:
   licenses:
     desc: Check licenses of dependencies linked into the release binary
     cmds:
+      # MIT-0 is not recognized by go-licenses; verify its reviewed exact text
+      # before excluding that module from the classifier below.
+      - go run ./tools/licenseexceptions
       # go-licenses cannot associate these nested package layouts with their
       # module-root Apache-2.0 LICENSE files. Module content remains go.sum
       # pinned; every other linked dependency remains checked below.
@@ -124,6 +127,7 @@ tasks:
         --ignore github.com/cyberphone/json-canonicalization
         --ignore github.com/in-toto/attestation
         --ignore github.com/in-toto/in-toto-golang
+        --ignore github.com/segmentio/asm
 
   secrets:
     desc: Scan repository history and the working tree for committed secrets

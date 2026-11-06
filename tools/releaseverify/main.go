@@ -458,6 +458,7 @@ func verifyLicenseBundle(root string) error {
 		"github.com/hashicorp/go-multierror/LICENSE":       false,
 		"github.com/hashicorp/go-multierror/multierror.go": false,
 		"github.com/modelcontextprotocol/go-sdk/LICENSE":   false,
+		"github.com/segmentio/asm/LICENSE":                 false,
 		"golang.org/x/sys/LICENSE":                         false,
 	}
 	files := 0

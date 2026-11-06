@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
 )
@@ -306,7 +307,13 @@ func TestCreateMailDraftAddsTwentyMiBAttachment(t *testing.T) {
 	input.Attachments = []application.MailFileAttachment{{
 		Name: "fixture.txt", ContentType: "text/plain", Content: make([]byte, application.MaxMailSendAttachmentBytes),
 	}}
-	draft, err := testClient(t, server, nil).CreateMailDraft(context.Background(), input)
+	// Race-instrumented JSON decoding of a 20 MiB fixture can exceed the
+	// production request timeout. Keep this transport-contract test bounded
+	// independently without changing the production client's timeout.
+	client := testClient(t, server, func(options *Options) {
+		options.HTTPClient.Timeout = 2 * time.Minute
+	})
+	draft, err := client.CreateMailDraft(t.Context(), input)
 	if err != nil {
 		t.Fatalf("CreateMailDraft() error = %v", err)
 	}
