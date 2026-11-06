@@ -42,7 +42,9 @@ func TestStopEndpointOwnerSignalsPinnedSameUserPeer(t *testing.T) {
 		}
 	}()
 
-	deadline := time.Now().Add(3 * time.Second)
+	// Starting an instrumented child can be delayed by parallel package builds.
+	// Bound readiness separately from the actual owner-stop operation below.
+	deadline := time.Now().Add(10 * time.Second)
 	for {
 		encoded, err := os.ReadFile(readyPath) // #nosec G304 -- path is below t.TempDir.
 		if err == nil {
