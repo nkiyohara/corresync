@@ -3,6 +3,20 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.4 - 2026-11-06
+
+- Fix Outlook Web search result windows so later pages and shrinking lookahead
+  requests can reach matches beyond the first page (#195).
+- Reject stalled searches and prevent contradictory terminal flags from
+  presenting incomplete search results as exhausted.
+- Add synthetic multi-page, cross-account, Japanese-query, archive-scope, and
+  search-bound regression coverage; document remaining live-verification limits.
+- Refresh direct and transitive Go libraries, including browser, SMTP, calendar,
+  CLI parsing, and signature verification dependencies. Pin Go 1.27.3 and
+  compatible analysis tools; macOS binaries require macOS 13 or later.
+
+See the [release notes](docs/releases/v0.9.4.md) for validation and upgrade limits.
+
 ## 0.9.3 - 2026-10-27
 
 - Expand Outlook Web draft/send attachments to 20 MiB per file and in total.
