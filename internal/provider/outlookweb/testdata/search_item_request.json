@@ -44,7 +44,7 @@
     "QueryString": {
       "__type": "QueryStringType:#Exchange",
       "Value": "subject:\"Quarterly plan\" from:alice",
-      "MaxResultsCount": 25,
+      "MaxResultsCount": 31,
       "ResetCache": true,
       "ReturnDeletedItems": false,
       "ReturnHighlightTerms": false,
