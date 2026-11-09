@@ -69,7 +69,7 @@ jobs:
           echo "Release source: $source_ref"
 
       - name: Install the locked release and signing toolchain
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
           version: 2026.7.7
           experimental: true
@@ -278,7 +278,7 @@ jobs:
           persist-credentials: false
 
       - name: Install locked cosign
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
           version: 2026.7.7
           experimental: true
@@ -338,7 +338,7 @@ jobs:
           cache: false
 
       - name: Install locked cosign
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
           version: 2026.7.7
           experimental: true
@@ -576,7 +576,7 @@ jobs:
 
       - name: Set up .NET for WinGetCreate
         if: steps.winget_pr_guard.outputs.skip != 'true'
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 6.0.428
 
