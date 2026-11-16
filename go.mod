@@ -13,7 +13,7 @@ require (
 	github.com/emersion/go-ical v0.0.0-20250609112844-439c63cef608
 	github.com/emersion/go-imap v1.2.1
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
-	github.com/emersion/go-smtp v0.25.1
+	github.com/emersion/go-smtp v0.26.0
 	github.com/emersion/go-webdav v0.7.0
 	github.com/google/jsonschema-go v0.4.3
 	github.com/google/uuid v1.6.0
@@ -32,7 +32,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/mod v0.42.0
 	golang.org/x/net v0.62.0
-	golang.org/x/oauth2 v0.37.0
+	golang.org/x/oauth2 v0.38.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/term v0.47.0
 )
