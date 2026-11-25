@@ -11,30 +11,50 @@ import (
 )
 
 type importCommand struct {
-	Scan  importScanCommand  `cmd:"" help:"Read one explicit local source and create an upload-free staging plan."`
-	Purge importPurgeCommand `cmd:"" help:"Delete one account's Corresync-owned import staging."`
+	Scan  importScanCommand  `cmd:"" help:"Read a local export into a private staging area on this computer."`
+	Purge importPurgeCommand `cmd:"" help:"Delete an account's staged imports; the source is not touched."`
+}
+
+func (*importCommand) Help() string {
+	return `Import reads a mail or calendar export you already have on this computer,
+such as an mbox file, a Maildir folder, or a Thunderbird profile, and stages
+its contents in a private area of the account's local state. It only reads
+the source: it never signs in, uploads, or changes the source. Nothing is
+copied to your mailbox.
+
+Examples:
+  corr import scan ~/Downloads/archive.mbox --account work
+  corr import scan ~/Downloads/archive.mbox --account work --approve-read
+  corr import purge --account work --approve`
 }
 
 type importScanCommand struct {
-	Source      string `arg:"" name:"source" type:"path" help:"Explicit archive, export, Maildir, or Thunderbird profile path."`
-	Account     string `help:"Configured account alias that owns the local staging area; defaults to default_account."`
-	Format      string `enum:"auto,mixed,mbox,maildir,eml,ics,vcf,pst,olm,thunderbird" default:"auto" help:"Source format; auto uses only the explicit path."`
-	ApproveRead bool   `name:"approve-read" help:"Approve read-only access to this exact local source; never approves authentication or upload."`
-	JSON        bool   `help:"Write the stable machine-readable plan."`
+	Source      string `arg:"" name:"source" type:"path" help:"Path of the archive, export file, Maildir folder, or Thunderbird profile to read."`
+	Account     string `help:"Account whose staging area to use (alias); defaults to the default account."`
+	Format      string `enum:"auto,mixed,mbox,maildir,eml,ics,vcf,pst,olm,thunderbird" default:"auto" help:"Format of the source; auto works it out from the path you give."`
+	ApproveRead bool   `name:"approve-read" help:"Allow reading this one source; it is only read, and nothing signs in or uploads."`
+	JSON        bool   `help:"Write the staging plan as machine-readable JSON."`
 }
 
 type importPurgeCommand struct {
-	Account string `help:"Configured account alias whose import staging is removed; defaults to default_account."`
-	Approve bool   `help:"Approve deletion of this account's Corresync-owned staged imports."`
-	JSON    bool   `help:"Write machine-readable output."`
+	Account string `help:"Account whose staged imports to delete (alias); defaults to the default account."`
+	Approve bool   `help:"Confirm deleting this account's staged imports."`
+	JSON    bool   `help:"Write machine-readable JSON."`
 }
 
 func (command *importScanCommand) Run(app *runtime) error {
 	if !command.ApproveRead {
-		return errors.New(importPrivacyExplanation(
+		retry := []string{"corr", "import", "scan", command.Source}
+		if command.Account != "" {
+			retry = append(retry, "--account", command.Account)
+		}
+		if command.Format != "" && command.Format != "auto" {
+			retry = append(retry, "--format", command.Format)
+		}
+		return withHint(errors.New(importPrivacyExplanation(
 			goruntime.GOOS,
 			command.Source,
-		) + "; review the path and rerun with --approve-read")
+		)+". Nothing was read yet; check the path, then add --approve-read"), shellCommand(append(retry, "--approve-read")...))
 	}
 	source, err := filepath.Abs(command.Source)
 	if err != nil {
@@ -43,7 +63,7 @@ func (command *importScanCommand) Run(app *runtime) error {
 	source = filepath.Clean(source)
 	if _, err := fmt.Fprintln(
 		app.stderr,
-		importPrivacyExplanation(goruntime.GOOS, source),
+		importPrivacyExplanation(goruntime.GOOS, source)+".",
 	); err != nil {
 		return err
 	}
@@ -74,7 +94,7 @@ func (command *importScanCommand) Run(app *runtime) error {
 	if _, err := view.printf(
 		"%s  %s\n\n  %-16s %s\n  %-16s %s\n  %-16s %d\n  %-16s %d\n  %-16s %d\n  %-16s %d\n",
 		view.success(),
-		view.strong("Read-only import plan staged"),
+		view.strong("Staged the export for import (read only)"),
 		"Plan", plan.ID,
 		"Format", plan.Format,
 		"Staged", plan.StagedItems,
@@ -87,7 +107,7 @@ func (command *importScanCommand) Run(app *runtime) error {
 	if plan.ExistingPlan {
 		if _, err := view.printf(
 			"  %s\n",
-			view.muted("The deterministic plan already existed; no duplicate objects were created."),
+			view.muted("This source was staged before with the same result; nothing was staged twice."),
 		); err != nil {
 			return err
 		}
@@ -128,9 +148,13 @@ func (command *importScanCommand) Run(app *runtime) error {
 
 func (command *importPurgeCommand) Run(app *runtime) error {
 	if !command.Approve {
-		return errors.New(
-			"import purge deletes only Corresync-owned staged content; rerun with --approve",
-		)
+		retry := []string{"corr", "import", "purge"}
+		if command.Account != "" {
+			retry = append(retry, "--account", command.Account)
+		}
+		return withHint(errors.New(
+			"import purge deletes the staged copies Corresync made, never the source; add --approve to confirm",
+		), shellCommand(append(retry, "--approve")...))
 	}
 	configuration, _, err := app.loadConfig()
 	if err != nil {
@@ -157,7 +181,7 @@ func (command *importPurgeCommand) Run(app *runtime) error {
 	_, err = view.printf(
 		"%s  %s\n",
 		view.success(),
-		view.strong("Purged account-owned import staging"),
+		view.strong("Deleted this account's staged imports"),
 	)
 	return err
 }
@@ -173,8 +197,8 @@ func importPrivacyExplanation(goos, source string) string {
 		permission = "Linux filesystem or sandbox portal access"
 	}
 	return fmt.Sprintf(
-		"Read-only import may request %s to read %q; it will not read credential stores, authenticate, upload, mutate, move, or delete the source",
-		permission,
+		"Reading %q may need %s. Corresync only reads it: it does not read saved passwords or other sign-in data, sign in, upload, or change, move, or delete the source",
 		source,
+		permission,
 	)
 }

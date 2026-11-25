@@ -14,21 +14,32 @@ import (
 )
 
 type authCommand struct {
-	Login        loginCommand        `cmd:"" help:"Explicitly authenticate one configured provider route."`
-	Status       authStatusCommand   `cmd:"" help:"Inspect content-free session state."`
-	Logout       authLogoutCommand   `cmd:"" help:"Close one account session or all local sessions."`
-	GoogleClient googleClientCommand `cmd:"" help:"Securely prepare a user-owned Google Desktop OAuth client."`
+	Login        loginCommand        `cmd:"" help:"Sign in to an account."`
+	Status       authStatusCommand   `cmd:"" help:"Show which accounts are signed in."`
+	Logout       authLogoutCommand   `cmd:"" help:"Sign out of one account, or of all accounts."`
+	GoogleClient googleClientCommand `cmd:"" help:"Store your own Google desktop OAuth client for Google sign-in."`
+}
+
+func (*authCommand) Help() string {
+	return `The local daemon holds your sign-ins while it runs. corr auth logout ends
+them; the browser data an Outlook Web sign-in saves stays until you add
+--clear-browser.
+
+Examples:
+  corr auth login --account work
+  corr auth status
+  corr auth logout --account work`
 }
 
 type googleClientCommand struct {
-	Import googleClientImportCommand `cmd:"" help:"Import a downloaded Desktop client into the OS keyring."`
+	Import googleClientImportCommand `cmd:"" help:"Import a downloaded desktop client into the system keyring."`
 }
 
 type googleClientImportCommand struct {
-	File    string `arg:"" type:"path" help:"Downloaded Google Desktop OAuth client JSON file."`
-	Key     string `required:"" help:"OS-keyring handle to record in the account route."`
-	Replace bool   `help:"Replace the existing OS-keyring value at this exact handle."`
-	JSON    bool   `help:"Write machine-readable non-secret metadata."`
+	File    string `arg:"" type:"path" help:"Google desktop OAuth client JSON file you downloaded."`
+	Key     string `required:"" help:"Name to store the client under in the system keyring; the account's settings refer to it."`
+	Replace bool   `help:"Replace the value already stored under this keyring name."`
+	JSON    bool   `help:"Write machine-readable JSON without the client secret."`
 
 	store        func(string, []byte) error
 	replaceStore func(string, []byte) error
@@ -57,7 +68,7 @@ func (command *googleClientImportCommand) Run(app *runtime) error {
 		store = credential.StoreOSKeyring
 	}
 	if err := store(command.Key, client.Secret); err != nil {
-		return fmt.Errorf("store Google OAuth client credential: %w", err)
+		return fmt.Errorf("save the Google client in the system keyring: %w", err)
 	}
 	result := googleClientImportResult{
 		Imported: true, ClientID: client.ID, CredentialKey: command.Key,
@@ -70,17 +81,17 @@ func (command *googleClientImportCommand) Run(app *runtime) error {
 	_, err = view.printf(
 		"%s  %s\n\n  %-14s %s\n  %-14s %s\n  %-14s %s\n\n   %s\n",
 		view.success(),
-		view.strong("Google Desktop OAuth client ready"),
+		view.strong("Google desktop OAuth client saved"),
 		"Client ID", sanitizeCell(result.ClientID, 512),
-		"Keyring handle", sanitizeCell(result.CredentialKey, 256),
-		"Loopback", result.RedirectURI,
-		view.muted("The generated client credential is in the OS keyring and never entered Corresync configuration."),
+		"Keyring name", sanitizeCell(result.CredentialKey, 256),
+		"Redirect", result.RedirectURI,
+		view.muted("The client secret is in the system keyring; it is not written to the Corresync configuration."),
 	)
 	return err
 }
 
 type authStatusCommand struct {
-	Account string `help:"Show only one configured account alias."`
+	Account string `help:"Show only this account (alias)."`
 	JSON    bool   `help:"Write machine-readable JSON."`
 }
 
@@ -333,14 +344,17 @@ func serviceAuthenticationLabel(state application.AuthenticationState) string {
 }
 
 type authLogoutCommand struct {
-	ClearBrowser bool   `help:"Also remove this account’s dedicated browser sign-in storage; requires --account. OS or provider SSO may still sign you in."`
-	Account      string `help:"Close only this configured account alias or ID."`
+	ClearBrowser bool   `help:"Also delete the browser data this account saved when it signed in; needs --account. Single sign-on from your system or provider may still sign you in."`
+	Account      string `help:"Sign out of only this account (alias or ID)."`
 	JSON         bool   `help:"Write machine-readable JSON."`
 }
 
 func (command *authLogoutCommand) Run(app *runtime) (returnErr error) {
 	if command.ClearBrowser && command.Account == "" {
-		return errors.New("--clear-browser requires one explicit --account")
+		return withHint(
+			errors.New("--clear-browser needs --account, because it deletes one account's browser data"),
+			shellCommand("corr", "auth", "logout", "--account", "ALIAS", "--clear-browser"),
+		)
 	}
 	if command.Account != "" {
 		configuration, _, err := app.loadConfig()
@@ -357,7 +371,7 @@ func (command *authLogoutCommand) Run(app *runtime) (returnErr error) {
 		}
 		defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
 		if _, err := client.LogoutWithOptions(app.context, daemonapi.LogoutInput{Account: account.ID, ClearBrowser: command.ClearBrowser}, app.caller()); err != nil {
-			return fmt.Errorf("clear account session: %w", err)
+			return describeDaemonFailure("sign out of "+alias, err)
 		}
 		report := struct {
 			BrowserSignInCleared bool   `json:"browserSignInCleared"`
@@ -374,16 +388,31 @@ func (command *authLogoutCommand) Run(app *runtime) (returnErr error) {
 		if command.JSON {
 			return writeJSON(app.stdout, report)
 		}
-		storageNotice := "Saved browser sign-in remains. Use --account " + sanitizeCell(alias, 64) + " --clear-browser to remove it."
-		if command.ClearBrowser {
-			storageNotice = "Dedicated browser storage removed. OS/provider SSO may still sign you in. Other accounts are unchanged."
-		}
 		view := newConsoleView(app, app.stdout, app.interactiveStdout())
+		width := app.textWidth(app.stdout)
+		if command.ClearBrowser {
+			_, err = view.printf(
+				"%s  %s\n%s\n",
+				view.success(),
+				view.strong("Signed out of "+sanitizeCell(alias, 64)),
+				view.muted(wrapText(
+					"Deleted the browser data this account saved when it signed in. Single sign-on from your system or provider may still sign you in. Other accounts are unchanged.",
+					width,
+					"   ",
+				)),
+			)
+			return err
+		}
 		_, err = view.printf(
-			"%s  %s\n   %s\n",
+			"%s  %s\n%s\n   %s\n",
 			view.success(),
-			view.strong("Local session cleared for "+sanitizeCell(alias, 64)),
-			view.muted(storageNotice),
+			view.strong("Signed out of "+sanitizeCell(alias, 64)),
+			view.muted(wrapText(
+				"The browser data saved when it signed in stays on this computer. To delete it:",
+				width,
+				"   ",
+			)),
+			view.nextStep(shellCommand("corr", "auth", "logout", "--account", alias, "--clear-browser")),
 		)
 		return err
 	}
@@ -394,7 +423,7 @@ func (command *authLogoutCommand) Run(app *runtime) (returnErr error) {
 	}
 	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
 	if err := client.Shutdown(app.context, app.caller()); err != nil {
-		return fmt.Errorf("clear sessions: %w", err)
+		return describeDaemonFailure("sign out of all accounts", err)
 	}
 	_, running, err := waitForDaemonExit(
 		app.context,
@@ -404,10 +433,16 @@ func (command *authLogoutCommand) Run(app *runtime) (returnErr error) {
 		daemonShutdownTimeout,
 	)
 	if err != nil {
-		return fmt.Errorf("wait for sessions to close: %w", err)
+		return withHint(
+			fmt.Errorf("the local daemon did not confirm that it stopped after signing out: %w", err),
+			shellCommand("corr", "daemon", "status"),
+		)
 	}
 	if running {
-		return errors.New("a new session owner started before logout completed")
+		return withHint(
+			errors.New("the local daemon started again before sign-out finished; another corr command may have started it"),
+			shellCommand("corr", "auth", "logout"),
+		)
 	}
 	report := struct {
 		LoggedOut bool   `json:"loggedOut"`
@@ -418,10 +453,14 @@ func (command *authLogoutCommand) Run(app *runtime) (returnErr error) {
 	}
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
 	_, err = view.printf(
-		"%s  %s\n   %s\n",
+		"%s  %s\n%s\n",
 		view.success(),
-		view.strong("All local sessions cleared"),
-		view.muted("Dedicated browsers were closed; browser profiles remain on this device."),
+		view.strong("Signed out of all accounts"),
+		view.muted(wrapText(
+			"The local daemon stopped and closed its browsers. The browser data they saved stays on this computer.",
+			app.textWidth(app.stdout),
+			"   ",
+		)),
 	)
 	return err
 }

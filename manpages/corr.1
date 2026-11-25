@@ -26,11 +26,13 @@ configuration.
 Discover and manage isolated accounts and their provider routes.
 .TP
 .B doctor
-Diagnose local prerequisites and run explicitly requested provider probes.
+Check the configuration, browser, local daemon, and update status; with
+.BR --online ,
+also check the connection to the provider through an existing sign-in.
 .TP
 .B auth
-Open an interactive provider sign-in, inspect content-free session state, or
-close sessions and clear in-memory authorization.
+Sign in to an account, show which accounts are signed in (including a sign-in
+that is still waiting for you and when it expires), or sign out.
 .TP
 .B mail
 Discover folders; list, search, and read messages; create drafts; send reviewed
@@ -49,40 +51,44 @@ Read a bounded, normalized agenda across isolated accounts with account and
 provider provenance and explicit partial failures.
 .TP
 .B import
-Plan and approve a bounded read-only scan of one local export into private
-account-local staging, or purge only that staging.
+Read a local mail or calendar export, after you approve reading that one path,
+into a private staging area for the account, or delete that staging area. The
+source is only read.
 .TP
 .B monitor
-Inspect or configure account-scoped monitoring. Collection defaults to off and
-advances explicitly through local notification, durable queue, and an approved
-runner.
+Show or change monitoring for an account. It is off until you turn it on, one
+mode at a time: desktop notification, local queue, then a program you choose.
 .TP
 .B events
-List, acknowledge, or explicitly purge the durable account-local event queue.
+List, mark as handled, or permanently delete the events monitoring has queued
+for an account.
 .TP
 .B daemon
-Start, inspect, or stop the authenticated local session owner.
+Start, stop, and check the local daemon: the background process that keeps
+your sign-ins and talks to providers. Other commands start it when needed.
 .TP
 .B integrations
-Detect installed local agent hosts, inspect the typed support catalog, or
-preview, apply, verify, repair, and remove exact local integrations.
+Find AI agents on this computer and connect Corresync to them, showing the
+planned changes and asking before it changes anything; also check, repair, and
+remove those connections.
 .TP
 .B mcp
-Run the local stdio MCP server, register it through supported client CLIs, or
-print native client configuration.
+Run the MCP server for an AI agent, add it to an agent with the agent's own
+command, or print the agent's configuration.
 .TP
 .B update
-Check the latest stable public release. Explicitly self-update a direct
-installation after signed provenance and platform verification, or print the
-owner-specific command for a package-managed installation.
+Check for a newer release. Update a direct installation after verifying its
+signature and platform, or print the command for the package manager that
+installed corr.
 .TP
 .B completion
 Generate a Bash, Zsh, or Fish completion script, or detect and idempotently
 install completion for the current shell.
 .TP
 .B feedback
-Print an allowlisted privacy-preserving local report before an explicitly
-selected copy, new-file save, or browser-open action. It never submits an issue.
+Print a diagnostics report with private details removed, then copy it, save it
+to a new file, or open a prefilled GitHub issue page only if you ask. It never
+submits an issue.
 .TP
 .B version
 Print build and version information.

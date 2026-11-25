@@ -1,8 +1,14 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/nkiyohara/corresync/internal/updatecheck"
@@ -10,10 +16,59 @@ import (
 
 type updateView struct {
 	consoleView
+	width int
 }
 
 func newUpdateView(app *runtime, writer io.Writer, interactive bool) updateView {
-	return updateView{consoleView: newConsoleView(app, writer, interactive)}
+	return updateView{consoleView: newConsoleView(app, writer, interactive), width: app.textWidth(writer)}
+}
+
+var releaseHTTPStatusPattern = regexp.MustCompile(`returned HTTP (\d{3})`)
+
+// updateUnavailableReason says in words why release information is missing,
+// for example "the release lookup timed out". Release lookups read public
+// GitHub metadata only, so an unrecognised cause is shown as it is.
+func updateUnavailableReason(report updateReport, err error) string {
+	var netErr net.Error
+	var dnsErr *net.DNSError
+	var opErr *net.OpError
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || errors.As(err, &netErr) && netErr.Timeout():
+		return "the release lookup timed out"
+	case errors.As(err, &dnsErr) || errors.As(err, &opErr):
+		return "GitHub could not be reached; check the network connection"
+	}
+	if err != nil {
+		if match := releaseHTTPStatusPattern.FindStringSubmatch(err.Error()); match != nil {
+			switch code, _ := strconv.Atoi(match[1]); {
+			case code == http.StatusForbidden || code == http.StatusTooManyRequests:
+				return "GitHub's limit on release lookups was reached; try again later"
+			case code >= http.StatusInternalServerError:
+				return fmt.Sprintf("GitHub answered with a server error (HTTP %d)", code)
+			default:
+				return fmt.Sprintf("GitHub refused the release lookup (HTTP %d)", code)
+			}
+		}
+	}
+	switch {
+	case report.Cached && report.CheckedAt != "":
+		return "the last automatic check, at " + report.CheckedAt + ", failed"
+	case errors.Is(err, updatecheck.ErrUnavailable) && report.CheckedAt == "":
+		return "another corr command is checking right now"
+	case err != nil && !errors.Is(err, updatecheck.ErrUnavailable):
+		return singleLine(err.Error())
+	case err != nil:
+		var reasons []string
+		for line := range strings.Lines(err.Error()) {
+			if line = strings.TrimSpace(line); line != "" && line != updatecheck.ErrUnavailable.Error() {
+				reasons = append(reasons, line)
+			}
+		}
+		if len(reasons) > 0 {
+			return strings.Join(reasons, "; ")
+		}
+	}
+	return "the release information could not be read"
 }
 
 func (view updateView) writeNotice(report updateReport) error {
@@ -48,12 +103,19 @@ func (view updateView) writeAutomaticInstallStart(current, latest string) error 
 	return err
 }
 
-func (view updateView) writeAutomaticInstallFailure(current string) error {
+// writeAutomaticInstallFailure reports why an automatic update did not
+// install. Install errors name release files and local paths, never account
+// data.
+func (view updateView) writeAutomaticInstallFailure(current string, cause error) error {
+	reason := ""
+	if cause != nil {
+		reason = " (" + sanitizeCell(singleLine(cause.Error()), 240) + ")"
+	}
 	_, err := view.printf(
 		"%s  %s\n",
 		view.warning(),
-		"Automatic update failed; continuing with "+
-			strings.TrimPrefix(current, "v")+". Run "+view.command("corr update")+" to retry.",
+		"Automatic update failed"+reason+"; continuing with "+
+			strings.TrimPrefix(current, "v")+". Run "+view.command("corr update")+" to try again.",
 	)
 	return err
 }
@@ -95,7 +157,9 @@ func (view updateView) writeProgress(progress updatecheck.InstallProgress) {
 	_, _ = view.printf("  %s %s\n", view.success(), progress.Detail)
 }
 
-func (view updateView) writeCheck(report updateReport) error {
+// writeCheck shows the result of `corr update check`; checkErr is the lookup
+// error, used to say why the status is unavailable.
+func (view updateView) writeCheck(report updateReport, checkErr error) error {
 	if report.Status == updatecheck.StatusAvailable || report.Status == updatecheck.StatusCurrent {
 		if err := view.writeReleaseSelection(report.Channel, report.LatestVersion); err != nil {
 			return err
@@ -154,8 +218,15 @@ func (view updateView) writeCheck(report updateReport) error {
 		return err
 	case updatecheck.StatusUnavailable:
 		_, err := view.printf(
-			"%s  Update status is temporarily unavailable; normal Corresync operations are unaffected.\n",
-			view.muted("•"),
+			"%s  %s\n%s\n",
+			view.warning(),
+			view.strong("Could not check for updates"),
+			wrapText(
+				sentenceCase(updateUnavailableReason(report, checkErr))+
+					". Normal Corresync commands still work, and corr update asks again each time you run it.",
+				view.width,
+				"   ",
+			),
 		)
 		return err
 	default:
@@ -187,7 +258,7 @@ func (view updateView) writeAction(report updateActionReport) error {
 			"Sigstore identity · SHA-256 · version · platform",
 			"Backup",
 			report.BackupPath,
-			view.muted("Any running session owner for this configuration was restarted. Restart connected MCP hosts to load the updated command."),
+			view.muted("The local daemon for this configuration was restarted if it was running. Restart connected AI agents so they load the updated command."),
 		)
 		return err
 	case string(updatecheck.InstallStatusCurrent):

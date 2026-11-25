@@ -92,7 +92,7 @@ func TestIntegrationsSetupAppliesAndVerifiesIndependentHosts(t *testing.T) {
 	if err := command.Run(app); err != nil {
 		t.Fatal(err)
 	}
-	if len(mutations) != 1 || !strings.Contains(stdout.String(), "applied_reload_required") {
+	if len(mutations) != 1 || !strings.Contains(stdout.String(), "done; restart the agent") {
 		t.Fatalf("mutations = %#v, stdout = %s", mutations, stdout.String())
 	}
 	cursorPath := filepath.Join(filepath.Dir(filepath.Dir(configPath)), "..", ".cursor", "mcp.json")
@@ -167,7 +167,7 @@ func TestIntegrationsYesReturnsErrorForBlockedHost(t *testing.T) {
 	}}
 	err := command.Run(app)
 	if err == nil || !strings.Contains(err.Error(), "not Corresync-owned") ||
-		!strings.Contains(stdout.String(), "blocked_before_change") {
+		!strings.Contains(stdout.String(), "blocked; nothing changed") {
 		t.Fatalf("Run() error = %v, stdout = %s", err, stdout.String())
 	}
 }
@@ -237,8 +237,8 @@ func TestIntegrationsSetupContinuesAfterHostFailureAndRerunResumes(t *testing.T)
 	if data, readErr := os.ReadFile(cursorPath); readErr != nil || !integrationConfigUsesExecutable(data, executable) {
 		t.Fatalf("later Cursor host was not applied: %s, error %v", data, readErr)
 	}
-	if !strings.Contains(stdout.String(), "failed_after_change") ||
-		!strings.Contains(stdout.String(), "applied_reload_required") {
+	if !strings.Contains(stdout.String(), "failed after changing settings") ||
+		!strings.Contains(stdout.String(), "done; restart the agent") {
 		t.Fatalf("first-run results = %s", stdout.String())
 	}
 
@@ -247,7 +247,7 @@ func TestIntegrationsSetupContinuesAfterHostFailureAndRerunResumes(t *testing.T)
 	if err := command.Run(app); err != nil {
 		t.Fatalf("resume Run() error = %v", err)
 	}
-	if !codexRegistered || !strings.Contains(stdout.String(), "already_current") {
+	if !codexRegistered || !strings.Contains(stdout.String(), "already up to date") {
 		t.Fatalf("resume did not preserve Cursor and finish Codex: %s", stdout.String())
 	}
 }

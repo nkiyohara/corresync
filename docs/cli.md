@@ -215,7 +215,7 @@ corr doctor --online --connection-only --account personal
 `auth login` displays the exact OAuth scope set before any provider page can
 open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
-closes the entire local session owner. These operations keep saved browser
+stops the local daemon, which ends every sign-in. These operations keep saved browser
 sign-in, so a later explicit login can reopen the mailbox without a password.
 Use `corr auth logout --account work --clear-browser` to also remove only that
 account's dedicated Outlook/Teams browser storage. It requires an explicit
@@ -238,6 +238,19 @@ and prints the mail, calendar, and task state separately. A signed-out or
 expired route shows
 the exact local `corr auth login --account ALIAS` action; the command does not
 run that action automatically.
+
+While another `corr auth login --web`, `--host`, or `--terminal` is waiting for
+you, `auth status` shows that sign-in for its account, for example
+`Sign-in in progress (forwarded login view), expires in 3 min`, and `--json`
+adds `pendingSignIn` with its kind and expiry (see [JSON output](json.md)).
+Nothing else about that sign-in is reported. Finish it where it started, or run
+`corr auth login --account ALIAS` again to replace it. A sign-in in a browser
+window on this computer is not listed.
+
+A failed `auth login` names the account, keeps the reason the local daemon
+gave, and suggests a next command: `corr doctor --account ALIAS` when the
+browser or route could not start, or the same login again after a timeout or
+an expired login view.
 
 When a read reports `authentication_required`, `authentication_pending`, or
 `reauthentication_required`, finish the human-owned login, verify the same
@@ -712,15 +725,19 @@ corr daemon status --json
 corr daemon stop
 ```
 
-Normal provider commands start the config-scoped daemon on demand. It owns
-sessions and exposes authenticated local IPC only—never TCP. A config digest
-change requires an explicit stop. A compatible old binary can be drained and
-replaced without retrying an application operation.
+The local daemon is the background process that keeps your sign-ins and talks
+to providers. Normal provider commands start the config-scoped daemon on
+demand. It owns sessions and exposes authenticated local IPC only—never TCP. A
+config digest change requires an explicit stop. A compatible old binary can be
+drained and replaced without retrying an application operation.
 
-`daemon status` reports unavailable owners without printing private state
-paths or credential-file details. Its JSON form uses stable `ready` or
-`unavailable` states and a bounded reason; an authorization mismatch remains
-distinct from an owner that is not running.
+`daemon status` reports an unavailable daemon without printing private state
+paths or credential-file details. The human message says whether the daemon is
+not running, is a different version of corr, refused the command, or did not
+answer, followed by the reason code and a suggested command. Its JSON form uses
+stable `ready` or `unavailable` states and a bounded reason; an authorization
+mismatch remains distinct from an owner that is not running. `daemon stop` on
+a daemon that is not running still exits with status 1 and says so.
 
 On Unix, every process derives the same endpoint regardless of
 `XDG_RUNTIME_DIR` or `TMPDIR`. v0.8.6 can authentically drain one owner left at
@@ -794,7 +811,10 @@ Package-managed installations print their owner command. Direct installs
 verify Sigstore identity, checksum, version, OS, and architecture before a
 rollback-capable replacement. No ambiguous update is retried.
 
-`corr update check` asks the release endpoint each time it runs. Eligible
+`corr update check` asks the release endpoint each time it runs. When the
+lookup fails it says why where it can tell (no network, GitHub's rate limit,
+a timeout, or another `corr` checking at the same moment); `corr doctor` shows
+the same reason for its cached check. Eligible
 interactive CLI starts perform a bounded, 24-hour-cached check instead, which
 also remembers a failed lookup, and show a short installation-specific notice.
 New standalone configurations enable the verified replacement path by default;
@@ -818,7 +838,7 @@ Use `corr config set updates.channel stable` to return. Channel changes never
 downgrade. Package-manager catalogs are stable-only, so a managed preview check
 shows the direct release URL instead of an owner command.
 
-After verified installation, the existing config-scoped session owner restarts
+After verified installation, the existing config-scoped local daemon restarts
 and the requested interactive command runs with the updated executable. Owners
 from 0.9.2 also detect external executable replacement and retire after admitted
 requests finish. Disable installation with `corr config set

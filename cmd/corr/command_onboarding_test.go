@@ -562,8 +562,8 @@ func TestGuidedSetupConnectsSelectedDetectedAgentThroughReviewedPlan(t *testing.
 	}
 	for _, expected := range []string{
 		"Which agents do you use?",
-		"Integration plan",
-		"applied_reload_required",
+		"Planned change",
+		"done; restart the agent",
 		"Setup summary",
 		"codex · open a new session or reload the host",
 	} {

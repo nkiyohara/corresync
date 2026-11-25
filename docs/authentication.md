@@ -9,7 +9,8 @@ corr auth status
 corr auth logout
 ```
 
-The daemon is the only authenticated session owner. CLI and MCP call it through
+The local daemon, the background process that keeps your sign-ins, is the only
+authenticated session owner. CLI and MCP call it through
 private local IPC and never receive provider credentials.
 
 ## Signing in from an MCP client
@@ -253,6 +254,15 @@ active account when at least one configured service is active. Captured time,
 normalized capabilities, and degradations describe only active service
 leases. Status performs no provider request or surprise login and returns no
 address, endpoint, cookie, token, page content, or mailbox item.
+
+When a sign-in through the forwarded login view (`--web` or `--host`) or the
+text relay (`--terminal`) is still waiting for you, status shows it for that
+account with its kind and the time left before the local daemon ends it, for
+example `Sign-in in progress (forwarded login view), expires in 3 min`. It
+never shows the sign-in's session ID, pairing link, page address, or anything
+on the page. Finish the sign-in where it was started, or start
+`corr auth login` for the account again to replace it. MCP `account_status`
+does not report it.
 
 A definitive runtime rejection invalidates the owning adapter lease before the
 operation returns. Services sharing that lease transition together; a hybrid

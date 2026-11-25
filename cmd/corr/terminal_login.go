@@ -32,7 +32,7 @@ func runTerminalLogin(
 	}
 	state, err := term.MakeRaw(int(input.Fd()))
 	if err != nil {
-		return fmt.Errorf("enable terminal key relay: %w", err)
+		return fmt.Errorf("switch the terminal to key-by-key input: %w", err)
 	}
 	defer func() { returnErr = errors.Join(returnErr, term.Restore(int(input.Fd()), state)) }()
 	ctx, cancel := context.WithCancel(app.context)
@@ -71,7 +71,7 @@ func runTerminalLoginLoop(app *runtime, client terminalLoginClient, account doma
 
 	for result.Status == "pending" {
 		if result.View == nil {
-			return errors.New("terminal login returned no browser view")
+			return errors.New("the sign-in page did not reach the text relay; run the command again")
 		}
 		if err := writeTerminalLoginView(app, *result.View); err != nil {
 			return err
@@ -90,7 +90,7 @@ func runTerminalLoginLoop(app *runtime, client terminalLoginClient, account doma
 				return err
 			}
 			sessionID = ""
-			_, err = fmt.Fprintln(app.stdout, "Terminal login cancelled.")
+			_, err = fmt.Fprintln(app.stdout, "Sign-in cancelled.")
 			return err
 		case "r", "refresh":
 			result, err = advanceTerminalLogin(app, client, result, daemonapi.TerminalLoginAction{Type: "refresh"})
@@ -102,14 +102,14 @@ func runTerminalLoginLoop(app *runtime, client terminalLoginClient, account doma
 
 		position, err := strconv.Atoi(selection)
 		if err != nil || position < 1 || position > len(result.View.Controls) {
-			if _, writeErr := fmt.Fprintln(app.stdout, "Choose a listed control, r to refresh, or q to cancel."); writeErr != nil {
+			if _, writeErr := fmt.Fprintln(app.stdout, "Type a number from the list, r to refresh the page, or q to cancel."); writeErr != nil {
 				return writeErr
 			}
 			continue
 		}
 		control := result.View.Controls[position-1]
 		if control.Disabled {
-			if _, err := fmt.Fprintln(app.stdout, "That control is disabled."); err != nil {
+			if _, err := fmt.Fprintln(app.stdout, "That item is turned off on the page; choose another."); err != nil {
 				return err
 			}
 			continue
@@ -143,10 +143,10 @@ func runTerminalLoginLoop(app *runtime, client terminalLoginClient, account doma
 		}
 	}
 	if result.Status != "authenticated" {
-		return fmt.Errorf("terminal login ended in unexpected state %q", result.Status)
+		return fmt.Errorf("the text-relay sign-in ended in an unexpected state (%q)", result.Status)
 	}
 	sessionID = ""
-	_, err = fmt.Fprintf(app.stdout, "Authenticated Outlook Web account %q.\n", account)
+	_, err = fmt.Fprintf(app.stdout, "Signed in to Outlook Web (account %s).\n", account)
 	return err
 }
 
@@ -161,7 +161,10 @@ func interactiveTerminalInput(app *runtime) (*os.File, error) {
 	}
 	input, ok := source.(*os.File)
 	if !ok || !term.IsTerminal(int(input.Fd())) {
-		return nil, errors.New("terminal login requires an interactive TTY; piped input is not accepted")
+		return nil, withHint(
+			errors.New("--terminal needs an interactive terminal; it does not read piped input"),
+			"run it in a terminal window, or sign in without --terminal",
+		)
 	}
 	return input, nil
 }
@@ -176,7 +179,7 @@ func writeTerminalLoginView(app *runtime, view daemonapi.TerminalLoginView) erro
 		}
 	}
 	if view.Origin != "" {
-		if _, err := fmt.Fprintf(app.stdout, "Origin: %s\n", view.Origin); err != nil {
+		if _, err := fmt.Fprintf(app.stdout, "Site: %s\n", view.Origin); err != nil {
 			return err
 		}
 	}
@@ -187,11 +190,17 @@ func writeTerminalLoginView(app *runtime, view daemonapi.TerminalLoginView) erro
 	}
 	for index, control := range view.Controls {
 		qualifier := control.Kind
+		switch control.Kind {
+		case "input":
+			qualifier = "field"
+		case "activate":
+			qualifier = "click"
+		}
 		if control.Sensitive {
-			qualifier += ", hidden input"
+			qualifier += ", hidden as you type"
 		}
 		if control.Disabled {
-			qualifier += ", disabled"
+			qualifier += ", turned off"
 		}
 		if _, err := fmt.Fprintf(app.stdout, "[%d] %s (%s)\n", index+1, control.Name, qualifier); err != nil {
 			return err
@@ -243,7 +252,7 @@ func relayTerminalKeys(
 	reader *terminalInput,
 	result *daemonapi.TerminalLoginResult,
 ) (returnErr error) {
-	if _, err := fmt.Fprintln(app.stdout, "Type into the browser field; Enter submits, Esc returns to the control list. Use Backspace to correct input."); err != nil {
+	if _, err := fmt.Fprintln(app.stdout, "Type into this field. Enter submits, Esc goes back to the list."); err != nil {
 		return err
 	}
 	visibleCharacters := 0
@@ -314,7 +323,7 @@ func terminalLoginViewUnchanged(
 func writeTerminalProgressHint(app *runtime) error {
 	_, err := fmt.Fprintln(
 		app.stdout,
-		"No visible page change yet. Wait a moment and press r to refresh, or choose another control.",
+		"No change on the page yet. Press r to refresh, or choose another item.",
 	)
 	return err
 }

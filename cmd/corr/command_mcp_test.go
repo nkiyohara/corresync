@@ -222,7 +222,7 @@ func TestMCPSetupUsesOfficialClientCommands(t *testing.T) {
 				}}
 				return command.Run(app)
 			},
-			wantMessage: "Registered MCP server \"outlook_work\" with Codex",
+			wantMessage: "Added MCP server \"outlook_work\" to Codex",
 		},
 		{
 			name:   "Claude Code",
@@ -240,7 +240,7 @@ func TestMCPSetupUsesOfficialClientCommands(t *testing.T) {
 				}
 				return command.Run(app)
 			},
-			wantMessage: "Registered MCP server \"outlook_work\" with Claude Code",
+			wantMessage: "Added MCP server \"outlook_work\" to Claude Code",
 		},
 		{
 			name:   "GitHub Copilot CLI",
@@ -256,7 +256,7 @@ func TestMCPSetupUsesOfficialClientCommands(t *testing.T) {
 				}}
 				return command.Run(app)
 			},
-			wantMessage: "Registered MCP server \"outlook_work\" with GitHub Copilot CLI",
+			wantMessage: "Added MCP server \"outlook_work\" to GitHub Copilot CLI",
 		},
 		{
 			name:   "Gemini CLI",
@@ -276,7 +276,7 @@ func TestMCPSetupUsesOfficialClientCommands(t *testing.T) {
 				}
 				return command.Run(app)
 			},
-			wantMessage: "Registered MCP server \"outlook_work\" with Gemini CLI",
+			wantMessage: "Added MCP server \"outlook_work\" to Gemini CLI",
 		},
 		{
 			name:   "Qwen Code",
@@ -296,7 +296,7 @@ func TestMCPSetupUsesOfficialClientCommands(t *testing.T) {
 				}
 				return command.Run(app)
 			},
-			wantMessage: "Registered MCP server \"outlook_work\" with Qwen Code",
+			wantMessage: "Added MCP server \"outlook_work\" to Qwen Code",
 		},
 		{
 			name:   "Qoder",
@@ -314,7 +314,7 @@ func TestMCPSetupUsesOfficialClientCommands(t *testing.T) {
 				}
 				return command.Run(app)
 			},
-			wantMessage: "Registered MCP server \"outlook_work\" with Qoder",
+			wantMessage: "Added MCP server \"outlook_work\" to Qoder",
 		},
 	}
 
@@ -411,8 +411,8 @@ func TestMCPSetupRequiresConfiguredAccount(t *testing.T) {
 		initialize  bool
 		wantMessage string
 	}{
-		{name: "missing", wantMessage: "corr setup <email-address>"},
-		{name: "empty", initialize: true, wantMessage: "configure an account before MCP setup"},
+		{name: "missing", wantMessage: "the configuration could not be loaded"},
+		{name: "empty", initialize: true, wantMessage: "the configuration has no accounts"},
 	} {
 		t.Run(fixture.name, func(t *testing.T) {
 			var stdout bytes.Buffer
@@ -429,9 +429,12 @@ func TestMCPSetupRequiresConfiguredAccount(t *testing.T) {
 					Name: "corresync", Executable: os.Args[0],
 				},
 			}}
-			if err := command.Run(app); err == nil ||
-				!strings.Contains(err.Error(), fixture.wantMessage) {
+			err := command.Run(app)
+			if err == nil || !strings.Contains(err.Error(), fixture.wantMessage) {
 				t.Fatalf("Run() error = %v, want %q guidance", err, fixture.wantMessage)
+			}
+			if hint, _ := errorHint(err); hint != "corr setup" {
+				t.Fatalf("Run() hint = %q, want corr setup", hint)
 			}
 		})
 	}

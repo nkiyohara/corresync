@@ -49,7 +49,7 @@ func TestFeedbackPrintsCompleteReportBeforeOfferingActions(t *testing.T) {
 		`"mail_or_calendar_content_included": false`,
 		`"task_content_included": false`,
 		`"id": "microsoft-owa"`,
-		"requires a GitHub account",
+		"needs a GitHub account",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("feedback output is missing %q:\n%s", want, output)

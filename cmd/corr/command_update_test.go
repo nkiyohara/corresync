@@ -200,8 +200,8 @@ func TestUpdateMessageExplainsCoordinatedOwnerRestart(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stdout.String(), "session owner for this configuration was restarted") ||
-		!strings.Contains(stdout.String(), "Restart connected MCP hosts") {
+	if !strings.Contains(stdout.String(), "local daemon for this configuration was restarted") ||
+		!strings.Contains(stdout.String(), "Restart connected AI agents") {
 		t.Fatalf("update recovery guidance = %q", stdout.String())
 	}
 }

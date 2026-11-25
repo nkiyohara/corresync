@@ -38,7 +38,7 @@ func TestWriteTerminalLoginViewMarksSensitiveInputs(t *testing.T) {
 	}
 	output := stdout.String()
 	for _, expected := range []string{
-		"Sign in", "Origin: https://login.example", "[1] Password (input, hidden input)", "[2] Next (activate)",
+		"Sign in", "Site: https://login.example", "[1] Password (field, hidden as you type)", "[2] Next (click)",
 	} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("output missing %q:\n%s", expected, output)
@@ -79,12 +79,15 @@ func TestLoginWithoutDisplayNeedsNoFlagExceptForJSON(t *testing.T) {
 	}
 	for _, expected := range []string{
 		"DISPLAY and WAYLAND_DISPLAY are both unset",
-		"corr auth login --account 'work'",
-		"without --json",
+		"--json needs a browser window",
+		"Without --json",
 	} {
 		if !strings.Contains(err.Error(), expected) {
 			t.Fatalf("Run() error missing %q: %v", expected, err)
 		}
+	}
+	if hint, _ := errorHint(err); hint != "corr auth login --account work" {
+		t.Fatalf("Run() hint = %q, want the command without --json", hint)
 	}
 
 	var stderr bytes.Buffer

@@ -22,21 +22,14 @@ const maximumSummaryLength = 70
 // needed. Keys are top-level command names; the value names the work package
 // that owns the files.
 var helpStyleAllowlist = map[string]string{
-	"account":      "B. setup, settings, accounts",
-	"agenda":       "A. everyday commands",
-	"auth":         "C. sign-in, daemon, maintenance",
-	"calendar":     "A. everyday commands",
-	"config":       "B. setup, settings, accounts",
-	"daemon":       "C. sign-in, daemon, maintenance",
-	"doctor":       "C. sign-in, daemon, maintenance",
-	"events":       "C. sign-in, daemon, maintenance",
-	"import":       "C. sign-in, daemon, maintenance",
-	"integrations": "C. sign-in, daemon, maintenance",
-	"mail":         "A. everyday commands",
-	"monitor":      "C. sign-in, daemon, maintenance",
-	"queries":      "A. everyday commands",
-	"setup":        "B. setup, settings, accounts",
-	"tasks":        "A. everyday commands",
+	"account":  "B. setup, settings, accounts",
+	"agenda":   "A. everyday commands",
+	"calendar": "A. everyday commands",
+	"config":   "B. setup, settings, accounts",
+	"mail":     "A. everyday commands",
+	"queries":  "A. everyday commands",
+	"setup":    "B. setup, settings, accounts",
+	"tasks":    "A. everyday commands",
 }
 
 // bannedHelpWords are review vocabulary that must not reach a reader. Text in
