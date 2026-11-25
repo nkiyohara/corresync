@@ -57,7 +57,7 @@ The exact boundary:
 
 ### Daemon protocol
 
-Protocol 31 adds two private methods. `login.mcp.request` reserves at most one
+Protocol 32 adds two private methods. `login.mcp.request` reserves at most one
 approval prompt per account, bound to the requesting MCP caller, for five
 minutes, and returns an unguessable one-use ticket with the alias and routes.
 It never launches anything. `login.mcp.resolve` consumes that ticket with the
