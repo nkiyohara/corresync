@@ -36,6 +36,11 @@ surface, so new configuration converges on `corr`.
 
 The compatibility entry ships in the v0.8 and v0.9 release lines. It may be
 removed no earlier than v0.10.0, after a stable release has announced removal.
+
+Removal is announced in v0.10.0: that release still ships the entry, says in
+its release notes and changelog that v0.11.0 removes it, and prints a one-line
+notice on a terminal when the program is started as `corresync`. Scripts,
+pipes, and MCP hosts see no change in v0.10.
 The v0.7 updater-compatible archive filename remains
 `corresync_<version>_<os>_<arch>`; the product, package, and release artifact
 names also remain Corresync.

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -360,7 +361,24 @@ func terminationSignals() []os.Signal {
 	return signals
 }
 
+// oldCommandNameNotice returns the removal notice for the `corresync`
+// compatibility command (ADR 0016), or nothing when the program was started
+// as corr.
+func oldCommandNameNotice(argv0 string) string {
+	name := strings.TrimSuffix(strings.ToLower(filepath.Base(argv0)), ".exe")
+	if name != "corresync" {
+		return ""
+	}
+	return "corresync is the old name of this command and will be removed in 0.11.0. Use corr instead."
+}
+
 func main() {
+	// Only a person at a terminal sees the notice; scripts, pipes, and MCP
+	// hosts that still start the old name keep their output unchanged.
+	if notice := oldCommandNameNotice(os.Args[0]); notice != "" &&
+		outputIsTerminal(os.Stderr) && !completionEnvironmentActive() {
+		_, _ = fmt.Fprintln(os.Stderr, notice)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), terminationSignals()...)
 	code := runWithCrashBoundary(
 		ctx,

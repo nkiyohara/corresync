@@ -87,11 +87,8 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 		return err
 	}
 	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
-	// Say where the sign-in goes before anything opens. A first sign-in with
-	// these settings asks for confirmation on a terminal; the SSH helper's
-	// standard input is the login view's channel, so it only prints.
-	canPrompt := !command.JSON && !command.WebStdio && app.interactiveInput() && app.interactiveStdout()
-	if err := reviewSignInDestination(app, client, alias, configured, canPrompt); err != nil {
+	// Say where the sign-in goes before anything opens.
+	if err := reviewSignInDestination(app, client, alias, configured); err != nil {
 		return err
 	}
 	if command.WebStdio {

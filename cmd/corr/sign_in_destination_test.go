@@ -25,25 +25,6 @@ func (stub *signInVerifierStub) SignInVerified(_ context.Context, _ domain.Accou
 	return stub.verified, stub.err
 }
 
-type confirmRecorder struct {
-	calls  int
-	hosts  []string
-	answer bool
-}
-
-// withConfirm replaces the terminal confirmation for one test. Tests that use
-// it must not run in parallel.
-func withConfirm(t *testing.T, recorder *confirmRecorder) {
-	t.Helper()
-	previous := confirmSignInDestination
-	confirmSignInDestination = func(_ *runtime, _ string, hosts []string) (bool, error) {
-		recorder.calls++
-		recorder.hosts = hosts
-		return recorder.answer, nil
-	}
-	t.Cleanup(func() { confirmSignInDestination = previous })
-}
-
 func signInNoticeApp(t *testing.T) (*runtime, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
@@ -124,21 +105,12 @@ func TestSignInNoticeNamesEachDestinationByRouteKind(t *testing.T) {
 	}
 }
 
-func TestFirstSignInAsksOnATerminalAndStopsOnNo(t *testing.T) {
-	recorder := &confirmRecorder{answer: false}
-	withConfirm(t, recorder)
+func TestFirstSignInPrintsTheDestinationAndContinues(t *testing.T) {
 	app, stdout, stderr := signInNoticeApp(t)
 	verifier := &signInVerifierStub{}
 	account := config.OutlookDefault().Accounts["work"]
-	err := reviewSignInDestination(app, verifier, "work", account, true)
-	if err == nil || !strings.Contains(err.Error(), "nothing was opened") {
+	if err := reviewSignInDestination(app, verifier, "work", account); err != nil {
 		t.Fatalf("review error = %v", err)
-	}
-	if hint, _ := errorHint(err); hint != "corr account show work" {
-		t.Fatalf("hint = %q", hint)
-	}
-	if recorder.calls != 1 || !slices.Equal(recorder.hosts, []string{"outlook.cloud.microsoft"}) {
-		t.Fatalf("confirmation = %+v", recorder)
 	}
 	if verifier.calls != 1 || verifier.caller.Surface != "cli" {
 		t.Fatalf("verification query = %+v", verifier)
@@ -147,61 +119,36 @@ func TestFirstSignInAsksOnATerminalAndStopsOnNo(t *testing.T) {
 		!strings.Contains(stderr.String(), "This is the first sign-in with these connection settings.") {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
+	// --json output goes to stdout and stays exactly as before.
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q, want nothing", stdout.String())
 	}
-
-	recorder.answer = true
-	if err := reviewSignInDestination(app, verifier, "work", account, true); err != nil {
-		t.Fatalf("confirmed review error = %v", err)
-	}
 }
 
-func TestVerifiedSignInDoesNotAsk(t *testing.T) {
-	recorder := &confirmRecorder{}
-	withConfirm(t, recorder)
+func TestVerifiedSignInOmitsTheFirstTimeNote(t *testing.T) {
 	app, stdout, stderr := signInNoticeApp(t)
 	err := reviewSignInDestination(app, &signInVerifierStub{verified: true}, "work",
-		config.OutlookDefault().Accounts["work"], true)
-	if err != nil || recorder.calls != 0 {
-		t.Fatalf("review error = %v, confirmations = %d", err, recorder.calls)
-	}
-	if !strings.Contains(stderr.String(), "Outlook Web (mail, calendar): outlook.cloud.microsoft") ||
+		config.OutlookDefault().Accounts["work"])
+	if err != nil || !strings.Contains(stderr.String(), "outlook.cloud.microsoft") ||
 		strings.Contains(stderr.String(), "first sign-in") || stdout.Len() != 0 {
-		t.Fatalf("stdout = %q stderr = %q", stdout.String(), stderr.String())
+		t.Fatalf("review error = %v stderr = %q stdout = %q", err, stderr.String(), stdout.String())
 	}
 }
 
-func TestNonInteractiveFirstSignInPrintsTheNoticeAndContinues(t *testing.T) {
-	for name, verifier := range map[string]*signInVerifierStub{
-		"unverified":           {},
-		"verification unknown": {err: errors.New("old daemon")},
-	} {
-		t.Run(name, func(t *testing.T) {
-			recorder := &confirmRecorder{}
-			withConfirm(t, recorder)
-			app, stdout, stderr := signInNoticeApp(t)
-			err := reviewSignInDestination(app, verifier, "work", config.OutlookDefault().Accounts["work"], false)
-			if err != nil || recorder.calls != 0 {
-				t.Fatalf("review error = %v, confirmations = %d", err, recorder.calls)
-			}
-			if !strings.Contains(stderr.String(), "outlook.cloud.microsoft") ||
-				!strings.Contains(stderr.String(), "This is the first sign-in") {
-				t.Fatalf("stderr = %q", stderr.String())
-			}
-			// --json output goes to stdout and stays exactly as before.
-			if stdout.Len() != 0 {
-				t.Fatalf("stdout = %q", stdout.String())
-			}
-		})
+// An older daemon cannot answer the verification query; the notice then
+// treats the settings as new rather than failing the sign-in.
+func TestUnknownVerificationStillSignsIn(t *testing.T) {
+	app, _, stderr := signInNoticeApp(t)
+	err := reviewSignInDestination(app, &signInVerifierStub{err: errors.New("old daemon")}, "work",
+		config.OutlookDefault().Accounts["work"])
+	if err != nil || !strings.Contains(stderr.String(), "This is the first sign-in") {
+		t.Fatalf("review error = %v stderr = %q", err, stderr.String())
 	}
 }
 
 // The MCP rename-and-add scenario ends here: the person runs the command the
 // agent relayed and is shown the look-alike host before anything opens.
-func TestLookAlikeAccountStopsAtTheConfirmationShowingItsHost(t *testing.T) {
-	recorder := &confirmRecorder{answer: false}
-	withConfirm(t, recorder)
+func TestLookAlikeAccountShowsItsHostBeforeSigningIn(t *testing.T) {
 	configuration := cloneSignInConfig(config.OutlookDefault())
 	configuration.Accounts["work-old"] = configuration.Accounts["work"]
 	lookAlike := configuration.Accounts["work"]
@@ -210,24 +157,20 @@ func TestLookAlikeAccountStopsAtTheConfirmationShowingItsHost(t *testing.T) {
 	configuration = withOutlookOrigin(configuration, "https://outlook-office.example")
 
 	app, _, stderr := signInNoticeApp(t)
-	err := reviewSignInDestination(app, &signInVerifierStub{}, "work", configuration.Accounts["work"], true)
-	if err == nil {
-		t.Fatal("look-alike sign-in went ahead")
+	if err := reviewSignInDestination(app, &signInVerifierStub{}, "work", configuration.Accounts["work"]); err != nil {
+		t.Fatal(err)
 	}
-	if !slices.Equal(recorder.hosts, []string{"outlook-office.example"}) ||
-		!strings.Contains(stderr.String(), "Outlook Web (mail, calendar): outlook-office.example") {
-		t.Fatalf("hosts = %v stderr = %q", recorder.hosts, stderr.String())
+	if !strings.Contains(stderr.String(), "Outlook Web (mail, calendar): outlook-office.example") ||
+		!strings.Contains(stderr.String(), "This is the first sign-in with these connection settings.") {
+		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
 
 func TestSignInNoticeRefusesToRenderLookAlikeHosts(t *testing.T) {
-	recorder := &confirmRecorder{answer: false}
-	withConfirm(t, recorder)
 	configuration := withOutlookOrigin(cloneSignInConfig(config.OutlookDefault()), "https://outlоok.example")
 	app, _, stderr := signInNoticeApp(t)
-	err := reviewSignInDestination(app, &signInVerifierStub{}, "work", configuration.Accounts["work"], true)
-	if err == nil || recorder.calls != 1 || len(recorder.hosts) != 0 {
-		t.Fatalf("review error = %v, confirmation = %+v", err, recorder)
+	if err := reviewSignInDestination(app, &signInVerifierStub{}, "work", configuration.Accounts["work"]); err != nil {
+		t.Fatalf("review error = %v", err)
 	}
 	if strings.Contains(stderr.String(), "о") ||
 		!strings.Contains(stderr.String(), "cannot be shown in") ||

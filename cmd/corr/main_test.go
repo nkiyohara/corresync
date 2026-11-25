@@ -369,3 +369,20 @@ func rootCommandDescription(t *testing.T, help, command string) string {
 	t.Fatalf("root help is missing command %q:\n%s", command, help)
 	return ""
 }
+
+func TestOldCommandNameNoticeOnlyForCorresync(t *testing.T) {
+	t.Parallel()
+	for argv0, want := range map[string]bool{
+		"corr": false, "/usr/local/bin/corr": false, "corr.exe": false,
+		"corresync": true, "/home/ana/.local/bin/corresync": true, "Corresync.EXE": true,
+		"corresync-helper": false,
+	} {
+		notice := oldCommandNameNotice(argv0)
+		if (notice != "") != want {
+			t.Errorf("oldCommandNameNotice(%q) = %q", argv0, notice)
+		}
+		if want && (!strings.Contains(notice, "0.11.0") || !strings.Contains(notice, "corr instead")) {
+			t.Errorf("notice = %q", notice)
+		}
+	}
+}

@@ -147,8 +147,8 @@ single-user tool, not a remote gateway or tenant administration service.
   that shows elicitation requests or `input_required` results to the model, or
   lets the model fill the retried call, lets the model approve, and Corresync
   cannot detect that. The person is then still protected by the CLI-verified
-  destination (the verifying `corr auth login` shows every sign-in host and,
-  the first time with given settings, asks for confirmation on a terminal),
+  destination (the verifying `corr auth login` shows every sign-in host and
+  says when it is the first sign-in with given settings; it does not ask),
   credentials and MFA typed by a person in the browser, the cool-down, and the
   audit log. Hosts without a display, logout, and browser
   clearing stay CLI-only.
