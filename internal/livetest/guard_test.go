@@ -73,7 +73,9 @@ func TestEveryLiveHarnessIsTaggedAndGated(t *testing.T) {
 		}
 		if entry.IsDir() {
 			switch entry.Name() {
-			case ".git", "vendor", "node_modules", "dist", ".release":
+			case ".git", "vendor", "node_modules", "dist", ".release", ".claude":
+				// .claude holds local agent worktrees: full copies of other
+				// revisions that are not part of this tree.
 				return filepath.SkipDir
 			}
 			return nil
