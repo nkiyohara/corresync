@@ -10,7 +10,7 @@
     <title>Corresync — local MCP and CLI for mail, calendars, and tasks</title>
     <meta
       name="description"
-      content="A local-first MCP server and CLI for mail, calendars, and tasks across Outlook, Gmail, Google Calendar, Microsoft To Do, Google Tasks, Todoist, TickTick, JMAP, IMAP/SMTP, and CalDAV."
+      content="A CLI and MCP server that runs on your computer and works with mail, calendars, and tasks in Outlook, Gmail, Google Calendar, Microsoft To Do, Google Tasks, Todoist, TickTick, JMAP, IMAP/SMTP, and CalDAV."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -20,7 +20,7 @@
     >
     <meta
       property="og:description"
-      content="Bring mail, calendars, and tasks into one local CLI and MCP server, while each account keeps its own provider route and sign-in."
+      content="Use mail, calendars, and tasks from several accounts through one CLI and MCP server on your computer. Each account connects and signs in separately."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -44,7 +44,7 @@
     >
     <meta
       name="twitter:description"
-      content="Bring mail, calendars, and tasks into one local CLI and MCP server, while each account keeps its own provider route and sign-in."
+      content="Use mail, calendars, and tasks from several accounts through one CLI and MCP server on your computer. Each account connects and signs in separately."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -82,7 +82,7 @@
           "programmingLanguage": "Go",
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
-          "description": "A local-first, provider-neutral MCP server and CLI for account-isolated mail, calendars, and tasks."
+          "description": "An MCP server and CLI that runs on your computer and works with mail, calendars, and tasks from several providers, keeping each account separate."
         }
       ]
     }
@@ -125,27 +125,28 @@
           <p class="eyebrow">
             <span aria-hidden="true"></span>Mail · Calendar · Tasks
           </p>
-          <h1 id="hero-title">One local surface for <em>the work across your accounts.</em></h1>
+          <h1 id="hero-title">
+            A local CLI and MCP server <em>for mail, calendars, and tasks</em>
+          </h1>
           <p class="lede">
-            Bring work and personal mail, calendars, and task lists to Codex, Claude Code, any MCP
-            agent, and your own terminal. Corresync keeps every account’s identity and
-            authorization isolated while one typed interface helps you find, plan, follow up, and
-            act.
+            Corresync connects your work and personal mail, calendars, and task lists to Codex,
+            Claude Code, other MCP agents, and your terminal. Each account signs in on its own, and
+            the same commands work across all of them.
           </p>
           <p class="hero-providers">
-            <strong>Built around the services you already use:</strong> Outlook · Gmail · Google
-            Calendar · Microsoft To Do · Todoist · TickTick · open standards. Routes and
-            capabilities remain explicit per account —
-            <a href="providers.html">explore the provider details</a>.
+            <strong>Supported services:</strong> Outlook · Gmail · Google Calendar · Microsoft To
+            Do · Todoist · TickTick · open standards. What works depends on the account and how
+            it connects. <a href="providers.html">See the provider details</a>.
           </p>
           <div class="actions">
             <a class="button primary" href="#install">Set up with your AI agent</a>
             <a class="button secondary" href="providers.html#check">Check my email provider</a>
           </div>
           <p class="hero-note">
-            Sign-in stays in your browser or OS keyring—agents never hold Corresync-managed
-            credentials, and there is no hosted relay. Consequential writes show an exact preview
-            and commit only when you approve.
+            Sign-in happens in your browser or uses credentials kept in your OS keyring. Agents
+            never get the credentials Corresync manages, and there is no hosted relay. Before
+            sending mail or making another important change, Corresync shows an exact preview and
+            waits for your approval.
           </p>
         </div>
 
@@ -204,7 +205,7 @@
             </details>
           </div>
           <details class="manual-setup">
-            <summary>Optional: manual installation and later setup steps</summary>
+            <summary>Install manually instead</summary>
             <div class="install-block">
               <p class="os-label" id="install-unix">macOS · Linux</p>
               <div class="cmd" data-copy data-copy-label="macOS and Linux install command">
@@ -236,7 +237,7 @@
               </div>
             </div>
             <div class="install-block">
-              <p class="os-label" id="install-connect">Next · finish guided setup</p>
+              <p class="os-label" id="install-connect">Then · run guided setup</p>
               <div class="cmd" data-copy data-copy-label="account setup command">
                 <pre
                   tabindex="0"
@@ -246,12 +247,11 @@
               </div>
             </div>
             <p class="install-note">
-              Setup resumes from current local state, discovers account routes without credentials,
-              and previews both account and agent-host changes before applying them. Sign-in remains
-              a separate choice. Prefer to read before you run? Review <a href="install.sh"
-              >install.sh</a> or
-              <a href="install.ps1">install.ps1</a> first. Homebrew, Scoop, native Linux packages,
-              and direct downloads are listed in
+              Setup picks up where you left off. It looks up how to connect each address without
+              using any credentials, and shows the account and agent changes before making them.
+              Signing in is a separate step. You can read <a href="install.sh">install.sh</a> or
+              <a href="install.ps1">install.ps1</a> before running it. Homebrew, Scoop, native Linux
+              packages, and direct downloads are listed in
               <a href="getting-started.html#other-install-methods">getting started</a>.
             </p>
           </details>
@@ -260,14 +260,13 @@
 
       <section class="service-landscape" aria-labelledby="service-landscape-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Your working day, one surface</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>Supported services</p>
           <h2 id="service-landscape-title">
-            Mail, calendars, and tasks—without changing how you sign in.
+            Mail, calendars, and task lists you can connect
           </h2>
           <p>
-            Corresync is one local CLI and MCP server for the accounts you already control. Each
-            provider exposes a different set of capabilities, so setup stays explicit and the
-            details remain attached to the account.
+            Corresync works with accounts you already have, and you sign in the same way as before.
+            Providers support different features, so each account is set up separately.
           </p>
         </div>
         <div class="service-grid">
@@ -336,38 +335,38 @@
           </article>
         </div>
         <p class="service-cta">
-          <a href="providers.html">Explore providers and setup routes<span aria-hidden="true">
+          <a href="providers.html">See all providers and how they connect<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
 
       <section class="trust-row" aria-label="Why Corresync">
         <div>
-          <strong>One MCP, every account</strong>
-          <span>Work and personal stay isolated; every result keeps its account and provider
-            provenance.</span>
+          <strong>Accounts kept separate</strong>
+          <span>Work and personal accounts don’t mix. Each result shows which account and provider
+            it came from.</span>
         </div>
         <div>
-          <strong>Agents never hold credentials</strong>
-          <span>Sign-in lives in a visible browser or the OS keyring. No hosted relay, no remote MCP
-            endpoint.</span>
+          <strong>Agents don’t get credentials</strong>
+          <span>Sign-in happens in a visible browser window or uses the OS keyring. There is no
+            hosted relay or remote MCP endpoint.</span>
         </div>
         <div>
-          <strong>Preview, then commit</strong>
-          <span>Sends and destructive writes return an exact server-enforced review first. Approval
-            is single-use.</span>
+          <strong>You approve each send</strong>
+          <span>Sends and destructive changes show an exact preview first, and Corresync itself
+            checks the approval. Each approval works once.</span>
         </div>
       </section>
 
       <section class="policy-callout" aria-labelledby="policy-callout-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>Your data, explained</p>
-          <h2 id="policy-callout-title">Connect Google with an OAuth client you control.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Google accounts</p>
+          <h2 id="policy-callout-title">Google needs your own OAuth client</h2>
           <p>
-            Create a Desktop OAuth client in your own Google Cloud project, import its downloaded
-            JSON through guided setup, then sign in in your normal browser. The client credential
-            and account grant stay in the OS keyring; Corresync-managed Google OAuth stays disabled.
-            <a href="google-oauth.html">Follow the illustrated setup</a>.
+            Create a Desktop OAuth client in your own Google Cloud project, import the JSON file you
+            download during guided setup, then sign in with your normal browser. The client
+            credential and the account grant are stored in the OS keyring. Corresync’s own managed
+            Google OAuth is turned off. <a href="google-oauth.html">Step-by-step guide</a>.
           </p>
         </div>
         <div class="actions">
@@ -378,16 +377,16 @@
 
       <section class="journey" id="quickstart" aria-labelledby="journey-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>After install: three short commands</p>
-          <h2 id="journey-title">Choose. Sign in. Ask.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>After installing</p>
+          <h2 id="journey-title">Add an account and connect your agent</h2>
           <p>
-            No provider is preselected. Corresync first discovers evidence for your address, adds
-            one explicit account route, and only then lets you start that account’s sign-in.
+            Corresync doesn’t assume a provider. It first looks up how your address can be
+            reached, adds the account with the route you pick, and only then lets you sign in.
           </p>
         </div>
         <div class="journey-grid">
           <div class="journey-step">
-            <p class="os-label" id="journey-signin">1 · Choose and sign in</p>
+            <p class="os-label" id="journey-signin">1 · Add an account and sign in</p>
             <div class="cmd" data-copy data-copy-label="account and sign-in commands">
               <pre
                 tabindex="0"
@@ -396,10 +395,13 @@
               ><code>corr setup you@example.com --alias personal
 corr auth login --account personal</code></pre>
             </div>
-            <p>Discovery opens nothing. The separate login uses the selected route.</p>
+            <p>
+              The lookup opens nothing and signs nothing in. Login is a separate command and uses
+              the route you picked.
+            </p>
           </div>
           <div class="journey-step">
-            <p class="os-label" id="journey-connect">2 · Connect</p>
+            <p class="os-label" id="journey-connect">2 · Connect your agent</p>
             <div class="cmd" data-copy data-copy-label="agent setup command">
               <pre
                 tabindex="0"
@@ -407,7 +409,9 @@ corr auth login --account personal</code></pre>
                 aria-labelledby="journey-connect"
               ><code>corr mcp setup codex</code></pre>
             </div>
-            <p>Registers the local stdio server with your agent. Restart the client once.</p>
+            <p>
+              Adds Corresync to your agent as a local stdio server. Restart the agent afterwards.
+            </p>
           </div>
           <div class="journey-step">
             <p class="os-label" id="journey-ask">3 · Ask</p>
@@ -418,11 +422,13 @@ corr auth login --account personal</code></pre>
             ><code><span class="t-ask">›</span> What needs my attention
   before noon, across all
   my accounts?</code></pre>
-            <p>The agent calls typed tools; answers keep each account’s identity.</p>
+            <p>
+              The agent calls Corresync’s tools, and each answer says which account it came from.
+            </p>
           </div>
         </div>
         <p class="center-link">
-          <a href="getting-started.html">Walk through the full getting-started guide<span
+          <a href="getting-started.html">Read the full getting-started guide<span
               aria-hidden="true"
             >
               →</span></a>
@@ -431,18 +437,19 @@ corr auth login --account personal</code></pre>
 
       <section class="outcomes" id="outcomes" aria-labelledby="outcomes-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Day-one outcomes</p>
-          <h2 id="outcomes-title">What you can ask before your coffee cools.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Examples</p>
+          <h2 id="outcomes-title">What you can ask for</h2>
           <p>
-            The CLI and MCP agents share the same typed operations, account isolation, and policy
-            checks—so everything below works both ways.
+            The CLI and the MCP tools run the same operations with the same checks, so each example
+            works from either one.
           </p>
         </div>
         <div class="outcome-grid">
           <article class="outcome-card">
-            <h3>Search every inbox at once</h3>
+            <h3>Search all inboxes</h3>
             <p class="outcome-ask">
-              “Find the quarterly-plan thread—work or personal, I don’t remember which.”
+              “Find the quarterly-plan thread. It’s in work or personal, I don’t remember
+              which.”
             </p>
             <pre
               tabindex="0"
@@ -453,11 +460,11 @@ corr auth login --account personal</code></pre>
 <span class="t-unread">●</span> <span class="t-dim">work · microsoft-owa</span>  Ana Ruiz  Plan review
 <span class="t-read">·</span> <span class="t-dim">personal · jmap</span>   Finance      Plan receipt</code></pre>
             <p class="outcome-note">
-              A failed account surfaces as an explicit partial result—never silently hidden.
+              If one account fails, the result says so and is marked as partial.
             </p>
           </article>
           <article class="outcome-card">
-            <h3>See one agenda</h3>
+            <h3>One agenda for all calendars</h3>
             <p class="outcome-ask">“What does my day look like across both calendars?”</p>
             <pre
               tabindex="0"
@@ -469,11 +476,11 @@ corr auth login --account personal</code></pre>
 09:30 <span class="t-dim">work</span>      Design review · Teams
 12:30 <span class="t-dim">personal</span>  Dentist</code></pre>
             <p class="outcome-note">
-              Time zones, calendars, and provider provenance stay attached to every event.
+              Each event shows its time zone, its calendar, and the provider it came from.
             </p>
           </article>
           <article class="outcome-card">
-            <h3>Preview a send before approving it</h3>
+            <h3>Check a message before it is sent</h3>
             <p class="outcome-ask">“Draft the reply to Ana. I’ll approve the send myself.”</p>
             <pre
               tabindex="0"
@@ -487,31 +494,32 @@ corr auth login --account personal</code></pre>
 <span class="t-dim">Nothing sent until this exact
 payload is approved.</span></code></pre>
             <p class="outcome-note">
-              The commit must match the reviewed account, recipients, and bytes exactly.
+              The message is sent only if the account, recipients, and content match the preview
+              exactly.
             </p>
           </article>
         </div>
         <p class="center-link">
-          <a href="features.html">See everything you can do—and every limit—in plain
-            language<span aria-hidden="true">
+          <a href="features.html">See all features and their limits<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
 
       <section class="safety safety-preview" aria-labelledby="safety-title">
         <div class="safety-head">
-          <p class="eyebrow light"><span aria-hidden="true"></span>Safety you can see</p>
-          <h2 id="safety-title">Nothing sends on the first attempt.</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>How sending works</p>
+          <h2 id="safety-title">The first command only shows a preview</h2>
           <p class="safety-lede">
-            A consequential command first returns a review. Approval stays bound to that caller,
-            account, provider, target, payload, expiry, and one use.
+            A command that sends or changes something important first returns a review. The approval
+            only works for that caller, account, provider, target, and content, expires, and works
+            once.
           </p>
         </div>
         <div class="safety-body">
           <figure class="terminal safety-terminal">
             <figcaption class="term-bar">
               <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span class="term-title">review before effect</span>
+              <span class="term-title">send preview</span>
             </figcaption>
             <pre
               tabindex="0"
@@ -532,53 +540,51 @@ payload is approved.</span></code></pre>
           </figure>
           <ul class="safety-points">
             <li>
-              <strong>Agents get typed tools, never credentials.</strong> Passwords, cookies, and
-              OAuth grants have no MCP surface and no configuration field.
+              <strong>Agents get tools, not credentials.</strong> No MCP tool exposes passwords,
+              cookies, or OAuth grants, and the configuration file has no field for them.
             </li>
             <li>
-              <strong>Local only.</strong> The MCP server speaks stdio on your machine. No hosted
-              relay, no remote endpoint, no telemetry pipeline.
+              <strong>Runs on your computer.</strong> The MCP server talks to your agent over stdio.
+              There is no hosted relay, remote endpoint, or telemetry pipeline.
             </li>
             <li>
-              <strong>Unknown means stop.</strong> An ambiguous remote write is never retried
-              automatically.
+              <strong>Unclear results are not retried.</strong> If Corresync can’t tell whether a
+              remote write went through, it stops and does not retry on its own.
             </li>
             <li>
-              <strong>Mailbox content is untrusted data.</strong> It is never authority to run a
-              command or start an agent.
+              <strong>Mail content is treated as untrusted.</strong> Text in a message can’t make
+              Corresync run a command or start an agent.
             </li>
           </ul>
         </div>
         <p class="safety-links">
-          <a href="safety.html">See the complete safety model in plain language<span
-              aria-hidden="true"
-            >
+          <a href="safety.html">Read the safety page<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
 
       <section class="provider-preview" aria-labelledby="provider-preview-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Bring the route you already use</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>How accounts connect</p>
           <h2 id="provider-preview-title">
-            Provider-native when useful. Standards-first when available.
+            Provider APIs, browser sign-in, and open standards
           </h2>
           <p>
-            Mail and calendar routes are selected independently, so one account can pair IMAP/SMTP
-            mail with a CalDAV calendar—or use one native route for both.
+            Mail and calendar routes are chosen separately. One account can use IMAP/SMTP for mail
+            and CalDAV for its calendar, or one provider route for both.
           </p>
         </div>
         <div class="route-family-grid">
           <article class="route-family">
-            <p class="chip">Browser-owned</p>
+            <p class="chip">Browser sign-in</p>
             <h3>Outlook Web</h3>
             <p>
-              Keep interactive Outlook sign-in in a dedicated visible browser while supporting typed
-              mail and calendar operations.
+              You sign in to Outlook yourself in a separate, visible browser window. Mail and
+              calendar commands then work through that session.
             </p>
           </article>
           <article class="route-family accent-card">
-            <p class="chip">Explicit OAuth</p>
+            <p class="chip">OAuth</p>
             <h3>Microsoft Graph · Google with your own client</h3>
             <p>
               Microsoft Graph accepts a public client you are authorized to use. Gmail, Google
@@ -590,19 +596,18 @@ payload is approved.</span></code></pre>
             <p class="chip">Open standards</p>
             <h3>JMAP, IMAP/SMTP, and CalDAV</h3>
             <p>
-              Use encrypted standards endpoints with an OS-keyring entry or one explicitly approved
-              credential helper reference.
+              Connects over an encrypted connection. The password comes from an OS keyring entry or
+              from a credential helper you approved.
             </p>
           </article>
         </div>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span>
           <p>
-            <strong>Choose with the details in view.</strong> The provider guide shows the exact
-            sign-in route, setup requirements, and account-dependent capabilities before you add
-            anything.
+            <strong>Check before you add an account.</strong> The provider page lists how each route
+            signs in, what you need to set up, and which features depend on the account.
           </p>
-          <a href="providers.html#check">Check an address privately<span aria-hidden="true">
+          <a href="providers.html#check">Check your address<span aria-hidden="true">
               →</span></a>
         </div>
       </section>
@@ -610,10 +615,10 @@ payload is approved.</span></code></pre>
       <section class="agents" aria-labelledby="agents-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Local MCP over stdio</p>
-          <h2 id="agents-title">Meet your agent where it already works.</h2>
+          <h2 id="agents-title">Supported agents</h2>
           <p>
-            Setup writes absolute local paths into the client you choose and never creates a remote
-            endpoint. Every client reaches the same 43 narrow tools.
+            Setup writes absolute local paths into the configuration of the agent you choose. It
+            does not create a remote endpoint. Every agent gets the same 43 tools.
           </p>
         </div>
         <div class="agent-grid">
@@ -637,7 +642,7 @@ payload is approved.</span></code></pre>
           </article>
         </div>
         <p class="center-link">
-          <a href="getting-started.html#connect">See the exact command for every client<span
+          <a href="getting-started.html#connect">Setup commands for each agent<span
               aria-hidden="true"
             >
               →</span></a>
@@ -646,37 +651,37 @@ payload is approved.</span></code></pre>
 
       <section class="honest-edges" aria-labelledby="edges-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>Honest edges</p>
-          <h2 id="edges-title">Clear limits are part of the product.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Limits</p>
+          <h2 id="edges-title">Current limits</h2>
           <p class="fine-print">
-            The complete picture—capabilities, limits, and how compatibility claims are
-            backed—is on the <a href="features.html">features page</a>.
+            The <a href="features.html">features page</a> lists every capability and limit, and what
+            evidence each compatibility claim is based on.
           </p>
         </div>
         <ul>
           <li>
             <strong>Gmail, Google Calendar, and Google Tasks use your own OAuth client.</strong>
-            Guided setup imports a Google Desktop client into the OS keyring before explicit login.
+            Guided setup imports a Google Desktop client into the OS keyring before you sign in.
           </li>
           <li>
-            <strong>Microsoft Graph is bring-your-own OAuth.</strong> Corresync does not operate a
-            token relay.
+            <strong>Microsoft Graph uses an OAuth client you provide.</strong> Corresync does not
+            run a token relay.
           </li>
           <li>
-            <strong>Windows desktop notifications are unavailable.</strong> Queue and approved
-            runner modes remain available.
+            <strong>No desktop notifications on Windows.</strong> The queue and approved runner
+            modes still work there.
           </li>
           <li>
-            <strong>Capabilities stay account-specific.</strong> Setup shows the route and services
-            available to that account instead of guessing from the email brand.
+            <strong>Features depend on the account.</strong> Setup shows the route and services that
+            account actually has instead of guessing from the email provider’s name.
           </li>
         </ul>
       </section>
 
       <section class="final-cta" aria-labelledby="final-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>Ready when your inboxes are</p>
-        <h2 id="final-title">Bring your correspondence into one local conversation.</h2>
-        <p>Install in one command. Connect your agent in one more.</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>Install</p>
+        <h2 id="final-title">Get started</h2>
+        <p>One command installs Corresync, and another connects it to your agent.</p>
         <div class="actions centered">
           <a class="button primary" href="#install">Copy the install command</a>
           <a class="button secondary" href="getting-started.html">Follow the full guide</a>

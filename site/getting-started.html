@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Getting started with Corresync — install to first answer</title>
+    <title>Getting started with Corresync — install, sign in, and connect an agent</title>
     <meta
       name="description"
-      content="Install Corresync, add Outlook, iCloud Mail and Calendar, or standards-based accounts, connect any local MCP client, and ask your first cross-account question."
+      content="Install Corresync, add Outlook, iCloud Mail and Calendar, or standards-based accounts, connect a local MCP client, and ask a question that covers several accounts."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Getting started with Corresync">
     <meta
       property="og:description"
-      content="Install with one command, sign in visibly, connect your MCP agent, and ask across every inbox and calendar you connect."
+      content="Install with one command, sign in through your browser, connect your MCP agent, and ask about every inbox and calendar you add."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -28,18 +28,18 @@
     <meta property="og:image:height" content="630">
     <meta
       property="og:image:alt"
-      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Getting started with Corresync">
     <meta
       name="twitter:description"
-      content="Install with one command, sign in visibly, connect your MCP agent, and ask across every inbox and calendar you connect."
+      content="Install with one command, sign in through your browser, connect your MCP agent, and ask about every inbox and calendar you add."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
-      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <link rel="canonical" href="https://corresync.org/getting-started.html">
     <link rel="alternate" hreflang="en" href="https://corresync.org/getting-started.html">
@@ -96,14 +96,14 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>Getting started</p>
-        <h1 id="page-title">Install to first answer, <em>in four clear steps.</em></h1>
+        <h1 id="page-title">Getting started <em>in four steps</em></h1>
         <p class="lede">
-          Install <code>corr</code>, connect multiple work or personal email and calendar accounts,
-          register the local MCP server with your agent, and ask something that spans them. Each
-          account keeps a separate identity and authorization even when a search or agenda combines
-          results. Outlook Web sign-in stays browser-owned; API and standards grants stay behind
-          your OS keyring. Agents never receive Corresync-managed credentials, and the MCP
-          connection is local stdio—no hosted relay.
+          Install <code>corr</code>, add your work or personal email and calendar accounts, register
+          the local MCP server with your agent, and ask a question that covers them. Each account
+          keeps its own sign-in, even when a search or agenda combines results. Outlook Web sign-in
+          happens in a browser; API and standards credentials are kept in your OS keyring. Agents
+          never receive the credentials Corresync manages. The MCP connection is local stdio, with
+          no hosted relay.
         </p>
         <div class="actions">
           <a class="button primary" href="#step-install">Start at step 1</a>
@@ -118,8 +118,8 @@
             <div>
               <h2 id="install-title">Install <code>corr</code></h2>
               <p>
-                Pick your platform. Installing gives you the <code>corr</code> command—no account
-                is added and nothing signs in until you do.
+                Pick your platform. Installing only gives you the <code>corr</code> command. No
+                account is added and nothing signs in until you do it.
               </p>
             </div>
           </header>
@@ -134,9 +134,9 @@
                 ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
               </div>
               <p class="block-note">
-                Installs the verified stable release for your current user. Review
-                <a href="install.sh">install.sh</a> first if you like; no account or MCP client is
-                changed.
+                Installs the verified stable release for your user account. You can read
+                <a href="install.sh">install.sh</a> first. It does not change any account or MCP
+                client.
               </p>
             </div>
             <div class="install-block">
@@ -149,9 +149,9 @@
                 ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
               </div>
               <p class="block-note">
-                Installs without elevation and updates only your user <code>PATH</code>. Review
-                <a href="install.ps1">install.ps1</a> first; organization policy still takes
-                precedence.
+                Installs without administrator rights and changes only your user <code>PATH</code>.
+                You can read <a href="install.ps1">install.ps1</a> first. Your organization’s
+                policy still applies.
               </p>
             </div>
           </div>
@@ -162,7 +162,10 @@
           >
             <div class="install-alternatives-head">
               <h3 id="other-install-title">Other installation methods</h3>
-              <p>Prefer a package manager? It keeps ownership of upgrades and removal.</p>
+              <p>
+                If you install with a package manager, that package manager handles upgrades and
+                removal.
+              </p>
             </div>
             <div class="install-grid">
               <div class="install-block">
@@ -219,7 +222,7 @@ scoop install corresync/corresync</code></pre>
           </div>
           <div class="install-block verify-block">
             <p class="os-label" id="gs-updates">
-              Automatic updates · enable for an existing configuration
+              Automatic updates · turn on for an existing configuration
             </p>
             <div class="cmd" data-copy data-copy-label="enable verified automatic updates">
               <pre
@@ -229,16 +232,17 @@ scoop install corresync/corresync</code></pre>
               ><code>corr config set updates.auto_install true</code></pre>
             </div>
             <p class="block-note">
-              From 0.9.2, new standalone configurations enable signed, verified automatic updates.
-              Existing preferences are preserved; this command enables installation for an existing
-              configuration. Homebrew, Scoop, and WinGet remain managed by their package manager.
-              Interactive updates restart the session owner and continue with the updated command.
-              MCP, configuration changes, and machine-readable output never trigger installation.
-              Disable installation with <code>corr config set updates.auto_install false</code>.
+              Since 0.9.2, new standalone configurations turn on signed, verified automatic updates.
+              Existing settings are kept; use this command to turn on installation for an existing
+              configuration. Homebrew, Scoop, and WinGet installs are updated by their package
+              manager. An interactive update restarts the session owner and then runs the updated
+              command. MCP, configuration changes, and machine-readable output never install an
+              update. Turn installation off with <code>corr config set updates.auto_install
+                false</code>.
             </p>
           </div>
           <div class="install-block verify-block">
-            <p class="os-label" id="gs-preview">Optional · follow signed previews</p>
+            <p class="os-label" id="gs-preview">Optional · preview releases</p>
             <div class="cmd" data-copy data-copy-label="select the preview release channel">
               <pre
                 tabindex="0"
@@ -248,16 +252,16 @@ scoop install corresync/corresync</code></pre>
 corr update</code></pre>
             </div>
             <p class="block-note">
-              Stable is the default. Preview uses the same signed, verified standalone update path;
-              return with <code>corr config set updates.channel stable</code>. Corresync never
-              downgrades, and previews do not enter package-manager catalogs.
+              Stable is the default. Preview releases are signed and verified the same way as stable
+              ones. To go back, run <code>corr config set updates.channel stable</code>. Corresync
+              never downgrades, and previews are not published to package managers.
             </p>
           </div>
           <p class="step-foot">
-            macOS release binaries are Developer ID-signed and Apple-notarized. Windows binaries are
-            not yet Authenticode-signed—verify downloads instead of overriding Gatekeeper or
-            SmartScreen. Direct archives, packages, checksums, and signed provenance are available
-            on the <a href="https://github.com/nkiyohara/corresync/releases">release page</a>.
+            macOS release binaries are signed with a Developer ID and notarized by Apple. Windows
+            binaries are not yet Authenticode-signed, so verify the download rather than overriding
+            Gatekeeper or SmartScreen. Archives, packages, checksums, and signed provenance are on
+            the <a href="https://github.com/nkiyohara/corresync/releases">release page</a>.
           </p>
         </li>
 
@@ -267,43 +271,44 @@ corr update</code></pre>
             <div>
               <h2 id="signin-title">Set up your mail and calendar account</h2>
               <p>
-                Start with one command. The guided setup asks for your email address, discovers
-                likely mail and calendar services without credentials, explains the choices, and
-                shows a final review before anything is added.
+                Run one command. Guided setup asks for your email address, looks up the likely mail
+                and calendar services without using credentials, explains the options, and shows a
+                final review before it adds anything.
               </p>
               <p>
-                Sign-in or access to an external credential is always a separate, clearly labelled
-                choice after that review. The wizard can then run a bounded connection check or add
-                another account. <code>corr settings</code> opens the same keyboard-friendly flow;
-                set <code>CORRESYNC_ACCESSIBLE=true</code> for line-oriented screen-reader prompts,
-                and type <code>:cancel</code> to leave an input step safely.
+                Signing in, or using an external credential, is a separate step that you choose
+                after that review. The wizard can then run a short connection check or add another
+                account. <code>corr settings</code> opens the same keyboard-friendly flow; set <code
+                >CORRESYNC_ACCESSIBLE=true</code> for plain line-by-line prompts that work with
+                screen readers, and type <code>:cancel</code> to leave an input step.
               </p>
             </div>
           </header>
           <div class="duo">
             <div>
               <p>
-                Outlook Web works with provider-owned browser sign-in. Microsoft Graph, JMAP,
-                IMAP/SMTP, and CalDAV are also available when your provider supports them and you
-                explicitly choose the required route or credential owner. Discovery itself never
-                opens a browser, reads a keyring, or asks an administrator for consent.
+                Outlook Web uses Microsoft’s own browser sign-in. Microsoft Graph, JMAP,
+                IMAP/SMTP, and CalDAV also work when your provider supports them and you choose that
+                route and where its credential comes from. The lookup itself never opens a browser,
+                reads a keyring, or asks an administrator for consent.
               </p>
               <p>
                 <strong>Using iCloud?</strong> <code>corr setup</code> recognises iCloud Mail and
                 Calendar together for <code>@icloud.com</code>, <code>@me.com</code>, and
                 <code>@mac.com</code> addresses, or from complete verified service records for a
-                custom iCloud domain. After you approve the account, it explains Apple’s
-                two-factor authentication and app-specific password requirement. Your operating
-                system asks for that password directly; Corresync never receives it.
+                custom iCloud domain. After you approve the account, it explains that Apple requires
+                two-factor authentication and an app-specific password. Your operating system asks
+                for that password itself; Corresync never receives it.
               </p>
               <p>
                 <strong>Using Google?</strong> Create a Desktop OAuth client in a Google Cloud
-                project you control. Guided setup validates the downloaded JSON and imports the
-                generated credential into your OS keyring before an explicit browser login.
+                project you control. Guided setup checks the downloaded JSON and imports the
+                generated credential into your OS keyring. You then sign in through the browser as a
+                separate step.
               </p>
               <p class="step-links">
                 <a href="providers.html#check">Check your address without sending it</a> ·
-                <a href="safety.html">see how sign-in ownership works</a>
+                <a href="safety.html">how sign-in works</a>
               </p>
             </div>
             <div class="stack">
@@ -317,10 +322,10 @@ corr update</code></pre>
                   ><code>corr setup</code></pre>
                 </div>
                 <p class="block-note">
-                  The wizard checks your current local state, optionally adds shell completion, and
-                  resumes at the first unfinished step. It previews every account route, keeps
-                  authentication separate, then lets you select several detected agents and reviews
-                  one local integration plan before applying and verifying each host.
+                  The wizard checks what is already set up, can add shell completion, and continues
+                  from the first unfinished step. It shows each account route before adding it and
+                  keeps sign-in as a separate step. Then you pick the agents it found, review one
+                  plan for all of them, and it applies and checks each one.
                 </p>
               </div>
               <div class="install-block">
@@ -331,14 +336,15 @@ corr auth login --account personal
 corr doctor --account personal</code></pre>
                 </div>
                 <p class="block-note">
-                  These commands stay non-interactive and are suitable for scripts.
+                  These commands don’t prompt, so you can use them in scripts.
                 </p>
               </div>
               <div class="install-block">
                 <p class="os-label">iCloud Mail + Calendar · available now</p>
                 <p class="block-note">
-                  The guided preset adds both services, can share one reviewed credential handle,
-                  and shows their last-authenticated status without reading content. Read Apple’s
+                  The guided preset adds both services, can use one credential handle you reviewed
+                  for both, and shows when each last signed in without reading any content. Read
+                  Apple’s
                   <a href="https://support.apple.com/en-gb/102654">app-specific password guide</a>
                   before connecting.
                 </p>
@@ -348,9 +354,9 @@ corr doctor --account personal</code></pre>
                   Gmail · Google Calendar · Google Tasks
                 </p>
                 <p class="block-note">
-                  Follow the <a href="google-oauth.html">illustrated Google OAuth guide</a> to
-                  create a Desktop client, choose only the services you need, and keep both the
-                  client credential and account grant in the OS keyring.
+                  The <a href="google-oauth.html">Google OAuth guide</a> shows how to create a
+                  Desktop client and pick only the services you need. The client credential and the
+                  account grant are both stored in the OS keyring.
                 </p>
               </div>
             </div>
@@ -361,10 +367,10 @@ corr doctor --account personal</code></pre>
           <header>
             <span class="step-badge" aria-hidden="true">3</span>
             <div>
-              <h2 id="connect-title">Connect the agent you already use</h2>
+              <h2 id="connect-title">Connect your agent</h2>
               <p>
-                One command registers Corresync as a local stdio MCP server in the client’s own
-                configuration, with absolute paths and no remote endpoint. Restart the client
+                One command adds Corresync as a local stdio MCP server to the agent’s own
+                configuration, using absolute paths and no remote endpoint. Restart the agent
                 afterwards.
               </p>
             </div>
@@ -456,11 +462,11 @@ corr doctor --account personal</code></pre>
                   aria-label="Generic MCP serve command"
                 ><code>corr mcp serve</code></pre>
               </div>
-              <p>Generic stdio transport—point any client at this command.</p>
+              <p>Plain stdio server. Point any MCP client at this command.</p>
             </div>
           </div>
           <p class="step-foot">
-            Every client reaches the same 43 narrow tools and two read-only monitor resources—see
+            Every client gets the same 43 tools and two read-only monitor resources. See
             <a href="features.html#agents">what agents can and cannot do</a>. Codex and Claude Code
             users can also install the bundled plugin and Agent Skill.
           </p>
@@ -470,10 +476,10 @@ corr doctor --account personal</code></pre>
           <header>
             <span class="step-badge" aria-hidden="true">4</span>
             <div>
-              <h2 id="ask-title">Ask across everything</h2>
+              <h2 id="ask-title">Ask your first question</h2>
               <p>
-                Reads span accounts without merging them; writes are deliberately different. Try
-                these first:
+                Reads can cover several accounts at once without merging them. Writes always target
+                one account. Some prompts to try:
               </p>
             </div>
           </header>
@@ -485,24 +491,25 @@ corr doctor --account personal</code></pre>
                 </li>
                 <li>“What’s on all my calendars tomorrow morning?”</li>
                 <li>
-                  “Draft a reply to Ana—I’ll review the preview before anything sends.”
+                  “Draft a reply to Ana. I’ll review the preview before anything is sent.”
                 </li>
               </ul>
               <p>
-                Each result keeps its account and provider, and a failed route surfaces as an
-                explicit partial failure instead of hiding what succeeded.
+                Each result shows its account and provider. If one route fails, the result is marked
+                as a partial failure and still shows what succeeded.
               </p>
               <p>
-                When the agent—or you—asks to send, Corresync returns a review of the exact
-                message. Only approving that exact payload (same account, recipients, and bytes)
-                commits it: <code>--approve</code> in the CLI, or the separate
-                <code>mail_send_commit</code> tool over MCP. Approval is short-lived and single-use.
+                When you or the agent ask to send, Corresync returns a review of the exact message.
+                It is sent only when you approve that exact message (same account, recipients, and
+                content): <code>--approve</code> in the CLI, or the separate
+                <code>mail_send_commit</code> tool over MCP. The approval is short-lived and works
+                once.
               </p>
             </div>
             <figure class="terminal">
               <figcaption class="term-bar">
                 <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="term-title">review before effect</span>
+                <span class="term-title">send preview</span>
               </figcaption>
               <pre
                 tabindex="0"
@@ -529,42 +536,43 @@ corr doctor --account personal</code></pre>
 
       <section aria-labelledby="next-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Where next</p>
-          <h2 id="next-title">Go deeper when you need to.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>More</p>
+          <h2 id="next-title">Other pages</h2>
         </div>
         <div class="control-grid">
           <article>
             <h3>Providers and limits</h3>
             <p>
-              What each route can and cannot do, stated per capability.
+              What each route can and cannot do.
               <a href="providers.html">Compare routes</a>.
             </p>
           </article>
           <article>
             <h3>The safety model</h3>
             <p>
-              Credentials, isolation, preview→commit, and what is deliberately absent.
-              <a href="safety.html">Read the guarantees</a>.
+              Credentials, account separation, approvals, and what Corresync does not do.
+              <a href="safety.html">Read the safety page</a>.
             </p>
           </article>
           <article>
-            <h3>Everything you can do</h3>
+            <h3>Features</h3>
             <p>
-              Mail, calendar, agents, scripting, import, and monitoring in plain language.
-              <a href="features.html">Tour the features</a>.
+              Mail, calendar, agents, scripting, import, and monitoring.
+              <a href="features.html">See the features</a>.
             </p>
           </article>
           <article>
             <h3>Agent integrations</h3>
             <p>
-              Compare direct MCP, Skills, native packages, and actual directory availability.
-              <a href="integrations.html">See the truthful integration matrix</a>.
+              Direct MCP setup, Skills, native packages, and which directories actually list
+              Corresync.
+              <a href="integrations.html">See the integration table</a>.
             </p>
           </article>
           <article>
             <h3>Scripts and stable JSON</h3>
             <p>
-              Automate against the same core and the same policy checks.
+              Scripts use the same code and the same checks as the CLI.
               <a href="features.html#scripting">See how scripting works</a>.
             </p>
           </article>
@@ -572,10 +580,10 @@ corr doctor --account personal</code></pre>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span>
           <p>
-            <strong>Before you connect a sensitive account:</strong> provider routes ship with
-            deterministic synthetic contract coverage. Google authorization and bounded reads have
-            one commit-bound macOS arm64 observation; other provider and write surfaces remain
-            live-unobserved.
+            <strong>Before you connect a sensitive account:</strong> provider routes are tested
+            against synthetic provider contracts. Google authorization and bounded reads have one
+            live observation, on macOS arm64 at a specific commit. Other providers and all writes
+            are live-unobserved.
           </p>
           <a href="features.html#evidence">How evidence works<span aria-hidden="true">
               →</span></a>
@@ -583,12 +591,12 @@ corr doctor --account personal</code></pre>
       </section>
 
       <section class="final-cta" aria-labelledby="gs-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>That’s the whole loop</p>
-        <h2 id="gs-cta-title">Install, sign in, connect, ask.</h2>
-        <p>Everything else is detail you can read when you want it.</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>Summary</p>
+        <h2 id="gs-cta-title">Install, sign in, connect your agent</h2>
+        <p>The other pages cover the details.</p>
         <div class="actions centered">
           <a class="button primary" href="safety.html">Read the safety model</a>
-          <a class="button secondary" href="features.html">See everything you can do</a>
+          <a class="button secondary" href="features.html">See the features</a>
         </div>
       </section>
     </main>

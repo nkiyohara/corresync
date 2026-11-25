@@ -31,23 +31,23 @@
   });
   const routeCapabilities = Object.freeze({
     "microsoft-owa": Object.freeze({
-      mail: "Typed mail reads and writes",
+      mail: "Mail reads and writes",
       calendar: "Selectable calendars and provider-supported Teams links",
     }),
     "microsoft-graph": Object.freeze({
-      mail: "Typed mail reads and writes",
-      calendar: "Selectable calendars and typed Teams-link creation",
+      mail: "Mail reads and writes",
+      calendar: "Selectable calendars and Teams-link creation",
     }),
     "apple-icloud": Object.freeze({
       mail: "IMAP reads and organization with SMTP composition and sending",
       calendar: "CalDAV calendar reads and reviewed writes",
     }),
     google: Object.freeze({
-      mail: "Typed Gmail API operations with your Desktop OAuth client",
+      mail: "Gmail API operations with your Desktop OAuth client",
       calendar: "Selectable calendars and provider-supported Google Meet links",
     }),
     jmap: Object.freeze({
-      mail: "Typed JMAP mail operations",
+      mail: "JMAP mail operations",
       calendar: "Not provided by this route",
     }),
     "imap-smtp": Object.freeze({
@@ -56,7 +56,7 @@
     }),
     caldav: Object.freeze({
       mail: "Not provided by this route",
-      calendar: "Typed calendar operations and conditional scheduling",
+      calendar: "Calendar operations and conditional scheduling",
     }),
   });
   const familyNames = Object.freeze({
@@ -75,10 +75,10 @@
     unknown: "Confidence unknown",
   });
   const signInNames = Object.freeze({
-    provider_browser: "A dedicated visible browser owns sign-in",
+    provider_browser: "You sign in in a separate, visible browser window",
     public_oauth: "System-browser OAuth; the grant stays in the OS keyring",
     user_owned_oauth: "Your Desktop OAuth client; its credential and grant stay in the OS keyring",
-    external_credential: "OS keyring or an explicitly approved credential helper",
+    external_credential: "OS keyring or a credential helper you approved",
     disabled: "Disabled; no sign-in can start",
   });
   const nextLinks = Object.freeze({
@@ -148,7 +148,7 @@
     mail: "Mail",
     calendar: "Calendar",
     signIn: "Sign-in",
-    isolation: "Add this account separately when you are ready. Its identity and authorization stay isolated from your other work or personal accounts, while combined searches and agendas keep the source account visible.",
+    isolation: "Add this account separately when you are ready. It signs in on its own and is kept apart from your other work or personal accounts. Combined searches and agendas show which account each result came from.",
     details: "Technical details and limits",
     publicSignals: values => `Public signals: ${values.join(", ")}.`,
     unavailableStatus: "! Check unavailable",
