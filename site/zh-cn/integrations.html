@@ -3,20 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync AI 集成 — 本地 MCP、插件与真实发布状态</title>
+    <title>Corresync AI 集成：本地 MCP、插件和发布状态</title>
     <meta
       name="description"
-      content="准确查看 Corresync 在各类 AI 代理中的 MCP、Skill、插件、扩展、Power 与市场上架状态。"
+      content="查看 Corresync 的 MCP、Skill、插件、扩展、Power 在各个本地 AI 智能体中是已发布、仅提供源码，还是尚未上架。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta
-      property="og:title"
-      content="Corresync AI 集成 — 本地 MCP、插件与真实发布状态"
-    >
+    <meta property="og:title" content="Corresync AI 集成：本地 MCP、插件和发布状态">
     <meta
       property="og:description"
-      content="准确查看 Corresync 在各类 AI 代理中的 MCP、Skill、插件、扩展、Power 与市场上架状态。"
+      content="查看 Corresync 的 MCP、Skill、插件、扩展、Power 在各个本地 AI 智能体中是已发布、仅提供源码，还是尚未上架。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
@@ -28,24 +25,15 @@
     <meta property="og:image" content="https://corresync.org/social-card.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta
-      property="og:image:alt"
-      content="Corresync 标志及其本地、供应商中立的 MCP 定位。"
-    >
+    <meta property="og:image:alt" content="Corresync 标志和本地 MCP 服务器说明。">
     <meta name="twitter:card" content="summary_large_image">
-    <meta
-      name="twitter:title"
-      content="Corresync AI 集成 — 本地 MCP、插件与真实发布状态"
-    >
+    <meta name="twitter:title" content="Corresync AI 集成：本地 MCP、插件和发布状态">
     <meta
       name="twitter:description"
-      content="准确查看 Corresync 在各类 AI 代理中的 MCP、Skill、插件、扩展、Power 与市场上架状态。"
+      content="查看 Corresync 的 MCP、Skill、插件、扩展、Power 在各个本地 AI 智能体中是已发布、仅提供源码，还是尚未上架。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
-    <meta
-      name="twitter:image:alt"
-      content="Corresync 标志及其本地、供应商中立的 MCP 定位。"
-    >
+    <meta name="twitter:image:alt" content="Corresync 标志和本地 MCP 服务器说明。">
     <link rel="canonical" href="https://corresync.org/zh-cn/integrations.html">
     <link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html">
     <link rel="alternate" hreflang="ja" href="https://corresync.org/ja/integrations.html">
@@ -71,8 +59,8 @@
       <div class="header-navs">
         <nav class="site-nav" aria-label="主导航">
           <a href="./">首页</a>
-          <a href="getting-started.html">开始使用</a>
-          <a href="providers.html">服务商</a>
+          <a href="getting-started.html">快速开始</a>
+          <a href="providers.html">支持服务</a>
           <a href="features.html">功能</a>
           <a href="integrations.html" aria-current="page">AI 集成</a>
           <a href="safety.html">安全</a>
@@ -95,26 +83,27 @@
 
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>不夸大能力的 AI 集成</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>AI 智能体集成</p>
         <h1 id="page-title">
-          在常用代理中使用 Corresync。 <em>封装方式与发布状态一目了然。</em>
+          在常用的智能体中使用 Corresync。 <em
+          >封装方式和发布状态见下表。</em>
         </h1>
         <p class="lede">
-          Corresync 通过 stdio 连接本机 AI 代理。本表分别标明直接 MCP
-          配置、Skill、原生封装、仓库源码和官方市场上架情况，不会把“兼容”说成“已官方上架”。
+          Corresync 通过 stdio 连接本机的 AI 智能体。下表分别列出直接 MCP
+          配置、Skill、原生封装、仓库源码和官方市场上架情况。客户端兼容不等于已在官方市场上架。
         </p>
         <div class="actions">
-          <a class="button primary" href="getting-started.html">配置检测到的代理</a>
-          <a class="button secondary" href="#matrix">查看完整矩阵</a>
+          <a class="button primary" href="getting-started.html">配置检测到的智能体</a>
+          <a class="button secondary" href="#matrix">查看表格</a>
         </div>
       </section>
 
       <section class="publication-snapshot" aria-labelledby="snapshot-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>版本快照</p>
-          <h2 id="snapshot-title">三个版本号，代表三个不同事实。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>版本</p>
+          <h2 id="snapshot-title">三个版本号</h2>
           <p>
-            开发中的源码可能领先于最新稳定版，外部注册表也可能仍显示较早的已验证记录，因此这里刻意分开呈现。
+            仓库源码可能比最新稳定版更新，外部注册表也可能还显示之前核验过的旧版本，所以三者分开显示。
           </p>
         </div>
         <dl class="version-strip">
@@ -127,7 +116,7 @@
             <dd><code>0.8.6</code></dd>
           </div>
           <div>
-            <dt>MCP Registry 实测</dt>
+            <dt>MCP Registry 上的版本</dt>
             <dd><code>0.8.6</code></dd>
           </div>
         </dl>
@@ -135,10 +124,10 @@
 
       <section id="matrix" class="publication-matrix" aria-labelledby="matrix-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>发布矩阵</p>
-          <h2 id="matrix-title">现在能在哪里获得什么。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>发布情况</p>
+          <h2 id="matrix-title">各渠道的提供情况</h2>
           <p>
-            所有可用集成都只在本机运行。“源码可用”仅表示本仓库含有经过审查的封装，并不代表上游厂商已上架或背书。
+            下列集成都在本机运行。“源码可用”只表示本仓库中有经过审查的封装，不代表上游厂商已上架或认可。
           </p>
         </div>
         <div class="legal-table-wrap publication-table-wrap">
@@ -330,14 +319,14 @@
 
       <section class="tinted-section publication-meanings" aria-labelledby="meaning-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>按字面理解状态</p>
-          <h2 id="meaning-title">兼容、封装和发布互不等同。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>状态说明</p>
+          <h2 id="meaning-title">兼容、封装和发布是三回事</h2>
         </div>
         <div class="benefit-grid publication-card-grid">
           <article class="benefit-card featured">
             <span class="publication-state published">已发布</span><h3>已发布</h3>
             <p>
-              已核验所示版本的外部公开记录。稳定版自动化在发布后还会再次核对。
+              已核验所示版本的外部公开记录。稳定版发布流程会在发布后再核验一次。
             </p>
           </article>
           <article class="benefit-card">
@@ -345,14 +334,14 @@
               源码可用
             </h3>
             <p>
-              仓库会生成并测试带版本的原生封装，但不声称已进入厂商官方目录。
+              仓库会生成并测试带版本号的原生封装，但不声称已进入厂商的官方目录。
             </p>
           </article>
           <article class="benefit-card">
             <span class="publication-state not_listed">尚未上架</span><h3>尚未上架</h3>
             <p>
-              目前可用 corr setup 完成经过审查的直接 MCP
-              配置；原生元数据和上游审核就绪后才会提交。
+              可以用 corr setup 完成经过审查的直接 MCP
+              配置。原生元数据和上游审核就绪后才会提交上架。
             </p>
           </article>
         </div>
@@ -360,33 +349,34 @@
 
       <section class="honest-edges publication-boundary" aria-labelledby="boundary-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>本地就是本地</p>
-          <h2 id="boundary-title">目录上架不会自动启用云端代理或私有隧道。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>只在本地运行</p>
+          <h2 id="boundary-title">上架目录不会启用云端智能体或私有隧道</h2>
         </div>
         <div>
           <p>
             Corresync 只提供本地 stdio
-            服务和本地账户状态。即使存在插件格式，托管版
-            ChatGPT、云端代理、Kiro Web 和远程沙箱也无法直接访问。
+            服务和本地账号状态。即使有对应的插件格式，托管版
+            ChatGPT、云端智能体、Kiro Web 和远程沙箱也无法访问它。
           </p>
           <p class="fine-print">
             托管中继或私有 MCP
-            隧道会形成新的数据路径，必须另行完成架构决策、明确同意、隐私披露、撤销设计和安全审查。
+            隧道会带来新的数据路径，需要单独的架构决策、同意、隐私说明、撤销机制和安全审查。
           </p>
         </div>
       </section>
 
       <section class="final-cta" aria-labelledby="integrations-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>最快的开始方式</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>开始使用</p>
         <h2 id="integrations-cta-title">
-          让 corr setup 检测并连接这台设备上的代理。
+          运行 corr setup，检测并连接本机上的智能体
         </h2>
         <p>
-          矩阵用于查阅；引导命令仍是自然入口，并且只会提供经过审查的本地路径。
+          此表仅供查阅。初次配置请运行 corr
+          setup，它只会提供经过审查的本地连接方式。
         </p>
         <div class="actions centered">
-          <a class="button primary" href="getting-started.html">打开入门指南</a>
-          <a class="button secondary" href="providers.html">检查服务商路径</a>
+          <a class="button primary" href="getting-started.html">打开快速开始</a>
+          <a class="button secondary" href="providers.html">查看各服务商的连接方式</a>
         </div>
       </section>
     </main>
@@ -400,19 +390,18 @@
           height="64"
         ><span class="brand-name">corresync</span></a>
       <p>
-        独立的本地优先邮件、日历和任务工具。与此处提到的服务商或 AI
-        代理厂商没有隶属或背书关系。
+        独立开发的本地邮件、日历和任务工具，与本页提到的服务商或 AI
+        智能体厂商没有隶属或背书关系。
       </p>
       <nav aria-label="页脚">
-        <a href="getting-started.html">开始使用</a><a href="providers.html">服务商</a><a
+        <a href="getting-started.html">快速开始</a><a href="providers.html">支持服务</a><a
           href="features.html"
         >功能</a><a href="integrations.html">AI 集成</a><a href="safety.html">安全</a><a
           href="privacy.html"
-        >隐私</a><a href="terms.html">使用条款</a><a
-          href="https://github.com/nkiyohara/corresync"
-        >GitHub 源码</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new"
-        >安全报告</a><a href="https://github.com/nkiyohara/corresync/releases"
-        >版本发布</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        >隐私</a><a href="terms.html">条款</a><a href="https://github.com/nkiyohara/corresync"
+        >源代码</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >安全报告</a><a href="https://github.com/nkiyohara/corresync/releases">发布</a><a
+          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
         >Apache-2.0</a>
       </nav>
     </footer>
