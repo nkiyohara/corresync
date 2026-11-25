@@ -1,0 +1,887 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "provider": "microsoft-owa",
+      "providerName": "Microsoft Outlook on the web",
+      "route": "outlook_web",
+      "service": "mail",
+      "availability": "available",
+      "authentication": "browser-session",
+      "deterministicEvidence": {
+        "summary": "Synthetic typed wire contracts for folders, list, search pagination, body, attachments, drafts, send, move, read state, and delete",
+        "tests": ["internal/provider/outlookweb", "internal/application/mail_test.go"]
+      },
+      "liveEvidence": {
+        "state": "historical-not-commit-bound",
+        "summary": "Microsoft 365 notes from 2026-07-18, 2026-07-19, and 2026-07-25 did not record the exact commit; a content-free v0.9.0-rc.4 check found that consumer accounts use an unsupported authorization scheme"
+      },
+      "notes": "Microsoft 365 work or school accounts. Consumer Outlook.com discovery is closed; Outlook.com uses `microsoft-graph`.",
+      "issue": 36
+    },
+    {
+      "provider": "microsoft-owa",
+      "providerName": "Microsoft Outlook on the web",
+      "route": "outlook_web",
+      "service": "calendar",
+      "availability": "available",
+      "authentication": "browser-session",
+      "deterministicEvidence": {
+        "summary": "Synthetic typed wire contracts for primary-calendar list, create, update, cancel, recurrence, reminders, attendees, and Teams join links",
+        "tests": ["internal/provider/outlookweb", "internal/application/calendar_test.go"]
+      },
+      "liveEvidence": {
+        "state": "historical-not-commit-bound",
+        "summary": "Microsoft 365 notes from 2026-07-18, 2026-07-19, and 2026-07-25 did not record the exact commit"
+      },
+      "notes": "A Teams join link is returned only by a reviewed event creation when the calendar advertises that capability; calendar list does not reliably return it.",
+      "issue": 36
+    },
+    {
+      "provider": "microsoft-graph",
+      "providerName": "Microsoft Graph",
+      "route": "microsoft_graph",
+      "service": "mail",
+      "availability": "available-with-setup",
+      "authentication": "user-oauth-client",
+      "deterministicEvidence": {
+        "summary": "Synthetic REST and application integration contracts",
+        "tests": ["internal/provider/graphapi"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "Your own public OAuth client with service-derived scopes. Global, GCC High, and DoD use closed endpoint and authority pairs.",
+      "issue": 36
+    },
+    {
+      "provider": "microsoft-graph",
+      "providerName": "Microsoft Graph",
+      "route": "microsoft_graph",
+      "service": "calendar",
+      "availability": "available-with-setup",
+      "authentication": "user-oauth-client",
+      "deterministicEvidence": {
+        "summary": "Synthetic REST, time-zone, DST, and application integration contracts, including typed Teams-link creation",
+        "tests": ["internal/provider/graphapi"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "Selectable calendars and typed Teams-link creation as an event property.",
+      "issue": 36
+    },
+    {
+      "provider": "google",
+      "providerName": "Google (Gmail and Google Calendar APIs)",
+      "route": "google",
+      "service": "mail",
+      "availability": "available-with-setup",
+      "authentication": "user-oauth-client",
+      "deterministicEvidence": {
+        "summary": "Synthetic Gmail REST, credential-import, OAuth, migration, and application integration contracts",
+        "tests": ["internal/provider/googleapi", "internal/googleoauthclient"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation of this route; the 2026-07-30 macOS arm64 record covers only the retired IMAP/SMTP transport"
+      },
+      "notes": "Your own Google Desktop OAuth client. Adding the account starts no OAuth; explicit local login does.",
+      "issue": 36
+    },
+    {
+      "provider": "google",
+      "providerName": "Google (Gmail and Google Calendar APIs)",
+      "route": "google",
+      "service": "calendar",
+      "availability": "available-with-setup",
+      "authentication": "user-oauth-client",
+      "deterministicEvidence": {
+        "summary": "Synthetic Calendar REST, time-zone, all-day, OAuth, and application integration contracts, including the Google Meet field",
+        "tests": ["internal/provider/googleapi", "internal/googleoauthclient"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation of this route"
+      },
+      "notes": "Selectable calendars; Google Meet creation only after the calendar capability is observed.",
+      "issue": 36
+    },
+    {
+      "provider": "google",
+      "providerName": "Google (Gmail and Google Calendar APIs)",
+      "route": "managed_oauth",
+      "service": "mail",
+      "availability": "disabled",
+      "authentication": "managed-oauth-client",
+      "deterministicEvidence": {
+        "summary": "The release-owned gate stays closed; no setting can open it",
+        "tests": ["internal/compatcatalog/drift_test.go"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation"
+      },
+      "notes": "A Corresync-owned Google client needs an approved client and opt-in live evidence first."
+    },
+    {
+      "provider": "google",
+      "providerName": "Google (Gmail and Google Calendar APIs)",
+      "route": "managed_oauth",
+      "service": "calendar",
+      "availability": "disabled",
+      "authentication": "managed-oauth-client",
+      "deterministicEvidence": {
+        "summary": "The release-owned gate stays closed; no setting can open it",
+        "tests": ["internal/compatcatalog/drift_test.go"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation"
+      },
+      "notes": "A Corresync-owned Google client needs an approved client and opt-in live evidence first."
+    },
+    {
+      "provider": "google-web",
+      "providerName": "Google web adapter (legacy)",
+      "route": "google_web",
+      "service": "mail",
+      "availability": "unsupported",
+      "authentication": "browser-session",
+      "deterministicEvidence": {
+        "summary": "Synthetic semantic-DOM contracts retained; runtime sign-in stops before browser launch",
+        "tests": ["internal/provider/googleweb"]
+      },
+      "liveEvidence": {
+        "state": "rejected",
+        "summary": "Google rejected the software-controlled browser sign-in on 2026-07-29"
+      },
+      "notes": "Kept only to handle v0.8.0 and v0.8.1 configuration safely. Use the `google` route.",
+      "issue": 59
+    },
+    {
+      "provider": "google-web",
+      "providerName": "Google web adapter (legacy)",
+      "route": "google_web",
+      "service": "calendar",
+      "availability": "unsupported",
+      "authentication": "browser-session",
+      "deterministicEvidence": {
+        "summary": "Synthetic semantic-DOM contracts retained; runtime sign-in stops before browser launch",
+        "tests": ["internal/provider/googleweb"]
+      },
+      "liveEvidence": {
+        "state": "rejected",
+        "summary": "Google rejected the software-controlled browser sign-in on 2026-07-29"
+      },
+      "notes": "Kept only to handle v0.8.0 and v0.8.1 configuration safely. Use the `google` route.",
+      "issue": 59
+    },
+    {
+      "provider": "jmap",
+      "providerName": "JMAP",
+      "route": "jmap",
+      "service": "mail",
+      "availability": "available-with-setup",
+      "authentication": "external-credential",
+      "deterministicEvidence": {
+        "summary": "Synthetic RFC 8620 session, query, and write contracts",
+        "tests": ["internal/provider/jmap"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "Server-specific behavior is reported through observed capabilities and degradations.",
+      "issue": 36
+    },
+    {
+      "provider": "imap-smtp",
+      "providerName": "IMAP and SMTP",
+      "route": "imap_smtp",
+      "service": "mail",
+      "availability": "available-with-setup",
+      "authentication": "external-credential",
+      "deterministicEvidence": {
+        "summary": "Synthetic protocol, MIME, bounded-literal, and capability contracts",
+        "tests": ["internal/provider/imapmail"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "Server-specific behavior is reported through observed capabilities and degradations.",
+      "issue": 36
+    },
+    {
+      "provider": "pop3",
+      "providerName": "POP3",
+      "route": "pop3",
+      "service": "mail",
+      "availability": "unsupported",
+      "authentication": "external-credential",
+      "deterministicEvidence": {
+        "summary": "None; the identifier is reserved in discovery and configuration validation"
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation"
+      },
+      "notes": "Reserved unavailable identifier; its presence is not an adapter claim."
+    },
+    {
+      "provider": "caldav",
+      "providerName": "CalDAV",
+      "route": "caldav",
+      "service": "calendar",
+      "availability": "available-with-setup",
+      "authentication": "external-credential",
+      "deterministicEvidence": {
+        "summary": "Synthetic WebDAV, iCalendar, and conditional-write contracts",
+        "tests": [
+          "internal/provider/caldav/client_test.go",
+          "internal/provider/caldav/calendar_inherited_allday_test.go"
+        ]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "Independent from the CalDAV VTODO task route.",
+      "issue": 36
+    },
+    {
+      "provider": "apple-icloud",
+      "providerName": "Apple iCloud (guided preset)",
+      "route": "imap_smtp",
+      "service": "mail",
+      "availability": "available-with-setup",
+      "authentication": "external-credential",
+      "deterministicEvidence": {
+        "summary": "Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts",
+        "tests": ["internal/discovery", "cmd/corr"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "A guided preset over the `imap-smtp` route, not a separate adapter. Needs an Apple app-specific password entered through the OS-owned prompt.",
+      "issue": 36
+    },
+    {
+      "provider": "apple-icloud",
+      "providerName": "Apple iCloud (guided preset)",
+      "route": "caldav",
+      "service": "calendar",
+      "availability": "available-with-setup",
+      "authentication": "external-credential",
+      "deterministicEvidence": {
+        "summary": "Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts",
+        "tests": ["internal/discovery", "cmd/corr"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "A guided preset over the `caldav` route, not a separate adapter. Shares one credential handle with Mail by default.",
+      "issue": 36
+    },
+    {
+      "provider": "microsoft-graph",
+      "providerName": "Microsoft Graph",
+      "route": "microsoft_graph",
+      "service": "tasks",
+      "availability": "available-with-setup",
+      "authentication": "user-oauth-client",
+      "deterministicEvidence": {
+        "summary": "Synthetic OAuth, national-cloud, REST CRUD and delta, recurrence and time-zone, cursor-restart, and application integration contracts",
+        "tests": [
+          "internal/provider/graphapi/task_test.go",
+          "internal/application/task_service_test.go"
+        ]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "An opt-in read-only harness exists; no record has been committed"
+      },
+      "notes": "Microsoft To Do. Microsoft Graph operated by 21Vianet is rejected before OAuth.",
+      "issue": 108,
+      "taskContract": {
+        "crudState": "synthetic; read-only or CRUD/state",
+        "reminderRecurrence": "one absolute reminder; portable recurrence plus exact provider-rule preservation",
+        "hierarchyMetadata": "checklist, categories, typed linked sources; no assignments",
+        "timeContract": "zoned datetime; Windows names canonicalized through pinned CLDR",
+        "sync": "delta with safe reset"
+      }
+    },
+    {
+      "provider": "microsoft-web-tasks",
+      "providerName": "Outlook Web and Exchange Tasks",
+      "route": "microsoft_web_tasks",
+      "service": "tasks",
+      "availability": "planned",
+      "authentication": "browser-session",
+      "deterministicEvidence": {
+        "summary": "None; provider identifier reserved"
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation"
+      },
+      "notes": "Configuration accepts the provider only; the adapter is unavailable.",
+      "issue": 109,
+      "taskContract": {
+        "crudState": "phased target; delete requires ambiguity evidence",
+        "reminderRecurrence": "observe",
+        "hierarchyMetadata": "modern To Do fields limited",
+        "timeContract": "observe",
+        "sync": "bounded polling"
+      }
+    },
+    {
+      "provider": "todoist",
+      "providerName": "Todoist",
+      "route": "todoist",
+      "service": "tasks",
+      "availability": "available-with-setup",
+      "authentication": "user-oauth-client",
+      "deterministicEvidence": {
+        "summary": "Synthetic public-client OAuth, refresh rotation, API v1 REST and Sync CRUD, plan, time, temporary-ID, cursor and isolation, and application integration contracts",
+        "tests": ["internal/provider/todoist"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "An opt-in harness exists; no record has been committed"
+      },
+      "notes": "Your own public client with PKCE. No personal API token or client secret is accepted.",
+      "issue": 110,
+      "taskContract": {
+        "crudState": "synthetic; read-only or CRUD/state",
+        "reminderRecurrence": "relative/absolute reminders; exact provider recurrence; plan-sensitive",
+        "hierarchyMetadata": "subtasks, labels, one assignee; sections/duration/comments degraded",
+        "timeContract": "date/floating/zoned schedule plus date-only deadline",
+        "sync": "bounded sync token; no webhook"
+      }
+    },
+    {
+      "provider": "caldav",
+      "providerName": "CalDAV",
+      "route": "caldav",
+      "service": "tasks",
+      "availability": "available-with-setup",
+      "authentication": "external-credential",
+      "deterministicEvidence": {
+        "summary": "Synthetic RFC 5545 mapping, WebDAV ETag writes, RFC 6578 sync and reset, account and session isolation, and extension-preservation contracts",
+        "tests": ["internal/provider/caldav/task_test.go"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation on a real server"
+      },
+      "notes": "VTODO collections; independent consent and session from the CalDAV calendar route.",
+      "issue": 111,
+      "taskContract": {
+        "crudState": "synthetic with strong ETag",
+        "reminderRecurrence": "VTODO recurrence and alarms",
+        "hierarchyMetadata": "RELATED-TO parents and categories; assignment unavailable",
+        "timeContract": "date, floating, and zoned datetime",
+        "sync": "RFC 6578 sync token with reset"
+      }
+    },
+    {
+      "provider": "google-tasks",
+      "providerName": "Google Tasks",
+      "route": "google_tasks",
+      "service": "tasks",
+      "availability": "available-with-setup",
+      "authentication": "user-oauth-client",
+      "deterministicEvidence": {
+        "summary": "Synthetic REST, identity, independent-scope, OAuth, ETag, assigned-task, polling and reset, and application integration contracts",
+        "tests": ["internal/provider/googletasks"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "Your own Google Desktop OAuth client with a task-only grant that never widens a Gmail or Calendar grant.",
+      "issue": 112,
+      "taskContract": {
+        "crudState": "synthetic through user-owned Desktop OAuth; strong ETag and assigned-task restrictions",
+        "reminderRecurrence": "unavailable",
+        "hierarchyMetadata": "subtasks, ordering, output-only source links; no labels",
+        "timeContract": "due is date-only",
+        "sync": "bounded `updatedMin` polling with reset"
+      }
+    },
+    {
+      "provider": "apple-reminders",
+      "providerName": "Apple Reminders",
+      "route": "apple_reminders",
+      "service": "tasks",
+      "availability": "planned",
+      "authentication": "os-permission",
+      "deterministicEvidence": {
+        "summary": "None; provider identifier reserved"
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation"
+      },
+      "notes": "Configuration accepts the provider only; the adapter is unavailable.",
+      "issue": 113,
+      "taskContract": {
+        "crudState": "target after explicit full Reminders permission",
+        "reminderRecurrence": "recurrence and alarms target",
+        "hierarchyMetadata": "URL target; hierarchy/labels observe",
+        "timeContract": "EventKit components require exact mapping",
+        "sync": "local notification then bounded refetch"
+      }
+    },
+    {
+      "provider": "ticktick",
+      "providerName": "TickTick",
+      "route": "ticktick",
+      "service": "tasks",
+      "availability": "available-with-setup",
+      "authentication": "user-oauth-client",
+      "deterministicEvidence": {
+        "summary": "Synthetic confidential-client OAuth, transient-secret, REST CRUD and search, time, recurrence, assignment, permission, bounds, polling and tombstone, cursor and isolation, and application integration contracts",
+        "tests": ["internal/provider/ticktick"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "An opt-in read-only harness exists; no record has been committed"
+      },
+      "notes": "Your own confidential client; its secret stays behind a separate external-credential consent. Identity, refresh, atomic-write, reopen, reminder, and complete-pagination gaps are reported.",
+      "issue": 114,
+      "taskContract": {
+        "crudState": "synthetic; read-only or create/update/complete/delete; no reopen",
+        "reminderRecurrence": "exact provider recurrence; reminder replacement unavailable",
+        "hierarchyMetadata": "subtasks/checklists, labels, ordering, one assignee; comments/focus degraded",
+        "timeContract": "date or IANA-zoned datetime",
+        "sync": "bounded full-snapshot polling; no webhook"
+      }
+    },
+    {
+      "provider": "anydo-mcp",
+      "providerName": "Any.do (remote MCP)",
+      "route": "anydo_mcp",
+      "service": "tasks",
+      "availability": "planned",
+      "authentication": "upstream-mcp",
+      "deterministicEvidence": {
+        "summary": "None; provider identifier reserved"
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation"
+      },
+      "notes": "Configuration accepts the provider only; the adapter is unavailable.",
+      "issue": 115,
+      "taskContract": {
+        "crudState": "allowlisted negotiated tools only",
+        "reminderRecurrence": "observe from reviewed schema",
+        "hierarchyMetadata": "personal/workspace/calendar/grocery distinctions required",
+        "timeContract": "observe",
+        "sync": "upstream MCP; no implicit retry"
+      }
+    },
+    {
+      "provider": "things",
+      "providerName": "Things 3",
+      "route": "things",
+      "service": "tasks",
+      "availability": "planned",
+      "authentication": "local-automation",
+      "deterministicEvidence": {
+        "summary": "None; provider identifier reserved"
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation"
+      },
+      "notes": "Configuration accepts the provider only; the adapter is unavailable.",
+      "issue": 116,
+      "taskContract": {
+        "crudState": "documented local automation only; one-way operations explicit",
+        "reminderRecurrence": "observe",
+        "hierarchyMetadata": "tags and deep links target; unsupported fields reviewed",
+        "timeContract": "observe",
+        "sync": "bounded polling/local invalidation"
+      }
+    },
+    {
+      "provider": "omnifocus",
+      "providerName": "OmniFocus",
+      "route": "omnifocus",
+      "service": "tasks",
+      "availability": "planned",
+      "authentication": "local-automation",
+      "deterministicEvidence": {
+        "summary": "None; provider identifier reserved"
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation"
+      },
+      "notes": "Configuration accepts the provider only; the adapter is unavailable.",
+      "issue": 117,
+      "taskContract": {
+        "crudState": "fixed Omni Automation bridge target",
+        "reminderRecurrence": "recurrence target",
+        "hierarchyMetadata": "projects, hierarchy, tags and deep links target",
+        "timeContract": "defer/due mapping target",
+        "sync": "bounded polling/local invalidation"
+      }
+    },
+    {
+      "provider": "microsoft-teams",
+      "providerName": "Microsoft Teams",
+      "route": "teams_graph",
+      "service": "messages",
+      "availability": "preview",
+      "authentication": "user-oauth-client",
+      "deterministicEvidence": {
+        "summary": "Shared synthetic fixtures; account, workspace, and actor isolation, scope capability observation, cursor binding, malformed result, and preview/commit tests",
+        "tests": [
+          "internal/provider/teamsgraph",
+          "internal/provider/teamscontract",
+          "internal/rollout/messaging_test.go"
+        ]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "Your own Microsoft public client. Graph and Web parity is not yet proven; an account uses exactly one Teams transport.",
+      "issue": 146
+    },
+    {
+      "provider": "microsoft-teams",
+      "providerName": "Microsoft Teams",
+      "route": "teams_web",
+      "service": "messages",
+      "availability": "preview",
+      "authentication": "browser-session",
+      "deterministicEvidence": {
+        "summary": "Shared synthetic fixtures; semantic DOM bounds, account and workspace isolation, cursor binding, and preview/commit tests",
+        "tests": [
+          "internal/provider/teamsweb",
+          "internal/provider/teamscontract",
+          "internal/rollout/messaging_test.go"
+        ]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "Needs a visible browser; terminal login is not supported.",
+      "issue": 146
+    },
+    {
+      "provider": "slack",
+      "providerName": "Slack",
+      "route": "slack_api",
+      "service": "messages",
+      "availability": "disabled",
+      "authentication": "external-credential",
+      "deterministicEvidence": {
+        "summary": "Synthetic Web API contracts for workspace and actor confirmation, installation scopes, bounded cursors and file reads, rate limits, and outcome-unknown writes; release-gate tests",
+        "tests": ["internal/provider/slackapi", "internal/rollout/messaging_test.go"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No observation"
+      },
+      "notes": "The adapter stays dormant behind the release gate (ADR 0034). Use your agent host's own Slack connector."
+    },
+    {
+      "provider": "mattermost",
+      "providerName": "Mattermost",
+      "route": "mattermost_api",
+      "service": "messages",
+      "availability": "preview",
+      "authentication": "external-credential",
+      "deterministicEvidence": {
+        "summary": "Synthetic v4 REST and WebSocket contracts; DNS pinning, SSRF, redirect, compression, event-flood bounds, role capability observation, and preview/commit tests",
+        "tests": ["internal/provider/mattermostapi", "internal/rollout/messaging_test.go"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "No recorded live observation"
+      },
+      "notes": "One selected public HTTPS origin and team. Attachment sends and ID-bound mention writes are unavailable.",
+      "issue": 148
+    },
+    {
+      "provider": "corresync",
+      "providerName": "CLI, stable JSON, configuration schema v12",
+      "route": "cli_json_config",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Unit, golden, migration, and `NO_COLOR` tests",
+        "tests": ["internal/config", "cmd/corr"]
+      },
+      "liveEvidence": {
+        "state": "historical-not-commit-bound",
+        "summary": "Local-terminal note without an exact commit"
+      }
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Account lifecycle and credential-free discovery",
+      "route": "account_discovery",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Unit, DNS and well-known fixtures, and atomic-store tests",
+        "tests": [
+          "internal/discovery",
+          "internal/accountstore",
+          "internal/application/account_discovery_test.go"
+        ]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      },
+      "notes": "Discovery never starts OAuth or an administrator-consent flow."
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Public domain-only compatibility checker",
+      "route": "public_checker",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Browser privacy and source checks; DNS, CORS, bounds, redirect, failure, and SSRF fixtures",
+        "tests": ["web/discovery-worker/test", "site/check.test.cjs"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      },
+      "notes": "No provider authentication; a result is a hint, not a capability."
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Authenticated local IPC",
+      "route": "local_ipc",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Unix adversarial tests, Windows contracts, and cross-build",
+        "tests": ["internal/localipc", "internal/daemonapi"]
+      },
+      "liveEvidence": {
+        "state": "historical-not-commit-bound",
+        "summary": "macOS arm64 note without an exact commit"
+      }
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Cross-account search and agenda",
+      "route": "cross_account_projection",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Isolation, ordering, bounds, and partial-failure tests",
+        "tests": [
+          "internal/application/projection_test.go",
+          "internal/application/projection_pagination_test.go"
+        ]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      }
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Canonical task model, CLI, MCP, IPC, and cross-account projection",
+      "route": "task_model",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests",
+        "tests": [
+          "internal/application/task_contract_test.go",
+          "internal/application/task_service_test.go",
+          "cmd/corr"
+        ]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      },
+      "notes": "Each task provider route is listed in the Tasks table."
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Private saved mail and calendar queries",
+      "route": "saved_queries",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Account isolation, strict bounded store, revision race, corrupt purge, CLI and MCP schema, live freshness, and resource-bound tests",
+        "tests": ["internal/savedquerystore", "internal/application/saved_query_test.go"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      },
+      "notes": "Definitions only; provider results are never persisted."
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Account and service recovery and provider drift",
+      "route": "recovery",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Per-lease invalidation, concurrency and drain, preview and monitor cleanup, stateless API retry and circuit, throttle, browser-owner loss, and content-free error tests",
+        "tests": ["internal/session", "internal/provider/restapi"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      },
+      "issue": 45
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Provider-neutral messaging model, schema, and release gate",
+      "route": "messaging_model",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Shared synthetic fixtures; isolation, Graph and Web parity, capability observation, cursor binding, and preview/commit tests",
+        "tests": [
+          "internal/application/message_contract_test.go",
+          "internal/application/message_service_test.go",
+          "internal/rollout"
+        ]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      },
+      "notes": "Route availability is listed in the Messages table.",
+      "issue": 149
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Read-only import staging",
+      "route": "import_staging",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Format, identity, traversal, symlink, and bound tests",
+        "tests": ["internal/importstage", "internal/application/import_test.go"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      }
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Monitoring, queue, and local runner",
+      "route": "monitoring",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Consent, recovery, deduplication, loop, rate, and circuit tests",
+        "tests": [
+          "internal/eventqueue",
+          "internal/dispatch",
+          "internal/application/monitor_engine_test.go"
+        ]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      },
+      "notes": "Separate opt-in that defaults to off; MCP cannot enable it."
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Redacted feedback",
+      "route": "feedback",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Allowlist, secret corpus, malformed and oversized input, and action-order tests",
+        "tests": ["internal/feedback"]
+      },
+      "liveEvidence": {
+        "state": "historical-not-commit-bound",
+        "summary": "Local-terminal note without an exact commit"
+      }
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Local agent-host detection",
+      "route": "agent_host_detection",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Catalog validation; Unix, Windows, and macOS path, manager, app, symlink, cache, timeout, cancellation, and secret-free JSON fixtures",
+        "tests": ["internal/agenthost"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Not run"
+      }
+    },
+    {
+      "provider": "corresync",
+      "providerName": "MCP clients",
+      "route": "mcp_clients",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Native setup-plan and schema tests",
+        "tests": ["internal/mcpserver", "internal/integrationlifecycle"]
+      },
+      "liveEvidence": {
+        "state": "historical-not-commit-bound",
+        "summary": "Codex and Claude notes without an exact commit"
+      }
+    },
+    {
+      "provider": "corresync",
+      "providerName": "Distribution",
+      "route": "distribution",
+      "service": "boundary",
+      "availability": "available",
+      "authentication": "none",
+      "deterministicEvidence": {
+        "summary": "Archive, package, SBOM, and inventory verification in candidate and tag workflows; the tagged release workflow and published assets are release-bound",
+        "tests": ["tools/releaseverify", "tools/catalogrender"]
+      },
+      "liveEvidence": {
+        "state": "not-run",
+        "summary": "Release-bound workflow evidence does not cover provider or native-platform observations"
+      },
+      "issue": 50
+    }
+  ]
+}
