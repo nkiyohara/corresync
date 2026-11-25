@@ -12,11 +12,11 @@
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync — メール・予定・タスクをひとつのローカルMCPへ"
+      content="Corresync — メール・予定・タスクを扱うローカルのMCPサーバーとCLI"
     >
     <meta
       property="og:description"
-      content="仕事用も個人用も、メール、予定、タスクをひとつのローカルCLIとMCPへ。アカウントごとの認証と接続方法は分離したままです。"
+      content="仕事用と個人用のメール、予定、タスクをローカルのCLIとMCPサーバーで扱えます。サインインと接続方法はアカウントごとに分かれています。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -36,11 +36,11 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta
       name="twitter:title"
-      content="Corresync — メール・予定・タスクをひとつのローカルMCPへ"
+      content="Corresync — メール・予定・タスクを扱うローカルのMCPサーバーとCLI"
     >
     <meta
       name="twitter:description"
-      content="メール、予定、タスクをひとつのローカルCLIとMCPへ。アカウントごとの認証は分離したままです。"
+      content="メール、予定、タスクをローカルのCLIとMCPサーバーで扱えます。サインインはアカウントごとに分かれています。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -80,7 +80,7 @@
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
           "inLanguage": "ja",
-          "description": "メール、カレンダー、タスクの複数アカウントを分離して扱う、ローカルファーストでプロバイダー中立なMCPサーバーとCLI。"
+          "description": "メール、カレンダー、タスクの複数アカウントをアカウントごとに分けて扱う、ローカルで動くMCPサーバーとCLIです。特定のプロバイダーに依存しません。"
         }
       ]
     }
@@ -125,19 +125,18 @@
             <span aria-hidden="true"></span>メール · カレンダー · タスク
           </p>
           <h1 id="hero-title">
-            仕事のやり取りを、<em>ひとつのローカルMCPから。</em>
+            メール・予定・タスクのための<em>ローカルMCPサーバーとCLI</em>
           </h1>
           <p class="lede">
             仕事用と個人用のメール、予定、タスクを、Codex、Claude
-            Code、MCP対応エージェント、そして普段のターミナルへ。アカウントごとの本人性と認可は混ぜずに、
-            探す、整理する、返す、実行するをひとつの型付きインターフェースにまとめます。
+            Code、その他のMCP対応エージェント、ターミナルから扱えます。検索、整理、返信、送信などは共通のツールで行い、サインインと権限はアカウントごとに分けて管理します。
           </p>
           <p class="hero-providers">
-            <strong>いつものサービスを、いつもの認証のまま：</strong>Outlook ·
-            Gmail · Google カレンダー · Microsoft To Do · Todoist · TickTick ·
-            オープン標準。接続経路と機能はアカウントごとに明示します。<a
+            <strong>対応サービス：</strong>Outlook · Gmail · Googleカレンダー ·
+            Microsoft To Do · Todoist · TickTick ·
+            オープン標準。使える接続方法と機能はアカウントごとに表示します。<a
               href="providers.html"
-            >サービス別の詳細を見る</a>。
+            >サービス別の詳細</a>
           </p>
           <div class="actions">
             <a class="button primary" href="#install">AI エージェントでセットアップ</a>
@@ -145,23 +144,20 @@
             >メールアドレスで対応状況を確認</a>
           </div>
           <p class="hero-note">
-            サインインはブラウザまたはOSキーチェーンが担当し、エージェントが認証情報を持つことはありません。
-            Corresyncの中継サーバーもありません。送信などの重要な操作は、正確なプレビューを確認してから確定します。
+            サインインはブラウザまたはOSキーチェーンの中で行われ、Corresyncが扱う認証情報をエージェントが持つことはありません。Corresyncの中継サーバーもありません。送信などの操作は、プレビューを確認して承認するまで実行されません。
           </p>
         </div>
 
         <div class="install-panel" id="install" aria-labelledby="install-title">
           <div class="install-head">
-            <h2 id="install-title">Corresync をセットアップ</h2>
+            <h2 id="install-title">セットアップ</h2>
             <p>
-              いつもの AI エージェントで、このコンピューターに Corresync
-              をインストールまたは更新できます。各手順はご自身で確認できます。
+              手元のAIエージェントを使って、このコンピューターにCorresyncをインストール・更新できます。各手順は自分で確認できます。
             </p>
           </div>
           <div class="agent-setup">
             <p>
-              おすすめはスタンドアロン版 CLI
-              です。新規セットアップでは、検証済みの自動更新をオンにします。インストール済みの場合は、ご自身で変更しない限り、パッケージマネージャーでの管理、既存の設定、自動更新の設定をそのまま引き継ぎます。
+              おすすめはスタンドアロン版のCLIです。新しくセットアップすると、検証済みの自動更新が有効になります。すでにインストールしている場合は、パッケージマネージャーでの管理、既存の設定、自動更新の設定をそのまま引き継ぎます。変更するかどうかは自分で選べます。
             </p>
             <div class="actions">
               <a
@@ -176,14 +172,14 @@
               >Claude でセットアップ</a>
             </div>
             <p>
-              お使いのデスクトップアプリを選ぶと、セットアップ依頼が入力された状態で開きます。内容を確認してから、ご自身で送信してください。
+              使っているデスクトップアプリのボタンを押すと、セットアップ依頼が入力された状態でアプリが開きます。内容を確認してから自分で送信してください。
             </p>
             <p class="install-note">
-              このコンピューターを操作できる ChatGPT Codex または Claude Code
-              のデスクトップアプリが必要です。権限の確認が表示されたら承認してください。管理者権限は不要です。アカウントへのサインインと多要素認証はご自身で行ってください。パスワードや確認コードをチャットに貼り付けないでください。
+              このコンピューターを操作できるChatGPT CodexまたはClaude
+              Codeのデスクトップアプリが必要です。権限の確認が表示されたら承認してください。管理者権限は不要です。アカウントへのサインインと多要素認証は自分で行い、パスワードや確認コードはチャットに貼り付けないでください。
             </p>
             <p class="install-note">
-              スマートフォンでご覧の場合は、セットアップするコンピューターでこのページを開くか、手順をコピーしてそのコンピューターに送ってください。
+              スマートフォンで見ている場合は、セットアップするコンピューターでこのページを開くか、手順をコピーしてそのコンピューターに送ってください。
             </p>
             <details class="setup-request">
               <summary>
@@ -199,7 +195,7 @@
             </details>
           </div>
           <details class="manual-setup">
-            <summary>任意：手動インストールとその後の設定手順</summary>
+            <summary>手動でインストールする場合</summary>
             <div class="install-block">
               <p class="os-label" id="install-unix">macOS · Linux</p>
               <div
@@ -243,7 +239,7 @@
               </div>
             </div>
             <div class="install-block">
-              <p class="os-label" id="install-connect">次にガイド付き設定を完了</p>
+              <p class="os-label" id="install-connect">インストール後の設定</p>
               <div class="cmd" data-copy data-copy-label="アカウント設定コマンド">
                 <pre
                   tabindex="0"
@@ -253,8 +249,10 @@
               </div>
             </div>
             <p class="install-note">
-              現在のローカル状態から再開し、認証情報なしでアカウント候補を探します。アカウントとエージェントの変更は適用前に確認でき、サインインは別の操作です。その他の導入方法やMCPクライアントごとの設定は
-              <a href="getting-started.html">スタートガイド</a>にまとめています。
+              corr
+              setupは、途中まで済んだ設定があればそこから続けます。アカウントの接続方法は認証情報を使わずに調べます。アカウントとエージェントの設定変更は適用前に内容を確認でき、サインインはその後に別の操作で行います。ほかのインストール方法やMCPクライアントごとの設定は<a
+                href="getting-started.html"
+              >スタートガイド</a>にあります。
             </p>
           </details>
         </div>
@@ -263,14 +261,13 @@
       <section class="service-landscape" aria-labelledby="service-landscape-title">
         <div class="section-heading">
           <p class="eyebrow">
-            <span aria-hidden="true"></span>一日の仕事を、ひとつの窓口に
+            <span aria-hidden="true"></span>対応サービス
           </p>
           <h2 id="service-landscape-title">
-            メールも、予定も、タスクも。サインイン方法はそのまま。
+            今のサインイン方法のまま使えるサービス
           </h2>
           <p>
-            自分で管理するアカウントを、ひとつのローカルCLIとMCPサーバーから扱えます。
-            機能はサービスやアカウントによって異なるため、設定では接続方法と利用範囲を明確に示します。
+            自分で管理しているアカウントを、ローカルのCLIとMCPサーバーから扱えます。使える機能はサービスやアカウントによって違うため、設定時に接続方法と使える範囲を表示します。
           </p>
         </div>
         <div class="service-grid">
@@ -360,21 +357,21 @@
         </p>
       </section>
 
-      <section class="trust-row" aria-label="Corresyncを選ぶ理由">
+      <section class="trust-row" aria-label="主な特徴">
         <div>
-          <strong>ひとつのMCPで、すべてのアカウントへ</strong>
+          <strong>複数のアカウントをひとつのMCPで</strong>
           <span
-          >仕事用と個人用は分離したまま。結果にはアカウントとプロバイダーが必ず残ります。</span>
+          >仕事用と個人用は分けて扱います。結果にはどのアカウント、どのプロバイダーのものかが表示されます。</span>
         </div>
         <div>
           <strong>認証情報をエージェントに渡さない</strong>
           <span
-          >サインインは見えるブラウザかOSキーチェーン内で完結。外部の中継サーバーもありません。</span>
+          >サインインは画面に表示されるブラウザか、OSキーチェーンの中で済みます。リモートのMCPエンドポイントもありません。</span>
         </div>
         <div>
-          <strong>確認してから、実行</strong>
+          <strong>送信前の確認</strong>
           <span
-          >送信や破壊的操作は、サーバー側で拘束された確認結果を先に返します。承認は一度だけ有効です。</span>
+          >送信や削除などの操作では、サーバーがまず確認用のプレビューを返します。承認は1回しか使えません。</span>
         </div>
       </section>
 
@@ -382,14 +379,12 @@
         <div>
           <p class="eyebrow"><span aria-hidden="true"></span>Google対応について</p>
           <h2 id="policy-callout-title">
-            自分のOAuthクライアントで、Googleをつなげます。
+            Googleは自分のOAuthクライアントで接続します
           </h2>
           <p>
             自分のGoogle
-            CloudプロジェクトにデスクトップOAuthクライアントを作り、
-            ガイド付き設定でJSONを読み込みます。認証情報とアカウントの認可はOSキーチェーンに保存し、
-            Corresync管理版OAuthは無効のままです。<a href="google-oauth.html"
-            >画面付きの手順を見る</a>。
+            CloudプロジェクトでデスクトップOAuthクライアントを作り、ダウンロードしたJSONをガイド付き設定で読み込みます。クライアントの認証情報とアカウントの認可はOSキーチェーンに保存されます。Corresyncが管理するGoogle
+            OAuthは無効のままです。<a href="google-oauth.html">画面付きの手順</a>
           </p>
         </div>
         <div class="actions">
@@ -401,17 +396,18 @@
       <section class="journey" id="quickstart" aria-labelledby="journey-title">
         <div class="section-heading">
           <p class="eyebrow">
-            <span aria-hidden="true"></span>インストール後は3つの短い操作だけ
+            <span aria-hidden="true"></span>インストール後の手順
           </p>
-          <h2 id="journey-title">選ぶ。サインインする。頼む。</h2>
+          <h2 id="journey-title">アカウント追加から質問まで</h2>
           <p>
-            プロバイダーは自動選択されません。まずアドレスから認証なしで候補を調べ、使う経路を明示してから、
-            そのアカウントのサインインを開始します。
+            プロバイダーは自動では選ばれません。まず認証なしでアドレスの接続方法を調べ、使う方法を決めてアカウントを追加します。サインインはその後です。
           </p>
         </div>
         <div class="journey-grid">
           <div class="journey-step">
-            <p class="os-label" id="journey-signin">1 · 選んでサインイン</p>
+            <p class="os-label" id="journey-signin">
+              1 · アカウントを追加してサインイン
+            </p>
             <div
               class="cmd"
               data-copy
@@ -425,7 +421,7 @@
 corr auth login --account personal</code></pre>
             </div>
             <p>
-              候補検索だけでは何も開きません。別のログイン操作が、選択済みの経路を使います。
+              接続方法を調べるだけでは何も開きません。サインインは次のログインコマンドで、選んだ接続方法を使って行います。
             </p>
           </div>
           <div class="journey-step">
@@ -438,11 +434,11 @@ corr auth login --account personal</code></pre>
               ><code>corr mcp setup codex</code></pre>
             </div>
             <p>
-              ローカルのstdioサーバーを登録します。クライアントを一度再起動すれば準備完了です。
+              エージェントにローカルのstdioサーバーを登録します。登録後にクライアントを再起動してください。
             </p>
           </div>
           <div class="journey-step">
-            <p class="os-label" id="journey-ask">3 · 質問する</p>
+            <p class="os-label" id="journey-ask">3 · エージェントに頼む</p>
             <pre
               tabindex="0"
               role="region"
@@ -450,29 +446,29 @@ corr auth login --account personal</code></pre>
             ><code><span class="t-ask">›</span> 今日の正午までに対応が必要なことを、
   全アカウントから教えて</code></pre>
             <p>
-              エージェントは型付きツールを使い、回答には元のアカウントが表示されます。
+              エージェントはCorresyncのツールを呼び出します。回答にはどのアカウントの情報かが表示されます。
             </p>
           </div>
         </div>
         <p class="center-link">
-          <a href="getting-started.html">詳しいスタートガイドを見る<span
-              aria-hidden="true"
-            >
+          <a href="getting-started.html">スタートガイドを読む<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
 
       <section class="outcomes" id="outcomes" aria-labelledby="outcomes-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>最初の日からできること</p>
-          <h2 id="outcomes-title">複数の受信箱と予定を、ひとつの問いで。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>使用例</p>
+          <h2 id="outcomes-title">
+            複数アカウントのメールと予定をまとめて調べる
+          </h2>
           <p>
-            CLIとMCPは、同じ型付き操作、アカウント分離、ポリシーチェックを共有しています。
+            CLIとMCPは同じ処理を呼び出し、アカウントの分離やポリシーのチェックも共通です。以下の例はどちらからでも使えます。
           </p>
         </div>
         <div class="outcome-grid">
           <article class="outcome-card">
-            <h3>すべての受信箱を横断検索</h3>
+            <h3>全アカウントのメール検索</h3>
             <p class="outcome-ask">
               「四半期計画のスレッドを探して。仕事用か個人用かは覚えていない」
             </p>
@@ -485,11 +481,11 @@ corr auth login --account personal</code></pre>
 <span class="t-unread">●</span> <span class="t-dim">work · microsoft-owa</span>  Ana Ruiz  Plan review
 <span class="t-read">·</span> <span class="t-dim">personal · jmap</span>   Finance      Plan receipt</code></pre>
             <p class="outcome-note">
-              一部のアカウントが失敗した場合も、隠さず部分結果として示します。
+              失敗したアカウントがあれば、部分的な結果であることを示します。
             </p>
           </article>
           <article class="outcome-card">
-            <h3>今日の予定をひとつに</h3>
+            <h3>今日の予定の一覧</h3>
             <p class="outcome-ask">
               「仕事と個人、両方のカレンダーから今日の予定を教えて」
             </p>
@@ -503,11 +499,11 @@ corr auth login --account personal</code></pre>
 09:30 <span class="t-dim">work</span>      Design review · Teams
 12:30 <span class="t-dim">personal</span>  Dentist</code></pre>
             <p class="outcome-note">
-              タイムゾーン、カレンダー、プロバイダー情報は各予定に付いたままです。
+              各予定にはタイムゾーン、カレンダー、プロバイダーの情報が付きます。
             </p>
           </article>
           <article class="outcome-card">
-            <h3>送信前に、内容を確認</h3>
+            <h3>送信前の内容確認</h3>
             <p class="outcome-ask">
               「Anaへの返信を下書きして。送信は自分で承認する」
             </p>
@@ -522,25 +518,22 @@ corr auth login --account personal</code></pre>
   body  text/plain · 412 B
 <span class="t-dim">この内容を承認するまで送信されません。</span></code></pre>
             <p class="outcome-note">
-              確定できるのは、確認したアカウント・宛先・本文と完全に一致する操作だけです。
+              確認したときとアカウント、宛先、本文が完全に一致する場合だけ送信できます。
             </p>
           </article>
         </div>
         <p class="center-link">
-          <a href="features.html">できることと制限を、まとめて見る<span
-              aria-hidden="true"
-            >
+          <a href="features.html">できることと制限の一覧<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
 
       <section class="safety safety-preview" aria-labelledby="safety-title">
         <div class="safety-head">
-          <p class="eyebrow light"><span aria-hidden="true"></span>目に見える安全設計</p>
-          <h2 id="safety-title">最初の操作では、送信されません。</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>安全性</p>
+          <h2 id="safety-title">送信は確認してから</h2>
           <p class="safety-lede">
-            影響のある操作はまず確認結果を返します。承認は、呼び出し元、アカウント、プロバイダー、対象、
-            内容、有効期限、一回限りという条件に結び付いています。
+            送信のように結果が残る操作は、最初の呼び出しでは実行されず、確認用のプレビューを返します。承認は、そのときの呼び出し元、アカウント、プロバイダー、対象、内容にだけ有効で、期限があり、1回しか使えません。
           </p>
         </div>
         <div class="safety-body">
@@ -568,25 +561,24 @@ corr auth login --account personal</code></pre>
           <ul class="safety-points">
             <li>
               <strong
-              >エージェントには型付きツールだけ。</strong>パスワード、Cookie、OAuth
-              認可情報はMCPにも設定にも現れません。
+              >エージェントが使えるのはツールだけです。</strong>パスワード、Cookie、OAuthの認可情報は、MCPのツールにも設定ファイルにも出てきません。
             </li>
             <li>
               <strong
-              >処理はローカル。</strong>MCPサーバーは端末上のstdioで動きます。外部中継も遠隔エンドポイントもありません。
+              >ローカルで動きます。</strong>MCPサーバーはこのコンピューター上でstdioを使って動き、外部の中継やリモートのエンドポイントはありません。
             </li>
             <li>
               <strong
-              >結果が不明なら止まる。</strong>成否が曖昧な書き込みを自動再試行しません。
+              >結果がわからない書き込みは再試行しません。</strong>成功したかどうか判断できない書き込みは、自動で再試行せずに止まります。
             </li>
             <li>
               <strong
-              >メール本文は信頼しないデータ。</strong>メールの内容がコマンド実行やエージェント起動の権限になることはありません。
+              >メールの内容は信頼しないデータとして扱います。</strong>メールに何が書かれていても、それを根拠にコマンドの実行やエージェントの起動が許可されることはありません。
             </li>
           </ul>
         </div>
         <p class="safety-links">
-          <a href="safety.html">安全設計を詳しく見る<span aria-hidden="true">
+          <a href="safety.html">安全性について詳しく<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
@@ -594,45 +586,50 @@ corr auth login --account personal</code></pre>
       <section class="provider-preview" aria-labelledby="provider-preview-title">
         <div class="section-heading">
           <p class="eyebrow">
-            <span aria-hidden="true"></span>普段使っている経路を選ぶ
+            <span aria-hidden="true"></span>接続方法
           </p>
           <h2 id="provider-preview-title">
-            必要なら純正API。使えるならオープン標準。
+            各サービスのAPIとオープン標準
           </h2>
           <p>
-            メールとカレンダーは別々に選べるため、IMAP/SMTPとCalDAVを組み合わせることもできます。
+            メールとカレンダーの接続方法は別々に選べます。たとえばメールはIMAP/SMTP、カレンダーはCalDAVという組み合わせもできます。
           </p>
         </div>
         <div class="route-family-grid">
           <article class="route-family">
-            <p class="chip">ブラウザ管理</p>
+            <p class="chip">ブラウザでサインイン</p>
             <h3>Outlook Web</h3>
             <p>
-              Outlookへの対話的なサインインを専用の見えるブラウザに任せ、メールと予定を型付き操作で扱います。
+              Outlookへのサインインは、専用に開く画面付きのブラウザで自分で行います。その後、メールと予定を操作できます。
             </p>
           </article>
           <article class="route-family accent-card">
-            <p class="chip">明示的OAuth</p>
+            <p class="chip">OAuth</p>
             <h3>Microsoft Graph · Googleは自分のクライアントで</h3>
             <p>
-              Graphは許可された公開クライアントを明示的に選べます。Googleは自分のデスクトップOAuthクライアントを使います。
+              Microsoft
+              Graphは、利用を許可されている公開クライアントを指定して使います。Gmail、Googleカレンダー、Google
+              Tasksは、自分のGoogle
+              Cloudプロジェクトで作ったデスクトップOAuthクライアントを使います。
             </p>
           </article>
           <article class="route-family">
             <p class="chip">オープン標準</p>
             <h3>JMAP、IMAP/SMTP、CalDAV</h3>
             <p>
-              暗号化された標準エンドポイントと、OSキーチェーンまたは明示的に許可した認証ヘルパーを使います。
+              暗号化された接続を使います。認証情報はOSキーチェーンか、自分で許可した認証ヘルパーから読み込みます。
             </p>
           </article>
         </div>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span>
           <p>
-            <strong>選ぶ前に、必要な情報がわかります。</strong>
-            サービス一覧には、正確なサインイン方法、設定要件、アカウントごとに異なる機能をまとめています。
+            <strong>追加する前に条件を確認できます。</strong>
+            サービス一覧に、サインイン方法、設定に必要なもの、アカウントによって変わる機能をまとめています。
           </p>
-          <a href="providers.html#check">アドレスを非公開で確認<span aria-hidden="true">
+          <a href="providers.html#check">アドレスの対応状況を確認<span
+              aria-hidden="true"
+            >
               →</span></a>
         </div>
       </section>
@@ -640,36 +637,39 @@ corr auth login --account personal</code></pre>
       <section class="agents" aria-labelledby="agents-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>stdioで動くローカルMCP</p>
-          <h2 id="agents-title">いつものエージェントに、そのままつながる。</h2>
+          <h2 id="agents-title">対応しているエージェント</h2>
           <p>
-            設定は選んだクライアントにローカルの絶対パスを書き込みます。遠隔エンドポイントは作りません。
+            セットアップでは、選んだクライアントの設定にローカルの絶対パスを書き込みます。リモートのエンドポイントは作りません。
           </p>
         </div>
         <div class="agent-grid">
           <article>
             <span class="agent-letter" aria-hidden="true">C</span><h3>Codex</h3><code>corr mcp setup
-              codex</code><p>登録に加え、PluginとAgent Skillも同梱。</p>
+              codex</code><p>MCPの登録に加えて、PluginとAgent Skillも入ります。</p>
           </article>
           <article>
             <span class="agent-letter" aria-hidden="true">A</span><h3>Claude Code</h3><code>corr mcp
               setup claude-code</code><p>
-              ユーザー単位またはプロジェクト単位で登録。
+              ユーザー単位かプロジェクト単位で登録します。
             </p>
           </article>
           <article>
             <span class="agent-letter" aria-hidden="true">GH</span><h3>GitHub Copilot CLI</h3><code
-            >corr mcp setup github-copilot</code><p>標準の登録と接続確認に対応。</p>
+            >corr mcp setup github-copilot</code><p>
+              Copilot CLI標準の方法で登録し、接続を確認します。
+            </p>
           </article>
           <article>
             <span class="agent-letter" aria-hidden="true">+</span><h3>
               その他のMCPクライアント
             </h3><code>corr mcp --help</code><p>
-              Gemini CLI、Qwen Code、Qoder、Kimi Code、汎用stdio。
+              Gemini CLI、Qwen Code、Qoder、Kimi
+              Code、その他のstdio対応クライアント。
             </p>
           </article>
         </div>
         <p class="center-link">
-          <a href="getting-started.html#connect">クライアント別のコマンドを見る<span
+          <a href="getting-started.html#connect">クライアント別のコマンド<span
               aria-hidden="true"
             >
               →</span></a>
@@ -678,38 +678,38 @@ corr auth login --account personal</code></pre>
 
       <section class="honest-edges" aria-labelledby="edges-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>制限も隠さない</p>
-          <h2 id="edges-title">できないことも、製品仕様の一部です。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>制限事項</p>
+          <h2 id="edges-title">現在の制限</h2>
           <p class="fine-print">
-            詳しい対応範囲と根拠は<a href="features.html"
-            >できること</a>にまとめています。
+            対応範囲とその根拠は<a href="features.html"
+            >できること</a>のページにまとめています。
           </p>
         </div>
         <ul>
           <li>
             <strong>Gmail、Googleカレンダー、Google
-              Tasksは自分のOAuthクライアントで利用できます。</strong>ガイド付き設定が秘密値をOSキーチェーンへ保存します。
+              Tasksには自分のOAuthクライアントが必要です。</strong>ガイド付き設定で、クライアントの秘密値をOSキーチェーンに保存します。
           </li>
           <li>
             <strong>Microsoft
-              Graphは自分で用意するOAuthです。</strong>Corresyncはトークン中継を運営しません。
+              GraphのOAuthクライアントは自分で用意します。</strong>Corresyncはトークンの中継サーバーを運営していません。
           </li>
           <li>
             <strong
-            >Windowsのデスクトップ通知は未対応です。</strong>キューと承認済みランナーは利用できます。
+            >Windowsのデスクトップ通知には対応していません。</strong>キューと承認済みランナーは使えます。
           </li>
           <li>
             <strong>機能はアカウントごとに確認します。</strong>
-            メールアドレスのブランドだけで決めつけず、設定時に接続経路とサービスを表示します。
+            メールアドレスのドメインから推測せず、設定時にそのアカウントで使える接続方法とサービスを表示します。
           </li>
         </ul>
       </section>
 
       <section class="final-cta" aria-labelledby="final-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>受信箱の準備ができたら</p>
-        <h2 id="final-title">複数のやり取りを、ひとつのローカルな会話へ。</h2>
+        <p class="eyebrow"><span aria-hidden="true"></span>はじめる</p>
+        <h2 id="final-title">インストールとエージェントへの接続</h2>
         <p>
-          インストールは1コマンド。エージェントへの接続も、あと1コマンドです。
+          インストールに1コマンド、エージェントへの接続に1コマンドです。
         </p>
         <div class="actions centered">
           <a class="button primary" href="#install">インストールコマンドを見る</a>

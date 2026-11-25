@@ -6,7 +6,7 @@
     <title>対応メール・カレンダー・タスクサービス — Corresync</title>
     <meta
       name="description"
-      content="Outlook、Microsoft 365、Gmail、Googleカレンダー、Google Tasks、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP、CalDAVの対応状況と、自分で用意するOAuth設定を比較。"
+      content="Outlook、Microsoft 365、Gmail、Googleカレンダー、Google Tasks、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP、CalDAVの対応状況と、自分で用意するOAuthクライアントの設定をまとめています。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="Todoist、TickTick、iCloud、CalDAV VTODOなどの接続経路と、自分のデスクトップOAuthクライアントで使うGoogle対応を確認できます。"
+      content="Todoist、TickTick、iCloud、CalDAV VTODOなどの接続方法と、自分のデスクトップOAuthクライアントで使うGoogleの対応状況を確認できます。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -40,7 +40,7 @@
     >
     <meta
       name="twitter:description"
-      content="Outlook、Todoist、TickTick、iCloud、CalDAV VTODOと、自分のデスクトップOAuthクライアントで使うGoogle経路を比較できます。"
+      content="Outlook、Todoist、TickTick、iCloud、CalDAV VTODOと、自分のデスクトップOAuthクライアントで使うGoogleの接続方法を比べられます。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -96,11 +96,11 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow">
-          <span aria-hidden="true"></span>接続経路と違いを、はっきり表示
+          <span aria-hidden="true"></span>対応サービス
         </p>
-        <h1 id="page-title"><em>あなたのアカウント</em>に合う経路を選ぶ。</h1>
+        <h1 id="page-title"><em>アカウント</em>ごとの接続方法</h1>
         <p class="lede">
-          ロゴだけで機能を決めつけません。まず認証情報なしで公開情報を集め、メールとカレンダーの経路を選んでから認証します。
+          使える機能は、サービス名から推測せずに調べます。まず認証情報を使わずに公開情報を集め、メールとカレンダーの接続方法を選んでから認証します。
         </p>
         <div class="actions">
           <a class="button primary" href="#check">アドレスで確認</a><a
@@ -112,12 +112,12 @@
 
       <section class="compatibility-checker" id="check" aria-labelledby="checker-title">
         <div class="checker-intro">
-          <p class="eyebrow"><span aria-hidden="true"></span>このアドレスで使える？</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>対応状況の確認</p>
           <h2 id="checker-title">
-            メールアドレスを外へ出さずに、対応状況を確認。
+            メールアドレスで対応状況を調べる
           </h2>
           <p>
-            接続したいメールアドレスを入力してください。ブラウザはアドレス全体を手元に残し、@より後ろのドメインだけを確認サービスへ送ります。
+            接続したいメールアドレスを入力してください。確認サービスに送られるのは、@より後ろのドメインだけです。
           </p>
         </div>
         <form id="compatibility-form" class="checker-form" novalidate>
@@ -139,17 +139,19 @@
             </button>
           </div>
           <p id="compatibility-validation" class="checker-validation" hidden>
-            you@example.comのように、@より後ろまで含むメールアドレスを入力してください。ドメインが揃うまで問い合わせは行いません。
+            you@example.comのように、@より後ろまで含めて入力してください。@の後ろにドメインが入力されるまで、問い合わせは行いません。
           </p>
         </form>
         <p id="compatibility-privacy" class="checker-privacy">
           <strong
-          >ブラウザの外へ出るのはドメインだけです。</strong>@より前はこのページ内に残り、送信・保存・記録されず、URLにも入りません。確認サービスは公開DNSだけを読み、何も保持せず、サインインも開始しません。オンライン確認を使わず、インストール後に<code
-          >corr account discover you@example.com</code>を実行することもできます。
+          >ブラウザの外へ出るのはドメインだけです。</strong>@より前の部分はこのページの中だけで使われ、送信、保存、記録はされず、URLにも含まれません。確認サービスは公開DNSレコードを読むだけで、何も保存せず、サインインも始めません。この確認を使わずに、インストール後に<code
+          >corr account discover
+            you@example.com</code>を実行してローカルで調べることもできます。
         </p>
         <noscript><p class="checker-noscript">
-            この任意の確認にはJavaScriptが必要です。省略して、インストール後に<code
-            >corr account discover you@example.com</code>をローカルで実行できます。
+            この確認にはJavaScriptが必要です。使わない場合は、インストール後に<code
+            >corr account discover
+              you@example.com</code>をローカルで実行してください。
           </p></noscript>
         <p id="compatibility-live" class="visually-hidden" role="status" aria-live="polite"></p>
         <article
@@ -162,78 +164,83 @@
         </article>
       </section>
 
-      <section class="evidence-banner" aria-label="対応根拠の状態">
+      <section class="evidence-banner" aria-label="テストと確認状況">
         <span class="status-dot" aria-hidden="true"></span><div>
-          <strong>v0.8の根拠は、決定的かつ経路別です。</strong><p>
-            以下の経路には、合成データを使ったプロバイダー契約テストとアプリテストがあります。Google
-            API経路は合成契約テスト済みで、実環境では未観測です。
+          <strong>v0.8のテスト状況（接続方法ごと）</strong><p>
+            以下の接続方法には、合成データを使ったプロバイダー契約テストとアプリケーションのテストがあります。Google
+            APIを使う接続方法は合成データでの契約テストのみで、実環境ではまだ確認していません。
           </p>
-        </div><a href="features.html#evidence">根拠の読み方<span aria-hidden="true">
+        </div><a href="features.html#evidence">テストと確認状況について<span
+            aria-hidden="true"
+          >
             →</span></a>
       </section>
 
       <section id="route-cards" aria-labelledby="microsoft-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Microsoftの経路</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>Microsoft</p>
           <h2 id="microsoft-title">
-            信頼しているブラウザを使うか、Graphを明示的に選ぶ。
+            Outlook WebとMicrosoft Graph
           </h2>
           <p>
-            Outlook Webはブラウザがサインインを管理します。Microsoft
-            Graphは別途設定する公開OAuthクライアントで、自動代替経路にはなりません。
+            Outlook Webではサインインをブラウザが管理します。Microsoft
+            Graphは別に設定する公開OAuthクライアントを使う方法で、ほかの接続方法の代わりに自動で使われることはありません。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card" id="microsoft-owa">
             <header>
               <span class="route-icon" aria-hidden="true">OW</span><div>
-                <p class="chip">ブラウザ管理</p>
+                <p class="chip">ブラウザでサインイン</p>
                 <h3>Outlook Web</h3>
               </div>
             </header>
             <dl>
               <div>
                 <dt>メール</dt>
-                <dd>読み取り、作成、整理、確認付きの破壊的操作</dd>
+                <dd>読み取り、作成、整理、確認を挟んだ削除などの操作</dd>
               </div>
               <div>
                 <dt>カレンダー</dt>
-                <dd>カレンダー選択と、プロバイダー対応のTeams参加リンク</dd>
+                <dd>
+                  カレンダーの選択、プロバイダーが対応するTeams参加リンク
+                </dd>
               </div>
               <div>
                 <dt>サインイン</dt>
-                <dd>専用の見えるブラウザプロファイル</dd>
+                <dd>画面に表示される専用のブラウザプロファイル</dd>
               </div>
             </dl>
             <p class="route-foot">
-              SSO、MFA、Conditional Access、組織の通知はブラウザ内に残ります。
+              SSO、MFA、Conditional
+              Access、組織からの通知はブラウザの中で処理されます。
             </p>
           </article>
           <article class="route-card accent-card" id="microsoft-graph">
             <header>
               <span class="route-icon" aria-hidden="true">G</span><div>
-                <p class="chip">明示的OAuth</p>
+                <p class="chip">OAuth</p>
                 <h3>Microsoft Graph</h3>
               </div>
             </header>
             <dl>
               <div>
                 <dt>メール</dt>
-                <dd>読み取り、作成、整理、確認付きの破壊的操作</dd>
+                <dd>読み取り、作成、整理、確認を挟んだ削除などの操作</dd>
               </div>
               <div>
                 <dt>カレンダー</dt>
-                <dd>カレンダー選択と型付きTeams参加リンク作成</dd>
+                <dd>カレンダーの選択、Teams参加リンクの作成</dd>
               </div>
               <div>
                 <dt>サインイン</dt>
                 <dd>
-                  自分が利用を許可された公開クライアント。認可情報はOSキーチェーンに保存
+                  利用を許可されている公開クライアント。認可情報はOSキーチェーンに保存
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              Graphは明示的に選んだ場合、または既存の認可がある場合だけ利用します。
+              Graphを使うのは、自分で選んだ場合か、すでに認可している場合だけです。
             </p>
           </article>
         </div>
@@ -243,18 +250,18 @@
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Apple iCloud</p>
           <h2 id="icloud-title">
-            iCloudメールとカレンダーを、ひとつのガイドで設定。
+            iCloudメールとカレンダーの設定
           </h2>
           <p>
             <code>corr
-              setup</code>はAppleの公開済みアドレス種別と、必要なサービス記録がすべて確認できたカスタムiCloudドメインを認識します。Apple公式のIMAP、SMTP、CalDAV接続先を提案し、アカウントを追加する前に利用者名と経路をすべて確認できます。
+              setup</code>は、Appleが公開しているアドレスの種類と、必要なサービスレコードがすべて確認できたカスタムiCloudドメインを認識します。Appleが公開しているIMAP、SMTP、CalDAVの接続先を提案し、アカウントを追加する前にユーザー名と接続方法をすべて確認できます。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">iC</span><div>
-                <p class="chip">現在利用可能 · ガイド付き</p>
+                <p class="chip">利用可能 · ガイド付き</p>
                 <h3>iCloudメール＋カレンダー</h3>
               </div>
             </header>
@@ -265,7 +272,9 @@
               </div>
               <div>
                 <dt>カレンダー</dt>
-                <dd>CalDAVでの検索、読み取り、確認付きの書き込み</dd>
+                <dd>
+                  CalDAVでのカレンダー検出、読み取り、確認を挟んだ書き込み
+                </dd>
               </div>
               <div>
                 <dt>サインイン</dt>
@@ -275,7 +284,7 @@
               </div>
             </dl>
             <p class="route-foot">
-              CorresyncがOSへ渡すのは固定サービス名と確認済みハンドルだけで、パスワードは読みません。最後に認証できたメールとカレンダーの状態を、本文や予定内容を取得せず別々に表示します。
+              CorresyncがOSに渡すのは、決まったサービス名と確認済みのハンドルだけです。パスワードは読みません。メールとカレンダーそれぞれについて、最後に認証できた状態を、メールや予定の内容を取得せずに表示します。
             </p>
           </article>
           <article class="route-card">
@@ -286,13 +295,13 @@
               </div>
             </header>
             <p>
-              2ファクタ認証を有効にし、Apple
-              Accountのページでアプリ用パスワードを作成します。ガイドは、確認済みのローカルアカウントを追加した後、明示的に選んだ場合だけAppleのページを開きます。
+              2ファクタ認証を有効にしてから、Apple
+              Accountのページでアプリ用パスワードを作成します。ガイド付き設定がAppleのページを開くのは、ローカルにアカウントを追加した後、自分で開くことを選んだ場合だけです。
             </p>
             <p class="route-foot">
-              Apple公式の<a href="https://support.apple.com/ja-jp/102525"
+              Appleの<a href="https://support.apple.com/ja-jp/102525"
               >iCloudメール設定</a>と<a href="https://support.apple.com/ja-jp/102654"
-              >アプリ用パスワードの案内</a>を参照してください。このプリセットは合成契約テスト済みで、オプトインの実環境観測が記録されるまでは実環境未観測です。
+              >アプリ用パスワードの説明</a>も参照してください。このプリセットは合成データでの契約テストのみで、オプトインで行う実環境での確認が記録されるまでは、実環境では未確認の扱いです。
             </p>
           </article>
         </div>
@@ -300,23 +309,22 @@
 
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Googleの経路</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>Google</p>
           <h2 id="google-title">
             Gmail、Googleカレンダー、Google
-            Tasksは自分のOAuthクライアントで利用できます。
+            Tasksは自分のOAuthクライアントで使います
           </h2>
           <p>
             自分のGoogle
-            CloudプロジェクトにデスクトップOAuthクライアントを作り、JSONをガイド付き設定で読み込みます。
-            Corresync管理版OAuthは休眠状態のまま、自分のクライアントでGoogleの通常ブラウザ認証を開きます。
+            CloudプロジェクトでデスクトップOAuthクライアントを作り、そのJSONをガイド付き設定で読み込みます。Corresyncが管理するOAuthは使われず、自分のクライアントで通常のGoogleのブラウザ認証が開きます。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">GA</span><div>
-                <p class="chip">設定後に利用可能 · 自分のOAuth</p>
-                <h3>Google API経路</h3>
+                <p class="chip">設定すれば利用可能 · 自分のOAuthクライアント</p>
+                <h3>Google API</h3>
               </div>
             </header>
             <dl>
@@ -324,36 +332,38 @@
                 <dt>メール</dt>
                 <dd>
                   Gmail
-                  APIによるラベル、検索、選択読み取り、作成、送信、整理。永久削除ではなくゴミ箱へ移動
+                  APIでのラベル、検索、指定したメールの読み取り、作成、送信、整理。削除は完全削除ではなくゴミ箱への移動
                 </dd>
               </div>
               <div>
                 <dt>カレンダー</dt>
-                <dd>カレンダー選択と、対応時のGoogle Meet</dd>
+                <dd>
+                  カレンダーの選択、カレンダーが対応していればGoogle Meet
+                </dd>
               </div>
               <div>
                 <dt>タスク</dt>
                 <dd>
-                  日付だけの期限、サブタスク、並び順、参照リンク、安全な差分確認
+                  日付のみの期限、サブタスク、並び順、参照リンク、安全なポーリング
                 </dd>
               </div>
               <div>
                 <dt>サインイン</dt>
                 <dd>
-                  自分のデスクトップOAuthクライアント。認証情報とアカウント別の認可はOSキーチェーンに保存
+                  自分のデスクトップOAuthクライアント。クライアントの認証情報とアカウントごとの認可はOSキーチェーンに保存
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              通常ブラウザがOAuthを担当し、固定したGoogle
-              APIへ端末から直接接続します。
-              <a href="google-oauth.html">Google Cloudの画面と全手順を見る</a>。
+              OAuthの認証は普段のブラウザで行い、その後はこのコンピューターから決まったGoogle
+              APIへ直接接続します。
+              <a href="google-oauth.html">Google Cloudの画面と設定手順</a>
             </p>
           </article>
           <article class="route-card">
             <header>
               <span class="route-icon" aria-hidden="true">✓</span><div>
-                <p class="chip">現在利用可能</p>
+                <p class="chip">利用可能</p>
                 <h3>Google Workspace MCP</h3>
               </div>
             </header>
@@ -372,7 +382,7 @@
               </div>
             </dl>
             <p class="route-foot">
-              Google公式の<a
+              Googleの<a
                 href="https://developers.google.com/workspace/guides/configure-mcp-servers"
               >Workspace MCP設定ガイド</a>を参照してください。
             </p>
@@ -382,54 +392,54 @@
 
       <section id="tasks" aria-labelledby="tasks-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>タスクの接続経路</p>
-          <h2 id="tasks-title">いつものタスクサービスを、そのままつなぐ。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>タスク</p>
+          <h2 id="tasks-title">タスク管理サービス</h2>
           <p>
-            タスクはメールやカレンダーと別に選べます。認可、利用できる機能、同期カーソル、確認後の書き込みは、アカウントごとに分離されます。
+            タスクの接続方法は、メールやカレンダーとは別に選べます。認可、使える機能、同期カーソル、確認後の書き込みはアカウントごとに分かれています。
           </p>
         </div>
         <div class="route-grid three">
           <article class="route-card" id="microsoft-todo">
             <header>
               <span class="route-icon" aria-hidden="true">To</span><div>
-                <p class="chip">現在利用可能 · 明示的OAuth</p>
+                <p class="chip">利用可能 · OAuth</p>
                 <h3>Microsoft To Do</h3>
               </div>
             </header>
             <p>
-              タスクリスト、作成・更新、完了・再開・削除、繰り返し、チェックリスト、カテゴリ、上限付きGraph差分同期に対応します。
+              タスクリスト、作成・更新、完了・再開・削除、繰り返し、チェックリスト、カテゴリ、件数に上限のあるGraphの差分同期に対応しています。
             </p>
             <p class="route-foot">
-              自分で登録・選択する権限のあるMicrosoft
-              Graph公開クライアントを使います。
+              自分が登録・選択する権限を持つMicrosoft
+              Graphの公開クライアントを使います。
             </p>
           </article>
           <article class="route-card" id="todoist">
             <header>
               <span class="route-icon" aria-hidden="true">Td</span><div>
-                <p class="chip">現在利用可能 · 明示的OAuth</p>
+                <p class="chip">利用可能 · OAuth</p>
                 <h3>Todoist</h3>
               </div>
             </header>
             <p>
-              プロジェクト、作成・更新と状態変更、リマインダー、繰り返し、サブタスク、ラベル、担当者、日付と時刻、上限付き同期に対応します。
+              プロジェクト、作成・更新と状態の変更、リマインダー、繰り返し、サブタスク、ラベル、担当者、日付と時刻、件数に上限のある同期に対応しています。
             </p>
             <p class="route-foot">
-              PKCE対応の公開OAuthクライアントを使い、プラン依存の機能も隠しません。
+              PKCEを使う自分の公開OAuthクライアントで接続します。プランによって変わる機能も、そのことがわかるように表示します。
             </p>
           </article>
           <article class="route-card accent-card" id="ticktick">
             <header>
               <span class="route-icon" aria-hidden="true">Ti</span><div>
-                <p class="chip">現在利用可能 · 明示的OAuth</p>
+                <p class="chip">利用可能 · OAuth</p>
                 <h3>TickTick</h3>
               </div>
             </header>
             <p>
-              プロジェクトとInbox、検索、作成・更新・完了・削除、繰り返し、チェックリスト、ラベル、1人の担当者、並び順、上限付きポーリングに対応します。
+              プロジェクトとInbox、検索、作成・更新・完了・削除、繰り返し、チェックリスト、ラベル、担当者1人、並び順、件数に上限のあるポーリングに対応しています。
             </p>
             <p class="route-foot">
-              自分で登録した、クライアントシークレット方式のOAuthアプリを使います。シークレットは許可した認証情報ストアに残し、再開やリマインダー変更は対応済みと表示しません。
+              自分で登録した、クライアントシークレットを使うOAuthアプリで接続します。シークレットは許可した認証情報ストアに保存されます。タスクの再開とリマインダーの置き換えは、対応機能として扱っていません。
             </p>
           </article>
         </div>
@@ -439,10 +449,10 @@
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>オープン標準</p>
           <h2 id="standards-title">
-            プロバイダーが実際に提供するサービスを組み合わせる。
+            プロバイダーが提供している標準プロトコル
           </h2>
           <p>
-            有効なTLSと、OSキーチェーンまたは明示的に許可した絶対パスの認証ヘルパーを使います。
+            有効なTLS証明書で接続します。認証情報はOSキーチェーンか、自分で許可した認証ヘルパー（絶対パスで指定）から読み込みます。
           </p>
         </div>
         <div class="route-grid three">
@@ -455,10 +465,10 @@
             </header>
             <p>
               RFC
-              8620の型付き契約テストで、読み取り、下書き、対応時の送信、移動、状態変更、確認付き削除を扱います。
+              8620に沿って、読み取り、下書き、サーバーが対応していれば送信、移動、状態の変更、確認を挟んだ削除を扱います。
             </p>
             <p class="route-foot">
-              読み取り専用やSubmission未対応は、利用不可として明示します。
+              読み取り専用のアカウントや、Submissionに対応していないサーバーでは、その操作は利用不可と表示します。
             </p>
           </article>
           <article class="route-card" id="imap-smtp">
@@ -469,12 +479,10 @@
               </div>
             </header>
             <p>
-              フォルダー、読み取り、MIME、下書き、安全な移動、送信済みメールボックスを確認できるSMTP
-              submissionに対応します。
+              IMAPのフォルダー、読み取り、MIME、下書き、安全な移動と、SMTPでの送信に対応しています。送信結果は送信済みメールボックスで確認します。
             </p>
             <p class="route-foot">
-              UIDPLUSやSent
-              メールボックスが必要な操作は、安全でない代替処理をせず事前に失敗します。
+              UIDPLUSや送信済みメールボックスが必要な操作は、安全でない代わりの処理をせず、実行前にエラーになります。
             </p>
           </article>
           <article class="route-card" id="caldav">
@@ -485,10 +493,10 @@
               </div>
             </header>
             <p>
-              VEVENTカレンダーとVTODOタスクリストを分けて検出。件数を制限した読み取り、繰り返し、同期トークン、内容確認後の条件付き書き込みに対応します。
+              VEVENTのカレンダーとVTODOのタスクリストを別々に検出します。件数に上限のある読み取り、繰り返し、同期トークン、確認を挟んだ条件付きの書き込みに対応しています。
             </p>
             <p class="route-foot">
-              予定調整とタスクの機能は、サインイン後にそれぞれ確認されます。
+              予定の調整機能とタスクの機能は、サインイン後にそれぞれ確認します。
             </p>
           </article>
         </div>
@@ -497,14 +505,13 @@
       <section class="mix-panel" aria-labelledby="mix-title">
         <div>
           <p class="eyebrow light">
-            <span aria-hidden="true"></span>ひとつのアカウント、ふたつの経路
+            <span aria-hidden="true"></span>メールとカレンダーの組み合わせ
           </p>
           <h2 id="mix-title">
-            メールと予定が同じプロトコルである必要はありません。
+            メールとカレンダーで別のプロトコルを使う
           </h2>
           <p>
-            IMAP/SMTPとCalDAVを組み合わせるほか、メール専用・カレンダー専用にもできます。アカウントの安定した本人性により、プロファイル、認証情報、カーソル、プレビュー、監査
-            コンテキストを分離します。
+            IMAP/SMTPとCalDAVを組み合わせることも、メールだけ・カレンダーだけのアカウントにすることもできます。アカウントには変わらない内部IDが付き、プロファイル、認証情報、カーソル、プレビュー、監査ログの情報はアカウントごとに分かれます。
           </p>
         </div>
         <figure class="terminal">
@@ -516,7 +523,7 @@
           <pre
             tabindex="0"
             role="region"
-            aria-label="利用経路を検索して明示的に追加する例"
+            aria-label="接続方法を調べてアカウントを追加する例"
           ><code><span class="t-prompt">$</span> corr account discover reader@example.invalid
 <span class="t-dim">evidence  DNS · well-known · provider metadata</span>
 <span class="t-dim">action    none — discovery never authenticates</span>
@@ -528,33 +535,37 @@
 
       <section class="honest-edges" aria-labelledby="provider-limits-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>隠れた代替経路なし</p>
-          <h2 id="provider-limits-title">ない機能を、あるようには見せません。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>制限の扱い</p>
+          <h2 id="provider-limits-title">対応していない機能の表示</h2>
           <p class="fine-print">
-            エージェントが使える操作と部分対応の表示方法は<a
+            エージェントが使える操作と、一部だけ対応している場合の表示は<a
               href="features.html"
             >できること</a>で説明しています。
           </p>
         </div>
         <ul>
-          <li>制限は型付き機能または機能低下として返します。</li>
           <li>
-            自動検出からGoogle
-            OAuthを開始せず、明示的なローカルログインのみがブラウザを開きます。
+            プロバイダー側の制限は、使える機能の一覧や機能の制限として結果に含めます。
           </li>
-          <li>自動検索からGraphの認可を開始しません。</li>
           <li>
-            会議リンクは、選んだカレンダー経路が対応を報告した場合だけ要求します。
+            自動検出でGoogle OAuthが始まることはありません。Google
+            OAuthの画面が開くのは、自分でローカルのログインを実行したときだけです。
           </li>
-          <li>結果不明の書き込みは照合を求め、自動再試行しません。</li>
+          <li>自動検出でGraphの認可が始まることはありません。</li>
+          <li>
+            会議リンクは、選んだカレンダーの接続方法が対応していると報告した場合だけ作成を依頼します。
+          </li>
+          <li>
+            結果がわからない書き込みは、状態の照合が必要になり、自動では再試行しません。
+          </li>
         </ul>
       </section>
 
       <section class="final-cta" aria-labelledby="provider-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>自分で選ぶ</p>
-        <h2 id="provider-cta-title">根拠を確認してから、認証する。</h2>
+        <p class="eyebrow"><span aria-hidden="true"></span>アカウントの追加</p>
+        <h2 id="provider-cta-title">調べてから認証する</h2>
         <p>
-          候補検索は認証情報を読み取らず、アカウントも追加しません。
+          接続方法を調べるときは認証情報を読まず、アカウントも追加しません。
         </p>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html"

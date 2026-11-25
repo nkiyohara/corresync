@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresyncの安全設計 — ローカルな権限と確認付き操作</title>
+    <title>Corresyncの安全性 — 認証情報の扱いと送信前の確認</title>
     <meta
       name="description"
-      content="サインインをブラウザやOSキーチェーンに任せ、アカウントを分離し、重要な操作をプレビューしてから確定するCorresyncの安全設計を説明します。"
+      content="Corresyncがサインインをブラウザやキーチェーンに任せ、アカウントを分けて扱い、送信などの操作をプレビューしてから実行する仕組みを説明します。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresyncの安全設計 — ローカルな権限と確認付き操作"
+      content="Corresyncの安全性 — 認証情報の扱いと送信前の確認"
     >
     <meta
       property="og:description"
-      content="認証情報、アカウント分離、プレビュー→実行、信頼境界をわかりやすく説明します。"
+      content="認証情報の扱い、アカウントの分離、プレビューと実行の流れ、信頼境界について説明します。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -33,10 +33,10 @@
       content="Corresyncのロゴと製品概要を示す英語のメッセージ"
     >
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Corresyncの安全設計">
+    <meta name="twitter:title" content="Corresyncの安全性">
     <meta
       name="twitter:description"
-      content="認証情報、アカウント分離、確認付き操作の境界を説明します。"
+      content="認証情報の扱い、アカウントの分離、送信前の確認について説明します。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -95,76 +95,74 @@
 
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>安全設計</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>安全性</p>
         <h1 id="page-title">
-          エージェントに渡すのは型付きツール。<em
-          >認証情報は渡さない。</em>
+          エージェントに渡すのはツールだけで、<em
+          >認証情報は渡しません</em>
         </h1>
         <p class="lede">
-          Corresyncは、利用者がすでに持つアカウントの権限だけを、端末上で狭く使います。パスワード、Cookie、OAuth
-          トークンはMCPに現れず、書き込みは対象と内容を確認してから一度だけ確定します。
+          Corresyncは、自分がすでに持っているアカウントの権限を、このコンピューター上で必要な範囲だけ使います。パスワード、Cookie、OAuthトークンはMCPには出てきません。書き込みは、対象と内容を確認してから1回だけ実行します。
         </p>
         <div class="actions">
-          <a class="button primary" href="#promises">守ることを見る</a><a
+          <a class="button primary" href="#promises">基本方針</a><a
             class="button secondary"
             href="privacy.html"
-          >データの扱いを見る</a>
+          >データの扱い</a>
         </div>
       </section>
 
       <section id="promises" aria-labelledby="promises-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>変えない約束</p>
-          <h2 id="promises-title">権限は狭く、何が起きるかは見える状態に。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>基本方針</p>
+          <h2 id="promises-title">
+            権限の範囲と、操作の結果がわかるようにする
+          </h2>
         </div>
         <div class="promise-grid">
           <article>
             <span class="promise-mark" aria-hidden="true">01</span><h3>
-              認証情報は本来の場所に
+              認証情報の保存場所
             </h3>
             <p>
-              ブラウザセッションは専用の見えるブラウザ、API
-              認可情報や標準経路の秘密情報はOSキーチェーンまたは明示した外部ヘルパーが管理します。コアの設定スキーマは秘密情報を表現できません。
+              ブラウザのセッションは画面に表示される専用のブラウザが持ちます。APIの認可情報やオープン標準で使う秘密情報は、OSキーチェーンか自分で指定した外部ヘルパーが管理します。Corresyncの設定ファイルには、秘密情報を書く項目がありません。
             </p>
           </article>
           <article>
             <span class="promise-mark" aria-hidden="true">02</span><h3>
-              書き込みは必ずひとつのアカウントへ
+              書き込み先は1つのアカウント
             </h3>
             <p>
-              複数アカウントを読み取ることはできますが、書き込み前には安定した不透明な
-              本人性から正確なアカウントと保存先を解決します。
+              複数のアカウントをまとめて読み取ることはできます。書き込みの前には、アカウントごとの内部IDから対象のアカウントと保存先を1つに決めます。
             </p>
           </article>
           <article>
             <span class="promise-mark" aria-hidden="true">03</span><h3>
-              影響のある操作は先にレビュー
+              結果が残る操作は先に確認
             </h3>
             <p>
-              送信、予定変更、移動、削除などは、サーバーが拘束したプレビューを返します。確認した対象と内容に一致しなければ実行できません。
+              送信、予定の変更、移動、削除などでは、サーバーがまずプレビューを返します。確認した対象と内容が一致しなければ実行できません。
             </p>
           </article>
           <article>
             <span class="promise-mark" aria-hidden="true">04</span><h3>
-              結果不明なら止まる
+              結果がわからないときは止まる
             </h3>
             <p>
-              リモート書き込みの成否が曖昧なときは自動再試行しません。重複送信や二重更新を避けるため、照合が必要な状態として返します。
+              リモートへの書き込みが成功したかどうか判断できないときは、自動で再試行しません。二重送信や二重更新を防ぐため、照合が必要な状態として返します。
             </p>
           </article>
           <article>
             <span class="promise-mark" aria-hidden="true">05</span><h3>
-              既定では監視しない
+              初期状態では監視しない
             </h3>
             <p>
-              インポート走査は読み取り専用。モニタリング、エージェント実行、データ
-              外部送信は別々のオプトインで、初期状態は無効です。MCPから有効化できません。
+              インポートのための読み取りは読み取り専用です。モニタリング、エージェントの実行、外部へのデータ送信はそれぞれ個別のオプトインで、初期状態では無効です。MCPから有効にすることはできません。
             </p>
           </article>
           <article>
-            <span class="promise-mark" aria-hidden="true">06</span><h3>制限を消さない</h3>
+            <span class="promise-mark" aria-hidden="true">06</span><h3>制限は隠さない</h3>
             <p>
-              機能はサインイン後にアカウント単位で観測します。ブランドから推測せず、機能低下と部分失敗を明示します。
+              使える機能は、サインインした後にアカウントごとに確認します。サービス名から推測せず、機能の制限や一部の失敗は結果に表示します。
             </p>
           </article>
         </div>
@@ -173,21 +171,19 @@
       <section class="architecture-panel" aria-labelledby="architecture-title">
         <div>
           <p class="eyebrow light">
-            <span aria-hidden="true"></span>ひとつのアプリケーションコア
+            <span aria-hidden="true"></span>構成
           </p>
           <h2 id="architecture-title">
-            人、スクリプト、エージェントに同じ境界を。
+            人、スクリプト、エージェントで共通のチェック
           </h2>
           <p>
-            CLIとMCPは同じ型付きユースケースを呼びます。プロバイダーアダプターは、プロトコル変換だけを担い、ポリシーを持ちません。
+            CLIとMCPは同じアプリケーションの処理を呼び出します。プロバイダーごとのアダプターはプロトコルの変換だけを行い、ポリシーの判断はしません。
           </p>
         </div>
         <div class="flow" aria-label="Corresyncの信頼境界">
           <span class="flow-in">CLI · MCP</span><span class="flow-edge" aria-hidden="true"
-          >→</span><span
-            class="flow-core"
-          >型付きのアプリケーションユースケース<br><small>アカウント ·
-              ポリシー · プレビュー/実行</small></span><span
+          >→</span><span class="flow-core">アプリケーションの処理<br><small
+            >アカウント · ポリシー · プレビュー/実行</small></span><span
             class="flow-edge"
             aria-hidden="true"
           >→</span><span class="flow-in">プロバイダーアダプター</span>
@@ -198,11 +194,10 @@
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>プレビュー → 実行</p>
           <h2 id="review-title">
-            最初の操作で影響を表示し、次の操作は完全に一致させる。
+            送信の流れ
           </h2>
           <p>
-            承認
-            トークンは呼び出し元、アカウント、プロバイダー、対象、バージョン、内容、操作結果、有効期限、一回限りという条件に結び付きます。
+            1回目のコマンドで結果を表示し、2回目のコマンドはその内容と完全に一致している必要があります。承認トークンは、呼び出し元、アカウント、プロバイダー、対象、バージョン、内容、操作の種類に対してだけ有効で、期限があり、1回しか使えません。
           </p>
         </div>
         <div class="review-grid">
@@ -210,7 +205,7 @@
             <figcaption class="term-bar">
               <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
                 class="term-title"
-              >サーバー-enforced レビュー</span>
+              >サーバー側の確認画面</span>
             </figcaption>
             <pre
               tabindex="0"
@@ -231,22 +226,24 @@
           </figure>
           <div class="review-copy">
             <article>
-              <h3>短時間だけ有効</h3>
-              <p>古いレビューを後から流用できません。</p>
+              <h3>有効期限</h3>
+              <p>古いプレビューを後から使い回すことはできません。</p>
             </article>
             <article>
-              <h3>一回限り</h3>
-              <p>同じ承認を二度実行できません。</p>
+              <h3>1回限り</h3>
+              <p>同じ承認で2回実行することはできません。</p>
             </article>
             <article>
-              <h3>対象と内容に拘束</h3>
+              <h3>対象と内容の一致</h3>
               <p>
-                アカウント、宛先、バイト列が変われば新しいレビューが必要です。
+                アカウント、宛先、本文のバイト列が変わったら、プレビューからやり直しになります。
               </p>
             </article>
             <article>
               <h3>CLIとMCPで共通</h3>
-              <p>annotationだけに頼らず、コアが同じポリシーを強制します。</p>
+              <p>
+                MCPのannotationに頼らず、CLIとMCPに同じポリシーをコア側で適用します。
+              </p>
             </article>
           </div>
         </div>
@@ -254,32 +251,30 @@
 
       <section class="tinted-section" id="authentication" aria-labelledby="auth-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>認証の持ち主</p>
-          <h2 id="auth-title">経路を選んでから、頼んだときだけ認証する。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>サインイン</p>
+          <h2 id="auth-title">接続方法を選んでから、自分で認証する</h2>
           <p>
-            候補検索は認証情報を使わないで、有効なTLSを要求し、管理者同意や管理者による審査を始めません。
+            接続方法を調べるときは認証情報を使わず、有効なTLS証明書を必須とします。管理者の同意や審査の手続きを始めることもありません。
           </p>
         </div>
         <div class="auth-grid">
           <article>
             <h3>Outlook Web</h3>
             <p>
-              専用の見えるブラウザが対話式
-              サインインを持ちます。パスワードやCookieをコアへ取り込みません。SSO、MFA、Conditional
-              Accessを回避しません。
+              サインインは、画面に表示される専用のブラウザで自分で行います。パスワードやCookieをCorresyncのコアに取り込むことはなく、SSO、MFA、Conditional
+              Accessを回避することもありません。
             </p>
           </article>
           <article>
             <h3>GoogleとGraph</h3>
             <p>
-              通常のシステムブラウザ
-              OAuthとPKCEを使い、認可情報はOSキーチェーンに保存します。Graphは明示選択のみ。Googleは自分のデスクトップOAuthクライアントを使い、その認証情報も別のキーチェーン項目に保存します。
+              普段使っているブラウザでOAuth（PKCE）の認証を行い、認可情報はOSキーチェーンに保存します。Graphは自分で選んだ場合だけ使います。Googleでは自分のデスクトップOAuthクライアントを使い、クライアントの認証情報も別の項目としてキーチェーンに保存します。
             </p>
           </article>
           <article>
             <h3>JMAP、IMAP/SMTP、CalDAV</h3>
             <p>
-              設定には認証情報への参照だけを保存し、秘密情報は同意済みの外部認証情報インターフェースから読みます。有効なTLSを必須とし、TLS傍受は行いません。
+              設定ファイルに保存するのは認証情報の参照先だけです。秘密情報は、使用を許可した外部の認証情報インターフェースから読み込みます。有効なTLS証明書を必須とし、TLSの傍受は行いません。
             </p>
           </article>
         </div>
@@ -288,39 +283,38 @@
       <section id="untrusted-data" aria-labelledby="data-title">
         <div class="section-heading">
           <p class="eyebrow">
-            <span aria-hidden="true"></span>メールボックスは信頼しない入力
+            <span aria-hidden="true"></span>メールの内容の扱い
           </p>
           <h2 id="data-title">
-            メールが、自分自身に権限を与えることはできない。
+            メールの内容は信頼しないデータとして扱う
           </h2>
           <p>
-            本文、添付、予定、プロバイダー応答はすべて信頼できないデータです。そこに書かれた命令がツール実行、アカウント追加、モニタリング開始、承認の代わりになることはありません。
+            本文、添付ファイル、予定、プロバイダーからの応答は、すべて信頼できないデータとして扱います。そこに命令が書かれていても、ツールの実行、アカウントの追加、モニタリングの開始、承認の代わりになることはありません。
           </p>
         </div>
         <div class="control-grid">
           <article>
-            <h3>メタデータから読む</h3>
+            <h3>メタデータを先に読む</h3>
             <p>
-              必要なメッセージを選ぶまで本文や添付ファイルを取得せず、すべて上限付きです。
+              メッセージを指定するまで本文や添付ファイルは取得しません。取得するデータにはすべて上限があります。
             </p>
           </article>
           <article>
-            <h3>読み取り専用インポート用の一時領域</h3>
+            <h3>読み取り専用のインポート（一時領域）</h3>
             <p>
-              別アプリの秘密情報は再利用せず、候補を表示するだけです。
+              ほかのアプリの秘密情報は使わず、候補を表示するだけです。
             </p>
           </article>
           <article>
-            <h3>任意で有効にするモニタリング</h3>
+            <h3>モニタリング</h3>
             <p>
-              検索条件、アカウント、間隔、通知先を利用者が設定した場合だけ動きます。
+              検索条件、アカウント、間隔、通知先を自分で設定した場合だけ動きます。
             </p>
           </article>
           <article>
-            <h3>明示的フィードバック</h3>
+            <h3>フィードバック</h3>
             <p>
-              共有前に内容を確認し、メール
-              コンテンツ、アドレス、トークン、認証情報を含めません。
+              共有する前に内容を確認できます。メールの内容、アドレス、トークン、認証情報は含まれません。
             </p>
           </article>
         </div>
@@ -328,64 +322,62 @@
 
       <section class="absent-panel" id="out-of-scope" aria-labelledby="absent-title">
         <div>
-          <p class="eyebrow light"><span aria-hidden="true"></span>存在しないもの</p>
-          <h2 id="absent-title">Corresyncはアカウントの権限を広げません。</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>対象外</p>
+          <h2 id="absent-title">アカウントの権限を広げる機能はありません</h2>
         </div>
         <ul>
           <li>
-            ホスト型 トークン/メール リレー、マルチユーザー
-            サーバー、リモートMCP エンドポイント
+            ホスト型のトークン・メール中継、マルチユーザーのサーバー、リモートのMCPエンドポイント
           </li>
           <li>
-            パスワード、アプリパスワード、OAuth
-            トークン、Cookieをコアに保存するスキーマ
+            パスワード、アプリ用パスワード、OAuthトークン、Cookieをコアに保存する設定項目
           </li>
-          <li>無人ログイン、TLS傍受、MFAやConditional Accessの回避</li>
-          <li>tenant-wideまたはadministrator アクセス</li>
-          <li>Graphへの自動代替経路や自動機能の探索</li>
-          <li>現行リリースでのTeamsチャット／チャネル機能</li>
-          <li>Teamsの通話、録画、プレゼンス、会議ライフサイクル管理</li>
+          <li>無人でのログイン、TLSの傍受、MFAやConditional Accessの回避</li>
+          <li>テナント全体へのアクセスや管理者権限でのアクセス</li>
+          <li>Graphへの自動切り替えや、機能の自動探索</li>
+          <li>現在のリリースでのTeamsのチャット・チャネル機能</li>
+          <li>Teamsの通話、録画、プレゼンス、会議のライフサイクル管理</li>
         </ul>
       </section>
 
       <section class="evidence-explainer" id="evidence" aria-labelledby="evidence-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>証拠の範囲</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>テストの範囲</p>
           <h2 id="evidence-title">
-            合成テスト範囲は、実プロバイダーでの保証ではありません。
+            合成データでのテストは実際のプロバイダーでの動作を保証しない
           </h2>
           <p>
-            既定テストとCIは合成テストデータだけを使い、認証情報や個人情報を含めません。実環境
-            メールボックス
-            テストはオプトインで、既定コマンドやCIから実行できません。
+            通常のテストとCIでは合成したテストデータだけを使い、認証情報や個人情報は含みません。実際のメールボックスを使うテストはオプトインで、通常のテストコマンドやCIからは実行できません。
           </p>
         </div>
         <div>
           <p>
             <strong
-            >プロバイダー標準な主張：</strong>一次資料と合成契約テストで実装を確認。
+            >プロバイダーの仕様への準拠：</strong>一次資料と合成データでの契約テストで実装を確認しています。
           </p>
           <p>
             <strong
-            >実環境で観測済みな主張：</strong>実行、リリース、環境、合成データに結び付いた文書がある場合だけ表示。
+            >実環境で確認済み：</strong>実行したコミット、リリース、環境、合成データを記録した文書がある場合だけ、こう表示します。
           </p>
           <p>
             <strong
-            >機能：</strong>ブランドではなく、サインイン後にアカウントごとに観測。
+            >機能：</strong>サービス名からではなく、サインイン後にアカウントごとに確認します。
           </p>
         </div>
       </section>
 
       <section class="final-cta" aria-labelledby="safety-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>設計も検証も公開</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>ソースと検証</p>
         <h2 id="safety-cta-title">
-          境界は文書化され、チェックは実行できます。
+          設計の文書とテストは公開しています
         </h2>
-        <p>元データ、ADR、テスト、リリース 来歴を公開しています。</p>
+        <p>
+          ソースコード、ADR、テスト、リリースの来歴情報を公開しています。
+        </p>
         <div class="actions centered">
           <a class="button primary" href="https://github.com/nkiyohara/corresync"
           >ソースコードを見る</a><a class="button secondary" href="getting-started.html"
-          >安全に始める</a>
+          >スタートガイド</a>
         </div>
       </section>
     </main>
