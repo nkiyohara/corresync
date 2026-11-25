@@ -26,8 +26,8 @@ type mailCommand struct {
 	Move       mailMoveCommand       `cmd:"" help:"Review and move one versioned message to one folder."`
 	Mark       mailMarkCommand       `cmd:"" help:"Review and mark one versioned message read or unread."`
 	Delete     mailDeleteCommand     `cmd:"" help:"Review and permanently delete one versioned message."`
-	Draft      mailDraftCommand      `cmd:"" help:"Review and save a new, reply, or forward draft without sending."`
-	Send       mailSendCommand       `cmd:"" help:"Review and send one new message or forward; replies use draft then send-draft."`
+	Draft      mailDraftCommand      `cmd:"" help:"Review and save a new, reply, reply-all, or forward draft without sending; reply addresses only the sender, reply-all keeps the other To/Cc."`
+	Send       mailSendCommand       `cmd:"" help:"Review and send one new message or forward; reply and reply-all use draft then send-draft."`
 	SendDraft  mailSendDraftCommand  `cmd:"" help:"Review and send one exact saved draft version."`
 }
 
@@ -50,7 +50,7 @@ type mailSendCommand struct {
 	Subject            string   `help:"Message subject; CR/LF are rejected."`
 	BodyFile           string   `name:"body-file" help:"Text or HTML body file, or - for stdin."`
 	BodyFormat         string   `name:"body-format" default:"text" enum:"text,html" help:"Message body format."`
-	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"Use new or forward; reply and reply-all require draft then send-draft."`
+	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"Composition mode: new or forward with explicit recipients. reply (sender or Reply-To only) and reply-all (sender plus the other To/Cc) require mail draft, then send-draft."`
 	ReferenceMessageID string   `name:"reference-message-id" help:"Exact source message ID for replies or forwards."`
 	ReferenceChangeKey string   `name:"reference-change-key" help:"Exact source change key for replies or forwards."`
 	Attachments        []string `name:"attachment" type:"path" help:"File to attach; repeat as needed."`
@@ -74,7 +74,7 @@ type mailDraftCommand struct {
 	Subject            string   `help:"Draft subject; CR/LF are rejected."`
 	BodyFile           string   `name:"body-file" help:"Text or HTML body file, or - for stdin."`
 	BodyFormat         string   `name:"body-format" default:"text" enum:"text,html" help:"Draft body format."`
-	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"Composition mode."`
+	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"Composition mode: new (explicit recipients), reply (sender or Reply-To only), reply-all (sender plus the other To/Cc), or forward (explicit recipients). Choose from the intended audience; reply and reply-all derive recipients from the source."`
 	ReferenceMessageID string   `name:"reference-message-id" help:"Exact source message ID for replies or forwards."`
 	ReferenceChangeKey string   `name:"reference-change-key" help:"Exact source change key for replies or forwards."`
 	Attachments        []string `name:"attachment" type:"path" help:"File to attach; repeat as needed."`
@@ -766,13 +766,74 @@ func (command *mailDraftCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, access)
 	}
-	_, err = fmt.Fprintf(
-		app.stdout,
-		"Saved draft %s for %d recipient(s); nothing was sent.\n",
+	return writeSavedDraft(app.stdout, access)
+}
+
+// writeSavedDraft reports the provider-resolved addressing of a saved draft so
+// that the audience can be checked before the draft is called ready.
+func writeSavedDraft(writer io.Writer, access application.MailDraftAccess) error {
+	review := access.Review
+	if _, err := fmt.Fprintf(
+		writer,
+		"Saved draft %s; nothing was sent.\nMode: %s\n",
 		sanitizeCell(access.Draft.ID, 80),
-		len(access.Review.To)+len(access.Review.CC)+len(access.Review.BCC),
-	)
-	return err
+		sanitizeCell(string(review.ComposeMode), 16),
+	); err != nil {
+		return err
+	}
+	if review.ReferenceMessageID != "" {
+		if _, err := fmt.Fprintf(
+			writer, "Source message: %s (change key %s)\n",
+			sanitizeCell(review.ReferenceMessageID, 4096),
+			sanitizeCell(review.ReferenceChangeKey, 4096),
+		); err != nil {
+			return err
+		}
+	}
+	addressing := access.Addressing
+	if addressing == nil || addressing.Status != application.MailAddressingResolved ||
+		addressing.Resolved == nil {
+		_, err := fmt.Fprintf(
+			writer,
+			"Resolved To/Cc/subject: not reported by this provider route (unknown, not empty). "+
+				"Check the draft's recipients in the provider before calling it ready.\n"+
+				"Bcc: %s\n",
+			mailReviewRecipients(review.BCC),
+		)
+		return err
+	}
+	resolved := addressing.Resolved
+	if _, err := fmt.Fprintf(
+		writer,
+		"Resolved To: %s\nResolved Cc: %s\nBcc: %s\nResolved subject: %s\n",
+		mailReviewRecipientsOrNone(resolved.To),
+		mailReviewRecipientsOrNone(resolved.CC),
+		mailReviewRecipients(review.BCC),
+		sanitizeCell(resolved.Subject, 4*application.MaxMailSubjectBytes),
+	); err != nil {
+		return err
+	}
+	if omitted := resolved.SourceParticipantsNotIncluded; omitted != nil && *omitted > 0 {
+		hint := "check the intended audience before calling the draft ready"
+		if review.ComposeMode == application.MailComposeReply {
+			hint = "save a new draft with --mode reply-all to keep them"
+		}
+		if _, err := fmt.Fprintf(
+			writer,
+			"Note: %d To/Cc participant(s) of the source message are not addressed by this draft; %s.\n",
+			*omitted, hint,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func mailReviewRecipientsOrNone(recipients []string) string {
+	if len(recipients) == 0 {
+		return "(none)"
+	}
+	return mailReviewRecipients(recipients)
 }
 
 func (command *mailSendCommand) Run(app *runtime) (returnErr error) {

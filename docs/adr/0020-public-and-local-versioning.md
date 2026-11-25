@@ -389,3 +389,12 @@ no longer scale with the requested offset.
 The shared REST request ceiling is 12 MiB so existing small-mail inputs fit
 after MIME, quoted-printable, and Base64 expansion. This does not increase
 other providers' attachment input limits or their response limits.
+
+### 0.9.5 resolved draft addressing
+
+The save-only draft result gains the optional `addressing` object (issue 221).
+Omission keeps its old meaning: the resolved addressing is unknown. Inputs,
+effects, approval binding, and the configuration schema are unchanged. Explicit
+recipients in `reply` and `reply_all` are still rejected; only the error text
+now names `reply_all`. Protocol 30 replaces protocol 29 because the private
+daemon response shape changes.

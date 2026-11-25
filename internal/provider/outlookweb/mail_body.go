@@ -39,6 +39,8 @@ type getItemMessage struct {
 	BCCRecipients []emailAddress       `json:"BccRecipients"`
 	Attachments   []mailAttachmentItem `json:"Attachments"`
 	IsDraft       bool                 `json:"IsDraft"`
+	From          recipient            `json:"From"`
+	ReceivedBy    recipient            `json:"ReceivedBy"`
 }
 
 // emailAddress is the flat EmailAddress shape OWA uses for message recipient

@@ -76,6 +76,15 @@ offer recovery, not permission to authenticate automatically.
   after the user explicitly approves that exact action.
 - Draft creation is save-only. State whether an item was drafted, committed,
   sent, updated, cancelled, moved, acknowledged, or deleted.
+- Choose the draft `composeMode` from the intended audience. `reply` addresses
+  only the source sender; `reply_all` keeps the other To and Cc participants;
+  `new` and `forward` use only the recipients you supply. In a multi-person
+  thread, ask when the audience is unclear instead of defaulting to `reply`.
+- Before calling a draft ready, check `addressing` in the draft result. Report
+  the resolved To, Cc, and subject. If `sourceParticipantsNotIncluded` is
+  positive on a reply, say so. If the status is `unresolved`, say the
+  recipients are unknown and must be checked in the provider; never present
+  them as empty.
 - Account add, rename, and removal use their own preview/commit pairs. Addition
   never authenticates; the review requires a later explicit local CLI login.
   Removal may delete an unshared Corresync-owned OAuth grant, so present that

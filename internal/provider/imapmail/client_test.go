@@ -495,6 +495,12 @@ func TestClientSendsAndRemovesOneExactSavedDraft(t *testing.T) {
 	if err := snapshot.Validate(input, application.MaxMailRecipients); err != nil {
 		t.Fatalf("snapshot validation = %v; snapshot=%+v", err, snapshot)
 	}
+	// The save-time addressing matches what the send preview later reads.
+	if addressing := draft.Addressing; addressing == nil ||
+		!slices.Equal(addressing.To, snapshot.To) || !slices.Equal(addressing.CC, snapshot.CC) ||
+		addressing.Subject != snapshot.Subject || addressing.SourceParticipantsKnown {
+		t.Fatalf("draft addressing = %#v; snapshot=%+v", draft.Addressing, snapshot)
+	}
 	if !slices.Equal(snapshot.To, []string{"to@example.invalid"}) ||
 		!slices.Equal(snapshot.CC, []string{"cc@example.invalid"}) ||
 		!slices.Equal(snapshot.BCC, []string{"bcc@example.invalid"}) ||

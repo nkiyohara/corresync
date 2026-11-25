@@ -15,6 +15,7 @@ type fakeMailReader struct {
 	pages      []MailPage
 	folderPage MailFolderPage
 	draft      MailDraftSnapshot
+	addressing *MailDraftAddressing
 	err        error
 	calls      int
 	draftReads int
@@ -55,7 +56,7 @@ func (reader *fakeMailReader) GetMailAttachment(context.Context, MailAttachmentI
 
 func (reader *fakeMailReader) CreateMailDraft(context.Context, MailDraftInput) (MailDraft, error) {
 	reader.calls++
-	return MailDraft{ID: "draft-1", ChangeKey: "change-1"}, reader.err
+	return MailDraft{ID: "draft-1", ChangeKey: "change-1", Addressing: reader.addressing}, reader.err
 }
 
 func (reader *fakeMailReader) SendMail(context.Context, MailSendInput) (MailSendResult, error) {

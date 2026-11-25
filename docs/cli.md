@@ -365,6 +365,33 @@ bounded repeatable attachments. Review output includes normalized source
 version, recipients, subject, body format/size/digest, and attachment
 size/digest. It does not print the body.
 
+Choose `--mode` from the intended audience:
+
+- `new` and `forward` address only the `--to`, `--cc`, and `--bcc` you supply.
+- `reply` addresses only the source sender (or its Reply-To).
+- `reply-all` addresses the sender plus the source's other visible To and Cc
+  participants, excluding this account.
+
+`reply` and `reply-all` derive recipients from the source message and reject
+explicit recipients; the error names `reply-all` when you tried to add people
+to a plain reply. A saved draft reports the provider-resolved To, Cc, and
+subject. When a `reply` leaves out source To/Cc participants, the output says
+how many and that `reply-all` keeps them. A route that cannot report the
+resolved addressing says it is unknown rather than showing an empty list.
+Check the resolved recipients before calling a draft ready. See
+[the JSON contract](json.md#mail) for the `addressing` field.
+
+```console
+# Reply to everyone on a synthetic thread, then check the resolved audience
+printf 'Synthetic reply.\n' | \
+  corr mail draft \
+    --account work \
+    --mode reply-all \
+    --reference-message-id opaque-source-id \
+    --reference-change-key opaque-source-change-key \
+    --body-file -
+```
+
 Reply and reply-all must be saved as drafts before sending, so the send preview
 can show the resolved recipients and enforce `policy.max_recipients`. Create
 one with `corr mail draft --mode reply-all` (or `reply`) and the exact

@@ -32,6 +32,21 @@ type gmailComposition struct {
 	ThreadID    string
 	InReplyTo   string
 	References  string
+	// SourceParticipants are the reference message's To and Cc addresses
+	// other than the configured address, when they parse (reply modes only).
+	SourceParticipants      []string
+	SourceParticipantsKnown bool
+}
+
+// draftAddressing reports the visible addressing written into the draft.
+// Bcc is deliberately absent.
+func (composition gmailComposition) draftAddressing() *application.MailDraftAddressing {
+	return &application.MailDraftAddressing{
+		To: append([]string(nil), composition.To...), CC: append([]string(nil), composition.CC...),
+		Subject:                 composition.Subject,
+		SourceParticipants:      append([]string(nil), composition.SourceParticipants...),
+		SourceParticipantsKnown: composition.SourceParticipantsKnown,
+	}
 }
 
 func (client *Client) CreateMailDraft(
@@ -80,6 +95,7 @@ func (client *Client) CreateMailDraft(
 	}
 	return application.MailDraft{
 		ID: id, ChangeKey: encodeHistoryID(response.Message.HistoryID),
+		Addressing: composition.draftAddressing(),
 	}, nil
 }
 
@@ -206,6 +222,13 @@ func (client *Client) composition(
 	}
 	if mode == application.MailComposeReply ||
 		mode == application.MailComposeReplyAll {
+		participants, participantsErr := gmailAddresses(
+			headerValue(message.Payload.Headers, "To")+","+
+				headerValue(message.Payload.Headers, "Cc"),
+			client.address,
+		)
+		result.SourceParticipants = participants
+		result.SourceParticipantsKnown = participantsErr == nil
 		count := len(result.To) + len(result.CC)
 		if count == 0 {
 			return gmailComposition{}, errors.New(

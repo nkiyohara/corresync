@@ -71,8 +71,22 @@ type createItemResult struct {
 	ItemID itemID `json:"ItemId"`
 }
 
-// CreateMailDraft saves one new-message or response draft without sending it.
+// CreateMailDraft saves one new-message or response draft without sending it
+// and reports the addressing Exchange resolved for the saved version.
 func (client *Client) CreateMailDraft(
+	ctx context.Context,
+	input application.MailDraftInput,
+) (application.MailDraft, error) {
+	draft, err := client.createDraft(ctx, input)
+	if err != nil {
+		return application.MailDraft{}, err
+	}
+	draft.Addressing = client.draftAddressing(ctx, input, draft)
+	return draft, nil
+}
+
+// createDraft saves one draft and its attachments. Each write is attempted once.
+func (client *Client) createDraft(
 	ctx context.Context,
 	input application.MailDraftInput,
 ) (application.MailDraft, error) {
@@ -112,14 +126,14 @@ func (client *Client) CreateMailDraft(
 		}
 	}
 	draft := application.MailDraft{ID: item.ItemID.ID, ChangeKey: item.ItemID.ChangeKey}
-	if len(input.Attachments) == 0 {
-		return draft, nil
+	if len(input.Attachments) != 0 {
+		attached, err := client.createFileAttachments(ctx, draft, input.Attachments)
+		if err != nil {
+			return application.MailDraft{}, err
+		}
+		draft = attached
 	}
-	attached, err := client.createFileAttachments(ctx, draft, input.Attachments)
-	if err != nil {
-		return application.MailDraft{}, err
-	}
-	return attached, nil
+	return draft, nil
 }
 
 func buildCreateDraftEnvelope(input application.MailDraftInput) createItemEnvelope {

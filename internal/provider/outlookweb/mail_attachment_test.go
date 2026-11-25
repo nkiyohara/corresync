@@ -44,6 +44,11 @@ func TestCreateMailDraftAddsBoundedAttachmentAndRefreshesChangeKey(t *testing.T)
 			_, _ = writer.Write(createAttachmentResponse(
 				createAttachmentMessage("attachment-1", "synthetic-draft-1", "synthetic-change-2"),
 			))
+		case "GetItem":
+			if call != 3 {
+				t.Errorf("GetItem call = %d", call)
+			}
+			writeGetItemFailure(writer)
 		default:
 			t.Errorf("unexpected action %q", httpRequest.URL.Query().Get("action"))
 		}
@@ -58,7 +63,7 @@ func TestCreateMailDraftAddsBoundedAttachmentAndRefreshesChangeKey(t *testing.T)
 	if err != nil {
 		t.Fatalf("CreateMailDraft() error = %v", err)
 	}
-	if draft.ID != "synthetic-draft-1" || draft.ChangeKey != "synthetic-change-2" || calls.Load() != 2 {
+	if draft.ID != "synthetic-draft-1" || draft.ChangeKey != "synthetic-change-2" || calls.Load() != 3 {
 		t.Fatalf("unexpected result: draft=%+v calls=%d", draft, calls.Load())
 	}
 }
@@ -297,6 +302,11 @@ func TestCreateMailDraftAddsTwentyMiBAttachment(t *testing.T) {
 			_, _ = writer.Write(createAttachmentResponse(
 				createAttachmentMessage("attachment-1", "synthetic-draft-1", "synthetic-change-2"),
 			))
+		case "GetItem":
+			if call != 3 {
+				t.Errorf("GetItem call = %d", call)
+			}
+			writeGetItemFailure(writer)
 		default:
 			t.Errorf("unexpected action %q", httpRequest.URL.Query().Get("action"))
 		}
@@ -317,7 +327,7 @@ func TestCreateMailDraftAddsTwentyMiBAttachment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateMailDraft() error = %v", err)
 	}
-	if draft.ID != "synthetic-draft-1" || draft.ChangeKey != "synthetic-change-2" || calls.Load() != 2 {
+	if draft.ID != "synthetic-draft-1" || draft.ChangeKey != "synthetic-change-2" || calls.Load() != 3 {
 		t.Fatalf("unexpected result: draft=%+v calls=%d", draft, calls.Load())
 	}
 }

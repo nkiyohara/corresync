@@ -54,6 +54,10 @@ func TestCreateMailDraftNormalizesResponseAndNeverRetries(t *testing.T) {
 	requestBodies := make(chan []byte, 1)
 	var calls atomic.Int32
 	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Query().Get("action") == "GetItem" {
+			writeGetItemFailure(writer)
+			return
+		}
 		calls.Add(1)
 		body, err := io.ReadAll(request.Body)
 		if err != nil {
@@ -71,7 +75,7 @@ func TestCreateMailDraftNormalizesResponseAndNeverRetries(t *testing.T) {
 		t.Fatalf("CreateMailDraft() error = %v", err)
 	}
 	assertJSONEqual(t, <-requestBodies, expectedRequest)
-	if draft.ID != "synthetic-draft-1" || draft.ChangeKey != "synthetic-change-1" {
+	if draft.ID != "synthetic-draft-1" || draft.ChangeKey != "synthetic-change-1" || draft.Addressing != nil {
 		t.Fatalf("unexpected draft: %+v", draft)
 	}
 	if calls.Load() != 1 {
@@ -91,4 +95,10 @@ func TestCreateMailDraftMarksMalformedSuccessResponseUnknown(t *testing.T) {
 	if !errors.Is(err, application.ErrWriteOutcomeUnknown) {
 		t.Fatalf("CreateMailDraft() error = %v, want ErrWriteOutcomeUnknown", err)
 	}
+}
+
+// writeGetItemFailure answers a draft read-back with an Exchange error so a
+// write-focused test leaves the resolved addressing unreported.
+func writeGetItemFailure(writer http.ResponseWriter) {
+	_, _ = writer.Write([]byte(`{"Body":{"ResponseMessages":{"Items":[{"ResponseClass":"Error","ResponseCode":"ErrorItemNotFound","Items":[]}]}}}`))
 }

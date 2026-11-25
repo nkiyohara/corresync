@@ -3,6 +3,7 @@ package outlookweb
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/nkiyohara/corresync/internal/application"
 )
@@ -16,30 +17,11 @@ func (client *Client) GetMailDraftSnapshot(
 	if err := input.Validate(); err != nil {
 		return application.MailDraftSnapshot{}, err
 	}
-	payload := buildGetDraftSnapshotEnvelope(input)
-	var response responseEnvelope[getItemResponseBody]
-	if err := client.Call(ctx, GetItem, payload, &response); err != nil {
+	item, err := client.getExactItem(
+		ctx, input.DraftID, input.DraftChangeKey, draftSnapshotShape(), "draft",
+	)
+	if err != nil {
 		return application.MailDraftSnapshot{}, err
-	}
-	if len(response.Body.ResponseMessages.Items) != 1 {
-		return application.MailDraftSnapshot{}, errors.New(
-			"OWA GetItem returned an unexpected response count",
-		)
-	}
-	message := response.Body.ResponseMessages.Items[0]
-	if err := checkResponse(GetItem.Name(), message.ResponseClass, message.ResponseCode); err != nil {
-		return application.MailDraftSnapshot{}, err
-	}
-	if len(message.Items) != 1 {
-		return application.MailDraftSnapshot{}, errors.New(
-			"OWA GetItem did not return exactly one draft",
-		)
-	}
-	item := message.Items[0]
-	if item.ItemID.ID != input.DraftID || item.ItemID.ChangeKey != input.DraftChangeKey {
-		return application.MailDraftSnapshot{}, errors.New(
-			"OWA saved draft changed or returned a different identity",
-		)
 	}
 	if !item.IsDraft {
 		return application.MailDraftSnapshot{}, errors.New("OWA item is not a saved draft")
@@ -80,28 +62,74 @@ func (client *Client) SendMailDraft(
 	})
 }
 
-func buildGetDraftSnapshotEnvelope(input application.MailDraftSendInput) getItemEnvelope {
+// getExactItem reads one item at one exact ItemId/ChangeKey pair. Exchange
+// rejects a stale pair, and a response for another identity is refused.
+func (client *Client) getExactItem(
+	ctx context.Context,
+	id, changeKey string,
+	shape itemResponseShape,
+	kind string,
+) (getItemMessage, error) {
+	payload := buildExactGetItemEnvelope(id, changeKey, shape)
+	var response responseEnvelope[getItemResponseBody]
+	if err := client.Call(ctx, GetItem, payload, &response); err != nil {
+		return getItemMessage{}, err
+	}
+	if len(response.Body.ResponseMessages.Items) != 1 {
+		return getItemMessage{}, errors.New(
+			"OWA GetItem returned an unexpected response count",
+		)
+	}
+	message := response.Body.ResponseMessages.Items[0]
+	if err := checkResponse(GetItem.Name(), message.ResponseClass, message.ResponseCode); err != nil {
+		return getItemMessage{}, err
+	}
+	if len(message.Items) != 1 {
+		return getItemMessage{}, fmt.Errorf(
+			"OWA GetItem did not return exactly one %s", kind,
+		)
+	}
+	item := message.Items[0]
+	if item.ItemID.ID != id || item.ItemID.ChangeKey != changeKey {
+		return getItemMessage{}, fmt.Errorf(
+			"OWA saved %s changed or returned a different identity", kind,
+		)
+	}
+	return item, nil
+}
+
+func draftSnapshotShape() itemResponseShape {
+	return exactItemShape(
+		"Text",
+		"item:Subject",
+		"item:Body",
+		"item:Attachments",
+		"message:ToRecipients",
+		"message:CcRecipients",
+		"message:BccRecipients",
+		"item:IsDraft",
+	)
+}
+
+func exactItemShape(bodyType string, fields ...string) itemResponseShape {
+	properties := make([]propertyURI, 0, len(fields))
+	for _, field := range fields {
+		properties = append(properties, propertyURI{Type: "PropertyUri:#Exchange", FieldURI: field})
+	}
+	return itemResponseShape{
+		Type: "ItemResponseShape:#Exchange", BaseShape: "IdOnly", BodyType: bodyType,
+		AdditionalProperties: properties,
+	}
+}
+
+func buildExactGetItemEnvelope(id, changeKey string, shape itemResponseShape) getItemEnvelope {
 	return getItemEnvelope{
 		Type:   "GetItemJsonRequest:#Exchange",
 		Header: newRequestHeader(defaultZone),
 		Body: getItemRequest{
-			Type: "GetItemRequest:#Exchange",
-			ItemShape: itemResponseShape{
-				Type: "ItemResponseShape:#Exchange", BaseShape: "IdOnly", BodyType: "Text",
-				AdditionalProperties: []propertyURI{
-					{Type: "PropertyUri:#Exchange", FieldURI: "item:Subject"},
-					{Type: "PropertyUri:#Exchange", FieldURI: "item:Body"},
-					{Type: "PropertyUri:#Exchange", FieldURI: "item:Attachments"},
-					{Type: "PropertyUri:#Exchange", FieldURI: "message:ToRecipients"},
-					{Type: "PropertyUri:#Exchange", FieldURI: "message:CcRecipients"},
-					{Type: "PropertyUri:#Exchange", FieldURI: "message:BccRecipients"},
-					{Type: "PropertyUri:#Exchange", FieldURI: "item:IsDraft"},
-				},
-			},
-			ItemIDs: []itemID{{
-				Type: "ItemId:#Exchange", ID: input.DraftID,
-				ChangeKey: input.DraftChangeKey,
-			}},
+			Type:      "GetItemRequest:#Exchange",
+			ItemShape: shape,
+			ItemIDs:   []itemID{{Type: "ItemId:#Exchange", ID: id, ChangeKey: changeKey}},
 		},
 	}
 }

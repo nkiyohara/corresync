@@ -170,6 +170,32 @@ func TestGmailAPIContractUsesBoundedNativeOperations(t *testing.T) {
 		!strings.Contains(drafts[0], "draft.txt") {
 		t.Fatalf("CreateMailDraft() = %#v, %v, raw %q", draft, err, drafts)
 	}
+	if addressing := draft.Addressing; addressing == nil ||
+		!slices.Equal(addressing.To, []string{"to@example.test"}) || addressing.Subject != "Draft" {
+		t.Fatalf("new draft addressing = %#v", draft.Addressing)
+	}
+	for _, test := range []struct {
+		mode   application.MailComposeMode
+		to, cc []string
+	}{
+		{mode: application.MailComposeReply, to: []string{"replies@example.test"}},
+		{
+			mode: application.MailComposeReplyAll, to: []string{"replies@example.test"},
+			cc: []string{"observer@example.test"},
+		},
+	} {
+		reply, err := client.CreateMailDraft(t.Context(), application.MailDraftInput{
+			ComposeMode: test.mode, Body: "reply",
+			ReferenceMessageID: message.ID, ReferenceChangeKey: message.ChangeKey,
+		})
+		addressing := reply.Addressing
+		if err != nil || addressing == nil ||
+			!slices.Equal(addressing.To, test.to) || !slices.Equal(addressing.CC, test.cc) ||
+			addressing.Subject != "Re: Synthetic" || !addressing.SourceParticipantsKnown ||
+			!slices.Equal(addressing.SourceParticipants, []string{"observer@example.test"}) {
+			t.Fatalf("%s addressing = %#v, %v", test.mode, addressing, err)
+		}
+	}
 	sent, err := client.SendMail(t.Context(), application.MailSendInput{
 		To: []string{"to@example.test"}, Subject: "Sent", Body: "body",
 	})

@@ -128,6 +128,8 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			replyDraftBody = readGraphBody(t, request)
 			message := graphTestMessage(false, `W/"reply"`)
 			message.ID = "reply1"
+			message.ToRecipients = &[]graphRecipient{{EmailAddress: graphEmailAddress{Address: "sender@example.test"}}}
+			message.CcRecipients = &[]graphRecipient{}
 			writeGraphJSONStatus(t, writer, message, http.StatusCreated)
 		case "POST /me/messages/reply1/attachments":
 			attachedDrafts = append(attachedDrafts, "reply1")
@@ -286,6 +288,9 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 	if err != nil || draft.ID == "" || draft.ChangeKey == "" {
 		t.Fatalf("draft = %#v error = %v", draft, err)
 	}
+	if draft.Addressing != nil {
+		t.Fatalf("response without recipient lists reported addressing: %#v", draft.Addressing)
+	}
 	if len(newDraftBodies) != 1 ||
 		strings.Contains(string(newDraftBodies[0]), `"attachments"`) {
 		t.Fatalf("new draft embedded attachments inline: %q", newDraftBodies)
@@ -332,6 +337,12 @@ func TestGraphContractUsesDelegatedReadsAndETagConditions(t *testing.T) {
 			}},
 		},
 	)
+	if addressing := replyDraft.Addressing; addressing == nil ||
+		len(addressing.To) != 1 || addressing.To[0] != "sender@example.test" ||
+		addressing.CC == nil || len(addressing.CC) != 0 || addressing.Subject != "Synthetic message" ||
+		addressing.SourceParticipantsKnown {
+		t.Fatalf("reply draft addressing = %#v", replyDraft.Addressing)
+	}
 	if err != nil || replyDraft.ID == "" || replyDraft.ChangeKey == "" ||
 		!strings.Contains(string(replyDraftBody), `"content":"reply body"`) ||
 		strings.Contains(string(replyDraftBody), `"toRecipients"`) ||

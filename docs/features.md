@@ -100,7 +100,10 @@ and 3 MiB total until their large-upload contracts are implemented. Provider
 and tenant limits can be lower. Reply and reply-all composition uses save-only drafts;
 sending requires the resolved recipient review in `mail send-draft` where the
 account supports exact-version draft sending. Otherwise, review and send the
-saved draft in the provider's own interface. Direct `mail send` accepts new
+saved draft in the provider's own interface. A saved draft reports the
+provider-resolved To, Cc, and subject, or says they are unknown, and a `reply`
+reports how many source To/Cc participants it left out when the route can tell.
+Direct `mail send` accepts new
 messages and forwards with explicit recipients. Every write is attempted once;
 an unknown outcome is reported and never automatically retried.
 

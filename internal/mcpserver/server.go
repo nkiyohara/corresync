@@ -252,13 +252,13 @@ type MailAttachmentGetInput struct {
 // MailDraftInput creates one save-only draft or response and never sends it.
 type MailDraftInput struct {
 	Account            string                    `json:"account,omitempty" jsonschema:"Configured account alias; omit to use default_account"`
-	To                 []string                  `json:"to,omitempty" jsonschema:"Bare To recipient addresses; omit for reply and reply_all"`
-	CC                 []string                  `json:"cc,omitempty" jsonschema:"Bare Cc recipient addresses; omit for reply and reply_all"`
-	BCC                []string                  `json:"bcc,omitempty" jsonschema:"Bare Bcc recipient addresses; omit for reply and reply_all"`
+	To                 []string                  `json:"to,omitempty" jsonschema:"Bare To recipient addresses for new or forward; omit for reply and reply_all, which derive recipients from the source"`
+	CC                 []string                  `json:"cc,omitempty" jsonschema:"Bare Cc recipient addresses for new or forward; omit for reply and reply_all (use reply_all to keep the source Cc)"`
+	BCC                []string                  `json:"bcc,omitempty" jsonschema:"Bare Bcc recipient addresses for new or forward; omit for reply and reply_all"`
 	Subject            string                    `json:"subject,omitempty" jsonschema:"Draft subject"`
 	Body               string                    `json:"body,omitempty" jsonschema:"Text or HTML draft body"`
 	BodyFormat         string                    `json:"bodyFormat,omitempty" jsonschema:"Body format: text or html; omit for text"`
-	ComposeMode        string                    `json:"composeMode,omitempty" jsonschema:"Composition mode: new, reply, reply_all, or forward; omit for new"`
+	ComposeMode        string                    `json:"composeMode,omitempty" jsonschema:"Composition mode chosen from the intended audience: new (explicit recipients), reply (only the source sender or Reply-To), reply_all (the sender plus the other visible To/Cc participants), or forward (explicit recipients); omit for new"`
 	ReferenceMessageID string                    `json:"referenceMessageId,omitempty" jsonschema:"Exact source message ID for reply or forward"`
 	ReferenceChangeKey string                    `json:"referenceChangeKey,omitempty" jsonschema:"Exact source change key for reply or forward"`
 	Attachments        []MailFileAttachmentInput `json:"attachments,omitempty" jsonschema:"Bounded file attachments for a saved draft"`
@@ -273,7 +273,7 @@ type MailSendInput struct {
 	Subject            string                    `json:"subject,omitempty" jsonschema:"Message subject"`
 	Body               string                    `json:"body,omitempty" jsonschema:"Text or HTML message body"`
 	BodyFormat         string                    `json:"bodyFormat,omitempty" jsonschema:"Body format: text or html; omit for text"`
-	ComposeMode        string                    `json:"composeMode,omitempty" jsonschema:"Direct send mode: new or forward; omit for new. reply and reply_all require mail_create_draft then mail_send_draft"`
+	ComposeMode        string                    `json:"composeMode,omitempty" jsonschema:"Direct send mode: new or forward with explicit recipients; omit for new. reply (source sender only) and reply_all (sender plus the other To/Cc) require mail_create_draft then mail_send_draft"`
 	ReferenceMessageID string                    `json:"referenceMessageId,omitempty" jsonschema:"Exact source message ID for forward"`
 	ReferenceChangeKey string                    `json:"referenceChangeKey,omitempty" jsonschema:"Exact source change key for forward"`
 	Attachments        []MailFileAttachmentInput `json:"attachments,omitempty" jsonschema:"Bounded file attachments to send"`
@@ -1153,7 +1153,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mail_create_draft",
 		Title:       "Create a mail draft",
-		Description: "Create one save-only text or HTML draft through the configured mail route, including a reply, reply-all, forward, and bounded attachments. This tool never sends mail. The exact source version, supplied recipients, content, and attachment hashes are bound to the returned review. For replies, use mail_send_draft to review resolved recipients before sending where exact-version draft send is supported.",
+		Description: "Create one save-only text or HTML draft through the configured mail route with bounded attachments. composeMode is new, reply (only the source sender or Reply-To), reply_all (the sender plus the other visible To/Cc participants), or forward; choose it from the intended audience. This tool never sends mail. The exact source version, supplied recipients, content, and attachment hashes are bound to the returned review. A completed result also returns addressing: status resolved with the provider-resolved to, cc, and subject (and, for replies, sourceParticipantsNotIncluded), or status unresolved when the route did not report them, which is unknown rather than empty. Check the resolved recipients before calling a draft ready; use mail_send_draft for the exact send review where supported.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Create a mail draft",
 			ReadOnlyHint:    false,
@@ -1161,7 +1161,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			OpenWorldHint:   &openWorld,
 		},
 		Meta: mcp.Meta{
-			"io.github.nkiyohara.corresync/data-classification": "private-user-supplied",
+			"io.github.nkiyohara.corresync/data-classification": "private-untrusted",
 			"io.github.nkiyohara.corresync/effect":              "reversible_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input MailDraftInput) (*mcp.CallToolResult, application.MailDraftAccess, error) {
@@ -1187,7 +1187,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mail_create_draft_commit",
 		Title:       "Approve mail draft creation",
-		Description: "Consume one caller-bound preview for an exact save-only draft. This tool never sends mail.",
+		Description: "Consume one caller-bound preview for an exact save-only draft and return the same addressing review as mail_create_draft; check the resolved recipients before calling the draft ready. This tool never sends mail.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Approve mail draft creation",
 			ReadOnlyHint:    false,
@@ -1195,7 +1195,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 			OpenWorldHint:   &openWorld,
 		},
 		Meta: mcp.Meta{
-			"io.github.nkiyohara.corresync/data-classification": "private-user-supplied",
+			"io.github.nkiyohara.corresync/data-classification": "private-untrusted",
 			"io.github.nkiyohara.corresync/effect":              "reversible_write",
 		},
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, input ApprovalInput) (*mcp.CallToolResult, application.MailDraftAccess, error) {

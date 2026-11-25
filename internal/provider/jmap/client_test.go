@@ -182,6 +182,7 @@ func (fixture *syntheticJMAP) serveAPI(writer http.ResponseWriter, request *http
 				"from":       []map[string]string{{"name": "Sender", "email": "sender@example.invalid"}},
 				"replyTo":    []map[string]string{{"name": "Replies", "email": "replies@example.invalid"}},
 				"to":         []map[string]string{{"email": "reader@example.invalid"}},
+				"cc":         []map[string]string{{"email": "colleague@example.invalid"}, {"email": "READER@example.invalid"}},
 				"subject":    "Synthetic message", "hasAttachment": true,
 				"textBody":   []map[string]any{{"partId": "text", "type": "text/plain"}},
 				"bodyValues": map[string]any{"text": map[string]any{"value": "Hello"}},
@@ -467,6 +468,20 @@ func TestClientReadsAndConditionallyUpdatesSyntheticJMAP(t *testing.T) {
 	}
 	if reply.ID != "draft-1" {
 		t.Fatalf("reply = %#v", reply)
+	}
+	// The draft reports what it wrote; the account itself is never a
+	// participant that the reply left out.
+	if addressing := reply.Addressing; addressing == nil ||
+		!slices.Equal(addressing.To, []string{"replies@example.invalid"}) ||
+		len(addressing.CC) != 0 || addressing.Subject != "Re: Synthetic message" ||
+		!addressing.SourceParticipantsKnown ||
+		!slices.Equal(addressing.SourceParticipants, []string{"colleague@example.invalid"}) {
+		t.Fatalf("reply addressing = %#v", reply.Addressing)
+	}
+	if addressing := draft.Addressing; addressing == nil ||
+		!slices.Equal(addressing.To, []string{"recipient@example.invalid"}) ||
+		addressing.SourceParticipantsKnown {
+		t.Fatalf("new draft addressing = %#v", draft.Addressing)
 	}
 	fixture.mu.Lock()
 	created := append([][]emailAddress(nil), fixture.created...)
