@@ -1,7 +1,7 @@
 # Corresync documentation
 
 Corresync is the product and package name; `corr` is the main command. These
-guides describe the v0.8 multi-account, multi-provider implementation. For an
+guides describe the v0.9 multi-account, multi-provider implementation. For an
 installed binary, its matching release notes take precedence.
 
 ## Guides
@@ -48,8 +48,9 @@ account flow is in `corr settings`.
 
 The account flow uses a service checklist. For a Microsoft account you can set
 up Outlook Mail, Outlook Calendar, and Microsoft To Do separately; To Do needs
-its own Graph authorization. Teams is shown as a coming-soon notice you cannot
-select until its source-owned release gate is complete. An email domain never
+its own Graph authorization. Teams messaging can be selected as a preview,
+through Teams Web or a Graph authorization you grant; it lacks complete live
+compatibility evidence. An email domain never
 proves that a service is available. For Apple's documented iCloud address
 families, or a custom domain with the complete verified set of Apple service
 records, the wizard combines Mail and Calendar and hands app-specific password
