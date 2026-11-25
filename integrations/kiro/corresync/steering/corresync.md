@@ -50,7 +50,9 @@ When a tool returns `authentication_required`, `authentication_pending`, or
      then stop. Do not retry `account_sign_in` or ask again. With reason
      `cli_sign_in_required`, explain that this account must be signed in once
      from the CLI with that command (and again after its settings change)
-     before it can be approved from here.
+     before it can be approved from here. The command prints the sign-in page
+     it will open and asks the person to confirm it; ask them to compare that
+     page with the one they normally use. Never say the page is safe.
 4. Never ask the user to paste a password, app-specific password, OTP, cookie,
    or token into chat.
 5. Wait for the human-owned browser, terminal, MFA, or secure credential UI to

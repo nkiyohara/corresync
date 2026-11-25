@@ -411,6 +411,10 @@ The MCP catalog gains the additive `account_sign_in` tool and the
 authentication action gains the optional `nextAction.mcpTool` field (ADR 0039).
 Omission keeps its old meaning. Protocol 32 replaces protocol 31 because the
 private daemon adds the `login.mcp.request` and `login.mcp.resolve` methods.
+Before protocol 33 was released, the approval result also gained the address
+and each route's kind, host, OAuth client ID, and additional hosts, and the
+daemon gained the CLI-only `login.verified` query, which returns one boolean
+for one account; these ship within protocol 33.
 
 ### Unfinished sign-in in session status
 

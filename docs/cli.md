@@ -260,6 +260,37 @@ Nothing else about that sign-in is reported. Finish it where it started, or run
 `corr auth login --account ALIAS` again to replace it. A sign-in in a browser
 window on this computer is not listed.
 
+Before anything opens, every `corr auth login` (a browser on this computer,
+`--web`, `--terminal`, and the helper behind `--host`) prints where it will sign
+in, on standard error so `--json` output is unchanged:
+
+```text
+Signing in to work (ana@example.com)
+  Outlook Web (mail, calendar): outlook.office.com
+  Gmail / Google (calendar): accounts.google.com, OAuth client
+  1234.apps.googleusercontent.com (opens in your browser)
+  IMAP / SMTP (mail): imap.example.com:993, smtp.example.com:465 (uses the saved
+  password from your keyring)
+```
+
+If the account's current connection settings have never been signed in to from
+the CLI (a new account, or any change to its routes since), it adds "This is
+the first sign-in with these connection settings. Check that the page above is
+the one you expect." On an interactive terminal it then asks
+`Sign in to work at outlook.office.com?`, defaulting to Cancel; Cancel stops
+with "did not sign in to work; nothing was opened" and
+`Try: corr account show work`. Without a terminal, with `--json`, and in the
+`--host` helper the notice is printed and the sign-in continues. With `--host`
+the notice comes from the remote host through SSH and there is no question on
+your computer; check the hosts it prints, and the page address the login view
+shows.
+
+While a sign-in that an MCP client started after your approval is open, `auth
+login` for any account and `auth logout` for other accounts stop at once and
+name that account
+and the time it ends; `corr auth logout --account ALIAS` for that account
+cancels it and closes its browser.
+
 A failed `auth login` names the account, keeps the reason the local daemon
 gave, and suggests a next command: `corr doctor --account ALIAS` when the
 browser or route could not start, or the same login again after a timeout or

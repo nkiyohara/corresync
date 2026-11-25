@@ -147,8 +147,10 @@ single-user tool, not a remote gateway or tenant administration service.
   that shows elicitation requests or `input_required` results to the model, or
   lets the model fill the retried call, lets the model approve, and Corresync
   cannot detect that. The person is then still protected by the CLI-verified
-  destination, credentials and MFA typed by a person in the browser, the
-  cool-down, and the audit log. Hosts without a display, logout, and browser
+  destination (the verifying `corr auth login` shows every sign-in host and,
+  the first time with given settings, asks for confirmation on a terminal),
+  credentials and MFA typed by a person in the browser, the cool-down, and the
+  audit log. Hosts without a display, logout, and browser
   clearing stay CLI-only.
 - Account-add approval displays the exact external backend/key handles and
   rejects cross-account handle reuse before both preview and atomic commit.

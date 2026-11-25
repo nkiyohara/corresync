@@ -124,6 +124,34 @@ replayed, tampered, or cross-account state starts nothing.
   credential enrollment, and everything else MCP could not do before remain
   outside MCP.
 
+### The CLI sign-in that verifies a destination
+
+Because `cli_sign_in_required` sends the person to `corr auth login`, that
+command must show where it goes. Every mode prints, before anything opens and
+from the same server-derived description as the MCP prompt, the account, its
+address, and each service's host, OAuth client ID, or credential server and
+port. When the current settings have no CLI verification record, it says this
+is the first sign-in with these settings and, on an interactive terminal, asks
+for confirmation naming the hosts, defaulting to Cancel. The CLI learns that
+through the private `login.verified` query, which answers one boolean for one
+account and only to the CLI surface. Non-interactive runs, `--json`, and the
+`--host` helper print the notice and continue: the helper's standard input is
+the login view's channel, so the notice reaches the person's computer through
+the forwarded SSH standard error and the login view's own page address, with
+no local question. For MCP the `cli_sign_in_required` guidance tells the agent
+that the command shows the page and that the person must check it, never that
+the page is safe.
+
+A prompt still open when the daemon restarts (for example after a
+self-committed `settings_update`) is recorded in `cooldowns.json` and cools its
+account down at the next start; a decline, cancel, or failed prompt that
+arrives for an unknown or stale ticket still cools down the account it names.
+A failed cool-down write leaves `cooldowns.failed`, so the next start cools
+down every account until a write succeeds again. While an MCP-started sign-in
+holds the activation lock, a running terminal or forwarded-view interaction for
+another account can still be polled and cancelled, and every new CLI sign-in or
+logout decides atomically against that lock instead of waiting silently.
+
 ## Threat analysis
 
 **Prompt injection asking for sign-in.** Mail, calendar, or chat content can
@@ -169,7 +197,10 @@ the tool refuses without prompting. Destinations therefore come only from
 settings a person has already signed in to from the CLI; the model, the
 client, and the prompt answer cannot supply or alter a URL. The prompt also
 names the exact host, the OAuth client ID, and the address in plain ASCII
-before anything opens, and the window opens only after acceptance. A person
+before anything opens, and the window opens only after acceptance. The
+verifying CLI sign-in shows the same destination and, the first time, asks
+the person to confirm it, so a look-alike added through MCP stops at that
+question with its host visible. A person
 who did not expect a window can close it; the sign-in then fails and the
 cool-down applies.
 

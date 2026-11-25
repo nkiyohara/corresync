@@ -13,6 +13,13 @@ The local daemon, the background process that keeps your sign-ins, is the only
 authenticated session owner. CLI and MCP call it through
 private local IPC and never receive provider credentials.
 
+`corr auth login` prints, before anything opens, the account, its address, and
+each service's sign-in page host (with the OAuth client ID) or saved-credential
+server and port. The first sign-in with an account's current connection
+settings asks for confirmation on an interactive terminal (default Cancel);
+scripts, `--json`, and `--host` print the same notice and continue. See
+[CLI usage](cli.md#authentication-and-doctor).
+
 ## Signing in from an MCP client
 
 MCP can request a sign-in; it starts only after the user approves it in the MCP
