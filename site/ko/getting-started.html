@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync 시작하기 — 설치부터 첫 메일·캘린더 작업까지</title>
+    <title>Corresync 시작하기 — 설치, 계정 추가, MCP 연결</title>
     <meta
       name="description"
-      content="Corresync를 설치하고 Outlook, iCloud Mail·캘린더 또는 표준 계정을 추가한 뒤 로컬 MCP 클라이언트에 연결하는 방법입니다."
+      content="Corresync를 설치하고 Outlook, iCloud Mail·캘린더, 표준 프로토콜 계정을 추가한 뒤 로컬 MCP 클라이언트에 연결하는 방법입니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Corresync 시작하기">
     <meta
       property="og:description"
-      content="설치, 계정 탐색, 로그인, 로컬 MCP 연결을 차례로 진행하세요."
+      content="설치, 계정 찾기, 로그인, 로컬 MCP 연결 순서로 설정하는 방법입니다."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ko_KR">
@@ -28,7 +28,10 @@
     <meta property="og:image:alt" content="Corresync 로고와 영문 제품 소개">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Corresync 시작하기">
-    <meta name="twitter:description" content="설치부터 첫 로컬 MCP 연결까지.">
+    <meta
+      name="twitter:description"
+      content="Corresync 설치부터 로컬 MCP 클라이언트 연결까지 설명합니다."
+    >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 로고와 영문 제품 소개">
     <link rel="canonical" href="https://corresync.org/ko/getting-started.html">
@@ -88,11 +91,12 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>시작하기</p>
-        <h1 id="page-title">설치부터 첫 질문까지, <em>네 단계면 됩니다.</em></h1>
+        <h1 id="page-title">
+          설치부터 첫 질문까지 <em>네 단계로 설정합니다</em>
+        </h1>
         <p class="lede">
-          Corresync는 먼저 로그인하지 않습니다. 주소에서 공개 연결 정보를
-          찾고, 사용자가 경로를 고른 다음, 별도의 명령으로 그 계정만
-          로그인합니다.
+          바로 로그인하지 않습니다. 메일 주소의 공개 정보로 연결 방식을
+          찾고, 사용자가 고른 뒤 별도 명령으로 그 계정에만 로그인합니다.
         </p>
         <nav class="step-nav" aria-label="설정 단계">
           <a href="#step-install"><span>1</span>설치</a><a href="#step-account"><span
@@ -106,8 +110,8 @@
           <p class="step-number">1단계</p>
           <h2 id="install-title">Corresync 설치</h2>
           <p>
-            운영체제에 맞는 방법을 하나 선택하세요. 공식 설치 프로그램은
-            공개 릴리스의 체크섬과 출처 증명을 확인합니다.
+            운영체제에 맞는 방법을 하나 고르세요. 공식 설치 프로그램은
+            공개 릴리스의 체크섬과 출처 증명(provenance)을 확인합니다.
           </p>
         </div>
         <div class="setup-content">
@@ -177,9 +181,9 @@ scoop install corresync/corresync</code></pre>
           <p class="step-number">2단계</p>
           <h2 id="account-title">메일과 캘린더 계정 설정</h2>
           <p>
-            처음에는 명령 하나만 실행하면 됩니다. 안내 화면이 이메일
-            주소를 묻고, 자격 증명 없이 메일과 캘린더 서비스를 찾은 뒤
-            계정을 추가하기 전에 선택한 경로를 보여 줍니다.
+            처음에는 명령 하나면 됩니다. 메일 주소를 입력하면 자격 증명
+            없이 메일과 캘린더 서비스를 찾고, 계정 추가 전에 연결 방식을
+            보여 줍니다.
           </p>
         </div>
         <div class="setup-content">
@@ -191,19 +195,19 @@ scoop install corresync/corresync</code></pre>
             ><code>corr setup</code></pre>
           </div>
           <p>
-            현재 로컬 상태를 먼저 확인하고, 필요하면 셸 자동 완성을 설치한
-            뒤 끝나지 않은 단계부터 이어갑니다. 계정 경로는 저장 전에 미리
-            보여 주며, 로그인이나 외부 자격 증명 접근은 별도 선택입니다.
-            여러 계정을 추가한 다음 감지된 에이전트를 복수 선택하고, 로컬
-            통합 계획을 한 번 확인한 뒤 호스트별로 적용하고 검증합니다.
-            <code>corr settings</code>에서도 같은 흐름을 열 수 있습니다. 화면 읽기
-            프로그램을 사용한다면 <code>CORRESYNC_ACCESSIBLE=true</code>로 줄 단위
-            안내를 켤 수 있으며, 입력 단계에서 안전하게 나가려면 <code
-            >:cancel</code>을 입력하세요.
+            현재 로컬 상태를 확인하고, 필요하면 셸 자동 완성을 설치한 뒤
+            남은 단계부터 이어 갑니다. 연결 방식은 저장 전에 보여 주며,
+            로그인과 외부 자격 증명 접근은 따로 선택합니다. 계정을 추가한
+            뒤 감지된 에이전트를 골라 변경 계획을 한 번 확인하면
+            에이전트별로 적용하고 검증합니다.
+            <code>corr settings</code>로도 같은 화면을 열 수 있습니다. 화면 읽기
+            프로그램을 쓴다면 <code>CORRESYNC_ACCESSIBLE=true</code>로 줄 단위 안내를
+            켤 수 있습니다. 입력 중에 그만두려면 <code>:cancel</code>을
+            입력하세요.
           </p>
           <p>
-            <strong>고급 사용 또는 스크립트:</strong> 기존 명령은 대화 없이
-            그대로 동작합니다.
+            <strong>스크립트에서 쓸 때:</strong> 인수를 모두 지정하면 묻는 화면
+            없이 실행됩니다.
           </p>
           <div class="cmd" data-copy data-copy-label="비대화형 계정 설정 명령">
             <pre
@@ -216,19 +220,18 @@ scoop install corresync/corresync</code></pre>
             <h3>iCloud Mail과 캘린더도 함께 설정할 수 있나요?</h3>
             <p>
               네. <code>corr setup</code>은 <code>@icloud.com</code>, <code>@me.com</code>,
-              <code>@mac.com</code> 주소와 서비스 레코드가 모두 검증된 iCloud
-              사용자 도메인을 인식해 Mail과 캘린더를 한 번에 제안합니다.
-              계정을 추가한 뒤 Apple 이중 인증과 앱 암호를 안내합니다.
-              암호는 운영체제 자격 증명 화면이 직접 받아 Corresync에는
-              전달되지 않습니다.
+              <code>@mac.com</code> 주소와 서비스 레코드가 모두 확인된 iCloud
+              사용자 도메인을 알아보고 Mail과 캘린더를 함께 제안합니다.
+              계정 추가 후 Apple 이중 인증과 앱 암호를 안내합니다. 암호는
+              운영체제 입력 창에 직접 넣으므로 Corresync에 전달되지 않습니다.
             </p>
           </aside>
           <aside class="note-card">
             <h3>Google 계정은 어떻게 연결하나요?</h3>
             <p>
-              직접 관리하는 Google Cloud 프로젝트에 데스크톱 OAuth 클라이언트를
-              만드세요. 안내 설정이 다운로드한 JSON을 검증하고, 명시적인
-              브라우저 로그인 전에 자격 증명을 키체인으로 가져옵니다.
+              본인이 관리하는 Google Cloud 프로젝트에 데스크톱 OAuth
+              클라이언트를 만드세요. 안내 설정이 JSON을 검사해 키체인으로
+              가져온 뒤 브라우저 로그인을 시작할 수 있습니다.
             </p>
           </aside>
         </div>
@@ -238,9 +241,9 @@ scoop install corresync/corresync</code></pre>
           <p class="step-number">3단계</p>
           <h2 id="signin-title">선택한 계정에 로그인</h2>
           <p>
-            안내 화면에서 로그인을 선택하거나 아래 명령을 직접 실행할 수
-            있습니다. 어느 쪽이든 탐색이나 계정 추가만으로 브라우저,
-            키체인, 관리자 동의가 시작되지는 않습니다.
+            안내 화면에서 로그인을 고르거나 아래 명령을 실행하세요.
+            탐색이나 계정 추가만으로는 브라우저, 키체인, 관리자 동의가
+            시작되지 않습니다.
           </p>
         </div>
         <div class="setup-content">
@@ -253,29 +256,28 @@ scoop install corresync/corresync</code></pre>
           </div>
           <ul class="check-list">
             <li>
-              <strong>Outlook Web:</strong> 전용으로 보이는 브라우저가 로그인과
-              사이트 데이터를 소유합니다.
+              <strong>Outlook Web:</strong> 화면에 보이는 전용 브라우저가 로그인과
+              사이트 데이터를 맡습니다.
             </li>
             <li>
               <strong>Microsoft Graph:</strong> 사용 권한이 있는 공개 OAuth
-              클라이언트를 명시적으로 선택하고, 권한은 운영체제 키체인에
-              둡니다.
+              클라이언트를 직접 지정하고, 권한은 운영체제 키체인에 둡니다.
             </li>
             <li>
               <strong>iCloud:</strong> 앱 암호는 운영체제 자격 증명 저장소에 직접
-              입력합니다. Mail과 캘린더는 메시지 본문이나 일정 내용을 읽지
-              않고 마지막으로 인증된 상태를 각각 표시합니다.
+              입력합니다. Mail과 캘린더의 마지막 인증 상태는 메일 본문이나
+              일정 내용을 읽지 않고 각각 표시합니다.
             </li>
             <li>
-              <strong>JMAP · IMAP/SMTP · CalDAV:</strong> 비밀 정보는 키체인 또는
-              승인한 자격 증명 도우미가 보관하며 설정에는 참조만 남습니다.
+              <strong>JMAP · IMAP/SMTP · CalDAV:</strong> 비밀 정보는 키체인이나
+              승인한 자격 증명 도우미에 두고, 설정에는 참조만 남깁니다.
             </li>
             <li>
-              <strong>Google:</strong> 직접 소유한 데스크톱 OAuth 클라이언트와
-              키체인에 가져온 자격 증명을 사용합니다.
+              <strong>Google:</strong> 본인이 만든 데스크톱 OAuth 클라이언트와
+              키체인으로 가져온 자격 증명을 씁니다.
             </li>
           </ul>
-          <p>연결된 계정과 관찰된 기능을 확인합니다.</p>
+          <p>연결된 계정과 확인된 기능을 봅니다.</p>
           <div class="cmd" data-copy data-copy-label="계정 목록 명령">
             <pre
               tabindex="0"
@@ -291,7 +293,7 @@ scoop install corresync/corresync</code></pre>
           <h2 id="client-title">MCP 클라이언트 연결</h2>
           <p>
             아래 명령은 로컬 stdio MCP 서버를 해당 클라이언트에 등록합니다.
-            원격 MCP URL이나 호스팅 중계는 만들지 않습니다.
+            원격 MCP URL이나 외부 중계 서버는 만들지 않습니다.
           </p>
         </div>
         <div class="setup-content">
@@ -379,8 +381,8 @@ scoop install corresync/corresync</code></pre>
           </div>
           <p>
             클라이언트를 한 번 다시 시작한 뒤 메일이나 일정을 물어보세요.
-            계정을 넘나드는 읽기는 합칠 수 있지만, 모든 쓰기는 먼저 하나의
-            정확한 계정과 대상을 선택합니다.
+            읽기는 여러 계정을 합칠 수 있지만, 쓰기는 항상 계정 하나와
+            대상 하나를 먼저 정합니다.
           </p>
         </div>
       </section>
@@ -389,8 +391,7 @@ scoop install corresync/corresync</code></pre>
           <p class="step-number">완료</p>
           <h2 id="first-task-title">첫 작업 실행</h2>
           <p>
-            CLI와 MCP가 같은 애플리케이션 작업을 사용하므로 어느 쪽에서
-            시작해도 정책은 같습니다.
+            CLI와 MCP는 같은 작업을 호출하므로 정책도 같습니다.
           </p>
         </div>
         <div class="setup-content">
@@ -411,28 +412,28 @@ scoop install corresync/corresync</code></pre>
   --end 2026-08-13T00:00:00Z</code></pre>
           </div>
           <p>
-            보내기, 삭제, 참석자 초대 같은 작업은 검토 결과와 승인 토큰을
-            먼저 반환합니다. 미리 본 계정·대상·내용이 바뀌면 기존 승인을
-            사용할 수 없습니다.
+            보내기, 삭제, 참석자 초대 같은 작업은 먼저 검토 내용과 승인
+            토큰을 돌려줍니다. 미리 본 계정, 대상, 내용이 바뀌면 그 승인은
+            쓸 수 없습니다.
           </p>
         </div>
       </section>
       <section class="honest-edges" aria-labelledby="troubleshooting-title">
         <div>
           <p class="eyebrow"><span aria-hidden="true"></span>막혔을 때</p>
-          <h2 id="troubleshooting-title">추측하지 말고 상태를 확인하세요.</h2>
+          <h2 id="troubleshooting-title">문제 확인 방법</h2>
         </div>
         <ul>
           <li><code>corr doctor</code>로 설치와 로컬 환경을 확인합니다.</li>
           <li>
-            <code>corr account discover ADDRESS</code>를 다시 실행해 공개 연결 근거를
-            살펴봅니다.
+            <code>corr account discover ADDRESS</code>를 다시 실행해 공개 정보를
+            확인합니다.
           </li>
           <li>
-            조직의 MFA, Conditional Access, 관리자 동의, 비활성 프로토콜은 그대로
+            조직의 MFA, Conditional Access, 관리자 동의, 꺼진 프로토콜은 그대로
             적용됩니다.
           </li>
-          <li>일부 계정만 실패하면 집계 결과에 부분 실패가 표시됩니다.</li>
+          <li>일부 계정만 실패하면 합친 결과에 부분 실패로 표시됩니다.</li>
           <li>
             문제 보고에는 실제 메일, 캘린더, 주소, 토큰이나 자격 증명을
             넣지 마세요.
@@ -441,16 +442,17 @@ scoop install corresync/corresync</code></pre>
       </section>
       <section class="final-cta" aria-labelledby="next-title">
         <p class="eyebrow"><span aria-hidden="true"></span>다음 단계</p>
-        <h2 id="next-title">지원 경로와 안전장치를 더 살펴보세요.</h2>
+        <h2 id="next-title">더 읽을거리</h2>
         <p>
-          에이전트별 직접 MCP, Skill, 네이티브 패키지와 실제 등록 상태는
-          <a href="integrations.html">AI 연동 표</a>에서 구분해 볼 수 있습니다.
+          에이전트별 MCP 직접 연결, Skill, 네이티브 패키지와 실제 등록
+          상태는
+          <a href="integrations.html">AI 연동 표</a>에서 볼 수 있습니다.
         </p>
         <div class="actions centered">
           <a class="button primary" href="providers.html">지원 서비스 비교</a><a
             class="button secondary"
             href="safety.html"
-          >보안 모델 읽기</a>
+          >보안 설명 읽기</a>
         </div>
       </section>
     </main>
@@ -462,8 +464,8 @@ scoop install corresync/corresync</code></pre>
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        독립적인 로컬 우선 메일·캘린더 도구입니다. 여기에 언급된 업체와
-        제휴하거나 보증받지 않았습니다.
+        독립적으로 개발한 로컬 메일·캘린더 도구입니다. 이 사이트에
+        나오는 업체와 제휴 관계가 없으며 보증을 받지도 않았습니다.
       </p>
       <nav aria-label="바닥글">
         <a href="getting-started.html" aria-current="page">시작하기</a><a href="providers.html"
