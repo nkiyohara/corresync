@@ -130,17 +130,20 @@ Because `cli_sign_in_required` sends the person to `corr auth login`, that
 command must show where it goes. Every mode prints, before anything opens and
 from the same server-derived description as the MCP prompt, the account, its
 address, and each service's host, OAuth client ID, or credential server and
-port. When the current settings have no CLI verification record, it says this
-is the first sign-in with these settings and, on an interactive terminal, asks
-for confirmation naming the hosts, defaulting to Cancel. The CLI learns that
-through the private `login.verified` query, which answers one boolean for one
-account and only to the CLI surface. Non-interactive runs, `--json`, and the
-`--host` helper print the notice and continue: the helper's standard input is
-the login view's channel, so the notice reaches the person's computer through
-the forwarded SSH standard error and the login view's own page address, with
-no local question. For MCP the `cli_sign_in_required` guidance tells the agent
-that the command shows the page and that the person must check it, never that
-the page is safe.
+port. When the current settings have no CLI verification record, it adds that
+this is the first sign-in with these settings and that the page should be
+checked. The CLI learns that through the private `login.verified` query, which
+answers one boolean for one account and only to the CLI surface. The command
+does not stop to ask: the maintainer decided that an ordinary sign-in must not
+need an extra confirmation, so the notice is the control and the person can
+cancel with Ctrl-C or close the browser. With `--host` the notice reaches the
+person's computer through the forwarded SSH standard error. For MCP the
+`cli_sign_in_required` guidance tells the agent that the command shows the page
+and that the person must check it, never that the page is safe. The remaining
+risk is stated plainly: a person who runs the command without reading the
+notice, on an account whose connection a model changed, can still sign in at
+that changed page; the browser's address bar and the provider's own page are
+then the last check.
 
 A prompt still open when the daemon restarts (for example after a
 self-committed `settings_update`) is recorded in `cooldowns.json` and cools its

@@ -19,9 +19,8 @@ All notable user-facing changes are recorded here. The project follows
 - The forwarded login view shows its state and the time left, has a Paste
   button, relays pointer movement, and skips unchanged frames. `--host` needs
   0.10.0 on both computers.
-- `corr auth login` prints the page it will sign in to, and asks once before
-  the first sign-in with new connection settings. `corr auth status` shows a
-  sign-in that is still in progress.
+- `corr auth login` prints the page it will sign in to before anything opens.
+  `corr auth status` shows a sign-in that is still in progress.
 - Fix OAuth providers reporting "outcome unknown" for a write that was never
   sent when a token was revoked during sleep; they now ask you to sign in.
 - `corr update check` asks again instead of repeating a cached failure, and
@@ -29,6 +28,8 @@ All notable user-facing changes are recorded here. The project follows
 - Update all dependencies; generate the compatibility tables from one catalog
   checked against the code; add opt-in live observation harnesses.
 - The private daemon protocol is now 33; the MCP catalog has 72 tools.
+- Deprecation: the `corresync` command name will be removed in 0.11.0. Use
+  `corr`. Running `corresync` on a terminal prints a notice.
 
 See the [release notes](docs/releases/v0.10.0.md) for details and limits.
 

@@ -276,14 +276,10 @@ Signing in to work (ana@example.com)
 If the account's current connection settings have never been signed in to from
 the CLI (a new account, or any change to its routes since), it adds "This is
 the first sign-in with these connection settings. Check that the page above is
-the one you expect." On an interactive terminal it then asks
-`Sign in to work at outlook.office.com?`, defaulting to Cancel; Cancel stops
-with "did not sign in to work; nothing was opened" and
-`Try: corr account show work`. Without a terminal, with `--json`, and in the
-`--host` helper the notice is printed and the sign-in continues. With `--host`
-the notice comes from the remote host through SSH and there is no question on
-your computer; check the hosts it prints, and the page address the login view
-shows.
+the one you expect." The sign-in then continues without a question; press
+Ctrl-C if the page is not the one you expect. With `--host` the notice comes
+from the remote host through SSH; check the hosts it prints, and the page
+address the login view shows.
 
 While a sign-in that an MCP client started after your approval is open, `auth
 login` for any account and `auth logout` for other accounts stop at once and

@@ -131,7 +131,7 @@ var accountSignInGuidance = map[AccountSignInStatus]string{
 // when the account's settings were never signed in to from the CLI. The agent
 // must not vouch for the destination: the command shows it to the person.
 const accountSignInCLIRequiredGuidance = "This account's current connection settings have not been signed in to from the CLI, so Corresync will not offer a sign-in here. Nothing was started. " +
-	"Ask the person to run the nextAction command on the Corresync host themselves. It shows the sign-in page it will open and asks them to check it before anything opens; " +
+	"Ask the person to run the nextAction command on the Corresync host themselves. It shows the sign-in page before it opens anything; " +
 	"tell them to compare that page with the one they normally use. Do not say the page is safe and do not retry account_sign_in."
 
 func accountSignInGuidanceFor(status AccountSignInStatus, reason AccountSignInReason) string {

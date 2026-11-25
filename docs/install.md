@@ -3,7 +3,7 @@
 The package is Corresync and the primary executable is `corr`. Releases in the
 finite command-transition window that began with v0.8 also contain the identical
 `corresync` compatibility executable; scripts and new documentation should use
-`corr`.
+`corr`. The `corresync` name will be removed in 0.11.0.
 
 ## Install now
 
