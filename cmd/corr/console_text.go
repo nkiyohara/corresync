@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	runtimepkg "runtime"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -85,15 +86,23 @@ func (view consoleView) nextStep(command string) string {
 
 // shellCommand joins words into a command a user can paste into a shell,
 // quoting only the words that need it: shellCommand("corr", "account", "show",
-// alias).
+// alias). On Windows the quoting is PowerShell's.
 func shellCommand(words ...string) string {
+	return shellCommandForOS(runtimepkg.GOOS, words...)
+}
+
+func shellCommandForOS(goos string, words ...string) string {
 	quoted := make([]string, 0, len(words))
 	for _, word := range words {
-		if word != "" && strings.IndexFunc(word, needsShellQuote) < 0 {
+		switch {
+		case word != "" && strings.IndexFunc(word, needsShellQuote) < 0:
 			quoted = append(quoted, word)
-			continue
+		case goos == "windows":
+			// PowerShell: single quotes are literal; a quote is doubled.
+			quoted = append(quoted, "'"+strings.ReplaceAll(word, "'", "''")+"'")
+		default:
+			quoted = append(quoted, "'"+strings.ReplaceAll(word, "'", `'"'"'`)+"'")
 		}
-		quoted = append(quoted, "'"+strings.ReplaceAll(word, "'", `'"'"'`)+"'")
 	}
 	return strings.Join(quoted, " ")
 }

@@ -227,3 +227,22 @@ func TestTextWidth(t *testing.T) {
 		}
 	}
 }
+
+func TestShellCommandQuotesForTheHostShell(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		goos  string
+		words []string
+		want  string
+	}{
+		{"linux", []string{"corr", "auth", "login", "--account", "work"}, "corr auth login --account work"},
+		{"linux", []string{"corr", "account", "show", "it's mine"}, `corr account show 'it'"'"'s mine'`},
+		{"windows", []string{"corr", "auth", "login", "--account", "work"}, "corr auth login --account work"},
+		{"windows", []string{"corr", "account", "show", "it's mine"}, "corr account show 'it''s mine'"},
+		{"windows", []string{"corr", "mail", "send", "--subject", ""}, "corr mail send --subject ''"},
+	} {
+		if got := shellCommandForOS(test.goos, test.words...); got != test.want {
+			t.Errorf("shellCommandForOS(%s, %q) = %q, want %q", test.goos, test.words, got, test.want)
+		}
+	}
+}
