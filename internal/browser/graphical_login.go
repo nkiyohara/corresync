@@ -21,19 +21,17 @@ func (browser *Browser) GraphicalLogin(ctx context.Context, action application.G
 	defer browser.interactionMu.Unlock()
 	operation, cancel := terminalOperationContext(browser.context, ctx)
 	defer cancel()
-	var location string
-	if err := chromedp.Do(operation, storeAction(chromedp.Location(), &location)); err != nil {
-		return application.GraphicalLoginFrame{}, errors.New("login browser is unavailable")
+	if err := prepareGraphicalPage(operation); err != nil {
+		if !errors.Is(err, errGraphicalFrameNotReady) {
+			return application.GraphicalLoginFrame{}, err
+		}
+		// The page is mid-navigation. Nothing has been dispatched yet.
+		if action.Type == "refresh" {
+			return application.GraphicalLoginFrame{}, nil
+		}
+		return application.GraphicalLoginFrame{}, errors.New("the login page was still loading, so the input was not sent; try again")
 	}
-	target, err := url.Parse(location)
-	if err != nil || target.Scheme != "https" || target.Host == "" || target.User != nil {
-		return application.GraphicalLoginFrame{}, errors.New("graphical login requires an HTTPS page")
-	}
-	if _, err := chromedp.Call(operation, emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{
-		Width: application.GraphicalLoginWidth, Height: application.GraphicalLoginHeight, DeviceScaleFactor: 1,
-	}); err != nil {
-		return application.GraphicalLoginFrame{}, errors.New("cannot size login viewport")
-	}
+	var err error
 	switch action.Type {
 	case "text":
 		_, err = chromedp.Call(operation, input.InsertText, input.InsertTextParams{Text: action.Text})
@@ -83,6 +81,34 @@ const (
 )
 
 var errGraphicalFrameNotReady = errors.New("login page is still loading")
+
+// prepareGraphicalPage confirms, before any input, that the page is HTTPS and
+// sizes its viewport. Both requests are bounded like a screenshot: a page that
+// is being replaced may never answer them.
+func prepareGraphicalPage(operation context.Context) error {
+	attempt, cancel := context.WithTimeout(operation, graphicalFrameTimeout)
+	defer cancel()
+	var location string
+	if err := chromedp.Do(attempt, storeAction(chromedp.Location(), &location)); err != nil {
+		if attempt.Err() != nil && operation.Err() == nil {
+			return errGraphicalFrameNotReady
+		}
+		return errors.New("login browser is unavailable")
+	}
+	target, err := url.Parse(location)
+	if err != nil || target.Scheme != "https" || target.Host == "" || target.User != nil {
+		return errors.New("graphical login requires an HTTPS page")
+	}
+	if _, err := chromedp.Call(attempt, emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{
+		Width: application.GraphicalLoginWidth, Height: application.GraphicalLoginHeight, DeviceScaleFactor: 1,
+	}); err != nil {
+		if attempt.Err() != nil && operation.Err() == nil {
+			return errGraphicalFrameNotReady
+		}
+		return errors.New("cannot size login viewport")
+	}
+	return nil
+}
 
 // captureGraphicalFrame returns the viewport only when it and its origin
 // label describe the same HTTPS page. Sign-in pages redirect on load and

@@ -243,6 +243,52 @@ func TestGraphicalWireBoundsAndCompletion(t *testing.T) {
 	}
 }
 
+// A --host login must survive an unreadable screen or a rejected input the
+// way a local view does. Only a failed start or cancellation ends the helper.
+func TestGraphicalWireKeepsTheLoginOpenAfterAFailedInteraction(t *testing.T) {
+	failure := errors.New("synthetic unreadable screen")
+	for _, test := range []struct {
+		name     string
+		requests []string
+		want     []bool // Failed flag of each response
+		ends     error
+	}{
+		{"failed start ends the helper", []string{"null", `{"type":"refresh"}`}, []bool{true}, failure},
+		{"failed read and input keep it open", []string{"null", `{"type":"refresh"}`, `{"type":"click","x":1,"y":1}`, `{"type":"text","text":"synthetic"}`}, []bool{false, true, true, false}, nil},
+		{"failed cancel ends the helper", []string{"null", `{"type":"cancel"}`, `{"type":"refresh"}`}, []bool{false, true}, failure},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var input strings.Builder
+			for _, action := range test.requests {
+				input.WriteString(`{"version":1,"action":` + action + "}\n")
+			}
+			exchange := func(_ context.Context, action *application.GraphicalLoginAction) (loginui.Result, error) {
+				switch {
+				case action == nil && test.want[0], action != nil && (action.Type == "refresh" || action.Type == "click" || action.Type == "cancel"):
+					return loginui.Result{}, failure
+				case action != nil && action.Type == "text":
+					return loginui.Result{Status: "authenticated"}, nil
+				}
+				return loginui.Result{Status: "pending"}, nil
+			}
+			var output bytes.Buffer
+			if err := serveGraphicalStdio(t.Context(), strings.NewReader(input.String()), &output, exchange); !errors.Is(err, test.ends) {
+				t.Fatalf("helper ended with %v, want %v", err, test.ends)
+			}
+			decoder := json.NewDecoder(&output)
+			for index, failed := range test.want {
+				var got graphicalWireResponse
+				if err := decoder.Decode(&got); err != nil || got.Failed != failed {
+					t.Fatalf("response %d = %+v, %v; want failed=%v", index, got, err, failed)
+				}
+			}
+			if decoder.More() {
+				t.Fatal("helper answered after it should have ended")
+			}
+		})
+	}
+}
+
 type fakeGraphicalBrowser struct {
 	fakeTerminalBrowser
 	inputs     int

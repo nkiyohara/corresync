@@ -62,7 +62,8 @@ func runGraphicalLogin(app *runtime, client terminalLoginClient, account domain.
 	defer cancel()
 	exchange := graphicalExchange(app, client, account)
 	if stdio {
-		return serveGraphicalStdio(ctx, app.stdin, app.stdout, exchange)
+		// stderr travels back over SSH to the terminal that ran `--host`.
+		return serveGraphicalStdio(ctx, app.stdin, app.stdout, reportGraphicalFailures(app, exchange))
 	}
 	return serveGraphicalUI(ctx, app, exchange, port, "", lifetime)
 }
@@ -225,8 +226,14 @@ func serveGraphicalStdio(ctx context.Context, reader io.Reader, writer io.Writer
 		if err := json.NewEncoder(writer).Encode(response); err != nil {
 			return errors.New("login connection closed")
 		}
-		if err != nil || result.Status == "authenticated" || result.Status == "cancelled" {
+		// A failed start or cancellation ends the helper. Any later failure is
+		// reported and the login stays open, as it does for a local view: the
+		// local side counts unreadable screens and cancels when it gives up.
+		if err != nil && (request.Action == nil || request.Action.Type == "cancel") {
 			return err
+		}
+		if err == nil && (result.Status == "authenticated" || result.Status == "cancelled") {
+			return nil
 		}
 	}
 }
