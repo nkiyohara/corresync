@@ -453,6 +453,7 @@ type sessionBackend struct {
 
 	terminalSessions map[string]*terminalLoginSession
 	terminalAccounts map[domain.AccountID]string
+	signIn           *signInCoordinator
 	monitorStarted   map[domain.AccountID]bool
 	monitorCancel    map[domain.AccountID]context.CancelFunc
 	monitorDone      map[domain.AccountID]chan struct{}
@@ -704,7 +705,7 @@ func (backend *sessionBackend) serviceAuthenticationStatusLocked(
 		account.serviceActive(service) {
 		status.State = application.AuthenticationStateAuthenticated
 		status.Reason = ""
-	} else if _, pending := backend.terminalAccounts[accountID]; pending {
+	} else if backend.interactiveLoginPendingLocked(accountID) {
 		status.State = application.AuthenticationStatePending
 		status.Reason = application.AuthenticationReasonInteractionPending
 	} else if failures := backend.reauthentication[accountID]; failures != nil &&
@@ -976,8 +977,10 @@ func (backend *sessionBackend) Login(
 		return daemonapi.LoginResult{}, errors.New("session backend is closed")
 	}
 	backend.active.Add(1)
+	backend.beginInteractiveLoginLocked(accountID)
 	backend.mu.Unlock()
 	defer backend.active.Done()
+	defer backend.endInteractiveLogin(accountID)
 
 	account, err := backend.activateAccount(ctx, accountID)
 	if err != nil {
@@ -1044,7 +1047,7 @@ func (backend *sessionBackend) SessionStatus(
 				[]domain.Degradation(nil),
 				account.degradations...,
 			)
-		} else if _, exists := backend.terminalAccounts[accountID]; exists {
+		} else if backend.interactiveLoginPendingLocked(accountID) {
 			state.State = "pending"
 		}
 		result.Accounts = append(result.Accounts, state)

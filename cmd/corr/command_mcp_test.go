@@ -500,8 +500,8 @@ func TestMCPServeNegotiatesModernProtocolOverActualStdio(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list stdio tools: %v\nstderr:\n%s", err, stderr.String())
 	}
-	if len(tools.Tools) != 91 {
-		t.Fatalf("stdio tools = %d, want 91", len(tools.Tools))
+	if len(tools.Tools) != 92 {
+		t.Fatalf("stdio tools = %d, want 92", len(tools.Tools))
 	}
 	templates, err := session.ListResourceTemplates(t.Context(), nil)
 	if err != nil {

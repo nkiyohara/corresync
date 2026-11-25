@@ -1,0 +1,335 @@
+package application
+
+import (
+	"errors"
+	"fmt"
+	"regexp"
+	"time"
+	"unicode"
+
+	"github.com/nkiyohara/corresync/internal/domain"
+)
+
+// AccountSignInTool is the only MCP tool that may ask the person to approve a
+// sign-in. See docs/adr/0039-user-approved-sign-in-from-mcp.md.
+const AccountSignInTool = "account_sign_in"
+
+// AccountStatusTool is the content-free status tool an agent uses to observe
+// an unfinished or completed sign-in without starting another one.
+const AccountStatusTool = "account_status"
+
+const (
+	AccountSignInContractVersion = "1"
+	// AccountSignInApprovalTTL bounds how long one reserved approval request
+	// may wait for the person's answer in the MCP client.
+	AccountSignInApprovalTTL = 5 * time.Minute
+	// AccountSignInCooldown is the fixed period after a decline, cancellation,
+	// or unfinished MCP-started sign-in during which the same account cannot be
+	// prompted again from MCP. A person can always run `corr auth login`.
+	AccountSignInCooldown = 10 * time.Minute
+)
+
+// AccountSignInStatus is the bounded outcome of one account_sign_in call.
+type AccountSignInStatus string
+
+const (
+	AccountSignInStarted         AccountSignInStatus = "started"
+	AccountSignInAlreadySignedIn AccountSignInStatus = "already_signed_in"
+	AccountSignInDeclined        AccountSignInStatus = "declined"
+	AccountSignInUnavailable     AccountSignInStatus = "unavailable"
+	AccountSignInInProgress      AccountSignInStatus = "in_progress"
+)
+
+func (status AccountSignInStatus) Validate() error {
+	switch status {
+	case AccountSignInStarted, AccountSignInAlreadySignedIn,
+		AccountSignInDeclined, AccountSignInUnavailable, AccountSignInInProgress:
+		return nil
+	default:
+		return fmt.Errorf("invalid account sign-in status %q", status)
+	}
+}
+
+// AccountSignInReason is a bounded classification. It never carries provider,
+// browser, or model-supplied text.
+type AccountSignInReason string
+
+const (
+	AccountSignInReasonUserDeclined            AccountSignInReason = "user_declined"
+	AccountSignInReasonUserCancelled           AccountSignInReason = "user_cancelled"
+	AccountSignInReasonRecentlyDeclined        AccountSignInReason = "recently_declined"
+	AccountSignInReasonRecentlyUnfinished      AccountSignInReason = "recent_sign_in_unfinished"
+	AccountSignInReasonElicitationUnsupported  AccountSignInReason = "elicitation_unsupported"
+	AccountSignInReasonElicitationFailed       AccountSignInReason = "elicitation_failed"
+	AccountSignInReasonDisplayUnavailable      AccountSignInReason = "display_unavailable"
+	AccountSignInReasonApprovalExpired         AccountSignInReason = "approval_expired"
+	AccountSignInReasonApprovalPending         AccountSignInReason = "approval_pending"
+	AccountSignInReasonSignInRunning           AccountSignInReason = "sign_in_running"
+	AccountSignInReasonRouteUnsupported        AccountSignInReason = "route_unsupported"
+	AccountSignInReasonAliasNotDisplayable     AccountSignInReason = "alias_not_displayable"
+	AccountSignInReasonSessionOwnerUnsupported AccountSignInReason = "session_owner_unsupported"
+)
+
+var accountSignInReasonStatus = map[AccountSignInReason]AccountSignInStatus{
+	AccountSignInReasonUserDeclined:            AccountSignInDeclined,
+	AccountSignInReasonUserCancelled:           AccountSignInDeclined,
+	AccountSignInReasonRecentlyDeclined:        AccountSignInDeclined,
+	AccountSignInReasonRecentlyUnfinished:      AccountSignInUnavailable,
+	AccountSignInReasonElicitationUnsupported:  AccountSignInUnavailable,
+	AccountSignInReasonElicitationFailed:       AccountSignInUnavailable,
+	AccountSignInReasonDisplayUnavailable:      AccountSignInUnavailable,
+	AccountSignInReasonApprovalExpired:         AccountSignInUnavailable,
+	AccountSignInReasonRouteUnsupported:        AccountSignInUnavailable,
+	AccountSignInReasonAliasNotDisplayable:     AccountSignInUnavailable,
+	AccountSignInReasonSessionOwnerUnsupported: AccountSignInUnavailable,
+	AccountSignInReasonApprovalPending:         AccountSignInInProgress,
+	AccountSignInReasonSignInRunning:           AccountSignInInProgress,
+}
+
+// AccountSignInResult is the content-free structured result of
+// account_sign_in. Guidance is fixed server text selected by status.
+type AccountSignInResult struct {
+	Version    string                    `json:"version"`
+	Status     AccountSignInStatus       `json:"status"`
+	Account    domain.AccountID          `json:"account"`
+	Alias      string                    `json:"alias"`
+	Reason     AccountSignInReason       `json:"reason,omitempty"`
+	Guidance   string                    `json:"guidance"`
+	StatusTool string                    `json:"statusTool"`
+	ExpiresAt  *time.Time                `json:"expiresAt,omitempty"`
+	NextAction *AuthenticationNextAction `json:"nextAction,omitempty"`
+}
+
+var accountSignInGuidance = map[AccountSignInStatus]string{
+	AccountSignInStarted: "The person approved the request and Corresync opened the same browser sign-in as `corr auth login` on its host. " +
+		"The person completes password, MFA, and consent in that browser; nothing is entered in chat. " +
+		"Corresync finishes the session itself when the browser sign-in completes or expires at expiresAt. " +
+		"Check account_status for this account; when the requested service is authenticated, retry the original read once. Do not call account_sign_in again for this account.",
+	AccountSignInAlreadySignedIn: "This account already has an active session. Retry the original read once; do not call account_sign_in again.",
+	AccountSignInDeclined: "The person declined or cancelled this sign-in request, or declined one recently. Nothing was started. " +
+		"Do not ask again and do not call account_sign_in again; tell the person they can run the nextAction command themselves.",
+	AccountSignInUnavailable: "Corresync could not ask for or start this sign-in from this MCP client. Nothing was started. " +
+		"Tell the person to run the nextAction command on the Corresync host, then stop; do not retry account_sign_in.",
+	AccountSignInInProgress: "A sign-in request or browser sign-in for this account is already pending. Do not request it again. " +
+		"Wait for the person, then check account_status for this account.",
+}
+
+// NewAccountSignInResult builds the canonical result for a status and reason.
+// ExpiresAt is required exactly for started results.
+func NewAccountSignInResult(
+	status AccountSignInStatus,
+	reason AccountSignInReason,
+	account domain.AccountID,
+	alias string,
+	expiresAt *time.Time,
+) (AccountSignInResult, error) {
+	result := AccountSignInResult{
+		Version:    AccountSignInContractVersion,
+		Status:     status,
+		Account:    account,
+		Alias:      alias,
+		Reason:     reason,
+		Guidance:   accountSignInGuidance[status],
+		StatusTool: AccountStatusTool,
+	}
+	if expiresAt != nil {
+		value := expiresAt.UTC()
+		result.ExpiresAt = &value
+	}
+	if status == AccountSignInDeclined || status == AccountSignInUnavailable {
+		action := localInteractiveLoginAction(alias, "")
+		result.NextAction = &action
+	}
+	if err := result.Validate(); err != nil {
+		return AccountSignInResult{}, err
+	}
+	return result, nil
+}
+
+func (result AccountSignInResult) Validate() error {
+	if result.Version != AccountSignInContractVersion {
+		return errors.New("unsupported account sign-in result version")
+	}
+	if err := result.Status.Validate(); err != nil {
+		return err
+	}
+	if err := result.Account.ValidateOpaque(); err != nil {
+		return err
+	}
+	if err := domain.AccountAlias(result.Alias).Validate(); err != nil {
+		return err
+	}
+	if result.Reason == "" {
+		if result.Status != AccountSignInStarted && result.Status != AccountSignInAlreadySignedIn {
+			return errors.New("account sign-in result omits its reason")
+		}
+	} else if status, known := accountSignInReasonStatus[result.Reason]; !known || status != result.Status {
+		return fmt.Errorf("account sign-in reason %q does not match status %q", result.Reason, result.Status)
+	}
+	if result.Guidance != accountSignInGuidance[result.Status] ||
+		result.StatusTool != AccountStatusTool {
+		return errors.New("account sign-in result has non-canonical guidance")
+	}
+	if (result.Status == AccountSignInStarted) != (result.ExpiresAt != nil) {
+		return errors.New("account sign-in expiry must be present exactly for a started sign-in")
+	}
+	wantsAction := result.Status == AccountSignInDeclined || result.Status == AccountSignInUnavailable
+	if wantsAction != (result.NextAction != nil) {
+		return errors.New("account sign-in result has an unexpected next action")
+	}
+	if result.NextAction != nil {
+		if err := result.NextAction.validate(result.Alias); err != nil {
+			return err
+		}
+		if result.NextAction.MCPTool != "" {
+			return errors.New("account sign-in result must not point back at the sign-in tool")
+		}
+	}
+	return nil
+}
+
+// AccountSignInRoute names one configured service and its provider. It is the
+// only route detail shown in the approval prompt.
+type AccountSignInRoute struct {
+	Service  AuthenticationService `json:"service"`
+	Provider domain.ProviderID     `json:"provider"`
+}
+
+var accountSignInTicketPattern = regexp.MustCompile(`^sit1_[A-Za-z0-9_-]{43}$`)
+
+// AccountSignInApproval reserves one pending approval request for one account
+// and one MCP caller. The ticket is an unguessable one-use reference.
+type AccountSignInApproval struct {
+	Ticket    string               `json:"ticket"`
+	Account   domain.AccountID     `json:"account"`
+	Alias     string               `json:"alias"`
+	Routes    []AccountSignInRoute `json:"routes"`
+	ExpiresAt time.Time            `json:"expiresAt"`
+}
+
+func (approval AccountSignInApproval) Validate() error {
+	if err := ValidateAccountSignInTicket(approval.Ticket); err != nil {
+		return err
+	}
+	if err := approval.Account.ValidateOpaque(); err != nil {
+		return err
+	}
+	if err := domain.AccountAlias(approval.Alias).Validate(); err != nil {
+		return err
+	}
+	if len(approval.Routes) == 0 || len(approval.Routes) > 4 {
+		return errors.New("account sign-in approval must name one to four services")
+	}
+	for _, route := range approval.Routes {
+		if err := route.Service.Validate(); err != nil {
+			return err
+		}
+		if err := route.Provider.Validate(); err != nil {
+			return err
+		}
+	}
+	if approval.ExpiresAt.IsZero() {
+		return errors.New("account sign-in approval has no expiry")
+	}
+	return nil
+}
+
+// ValidateAccountSignInTicket checks the opaque one-use ticket shape.
+func ValidateAccountSignInTicket(ticket string) error {
+	if !accountSignInTicketPattern.MatchString(ticket) {
+		return errors.New("invalid account sign-in ticket")
+	}
+	return nil
+}
+
+// AccountSignInRequest is the session owner's answer to a sign-in request:
+// either a final result, or one reserved approval request to show the person.
+type AccountSignInRequest struct {
+	Result   *AccountSignInResult   `json:"result,omitempty"`
+	Approval *AccountSignInApproval `json:"approval,omitempty"`
+}
+
+func (request AccountSignInRequest) Validate(account domain.AccountID) error {
+	switch {
+	case request.Result != nil && request.Approval == nil:
+		if err := request.Result.Validate(); err != nil {
+			return err
+		}
+		if request.Result.Status == AccountSignInStarted {
+			return errors.New("a sign-in request cannot start before approval")
+		}
+		if request.Result.Account != account {
+			return errors.New("sign-in request result names a different account")
+		}
+	case request.Approval != nil && request.Result == nil:
+		if err := request.Approval.Validate(); err != nil {
+			return err
+		}
+		if request.Approval.Account != account {
+			return errors.New("sign-in approval names a different account")
+		}
+	default:
+		return errors.New("sign-in request must contain exactly one result or approval")
+	}
+	return nil
+}
+
+// AccountSignInDecision is what the MCP server observed from the person's
+// elicitation answer. Only AccountSignInDecisionApprovedByUser can start a
+// sign-in, and only the elicitation path of the MCP server sends it.
+type AccountSignInDecision string
+
+const (
+	AccountSignInDecisionApprovedByUser         AccountSignInDecision = "approved_by_user_elicitation"
+	AccountSignInDecisionDeclinedByUser         AccountSignInDecision = "declined_by_user"
+	AccountSignInDecisionCancelledByUser        AccountSignInDecision = "cancelled_by_user"
+	AccountSignInDecisionElicitationFailed      AccountSignInDecision = "elicitation_failed"
+	AccountSignInDecisionElicitationUnsupported AccountSignInDecision = "elicitation_unsupported"
+)
+
+func (decision AccountSignInDecision) Validate() error {
+	switch decision {
+	case AccountSignInDecisionApprovedByUser, AccountSignInDecisionDeclinedByUser,
+		AccountSignInDecisionCancelledByUser, AccountSignInDecisionElicitationFailed,
+		AccountSignInDecisionElicitationUnsupported:
+		return nil
+	default:
+		return fmt.Errorf("invalid account sign-in decision %q", decision)
+	}
+}
+
+// AccountSignInResolution consumes one reserved approval request.
+type AccountSignInResolution struct {
+	Account  domain.AccountID      `json:"account"`
+	Ticket   string                `json:"ticket"`
+	Decision AccountSignInDecision `json:"decision"`
+}
+
+func (resolution AccountSignInResolution) Validate() error {
+	if err := resolution.Account.ValidateOpaque(); err != nil {
+		return err
+	}
+	if err := ValidateAccountSignInTicket(resolution.Ticket); err != nil {
+		return err
+	}
+	return resolution.Decision.Validate()
+}
+
+// AccountSignInAliasDisplayable reports whether an alias is safe to quote in
+// a server-authored approval prompt. Aliases with punctuation that could frame
+// prompt text are refused instead of being shown.
+func AccountSignInAliasDisplayable(alias string) bool {
+	if domain.AccountAlias(alias).Validate() != nil {
+		return false
+	}
+	for _, character := range alias {
+		switch {
+		case unicode.IsLetter(character), unicode.IsDigit(character):
+		case character == '.', character == '_', character == '-',
+			character == '@', character == '+':
+		default:
+			return false
+		}
+	}
+	return true
+}

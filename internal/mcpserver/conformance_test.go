@@ -14,6 +14,8 @@ import (
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/nkiyohara/corresync/internal/application"
 )
 
 const (
@@ -31,6 +33,7 @@ var expectedToolNames = []string{
 	"account_rename",
 	"account_rename_commit",
 	"account_show",
+	"account_sign_in",
 	"account_status",
 	"agenda_list",
 	"calendar_cancel",
@@ -317,7 +320,11 @@ func TestModernProtocolRejectsInvalidNegotiationMetadata(t *testing.T) {
 func TestToolResultsConformToAdvertisedOutputSchemas(t *testing.T) {
 	t.Parallel()
 
-	server, err := New(&fakeBackend{}, Options{Version: "dev", Instance: "schemas"})
+	// account_sign_in resolves its synthetic alias to an opaque account so its
+	// structured result can be validated; other tools ignore the view.
+	server, err := New(&fakeBackend{accountView: application.AccountView{
+		Alias: "synthetic", ID: "acc_00000000000000000000000000000001",
+	}}, Options{Version: "dev", Instance: "schemas"})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

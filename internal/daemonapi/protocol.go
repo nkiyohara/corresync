@@ -37,6 +37,8 @@ const (
 	MethodLogout               Method = "logout"
 	MethodSessionStatus        Method = "session.status"
 	MethodTerminalLogin        Method = "login.terminal"
+	MethodSignInRequest        Method = "login.mcp.request"
+	MethodSignInResolve        Method = "login.mcp.resolve"
 	MethodMailFolders          Method = "mail.folders.list"
 	MethodMailList             Method = "mail.list"
 	MethodMailSearch           Method = "mail.search"
@@ -407,6 +409,21 @@ type TerminalLoginBackend interface {
 	TerminalLogin(context.Context, TerminalLoginInput, domain.Caller) (TerminalLoginResult, error)
 }
 
+// SignInBackend is the optional user-approved MCP sign-in extension (ADR
+// 0039). A request only reserves one approval prompt; a resolution consumes
+// it, and only a resolution whose decision says the person approved through
+// MCP elicitation starts the same visible sign-in as the CLI. Session owners
+// accept both methods only from the MCP surface.
+type SignInBackend interface {
+	RequestAccountSignIn(context.Context, domain.AccountID, domain.Caller) (application.AccountSignInRequest, error)
+	ResolveAccountSignIn(context.Context, application.AccountSignInResolution, domain.Caller) (application.AccountSignInResult, error)
+}
+
+// SignInRequestInput selects one configured account for an approval request.
+type SignInRequestInput struct {
+	Account domain.AccountID `json:"account"`
+}
+
 // MonitoringBackend is the optional local event extension. It has no method
 // for enabling monitoring, widening filters, configuring a runner, or purging.
 type MonitoringBackend interface {
@@ -464,7 +481,8 @@ type MessagingBackend interface {
 
 func (method Method) valid() bool {
 	switch method {
-	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
+	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin,
+		MethodSignInRequest, MethodSignInResolve, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
 		MethodMailGetAttachment, MethodMailCommitAttachment,
 		MethodMailCreateDraft, MethodMailCommitDraft, MethodMailSend, MethodMailCommitSend,
 		MethodMailSendDraft, MethodMailCommitSendDraft,

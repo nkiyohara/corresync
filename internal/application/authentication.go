@@ -112,13 +112,47 @@ type AuthenticationCommand struct {
 }
 
 // AuthenticationNextAction describes the only automatic-free recovery action
-// Corresync permits ordinary CLI and MCP callers to offer.
+// Corresync permits ordinary CLI and MCP callers to offer. MCPTool, when set,
+// names the one MCP tool that may ask the person to approve the same sign-in
+// in the MCP client; it never starts anything by itself (ADR 0039).
 type AuthenticationNextAction struct {
 	Kind                     string                `json:"kind"`
 	Command                  AuthenticationCommand `json:"command"`
+	MCPTool                  string                `json:"mcpTool,omitempty"`
 	RequiresUserConsent      bool                  `json:"requiresUserConsent"`
 	RequiresHumanInteraction bool                  `json:"requiresHumanInteraction"`
 	SecretsAllowedInMCP      bool                  `json:"secretsAllowedInMCP"`
+}
+
+func localInteractiveLoginAction(alias, mcpTool string) AuthenticationNextAction {
+	return AuthenticationNextAction{
+		Kind: "local_interactive_login",
+		Command: AuthenticationCommand{
+			Executable: "corr",
+			Args:       []string{"auth", "login", "--account", alias},
+		},
+		MCPTool:                  mcpTool,
+		RequiresUserConsent:      true,
+		RequiresHumanInteraction: true,
+		SecretsAllowedInMCP:      false,
+	}
+}
+
+func (action AuthenticationNextAction) validate(alias string) error {
+	if action.Kind != "local_interactive_login" ||
+		action.Command.Executable != "corr" ||
+		len(action.Command.Args) != 4 ||
+		action.Command.Args[0] != "auth" ||
+		action.Command.Args[1] != "login" ||
+		action.Command.Args[2] != "--account" ||
+		action.Command.Args[3] != alias ||
+		action.MCPTool != "" && action.MCPTool != AccountSignInTool ||
+		!action.RequiresUserConsent ||
+		!action.RequiresHumanInteraction ||
+		action.SecretsAllowedInMCP {
+		return errors.New("authentication action has an unsafe next action")
+	}
+	return nil
 }
 
 // AuthenticationRetry makes route preservation and write non-replay explicit.
@@ -168,23 +202,14 @@ func NewAuthenticationActionRequired(
 		)
 	}
 	action := AuthenticationActionRequired{
-		Version:  AuthenticationContractVersion,
-		Code:     code,
-		Account:  account,
-		Alias:    alias,
-		Service:  service,
-		Provider: provider,
-		Reason:   reason,
-		NextAction: AuthenticationNextAction{
-			Kind: "local_interactive_login",
-			Command: AuthenticationCommand{
-				Executable: "corr",
-				Args:       []string{"auth", "login", "--account", alias},
-			},
-			RequiresUserConsent:      true,
-			RequiresHumanInteraction: true,
-			SecretsAllowedInMCP:      false,
-		},
+		Version:    AuthenticationContractVersion,
+		Code:       code,
+		Account:    account,
+		Alias:      alias,
+		Service:    service,
+		Provider:   provider,
+		Reason:     reason,
+		NextAction: localInteractiveLoginAction(alias, AccountSignInTool),
 		Retry: AuthenticationRetry{
 			Automatic:                     false,
 			AfterAction:                   "retry_same_read_once",
@@ -219,17 +244,8 @@ func (action AuthenticationActionRequired) Validate() error {
 	if err := action.Reason.Validate(); err != nil {
 		return err
 	}
-	if action.NextAction.Kind != "local_interactive_login" ||
-		action.NextAction.Command.Executable != "corr" ||
-		len(action.NextAction.Command.Args) != 4 ||
-		action.NextAction.Command.Args[0] != "auth" ||
-		action.NextAction.Command.Args[1] != "login" ||
-		action.NextAction.Command.Args[2] != "--account" ||
-		action.NextAction.Command.Args[3] != action.Alias ||
-		!action.NextAction.RequiresUserConsent ||
-		!action.NextAction.RequiresHumanInteraction ||
-		action.NextAction.SecretsAllowedInMCP {
-		return errors.New("authentication action has an unsafe next action")
+	if err := action.NextAction.validate(action.Alias); err != nil {
+		return err
 	}
 	if action.Retry.Automatic ||
 		action.Retry.AfterAction != "retry_same_read_once" ||

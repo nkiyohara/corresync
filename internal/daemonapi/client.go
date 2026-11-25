@@ -77,6 +77,49 @@ func (client *Client) Login(ctx context.Context, account domain.AccountID, calle
 	return result, nil
 }
 
+// RequestAccountSignIn asks the session owner whether one account may be
+// offered to the person for an approved sign-in. It never starts one.
+func (client *Client) RequestAccountSignIn(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (application.AccountSignInRequest, error) {
+	if err := account.ValidateOpaque(); err != nil {
+		return application.AccountSignInRequest{}, err
+	}
+	var result application.AccountSignInRequest
+	if err := client.call(ctx, MethodSignInRequest, caller, SignInRequestInput{Account: account}, &result); err != nil {
+		return application.AccountSignInRequest{}, err
+	}
+	if err := result.Validate(account); err != nil {
+		return application.AccountSignInRequest{}, fmt.Errorf("daemon returned invalid sign-in request: %w", err)
+	}
+	return result, nil
+}
+
+// ResolveAccountSignIn reports the person's elicitation answer for one
+// reserved approval request.
+func (client *Client) ResolveAccountSignIn(
+	ctx context.Context,
+	resolution application.AccountSignInResolution,
+	caller domain.Caller,
+) (application.AccountSignInResult, error) {
+	if err := resolution.Validate(); err != nil {
+		return application.AccountSignInResult{}, err
+	}
+	var result application.AccountSignInResult
+	if err := client.call(ctx, MethodSignInResolve, caller, resolution, &result); err != nil {
+		return application.AccountSignInResult{}, err
+	}
+	if err := result.Validate(); err != nil {
+		return application.AccountSignInResult{}, fmt.Errorf("daemon returned invalid sign-in result: %w", err)
+	}
+	if result.Account != resolution.Account {
+		return application.AccountSignInResult{}, errors.New("daemon returned sign-in result for a different account")
+	}
+	return result, nil
+}
+
 // Logout closes exactly one account's in-memory provider sessions.
 func (client *Client) Logout(
 	ctx context.Context,
