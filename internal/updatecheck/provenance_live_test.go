@@ -1,3 +1,11 @@
+//go:build live
+
+// Opt-in checks against a published release: provenance verification and a
+// self-update of a disposable binary. They need no provider account, but they
+// read release assets the operator downloaded, so like every *_live_test.go
+// file they compile only with `-tags live` and skip unless their variables
+// are set.
+
 package updatecheck
 
 import (

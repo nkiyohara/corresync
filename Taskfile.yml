@@ -92,9 +92,10 @@ tasks:
         plugin validate plugins/corresync --strict
 
   vet:
-    desc: Run the Go static analyzer
+    desc: Run the Go static analyzer, also compiling the opt-in live harnesses without running them
     cmds:
       - go vet ./...
+      - go vet -tags live ./...
 
   lint:
     desc: Run the configured Go and shell linters
