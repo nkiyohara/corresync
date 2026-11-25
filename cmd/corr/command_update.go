@@ -66,9 +66,11 @@ func (command *updateCommand) Run(app *runtime) error {
 }
 
 func (command *updateCheckCommand) Run(app *runtime) error {
-	ctx, cancel := context.WithTimeout(app.context, 5*time.Second)
+	ctx, cancel := context.WithTimeout(app.context, 20*time.Second)
 	defer cancel()
-	report, _ := app.updateReport(ctx)
+	// An explicit check asks the release endpoint again. The 24-hour cache,
+	// which also remembers a failed lookup, is for the automatic notice only.
+	report, _ := app.updateReportFresh(ctx)
 	if command.JSON {
 		return writeJSON(app.stdout, report)
 	}
