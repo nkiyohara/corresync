@@ -279,7 +279,7 @@ the account.
 
 `corr settings` opens the same account wizard in an arrow-key form. Use it to
 sign in to, rename, select, or remove accounts, and to manage updates, safety,
-and browser sign-in. Its Setup guide entry resumes the full `corr setup` flow.
+and browser sign-in. Its Setup entry runs `corr setup`.
 The top-level Accounts category holds Add account and your accounts; selecting
 one shows only its actions. Removal shows the local data it deletes and asks
 you to confirm; removing the default first asks which account replaces it.
@@ -342,9 +342,17 @@ corr mcp setup codex
 ```
 
 Run `corr mcp --help` for Claude Code, GitHub Copilot CLI, Gemini CLI, Qwen
-Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 71
+Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 72
 narrow tools and two read-only monitor resources. There is no HTTP, SSE, or
 remote MCP endpoint, and no hosted relay.
+
+An agent cannot sign you in by itself. When an account needs sign-in, the agent
+can ask through the `account_sign_in` tool, and your MCP client then asks you.
+The prompt names the account and the sign-in page. Only if you accept does
+Corresync open the same browser sign-in as `corr auth login`. This works for
+an account you have already signed in to once from the terminal with the same
+connection settings, on a computer with a display; otherwise the agent gets
+the command for you to run.
 
 </details>
 

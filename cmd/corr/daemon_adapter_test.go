@@ -499,7 +499,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	if err := body.Run(app); err != nil {
 		t.Fatalf("mail body preview Run() error = %v", err)
 	}
-	if backend.bodyCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("private body was not read")) {
+	if backend.bodyCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("the message has not been read")) {
 		t.Fatalf("body preview commits=%d output=%s", backend.bodyCommits, stdout.String())
 	}
 	stdout.Reset()
@@ -509,7 +509,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 		t.Fatalf("mail body commit Run() error = %v", err)
 	}
 	if backend.bodyCommits != 1 || !bytes.Contains(stdout.Bytes(), []byte("Synthetic body")) ||
-		!bytes.Contains(stderr.Bytes(), []byte("Reading the private body")) {
+		!bytes.Contains(stderr.Bytes(), []byte("Reading this message now")) {
 		t.Fatalf("body commits=%d stdout=%q stderr=%s", backend.bodyCommits, stdout.String(), stderr.String())
 	}
 	stdout.Reset()
@@ -518,7 +518,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	if err := draft.Run(app); err != nil {
 		t.Fatalf("mail draft preview Run() error = %v", err)
 	}
-	if backend.draftCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("no draft was saved")) {
+	if backend.draftCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("no draft has been saved")) {
 		t.Fatalf("draft preview commits=%d output=%s", backend.draftCommits, stdout.String())
 	}
 	stdout.Reset()
@@ -528,7 +528,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 		t.Fatalf("mail draft commit Run() error = %v", err)
 	}
 	if backend.draftCommits != 1 || !bytes.Contains(stdout.Bytes(), []byte("draft-1")) ||
-		!bytes.Contains(stderr.Bytes(), []byte("Saving this exact draft")) {
+		!bytes.Contains(stderr.Bytes(), []byte("Saving this draft now")) {
 		t.Fatalf("draft commits=%d stdout=%s stderr=%s", backend.draftCommits, stdout.String(), stderr.String())
 	}
 	stdout.Reset()
@@ -539,7 +539,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	if err := send.Run(app); err != nil {
 		t.Fatalf("mail send preview Run() error = %v", err)
 	}
-	if backend.sendCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("nothing was sent")) {
+	if backend.sendCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("this message has not been sent")) {
 		t.Fatalf("preview commits=%d output=%s", backend.sendCommits, stdout.String())
 	}
 	stdout.Reset()
@@ -548,8 +548,8 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	if err := send.Run(app); err != nil {
 		t.Fatalf("mail send commit Run() error = %v", err)
 	}
-	if backend.sendCommits != 1 || !bytes.Contains(stdout.Bytes(), []byte("Sent message")) ||
-		!bytes.Contains(stderr.Bytes(), []byte("Committing this exact send")) {
+	if backend.sendCommits != 1 || !bytes.Contains(stdout.Bytes(), []byte("Sent the message")) ||
+		!bytes.Contains(stderr.Bytes(), []byte("Sending this message now")) {
 		t.Fatalf(
 			"commit count=%d stdout=%s stderr=%s",
 			backend.sendCommits, stdout.String(), stderr.String(),
@@ -564,7 +564,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 		t.Fatalf("mail send-draft preview Run() error = %v", err)
 	}
 	if backend.sendDraftCommits != 0 ||
-		!bytes.Contains(stdout.Bytes(), []byte("saved draft was not sent")) ||
+		!bytes.Contains(stdout.Bytes(), []byte("this draft has not been sent")) ||
 		!bytes.Contains(stdout.Bytes(), []byte("draft-change-1")) {
 		t.Fatalf("saved-draft preview commits=%d output=%s", backend.sendDraftCommits, stdout.String())
 	}
@@ -575,8 +575,8 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 		t.Fatalf("mail send-draft commit Run() error = %v", err)
 	}
 	if backend.sendDraftCommits != 1 ||
-		!bytes.Contains(stdout.Bytes(), []byte("Sent saved draft draft-1")) ||
-		!bytes.Contains(stderr.Bytes(), []byte("Committing this exact saved draft version")) {
+		!bytes.Contains(stdout.Bytes(), []byte("Sent draft draft-1")) ||
+		!bytes.Contains(stderr.Bytes(), []byte("Sending this draft now")) {
 		t.Fatalf(
 			"saved-draft commit count=%d stdout=%s stderr=%s",
 			backend.sendDraftCommits, stdout.String(), stderr.String(),
@@ -594,7 +594,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	if err := calendarCreate.Run(app); err != nil {
 		t.Fatalf("calendar create preview Run() error = %v", err)
 	}
-	if backend.calendarCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("no event was created")) {
+	if backend.calendarCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("no event has been created")) {
 		t.Fatalf("calendar preview commits=%d output=%s", backend.calendarCommits, stdout.String())
 	}
 	stdout.Reset()
@@ -606,7 +606,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	if backend.calendarCommits != 1 || !backend.calendarReview.OnlineMeeting ||
 		!bytes.Contains(stdout.Bytes(), []byte("event-created-1")) ||
 		!bytes.Contains(stdout.Bytes(), []byte("https://teams.microsoft.com/")) ||
-		!bytes.Contains(stderr.Bytes(), []byte("Committing this exact calendar event")) {
+		!bytes.Contains(stderr.Bytes(), []byte("Creating this event now")) {
 		t.Fatalf(
 			"calendar commit count=%d stdout=%s stderr=%s",
 			backend.calendarCommits, stdout.String(), stderr.String(),
@@ -621,7 +621,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	if err := calendarUpdate.Run(app); err != nil {
 		t.Fatalf("calendar update preview Run() error = %v", err)
 	}
-	if backend.calendarUpdateCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("no event was updated")) {
+	if backend.calendarUpdateCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("the event has not been changed")) {
 		t.Fatalf("calendar update preview commits=%d output=%s", backend.calendarUpdateCommits, stdout.String())
 	}
 	stdout.Reset()
@@ -631,7 +631,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 		t.Fatalf("calendar update commit Run() error = %v", err)
 	}
 	if backend.calendarUpdateCommits != 1 || !bytes.Contains(stdout.Bytes(), []byte("change-updated-1")) ||
-		!bytes.Contains(stderr.Bytes(), []byte("Committing this exact calendar update")) {
+		!bytes.Contains(stderr.Bytes(), []byte("Changing this event now")) {
 		t.Fatalf(
 			"calendar update commit count=%d stdout=%s stderr=%s",
 			backend.calendarUpdateCommits, stdout.String(), stderr.String(),
@@ -645,7 +645,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 	if err := calendarCancel.Run(app); err != nil {
 		t.Fatalf("calendar cancel preview Run() error = %v", err)
 	}
-	if backend.calendarCancelCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("nothing was cancelled")) {
+	if backend.calendarCancelCommits != 0 || !bytes.Contains(stdout.Bytes(), []byte("nothing has been cancelled")) {
 		t.Fatalf("calendar cancel preview commits=%d output=%s", backend.calendarCancelCommits, stdout.String())
 	}
 	stdout.Reset()
@@ -655,7 +655,7 @@ func TestCLIAndMCPAdaptersUseDaemonWithoutLaunchingBrowser(t *testing.T) {
 		t.Fatalf("calendar cancel commit Run() error = %v", err)
 	}
 	if backend.calendarCancelCommits != 1 || !bytes.Contains(stdout.Bytes(), []byte("event-created-1")) ||
-		!bytes.Contains(stderr.Bytes(), []byte("destructive calendar cancellation")) {
+		!bytes.Contains(stderr.Bytes(), []byte("Cancelling this event now")) {
 		t.Fatalf(
 			"calendar cancel commit count=%d stdout=%s stderr=%s",
 			backend.calendarCancelCommits, stdout.String(), stderr.String(),

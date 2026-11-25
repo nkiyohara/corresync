@@ -88,10 +88,10 @@ The expected release inventory is:
   catalogs;
 - source-building Homebrew plus Scoop and WinGet manifests.
 
-During the finite v0.8–v0.9 command transition, binary archives and packages
-also contain `corresync`, built from exactly the same package, source commit,
-version metadata, and flags as `corr`. There is no separate compatibility
-manual or completion.
+During the finite command transition that began with v0.8 (ADR 0016), binary
+archives and packages also contain `corresync`, built from exactly the same
+package, source commit, version metadata, and flags as `corr`. There is no
+separate compatibility manual or completion.
 
 The release hook renders every integration package from the canonical bundle
 specification using the exact stable or preview tag. Checked-in manifests are

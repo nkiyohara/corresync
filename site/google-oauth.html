@@ -264,7 +264,11 @@ $ corr doctor --account personal</code></pre>
             Don’t use service accounts, domain-wide delegation, or weaker controls to get around
             this.
           </li>
-          <li>MCP can use a session you already signed in to, but it cannot start Google OAuth.</li>
+          <li>
+            An agent cannot start Google sign-in by itself. It can ask, your MCP client asks you,
+            and the sign-in opens only if you accept, and only for an account you already signed in
+            to once from the terminal.
+          </li>
         </ul>
       </section>
       <section class="final-cta" aria-labelledby="oauth-cta">

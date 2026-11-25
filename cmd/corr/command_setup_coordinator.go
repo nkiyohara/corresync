@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"charm.land/huh/v2"
@@ -15,12 +16,10 @@ import (
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/integrationlifecycle"
+	"github.com/nkiyohara/corresync/internal/localipc"
 )
 
-const (
-	setupInspectionTimeout            = 750 * time.Millisecond
-	setupIntegrationInspectionTimeout = 3 * time.Second
-)
+const setupInspectionTimeout = 750 * time.Millisecond
 
 type setupCompletionState string
 
@@ -38,14 +37,14 @@ type setupCompletionInspection struct {
 }
 
 type setupPreflight struct {
-	configPath        string
-	accounts          application.AccountCatalog
-	sessions          map[string]application.SessionStatus
-	sessionProblem    string
-	completion        setupCompletionInspection
-	agents            agenthost.Report
-	agentProblem      string
-	integrationStates map[agenthost.ID]integrationlifecycle.State
+	configPath     string
+	createdConfig  bool
+	accounts       application.AccountCatalog
+	sessions       map[string]application.SessionStatus
+	sessionProblem string
+	completion     setupCompletionInspection
+	agents         agenthost.Report
+	agentProblem   string
 }
 
 type setupIntegrationOutcome struct {
@@ -53,40 +52,50 @@ type setupIntegrationOutcome struct {
 	results  []integrationlifecycle.Result
 }
 
+// runGuidedAccountSetup is `corr setup` without an address. It starts with
+// the question the person came for (the email address); tab completion and
+// AI agents are short optional steps after the accounts, and the summary at
+// the end names the one command to run next.
 func runGuidedAccountSetup(app *runtime, createdConfig bool) error {
-	if err := writeOnboardingWelcome(app); err != nil {
-		return err
-	}
 	preflight, err := inspectSetupPreflight(app)
 	if err != nil {
 		return err
 	}
-	if err := writeSetupPreflight(app, preflight); err != nil {
+	preflight.createdConfig = createdConfig
+	if err := writeOnboardingWelcome(app, preflight.accounts.Accounts); err != nil {
 		return err
 	}
 
-	completionProblem := offerSetupCompletion(app, &preflight.completion)
 	progress, err := runOnboardingAccountPhase(app, createdConfig)
 	if err != nil {
-		return errors.Join(completionProblem, err)
+		if createdConfig {
+			view := newConsoleView(app, app.stdout, true)
+			_, _ = view.printf(
+				"\n   %s\n",
+				view.muted("Settings were saved in a new file: "+sanitizeCell(preflight.configPath, 2048)),
+			)
+		}
+		return err
 	}
 	if progress.cancelled {
 		if len(preflight.accounts.Accounts) > 0 && progress.added == 0 {
-			return errors.Join(completionProblem, writeOnboardingPaused(app))
+			return writeOnboardingPaused(app)
 		}
-		return completionProblem
+		return nil
 	}
 	if !progress.proceed {
-		return completionProblem
+		return nil
 	}
 
-	// Account setup may have started or replaced the session owner, so derive
-	// the final summary from current local state rather than the opening view.
+	// Account setup may have started or replaced the daemon, so derive the
+	// final summary from current local state rather than the opening view.
 	preflight, err = refreshSetupAccountState(app, preflight)
 	if err != nil {
-		return errors.Join(completionProblem, err)
+		return err
 	}
-	integrations, integrationErr := runSetupAgentSelection(app, preflight.agents)
+	completionProblem := offerSetupCompletion(app, &preflight.completion)
+	inspectSetupAgents(app, &preflight)
+	integrations, integrationErr := runSetupAgentStep(app, preflight.agents)
 	if err := writeSetupSummary(
 		app,
 		preflight,
@@ -122,23 +131,20 @@ func inspectSetupPreflight(app *runtime) (setupPreflight, error) {
 		configPath,
 		catalog,
 	)
-	preflight.agents, err = app.detectAgentHosts(
-		app.context,
-		agenthost.Request{},
-	)
+	return preflight, nil
+}
+
+// inspectSetupAgents looks for AI agents on this computer. It runs only after
+// the accounts are done, so a slow lookup never delays the first question.
+func inspectSetupAgents(app *runtime, preflight *setupPreflight) {
+	report, err := app.detectAgentHosts(app.context, agenthost.Request{})
+	preflight.agents = report
 	if err != nil {
 		preflight.agentProblem = err.Error()
 	}
-	if preflight.agents.Failure != nil && preflight.agentProblem == "" {
-		preflight.agentProblem = preflight.agents.Failure.Code
+	if report.Failure != nil && preflight.agentProblem == "" {
+		preflight.agentProblem = report.Failure.Code
 	}
-	if len(catalog.Accounts) > 0 {
-		preflight.integrationStates = inspectSetupIntegrationStates(
-			app,
-			preflight.agents,
-		)
-	}
-	return preflight, nil
 }
 
 func refreshSetupAccountState(
@@ -208,24 +214,11 @@ func offerSetupCompletion(
 	if inspection.state != setupCompletionAbsent {
 		return nil
 	}
-	view := newConsoleView(app, app.stdout, true)
-	if _, err := view.printf(
-		"%s  %s\n   %s\n   %s\n",
-		view.info(),
-		view.strong("Optional shell completion"),
-		view.muted("Target: "+sanitizeCell(inspection.path, 2048)),
-		view.muted("Remove that generated file to uninstall."),
-	); err != nil {
-		return err
-	}
 	confirmed, err := runOnboardingConfirm(
 		app,
-		"Install shell completion?",
-		fmt.Sprintf(
-			"Corresync will write only %s. Remove that generated file to uninstall.",
-			sanitizeCell(inspection.path, 2048),
-		),
-		"Install "+inspection.shell+" completion",
+		"Install tab completion for "+inspection.shell+"?",
+		"Adds one file; remove it to uninstall: "+sanitizeCell(inspection.path, 2048),
+		"Install",
 		"Later",
 	)
 	if err != nil || !confirmed {
@@ -255,11 +248,16 @@ func inspectSetupSessions(
 	}
 	endpoint, err := app.endpoint(configPath)
 	if err != nil {
-		return result, "cannot resolve the local session owner"
+		return result, "cannot resolve the local daemon"
+	}
+	// No daemon is the normal state right after setup: every account is
+	// simply signed out, which is not a problem to report.
+	if active, activeErr := localipc.EndpointActive(endpoint); activeErr == nil && !active {
+		return result, ""
 	}
 	client, err := daemonapi.NewClient(endpoint)
 	if err != nil {
-		return result, "cannot inspect the local session owner"
+		return result, "cannot inspect the local daemon"
 	}
 	defer func() { _ = client.Close() }()
 	ctx, cancel := context.WithTimeout(app.context, setupInspectionTimeout)
@@ -267,7 +265,7 @@ func inspectSetupSessions(
 	owner, err := client.InspectOwner(ctx, app.caller())
 	status := owner.Status()
 	if err != nil {
-		return result, "the running session owner uses an incompatible local protocol"
+		return result, "the running daemon uses an incompatible local protocol"
 	}
 	if status.ProcessID < 1 {
 		return result, ""
@@ -276,11 +274,11 @@ func inspectSetupSessions(
 	if err != nil || status.ConfigDigest != fingerprint ||
 		status.ProtocolVersion != daemonapi.ProtocolVersion ||
 		status.Version != app.info.Version {
-		return result, "the running session owner does not match the current configuration and binary"
+		return result, "the running daemon does not match the current settings and version"
 	}
 	sessions, err := client.SessionStatus(ctx, app.caller())
 	if err != nil {
-		return result, "the running session owner could not report account status"
+		return result, "the running daemon could not report account status"
 	}
 	for _, session := range sessions.Accounts {
 		result[session.Alias] = session
@@ -288,38 +286,8 @@ func inspectSetupSessions(
 	return result, ""
 }
 
-func inspectSetupIntegrationStates(
-	app *runtime,
-	report agenthost.Report,
-) map[agenthost.ID]integrationlifecycle.State {
-	hosts := setupDetectedLifecycleHosts(report)
-	if len(hosts) == 0 {
-		return nil
-	}
-	engine, requests, err := prepareIntegrationLifecycle(
-		app,
-		integrationTargetFlags{Hosts: hosts, Scope: string(agenthost.ScopeUser)},
-		integrationlifecycle.OperationSetup,
-		true,
-	)
-	if err != nil {
-		return nil
-	}
-	states := make(map[agenthost.ID]integrationlifecycle.State, len(requests))
-	for _, request := range requests {
-		ctx, cancel := context.WithTimeout(
-			app.context,
-			setupIntegrationInspectionTimeout,
-		)
-		inspection, inspectErr := engine.Inspect(ctx, request)
-		cancel()
-		if inspectErr == nil {
-			states[request.Host] = inspection.State
-		}
-	}
-	return states
-}
-
+// setupDetectedLifecycleHosts lists the agents found on this computer that
+// setup can both connect and inspect.
 func setupDetectedLifecycleHosts(report agenthost.Report) []string {
 	hosts := make([]string, 0, len(report.Hosts))
 	for _, detection := range report.Hosts {
@@ -336,6 +304,46 @@ func setupDetectedLifecycleHosts(report agenthost.Report) []string {
 	return hosts
 }
 
+func setupAgentFound(status agenthost.DetectionStatus) bool {
+	return status == agenthost.StatusConfirmed || status == agenthost.StatusProbable
+}
+
+// runSetupAgentStep offers to connect AI agents as one optional question. The
+// agent's settings change only after the person picks agents and approves the
+// plan that follows.
+func runSetupAgentStep(
+	app *runtime,
+	report agenthost.Report,
+) (setupIntegrationOutcome, error) {
+	found := make([]string, 0, len(report.Hosts))
+	selectable := 0
+	for _, detection := range report.Hosts {
+		if !detection.Host.Lifecycle.Setup ||
+			detection.Status == agenthost.StatusUnsupportedSurface {
+			continue
+		}
+		selectable++
+		if setupAgentFound(detection.Status) {
+			found = append(found, sanitizeCell(detection.Host.DisplayName, 64))
+		}
+	}
+	if selectable == 0 {
+		return setupIntegrationOutcome{}, nil
+	}
+	description := "None found on this computer, but you can still pick one."
+	if len(found) > 0 {
+		description = "Found: " + strings.Join(found, ", ") + "."
+	}
+	description += " You review each change before it is made."
+	connect, err := runOnboardingConfirm(
+		app, "Connect an AI agent?", description, "Choose agents", "Later",
+	)
+	if err != nil || !connect {
+		return setupIntegrationOutcome{}, err
+	}
+	return runSetupAgentSelection(app, report)
+}
+
 func runSetupAgentSelection(
 	app *runtime,
 	report agenthost.Report,
@@ -346,26 +354,20 @@ func runSetupAgentSelection(
 			detection.Status == agenthost.StatusUnsupportedSurface {
 			continue
 		}
-		label := fmt.Sprintf(
-			"%s · %s · %s",
-			detection.Host.DisplayName,
-			detection.Status,
-			capabilitySummary(detection.Host),
-		)
-		option := huh.NewOption(label, detection.Host.ID)
-		if detection.Status == agenthost.StatusConfirmed ||
-			detection.Status == agenthost.StatusProbable {
-			option = option.Selected(true)
+		label := detection.Host.DisplayName + " (not found on this computer)"
+		if setupAgentFound(detection.Status) {
+			label = detection.Host.DisplayName + " (found)"
 		}
-		options = append(options, option)
+		options = append(options, huh.NewOption(label, detection.Host.ID).
+			Selected(setupAgentFound(detection.Status)))
 	}
 	if len(options) == 0 {
 		return setupIntegrationOutcome{}, nil
 	}
 	selected, submitted, err := runSettingsMultiSelect(
 		app,
-		"Which agents do you use?",
-		"Detected hosts are preselected. Known but missing hosts remain available; Corresync never installs an agent.",
+		"Which agents should use Corresync?",
+		"Agents found on this computer are selected. Corresync never installs an agent.",
 		options,
 		nil,
 	)
@@ -391,94 +393,20 @@ func runSetupAgentSelection(
 	return outcome, err
 }
 
-func writeSetupPreflight(app *runtime, preflight setupPreflight) error {
-	view := newConsoleView(app, app.stdout, true)
-	if _, err := view.printf(
-		"%s  %s\n\n  %-18s %s\n  %-18s %s\n  %-18s %s\n",
-		view.info(),
-		view.strong("Setup preflight"),
-		"Version", sanitizeCell(app.info.Version, 128),
-		"Configuration", sanitizeCell(preflight.configPath, 2048),
-		"Completion", completionPreflightLabel(preflight.completion),
-	); err != nil {
-		return err
-	}
-	if len(preflight.accounts.Accounts) == 0 {
-		if _, err := fmt.Fprintln(app.stdout, "  Accounts           none configured"); err != nil {
-			return err
-		}
-	} else {
-		for _, account := range preflight.accounts.Accounts {
-			session := preflight.sessions[account.Alias]
-			if _, err := fmt.Fprintf(
-				app.stdout,
-				"  Account            %-16s %s · %s\n",
-				sanitizeCell(account.Alias, 64),
-				accountRouteLabel(account),
-				session.State,
-			); err != nil {
-				return err
-			}
-		}
-	}
-	detected := 0
-	for _, detection := range preflight.agents.Hosts {
-		if detection.Status != agenthost.StatusConfirmed &&
-			detection.Status != agenthost.StatusProbable &&
-			detection.Status != agenthost.StatusSelectedMissing {
-			continue
-		}
-		detected++
-		connection := "connection not inspected"
-		if state, ok := preflight.integrationStates[detection.Host.ID]; ok {
-			connection = string(state)
-		}
-		if _, err := fmt.Fprintf(
-			app.stdout,
-			"  Agent              %-22s %s · %s\n",
-			sanitizeCell(detection.Host.DisplayName, 64),
-			detection.Status,
-			connection,
-		); err != nil {
-			return err
-		}
-	}
-	if detected == 0 {
-		if _, err := fmt.Fprintln(app.stdout, "  Agents             none detected; known hosts remain selectable"); err != nil {
-			return err
-		}
-	}
-	if preflight.agentProblem != "" {
-		if _, err := view.printf(
-			"  %s  %s\n",
-			view.warning(),
-			view.muted("Agent detection was incomplete; corr integrations detect --refresh can retry."),
-		); err != nil {
-			return err
-		}
-	}
-	_, err := fmt.Fprintln(app.stdout)
-	return err
-}
-
-func completionPreflightLabel(inspection setupCompletionInspection) string {
-	if inspection.shell == "" {
-		return string(inspection.state)
-	}
-	return inspection.shell + " · " + string(inspection.state)
-}
-
 func writeOnboardingPaused(app *runtime) error {
 	view := newConsoleView(app, app.stdout, true)
 	_, err := view.printf(
 		"\n%s  %s\n   %s\n",
 		view.info(),
-		view.strong("Setup paused"),
-		view.command("Resume from current state: corr setup"),
+		view.strong("Setup paused. Nothing was changed."),
+		view.muted("Run corr setup again to continue."),
 	)
 	return err
 }
 
+// writeSetupSummary ends guided setup: what is ready, what still needs the
+// person, the settings file (named once, here), and the one command to run
+// next.
 func writeSetupSummary(
 	app *runtime,
 	preflight setupPreflight,
@@ -489,58 +417,53 @@ func writeSetupSummary(
 	ready := make([]string, 0, len(preflight.accounts.Accounts)+len(integrations.results)+1)
 	attention := make([]string, 0, len(preflight.accounts.Accounts)+len(integrations.results)+2)
 	optional := make([]string, 0, 2)
+	next := ""
 
 	for _, account := range preflight.accounts.Accounts {
-		ready = append(ready, fmt.Sprintf(
-			"Account %s · %s route configured",
-			account.Alias,
-			accountRouteLabel(account),
-		))
 		session := preflight.sessions[account.Alias]
-		if session.Authenticated {
-			if len(session.Degradations) > 0 {
-				attention = append(attention, fmt.Sprintf(
-					"Account %s · %d observed degradation(s); corr auth status --account %s",
-					account.Alias,
-					len(session.Degradations),
-					shellSingleQuote(account.Alias),
-				))
-			} else {
-				ready = append(ready, "Account "+account.Alias+" · authenticated")
-			}
-		} else {
+		route := setupAccountServices(account)
+		switch {
+		case session.Authenticated && len(session.Degradations) > 0:
 			attention = append(attention, fmt.Sprintf(
-				"Account %s · %s; corr auth login --account %s",
+				"Account %s · %d problem(s) found after sign-in; %s",
 				account.Alias,
-				session.State,
-				shellSingleQuote(account.Alias),
+				len(session.Degradations),
+				shellCommand("corr", "auth", "status", "--account", account.Alias),
 			))
+		case session.Authenticated:
+			ready = append(ready, "Account "+account.Alias+" · "+route+" · signed in")
+		default:
+			ready = append(ready, "Account "+account.Alias+" · "+route)
+			attention = append(attention, "Account "+account.Alias+" · not signed in yet")
+			if next == "" {
+				next = shellCommand("corr", "auth", "login", "--account", account.Alias)
+			}
 		}
 	}
 
 	switch preflight.completion.state {
 	case setupCompletionCurrent:
-		ready = append(ready, preflight.completion.shell+" completion · installed")
+		ready = append(ready, preflight.completion.shell+" tab completion · installed")
 	case setupCompletionAbsent:
-		optional = append(optional, "Shell completion · corr completion install --shell auto")
+		optional = append(optional, "Tab completion · corr completion install --shell auto")
 	case setupCompletionUnavailable:
-		optional = append(optional, "Shell completion · corr completion install --help")
+		optional = append(optional, "Tab completion · corr completion install --help")
 	case setupCompletionConflict:
 		attention = append(attention, fmt.Sprintf(
-			"Shell completion · review %s before corr completion install --shell %s --force",
+			"Tab completion · a different file is at %s; check it, then run corr completion install --shell %s --force",
 			preflight.completion.path,
 			preflight.completion.shell,
 		))
 	}
 	if completionProblem != nil && preflight.completion.state != setupCompletionConflict {
-		attention = append(attention, "Shell completion · installation did not complete")
+		attention = append(attention, "Tab completion · installation did not finish")
 	}
 
 	for _, result := range integrations.results {
 		switch result.Status {
 		case integrationlifecycle.ResultAppliedVerified,
 			integrationlifecycle.ResultAlreadyCurrent:
-			ready = append(ready, string(result.Host)+" · connected and verified")
+			ready = append(ready, string(result.Host)+" · connected and checked")
 		case integrationlifecycle.ResultReloadRequired:
 			attention = append(attention, string(result.Host)+" · open a new session or reload the host")
 		case integrationlifecycle.ResultAlreadyAbsent,
@@ -561,19 +484,20 @@ func writeSetupSummary(
 	}
 	if !integrations.selected ||
 		(len(integrations.results) == 0 && integrationProblem == nil) {
-		optional = append(optional, "Agent connection · corr integrations setup HOST")
+		optional = append(optional, "AI agent · corr integrations setup HOST")
 	}
 	if integrationProblem != nil && len(integrations.results) == 0 {
-		attention = append(attention, "Agent connection · rerun corr setup or corr integrations setup HOST")
+		attention = append(attention, "AI agent · run corr setup again or corr integrations setup HOST")
 	}
 	if preflight.sessionProblem != "" {
-		attention = append(attention, "Session status · corr daemon status")
+		attention = append(attention, "Sign-in status · "+preflight.sessionProblem+"; corr daemon status")
 	}
 	if preflight.agentProblem != "" {
-		attention = append(attention, "Agent detection · corr integrations detect --refresh")
+		attention = append(attention, "AI agent search did not finish · corr integrations detect --refresh")
 	}
 
 	view := newConsoleView(app, app.stdout, true)
+	width := app.textWidth(app.stdout)
 	if _, err := view.printf("\n%s  %s\n", view.success(), view.strong("Setup summary")); err != nil {
 		return err
 	}
@@ -583,26 +507,66 @@ func writeSetupSummary(
 	}{
 		{title: "Ready", items: ready},
 		{title: "Needs attention", items: attention},
-		{title: "Optional later", items: optional},
+		{title: "Later, if you want", items: optional},
 	} {
-		if _, err := fmt.Fprintln(app.stdout, "\n"+group.title); err != nil {
-			return err
-		}
 		if len(group.items) == 0 {
-			if _, err := fmt.Fprintln(app.stdout, "  none"); err != nil {
-				return err
-			}
 			continue
 		}
+		if _, err := fmt.Fprintln(app.stdout, "\n  "+group.title); err != nil {
+			return err
+		}
 		for _, item := range group.items {
-			if _, err := fmt.Fprintln(app.stdout, "  - "+sanitizeCell(item, 2300)); err != nil {
+			if _, err := fmt.Fprintln(
+				app.stdout,
+				"    - "+strings.TrimPrefix(wrapText(sanitizeCell(item, 2300), width, "      "), "      "),
+			); err != nil {
 				return err
 			}
 		}
 	}
-	_, err := view.printf(
-		"\n%s\n",
-		view.command("Resume, repair, or add another account at any time: corr setup"),
-	)
+	settingsLine := "Settings file: " + sanitizeCell(preflight.configPath, 2048)
+	if preflight.createdConfig {
+		settingsLine = "Settings were saved in a new file: " + sanitizeCell(preflight.configPath, 2048)
+	}
+	lines := []string{
+		"",
+		wrapText(view.muted(settingsLine), width, "  "),
+		wrapText(view.muted("Run corr setup again at any time to add an account or repair one."), width, "  "),
+	}
+	if next != "" {
+		lines = append(lines, "", "  "+view.nextStep(next))
+	}
+	_, err := fmt.Fprintln(app.stdout, strings.Join(lines, "\n"))
 	return err
+}
+
+// setupAccountServices names an account's services and how each connects,
+// such as "Mail and Calendar (Outlook Web)" or "Mail (IMAP / SMTP)".
+func setupAccountServices(account application.AccountView) string {
+	type service struct{ name, provider string }
+	services := make([]service, 0, 4)
+	for _, route := range []struct {
+		name  string
+		route *application.AccountRouteView
+	}{{"Mail", account.Mail}, {"Calendar", account.Calendar}, {"Tasks", account.Tasks}} {
+		if route.route != nil {
+			services = append(services, service{route.name, providerDisplayName(route.route.Provider)})
+		}
+	}
+	if account.Messages != nil {
+		services = append(services, service{"Messages", string(account.Messages.Provider)})
+	}
+	parts := make([]string, 0, len(services))
+	for index := 0; index < len(services); index++ {
+		names := []string{services[index].name}
+		for index+1 < len(services) && services[index+1].provider == services[index].provider {
+			index++
+			names = append(names, services[index].name)
+		}
+		parts = append(parts, strings.Join(names, " and ")+" ("+services[index].provider+")")
+	}
+	if len(parts) == 0 {
+		return "no services"
+	}
+	return strings.Join(parts, ", ")
 }

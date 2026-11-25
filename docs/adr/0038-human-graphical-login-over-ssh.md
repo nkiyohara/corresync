@@ -87,3 +87,45 @@ released client accepted a graphical result before. On 2026-11-25 the view was
 run on a Linux host without a display against the real Outlook Web sign-in
 page, up to credential entry. A completed provider login from a Mac remains
 unobserved.
+
+## Amendment: login view usability
+
+The decision above stands. The view becomes easier to use, with these bounded
+additions:
+
+- The page shows one state at a time (starting, loading, ready, check the
+  screen, reconnecting, or how the login ended) and the time left before the
+  link expires. The loopback server adds the remaining lifetime to its own
+  page response; this is not daemon protocol.
+- Paste sends the local clipboard text as one existing `text` action within
+  the 4 KiB bound, and only on the person's explicit Paste button or
+  Ctrl/Cmd+V. The page reads the local clipboard at that moment only; nothing
+  reads or writes the remote page's clipboard.
+- A new `move` action carries only a viewport position and is dispatched as a
+  mouse move with no button, so hover menus open and nothing is activated. The
+  page sends at most five a second while the pointer is over the picture,
+  never queues one behind other input, and drops a move that fails. A failed
+  move does not stop input or count as a lost input. Moves are input like any
+  other: never repeated automatically, never sent to a non-HTTPS page.
+  Private daemon protocol 31 accepts the action, so client and daemon must
+  still be the same release.
+- An unchanged frame is not sent again. The loopback server keeps the last
+  frame in memory for the life of the view, tells the page by a frame number
+  that its picture is current, and sends the picture again to a reloaded tab.
+  The `--host` helper keeps a SHA-256 digest of the last frame it sent and
+  marks an identical one as unchanged instead. Frame identity includes the
+  origin, so the label always matches the picture. Frames are still never
+  logged or written anywhere.
+- The SSH wire becomes version 2 because it carries `move`. A newer local side
+  stops at the first request against an older helper, before any input. A
+  newer helper still answers version 1 requests in version 1 and refuses a
+  move in them; an older local side ignores the new optional `unchanged` and
+  `expiresIn` result fields and sees an omitted frame as "keep the picture".
+  Using the same release on both computers remains the supported setup.
+- The page refreshes about four times a second for a few seconds after input
+  and once a second when idle or after a failed read, so the five
+  consecutive unreadable screens that end the view still take about five
+  seconds.
+
+The Content-Security-Policy, pairing, Host and Origin checks, single
+controller, request bounds, and at-most-once input dispatch are unchanged.

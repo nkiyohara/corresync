@@ -18,10 +18,23 @@ import (
 )
 
 type doctorCommand struct {
-	Account        string `help:"Configured account alias; defaults to default_account."`
-	Online         bool   `help:"Validate live contracts through an already authenticated session."`
-	ConnectionOnly bool   `help:"With --online, report last-authenticated route connectivity without reading remote item metadata."`
-	JSON           bool   `help:"Write a content-free machine-readable report."`
+	Account        string `help:"Account to check (alias); defaults to the default account."`
+	Online         bool   `help:"Also check the connection to the provider; the account must already be signed in."`
+	ConnectionOnly bool   `help:"With --online, report what was confirmed at sign-in and read nothing from the provider."`
+	JSON           bool   `help:"Write a machine-readable report; it contains no mail, calendar, or task data."`
+}
+
+func (*doctorCommand) Help() string {
+	return `Doctor checks the configuration, the account, the browser it needs, the
+local daemon, and whether an update is available. With --online it also
+reads a little metadata from each of the account's services through a
+sign-in you already have; it never signs in, and it prints no mail,
+calendar, or task data.
+
+Examples:
+  corr doctor
+  corr doctor --online --account work
+  corr doctor --online --connection-only --json`
 }
 
 type doctorReport struct {
@@ -30,6 +43,9 @@ type doctorReport struct {
 	Version string        `json:"version"`
 	Account string        `json:"account,omitempty"`
 	Checks  []doctorCheck `json:"checks"`
+
+	// next is the command on the human "Next:" line; JSON leaves it out.
+	next string
 }
 
 type doctorCheck struct {
@@ -42,7 +58,7 @@ const browserProbeTimeout = 20 * time.Second
 
 func (command *doctorCommand) Run(app *runtime) error {
 	if command.ConnectionOnly && !command.Online {
-		return errors.New("--connection-only requires --online")
+		return withHint(errors.New("--connection-only requires --online"), shellCommand("corr", "doctor", "--online", "--connection-only"))
 	}
 	report := doctorReport{
 		Healthy: true,
@@ -56,7 +72,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 		report.add("config", "fail", doctorError(err))
 		return command.finish(app, report)
 	}
-	report.add("config", "pass", "strict secret-free configuration is valid")
+	report.add("config", "pass", "the configuration is valid and holds no passwords or tokens")
 
 	accountID, err := app.account(configuration, command.Account)
 	if err != nil {
@@ -69,7 +85,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 		return command.finish(app, report)
 	}
 	report.Account = string(accountID)
-	report.add("account", "pass", "configured account identity and provider routes are valid")
+	report.add("account", "pass", "the account and its provider settings are valid")
 	command.addOAuthScopes(configured, &report)
 	command.addUpdateStatus(app, configuration, &report)
 
@@ -87,7 +103,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 				"browser",
 				"pass",
 				"started "+sanitizeCell(filepath.Base(executable), 80)+
-					" with normal sandbox settings; no navigation performed",
+					" with its normal sandbox; it opened no page",
 			)
 		}
 	default:
@@ -101,7 +117,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 		}
 		report.add("local_ipc", "fail", doctorError(err))
 	} else {
-		report.add("local_ipc", "pass", "config-scoped no-TCP endpoint is available")
+		report.add("local_ipc", "pass", "the connection to the local daemon is set up; it uses no network port")
 		command.addDaemonStatus(app, configPath, &report)
 	}
 
@@ -109,8 +125,11 @@ func (command *doctorCommand) Run(app *runtime) error {
 		report.add(
 			"live_provider_routes",
 			"skip",
-			"run `corr auth login` first, then use --online to validate the selected routes",
+			"run `corr auth login` first, then use --online to check the connection to the provider",
 		)
+		if report.Healthy {
+			report.next = shellCommand("corr", "doctor", "--online", "--account", alias)
+		}
 		return command.finish(app, report)
 	}
 	if !report.Healthy {
@@ -121,13 +140,13 @@ func (command *doctorCommand) Run(app *runtime) error {
 	client, status, err := app.openDaemon(app.context)
 	if err != nil {
 		report.set("daemon", "fail", doctorError(err))
-		report.add("live_provider_routes", "skip", "session owner is unavailable")
+		report.add("live_provider_routes", "skip", "the local daemon is not available")
 		return command.finish(app, report)
 	}
 	report.set(
 		"daemon",
 		"pass",
-		fmt.Sprintf("protocol %d session owner is ready", status.ProtocolVersion),
+		fmt.Sprintf("the local daemon (protocol %d) is ready", status.ProtocolVersion),
 	)
 
 	sessions, err := client.SessionStatus(app.context, app.caller())
@@ -142,6 +161,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 			)
 		}
 		report.add("session", "fail", detail)
+		report.next = shellCommand("corr", "auth", "login", "--account", alias)
 		if configured.Mail != nil {
 			report.add("folder_contract", "skip", "provider session is not authenticated")
 			report.add("mail_contract", "skip", "provider session is not authenticated")
@@ -159,7 +179,7 @@ func (command *doctorCommand) Run(app *runtime) error {
 		}
 		return command.finish(app, report)
 	}
-	report.add("session", "pass", "selected provider routes authenticated in daemon memory")
+	report.add("session", "pass", "the account is signed in")
 	if command.ConnectionOnly {
 		command.addContentFreeConnectionChecks(configured, session, &report)
 		if err := client.Close(); err != nil {
@@ -300,12 +320,12 @@ func (command *doctorCommand) addOAuthScopes(
 	report.add(
 		"oauth_scopes",
 		"pass",
-		"configured explicit consent: "+strings.Join(summaries, "; "),
+		"scopes requested at sign-in: "+strings.Join(summaries, "; "),
 	)
 }
 
 func authenticatedAccountSession(
-	sessions daemonapi.SessionStatusResult,
+	sessions application.SessionStatusResult,
 	account domain.AccountID,
 ) (application.SessionStatus, bool) {
 	for _, session := range sessions.Accounts {
@@ -415,7 +435,7 @@ func (command *doctorCommand) addDaemonStatus(
 		report.add(
 			"daemon",
 			"fail",
-			"multiple session owners use legacy runtime locations; run `corr daemon stop` once",
+			"multiple copies of the local daemon are running, some from runtime folders of an older version; run `corr daemon stop` once",
 		)
 		return
 	}
@@ -455,7 +475,7 @@ func (command *doctorCommand) addDaemonStatus(
 				"daemon",
 				"fail",
 				fmt.Sprintf(
-					"running version %s uses protocol %d; run `corr daemon start` to replace it",
+					"the local daemon is version %s (protocol %d), not this corr; run `corr daemon start` to replace it",
 					status.Version,
 					status.ProtocolVersion,
 				),
@@ -465,7 +485,7 @@ func (command *doctorCommand) addDaemonStatus(
 		report.add(
 			"daemon",
 			"pass",
-			fmt.Sprintf("version %s protocol %d is ready", status.Version, status.ProtocolVersion),
+			fmt.Sprintf("the local daemon (version %s, protocol %d) is running", status.Version, status.ProtocolVersion),
 		)
 		return
 	}
@@ -475,7 +495,7 @@ func (command *doctorCommand) addDaemonStatus(
 			"daemon",
 			"fail",
 			fmt.Sprintf(
-				"running version %s uses protocol %d; run `corr daemon start` to replace it",
+				"the local daemon is version %s (protocol %d), not this corr; run `corr daemon start` to replace it",
 				status.Version,
 				status.ProtocolVersion,
 			),
@@ -483,7 +503,7 @@ func (command *doctorCommand) addDaemonStatus(
 		return
 	}
 	if errors.Is(statusErr, os.ErrNotExist) {
-		report.add("daemon", "skip", "not running; it will start on the first provider command")
+		report.add("daemon", "skip", "the local daemon is not running; the next command that needs it starts it")
 		return
 	}
 	report.add("daemon", "fail", doctorError(statusErr))
@@ -498,7 +518,8 @@ func (command *doctorCommand) addUpdateStatus(app *runtime, configuration config
 	defer cancel()
 	update, err := app.updateReport(ctx)
 	if err != nil {
-		report.add("update", "skip", string(configuration.Updates.Channel)+" release status is temporarily unavailable")
+		report.add("update", "skip", string(configuration.Updates.Channel)+
+			" release status is unavailable: "+updateUnavailableReason(update, err)+"; `corr update check` asks again")
 		return
 	}
 	switch update.Status {
@@ -517,7 +538,8 @@ func (command *doctorCommand) addUpdateStatus(app *runtime, configuration config
 	case updatecheck.StatusDevelopment:
 		report.add("update", "skip", "development build; "+string(update.Channel)+" release comparison skipped")
 	case updatecheck.StatusUnavailable:
-		report.add("update", "skip", string(update.Channel)+" release status is temporarily unavailable")
+		report.add("update", "skip", string(update.Channel)+
+			" release status is unavailable: "+updateUnavailableReason(update, nil)+"; `corr update check` asks again")
 	}
 }
 
@@ -561,6 +583,11 @@ func (command *doctorCommand) finish(app *runtime, report doctorReport) error {
 				view.strong(fmt.Sprintf("%-16s", sanitizeCell(check.Name, 40))),
 				sanitizeCell(check.Detail, 240),
 			); err != nil {
+				writeErr = errors.Join(writeErr, err)
+			}
+		}
+		if report.next != "" {
+			if _, err := view.printf("\n%s\n", view.nextStep(report.next)); err != nil {
 				writeErr = errors.Join(writeErr, err)
 			}
 		}

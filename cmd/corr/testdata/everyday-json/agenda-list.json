@@ -1,0 +1,69 @@
+{
+  "events": [
+    {
+      "accountAlias": "work",
+      "displayStart": "2026-07-28T10:00:00Z",
+      "displayEnd": "2026-07-28T11:00:00Z",
+      "displayTimeZone": "UTC",
+      "event": {
+        "id": "all-event-1",
+        "subject": "Synthetic agenda event",
+        "start": "2026-07-28T10:00:00Z",
+        "end": "2026-07-28T11:00:00Z",
+        "originalStart": "2026-07-28T10:00:00Z",
+        "originalEnd": "2026-07-28T11:00:00Z",
+        "originalStartTimeZone": "UTC",
+        "originalEndTimeZone": "UTC",
+        "originalStartFloating": false,
+        "originalEndFloating": false,
+        "organizer": {},
+        "isAllDay": false,
+        "isOnlineMeeting": false,
+        "isOrganizer": false,
+        "isCancelled": false,
+        "provenance": {
+          "accountId": "acc_00000000000000000000000000000001",
+          "provider": "microsoft-owa",
+          "calendarId": "calendar",
+          "sourceObjectId": "all-event-1"
+        }
+      }
+    }
+  ],
+  "accounts": [
+    {
+      "account": "acc_00000000000000000000000000000001",
+      "alias": "work",
+      "provider": "microsoft-owa",
+      "service": "calendar",
+      "complete": true,
+      "fetchedItems": 1,
+      "exhausted": true,
+      "capabilities": {
+        "mail": false,
+        "calendar": true,
+        "tasks": false,
+        "messages": false,
+        "folders": false,
+        "labels": false,
+        "push": false,
+        "freeBusy": false,
+        "incrementalSync": false,
+        "scheduledSend": false,
+        "sharedMailboxes": false,
+        "sharedCalendars": false,
+        "attachmentReads": false,
+        "attachmentWrites": false,
+        "draftSend": false
+      }
+    }
+  ],
+  "failures": null,
+  "start": "2026-07-28T00:00:00Z",
+  "end": "2026-07-29T00:00:00Z",
+  "displayTimeZone": "UTC",
+  "offset": 0,
+  "limit": 50,
+  "hasMore": false,
+  "complete": true
+}

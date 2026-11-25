@@ -14,16 +14,16 @@ import (
 )
 
 type accountCommand struct {
-	Discover accountDiscoverCommand `cmd:"" help:"Find explainable provider candidates without authenticating."`
-	List     accountListCommand     `cmd:"" help:"List configured account routes."`
-	Show     accountShowCommand     `cmd:"" help:"Show one configured account route."`
-	Add      accountAddCommand      `cmd:"" help:"Add an explicitly selected route without authenticating."`
-	Rename   accountRenameCommand   `cmd:"" help:"Rename an account while preserving its stable identity."`
-	Remove   accountRemoveCommand   `cmd:"" help:"Remove an account and its Corresync-owned local state."`
+	Discover accountDiscoverCommand `cmd:"" help:"Show how Corresync could connect to an address, without signing in."`
+	List     accountListCommand     `cmd:"" help:"List your accounts."`
+	Show     accountShowCommand     `cmd:"" help:"Show how one account connects."`
+	Add      accountAddCommand      `cmd:"" help:"Add an account with the connection you choose, without signing in."`
+	Rename   accountRenameCommand   `cmd:"" help:"Rename an account; its sign-in and data stay."`
+	Remove   accountRemoveCommand   `cmd:"" help:"Remove an account and what Corresync keeps for it on this computer."`
 }
 
 type accountDiscoverCommand struct {
-	Address string `arg:"" help:"Bare email address to inspect without credentials."`
+	Address string `arg:"" help:"Email address to look up. Nothing signs in."`
 	JSON    bool   `help:"Write machine-readable JSON."`
 }
 
@@ -32,70 +32,70 @@ type accountListCommand struct {
 }
 
 type accountShowCommand struct {
-	Account string `arg:"" help:"Account alias or stable opaque ID."`
+	Account string `arg:"" help:"Account name or ID."`
 	JSON    bool   `help:"Write machine-readable JSON."`
 }
 
 type accountAddCommand struct {
-	Address                          string `arg:"" optional:"" help:"Bare email address; task-only routes may omit it."`
-	Alias                            string `help:"Local alias; defaults to the address local part."`
-	Provider                         string `help:"Compatibility alias for --mail-provider."`
-	MailProvider                     string `help:"Explicit mail provider override; use none for calendar-only."`
-	CalendarProvider                 string `help:"Explicit calendar provider override; use none for mail-only."`
-	TaskProvider                     string `help:"Explicit task provider override; use none to omit tasks."`
-	MicrosoftCloud                   string `default:"global" enum:"global,gcc-high,dod,china" help:"Microsoft Graph deployment shared by selected Microsoft services."`
-	Origin                           string `help:"Outlook Web HTTPS origin override."`
-	Mailbox                          string `help:"Optional routed or sender mailbox identity."`
-	SessionURL                       string `help:"JMAP HTTPS session resource."`
-	APIBase                          string `help:"Google Calendar or Microsoft Graph API HTTPS base override."`
-	OAuthClientID                    string `name:"oauth-client-id" help:"BYO OAuth public-client ID."`
-	OAuthRedirectURI                 string `name:"oauth-redirect-uri" help:"Registered http://127.0.0.1 loopback redirect URI."`
-	AuthorizationKey                 string `help:"OS-keyring handle for the OAuth grant."`
-	ApproveOAuth                     bool   `name:"approve-oauth" help:"Confirm explicit OAuth authorization when no valid grant exists."`
-	OAuthClientSecretBackend         string `name:"oauth-client-secret-backend" default:"os-keyring" enum:"os-keyring,helper" help:"External backend for a Google Desktop client credential."`
-	OAuthClientSecretKey             string `name:"oauth-client-secret-key" help:"External lookup handle for a Google Desktop client credential."`
-	ApproveOAuthClientSecret         bool   `name:"approve-oauth-client-secret" help:"Record explicit consent to resolve the Google Desktop client credential."`
-	CalendarAPIBase                  string `name:"calendar-api-base" help:"Calendar OAuth API HTTPS base override."`
-	CalendarOAuthClientID            string `name:"calendar-oauth-client-id" help:"Calendar BYO OAuth public-client ID; defaults to --oauth-client-id."`
-	CalendarOAuthRedirectURI         string `name:"calendar-oauth-redirect-uri" help:"Calendar loopback redirect; defaults to --oauth-redirect-uri."`
-	CalendarAuthorizationKey         string `name:"calendar-authorization-key" help:"Calendar OAuth grant key; defaults to --authorization-key."`
-	ApproveCalendarOAuth             bool   `name:"approve-calendar-oauth" help:"Confirm a distinct calendar OAuth authorization."`
-	CalendarOAuthClientSecretBackend string `name:"calendar-oauth-client-secret-backend" help:"Calendar Google Desktop client credential backend (os-keyring or helper); defaults to --oauth-client-secret-backend."`
-	CalendarOAuthClientSecretKey     string `name:"calendar-oauth-client-secret-key" help:"Calendar Google Desktop client credential handle; defaults to --oauth-client-secret-key."`
-	ApproveCalendarOAuthClientSecret bool   `name:"approve-calendar-oauth-client-secret" help:"Confirm a distinct Calendar Google client credential reference."`
-	TaskAPIBase                      string `name:"task-api-base" help:"Pinned task API base override."`
-	TaskOAuthClientID                string `name:"task-oauth-client-id" help:"Task BYO OAuth client ID; defaults to --oauth-client-id."`
-	TaskOAuthRedirectURI             string `name:"task-oauth-redirect-uri" help:"Task loopback redirect; defaults to --oauth-redirect-uri."`
-	TaskAuthorizationKey             string `name:"task-authorization-key" help:"Independent OS-keyring grant handle for tasks; defaults to --authorization-key."`
-	ApproveTaskOAuth                 bool   `name:"approve-task-oauth" help:"Confirm the task OAuth grant and its task-only scope."`
-	TaskOAuthSecretBackend           string `name:"task-oauth-secret-backend" help:"External backend for a confidential task OAuth client secret (os-keyring or helper); defaults to --oauth-client-secret-backend."`
-	TaskOAuthSecretKey               string `name:"task-oauth-secret-key" help:"External lookup handle for a confidential task OAuth client secret."`
-	ApproveTaskOAuthSecret           bool   `name:"approve-task-oauth-secret" help:"Record explicit consent to resolve the confidential task OAuth client secret."`
-	TaskReadOnly                     bool   `name:"task-read-only" help:"Request the selected provider's read-only task scope."`
-	TaskCalDAVEndpoint               string `name:"task-caldav-endpoint" help:"CalDAV HTTPS discovery endpoint for VTODO tasks; defaults to --caldav-endpoint."`
-	TaskListPath                     string `name:"task-list-path" help:"Optional absolute CalDAV VTODO collection path."`
-	TaskUsername                     string `name:"task-username" help:"CalDAV task login identity; defaults to calendar, mail, or account identity."`
-	TaskCredentialBackend            string `name:"task-credential-backend" help:"External CalDAV task credential backend; defaults to --credential-backend."`
-	TaskCredentialKey                string `name:"task-credential-key" help:"Independent external CalDAV task credential handle."`
-	ApproveTaskCredential            bool   `name:"approve-task-credential" help:"Record explicit consent for the CalDAV task credential."`
-	Username                         string `help:"Mail login identity; defaults to the address and must match it for Google."`
-	CredentialBackend                string `default:"os-keyring" enum:"os-keyring,helper" help:"External standards credential backend."`
-	CredentialKey                    string `help:"External standards credential lookup key."`
-	ApproveCredential                bool   `help:"Record explicit consent to use that external credential."`
-	IMAPHost                         string `help:"IMAP server host."`
-	IMAPPort                         uint16 `help:"IMAP server port."`
-	IMAPTLS                          string `name:"imap-tls" default:"implicit" enum:"implicit,starttls" help:"IMAP TLS mode."`
-	SMTPHost                         string `help:"SMTP Submission server host."`
-	SMTPPort                         uint16 `help:"SMTP Submission server port."`
-	SMTPTLS                          string `name:"smtp-tls" default:"starttls" enum:"implicit,starttls" help:"SMTP TLS mode."`
-	CalDAVEndpoint                   string `name:"caldav-endpoint" help:"CalDAV HTTPS discovery endpoint."`
-	CalendarPath                     string `help:"Optional absolute CalDAV calendar path."`
-	CalendarUsername                 string `help:"CalDAV login identity; defaults to --username or the address."`
-	CalendarCredentialBackend        string `help:"External CalDAV credential backend; defaults to --credential-backend."`
-	CalendarCredentialKey            string `help:"External CalDAV credential key; defaults to --credential-key."`
-	ApproveCalendarCredential        bool   `help:"Record consent for a distinct CalDAV credential."`
+	Address                          string `arg:"" optional:"" help:"Email address; task-only accounts may leave it out."`
+	Alias                            string `help:"Name for the account; defaults to the part of the address before @."`
 	Default                          bool   `help:"Make this the default account."`
 	JSON                             bool   `help:"Write machine-readable JSON."`
+	Provider                         string `group:"Choose the connection:" help:"Older name for --mail-provider."`
+	MailProvider                     string `group:"Choose the connection:" help:"Mail connection: microsoft-owa, imap-smtp, jmap, google, microsoft-graph, or none."`
+	CalendarProvider                 string `group:"Choose the connection:" help:"Calendar connection: microsoft-owa, caldav, google, microsoft-graph, or none."`
+	TaskProvider                     string `group:"Choose the connection:" help:"Task service to add, or none. See the Tasks flags below."`
+	Mailbox                          string `group:"Choose the connection:" help:"Other mailbox to read or send as, if your provider allows it."`
+	Origin                           string `group:"Outlook Web:" help:"Outlook Web address, such as https://outlook.cloud.microsoft."`
+	SessionURL                       string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"JMAP session URL (https://)."`
+	Username                         string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"Mail sign-in name; defaults to the address. Google requires the address."`
+	CredentialBackend                string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" default:"os-keyring" enum:"os-keyring,helper" help:"Where the password is saved: os-keyring or a credential helper."`
+	CredentialKey                    string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"Name of the saved password entry."`
+	ApproveCredential                bool   `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"Allow this account to use that saved password."`
+	IMAPHost                         string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"IMAP server name."`
+	IMAPPort                         uint16 `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"IMAP server port."`
+	IMAPTLS                          string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" name:"imap-tls" default:"implicit" enum:"implicit,starttls" help:"IMAP encryption: implicit or starttls."`
+	SMTPHost                         string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"SMTP server name for sending."`
+	SMTPPort                         uint16 `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"SMTP server port."`
+	SMTPTLS                          string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" name:"smtp-tls" default:"starttls" enum:"implicit,starttls" help:"SMTP encryption: implicit or starttls."`
+	CalDAVEndpoint                   string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" name:"caldav-endpoint" help:"CalDAV server URL (https://)."`
+	CalendarPath                     string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"CalDAV calendar path, if the server needs one."`
+	CalendarUsername                 string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"CalDAV sign-in name; defaults to --username or the address."`
+	CalendarCredentialBackend        string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"Where the CalDAV password is saved; defaults to --credential-backend."`
+	CalendarCredentialKey            string `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"Name of the saved CalDAV password; defaults to --credential-key."`
+	ApproveCalendarCredential        bool   `group:"IMAP/SMTP, JMAP, and CalDAV (password saved outside Corresync):" help:"Allow this account to use a separate CalDAV password."`
+	MicrosoftCloud                   string `group:"Microsoft Graph and Google (your own OAuth client):" default:"global" enum:"global,gcc-high,dod,china" help:"Microsoft cloud for every Microsoft service on this account."`
+	APIBase                          string `group:"Microsoft Graph and Google (your own OAuth client):" help:"Different API address for Google Calendar or Microsoft Graph (https://)."`
+	OAuthClientID                    string `group:"Microsoft Graph and Google (your own OAuth client):" name:"oauth-client-id" help:"Client ID of your own app registration or OAuth client."`
+	OAuthRedirectURI                 string `group:"Microsoft Graph and Google (your own OAuth client):" name:"oauth-redirect-uri" help:"Redirect URI registered for that client, on http://127.0.0.1."`
+	AuthorizationKey                 string `group:"Microsoft Graph and Google (your own OAuth client):" help:"Keyring name to save the sign-in under."`
+	ApproveOAuth                     bool   `group:"Microsoft Graph and Google (your own OAuth client):" name:"approve-oauth" help:"Allow sign-in with that client when no saved sign-in exists."`
+	OAuthClientSecretBackend         string `group:"Microsoft Graph and Google (your own OAuth client):" name:"oauth-client-secret-backend" default:"os-keyring" enum:"os-keyring,helper" help:"Where the Google client secret is saved."`
+	OAuthClientSecretKey             string `group:"Microsoft Graph and Google (your own OAuth client):" name:"oauth-client-secret-key" help:"Name of the saved Google client secret."`
+	ApproveOAuthClientSecret         bool   `group:"Microsoft Graph and Google (your own OAuth client):" name:"approve-oauth-client-secret" help:"Allow this account to use the saved Google client secret."`
+	CalendarAPIBase                  string `group:"Calendar with its own OAuth sign-in:" name:"calendar-api-base" help:"Different calendar API address (https://)."`
+	CalendarOAuthClientID            string `group:"Calendar with its own OAuth sign-in:" name:"calendar-oauth-client-id" help:"Calendar client ID; defaults to --oauth-client-id."`
+	CalendarOAuthRedirectURI         string `group:"Calendar with its own OAuth sign-in:" name:"calendar-oauth-redirect-uri" help:"Calendar redirect URI; defaults to --oauth-redirect-uri."`
+	CalendarAuthorizationKey         string `group:"Calendar with its own OAuth sign-in:" name:"calendar-authorization-key" help:"Keyring name for the calendar sign-in; defaults to --authorization-key."`
+	ApproveCalendarOAuth             bool   `group:"Calendar with its own OAuth sign-in:" name:"approve-calendar-oauth" help:"Allow a separate calendar sign-in."`
+	CalendarOAuthClientSecretBackend string `group:"Calendar with its own OAuth sign-in:" name:"calendar-oauth-client-secret-backend" help:"Where the calendar Google client secret is saved (os-keyring or helper); defaults to --oauth-client-secret-backend."`
+	CalendarOAuthClientSecretKey     string `group:"Calendar with its own OAuth sign-in:" name:"calendar-oauth-client-secret-key" help:"Name of the saved calendar Google client secret; defaults to --oauth-client-secret-key."`
+	ApproveCalendarOAuthClientSecret bool   `group:"Calendar with its own OAuth sign-in:" name:"approve-calendar-oauth-client-secret" help:"Allow a separate calendar Google client secret."`
+	TaskAPIBase                      string `group:"Tasks:" name:"task-api-base" help:"Different task API address (https://)."`
+	TaskOAuthClientID                string `group:"Tasks:" name:"task-oauth-client-id" help:"Task OAuth client ID; defaults to --oauth-client-id."`
+	TaskOAuthRedirectURI             string `group:"Tasks:" name:"task-oauth-redirect-uri" help:"Task redirect URI; defaults to --oauth-redirect-uri."`
+	TaskAuthorizationKey             string `group:"Tasks:" name:"task-authorization-key" help:"Keyring name for the task sign-in; defaults to --authorization-key."`
+	ApproveTaskOAuth                 bool   `group:"Tasks:" name:"approve-task-oauth" help:"Allow the task sign-in and its task-only access."`
+	TaskOAuthSecretBackend           string `group:"Tasks:" name:"task-oauth-secret-backend" help:"Where the task client secret is saved (os-keyring or helper); defaults to --oauth-client-secret-backend."`
+	TaskOAuthSecretKey               string `group:"Tasks:" name:"task-oauth-secret-key" help:"Name of the saved task client secret."`
+	ApproveTaskOAuthSecret           bool   `group:"Tasks:" name:"approve-task-oauth-secret" help:"Allow this account to use the saved task client secret."`
+	TaskReadOnly                     bool   `group:"Tasks:" name:"task-read-only" help:"Ask only for read access to tasks."`
+	TaskCalDAVEndpoint               string `group:"Tasks:" name:"task-caldav-endpoint" help:"CalDAV server URL for tasks; defaults to --caldav-endpoint."`
+	TaskListPath                     string `group:"Tasks:" name:"task-list-path" help:"CalDAV task list path, if the server needs one."`
+	TaskUsername                     string `group:"Tasks:" name:"task-username" help:"CalDAV task sign-in name; defaults to the calendar or mail sign-in."`
+	TaskCredentialBackend            string `group:"Tasks:" name:"task-credential-backend" help:"Where the CalDAV task password is saved; defaults to --credential-backend."`
+	TaskCredentialKey                string `group:"Tasks:" name:"task-credential-key" help:"Name of the saved CalDAV task password."`
+	ApproveTaskCredential            bool   `group:"Tasks:" name:"approve-task-credential" help:"Allow this account to use the saved CalDAV task password."`
 
 	// onboardingOAuthProvider records which guided setup branch populated the
 	// shared OAuth fields. It is ephemeral provenance, never a CLI flag or
@@ -104,16 +104,54 @@ type accountAddCommand struct {
 	onboardingGoogleClientPath string
 }
 
+func (command *accountAddCommand) Help() string {
+	return `Most people use ` + "`corr setup`" + `, which asks questions instead. This command is for scripts and for choosing the connection yourself. It never signs in: run ` + "`corr auth login --account NAME`" + ` afterwards.
+
+Without --mail-provider, Corresync uses a connection it found for the address, but only one that is safe to pick for you; Microsoft Graph and Google are never picked automatically. Choose them, or any other connection, with the flags below. Corresync never takes a password or token on the command line; it reads only the name of an entry saved in the keyring or a credential helper.
+
+Examples:
+
+  # Microsoft 365 through Outlook Web (browser sign-in)
+  corr account add ana@example.com --alias work \
+    --mail-provider microsoft-owa --origin https://outlook.cloud.microsoft
+
+  # IMAP/SMTP mail and CalDAV calendar, password saved as ana-mail
+  corr account add ana@example.com --alias home \
+    --mail-provider imap-smtp --calendar-provider caldav \
+    --imap-host imap.example.com --imap-port 993 \
+    --smtp-host smtp.example.com --smtp-port 587 \
+    --caldav-endpoint https://dav.example.com/ \
+    --credential-key ana-mail --approve-credential
+
+  # Microsoft Graph with your own app registration
+  corr account add ana@outlook.com --alias personal \
+    --mail-provider microsoft-graph --calendar-provider microsoft-graph \
+    --oauth-client-id YOUR_CLIENT_ID \
+    --oauth-redirect-uri http://127.0.0.1:0/callback \
+    --authorization-key personal-graph --approve-oauth
+
+  # Gmail and Google Calendar with your own Desktop OAuth client
+  corr auth google-client import ~/Downloads/client_secret.json --key ana-google-client
+  corr account add ana@gmail.com --alias gmail \
+    --mail-provider google --calendar-provider google \
+    --oauth-client-id YOUR_CLIENT_ID.apps.googleusercontent.com \
+    --oauth-redirect-uri http://127.0.0.1:0 \
+    --authorization-key ana-google --approve-oauth \
+    --oauth-client-secret-key ana-google-client --approve-oauth-client-secret
+
+Mail and calendar can use different connections. Calendar OAuth flags default to the shared --oauth-* values. Task services (microsoft-graph, google-tasks, todoist, ticktick, caldav) use the Tasks flags and may be added without an email address. More examples: docs/cli.md.`
+}
+
 type accountRenameCommand struct {
-	Account string `arg:"" help:"Account alias or stable opaque ID."`
-	Alias   string `arg:"" help:"New local alias."`
+	Account string `arg:"" help:"Account name or ID."`
+	Alias   string `arg:"" help:"New name."`
 	JSON    bool   `help:"Write machine-readable JSON."`
 }
 
 type accountRemoveCommand struct {
-	Account    string `arg:"" help:"Account alias or stable opaque ID."`
-	NewDefault string `help:"Replacement alias when removing the default while another account remains."`
-	Approve    bool   `help:"Confirm deletion of Corresync-owned local state."`
+	Account    string `arg:"" help:"Account name or ID."`
+	NewDefault string `help:"Account to make the default when you remove the current default."`
+	Approve    bool   `help:"Confirm that Corresync should delete what it keeps for this account."`
 	JSON       bool   `help:"Write machine-readable JSON."`
 }
 
@@ -429,16 +467,15 @@ func (command *accountAddCommand) Run(app *runtime) error {
 	}
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
 	_, err = view.printf(
-		"%s  %s\n\n  %-14s %s\n  %-14s %d/100\n  %-14s %s\n  %-14s %s\n\n%s  %s\n   %s\n",
+		"%s  %s\n\n  %-12s %s\n  %-12s %s\n  %-12s %s\n\n%s  %s\n   %s\n",
 		view.info(),
-		view.strong("Selected provider route"),
-		"Provider", selected.Provider,
-		"Confidence", selected.Confidence,
-		"Authentication", selected.Authentication,
-		"Endpoint", sanitizeCell(endpoint, 2048),
+		view.strong("Connection"),
+		"Provider", providerDisplayName(selected.Provider),
+		"Sign-in", onboardingSignInSummary(&selected),
+		"Server", sanitizeCell(endpoint, 2048),
 		view.success(),
-		view.strong("Account "+sanitizeCell(account.Alias, 64)+" added; authentication has not started"),
-		view.command("Next: corr auth login --account "+shellSingleQuote(account.Alias)),
+		view.strong("Account "+sanitizeCell(account.Alias, 64)+" added; not signed in yet"),
+		view.nextStep(shellCommand("corr", "auth", "login", "--account", account.Alias)),
 	)
 	return err
 }
@@ -477,13 +514,12 @@ func (command *accountAddCommand) addTaskOnly(
 	}
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
 	_, err = view.printf(
-		"%s  %s\n\n  %-14s %s\n  %-14s %s\n\n%s  %s\n   %s\n",
-		view.info(), view.strong("Selected task route"),
-		"Provider", provider,
-		"Discovery", "not needed for an explicit task route",
+		"%s  %s\n\n  %-12s %s\n\n%s  %s\n   %s\n",
+		view.info(), view.strong("Task connection"),
+		"Provider", providerDisplayName(provider),
 		view.success(),
-		view.strong("Account "+sanitizeCell(account.Alias, 64)+" added; authentication has not started"),
-		view.command("Next: corr auth login --account "+shellSingleQuote(account.Alias)),
+		view.strong("Account "+sanitizeCell(account.Alias, 64)+" added; not signed in yet"),
+		view.nextStep(shellCommand("corr", "auth", "login", "--account", account.Alias)),
 	)
 	return err
 }
@@ -1213,8 +1249,9 @@ func (command *accountRenameCommand) Run(app *runtime) error {
 
 func (command *accountRemoveCommand) Run(app *runtime) error {
 	if !command.Approve {
-		return errors.New(
-			"account removal deletes Corresync-owned local state; review the account and rerun with --approve",
+		return withHint(
+			errors.New("removing an account deletes what Corresync keeps for it on this computer; add --approve to confirm"),
+			shellCommand("corr", "account", "remove", command.Account, "--approve"),
 		)
 	}
 	if err := app.requireDaemonStopped(); err != nil {
@@ -1321,8 +1358,12 @@ func selectAccountCandidate(
 			return candidate, nil
 		}
 	}
-	return application.ProviderCandidate{}, errors.New(
-		"no automatically selectable provider is available; inspect `corr account discover` and pass --provider with an explicit endpoint",
+	return application.ProviderCandidate{}, withHint(
+		fmt.Errorf(
+			"no connection for %s can be picked automatically; choose one with --mail-provider or --calendar-provider",
+			result.Address,
+		),
+		shellCommand("corr", "account", "add", result.Address, "--help"),
 	)
 }
 
@@ -1424,30 +1465,34 @@ func writeDiscoveryResult(app *runtime, result application.AccountDiscoveryResul
 	if _, err := view.printf(
 		"%s  %s\n   %s\n",
 		view.info(),
-		view.strong("Provider candidates"),
-		view.muted(result.Address+" · evidence only; no authentication performed"),
+		view.strong("Ways to connect "+sanitizeCell(result.Address, 254)),
+		view.muted("Found without signing in. You'll confirm a connection works when you sign in."),
 	); err != nil {
 		return err
 	}
 	if len(result.Candidates) == 0 {
 		_, err := view.printf(
-			"\n  No candidate was inferred. Manual --provider and endpoint flags remain available.\n"+
+			"\n  Corresync couldn't find how to connect. You can still choose a connection yourself.\n"+
 				"  %s\n",
-			view.command("Next: corr account add "+shellSingleQuote(result.Address)+" --help"),
+			view.nextStep(shellCommand("corr", "setup")),
 		)
 		return err
 	}
-	for _, candidate := range result.Candidates {
-		availability := "planned"
-		if candidate.Available {
-			availability = "available"
+	for index, candidate := range result.Candidates {
+		rank := "Also possible"
+		if index == 0 {
+			rank = "Recommended"
 		}
+		if !candidate.Available {
+			rank = "Not available in this version"
+		}
+		copied := candidate
 		if _, err := view.printf(
-			"\n  %-18s %3d/100 · %s · %s\n",
+			"\n  %-14s %s (%s) · %s\n",
+			rank,
+			providerDisplayName(candidate.Provider),
 			candidate.Provider,
-			candidate.Confidence,
-			candidate.Authentication,
-			availability,
+			onboardingSignInSummary(&copied),
 		); err != nil {
 			return err
 		}
@@ -1471,9 +1516,9 @@ func writeDiscoveryResult(app *runtime, result application.AccountDiscoveryResul
 		}
 	}
 	_, err := view.printf(
-		"\n  Discovery changed nothing and opened no sign-in page.\n"+
+		"\n  Nothing was changed and nothing signed in.\n"+
 			"  %s\n",
-		view.command("Next: corr account add "+shellSingleQuote(result.Address)+" --help"),
+		view.nextStep(shellCommand("corr", "setup")),
 	)
 	return err
 }

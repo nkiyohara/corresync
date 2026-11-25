@@ -19,6 +19,18 @@ type updateCommand struct {
 	JSON   bool    `help:"Write machine-readable JSON without terminal styling."`
 }
 
+func (*updateCommand) Help() string {
+	return `A corr installed from a release archive is replaced in place after its
+signature and checksum are verified. When Homebrew, WinGet, Scoop, or a
+Linux package manager installed corr, the command to run is shown instead
+and nothing is changed. The release channel is set in the configuration.
+
+Examples:
+  corr update
+  corr update check
+  corr update check --json`
+}
+
 type updateCheckCommand struct {
 	JSON bool `help:"Write machine-readable JSON."`
 }
@@ -70,12 +82,17 @@ func (command *updateCheckCommand) Run(app *runtime) error {
 	defer cancel()
 	// An explicit check asks the release endpoint again. The 24-hour cache,
 	// which also remembers a failed lookup, is for the automatic notice only.
-	report, _ := app.updateReportFresh(ctx)
+	report, checkErr := app.updateReportFresh(ctx)
 	if command.JSON {
 		return writeJSON(app.stdout, report)
 	}
+	if report.Status == "" && checkErr != nil {
+		// The check failed before it had a status, e.g. on an unreadable
+		// configuration; there is nothing to show but the cause.
+		return fmt.Errorf("check for updates: %w", checkErr)
+	}
 	view := newUpdateView(app, app.stdout, app.interactiveStdout())
-	return view.writeCheck(report)
+	return view.writeCheck(report, checkErr)
 }
 
 func (command *updateApplyCommand) Run(app *runtime) error {
@@ -116,7 +133,14 @@ func (command *updateApplyCommand) Run(app *runtime) error {
 
 	report, err := app.updateReportFresh(ctx)
 	if err != nil {
-		return fmt.Errorf("check latest %s release: %w", report.Channel, err)
+		return withHint(&updateCheckFailure{
+			message: fmt.Sprintf(
+				"could not check for a newer %s release: %s",
+				report.Channel,
+				updateUnavailableReason(report, err),
+			),
+			err: err,
+		}, "corr update")
 	}
 	action := updateActionReport{
 		Channel:        effectiveUpdateChannel(report.Channel),
@@ -140,6 +164,17 @@ func (command *updateApplyCommand) Run(app *runtime) error {
 	}
 	return view.writeAction(action)
 }
+
+// updateCheckFailure is a failed release lookup explained in words; the
+// cause stays available to errors.Is and errors.As.
+type updateCheckFailure struct {
+	message string
+	err     error
+}
+
+func (failure *updateCheckFailure) Error() string { return failure.message }
+
+func (failure *updateCheckFailure) Unwrap() error { return failure.err }
 
 func (app *runtime) updateReport(ctx context.Context) (updateReport, error) {
 	return app.updateReportWith(ctx, app.checkUpdate)
@@ -205,7 +240,7 @@ func (app *runtime) maybeHandleAutomaticUpdate(parent context.Context) (updatech
 		if result.Status == updatecheck.InstallStatusUpdated {
 			return result, err
 		}
-		_ = view.writeAutomaticInstallFailure(report.CurrentVersion)
+		_ = view.writeAutomaticInstallFailure(report.CurrentVersion, err)
 		return updatecheck.InstallResult{}, nil
 	}
 	_ = view.writeAutomaticInstallResult(result)

@@ -24,7 +24,7 @@ func TestRunShowsHelpWithoutArguments(t *testing.T) {
 	if code := run(context.Background(), nil, &stdout, &stderr); code != 0 {
 		t.Fatalf("run() code = %d, stderr = %q", code, stderr.String())
 	}
-	if !strings.Contains(stdout.String(), "Local-first, guarded mail, calendar, and tasks") {
+	if !strings.Contains(stdout.String(), "Mail, calendars, and tasks from the terminal and for AI agents") {
 		t.Fatalf("help output did not contain description: %q", stdout.String())
 	}
 }
@@ -185,7 +185,9 @@ func TestPendingMessagingCommandsStayHiddenButParseable(t *testing.T) {
 }
 
 func TestUpdateDefaultsToActionAndKeepsCheckOnlySubcommand(t *testing.T) {
-	t.Parallel()
+	// The failing run records diagnostics/last-error.json; keep it out of the
+	// developer's real state directory.
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

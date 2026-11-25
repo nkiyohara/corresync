@@ -3,6 +3,7 @@
 package loginui
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
@@ -28,12 +29,30 @@ var indexHTML []byte
 //go:embed client.js
 var clientJS []byte
 
+// Result is one answer from the remote login. It is also the SSH helper's
+// wire result, so both optional fields are omitted when unset and an older
+// local side, which ignores them, still works.
 type Result struct {
 	Status string                           `json:"status"`
 	Frame  *application.GraphicalLoginFrame `json:"frame,omitempty"`
+	// Unchanged means the remote screen is byte-identical to the frame sent
+	// last, so Frame is omitted. It is never set together with Frame.
+	Unchanged bool `json:"unchanged,omitempty"`
+	// ExpiresIn is the remote helper's remaining lifetime in whole seconds.
+	ExpiresIn int `json:"expiresIn,omitempty"`
 }
 
 type Exchange func(context.Context, *application.GraphicalLoginAction) (Result, error)
+
+// pageResult is the loopback page's view of a Result. FrameID names the frame
+// the server holds; when the page already shows it, Frame is omitted.
+type pageResult struct {
+	Status    string                           `json:"status"`
+	Frame     *application.GraphicalLoginFrame `json:"frame,omitempty"`
+	FrameID   uint64                           `json:"frameId,omitempty"`
+	Unchanged bool                             `json:"unchanged,omitempty"`
+	ExpiresIn int                              `json:"expiresIn,omitempty"`
+}
 
 type Server struct {
 	server     *http.Server
@@ -48,14 +67,25 @@ type Server struct {
 	outcome    string
 	failure    error
 	unreadable int
-	done       chan struct{}
+	expires    time.Time
+	// The last frame is kept in memory only so an unchanged screen need not be
+	// sent again, and so a reloaded tab can get it back. It is dropped when the
+	// view ends.
+	frame   *application.GraphicalLoginFrame
+	frameID uint64
+	done    chan struct{}
 }
+
+// maxRemoteLifetime bounds the remaining lifetime a remote helper may report.
+const maxRemoteLifetime = 10 * time.Minute
 
 // maxUnreadableScreens is how many screen reads in a row may fail before the
 // view gives up. One read per second means the remote login is gone: it
 // expired, or a newer login for the same account replaced it.
 const maxUnreadableScreens = 5
 
+// New binds the view to loopback. The deadline of ctx, if any, is the time
+// the page shows as the link's remaining lifetime.
 func New(ctx context.Context, port int, exchange Exchange) (*Server, error) {
 	if port < 0 || port > 65535 || exchange == nil {
 		return nil, errors.New("invalid login UI options")
@@ -70,6 +100,9 @@ func New(ctx context.Context, port int, exchange Exchange) (*Server, error) {
 		return nil, err
 	}
 	result := &Server{listener: listener, port: listener.Addr().(*net.TCPAddr).Port, token: hex.EncodeToString(random[:]), exchange: exchange, done: make(chan struct{})}
+	if deadline, ok := ctx.Deadline(); ok {
+		result.expires = deadline
+	}
 	result.server = &http.Server{Handler: result, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 15 * time.Second, MaxHeaderBytes: 8 << 10}
 	return result, nil
 }
@@ -113,6 +146,7 @@ func (server *Server) Run(ctx context.Context) error {
 		_, _ = server.exchange(cleanup, &application.GraphicalLoginAction{Type: "cancel"})
 	}
 	server.token = ""
+	server.frame = nil
 	return result
 }
 
@@ -173,12 +207,23 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	server.mu.Lock()
 	defer server.mu.Unlock()
 	if server.finished || server.token == "" || subtle.ConstantTimeCompare([]byte(bearer), []byte(server.token)) != 1 {
-		http.Error(writer, "This login link has expired or is not valid. Run the corr command again for a new link.", http.StatusUnauthorized)
+		fail(writer, http.StatusUnauthorized, "expired", "This link has expired or is no longer valid. Run the corr command again for a new link.")
 		return
 	}
 	if server.controller != "" && server.controller != controller {
-		http.Error(writer, "Another browser tab already controls this login. Continue there, or cancel and run the corr command again.", http.StatusConflict)
+		fail(writer, http.StatusConflict, "elsewhere", "Another browser tab is using this link. Continue there, or cancel and run the corr command again.")
 		return
+	}
+	// The frame the page shows now, so an unchanged screen is not sent again.
+	// A reloaded tab sends none and gets the current frame.
+	shown := uint64(0)
+	if value := request.Header.Get("X-Login-Frame"); value != "" {
+		parsed, err := strconv.ParseUint(value, 10, 64)
+		if err != nil || len(value) > 20 {
+			http.Error(writer, "invalid input", http.StatusBadRequest)
+			return
+		}
+		shown = parsed
 	}
 	var action application.GraphicalLoginAction
 	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, 8<<10))
@@ -214,7 +259,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 			server.finished = true
 			server.failure = err
 			close(server.done)
-			http.Error(writer, "The login could not start. The terminal running corr shows the reason.", http.StatusBadGateway)
+			fail(writer, http.StatusBadGateway, "start-failed", "The login could not start. The terminal running corr shows why.")
 			return
 		}
 	} else {
@@ -224,7 +269,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		if action.Type == "refresh" {
 			server.unreadable++
 			if server.unreadable < maxUnreadableScreens {
-				http.Error(writer, "The remote screen could not be read.", http.StatusBadGateway)
+				fail(writer, http.StatusBadGateway, "unreadable", "The remote screen could not be read.")
 				return
 			}
 			// Close whatever is left of the remote login, then end the command
@@ -235,22 +280,67 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 			server.finished = true
 			server.failure = fmt.Errorf("the remote login ended before sign-in completed; run the command again: %w", err)
 			close(server.done)
-			http.Error(writer, "This login has ended. The terminal running corr shows the reason.", http.StatusBadGateway)
+			fail(writer, http.StatusBadGateway, "ended", "This login has ended. The terminal running corr shows why.")
 			return
 		}
-		http.Error(writer, "The last input may not have reached the remote page. Check the screen before typing again; input is never repeated automatically.", http.StatusBadGateway)
+		if action.Type == "move" {
+			// A pointer move that did not arrive is dropped, not reported.
+			fail(writer, http.StatusBadGateway, "dropped", "The pointer move was not delivered.")
+			return
+		}
+		fail(writer, http.StatusBadGateway, "input-unknown", "The last input may not have arrived. Press Refresh view and look at the screen before you continue.")
 		return
 	}
 	server.unreadable = 0
-	if result.Frame != nil && len(result.Frame.JPEG) > application.MaxGraphicalLoginFrameBytes {
+	if result.Frame != nil && (len(result.Frame.JPEG) == 0 || len(result.Frame.JPEG) > application.MaxGraphicalLoginFrameBytes) {
+		server.frame = nil
 		http.Error(writer, "frame exceeds bound", http.StatusBadGateway)
 		return
 	}
+	if result.Frame == nil && result.Unchanged && server.frame != nil {
+		result.Frame = server.frame
+	}
+	if result.ExpiresIn > 0 && time.Duration(result.ExpiresIn)*time.Second <= maxRemoteLifetime {
+		if remote := time.Now().Add(time.Duration(result.ExpiresIn) * time.Second); server.expires.IsZero() || remote.Before(server.expires) {
+			server.expires = remote
+		}
+	}
+	response := pageResult{Status: result.Status}
+	if !server.expires.IsZero() {
+		response.ExpiresIn = max(0, int((time.Until(server.expires)+time.Second-1)/time.Second))
+	}
+	if result.Frame != nil {
+		if !sameFrame(server.frame, result.Frame) {
+			server.frame = result.Frame
+			server.frameID++
+		}
+		response.FrameID = server.frameID
+		if shown == server.frameID {
+			response.Unchanged = true
+		} else {
+			response.Frame = server.frame
+		}
+	}
 	writer.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(writer).Encode(result)
+	_ = json.NewEncoder(writer).Encode(response)
 	if result.Status == "authenticated" || result.Status == "cancelled" {
 		server.finished = true
 		server.outcome = result.Status
+		server.frame = nil
 		close(server.done)
 	}
+}
+
+// fail answers the page with one plain sentence and a fixed state name the
+// page uses to choose what to show. Neither carries remote content.
+func fail(writer http.ResponseWriter, status int, state, message string) {
+	writer.Header().Set("X-Login-State", state)
+	http.Error(writer, message, status)
+}
+
+// sameFrame reports whether two frames show the same picture of the same
+// origin. The origin is compared too: the label must always match the page.
+func sameFrame(previous, next *application.GraphicalLoginFrame) bool {
+	return previous != nil && next != nil && previous.Origin == next.Origin &&
+		previous.Width == next.Width && previous.Height == next.Height && bytes.Equal(previous.JPEG, next.JPEG)
 }

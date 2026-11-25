@@ -110,7 +110,8 @@ single-user tool, not a remote gateway or tenant administration service.
   use Authorization Code with PKCE. TickTick uses the provider's documented
   confidential Authorization Code contract without inventing PKCE or refresh.
 - User-owned Google mail, calendar, and task routes are configured without
-  authentication and may authorize only from explicit local CLI login. Each
+  authentication and may authorize only from explicit local CLI login or a
+  sign-in the user approved in the MCP client. Each
   route pins its API base and cannot represent a password, app password,
   alternate host, or arbitrary Google API transport. Google Tasks uses an
   independent task-only scope set and authorization handle. The managed Google
@@ -129,6 +130,28 @@ single-user tool, not a remote gateway or tenant administration service.
   with a bounded reviewed handle and no password argument. The child owns the
   TTY prompt; `corr` receives only its exit status. MCP, JSON, pipes, and
   non-interactive setup cannot launch it.
+- MCP can request a sign-in; it starts only after the user approves it in the
+  MCP client ([ADR 0039](adr/0039-user-approved-sign-in-from-mcp.md)). Only
+  `account_sign_in` can ask, and only for an account whose current connection
+  settings a person already signed in to from the CLI; adding or changing an
+  account, through MCP or the CLI, requires a CLI sign-in again, so MCP cannot
+  choose the destination. The server-authored prompt names the alias, address,
+  services, and each exact sign-in host and OAuth client ID in plain ASCII. The
+  daemon accepts the approved start only through its separate MCP approval
+  method with a one-use, caller-bound ticket. One prompt and one running
+  sign-in per account, a persisted ten-minute cool-down after any shown prompt
+  that was not accepted or any unfinished sign-in, and content-free audit
+  records bound repetition.
+- The sealed request state and ticket prove an answer belongs to this server's
+  request for this account; they do not prove a person produced it. A client
+  that shows elicitation requests or `input_required` results to the model, or
+  lets the model fill the retried call, lets the model approve, and Corresync
+  cannot detect that. The person is then still protected by the CLI-verified
+  destination (the verifying `corr auth login` shows every sign-in host and,
+  the first time with given settings, asks for confirmation on a terminal),
+  credentials and MFA typed by a person in the browser, the cool-down, and the
+  audit log. Hosts without a display, logout, and browser
+  clearing stay CLI-only.
 - Account-add approval displays the exact external backend/key handles and
   rejects cross-account handle reuse before both preview and atomic commit.
 - Discovery cannot access credentials, start consent, or probe administrator

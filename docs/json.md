@@ -77,6 +77,22 @@ plus `action`. States are `signed_out`, `authentication_pending`,
 compatibility fields; a partially active hybrid account is authenticated and
 its capabilities describe only active services.
 
+`auth status --json` adds an optional `pendingSignIn` member to an account
+while a sign-in started by another `corr auth login` is unfinished:
+
+```json
+"pendingSignIn": {"kind": "login_view", "expiresAt": "2026-11-25T10:03:00Z"}
+```
+
+`kind` is `login_view` (the forwarded login view of `--web` or `--host`) or
+`text_relay` (`--terminal`); treat any other value as an unfinished sign-in of
+an unknown kind. `expiresAt` is the UTC time at which the local daemon ends
+the sign-in if it is not finished. The member is omitted when no such sign-in
+exists and by daemons older than private protocol 33; a sign-in that opens a
+browser window on this computer is not reported. It never contains a session
+ID, pairing link, page address, or page content. MCP `account_status` does not
+include it.
+
 Authentication-blocked single-account calls and projection members use the
 same version-1 action:
 
@@ -95,6 +111,7 @@ same version-1 action:
       "executable": "corr",
       "args": ["auth", "login", "--account", "work"]
     },
+    "mcpTool": "account_sign_in",
     "requiresUserConsent": true,
     "requiresHumanInteraction": true,
     "secretsAllowedInMCP": false
@@ -109,7 +126,11 @@ same version-1 action:
 
 The other stable codes are `authentication_required` and
 `authentication_pending`. The command is executable-plus-argv, never shell
-text. The object contains only local routing metadata. Provider responses,
+text. The additive `mcpTool` names the one MCP tool that may ask the person to
+approve the same sign-in in an MCP client
+([ADR 0039](adr/0039-user-approved-sign-in-from-mcp.md)); it starts nothing by
+itself and older payloads omit it. The object contains only local routing
+metadata. Provider responses,
 addresses, credentials, factors, and remote identities are excluded. Unknown
 write outcome, permission denial, outage, throttling, and malformed
 configuration remain different failures.

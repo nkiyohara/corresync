@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -12,75 +13,97 @@ import (
 )
 
 type queriesCommand struct {
-	List   savedQueryListCommand   `cmd:"" help:"List private definitions without running them."`
-	Show   savedQueryShowCommand   `cmd:"" help:"Show one private definition without running it."`
-	Save   savedQuerySaveCommand   `cmd:"" help:"Review and save one bounded private definition."`
-	Run    savedQueryRunCommand    `cmd:"" help:"Run one definition against its live provider."`
-	Delete savedQueryDeleteCommand `cmd:"" help:"Review and delete one private definition."`
-	Purge  savedQueryPurgeCommand  `cmd:"" help:"Review and purge this account's private catalog."`
+	List   savedQueryListCommand   `cmd:"" help:"List your saved queries without running them."`
+	Show   savedQueryShowCommand   `cmd:"" help:"Show one saved query without running it."`
+	Save   savedQuerySaveCommand   `cmd:"" help:"Save a mail search or a calendar time range under a name."`
+	Run    savedQueryRunCommand    `cmd:"" help:"Run a saved query and show the live results."`
+	Delete savedQueryDeleteCommand `cmd:"" help:"Delete one saved query."`
+	Purge  savedQueryPurgeCommand  `cmd:"" help:"Delete all saved queries of an account permanently."`
+}
+
+var queriesHelpExamples = []helpExample{
+	{"Save a mail search, then run it:", []string{
+		"queries", "save", "mail", "from-ana", "from:ana@example.invalid", "--approve",
+	}},
+	{"", []string{"queries", "run", "from-ana"}},
+	{"Save \"the next 7 days\" of your calendar:", []string{
+		"queries", "save", "calendar", "next-week", "--window", "168h", "--time-zone", "Europe/London",
+	}},
+}
+
+// Help is the detail text of `corr queries --help`.
+func (queriesCommand) Help() string {
+	return helpWithExamples(`
+A saved query keeps only the search, never the messages or events it finds;
+each run asks the provider again. Queries are private to one account and stay
+on this computer.
+
+save, delete, and purge show a preview first and change nothing. Run the same
+command again with --approve added to carry it out; the preview ends with that
+command.`, queriesHelpExamples)
 }
 
 type savedQueryListCommand struct {
-	Account string `help:"Configured account alias; defaults to default_account."`
-	JSON    bool   `help:"Write the stable machine-readable schema."`
+	Account string `help:"Account alias (default: your default account)."`
+	JSON    bool   `help:"Print JSON for scripts and agents."`
 }
 
 type savedQueryShowCommand struct {
-	Name    string `arg:"" help:"Saved query name."`
-	Account string `help:"Configured account alias; defaults to default_account."`
-	JSON    bool   `help:"Write the stable machine-readable schema."`
+	Name    string `arg:"" help:"Name of the saved query."`
+	Account string `help:"Account alias (default: your default account)."`
+	JSON    bool   `help:"Print JSON for scripts and agents."`
 }
 
 type savedQuerySaveCommand struct {
-	Mail     savedMailQueryCommand     `cmd:"" help:"Save a bounded provider-native mail search."`
-	Calendar savedCalendarQueryCommand `cmd:"" help:"Save a relative live calendar window."`
+	Mail     savedMailQueryCommand     `cmd:"" help:"Save a mail search under a name."`
+	Calendar savedCalendarQueryCommand `cmd:"" help:"Save a calendar time range, counted from each run, under a name."`
 }
 
 type savedMailQueryCommand struct {
-	Name     string `arg:"" help:"Stable name using letters, digits, dots, dashes, or underscores."`
-	Query    string `arg:"" help:"Private query in the selected mail provider's user-facing language."`
-	Account  string `help:"Configured account alias; defaults to default_account."`
-	Folder   string `default:"inbox" enum:"inbox,archive,deleteditems,drafts,sentitems" help:"Well-known folder."`
-	FolderID string `name:"folder-id" help:"Opaque folder ID from mail folder discovery; takes precedence over folder."`
-	Limit    int    `default:"25" help:"Messages to return per live run (1-50)."`
-	TimeZone string `name:"time-zone" default:"UTC" help:"Provider time-zone identifier."`
-	Approve  bool   `help:"Apply the exact reviewed private definition."`
-	JSON     bool   `help:"Write the stable machine-readable schema."`
+	Name     string `arg:"" help:"Name for the query: letters, digits, dots, dashes, or underscores."`
+	Query    string `arg:"" help:"Search words, in your mail provider's search syntax."`
+	Account  string `help:"Account alias (default: your default account)."`
+	Folder   string `default:"inbox" enum:"inbox,archive,deleteditems,drafts,sentitems" help:"Folder to search, by name."`
+	FolderID string `name:"folder-id" placeholder:"ID" help:"Folder to search, by ID from corr mail folders; overrides --folder."`
+	Limit    int    `default:"25" help:"Most messages to show per run (1-50)."`
+	TimeZone string `name:"time-zone" default:"UTC" help:"Time zone the provider uses for dates."`
+	Approve  bool   `help:"Save the query instead of showing a preview."`
+	JSON     bool   `help:"Print JSON for scripts and agents."`
 }
 
 type savedCalendarQueryCommand struct {
-	Name        string        `arg:"" help:"Stable name using letters, digits, dots, dashes, or underscores."`
-	Account     string        `help:"Configured account alias; defaults to default_account."`
-	CalendarID  string        `name:"calendar-id" help:"Opaque calendar ID from calendar discovery; omit for the default calendar."`
-	StartOffset time.Duration `name:"start-offset" default:"0s" help:"Relative start from each live run, in whole minutes (up to 31 days)."`
-	Window      time.Duration `default:"168h" help:"Live calendar window in whole minutes (1 minute through 31 days)."`
-	TimeZone    string        `name:"time-zone" default:"UTC" help:"IANA display time zone recorded with the result."`
-	Approve     bool          `help:"Apply the exact reviewed private definition."`
-	JSON        bool          `help:"Write the stable machine-readable schema."`
+	Name        string        `arg:"" help:"Name for the query: letters, digits, dots, dashes, or underscores."`
+	Account     string        `help:"Account alias (default: your default account)."`
+	CalendarID  string        `name:"calendar-id" placeholder:"ID" help:"Calendar ID, from corr calendar folders; defaults to your main calendar."`
+	StartOffset time.Duration `name:"start-offset" default:"0s" help:"How far after the moment of each run the range starts, in whole minutes (up to 31 days)."`
+	Window      time.Duration `default:"168h" help:"Length of the range, in whole minutes (1 minute to 31 days)."`
+	TimeZone    string        `name:"time-zone" default:"UTC" help:"Time zone to show results in, such as Europe/London."`
+	Approve     bool          `help:"Save the query instead of showing a preview."`
+	JSON        bool          `help:"Print JSON for scripts and agents."`
 }
 
 type savedQueryRunCommand struct {
-	Name    string `arg:"" help:"Saved query name."`
-	Account string `help:"Configured account alias; defaults to default_account."`
-	Offset  int    `default:"0" help:"Zero-based live provider page offset (0-10000)."`
-	JSON    bool   `help:"Write the stable machine-readable schema."`
+	Name    string `arg:"" help:"Name of the saved query."`
+	Account string `help:"Account alias (default: your default account)."`
+	Offset  int    `default:"0" help:"Skip this many results, for paging (0-10000)."`
+	JSON    bool   `help:"Print JSON for scripts and agents."`
 }
 
 type savedQueryDeleteCommand struct {
-	Name    string `arg:"" help:"Saved query name."`
-	Account string `help:"Configured account alias; defaults to default_account."`
-	Approve bool   `help:"Delete the exact private definition shown in the review."`
-	JSON    bool   `help:"Write the stable machine-readable schema."`
+	Name    string `arg:"" help:"Name of the saved query."`
+	Account string `help:"Account alias (default: your default account)."`
+	Approve bool   `help:"Delete the query instead of showing a preview."`
+	JSON    bool   `help:"Print JSON for scripts and agents."`
 }
 
 type savedQueryPurgeCommand struct {
-	Account string `help:"Configured account alias; defaults to default_account."`
-	Approve bool   `help:"Permanently delete the exact account-local catalog shown in the review."`
-	JSON    bool   `help:"Write the stable machine-readable schema."`
+	Account string `help:"Account alias (default: your default account)."`
+	Approve bool   `help:"Delete every saved query of the account permanently instead of showing a preview."`
+	JSON    bool   `help:"Print JSON for scripts and agents."`
 }
 
 func (command *savedQueryListCommand) Run(app *runtime) error {
-	account, err := resolveSavedQueryAccount(app, command.Account)
+	alias, account, err := resolveSavedQueryAccount(app, command.Account)
 	if err != nil {
 		return err
 	}
@@ -96,17 +119,21 @@ func (command *savedQueryListCommand) Run(app *runtime) error {
 		return writeJSON(app.stdout, catalog)
 	}
 	if len(catalog.Queries) == 0 {
-		_, err = fmt.Fprintln(app.stdout, "No saved queries for this account.")
-		return err
+		return app.writeEmpty(emptyResult{
+			message: fmt.Sprintf("No saved queries for account %s.", sanitizeCell(alias, 64)),
+			next: printableCommand(withAccount(
+				[]string{commandName, "queries", "save", "mail", "NAME", "QUERY"}, command.Account,
+			)...),
+		})
 	}
 	writer := tabwriter.NewWriter(app.stdout, 0, 4, 2, ' ', 0)
-	if _, err := fmt.Fprintln(writer, "NAME\tKIND\tCONTENT CACHE\tREVISION"); err != nil {
+	if _, err := fmt.Fprintln(writer, "NAME\tKIND\tSTORES RESULTS\tREVISION"); err != nil {
 		return err
 	}
 	for _, query := range catalog.Queries {
 		if _, err := fmt.Fprintf(
 			writer,
-			"%s\t%s\tnone\t%s\n",
+			"%s\t%s\tno\t%s\n",
 			sanitizeCell(query.Name, application.MaxSavedQueryNameBytes),
 			query.Kind,
 			query.Revision[:12],
@@ -118,7 +145,7 @@ func (command *savedQueryListCommand) Run(app *runtime) error {
 }
 
 func (command *savedQueryShowCommand) Run(app *runtime) error {
-	account, err := resolveSavedQueryAccount(app, command.Account)
+	_, account, err := resolveSavedQueryAccount(app, command.Account)
 	if err != nil {
 		return err
 	}
@@ -131,7 +158,7 @@ func (command *savedQueryShowCommand) Run(app *runtime) error {
 		Name:    command.Name,
 	})
 	if err != nil {
-		return err
+		return withSavedQueryNameHint(app, service, account, command.Name, command.Account, err)
 	}
 	if command.JSON {
 		return writeJSON(app.stdout, query)
@@ -140,7 +167,7 @@ func (command *savedQueryShowCommand) Run(app *runtime) error {
 }
 
 func (command *savedMailQueryCommand) Run(app *runtime) error {
-	account, err := resolveSavedQueryAccount(app, command.Account)
+	_, account, err := resolveSavedQueryAccount(app, command.Account)
 	if err != nil {
 		return err
 	}
@@ -158,7 +185,7 @@ func (command *savedMailQueryCommand) Run(app *runtime) error {
 			Limit: command.Limit, TimeZone: command.TimeZone,
 		},
 	}
-	return saveQuery(app, input, command.Approve, command.JSON)
+	return saveQuery(app, input, command.Approve, command.JSON, app.approvalCommand(command, "queries", "save", "mail"))
 }
 
 func (command *savedCalendarQueryCommand) Run(app *runtime) error {
@@ -170,7 +197,7 @@ func (command *savedCalendarQueryCommand) Run(app *runtime) error {
 	if err != nil {
 		return err
 	}
-	account, err := resolveSavedQueryAccount(app, command.Account)
+	_, account, err := resolveSavedQueryAccount(app, command.Account)
 	if err != nil {
 		return err
 	}
@@ -191,7 +218,7 @@ func (command *savedCalendarQueryCommand) Run(app *runtime) error {
 			WindowMinutes: window, DisplayTimeZone: command.TimeZone,
 		},
 	}
-	return saveQuery(app, input, command.Approve, command.JSON)
+	return saveQuery(app, input, command.Approve, command.JSON, app.approvalCommand(command, "queries", "save", "calendar"))
 }
 
 func saveQuery(
@@ -199,6 +226,7 @@ func saveQuery(
 	input application.SavedQuerySaveInput,
 	approve bool,
 	jsonOutput bool,
+	approvalCommand string,
 ) error {
 	service, err := application.NewSavedQueryService(savedquerystore.New(), nil)
 	if err != nil {
@@ -215,7 +243,7 @@ func saveQuery(
 		if jsonOutput {
 			return writeJSON(app.stdout, access)
 		}
-		return writeSavedQueryChangeReview(app, review, false)
+		return writeSavedQueryChangeReview(app, review, false, approvalCommand)
 	}
 	query, err := service.ApplySave(app.context, review)
 	if err != nil {
@@ -226,11 +254,12 @@ func saveQuery(
 			Status: "completed", Query: &query,
 		})
 	}
-	return writeSavedQueryChangeReview(app, review, true)
+	return writeSavedQueryChangeReview(app, review, true, "")
 }
 
 func (command *savedQueryRunCommand) Run(app *runtime) (returnErr error) {
-	account, err := resolveSavedQueryAccount(app, command.Account)
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
+	_, account, err := resolveSavedQueryAccount(app, command.Account)
 	if err != nil {
 		return err
 	}
@@ -247,29 +276,30 @@ func (command *savedQueryRunCommand) Run(app *runtime) (returnErr error) {
 		Account: account, Name: command.Name, Offset: command.Offset,
 	}, app.caller())
 	if err != nil {
-		return err
+		return withSavedQueryNameHint(app, service, account, command.Name, command.Account, err)
 	}
 	if command.JSON {
 		return writeJSON(app.stdout, result)
 	}
 	if _, err := fmt.Fprintf(
 		app.stdout,
-		"Live provider result · fetched %s · no content cache\n\n",
+		"Live results from the provider, fetched %s; results are not stored.\n\n",
 		result.FetchedAt.Format(time.RFC3339),
 	); err != nil {
 		return err
 	}
+	empty := emptyResult{message: fmt.Sprintf("Saved query %s found nothing.", quoteForSentence(command.Name))}
 	if result.Mail != nil {
-		return writeMailTable(app, *result.Mail)
+		return writeMailTable(app, *result.Mail, empty)
 	}
 	if result.Calendar != nil {
-		return writeCalendarTable(app, *result.Calendar)
+		return writeCalendarTable(app, *result.Calendar, empty)
 	}
-	return errors.New("saved query returned no typed result")
+	return errors.New("saved query returned neither mail nor calendar results")
 }
 
 func (command *savedQueryDeleteCommand) Run(app *runtime) error {
-	account, err := resolveSavedQueryAccount(app, command.Account)
+	_, account, err := resolveSavedQueryAccount(app, command.Account)
 	if err != nil {
 		return err
 	}
@@ -281,7 +311,7 @@ func (command *savedQueryDeleteCommand) Run(app *runtime) error {
 		Account: account, Name: command.Name,
 	})
 	if err != nil {
-		return err
+		return withSavedQueryNameHint(app, service, account, command.Name, command.Account, err)
 	}
 	if !command.Approve {
 		if command.JSON {
@@ -289,7 +319,7 @@ func (command *savedQueryDeleteCommand) Run(app *runtime) error {
 				Status: "approval_required", Review: &review,
 			})
 		}
-		return writeSavedQueryChangeReview(app, review, false)
+		return writeSavedQueryChangeReview(app, review, false, app.approvalCommand(command, "queries", "delete"))
 	}
 	if err := service.ApplyDelete(app.context, review); err != nil {
 		return err
@@ -297,11 +327,11 @@ func (command *savedQueryDeleteCommand) Run(app *runtime) error {
 	if command.JSON {
 		return writeJSON(app.stdout, application.SavedQueryChangeAccess{Status: "completed"})
 	}
-	return writeSavedQueryChangeReview(app, review, true)
+	return writeSavedQueryChangeReview(app, review, true, "")
 }
 
 func (command *savedQueryPurgeCommand) Run(app *runtime) error {
-	account, err := resolveSavedQueryAccount(app, command.Account)
+	_, account, err := resolveSavedQueryAccount(app, command.Account)
 	if err != nil {
 		return err
 	}
@@ -321,7 +351,7 @@ func (command *savedQueryPurgeCommand) Run(app *runtime) error {
 				Status: "approval_required", Review: &review,
 			})
 		}
-		return writeSavedQueryPurgeReview(app, review, false)
+		return writeSavedQueryPurgeReview(app, review, false, app.approvalCommand(command, "queries", "purge"))
 	}
 	if err := service.ApplyPurge(app.context, review); err != nil {
 		return err
@@ -331,20 +361,44 @@ func (command *savedQueryPurgeCommand) Run(app *runtime) error {
 			Status: "completed", Purged: true,
 		})
 	}
-	return writeSavedQueryPurgeReview(app, review, true)
+	return writeSavedQueryPurgeReview(app, review, true, "")
 }
 
-func resolveSavedQueryAccount(app *runtime, reference string) (domain.AccountID, error) {
+func resolveSavedQueryAccount(app *runtime, reference string) (string, domain.AccountID, error) {
 	configuration, _, err := app.loadConfig()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return app.account(configuration, reference)
+	return resolveAccount(configuration, reference)
+}
+
+// withSavedQueryNameHint points to corr queries list when the named query is
+// not in the account's catalog.
+func withSavedQueryNameHint(
+	app *runtime,
+	service *application.SavedQueryService,
+	account domain.AccountID,
+	name, reference string,
+	err error,
+) error {
+	catalog, listErr := service.List(app.context, account)
+	if listErr != nil {
+		return err
+	}
+	for _, query := range catalog.Queries {
+		if query.Name == name {
+			return err
+		}
+	}
+	return withHint(err, printableCommand(withAccount([]string{commandName, "queries", "list"}, reference)...))
 }
 
 func wholeMinutes(name string, value time.Duration) (int, error) {
 	if value%time.Minute != 0 {
-		return 0, fmt.Errorf("saved query %s must use whole minutes", name)
+		return 0, withHint(
+			fmt.Errorf("saved query %s must use whole minutes", name),
+			"Use a whole number of minutes, such as 90m or 24h.",
+		)
 	}
 	minutes := value / time.Minute
 	if int64(int(minutes)) != int64(minutes) {
@@ -357,89 +411,98 @@ func writeSavedQueryDefinition(
 	app *runtime,
 	query application.SavedQueryDefinition,
 ) error {
-	if _, err := fmt.Fprintf(
-		app.stdout,
-		"%s · %s\nAccount: %s\nRevision: %s\nContent cache: none\n",
-		query.Name,
-		query.Kind,
-		query.Account,
-		query.Revision,
-	); err != nil {
+	if _, err := fmt.Fprintf(app.stdout, "Saved query %q (%s)\n", query.Name, query.Kind); err != nil {
 		return err
+	}
+	fields := []reviewField{
+		{"Account", sanitizeCell(string(query.Account), 128)},
+		{"Revision", sanitizeCell(query.Revision, 128)},
+		{"Stores results", "no"},
 	}
 	if query.Mail != nil {
-		_, err := fmt.Fprintf(
-			app.stdout,
-			"Folder: %s:%s\nLimit: %d\nTime zone: %s\nPrivate query: %q\n",
-			query.Mail.Folder.Kind,
-			sanitizeCell(query.Mail.Folder.ID, 4096),
-			query.Mail.Limit,
-			sanitizeCell(query.Mail.TimeZone, 128),
-			query.Mail.Query,
+		fields = append(fields,
+			reviewField{"Folder", fmt.Sprintf("%s:%s", query.Mail.Folder.Kind, sanitizeCell(query.Mail.Folder.ID, 4096))},
+			reviewField{"Limit", strconv.Itoa(query.Mail.Limit)},
+			reviewField{"Time zone", sanitizeCell(query.Mail.TimeZone, 128)},
+			reviewField{"Query", fmt.Sprintf("%q", query.Mail.Query)},
 		)
-		return err
+		return writeReviewFields(app.stdout, fields)
 	}
-	_, err := fmt.Fprintf(
-		app.stdout,
-		"Calendar: %s:%s\nStart offset: %d minutes\nWindow: %d minutes\nDisplay time zone: %s\n",
-		query.Calendar.Calendar.Kind,
-		sanitizeCell(query.Calendar.Calendar.ID, 4096),
-		query.Calendar.StartOffsetMinutes,
-		query.Calendar.WindowMinutes,
-		sanitizeCell(query.Calendar.DisplayTimeZone, 128),
+	fields = append(fields,
+		reviewField{"Calendar", fmt.Sprintf(
+			"%s:%s", query.Calendar.Calendar.Kind, sanitizeCell(query.Calendar.Calendar.ID, 4096),
+		)},
+		reviewField{"Starts", fmt.Sprintf("%d minutes after each run", query.Calendar.StartOffsetMinutes)},
+		reviewField{"Length", fmt.Sprintf("%d minutes", query.Calendar.WindowMinutes)},
+		reviewField{"Time zone", sanitizeCell(query.Calendar.DisplayTimeZone, 128)},
 	)
-	return err
+	return writeReviewFields(app.stdout, fields)
 }
 
 func writeSavedQueryChangeReview(
 	app *runtime,
 	review application.SavedQueryChangeReview,
 	completed bool,
+	approvalCommand string,
 ) error {
-	verb := "Save"
-	if review.Action == "delete" {
-		verb = "Delete"
+	status := fmt.Sprintf("Preview: saved query %q has not been saved.", review.Name)
+	switch {
+	case completed && review.Action == "delete":
+		status = fmt.Sprintf("Deleted saved query %q. No mail or calendar results were stored.", review.Name)
+	case completed:
+		status = fmt.Sprintf("Saved query %q. Only the search is stored, not its results.", review.Name)
+	case review.Action == "delete":
+		status = fmt.Sprintf("Preview: saved query %q has not been deleted.", review.Name)
 	}
-	status := "No changes made. Re-run with --approve to apply this exact review."
-	if completed {
-		status = verb + "d. Provider content was not cached."
+	if _, err := fmt.Fprintln(app.stdout, status); err != nil {
+		return err
 	}
-	if _, err := fmt.Fprintf(
-		app.stdout,
-		"%s private saved query %q for %s\nKind: %s\nReplaces existing: %t\nRevision: %s\n%s\n",
-		verb,
-		review.Name,
-		review.Account,
-		review.Kind,
-		review.Replaces,
-		review.Definition.Revision,
-		status,
-	); err != nil {
+	if err := writeReviewFields(app.stdout, []reviewField{
+		{"Account", sanitizeCell(string(review.Account), 128)},
+		{"Kind", sanitizeCell(string(review.Kind), 32)},
+		{"Replaces existing", previewYesNo(review.Replaces)},
+		{"Revision", sanitizeCell(review.Definition.Revision, 128)},
+	}); err != nil {
 		return err
 	}
 	if !completed && review.Action == "save" {
-		return writeSavedQueryDefinition(app, review.Definition)
+		if err := writeSavedQueryDefinition(app, review.Definition); err != nil {
+			return err
+		}
 	}
-	return nil
+	if completed || approvalCommand == "" {
+		return nil
+	}
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err := fmt.Fprintln(app.stdout, view.nextStep(approvalCommand))
+	return err
 }
 
 func writeSavedQueryPurgeReview(
 	app *runtime,
 	review application.SavedQueryPurgeReview,
 	completed bool,
+	approvalCommand string,
 ) error {
-	status := "No changes made. Re-run with --approve to purge this exact catalog."
+	status := "Preview: nothing has been deleted. Approving deletes every saved query of this account permanently."
 	if completed {
-		status = "Purged the private catalog. Provider content was not stored or removed."
+		status = "Deleted every saved query of this account permanently. No mail or calendar results were stored, so none were removed."
 	}
-	_, err := fmt.Fprintf(
-		app.stdout,
-		"Purge private saved queries for %s\nDefinitions: %d\nCorrupt catalog: %t\nCatalog revision: %s\n%s\n",
-		review.Account,
-		review.Definitions,
-		review.Corrupt,
-		review.CatalogRevision,
-		status,
-	)
+	if _, err := fmt.Fprintln(app.stdout, wrapText(status, app.textWidth(app.stdout), "")); err != nil {
+		return err
+	}
+	if err := writeReviewFields(app.stdout, []reviewField{
+		{"Account", sanitizeCell(string(review.Account), 128)},
+		{"Saved queries", strconv.Itoa(review.Definitions)},
+		{"Damaged catalog", previewYesNo(review.Corrupt)},
+		{"Catalog revision", sanitizeCell(review.CatalogRevision, 128)},
+	}); err != nil {
+		return err
+	}
+	if completed || approvalCommand == "" {
+		return nil
+	}
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err := fmt.Fprintln(app.stdout, view.nextStep(approvalCommand))
 	return err
 }

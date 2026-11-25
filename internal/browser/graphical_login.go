@@ -71,6 +71,10 @@ func (browser *Browser) GraphicalLogin(ctx context.Context, action application.G
 			parameters.Type = input.DispatchMouseEventTypeMouseReleased
 			_, err = chromedp.Call(operation, input.DispatchMouseEvent, parameters)
 		}
+	case "move":
+		// No button is pressed, so this only moves the pointer: hover menus
+		// open, nothing is activated.
+		_, err = chromedp.Call(operation, input.DispatchMouseEvent, input.DispatchMouseEventParams{Type: input.DispatchMouseEventTypeMouseMoved, X: float64(action.X), Y: float64(action.Y), Button: input.MouseButtonNone})
 	case "scroll":
 		_, err = chromedp.Call(operation, input.DispatchMouseEvent, input.DispatchMouseEventParams{Type: input.DispatchMouseEventTypeMouseWheel, X: float64(action.X), Y: float64(action.Y), DeltaY: float64(action.Delta)})
 	}

@@ -13,7 +13,7 @@ func TestAllDisabledAccountCannotStartAuthentication(t *testing.T) {
 	account.DisabledServices = []string{"mail", "calendar"}
 	configuration.Accounts["work"] = account
 	backend := &sessionBackend{configuration: configuration}
-	if _, err := backend.activateAccount(t.Context(), account.ID); err == nil || !strings.Contains(err.Error(), "all services") {
+	if err := backend.activateAccount(t.Context(), account.ID); err == nil || !strings.Contains(err.Error(), "all services") {
 		t.Fatalf("login = %v", err)
 	}
 	active, _, err := releasedSessionRoutes(account)

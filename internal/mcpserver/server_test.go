@@ -911,7 +911,7 @@ func TestMailListToolUsesDefaultsAndReturnsStructuredOutput(t *testing.T) {
 		t.Fatalf("ListTools() error = %v", err)
 	}
 	mailTool := toolNamed(tools.Tools, "mail_list")
-	if len(tools.Tools) != 71 || mailTool == nil || toolNamed(tools.Tools, "task_list") == nil ||
+	if len(tools.Tools) != 72 || mailTool == nil || toolNamed(tools.Tools, "task_list") == nil ||
 		toolNamed(tools.Tools, "saved_query_run") == nil {
 		t.Fatalf("unexpected tools: %+v", tools.Tools)
 	}

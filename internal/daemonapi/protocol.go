@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 30
+	ProtocolVersion   = 33
 	maxRequestBytes   = 40 << 20
 	maxResponseBytes  = 48 << 20
 	contentType       = "application/json"
@@ -37,6 +37,9 @@ const (
 	MethodLogout               Method = "logout"
 	MethodSessionStatus        Method = "session.status"
 	MethodTerminalLogin        Method = "login.terminal"
+	MethodSignInRequest        Method = "login.mcp.request"
+	MethodSignInResolve        Method = "login.mcp.resolve"
+	MethodSignInVerified       Method = "login.verified"
 	MethodMailFolders          Method = "mail.folders.list"
 	MethodMailList             Method = "mail.list"
 	MethodMailSearch           Method = "mail.search"
@@ -238,8 +241,51 @@ type LogoutResult struct {
 // SessionStatus is the application-owned, content-free session status schema.
 type SessionStatus = application.SessionStatus
 
-// SessionStatusResult is the application-owned bounded account status result.
-type SessionStatusResult = application.SessionStatusResult
+// SessionStatusResult is the daemon's account status: the application-owned
+// result plus the human sign-ins that are still unfinished. MCP receives only
+// the application-owned part (see Client.SessionStatus).
+type SessionStatusResult struct {
+	Accounts []SessionStatus `json:"accounts"`
+	// PendingSignIns lists, at most once per account, a sign-in that a human
+	// CLI command started and has not finished. It carries no session ID,
+	// pairing capability, page origin, or page content. Daemons before
+	// protocol 31 omit it, as does a daemon with nothing pending.
+	PendingSignIns []PendingSignIn `json:"pendingSignIns,omitempty"`
+}
+
+// PendingSignInKind names how an unfinished sign-in is shown to the person.
+type PendingSignInKind string
+
+const (
+	// PendingSignInLoginView is the forwarded graphical login view
+	// (`corr auth login --web` or `--host`).
+	PendingSignInLoginView PendingSignInKind = "login_view"
+	// PendingSignInTextRelay is the text-only terminal relay
+	// (`corr auth login --terminal`).
+	PendingSignInTextRelay PendingSignInKind = "text_relay"
+)
+
+// PendingSignIn is one unfinished human sign-in and when the daemon ends it.
+type PendingSignIn struct {
+	Account   domain.AccountID  `json:"account"`
+	Kind      PendingSignInKind `json:"kind"`
+	ExpiresAt time.Time         `json:"expiresAt"`
+}
+
+// Application returns the application-owned part of the result.
+func (result SessionStatusResult) Application() application.SessionStatusResult {
+	return application.SessionStatusResult{Accounts: result.Accounts}
+}
+
+// PendingSignIn returns the unfinished sign-in of account, if any.
+func (result SessionStatusResult) PendingSignIn(account domain.AccountID) (PendingSignIn, bool) {
+	for _, pending := range result.PendingSignIns {
+		if pending.Account == account {
+			return pending, true
+		}
+	}
+	return PendingSignIn{}, false
+}
 
 // MonitorStatusInput selects one stable account.
 type MonitorStatusInput struct {
@@ -407,6 +453,34 @@ type TerminalLoginBackend interface {
 	TerminalLogin(context.Context, TerminalLoginInput, domain.Caller) (TerminalLoginResult, error)
 }
 
+// SignInBackend is the optional user-approved MCP sign-in extension (ADR
+// 0039). A request only reserves one approval prompt; a resolution consumes
+// it, and only a resolution whose decision says the person approved through
+// MCP elicitation starts the same visible sign-in as the CLI. Session owners
+// accept both methods only from the MCP surface.
+type SignInBackend interface {
+	RequestAccountSignIn(context.Context, domain.AccountID, domain.Caller) (application.AccountSignInRequest, error)
+	ResolveAccountSignIn(context.Context, application.AccountSignInResolution, domain.Caller) (application.AccountSignInResult, error)
+}
+
+// SignInVerificationBackend answers, for the CLI only, whether one account's
+// current connection settings already completed a sign-in started from the
+// CLI. It exposes one boolean and is refused for every other caller surface.
+type SignInVerificationBackend interface {
+	SignInVerified(context.Context, domain.AccountID, domain.Caller) (SignInVerifiedResult, error)
+}
+
+// SignInVerifiedResult is the answer to MethodSignInVerified.
+type SignInVerifiedResult struct {
+	Account  domain.AccountID `json:"account"`
+	Verified bool             `json:"verified"`
+}
+
+// SignInRequestInput selects one configured account for an approval request.
+type SignInRequestInput struct {
+	Account domain.AccountID `json:"account"`
+}
+
 // MonitoringBackend is the optional local event extension. It has no method
 // for enabling monitoring, widening filters, configuring a runner, or purging.
 type MonitoringBackend interface {
@@ -464,7 +538,8 @@ type MessagingBackend interface {
 
 func (method Method) valid() bool {
 	switch method {
-	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
+	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin,
+		MethodSignInRequest, MethodSignInResolve, MethodSignInVerified, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
 		MethodMailGetAttachment, MethodMailCommitAttachment,
 		MethodMailCreateDraft, MethodMailCommitDraft, MethodMailSend, MethodMailCommitSend,
 		MethodMailSendDraft, MethodMailCommitSendDraft,

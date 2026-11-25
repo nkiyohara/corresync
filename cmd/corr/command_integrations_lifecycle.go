@@ -18,17 +18,17 @@ import (
 )
 
 type integrationTargetFlags struct {
-	Hosts       []string `arg:"" optional:"" name:"host" help:"Host IDs or compatibility aliases."`
-	Name        string   `default:"corresync" help:"Client-side MCP server name."`
-	Executable  string   `type:"path" help:"Corresync executable path; defaults to this process."`
-	Scope       string   `default:"user" enum:"local,project,user,workspace" help:"Host configuration scope."`
-	ProjectPath string   `name:"project" type:"path" help:"Explicit project root for project/workspace/local scope."`
+	Hosts       []string `arg:"" optional:"" name:"host" help:"Agent IDs or aliases, as shown by corr integrations list."`
+	Name        string   `default:"corresync" help:"Name of the MCP server in the agent's settings."`
+	Executable  string   `type:"path" help:"Path of the corr program the agent runs; defaults to this one."`
+	Scope       string   `default:"user" enum:"local,project,user,workspace" help:"Which of the agent's settings to change: user, project, workspace, or local."`
+	ProjectPath string   `name:"project" type:"path" help:"Project folder for project, workspace, or local scope; defaults to the current folder."`
 }
 
 type integrationMutationFlags struct {
 	integrationTargetFlags
-	JSON bool `help:"Write the preview as JSON without applying it."`
-	Yes  bool `help:"Apply the displayed plan without an interactive confirmation."`
+	JSON bool `help:"Write the planned changes as JSON and change nothing."`
+	Yes  bool `help:"Make the planned changes without asking for confirmation."`
 }
 
 type integrationsPlanCommand struct {
@@ -80,7 +80,31 @@ func (command *integrationsPlanCommand) Run(app *runtime) error {
 	if command.JSON {
 		return writeJSON(app.stdout, report)
 	}
-	return writeIntegrationPlans(app, plans, false)
+	if err := writeIntegrationPlans(app, plans, false); err != nil {
+		return err
+	}
+	if !plansNeedMutation(plans) {
+		return nil
+	}
+	setup := []string{"corr", "integrations", "setup"}
+	for _, plan := range plans {
+		setup = append(setup, string(plan.Host))
+	}
+	if command.Scope != string(agenthost.ScopeUser) {
+		setup = append(setup, "--scope", command.Scope)
+	}
+	if command.ProjectPath != "" {
+		setup = append(setup, "--project", command.ProjectPath)
+	}
+	if command.Name != "corresync" {
+		setup = append(setup, "--name", command.Name)
+	}
+	if command.Executable != "" {
+		setup = append(setup, "--executable", command.Executable)
+	}
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err = view.printf("\n%s\n", view.nextStep(shellCommand(setup...)))
+	return err
 }
 
 func (command *integrationsSetupCommand) Run(app *runtime) error {
@@ -122,16 +146,63 @@ func (command *integrationsDoctorCommand) Run(app *runtime) error {
 		return writeJSON(app.stdout, report)
 	}
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
-	if _, err := view.printf("%s  %s\n\n", view.info(), view.strong("Corresync integration health")); err != nil {
+	if _, err := view.printf("%s  %s\n\n", view.info(), view.strong("How Corresync is connected to AI agents")); err != nil {
 		return err
 	}
+	next := ""
 	for _, item := range report.Hosts {
-		if _, err := fmt.Fprintf(app.stdout, "  %-22s %-18s %s\n", item.DisplayName, item.Inspection.State, item.Inspection.Detail); err != nil {
+		if _, err := fmt.Fprintf(app.stdout, "  %-22s %-34s %s\n", item.DisplayName, integrationStateLabel(item.Inspection.State), item.Inspection.Detail); err != nil {
 			return err
 		}
+		if next == "" {
+			next = integrationStateNextStep(item.Host, item.Inspection.State)
+		}
 	}
-	_, err = fmt.Fprintln(app.stdout, "\nInspection read only the named registration or documented configuration entry; it did not read conversations, credentials, mail, or calendar data.")
+	if _, err := fmt.Fprintln(app.stdout, "\n"+wrapText(
+		"This check read only Corresync's entry in each agent's settings. It did not read conversations, passwords or other sign-in data, mail, or calendar data.",
+		app.textWidth(app.stdout),
+		"",
+	)); err != nil {
+		return err
+	}
+	if next == "" {
+		return nil
+	}
+	_, err = view.printf("%s\n", view.nextStep(next))
 	return err
+}
+
+func integrationStateLabel(state integrationlifecycle.State) string {
+	switch state {
+	case integrationlifecycle.StateAbsent:
+		return "not connected"
+	case integrationlifecycle.StateHealthy:
+		return "connected"
+	case integrationlifecycle.StateDisabled:
+		return "connected but turned off"
+	case integrationlifecycle.StateStalePath:
+		return "points to an old corr path"
+	case integrationlifecycle.StateVersionDrift:
+		return "set up by another corr version"
+	case integrationlifecycle.StateNameConflict:
+		return "another server uses this name"
+	case integrationlifecycle.StateMalformed:
+		return "settings file cannot be parsed"
+	case integrationlifecycle.StateUnreadable:
+		return "settings file cannot be read"
+	case integrationlifecycle.StateUnavailable:
+		return "cannot be checked from here"
+	default:
+		return string(state)
+	}
+}
+
+// integrationStateNextStep is the command that fixes state, if one does.
+func integrationStateNextStep(host agenthost.ID, state integrationlifecycle.State) string {
+	if state == integrationlifecycle.StateStalePath || state == integrationlifecycle.StateVersionDrift {
+		return shellCommand("corr", "integrations", "repair", string(host))
+	}
+	return ""
 }
 
 func runIntegrationMutation(app *runtime, flags integrationMutationFlags, operation integrationlifecycle.Operation) error {
@@ -145,7 +216,7 @@ func runIntegrationMutationWithResults(
 	operation integrationlifecycle.Operation,
 ) ([]integrationlifecycle.Result, error) {
 	if flags.JSON && flags.Yes {
-		return nil, errors.New("--json is preview-only and cannot be combined with --yes")
+		return nil, errors.New("--json only shows the planned changes, so it cannot be used with --yes")
 	}
 	engine, requests, err := prepareIntegrationLifecycle(app, flags.integrationTargetFlags, operation, true)
 	if err != nil {
@@ -172,7 +243,7 @@ func runIntegrationMutationWithResults(
 	}
 	if !flags.Yes {
 		if !app.interactiveInput() || !app.interactiveStdout() {
-			return nil, errors.New("integration changes require an interactive confirmation or explicit --yes")
+			return nil, errors.New("integration changes need an interactive confirmation; in a script, check the plan and add --yes")
 		}
 		confirmed, confirmErr := confirmIntegrationPlans(app, operation, len(plans))
 		if confirmErr != nil {
@@ -216,7 +287,7 @@ func integrationResultError(result integrationlifecycle.Result) error {
 		integrationlifecycle.ResultAlreadyCurrent, integrationlifecycle.ResultAlreadyAbsent:
 		return nil
 	case integrationlifecycle.ResultSkipped:
-		return fmt.Errorf("%s: integration change was skipped", result.Host)
+		return fmt.Errorf("%s: the change was skipped", result.Host)
 	case integrationlifecycle.ResultBlocked, integrationlifecycle.ResultFailedPreserved,
 		integrationlifecycle.ResultFailedChanged:
 		return fmt.Errorf("%s: %s", result.Host, result.Message)
@@ -231,7 +302,7 @@ func prepareIntegrationLifecycle(
 	requireAccount bool,
 ) (integrationlifecycle.Engine, []integrationlifecycle.Request, error) {
 	if len(flags.Hosts) == 0 {
-		return integrationlifecycle.Engine{}, nil, errors.New("select at least one host; run `corr integrations list`")
+		return integrationlifecycle.Engine{}, nil, withHint(errors.New("name at least one AI agent"), shellCommand("corr", "integrations", "list"))
 	}
 	var name, executable string
 	var arguments []string
@@ -282,7 +353,7 @@ func prepareIntegrationLifecycle(
 	for _, value := range flags.Hosts {
 		host, ok := app.agentHosts.Lookup(value)
 		if !ok {
-			return integrationlifecycle.Engine{}, nil, fmt.Errorf("unknown agent host %q; run `corr integrations list`", value)
+			return integrationlifecycle.Engine{}, nil, unknownAgentHostError(value)
 		}
 		if seen[host.ID] {
 			continue
@@ -460,19 +531,19 @@ func planIntegrations(ctx context.Context, engine integrationlifecycle.Engine, r
 
 func writeIntegrationPlans(app *runtime, plans []integrationlifecycle.Plan, mutation bool) error {
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
-	title := "Integration plan"
+	title := "Planned change"
 	if len(plans) > 1 {
-		title = "Integration plans"
+		title = "Planned changes"
 	}
 	if _, err := view.printf("%s  %s\n", view.info(), view.strong(title)); err != nil {
 		return err
 	}
 	for _, plan := range plans {
-		if _, err := fmt.Fprintf(app.stdout, "\n%s (%s) · %s · %s\n", plan.DisplayName, plan.Host, plan.Operation, plan.Previous.State); err != nil {
+		if _, err := fmt.Fprintf(app.stdout, "\n%s (%s) · %s · now %s\n", plan.DisplayName, plan.Host, plan.Operation, integrationStateLabel(plan.Previous.State)); err != nil {
 			return err
 		}
 		if plan.Previous.Path != "" {
-			if _, err := fmt.Fprintf(app.stdout, "  target  %s\n", plan.Previous.Path); err != nil {
+			if _, err := fmt.Fprintf(app.stdout, "  file    %s\n", plan.Previous.Path); err != nil {
 				return err
 			}
 		}
@@ -483,7 +554,7 @@ func writeIntegrationPlans(app *runtime, plans []integrationlifecycle.Plan, muta
 			continue
 		}
 		if len(plan.Actions) == 0 {
-			if _, err := fmt.Fprintln(app.stdout, "  change  none"); err != nil {
+			if _, err := fmt.Fprintln(app.stdout, "  change  nothing"); err != nil {
 				return err
 			}
 		}
@@ -506,27 +577,27 @@ func writeIntegrationPlans(app *runtime, plans []integrationlifecycle.Plan, muta
 					format = "YAML"
 				case integrationlifecycle.ActionCommand, integrationlifecycle.ActionPackage, integrationlifecycle.ActionSkill:
 				}
-				normalization := "formatting may normalize"
+				normalization := "the layout may be rewritten"
 				if action.Kind == integrationlifecycle.ActionJSON {
-					normalization = "comments will be removed and formatting normalized"
+					normalization = "comments are removed and the layout is rewritten"
 				}
-				if _, err := fmt.Fprintf(app.stdout, "  change  merge entry %q in %s (%s %s; recovery copy retained)\n", action.File.Entry, action.File.Path, format, normalization); err != nil {
+				if _, err := fmt.Fprintf(app.stdout, "  change  edit entry %q in %s (%s; %s; a backup copy is kept)\n", action.File.Entry, action.File.Path, format, normalization); err != nil {
 					return err
 				}
 			case action.Package != nil:
-				if _, err := fmt.Fprintf(app.stdout, "  change  stage %s package %s at %s from reviewed local assets\n", action.Package.Kind, action.Package.Version, action.Package.Target); err != nil {
+				if _, err := fmt.Fprintf(app.stdout, "  change  copy the %s package %s to %s from the files installed with corr\n", action.Package.Kind, action.Package.Version, action.Package.Target); err != nil {
 					return err
 				}
 			}
 		}
 		if plan.ReloadRequired {
-			if _, err := fmt.Fprintln(app.stdout, "  reload  new session or host reload required"); err != nil {
+			if _, err := fmt.Fprintln(app.stdout, "  then    start a new session in the agent, or reload it"); err != nil {
 				return err
 			}
 		}
 	}
 	if mutation {
-		_, err := fmt.Fprintln(app.stdout, "\nHosts are independent: a later failure does not undo an earlier verified host.")
+		_, err := fmt.Fprintln(app.stdout, "\n"+wrapText("Each agent is handled on its own: a failure with one does not undo a change already made and checked for another.", app.textWidth(app.stdout), ""))
 		return err
 	}
 	return nil
@@ -584,8 +655,8 @@ func confirmIntegrationPlans(app *runtime, operation integrationlifecycle.Operat
 		affirmative = "Remove integrations"
 	}
 	form := settingsForm(app, huh.NewConfirm().
-		Title(fmt.Sprintf("Apply %s plan to %d host(s)?", operation, count)).
-		Description("Only the displayed host registrations and Corresync-owned entries will change. Esc cancels.").
+		Title(fmt.Sprintf("Make these %s changes for %d agent(s)?", operation, count)).
+		Description("Only the entries shown above change. Esc cancels.").
 		Affirmative(affirmative).
 		Negative("Cancel").
 		Value(&confirmed))
@@ -605,15 +676,44 @@ func confirmIntegrationPlans(app *runtime, operation integrationlifecycle.Operat
 }
 
 func writeIntegrationResults(app *runtime, results []integrationlifecycle.Result) error {
-	if _, err := fmt.Fprintln(app.stdout, "\nIntegration results"); err != nil {
+	if _, err := fmt.Fprintln(app.stdout, "\nResults"); err != nil {
 		return err
 	}
+	reload := false
 	for _, result := range results {
-		if _, err := fmt.Fprintf(app.stdout, "  %-20s %-34s %s\n", result.Host, result.Status, result.Message); err != nil {
+		if _, err := fmt.Fprintf(app.stdout, "  %-20s %-34s %s\n", result.Host, integrationResultLabel(result.Status), result.Message); err != nil {
 			return err
 		}
+		reload = reload || result.Status == integrationlifecycle.ResultReloadRequired
 	}
-	return nil
+	if !reload {
+		return nil
+	}
+	_, err := fmt.Fprintln(app.stdout, "\nStart a new session in each agent marked \"restart the agent\" so it loads Corresync.")
+	return err
+}
+
+func integrationResultLabel(status integrationlifecycle.ResultStatus) string {
+	switch status {
+	case integrationlifecycle.ResultAppliedVerified:
+		return "done and checked"
+	case integrationlifecycle.ResultReloadRequired:
+		return "done; restart the agent"
+	case integrationlifecycle.ResultAlreadyCurrent:
+		return "already up to date"
+	case integrationlifecycle.ResultAlreadyAbsent:
+		return "already removed"
+	case integrationlifecycle.ResultSkipped:
+		return "skipped"
+	case integrationlifecycle.ResultBlocked:
+		return "blocked; nothing changed"
+	case integrationlifecycle.ResultFailedPreserved:
+		return "failed; settings unchanged"
+	case integrationlifecycle.ResultFailedChanged:
+		return "failed after changing settings"
+	default:
+		return string(status)
+	}
 }
 
 type runtimeIntegrationExecutor struct{ app *runtime }

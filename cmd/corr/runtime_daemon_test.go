@@ -473,8 +473,8 @@ func TestDaemonStopRepairsSplitRuntimeOwners(t *testing.T) {
 		t.Fatalf("daemonStopCommand.Run() error = %v", err)
 	}
 	if stopped.Load() != 2 ||
-		!strings.Contains(stdout.String(), "stopped 2 duplicate session owners") ||
-		!strings.Contains(stdout.String(), "next provider command") {
+		!strings.Contains(stdout.String(), "Stopped 2 copies of the local daemon") ||
+		!strings.Contains(stdout.String(), "next corr command that needs the daemon") {
 		t.Fatalf("daemon stop = calls %d, output %q", stopped.Load(), stdout.String())
 	}
 	if oldOwner.shutdowns.Load() != 0 || canonicalOwner.shutdowns.Load() != 0 {
@@ -524,7 +524,7 @@ func TestDaemonStopControlsPreviousRuntimeOwner(t *testing.T) {
 	if err := (&daemonStopCommand{}).Run(app); err != nil {
 		t.Fatalf("daemonStopCommand.Run() error = %v", err)
 	}
-	if !strings.Contains(stdout.String(), "session owner is stopping") {
+	if !strings.Contains(stdout.String(), "The local daemon is stopping") {
 		t.Fatalf("daemon stop output = %q", stdout.String())
 	}
 	select {

@@ -379,7 +379,7 @@ func TestAuditVisibleCancellationBeforePublishing(t *testing.T) {
 	handle := &auditCancelReadyHandle{readyTerminalSecurityBrowser: readySecurityTerminal(t), cancel: cancel}
 	backend := terminalSecurityBackend(t, configuration, func(context.Context, browser.Options) (browserHandle, error) { return handle, nil })
 	backend.app.stderr = io.Discard
-	_, err := backend.activateAccount(ctx, configured.ID)
+	err := backend.activateAccount(ctx, configured.ID)
 	active, published := backend.accounts[configured.ID]
 	if published {
 		defer func() { _ = closeSessionAccount(active) }()

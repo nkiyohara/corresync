@@ -22,7 +22,7 @@ func TestIntegrationsCatalogCommandsRenderFromTypedCatalog(t *testing.T) {
 	}{
 		{
 			name: "list", arguments: []string{"integrations", "list"},
-			contains: []string{"Agent host catalog", "codex", "catalog_only", "Run `corr integrations show HOST`"},
+			contains: []string{"AI agents Corresync can connect to", "codex", "listed only, no setup", "Next: corr integrations show HOST"},
 		},
 		{
 			name: "show compatibility alias", arguments: []string{"integrations", "show", "claude"},
@@ -112,7 +112,7 @@ func TestIntegrationsShowRejectsUnknownHost(t *testing.T) {
 	var stderr bytes.Buffer
 	app := newRuntime(t.Context(), "", &stdout, &stderr, buildinfo.Current())
 	err := (&integrationsShowCommand{Host: "unknown"}).Run(app)
-	if err == nil || !strings.Contains(err.Error(), "corr integrations list") {
+	if hint, _ := errorHint(err); err == nil || !strings.Contains(err.Error(), `"unknown"`) || hint != "corr integrations list" {
 		t.Fatalf("Run() error = %v", err)
 	}
 }

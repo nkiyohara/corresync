@@ -9,9 +9,10 @@ reproduce them.
 
 | Version | Security support |
 | --- | --- |
-| 0.9.x | Supported |
-| 0.8.x | Upgrade to 0.9.x |
-| 0.7.x | Upgrade to 0.9.x |
+| 0.10.x | Supported |
+| 0.9.x | Upgrade to 0.10.x |
+| 0.8.x | Upgrade to 0.10.x |
+| 0.7.x | Upgrade to 0.10.x |
 | 0.6.2 | Migration bridge only |
 | Earlier releases | Unsupported |
 

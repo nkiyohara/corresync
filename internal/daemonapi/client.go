@@ -77,6 +77,69 @@ func (client *Client) Login(ctx context.Context, account domain.AccountID, calle
 	return result, nil
 }
 
+// RequestAccountSignIn asks the session owner whether one account may be
+// offered to the person for an approved sign-in. It never starts one.
+func (client *Client) RequestAccountSignIn(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (application.AccountSignInRequest, error) {
+	if err := account.ValidateOpaque(); err != nil {
+		return application.AccountSignInRequest{}, err
+	}
+	var result application.AccountSignInRequest
+	if err := client.call(ctx, MethodSignInRequest, caller, SignInRequestInput{Account: account}, &result); err != nil {
+		return application.AccountSignInRequest{}, err
+	}
+	if err := result.Validate(account); err != nil {
+		return application.AccountSignInRequest{}, fmt.Errorf("daemon returned invalid sign-in request: %w", err)
+	}
+	return result, nil
+}
+
+// SignInVerified reports whether the account's current connection settings
+// already completed a sign-in started from the CLI.
+func (client *Client) SignInVerified(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (bool, error) {
+	if err := account.ValidateOpaque(); err != nil {
+		return false, err
+	}
+	var result SignInVerifiedResult
+	if err := client.call(ctx, MethodSignInVerified, caller, SignInRequestInput{Account: account}, &result); err != nil {
+		return false, err
+	}
+	if result.Account != account {
+		return false, errors.New("daemon returned sign-in verification for a different account")
+	}
+	return result.Verified, nil
+}
+
+// ResolveAccountSignIn reports the person's elicitation answer for one
+// reserved approval request.
+func (client *Client) ResolveAccountSignIn(
+	ctx context.Context,
+	resolution application.AccountSignInResolution,
+	caller domain.Caller,
+) (application.AccountSignInResult, error) {
+	if err := resolution.Validate(); err != nil {
+		return application.AccountSignInResult{}, err
+	}
+	var result application.AccountSignInResult
+	if err := client.call(ctx, MethodSignInResolve, caller, resolution, &result); err != nil {
+		return application.AccountSignInResult{}, err
+	}
+	if err := result.Validate(); err != nil {
+		return application.AccountSignInResult{}, fmt.Errorf("daemon returned invalid sign-in result: %w", err)
+	}
+	if result.Account != resolution.Account {
+		return application.AccountSignInResult{}, errors.New("daemon returned sign-in result for a different account")
+	}
+	return result, nil
+}
+
 // Logout closes exactly one account's in-memory provider sessions.
 func (client *Client) Logout(
 	ctx context.Context,
@@ -108,8 +171,20 @@ func (client *Client) LogoutWithOptions(ctx context.Context, input LogoutInput, 
 	return result, nil
 }
 
-// SessionStatus returns content-free in-memory authentication state.
-func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (SessionStatusResult, error) {
+// SessionStatus returns content-free in-memory authentication state. It
+// leaves out unfinished sign-ins, so the MCP server, which uses this method,
+// receives exactly what it received before protocol 31.
+func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (application.SessionStatusResult, error) {
+	result, err := client.SessionStatusWithSignIns(ctx, caller)
+	if err != nil {
+		return application.SessionStatusResult{}, err
+	}
+	return result.Application(), nil
+}
+
+// SessionStatusWithSignIns returns the same state as SessionStatus plus the
+// kind and expiry of each unfinished human sign-in, for `corr auth status`.
+func (client *Client) SessionStatusWithSignIns(ctx context.Context, caller domain.Caller) (SessionStatusResult, error) {
 	var result SessionStatusResult
 	if err := client.call(ctx, MethodSessionStatus, caller, struct{}{}, &result); err != nil {
 		return SessionStatusResult{}, err
@@ -328,6 +403,34 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 			}
 		default:
 			return errors.New("daemon returned unknown session state")
+		}
+	}
+	return validatePendingSignIns(result.PendingSignIns, seen)
+}
+
+func validatePendingSignIns(
+	pending []PendingSignIn,
+	accounts map[domain.AccountID]struct{},
+) error {
+	if len(pending) > len(accounts) {
+		return errors.New("daemon returned more pending sign-ins than accounts")
+	}
+	listed := make(map[domain.AccountID]struct{}, len(pending))
+	for _, signIn := range pending {
+		if _, exists := accounts[signIn.Account]; !exists {
+			return errors.New("daemon returned a pending sign-in for an unknown account")
+		}
+		if _, exists := listed[signIn.Account]; exists {
+			return errors.New("daemon returned duplicate pending sign-ins")
+		}
+		listed[signIn.Account] = struct{}{}
+		switch signIn.Kind {
+		case PendingSignInLoginView, PendingSignInTextRelay:
+		default:
+			return errors.New("daemon returned an unknown pending sign-in kind")
+		}
+		if signIn.ExpiresAt.IsZero() {
+			return errors.New("daemon returned a pending sign-in without an expiry")
 		}
 	}
 	return nil

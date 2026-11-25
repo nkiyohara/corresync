@@ -23,11 +23,19 @@ example on a host that has a display you cannot see. The command prints two
 things to do on your own computer:
 
 ```text
-1. On your own computer, forward the login port over SSH and leave it running:
-     ssh -N -L 127.0.0.1:38183:127.0.0.1:38183 nvidia7
-2. Open this link in a browser on your own computer:
-     http://127.0.0.1:38183/#…
+1. On your own computer, start this SSH tunnel and leave it running:
+
+   ssh -N -L 127.0.0.1:38183:127.0.0.1:38183 nvidia7
+
+   If you reach this server by another name, use that instead of nvidia7.
+
+2. Open this link in a browser there. It is private; do not share it.
+
+http://127.0.0.1:38183/#…
 ```
+
+The link is longer than 80 characters and is printed on a line of its own, so
+a narrow terminal wraps only the link.
 
 The host name in the `ssh` line is the server's own name. Replace it with
 whatever you normally type to reach the server, including a `user@` prefix or an
@@ -70,20 +78,38 @@ and the Homebrew directories.
 
 ## Using the login view
 
-Click the picture of the remote page and type as usual. Scrolling, Enter, Tab,
-arrow keys, IME input, and paste work. The page shows which site the remote
-browser is on, without the path or query. Check it before you type a password
-or code.
+The top of the page says what is happening: starting, loading, ready, check
+the screen, reconnecting, or how the login ended (signed in, cancelled,
+expired, could not start). Next to the title it shows how long the link stays
+valid. Below that it names the site the remote browser is on, for example
+"Signing in at login.microsoftonline.com", without the path or query. Check it
+before you type a password or code.
+
+Click the picture of the remote page and type as usual. The line under the
+picture says when your typing goes to the remote page. Scrolling, Enter, Tab,
+arrow keys, and IME input work. Moving the pointer over the picture moves it on
+the remote page too, so menus that open on hover work.
+
+To paste, press **Paste** or Ctrl+V (⌘V on a Mac). Either sends the text on
+your clipboard, up to 4 KB, as if you had typed it. The page reads the
+clipboard only when you do one of these. If the browser does not allow the
+Paste button to read the clipboard, the page says so; click the picture and
+press Ctrl+V or ⌘V instead.
 
 - The link works in one browser tab. Reloading that tab is fine.
 - The link stops working when sign-in completes, when you cancel, or when the
   login times out. The timeout is `browser.login_timeout` (five minutes by
-  default) and never more than ten minutes.
-- While the remote page is loading or redirecting, the view shows the last
-  picture and updates within a second or two.
-- If an input may not have arrived, the view says so and waits for you. It
-  never sends the same input twice by itself. Look at the screen, then
-  continue.
+  default) and never more than ten minutes. With `--host` the page counts down
+  the sooner of this computer's and the server's limits.
+- The picture refreshes several times a second for a few seconds after you do
+  something and once a second otherwise. A picture that has not changed is not
+  sent again.
+- While the remote page is loading or redirecting, the view keeps the last
+  picture and shows "Loading…" on it.
+- If an input may not have arrived, the view says "Check the screen" and stops
+  taking input. It never sends the same input twice by itself. Press **Refresh
+  view**, look at the screen, then continue. A pointer movement that does not
+  arrive is simply dropped.
 - Ctrl-C in the terminal, or **Cancel login** on the page, closes the remote
   browser. Closing the tab alone does not.
 
@@ -120,7 +146,10 @@ what you type.
 ## How much of this has been checked
 
 Automated tests drive the login view in a real Chromium, including input,
-form submission, page navigation, and a login that ends early. On 2026-11-25 the
+paste, pointer movement, form submission, page navigation, the remaining
+time, and a login that ends early. The paste, pointer movement, and refresh
+changes of the next release after 0.9.5 have not been run against a real
+provider yet. On 2026-11-25 the
 forwarded view was run on a Linux server without a display, against the real
 Outlook Web sign-in page, up to the point of entering credentials. A complete
 sign-in from a Mac, and the same flow inside Orca, have not been recorded yet.

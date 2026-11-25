@@ -3,6 +3,7 @@ module github.com/nkiyohara/corresync
 go 1.27.3
 
 require (
+	charm.land/bubbletea/v2 v2.1.3
 	charm.land/huh/v2 v2.0.3
 	charm.land/lipgloss/v2 v2.1.1
 	github.com/Microsoft/go-winio v0.6.4
@@ -40,7 +41,6 @@ require (
 require (
 	aead.dev/minisign v0.3.0 // indirect
 	charm.land/bubbles/v2 v2.2.2 // indirect
-	charm.land/bubbletea/v2 v2.1.3 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect

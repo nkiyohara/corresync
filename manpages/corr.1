@@ -18,71 +18,102 @@ owner. Consequential external writes require an exact preview followed by a
 separate commit.
 .SH COMMANDS
 .TP
+.B setup
+Set up Corresync step by step: asks for an email address, finds how to connect,
+adds the account, offers tab completion and AI agent connections, and ends with
+the command that signs you in.
+.B "corr setup ADDRESS"
+adds one account without questions, for scripts.
+.TP
+.B settings
+Change accounts, updates, safety, sign-in, and feedback settings from a menu.
+.TP
 .B config
-Create, locate, show, read, update, edit, and strictly validate the secret-free
-configuration.
+Create, show, change, edit, and check the settings file. It never holds a
+password or token.
 .TP
 .B account
-Discover and manage isolated accounts and their provider routes.
+Find how to connect an address, and add, list, rename, or remove accounts.
+Nothing signs in until you run
+.BR "corr auth login" .
 .TP
 .B doctor
-Diagnose local prerequisites and run explicitly requested provider probes.
+Check the configuration, browser, local daemon, and update status; with
+.BR --online ,
+also check the connection to the provider through an existing sign-in.
 .TP
 .B auth
-Open an interactive provider sign-in, inspect content-free session state, or
-close sessions and clear in-memory authorization.
+Sign in to an account, show which accounts are signed in (including a sign-in
+that is still waiting for you and when it expires), or sign out.
 .TP
 .B mail
-Discover folders; list, search, and read messages; create drafts; send reviewed
-new messages and forwards; review resolved reply recipients through saved
-draft sending where supported; retrieve bounded attachments; move,
-hard-delete, and set read state.
+List mail folders; list, search, and read messages; save attachments; save
+drafts, including replies and reply-all; send new messages, forwards, and
+saved drafts; move messages, mark them read or unread, and delete them
+permanently. Sending and deleting always show a preview first; run the same
+command again with
+.B \-\-approve
+to carry it out.
 .TP
 .B calendar
-List calendar event metadata in a bounded time window, or review and create,
-update, or cancel one typed event. A provider may expose a typed Teams or Google
-Meet join-link creation capability; this does not enable either service's
-general collaboration features.
+List calendars and events between two times; create, change, and cancel
+events. Each change shows a preview first and needs
+.BR \-\-approve .
+An event can get a Teams or Google Meet link when its calendar offers one;
+this does not enable the rest of either service.
 .TP
 .B agenda
-Read a bounded, normalized agenda across isolated accounts with account and
-provider provenance and explicit partial failures.
+List events from every calendar account together, labelled by account and
+provider. Accounts that could not be read are named under the list.
+.TP
+.B tasks
+List, search, and sync tasks; create and update tasks from a JSON file;
+complete, reopen, and delete them. Each change shows a preview first and needs
+.BR \-\-approve .
+.TP
+.B queries
+Save a mail search or a calendar time range under a name and run it again.
+Only the search is stored, never its results.
 .TP
 .B import
-Plan and approve a bounded read-only scan of one local export into private
-account-local staging, or purge only that staging.
+Read a local mail or calendar export, after you approve reading that one path,
+into a private staging area for the account, or delete that staging area. The
+source is only read.
 .TP
 .B monitor
-Inspect or configure account-scoped monitoring. Collection defaults to off and
-advances explicitly through local notification, durable queue, and an approved
-runner.
+Show or change monitoring for an account. It is off until you turn it on, one
+mode at a time: desktop notification, local queue, then a program you choose.
 .TP
 .B events
-List, acknowledge, or explicitly purge the durable account-local event queue.
+List, mark as handled, or permanently delete the events monitoring has queued
+for an account.
 .TP
 .B daemon
-Start, inspect, or stop the authenticated local session owner.
+Start, stop, and check the local daemon: the background process that keeps
+your sign-ins and talks to providers. Other commands start it when needed.
 .TP
 .B integrations
-Detect installed local agent hosts, inspect the typed support catalog, or
-preview, apply, verify, repair, and remove exact local integrations.
+Find AI agents on this computer and connect Corresync to them, showing the
+planned changes and asking before it changes anything; also check, repair, and
+remove those connections.
 .TP
 .B mcp
-Run the local stdio MCP server, register it through supported client CLIs, or
-print native client configuration.
+Run the MCP server for an AI agent, add it to an agent with the agent's own
+command, or print the agent's configuration.
 .TP
 .B update
-Check the latest stable public release. Explicitly self-update a direct
-installation after signed provenance and platform verification, or print the
-owner-specific command for a package-managed installation.
+Check for a newer release. Update a direct installation after verifying its
+signature and platform, or print the command for the package manager that
+installed corr.
 .TP
 .B completion
 Generate a Bash, Zsh, or Fish completion script, or detect and idempotently
 install completion for the current shell.
 .TP
 .B feedback
-Print an allowlisted privacy-preserving local report before an explicitly
-selected copy, new-file save, or browser-open action. It never submits an issue.
+Print a diagnostics report with private details removed, then copy it, save it
+to a new file, or open a prefilled GitHub issue page only if you ask. It never
+submits an issue.
 .TP
 .B version
 Print build and version information.
@@ -91,7 +122,8 @@ Print build and version information.
 .nf
 corr --version
 corr help auth
-corr config init
+corr setup
+corr setup reader@example.com --alias work
 corr account discover reader@example.com
 corr auth login
 corr auth status
@@ -103,11 +135,14 @@ corr agenda list --all-accounts --start 2026-07-17T00:00:00Z \
   --end 2026-07-18T00:00:00Z --time-zone UTC
 corr calendar create --subject "Design review" \
   --start 2026-07-20T09:00:00Z --end 2026-07-20T10:00:00Z
-# Review the output, then repeat with --approve.
+# The preview ends with "Next:" and the same command plus --approve.
 corr calendar update --event-id EVENT --change-key KEY \
   --subject "Updated design review"
 corr calendar cancel --event-id EVENT --change-key KEY
-# Both commands preview only; repeat with --approve to commit.
+# Both commands preview only; repeat with --approve to carry them out.
+corr mail draft --mode reply-all --reference-message-id MESSAGE \
+  --reference-change-key KEY --body-file reply.txt
+corr tasks complete --list-id LIST --task-id TASK --task-version VERSION
 corr integrations detect
 corr integrations show codex
 corr integrations plan codex claude-code

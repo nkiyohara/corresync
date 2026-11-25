@@ -29,17 +29,28 @@ corr config set policy.max_recipients 25
 corr config edit
 ```
 
-Interactive `corr setup` is the user-first coordinator. Its preflight derives
-progress from the current configuration, account/session state, shell
-completion, agent detection, and inspectable integration state. It can install
-completion at a displayed user-local path, add and authenticate several
-accounts through the shared credential-free wizard, select several agent hosts,
-and reuse the typed integration lifecycle for preview, one confirmation,
-independent apply, and verification. Re-running it skips healthy work and
-offers repairable or optional steps. `corr setup ADDRESS` keeps the
-deterministic, non-interactive account contract for scripts; it never prompts
-or authenticates. `config init` is the lower-level alternative and creates a
-valid configuration with zero accounts and no selected provider.
+Interactive `corr setup` starts with one question: the email address. It
+creates the settings file silently when needed, looks up how to connect
+without signing in, and lists the ways it found as **Recommended** and **Also
+possible**. When it finds nothing, or you pick **Something else**, it offers the
+connections you can set up by hand (IMAP/SMTP, JMAP, CalDAV, Outlook Web,
+Microsoft Graph, and Google), each with what it will ask for. A connection that
+needs something prepared first — your own Microsoft app registration, a Google
+Desktop OAuth client, or a saved password — is explained with a link to its
+guide before any question, with **Use another way to connect** and **Stop here
+and come back later**. When discovery found Outlook Web for the same address,
+the Microsoft Graph explanation also offers it, because it needs nothing
+prepared. Nothing signs in automatically and Microsoft Graph is never chosen for
+you.
+
+After the accounts, setup asks two optional questions — install tab completion
+for your shell, and connect an AI agent it found — each answered with one key.
+The summary names the settings file once and ends with the next command, such
+as `corr auth login --account work`. Answered questions leave a one-line record
+(`Account: ana@example.com`), and a cancelled question is erased. Re-running
+setup skips finished work. `corr setup ADDRESS` adds one account without
+prompting, for scripts and AI agents; it never signs in, and its `--json`
+output is unchanged. `config init` only creates an empty settings file.
 
 Provider route changes belong to the account lifecycle:
 
@@ -55,23 +66,25 @@ corr account remove old --new-default primary --approve
 `corr settings` is the guided path for everyday changes. Its arrow-key form is
 organized around configured accounts, updates, safety, and browser sign-in.
 The top-level Accounts category opens a second level containing **Add account**
-and the configured account list. Selecting an account opens graphical or
-terminal sign-in, rename, default, and removal actions for that account; Back
+and the configured account list. Selecting an account opens its services,
+**Sign in** (`corr auth login`: a browser on this computer, or for Outlook Web
+on a computer without a display, a login view you open over SSH), **Sign in
+with text only** (`--terminal`), rename, default, and removal actions; Back
 returns to the account list. Removal shows the local-state impact, defaults to
 cancellation, and asks for a replacement before deleting the current default
 when another account will remain. The final account can be removed and leaves
-an empty provider-neutral configuration.
-The form stops and restarts a running session owner around account
-configuration changes. Every choice explains its effect and displays the exact
-direct command. Set `CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader
-prompts and type `:cancel` to leave an input step safely. The remaining
-commands are stable direct forms for scripts and advanced use.
+an empty configuration.
+The form stops and restarts a running daemon around account changes. Every
+choice explains its effect and shows the matching direct command. Set
+`CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader prompts (their help
+text is printed too) and type `:cancel` to leave an input step safely. The
+remaining commands are stable direct forms for scripts and advanced use.
 
-`account discover` uses no credentials and performs no authentication. Its
-ranked candidates explain DNS/well-known evidence, confidence, required auth,
-and whether the provider is available. `account add` requires an explicit route
-when evidence is ambiguous, generates a stable opaque account ID, and leaves
-authentication and monitoring off.
+`account discover` signs in to nothing. It lists the ways it found to connect,
+best first, with the evidence (DNS and well-known lookups) and what each needs
+to sign in. `account add` needs the connection chosen with flags when it cannot
+be picked automatically, generates a stable account ID, and leaves sign-in and
+monitoring off. `corr account add --help` groups its flags by connection type.
 
 Examples:
 
@@ -215,7 +228,7 @@ corr doctor --online --connection-only --account personal
 `auth login` displays the exact OAuth scope set before any provider page can
 open, then invokes the route's browser/keyring/helper authentication. Targeted
 logout preserves every other account and the daemon; logout without an account
-closes the entire local session owner. These operations keep saved browser
+stops the local daemon, which ends every sign-in. These operations keep saved browser
 sign-in, so a later explicit login can reopen the mailbox without a password.
 Use `corr auth logout --account work --clear-browser` to also remove only that
 account's dedicated Outlook/Teams browser storage. It requires an explicit
@@ -238,6 +251,50 @@ and prints the mail, calendar, and task state separately. A signed-out or
 expired route shows
 the exact local `corr auth login --account ALIAS` action; the command does not
 run that action automatically.
+
+While another `corr auth login --web`, `--host`, or `--terminal` is waiting for
+you, `auth status` shows that sign-in for its account, for example
+`Sign-in in progress (forwarded login view), expires in 3 min`, and `--json`
+adds `pendingSignIn` with its kind and expiry (see [JSON output](json.md)).
+Nothing else about that sign-in is reported. Finish it where it started, or run
+`corr auth login --account ALIAS` again to replace it. A sign-in in a browser
+window on this computer is not listed.
+
+Before anything opens, every `corr auth login` (a browser on this computer,
+`--web`, `--terminal`, and the helper behind `--host`) prints where it will sign
+in, on standard error so `--json` output is unchanged:
+
+```text
+Signing in to work (ana@example.com)
+  Outlook Web (mail, calendar): outlook.office.com
+  Gmail / Google (calendar): accounts.google.com, OAuth client
+  1234.apps.googleusercontent.com (opens in your browser)
+  IMAP / SMTP (mail): imap.example.com:993, smtp.example.com:465 (uses the saved
+  password from your keyring)
+```
+
+If the account's current connection settings have never been signed in to from
+the CLI (a new account, or any change to its routes since), it adds "This is
+the first sign-in with these connection settings. Check that the page above is
+the one you expect." On an interactive terminal it then asks
+`Sign in to work at outlook.office.com?`, defaulting to Cancel; Cancel stops
+with "did not sign in to work; nothing was opened" and
+`Try: corr account show work`. Without a terminal, with `--json`, and in the
+`--host` helper the notice is printed and the sign-in continues. With `--host`
+the notice comes from the remote host through SSH and there is no question on
+your computer; check the hosts it prints, and the page address the login view
+shows.
+
+While a sign-in that an MCP client started after your approval is open, `auth
+login` for any account and `auth logout` for other accounts stop at once and
+name that account
+and the time it ends; `corr auth logout --account ALIAS` for that account
+cancels it and closes its browser.
+
+A failed `auth login` names the account, keeps the reason the local daemon
+gave, and suggests a next command: `corr doctor --account ALIAS` when the
+browser or route could not start, or the same login again after a timeout or
+an expired login view.
 
 When a read reports `authentication_required`, `authentication_pending`, or
 `reauthentication_required`, finish the human-owned login, verify the same
@@ -281,9 +338,19 @@ corr mail attachment \
 
 Search syntax belongs to the selected provider. Gmail and Graph queries can
 differ from Outlook AQS; the authenticated capability/degradation report makes
-that visible. Lists return metadata only. Body and attachment operations are
-explicit sensitive reads and may require a second call with `--approve`,
-depending on policy.
+that visible. Lists show sender, subject, date, and flags (`U` unread, `A` has
+attachments), not message text. When `preview_sensitive_reads` is on, `mail
+body` and `mail attachment` first print a preview that ends with a `Next:`
+line: the same command with `--approve` added.
+
+Message IDs are in the last column of `mail list` and `mail search`. Change
+keys, which `move`, `mark`, `delete`, and replies also need, are in their
+`--json` output. An empty result says which folder and account were searched
+and, for a search, suggests the same search across all accounts.
+
+When an account needs to sign in again, the error names the account and the
+service and ends with a `Try:` line such as `Try: corr auth login --account
+work`. An unknown `--account` alias ends with `Try: corr account list`.
 
 Outlook Web accepts mail list pages of up to 25 items; request later pages with
 `--offset`. Its mail time-zone value is an Exchange/Windows identifier such as
@@ -291,7 +358,7 @@ Outlook Web accepts mail list pages of up to 25 items; request later pages with
 `--time-zone` to use the UTC default. Unsupported values and provider-side
 search failures return an actionable error instead of an opaque HTTP 500.
 
-Attachment output is bounded and never overwrites an existing path.
+`--output` must name a new file; an existing file is never overwritten.
 
 ## Cross-account reads
 
@@ -308,10 +375,12 @@ corr agenda list --all-accounts \
   --limit 50
 ```
 
-These are read-only fan-outs across isolated account services. Results are
-normalized, deterministically sorted, globally bounded, and tagged with account
-alias and provider provenance. Unsupported accounts and provider failures are
-reported explicitly alongside successful results. Mail search and task listing
+These commands only read. Every row is labelled with its account and
+provider, and the results are sorted the same way on every run. An account
+whose results are limited is listed under the table as `Limited results from
+…`, and one that could not be read as `Missing results from …`, followed by the
+sign-in command when that is the cause; JSON reports the same in `accounts` and
+`failures`. Mail search and task listing
 read each available source before applying the global page, up to 5,000 matches
 and 2 MiB per account. An account that exceeds either bound contributes a
 failure and no partial prefix. Narrow the mail query or task status filter, or
@@ -360,10 +429,13 @@ corr mail send-draft \
 ```
 
 Save-only draft composition supports new, reply, reply-all, and forward modes;
-text or HTML; and
-bounded repeatable attachments. Review output includes normalized source
-version, recipients, subject, body format/size/digest, and attachment
-size/digest. It does not print the body.
+text or HTML; and repeatable attachments. A preview starts with what has not
+happened yet (for example `Preview: this message has not been sent.`), then
+lists `Will send: yes` or `no`, the mode, To, Cc, Bcc, subject, body format,
+body size and SHA-256, the original message for a reply or forward, and each
+attachment with its size and SHA-256, followed by the start of the body. Its
+last line is `Next:` with the same command plus `--approve`. With `--approve`,
+the same preview is printed on standard error before the change is made.
 
 Choose `--mode` from the intended audience:
 
@@ -373,12 +445,14 @@ Choose `--mode` from the intended audience:
   participants, excluding this account.
 
 `reply` and `reply-all` derive recipients from the source message and reject
-explicit recipients; the error names `reply-all` when you tried to add people
-to a plain reply. A saved draft reports the provider-resolved To, Cc, and
-subject. When a `reply` leaves out source To/Cc participants, the output says
-how many and that `reply-all` keeps them. A route that cannot report the
-resolved addressing says it is unknown rather than showing an empty list.
-Check the resolved recipients before calling a draft ready. See
+explicit recipients; the error ends with a `Try:` line that saves the same
+draft with `--mode reply-all` and without `--to`, `--cc`, or `--bcc`. A saved
+draft reports the To, Cc, and subject as the provider saved them, and ends
+with the `corr mail send-draft` command for that draft version. When a `reply`
+leaves out source To/Cc recipients, the output says how many and that
+`reply-all` keeps them. A route that cannot report the saved addressing says
+it is unknown rather than showing an empty list. Check the recipients before
+sending the draft. See
 [the JSON contract](json.md#mail) for the `addressing` field.
 
 ```console
@@ -393,7 +467,9 @@ printf 'Synthetic reply.\n' | \
 ```
 
 Reply and reply-all must be saved as drafts before sending, so the send preview
-can show the resolved recipients and enforce `policy.max_recipients`. Create
+can show the resolved recipients and enforce `policy.max_recipients`. A direct
+`mail send --mode reply` or `reply-all` fails with a `Try:` line naming the
+matching `corr mail draft` command. Create
 one with `corr mail draft --mode reply-all` (or `reply`) and the exact
 reference message ID/version, then use the returned draft ID/version with
 `corr mail send-draft`. Review every recipient before approving. If the account
@@ -429,10 +505,12 @@ corr mail delete \
   --change-key opaque-change-key
 ```
 
-Reversible writes may preview according to policy. Permanent delete always
-previews and requires `--approve`. Provider degradations state when an atomic
-version precondition is unavailable. Corresync never treats that limitation as
-permission to retry an ambiguous request.
+Move and mark show a preview first when `preview_reversible_writes` is on.
+Permanent delete always shows a preview and needs `--approve`; its preview
+ends with the command to run. Without `--message-id` or `--change-key`, the
+error ends with `Try: corr mail list --json`. Provider degradations state
+when an atomic version precondition is unavailable. Corresync never treats
+that limitation as permission to retry an ambiguous request.
 
 ## Calendar
 
@@ -487,7 +565,9 @@ corr calendar cancel \
   --change-key opaque-change-key
 ```
 
-Repeat the exact reviewed command with `--approve` to commit. Supported fields
+Each preview ends with a `Next:` line: the same command with `--approve`
+added. Run it to carry out the change; the preview is printed again on
+standard error first. Supported fields
 include bounded subject/body, absolute start/end, time zone, location, all-day
 state, reminder, closed recurrence creation/replacement/removal, and complete
 required/optional attendee lists. Use `--recurrence none` with replacement
@@ -531,8 +611,10 @@ corr tasks complete --account work \
 
 The file must omit `account`; `--account` is the only routing selector. Unknown
 JSON fields, trailing values, oversized documents, unsupported capabilities,
-and mismatched replacement flags fail before provider access. Each write prints
-the exact typed review. Notes are represented by a bounded preview, byte count,
+and mismatched replacement flags fail before provider access. Each write
+preview lists the action, account, provider, list, task, version, and any
+limitation, then the full change as JSON, and ends with the `--approve`
+command. Notes are represented by a bounded preview, byte count,
 and digest while the approval binds the complete content.
 
 Complete, reopen, and delete require the exact version returned by a read.
@@ -550,7 +632,7 @@ Saved queries keep a bounded private definition for one exact account. They do
 not save message or event results and do not run in the background.
 
 ```console
-# Review, then save the exact mail definition.
+# Preview, then save the mail search.
 corr queries save mail priority 'is:unread importance:high' --account work
 corr queries save mail priority 'is:unread importance:high' \
   --account work --approve
@@ -712,15 +794,19 @@ corr daemon status --json
 corr daemon stop
 ```
 
-Normal provider commands start the config-scoped daemon on demand. It owns
-sessions and exposes authenticated local IPC only—never TCP. A config digest
-change requires an explicit stop. A compatible old binary can be drained and
-replaced without retrying an application operation.
+The local daemon is the background process that keeps your sign-ins and talks
+to providers. Normal provider commands start the config-scoped daemon on
+demand. It owns sessions and exposes authenticated local IPC only—never TCP. A
+config digest change requires an explicit stop. A compatible old binary can be
+drained and replaced without retrying an application operation.
 
-`daemon status` reports unavailable owners without printing private state
-paths or credential-file details. Its JSON form uses stable `ready` or
-`unavailable` states and a bounded reason; an authorization mismatch remains
-distinct from an owner that is not running.
+`daemon status` reports an unavailable daemon without printing private state
+paths or credential-file details. The human message says whether the daemon is
+not running, is a different version of corr, refused the command, or did not
+answer, followed by the reason code and a suggested command. Its JSON form uses
+stable `ready` or `unavailable` states and a bounded reason; an authorization
+mismatch remains distinct from an owner that is not running. `daemon stop` on
+a daemon that is not running still exits with status 1 and says so.
 
 On Unix, every process derives the same endpoint regardless of
 `XDG_RUNTIME_DIR` or `TMPDIR`. v0.8.6 can authentically drain one owner left at
@@ -794,7 +880,10 @@ Package-managed installations print their owner command. Direct installs
 verify Sigstore identity, checksum, version, OS, and architecture before a
 rollback-capable replacement. No ambiguous update is retried.
 
-`corr update check` asks the release endpoint each time it runs. Eligible
+`corr update check` asks the release endpoint each time it runs. When the
+lookup fails it says why where it can tell (no network, GitHub's rate limit,
+a timeout, or another `corr` checking at the same moment); `corr doctor` shows
+the same reason for its cached check. Eligible
 interactive CLI starts perform a bounded, 24-hour-cached check instead, which
 also remembers a failed lookup, and show a short installation-specific notice.
 New standalone configurations enable the verified replacement path by default;
@@ -818,7 +907,7 @@ Use `corr config set updates.channel stable` to return. Channel changes never
 downgrade. Package-manager catalogs are stable-only, so a managed preview check
 shows the direct release URL instead of an owner command.
 
-After verified installation, the existing config-scoped session owner restarts
+After verified installation, the existing config-scoped local daemon restarts
 and the requested interactive command runs with the updated executable. Owners
 from 0.9.2 also detect external executable replacement and retire after admitted
 requests finish. Disable installation with `corr config set

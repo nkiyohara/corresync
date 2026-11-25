@@ -1,0 +1,13 @@
+{
+  "status": "approval_required",
+  "review": {
+    "action": "purge",
+    "account": "acc_00000000000000000000000000000001",
+    "catalogRevision": "bf56ad00f85d0de92941876142b9fffa4c54091fb87b5ef849097d862207e930",
+    "definitions": 1,
+    "corrupt": false,
+    "private": true,
+    "storesContent": false
+  },
+  "purged": false
+}

@@ -9,8 +9,49 @@ corr auth status
 corr auth logout
 ```
 
-The daemon is the only authenticated session owner. CLI and MCP call it through
+The local daemon, the background process that keeps your sign-ins, is the only
+authenticated session owner. CLI and MCP call it through
 private local IPC and never receive provider credentials.
+
+`corr auth login` prints, before anything opens, the account, its address, and
+each service's sign-in page host (with the OAuth client ID) or saved-credential
+server and port. The first sign-in with an account's current connection
+settings asks for confirmation on an interactive terminal (default Cancel);
+scripts, `--json`, and `--host` print the same notice and continue. See
+[CLI usage](cli.md#authentication-and-doctor).
+
+## Signing in from an MCP client
+
+MCP can request a sign-in; it starts only after the user approves it in the MCP
+client. This works only for an account you have already signed in to once with
+`corr auth login`, and again after any change to its connection settings.
+When a tool reports that an account needs sign-in, an agent may call
+`account_sign_in` with that account alias. Corresync then asks you, in the MCP
+client's own confirmation prompt, whether to sign in. The prompt is written by
+Corresync and names the account alias and address, the services, and the exact
+sign-in page host (and OAuth client ID) or saved-credential server for each.
+Nothing starts unless you accept.
+
+On acceptance the daemon starts the same sign-in as
+`corr auth login --account ALIAS`: the dedicated Outlook Web browser at the
+configured origin, or the provider's OAuth page in your browser. Enter your
+password, MFA, and consent only there. The tool returns immediately; the daemon
+completes the session when the browser sign-in finishes, or closes the browser
+when the browser login timeout expires. `corr auth status` and `account_status`
+show the account as pending meanwhile.
+
+Declining or cancelling blocks further prompts for that account from MCP for
+ten minutes, as does a prompt left unanswered or a sign-in that does not
+finish; the cool-down survives a daemon restart. While an MCP-started sign-in
+is open, `corr auth login` and `corr auth logout` for other accounts stop with
+a message naming it; `corr auth logout --account ALIAS` for that account
+cancels it and closes its browser. Clients without
+elicitation support, and Linux hosts without `DISPLAY` or `WAYLAND_DISPLAY`,
+get the `corr auth login --account ALIAS` command instead; the forwarded login
+view for hosts without a display is not available from MCP. Logout and
+`--clear-browser` remain CLI-only. Each request, answer, start, completion, and
+expiry is recorded in the local content-free audit log. See
+[ADR 0039](adr/0039-user-approved-sign-in-from-mcp.md).
 
 ## Outlook Web
 
@@ -227,6 +268,15 @@ active account when at least one configured service is active. Captured time,
 normalized capabilities, and degradations describe only active service
 leases. Status performs no provider request or surprise login and returns no
 address, endpoint, cookie, token, page content, or mailbox item.
+
+When a sign-in through the forwarded login view (`--web` or `--host`) or the
+text relay (`--terminal`) is still waiting for you, status shows it for that
+account with its kind and the time left before the local daemon ends it, for
+example `Sign-in in progress (forwarded login view), expires in 3 min`. It
+never shows the sign-in's session ID, pairing link, page address, or anything
+on the page. Finish the sign-in where it was started, or start
+`corr auth login` for the account again to replace it. MCP `account_status`
+does not report it.
 
 A definitive runtime rejection invalidates the owning adapter lease before the
 operation returns. Services sharing that lease transition together; a hybrid

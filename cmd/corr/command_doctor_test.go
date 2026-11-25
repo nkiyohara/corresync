@@ -550,7 +550,7 @@ func TestDoctorReportsSplitOwnersWithRunnableRecovery(t *testing.T) {
 	for _, check := range report.Checks {
 		if check.Name == "daemon" {
 			if check.Status != "fail" ||
-				!strings.Contains(check.Detail, "multiple session owners") ||
+				!strings.Contains(check.Detail, "multiple copies of the local daemon") ||
 				!strings.Contains(check.Detail, "corr daemon stop") {
 				t.Fatalf("daemon check = %+v", check)
 			}

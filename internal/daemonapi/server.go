@@ -310,6 +310,45 @@ func (server *Server) dispatch(ctx context.Context, request requestEnvelope) (an
 			return nil, errors.New("terminal login is not supported by this session owner")
 		}
 		return backend.TerminalLogin(ctx, input, request.Caller)
+	case MethodSignInRequest:
+		var input SignInRequestInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Account.ValidateOpaque(); err != nil {
+			return nil, err
+		}
+		backend, supported := server.backend.(SignInBackend)
+		if !supported {
+			return nil, errors.New("account sign-in requests are not supported by this session owner")
+		}
+		return backend.RequestAccountSignIn(ctx, input.Account, request.Caller)
+	case MethodSignInVerified:
+		var input SignInRequestInput
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Account.ValidateOpaque(); err != nil {
+			return nil, err
+		}
+		backend, supported := server.backend.(SignInVerificationBackend)
+		if !supported {
+			return nil, errors.New("sign-in verification is not supported by this session owner")
+		}
+		return backend.SignInVerified(ctx, input.Account, request.Caller)
+	case MethodSignInResolve:
+		var input application.AccountSignInResolution
+		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {
+			return nil, err
+		}
+		if err := input.Validate(); err != nil {
+			return nil, err
+		}
+		backend, supported := server.backend.(SignInBackend)
+		if !supported {
+			return nil, errors.New("account sign-in requests are not supported by this session owner")
+		}
+		return backend.ResolveAccountSignIn(ctx, input, request.Caller)
 	case MethodMailList:
 		var input application.MailListInput
 		if err := decodeStrict(bytes.NewReader(request.Params), &input); err != nil {

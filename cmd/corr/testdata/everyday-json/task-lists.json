@@ -1,0 +1,40 @@
+{
+  "lists": [
+    {
+      "id": "list-1",
+      "displayName": "Inbox",
+      "editable": true,
+      "default": true,
+      "capabilities": {
+        "read": false,
+        "crossListRead": false,
+        "search": false,
+        "create": false,
+        "update": false,
+        "complete": false,
+        "reopen": false,
+        "delete": false,
+        "optimisticConcurrency": false,
+        "reminders": false,
+        "recurrence": false,
+        "subtasks": false,
+        "checklist": false,
+        "assignments": false,
+        "labels": false,
+        "attachments": false,
+        "linkedSources": false,
+        "ordering": false,
+        "dateOnly": false,
+        "floatingDateTime": false,
+        "zonedDateTime": false
+      },
+      "provenance": {
+        "accountId": "acc_00000000000000000000000000000001",
+        "provider": "todoist"
+      }
+    }
+  ],
+  "offset": 0,
+  "limit": 50,
+  "hasMore": false
+}

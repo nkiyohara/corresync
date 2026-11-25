@@ -397,3 +397,32 @@ effects, approval binding, and the configuration schema are unchanged. Explicit
 recipients in `reply` and `reply_all` are still rejected; only the error text
 now names `reply_all`. Protocol 30 replaces protocol 29 because the private
 daemon response shape changes.
+
+### Graphical login pointer move
+
+The graphical login action gains the bounded `move` type (ADR 0038). Protocol
+31 replaces protocol 30 because the daemon accepts a value it rejected before.
+The SSH helper wire advances to version 2 for the same reason; a version 2
+helper still answers version 1 requests, which cannot carry `move`.
+
+### User-approved MCP sign-in
+
+The MCP catalog gains the additive `account_sign_in` tool and the
+authentication action gains the optional `nextAction.mcpTool` field (ADR 0039).
+Omission keeps its old meaning. Protocol 32 replaces protocol 31 because the
+private daemon adds the `login.mcp.request` and `login.mcp.resolve` methods.
+Before protocol 33 was released, the approval result also gained the address
+and each route's kind, host, OAuth client ID, and additional hosts, and the
+daemon gained the CLI-only `login.verified` query, which returns one boolean
+for one account; these ship within protocol 33.
+
+### Unfinished sign-in in session status
+
+The private session status result gains an optional `pendingSignIns` list:
+per account, the kind (`login_view` or `text_relay`) and expiry of a sign-in
+that a human `corr auth login` started and has not finished. It carries no
+session ID, pairing capability, caller, page origin, or page content. A result
+without the list keeps its old meaning and still validates. `auth status
+--json` adds the optional per-account `pendingSignIn` member; MCP
+`account_status` is unchanged and does not receive it. Protocol 33 replaces
+protocol 32 because the private daemon response shape changes.

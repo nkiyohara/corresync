@@ -124,8 +124,10 @@ management are not exposed.
 
 The Gmail, Google Calendar, and Google Tasks adapters use an explicitly selected
 user-owned Desktop OAuth client. Account setup records only reviewed external
-credential handles and starts no authentication. MCP cannot initiate OAuth;
-only explicit local CLI login may create or expand an authorization. After
+credential handles and starts no authentication. MCP can request a sign-in;
+it starts only after the user approves it in the MCP client
+([ADR 0039](adr/0039-user-approved-sign-in-from-mcp.md)). Only explicit local
+CLI login or that approved sign-in may create or expand an authorization. After
 that boundary, the session owner may resolve the already consented client
 credential when Google requires a token refresh; MCP cannot invoke that
 resolution directly and never receives the credential or grant.

@@ -1,0 +1,29 @@
+{
+  "status": "approval_required",
+  "review": {
+    "calendar": {
+      "kind": "distinguished",
+      "id": "calendar"
+    },
+    "subject": "Planning",
+    "bodyBytes": 0,
+    "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "start": "2026-12-01T09:00:00Z",
+    "end": "2026-12-01T10:00:00Z",
+    "invitationsWillBeSent": false,
+    "onlineMeeting": false,
+    "teamsMeeting": false,
+    "allDay": false,
+    "timeZone": "UTC"
+  },
+  "preview": {
+    "token": "<token>",
+    "expiresAt": "<time>",
+    "operation": {
+      "name": "calendar.create",
+      "effect": "external_write",
+      "account": "acc_00000000000000000000000000000001",
+      "digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  }
+}

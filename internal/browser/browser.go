@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -106,7 +107,7 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 		observation.observer = newRequestObserver(manager, instance.reportSessionError)
 		if err := chromedp.Do(browserContext); err != nil {
 			_ = instance.Close()
-			return nil, fmt.Errorf("start browser network observer: %w", err)
+			return nil, launchFailure(parent, "start the browser", err)
 		}
 		observation.bind(chromedp.FromContext(browserContext).Target.SessionID)
 		if _, err := chromedp.Call(browserContext, network.Enable, network.EnableParams{}); err != nil {
@@ -120,10 +121,28 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 	}
 	if err := chromedp.Do(browserContext, chromedp.Navigate(loginURL)); err != nil {
 		_ = instance.Close()
-		return nil, fmt.Errorf("navigate to Outlook Web: %w", err)
+		return nil, launchFailure(parent, "open the sign-in page", err)
 	}
 	closeRestoredPages(browserContext)
 	return instance, nil
+}
+
+// launchFailure keeps a failed browser start readable. When Chromium cannot
+// start, its whole crash output and stack trace arrive inside the error; a
+// person needs the cause in one line, and the sandbox case has fixed guidance.
+func launchFailure(parent context.Context, step string, err error) error {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("%s: %w", step, err)
+	}
+	if errors.Is(classifyProbeError(parent, err, runtime.GOOS), ErrLinuxSandboxUnavailable) {
+		return fmt.Errorf("%s: %w", step, ErrLinuxSandboxUnavailable)
+	}
+	detail, _, _ := strings.Cut(strings.TrimSpace(err.Error()), "\n")
+	const limit = 200
+	if len(detail) > limit {
+		detail = strings.ToValidUTF8(detail[:limit], "") + "…"
+	}
+	return fmt.Errorf("%s: %s", step, detail)
 }
 
 // closeRestoredPages closes the tabs Chromium reopens from the profile's

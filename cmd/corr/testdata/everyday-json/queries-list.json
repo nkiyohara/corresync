@@ -1,0 +1,21 @@
+{
+  "account": "acc_00000000000000000000000000000001",
+  "queries": [
+    {
+      "version": 1,
+      "account": "acc_00000000000000000000000000000001",
+      "name": "from-ana",
+      "kind": "mail",
+      "mail": {
+        "folder": {
+          "kind": "distinguished",
+          "id": "inbox"
+        },
+        "query": "from:ana@example.invalid",
+        "limit": 25,
+        "timeZone": "UTC"
+      },
+      "revision": "abcb4de33cbea7259ba5559a0b19d84fe8928ee3c919a59237b160a85a0b4cda"
+    }
+  ]
+}

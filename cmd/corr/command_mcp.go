@@ -25,6 +25,18 @@ type mcpCommand struct {
 	Setup  mcpSetupCommand  `cmd:"" help:"Register the server through a client's official CLI."`
 }
 
+func (*mcpCommand) Help() string {
+	return `MCP lets an AI agent use your mail, calendar, and tasks through Corresync.
+The agent starts corr mcp serve itself; you only add Corresync to the agent
+once. corr integrations can set up several agents at once and check them
+later.
+
+Examples:
+  corr mcp setup claude-code
+  corr mcp setup codex --dry-run
+  corr mcp config gemini-cli`
+}
+
 type mcpServeCommand struct {
 	Stdio bool `default:"true" help:"Use newline-delimited JSON over stdin/stdout."`
 }
@@ -217,15 +229,15 @@ func (command *mcpKimiCodeSetupCommand) Run(app *runtime) error {
 func resolveMCPSetup(app *runtime, name, executable string) (string, string, []string, error) {
 	configuration, _, err := app.loadConfig()
 	if err != nil {
-		return "", "", nil, fmt.Errorf(
-			"load Corresync configuration before MCP setup (run `corr setup <email-address>` first): %w",
+		return "", "", nil, withHint(fmt.Errorf(
+			"set up an account before adding Corresync to an AI agent; the configuration could not be loaded: %w",
 			err,
-		)
+		), shellCommand("corr", "setup"))
 	}
 	if len(configuration.Accounts) == 0 {
-		return "", "", nil, errors.New(
-			"configure an account before MCP setup; run `corr setup <email-address>` first",
-		)
+		return "", "", nil, withHint(errors.New(
+			"set up an account before adding Corresync to an AI agent; the configuration has no accounts",
+		), shellCommand("corr", "setup"))
 	}
 	name, executable, arguments, err := resolveMCPClientConfig(app, name, executable)
 	if err != nil {
@@ -293,15 +305,22 @@ func applyMCPSetup(app *runtime, client mcpSetupClient, name string, arguments [
 		return err
 	}
 	if err := app.runCommand(app.context, app.stdout, app.stderr, client.Command, arguments...); err != nil {
-		return fmt.Errorf("register MCP server with %s: %w", client.Label, err)
+		return withHint(
+			fmt.Errorf("add the MCP server to %s with %s: %w", client.Label, client.Command, err),
+			"any message above is from "+client.Command+"; --dry-run prints the command so you can run it yourself",
+		)
 	}
-	_, err := fmt.Fprintf(
-		app.stdout,
-		"Registered MCP server %q with %s.\nVerify with `%s`.\nStart a new %s session before asking it to use mail or calendar; existing sessions may retain their original tool catalog.\n",
-		name,
-		client.Label,
-		formatCommand(client.Command, client.Verify),
-		client.Label,
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err := view.printf(
+		"%s  %s\n%s\n%s\n",
+		view.success(),
+		view.strong(fmt.Sprintf("Added MCP server %q to %s", name, client.Label)),
+		wrapText(
+			"Start a new "+client.Label+" session before asking it about mail or calendar; a session that is already open may keep its old list of tools. To check the entry:",
+			app.textWidth(app.stdout),
+			"   ",
+		),
+		"   "+view.nextStep(formatCommand(client.Command, client.Verify)),
 	)
 	return err
 }

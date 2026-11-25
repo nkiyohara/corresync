@@ -105,15 +105,31 @@ func (command *feedbackCommand) Run(app *runtime) error {
 		)
 		return err
 	default:
+		words := []string{"corr", "feedback"}
+		if command.LastError {
+			words = append(words, "--last-error")
+		}
 		_, err := fmt.Fprint(
 			app.stdout,
-			"\nNothing was uploaded. After review, explicitly choose one action:\n"+
-				"  corr feedback --copy\n"+
-				"  corr feedback --save ./corresync-feedback.json\n"+
-				"  corr feedback --open-github  # requires a GitHub account; opens but never submits\n",
+			"\nNothing was uploaded. To share this report, run one of:\n"+
+				"  "+shellCommand(append(words, "--copy")...)+"\n"+
+				"  "+shellCommand(append(words, "--save", "./corresync-feedback.json")...)+"\n"+
+				"  "+shellCommand(append(words, "--open-github")...)+"  # needs a GitHub account; opens the page but does not submit\n",
 		)
 		return err
 	}
+}
+
+func (*feedbackCommand) Help() string {
+	return `The report holds your corr version, platform, install method, which kinds
+of provider you use, and with --last-error the most recent error and crash,
+with private details removed. It is printed in full first, and this
+command sends it nowhere unless you add --copy, --save, or --open-github.
+
+Examples:
+  corr feedback
+  corr feedback --last-error
+  corr feedback --last-error --open-github`
 }
 
 func (app *runtime) feedbackReport(includeLastError bool) ([]byte, error) {

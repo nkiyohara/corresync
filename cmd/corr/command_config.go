@@ -20,17 +20,17 @@ import (
 )
 
 type configCommand struct {
-	Init     configInitCommand     `cmd:"" help:"Create a safe default configuration."`
-	Path     configPathCommand     `cmd:"" help:"Print the effective configuration path."`
-	Show     configShowCommand     `cmd:"" help:"Show the validated secret-free configuration."`
-	Get      configGetCommand      `cmd:"" help:"Read one typed configuration value."`
-	Set      configSetCommand      `cmd:"" help:"Set one typed configuration value."`
-	Edit     configEditCommand     `cmd:"" help:"Safely edit and validate configuration."`
-	Validate configValidateCommand `cmd:"" help:"Strictly validate configuration."`
+	Init     configInitCommand     `cmd:"" help:"Create an empty settings file with no accounts."`
+	Path     configPathCommand     `cmd:"" help:"Print the path of the settings file in use."`
+	Show     configShowCommand     `cmd:"" help:"Show the current settings."`
+	Get      configGetCommand      `cmd:"" help:"Show one configuration value."`
+	Set      configSetCommand      `cmd:"" help:"Change one configuration value."`
+	Edit     configEditCommand     `cmd:"" help:"Edit the settings file and check it before saving."`
+	Validate configValidateCommand `cmd:"" help:"Check the settings file for errors."`
 }
 
 type configInitCommand struct {
-	Force bool `help:"Replace an existing regular config file."`
+	Force bool `help:"Replace an existing settings file."`
 	JSON  bool `help:"Write machine-readable JSON."`
 }
 
@@ -50,7 +50,10 @@ func (command *configInitCommand) Run(app *runtime) error {
 			return err
 		}
 		if !created {
-			return fmt.Errorf("config already exists at %s; use --force to replace it", path)
+			return withHint(
+				fmt.Errorf("a settings file already exists at %s", path),
+				"corr config init --force (replaces it with an empty one)",
+			)
 		}
 	}
 	if command.JSON {
@@ -64,10 +67,10 @@ func (command *configInitCommand) Run(app *runtime) error {
 	_, err = view.printf(
 		"%s  %s\n   %s\n\n   %s\n   %s\n",
 		view.success(),
-		view.strong("Provider-neutral configuration created"),
+		view.strong("Configuration created"),
 		view.muted(path),
-		"No account or provider was selected.",
-		view.command("Next: corr setup <email-address>"),
+		"It has no accounts yet.",
+		view.nextStep("corr setup"),
 	)
 	return err
 }
@@ -123,7 +126,7 @@ func (command *configShowCommand) Run(app *runtime) error {
 	if len(configuration.Accounts) == 0 {
 		_, err := view.printf(
 			"\n  No accounts configured.\n\n  %s\n",
-			view.command("Next: corr setup <email-address>"),
+			view.nextStep("corr setup"),
 		)
 		return err
 	}
@@ -180,7 +183,7 @@ func (command *configShowCommand) Run(app *runtime) error {
 }
 
 type configGetCommand struct {
-	Key  string `arg:"" help:"Typed key such as policy.max_recipients."`
+	Key  string `arg:"" help:"Key such as policy.max_recipients."`
 	JSON bool   `help:"Write machine-readable JSON."`
 }
 
@@ -231,7 +234,7 @@ func (command *configGetCommand) Run(app *runtime) error {
 }
 
 type configSetCommand struct {
-	Key   string `arg:"" help:"Typed key such as policy.max_recipients."`
+	Key   string `arg:"" help:"Key such as policy.max_recipients."`
 	Value string `arg:"" help:"New value."`
 	JSON  bool   `help:"Write machine-readable JSON."`
 }
@@ -385,7 +388,7 @@ func writeConfigUpdated(app *runtime, detail string) error {
 		view.success(),
 		view.strong("Configuration updated"),
 		view.muted(detail),
-		view.muted("A running session owner must be stopped before the new configuration takes effect."),
+		view.muted("If the daemon is running, run corr daemon stop so it picks up the change."),
 	)
 	return err
 }

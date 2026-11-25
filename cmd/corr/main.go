@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -23,39 +24,68 @@ import (
 	"github.com/nkiyohara/corresync/internal/updatecheck"
 )
 
+// cli is the root command. Each visible top-level command names its section of
+// the root help with a helpgroup tag; rootHelpGroups lists the sections in the
+// order they are shown. Fields are ordered as the root help lists them.
 type cli struct {
-	ConfigPath   string              `name:"config" type:"path" env:"CORRESYNC_CONFIG" help:"Path to config.toml."`
-	VersionFlag  kong.VersionFlag    `name:"version" short:"V" help:"Print version information and quit."`
-	Version      versionCommand      `cmd:"" help:"Print version and build information."`
-	Setup        setupCommand        `cmd:"" help:"Resume guided local setup, or add one account deterministically."`
-	Settings     settingsCommand     `cmd:"" help:"Change account names and everyday settings interactively."`
-	Config       configCommand       `cmd:"" help:"Inspect and script advanced configuration."`
-	Account      accountCommand      `cmd:"" help:"Discover and manage isolated accounts."`
-	Doctor       doctorCommand       `cmd:"" help:"Diagnose local setup and opt-in provider compatibility."`
-	Import       importCommand       `cmd:"" help:"Scan local exports into private read-only staging."`
-	Auth         authCommand         `cmd:"" help:"Inspect and manage interactive sessions."`
-	Login        loginCommand        `cmd:"" hidden:"" help:"Open the interactive provider sign-in."`
-	Mail         mailCommand         `cmd:"" help:"Read and manage mail."`
-	Calendar     calendarCommand     `cmd:"" help:"Read and manage calendar events."`
-	Agenda       agendaCommand       `cmd:"" help:"Read a normalized cross-account agenda."`
-	Tasks        tasksCommand        `cmd:"" help:"Read and manage provider-neutral tasks."`
-	Queries      queriesCommand      `cmd:"" help:"Save and run private mail and calendar queries."`
-	Messages     messagesCommand     `cmd:"" hidden:"" help:"Read and manage provider-neutral messaging."`
-	Monitor      monitorCommand      `cmd:"" help:"Configure account-scoped opt-in monitoring."`
-	Events       eventsCommand       `cmd:"" help:"Inspect and acknowledge the durable local event queue."`
-	Daemon       daemonCommand       `cmd:"" help:"Run and inspect the local session owner."`
-	Integrations integrationsCommand `cmd:"" help:"Detect and safely manage local AI-agent integrations."`
-	MCP          mcpCommand          `cmd:"" help:"Expose guarded mail, calendar, and task tools over MCP."`
-	Update       updateCommand       `cmd:"" help:"Install verified updates or show the package-manager command."`
-	Completion   completionCommand   `cmd:"" help:"Generate or install shell completion."`
-	Feedback     feedbackCommand     `cmd:"" help:"Review privacy-preserving local diagnostics and choose any external action."`
+	ConfigPath  string           `name:"config" type:"path" env:"CORRESYNC_CONFIG" help:"Path to config.toml."`
+	VersionFlag kong.VersionFlag `name:"version" short:"V" help:"Print version information and quit."`
+
+	Mail     mailCommand     `cmd:"" helpgroup:"everyday" help:"Read, search, send, and organize mail."`
+	Calendar calendarCommand `cmd:"" helpgroup:"everyday" help:"List, create, change, and cancel calendar events."`
+	Agenda   agendaCommand   `cmd:"" helpgroup:"everyday" help:"List events from all your calendar accounts together."`
+	Tasks    tasksCommand    `cmd:"" helpgroup:"everyday" help:"List, create, update, and complete tasks."`
+	Queries  queriesCommand  `cmd:"" helpgroup:"everyday" help:"Save mail and calendar searches and run them again."`
+	Messages messagesCommand `cmd:"" hidden:"" help:"Read and manage provider-neutral messaging."`
+
+	Setup    setupCommand    `cmd:"" helpgroup:"accounts" help:"Set up Corresync step by step, or add one account from a script."`
+	Settings settingsCommand `cmd:"" helpgroup:"accounts" help:"Change accounts and everyday settings from a menu."`
+	Account  accountCommand  `cmd:"" helpgroup:"accounts" help:"Find, add, rename, and remove accounts."`
+	Auth     authCommand     `cmd:"" helpgroup:"accounts" help:"Sign in to accounts, check sign-in status, and sign out."`
+	Login    loginCommand    `cmd:"" hidden:"" help:"Open the interactive provider sign-in."`
+
+	MCP          mcpCommand          `cmd:"" helpgroup:"agents" help:"Run the MCP server, or add it to an AI agent."`
+	Integrations integrationsCommand `cmd:"" helpgroup:"agents" help:"Find AI agents on this computer and connect Corresync to them."`
+
+	Doctor     doctorCommand     `cmd:"" helpgroup:"maintenance" help:"Check your setup for problems."`
+	Update     updateCommand     `cmd:"" helpgroup:"maintenance" help:"Install a verified update, or show the package manager command."`
+	Config     configCommand     `cmd:"" helpgroup:"maintenance" help:"Show, check, and change the configuration file."`
+	Completion completionCommand `cmd:"" helpgroup:"maintenance" help:"Print or install tab completion for your shell."`
+	Feedback   feedbackCommand   `cmd:"" helpgroup:"maintenance" help:"Show a private diagnostics report and choose whether to share it."`
+	Version    versionCommand    `cmd:"" helpgroup:"maintenance" help:"Print version and build information."`
+
+	Monitor monitorCommand `cmd:"" helpgroup:"advanced" help:"Watch an account for new mail and notify you or an agent."`
+	Events  eventsCommand  `cmd:"" helpgroup:"advanced" help:"List, acknowledge, and delete events found by monitoring."`
+	Import  importCommand  `cmd:"" helpgroup:"advanced" help:"Read a local mail or calendar export into private staging."`
+	Daemon  daemonCommand  `cmd:"" helpgroup:"advanced" help:"Start, stop, and check the local daemon."`
 }
+
+// rootHelpGroup is one section of the root help.
+type rootHelpGroup struct {
+	Key   string
+	Title string
+}
+
+// rootHelpGroups lists the root help sections in display order. Every visible
+// top-level command must name exactly one of these keys in its helpgroup tag.
+var rootHelpGroups = []rootHelpGroup{
+	{Key: "everyday", Title: "Everyday"},
+	{Key: "accounts", Title: "Accounts and sign-in"},
+	{Key: "agents", Title: "AI agents"},
+	{Key: "maintenance", Title: "Maintenance"},
+	{Key: "advanced", Title: "Advanced"},
+}
+
+const rootHelpGroupTag = "helpgroup"
 
 type versionCommand struct {
 	JSON bool `help:"Write machine-readable JSON."`
 }
 
-const commandName = "corr"
+const (
+	commandName    = "corr"
+	productTagline = "Mail, calendars, and tasks from the terminal and for AI agents."
+)
 
 func (command *versionCommand) Run(app *runtime) error {
 	if command.JSON {
@@ -98,7 +128,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		}
 		result, updateErr := app.maybeHandleAutomaticUpdate(executionContext)
 		if updateErr != nil {
-			_, _ = fmt.Fprintln(stderr, updateErr)
+			printCommandError(stderr, updateErr, true)
 			return 1
 		}
 		if result.Status == updatecheck.InstallStatusUpdated {
@@ -113,7 +143,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 	parser, err := kong.New(
 		&commandLine,
 		kong.Name(commandName),
-		kong.Description("Local-first, guarded mail, calendar, and tasks."),
+		kong.Description(productTagline),
 		kong.Help(compactHelpPrinter),
 		kong.Vars{"version": versionLine(info)},
 		kong.UsageOnError(),
@@ -143,7 +173,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		return exitCode
 	}
 	if err != nil {
-		_, _ = fmt.Fprintln(stderr, err)
+		printCommandError(stderr, err, !jsonOutputRequested(arguments))
 		return 2
 	}
 
@@ -157,7 +187,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 	if shouldHandleAutomaticUpdate(arguments) {
 		result, updateErr := app.maybeHandleAutomaticUpdate(executionContext)
 		if updateErr != nil {
-			_, _ = fmt.Fprintln(stderr, updateErr)
+			printCommandError(stderr, updateErr, !jsonOutputRequested(arguments))
 			return 1
 		}
 		if result.Status == updatecheck.InstallStatusUpdated {
@@ -170,7 +200,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		if root != "feedback" {
 			record = recordExecutionFailure(err, parsed.Command(), arguments)
 		}
-		_, _ = fmt.Fprintln(stderr, err)
+		printCommandError(stderr, err, !jsonOutputRequested(arguments))
 		if root != "feedback" {
 			app.maybeSubmitAutomaticFeedback(executionContext, root, record)
 		}
@@ -197,43 +227,93 @@ func compactHelpPrinter(options kong.HelpOptions, ctx *kong.Context) error {
 	if ctx.Selected() != nil {
 		return kong.DefaultHelpPrinter(options, ctx)
 	}
+	view := newConsoleViewWithEnvironment(ctx.Stdout, outputIsTerminal(ctx.Stdout), os.LookupEnv)
+	_, err := io.WriteString(ctx.Stdout, rootHelp(ctx.Model, view))
+	return err
+}
+
+// rootHelp renders the grouped command overview shown by `corr` and
+// `corr --help`.
+func rootHelp(model *kong.Application, view consoleView) string {
+	sections := rootHelpSections(model.Children)
+	name := model.Name
 	width := 0
-	for _, command := range ctx.Model.Children {
-		if !command.Hidden && len(command.Name) > width {
-			width = len(command.Name)
+	for _, section := range sections {
+		for _, command := range section.commands {
+			width = max(width, len(command.Name))
 		}
 	}
-	view := newConsoleViewWithEnvironment(ctx.Stdout, outputIsTerminal(ctx.Stdout), os.LookupEnv)
 	var help strings.Builder
 	_, _ = fmt.Fprintf(
 		&help,
-		"%s  %s\n%s\n\n",
+		"%s  %s\n%s\n\nUsage:\n  %s <command> [flags]\n",
 		view.info(),
 		view.strong("Corresync"),
-		strings.TrimSuffix(ctx.Model.Help, "."),
+		strings.TrimSuffix(model.Help, "."),
+		name,
 	)
-	_, _ = fmt.Fprintf(&help, "Usage:\n  %s <command> [flags]\n\nCommands:\n", ctx.Model.Name)
-	for _, command := range ctx.Model.Children {
-		if command.Hidden {
-			continue
+	for _, section := range sections {
+		_, _ = fmt.Fprintf(&help, "\n%s:\n", section.title)
+		for _, command := range section.commands {
+			_, _ = fmt.Fprintf(
+				&help,
+				"  %s  %s\n",
+				view.command(fmt.Sprintf("%-*s", width, command.Name)),
+				strings.TrimSuffix(command.Help, "."),
+			)
 		}
-		name := view.command(fmt.Sprintf("%-*s", width, command.Name))
-		_, _ = fmt.Fprintf(
-			&help,
-			"  %s %s\n",
-			name,
-			strings.TrimSuffix(command.Help, "."),
-		)
 	}
-	_, _ = fmt.Fprintf(
-		&help,
-		"\nFlags:\n  -h, --help           Show help\n  -V, --version        Print version information\n      --config <path>  Use a specific config.toml\n\nStart:\n  %s\n  %s\n\nRun %s for command-specific help.\n",
-		view.command(ctx.Model.Name+" setup <email-address>"),
-		view.command(ctx.Model.Name+" settings"),
-		view.command(ctx.Model.Name+" help <command>"),
-	)
-	_, err := io.WriteString(ctx.Stdout, help.String())
-	return err
+	help.WriteString("\nFlags:\n  -h, --help           Show help\n  -V, --version        Print version information\n      --config <path>  Use a specific config.toml\n\nStart:\n")
+	startWidth := len(name + " help <command>")
+	for _, start := range [][2]string{
+		{name + " setup", "Add an account and sign in, step by step"},
+		{name + " help <command>", "Show what one command can do"},
+	} {
+		_, _ = fmt.Fprintf(&help, "  %s  %s\n", view.command(fmt.Sprintf("%-*s", startWidth, start[0])), start[1])
+	}
+	return help.String()
+}
+
+type rootHelpSection struct {
+	title    string
+	commands []*kong.Node
+}
+
+// rootHelpSections groups the visible top-level commands in rootHelpGroups
+// order. A visible command without a known group is listed under "Other" so it
+// is never lost; TestRootHelpGroupsCoverEveryVisibleCommand rejects that case.
+func rootHelpSections(commands []*kong.Node) []rootHelpSection {
+	sections := make([]rootHelpSection, 0, len(rootHelpGroups)+1)
+	listed := make(map[*kong.Node]bool, len(commands))
+	for _, group := range rootHelpGroups {
+		section := rootHelpSection{title: group.Title}
+		for _, command := range commands {
+			if !command.Hidden && rootHelpGroupKey(command) == group.Key {
+				section.commands = append(section.commands, command)
+				listed[command] = true
+			}
+		}
+		if len(section.commands) > 0 {
+			sections = append(sections, section)
+		}
+	}
+	other := rootHelpSection{title: "Other"}
+	for _, command := range commands {
+		if !command.Hidden && !listed[command] {
+			other.commands = append(other.commands, command)
+		}
+	}
+	if len(other.commands) > 0 {
+		sections = append(sections, other)
+	}
+	return sections
+}
+
+func rootHelpGroupKey(command *kong.Node) string {
+	if command.Tag == nil {
+		return ""
+	}
+	return command.Tag.Get(rootHelpGroupTag)
 }
 
 func versionLine(info buildinfo.Info) string {
@@ -311,10 +391,10 @@ func runWithCrashBoundary(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			panicguard.Record(executionContext, panicguard.BoundaryProcess)
-			_, _ = fmt.Fprintln(
-				stderr,
-				"Corresync stopped unexpectedly. Run `corr feedback --last-error` to review the private, sanitized crash record.",
-			)
+			printCommandError(stderr, withHint(
+				errors.New("corresync stopped unexpectedly"),
+				"corr feedback --last-error to see the crash report and choose whether to share it",
+			), true)
 			code = 1
 		}
 	}()

@@ -453,6 +453,7 @@ type sessionBackend struct {
 
 	terminalSessions map[string]*terminalLoginSession
 	terminalAccounts map[domain.AccountID]string
+	signIn           *signInCoordinator
 	monitorStarted   map[domain.AccountID]bool
 	monitorCancel    map[domain.AccountID]context.CancelFunc
 	monitorDone      map[domain.AccountID]chan struct{}
@@ -561,6 +562,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 	}
 	backend.monitor = monitor
 	backend.monitorEngine = engine
+	backend.initSignInState()
 	return backend, nil
 }
 
@@ -704,7 +706,7 @@ func (backend *sessionBackend) serviceAuthenticationStatusLocked(
 		account.serviceActive(service) {
 		status.State = application.AuthenticationStateAuthenticated
 		status.Reason = ""
-	} else if _, pending := backend.terminalAccounts[accountID]; pending {
+	} else if backend.interactiveLoginPendingLocked(accountID) {
 		status.State = application.AuthenticationStatePending
 		status.Reason = application.AuthenticationReasonInteractionPending
 	} else if failures := backend.reauthentication[accountID]; failures != nil &&
@@ -976,13 +978,22 @@ func (backend *sessionBackend) Login(
 		return daemonapi.LoginResult{}, errors.New("session backend is closed")
 	}
 	backend.active.Add(1)
+	backend.beginInteractiveLoginLocked(accountID)
 	backend.mu.Unlock()
 	defer backend.active.Done()
+	defer backend.endInteractiveLogin(accountID)
 
-	account, err := backend.activateAccount(ctx, accountID)
+	if err := backend.lockActivationForCLI(ctx, "this sign-in"); err != nil {
+		return daemonapi.LoginResult{}, err
+	}
+	account, err := backend.activateAccountHeld(ctx, accountID)
+	backend.activationMu.Unlock()
 	if err != nil {
 		return daemonapi.LoginResult{}, err
 	}
+	backend.mu.Lock()
+	backend.recordCLISignInLocked(accountID)
+	backend.mu.Unlock()
 	return daemonapi.LoginResult{
 		Account: accountID, Authenticated: true, CapturedAt: account.captured,
 	}, nil
@@ -1044,12 +1055,38 @@ func (backend *sessionBackend) SessionStatus(
 				[]domain.Degradation(nil),
 				account.degradations...,
 			)
-		} else if _, exists := backend.terminalAccounts[accountID]; exists {
+		} else if backend.interactiveLoginPendingLocked(accountID) {
 			state.State = "pending"
+		}
+		if pending, exists := backend.pendingSignInLocked(accountID); exists {
+			result.PendingSignIns = append(result.PendingSignIns, pending)
 		}
 		result.Accounts = append(result.Accounts, state)
 	}
 	return result, nil
+}
+
+// pendingSignInLocked describes the unfinished terminal or forwarded-view
+// sign-in of account by its kind and expiry only. The session ID, the
+// caller, and anything about the page stay in the daemon.
+func (backend *sessionBackend) pendingSignInLocked(
+	account domain.AccountID,
+) (daemonapi.PendingSignIn, bool) {
+	id, exists := backend.terminalAccounts[account]
+	if !exists {
+		return daemonapi.PendingSignIn{}, false
+	}
+	interaction := backend.terminalSessions[id]
+	if interaction == nil || interaction.deadline.IsZero() {
+		return daemonapi.PendingSignIn{}, false
+	}
+	kind := daemonapi.PendingSignInTextRelay
+	if interaction.graphical {
+		kind = daemonapi.PendingSignInLoginView
+	}
+	return daemonapi.PendingSignIn{
+		Account: account, Kind: kind, ExpiresAt: interaction.deadline.UTC().Truncate(time.Second),
+	}, true
 }
 
 func (backend *sessionBackend) Logout(
@@ -1076,8 +1113,14 @@ func (backend *sessionBackend) LogoutWithOptions(ctx context.Context, input daem
 	if err := accountID.ValidateOpaque(); err != nil {
 		return daemonapi.LogoutResult{}, err
 	}
-
-	backend.activationMu.Lock()
+	// Logout of an account cancels its MCP-started sign-in, closing that
+	// browser; any other MCP-started sign-in would block this logout.
+	if _, err := backend.cancelMCPSignIn(ctx, accountID); err != nil {
+		return daemonapi.LogoutResult{}, err
+	}
+	if err := backend.lockActivationForCLI(ctx, "this logout"); err != nil {
+		return daemonapi.LogoutResult{}, err
+	}
 	defer backend.activationMu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return daemonapi.LogoutResult{}, err
@@ -1242,8 +1285,20 @@ func (backend *sessionBackend) TerminalLogin(
 	backend.active.Add(1)
 	backend.mu.Unlock()
 	defer backend.active.Done()
-	backend.activationMu.Lock()
-	defer backend.activationMu.Unlock()
+	// Polling, acting on, or cancelling an interaction that is already running
+	// continues while an MCP-started sign-in for another account holds the
+	// activation lock; that sign-in cannot be for this account, which has an
+	// interaction pending. A new start never waits silently behind it.
+	locked := backend.activationMu.TryLock()
+	if !locked && (input.SessionID == "" || !backend.mcpSignInRunning()) {
+		if err := backend.lockActivationForCLI(ctx, "this sign-in"); err != nil {
+			return daemonapi.TerminalLoginResult{}, err
+		}
+		locked = true
+	}
+	if locked {
+		defer backend.activationMu.Unlock()
+	}
 	if err := ctx.Err(); err != nil {
 		return daemonapi.TerminalLoginResult{}, err
 	}
@@ -1408,6 +1463,7 @@ func (backend *sessionBackend) TerminalLogin(
 		}
 		backend.accounts[input.Account] = account
 		backend.clearAuthenticationReasonsLocked(input.Account, account)
+		backend.recordCLISignInLocked(input.Account)
 		// The monitor belongs to the daemon lifecycle, not this login request.
 		backend.startMonitorLocked(input.Account, account) //nolint:contextcheck
 		_ = backend.dropTerminalInteraction(interaction, false)
@@ -3246,12 +3302,12 @@ func finishSessionCall[T any](
 	return result, backend.finishServiceUse(accountID, account, callErr)
 }
 
-func (backend *sessionBackend) activateAccount(
+// activateAccountHeld activates one account's provider routes. The caller
+// holds activationMu.
+func (backend *sessionBackend) activateAccountHeld(
 	ctx context.Context,
 	accountID domain.AccountID,
 ) (sessionAccount, error) {
-	backend.activationMu.Lock()
-	defer backend.activationMu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return sessionAccount{}, err
 	}

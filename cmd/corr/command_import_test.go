@@ -30,8 +30,11 @@ func TestImportScanRequiresPrivacyApprovalBeforeLocalAccess(t *testing.T) {
 	}
 	err := command.Run(app)
 	if err == nil || !strings.Contains(err.Error(), "--approve-read") ||
-		!strings.Contains(err.Error(), "will not read credential stores") {
+		!strings.Contains(err.Error(), "does not read saved passwords") {
 		t.Fatalf("Run() error = %v", err)
+	}
+	if hint, _ := errorHint(err); !strings.HasSuffix(hint, " --format eml --approve-read") {
+		t.Fatalf("Run() hint = %q, want the same scan with --approve-read", hint)
 	}
 	if stdout.Len() != 0 || stderr.Len() != 0 {
 		t.Fatalf(
@@ -82,7 +85,7 @@ func TestImportScanAndPurgeJSON(t *testing.T) {
 		plan.StagedItems != 1 || plan.ContentTrust != "untrusted_data" {
 		t.Fatalf("unexpected plan: %+v", plan)
 	}
-	if !strings.Contains(stderr.String(), "will not read credential stores") ||
+	if !strings.Contains(stderr.String(), "does not read saved passwords") ||
 		!strings.Contains(stderr.String(), source) {
 		t.Fatalf("privacy explanation = %q", stderr.String())
 	}

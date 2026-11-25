@@ -9,18 +9,31 @@ import (
 )
 
 type integrationsCommand struct {
-	Detect integrationsDetectCommand `cmd:"" help:"Detect installed local agent hosts without executing them."`
-	List   integrationsListCommand   `cmd:"" help:"List the declarative agent-host catalog."`
-	Show   integrationsShowCommand   `cmd:"" help:"Show one host and its supported integration surfaces."`
-	Plan   integrationsPlanCommand   `cmd:"" help:"Inspect and preview setup for one or more hosts."`
-	Setup  integrationsSetupCommand  `cmd:"" help:"Preview, confirm, apply, and verify one or more hosts."`
-	Doctor integrationsDoctorCommand `cmd:"" help:"Inspect Corresync integration state without changing it."`
-	Repair integrationsRepairCommand `cmd:"" help:"Preview and repair stale Corresync-owned fields."`
-	Remove integrationsRemoveCommand `cmd:"" help:"Preview and remove only Corresync-owned entries."`
+	Detect integrationsDetectCommand `cmd:"" help:"Find AI agents installed on this computer without running them."`
+	List   integrationsListCommand   `cmd:"" help:"List the AI agents Corresync knows how to connect to."`
+	Show   integrationsShowCommand   `cmd:"" help:"Show one AI agent and the ways Corresync connects to it."`
+	Plan   integrationsPlanCommand   `cmd:"" help:"Show what setup would change for one or more agents."`
+	Setup  integrationsSetupCommand  `cmd:"" help:"Connect Corresync to one or more agents and check the result."`
+	Doctor integrationsDoctorCommand `cmd:"" help:"Check how Corresync is connected to agents, changing nothing."`
+	Repair integrationsRepairCommand `cmd:"" help:"Fix outdated Corresync entries in an agent's settings."`
+	Remove integrationsRemoveCommand `cmd:"" help:"Remove Corresync's entries from an agent's settings."`
+}
+
+func (*integrationsCommand) Help() string {
+	return `An integration adds Corresync to an AI agent, such as Claude Code or Codex,
+as an MCP server, and where the agent supports it, as a skill or plugin.
+Setup, repair, and remove first show what they will change and ask before
+changing anything; they touch only entries Corresync added. Each agent is
+handled on its own, so a failure with one does not undo another.
+
+Examples:
+  corr integrations detect
+  corr integrations plan claude-code
+  corr integrations setup claude-code codex`
 }
 
 type integrationsDetectCommand struct {
-	Refresh bool `help:"Bypass the in-process detection cache."`
+	Refresh bool `help:"Look again instead of reusing the result from earlier in this run."`
 	JSON    bool `help:"Write machine-readable JSON."`
 }
 
@@ -29,7 +42,7 @@ type integrationsListCommand struct {
 }
 
 type integrationsShowCommand struct {
-	Host string `arg:"" name:"host" help:"Stable host ID or compatibility alias."`
+	Host string `arg:"" name:"host" help:"Agent ID or alias, as shown by corr integrations list."`
 	JSON bool   `help:"Write machine-readable JSON."`
 }
 
@@ -63,7 +76,7 @@ func (command *integrationsListCommand) Run(app *runtime) error {
 		return writeJSON(app.stdout, integrationCatalogReport{SchemaVersion: 1, Hosts: hosts})
 	}
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
-	if _, err := view.printf("%s  %s\n\n", view.info(), view.strong("Agent host catalog")); err != nil {
+	if _, err := view.printf("%s  %s\n\n", view.info(), view.strong("AI agents Corresync can connect to")); err != nil {
 		return err
 	}
 	for _, host := range hosts {
@@ -72,20 +85,35 @@ func (command *integrationsListCommand) Run(app *runtime) error {
 			"  %-22s %-20s %-18s %s\n",
 			host.DisplayName,
 			"("+string(host.ID)+")",
-			host.Support,
+			supportLabel(host.Support),
 			capabilitySummary(host),
 		); err != nil {
 			return err
 		}
 	}
-	_, err := fmt.Fprintln(app.stdout, "\nRun `corr integrations show HOST` for exact surfaces and support status.")
+	_, err := view.printf("\n%s\n", view.nextStep(shellCommand("corr", "integrations", "show", "HOST")))
 	return err
+}
+
+func supportLabel(support agenthost.Support) string {
+	switch support {
+	case agenthost.SupportVerified:
+		return "verified"
+	case agenthost.SupportExperimental:
+		return "experimental"
+	case agenthost.SupportConfigOnly:
+		return "configuration only"
+	case agenthost.SupportCatalogOnly:
+		return "listed only, no setup"
+	default:
+		return string(support)
+	}
 }
 
 func (command *integrationsShowCommand) Run(app *runtime) error {
 	host, ok := app.agentHosts.Lookup(command.Host)
 	if !ok {
-		return fmt.Errorf("unknown agent host %q; run `corr integrations list`", command.Host)
+		return unknownAgentHostError(command.Host)
 	}
 	if command.JSON {
 		return writeJSON(app.stdout, integrationHostReport{SchemaVersion: 1, Host: host})
@@ -95,22 +123,35 @@ func (command *integrationsShowCommand) Run(app *runtime) error {
 	if len(host.Aliases) > 0 {
 		aliases = strings.Join(host.Aliases, ", ")
 	}
-	_, err := view.printf(
+	if _, err := view.printf(
 		"%s  %s\n\n  %-20s %s\n  %-20s %s\n  %-20s %s\n  %-20s %s\n  %-20s %s\n  %-20s %s\n  %-20s %s\n  %-20s %s\n  %-20s %s\n  %-20s %s\n",
 		view.info(),
 		view.strong(host.DisplayName),
 		"ID", host.ID,
 		"Aliases", aliases,
 		"Surfaces", joinSurfaces(host.Surfaces),
-		"Support", host.Support,
-		"Capabilities", capabilitySummary(host),
-		"Detection evidence", joinEvidenceKinds(host.Detection.EvidenceKinds),
-		"Marketplace surface", yesNoLabel(host.Capabilities.MarketplaceSurface),
+		"Support", supportLabel(host.Support),
+		"Connects through", capabilitySummary(host),
+		"Detected by", joinEvidenceKinds(host.Detection.EvidenceKinds),
+		"In a marketplace", yesNoLabel(host.Capabilities.MarketplaceSurface),
 		"Published", yesNoLabel(host.Capabilities.Published),
-		"Lifecycle", lifecycleLabel(host.Lifecycle),
+		"corr can", lifecycleLabel(host.Lifecycle),
 		"Documentation", host.DocumentationURL,
-	)
+	); err != nil {
+		return err
+	}
+	if !host.Lifecycle.Setup {
+		return nil
+	}
+	_, err := view.printf("\n%s\n", view.nextStep(shellCommand("corr", "integrations", "plan", string(host.ID))))
 	return err
+}
+
+func unknownAgentHostError(name string) error {
+	return withHint(
+		fmt.Errorf("corr does not know an AI agent called %q", name),
+		shellCommand("corr", "integrations", "list"),
+	)
 }
 
 func writeAgentHostDetection(app *runtime, report agenthost.Report) error {
@@ -118,14 +159,15 @@ func writeAgentHostDetection(app *runtime, report agenthost.Report) error {
 	if _, err := view.printf(
 		"%s  %s\n%s · %s/%s · %s\n\n",
 		view.info(),
-		view.strong("Local agent hosts"),
+		view.strong("AI agents on this computer"),
 		report.Context.Kind,
 		report.Context.OS,
 		report.Context.Arch,
-		report.Cache,
+		detectionCacheLabel(report.Cache),
 	); err != nil {
 		return err
 	}
+	next := ""
 	for _, item := range report.Hosts {
 		location := ""
 		if len(item.Evidence) > 0 {
@@ -133,31 +175,83 @@ func writeAgentHostDetection(app *runtime, report agenthost.Report) error {
 		}
 		if _, err := fmt.Fprintf(
 			app.stdout,
-			"  %-22s %-20s %-19s %-16s %-16s%s\n",
+			"  %-22s %-20s %-19s %-24s %-22s%s\n",
 			item.Host.DisplayName,
 			"("+string(item.Host.ID)+")",
-			item.Status,
-			item.ConnectionStatus,
-			item.Host.Support,
+			detectionStatusLabel(item.Status),
+			connectionStatusLabel(item.ConnectionStatus),
+			supportLabel(item.Host.Support),
 			location,
 		); err != nil {
 			return err
 		}
+		if next == "" && item.Status == agenthost.StatusConfirmed && item.Host.Lifecycle.Setup {
+			next = shellCommand("corr", "integrations", "plan", string(item.Host.ID))
+		}
 	}
 	if len(report.Problems) > 0 {
-		if _, err := fmt.Fprintf(app.stdout, "\nDetection completed with %d bounded probe warning(s).\n", len(report.Problems)); err != nil {
+		if _, err := fmt.Fprintf(app.stdout, "\nDetection finished with %d warning(s); some agents may be missing from the list.\n", len(report.Problems)); err != nil {
 			return err
 		}
 	}
 	if report.Failure != nil {
-		_, err := fmt.Fprintf(app.stdout, "\nDetection incomplete: %s.\n", report.Failure.Code)
+		_, err := fmt.Fprintf(app.stdout, "\nDetection did not finish (%s); the list above is incomplete.\n", report.Failure.Code)
 		return err
 	}
-	_, err := fmt.Fprintln(
+	if _, err := fmt.Fprintln(
 		app.stdout,
-		"\nDetection is read-only. Connection state is not inspected until a lifecycle plan is explicitly requested.",
-	)
+		"\nDetection only looked for installed agents and ran none of them. It did not check whether Corresync is already connected; plan does that.",
+	); err != nil {
+		return err
+	}
+	if next == "" {
+		return nil
+	}
+	_, err := view.printf("%s\n", view.nextStep(next))
 	return err
+}
+
+func detectionStatusLabel(status agenthost.DetectionStatus) string {
+	switch status {
+	case agenthost.StatusConfirmed:
+		return "installed"
+	case agenthost.StatusProbable:
+		return "probably installed"
+	case agenthost.StatusSelectedMissing:
+		return "not found"
+	case agenthost.StatusNotFound:
+		return "not installed"
+	case agenthost.StatusUnsupportedSurface:
+		return "not supported here"
+	default:
+		return string(status)
+	}
+}
+
+func connectionStatusLabel(status agenthost.ConnectionStatus) string {
+	switch status {
+	case agenthost.ConnectionNotInspected:
+		return "connection not checked"
+	case agenthost.ConnectionNotDetected:
+		return "-"
+	case agenthost.ConnectionUnsupported:
+		return "cannot be connected"
+	default:
+		return string(status)
+	}
+}
+
+func detectionCacheLabel(cache agenthost.CacheStatus) string {
+	switch cache {
+	case agenthost.CacheFresh:
+		return "just checked"
+	case agenthost.CacheRefreshed:
+		return "checked again"
+	case agenthost.CacheHit:
+		return "result from earlier in this run"
+	default:
+		return string(cache)
+	}
 }
 
 func capabilitySummary(host agenthost.Host) string {
@@ -205,10 +299,10 @@ func yesNoLabel(value bool) string {
 
 func lifecycleLabel(lifecycle agenthost.Lifecycle) string {
 	if lifecycle.Setup {
-		return "setup + inspect + verify + repair + remove"
+		return "set up, check, repair, and remove"
 	}
 	if lifecycle.AdapterID != "" {
-		return "planned adapter"
+		return "detect; setup is planned"
 	}
 	return "detect only"
 }

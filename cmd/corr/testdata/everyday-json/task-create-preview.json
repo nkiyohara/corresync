@@ -1,0 +1,44 @@
+{
+  "status": "approval_required",
+  "review": {
+    "account": "acc_00000000000000000000000000000001",
+    "provider": "todoist",
+    "capabilities": {
+      "read": false,
+      "crossListRead": false,
+      "search": false,
+      "create": false,
+      "update": false,
+      "complete": false,
+      "reopen": false,
+      "delete": false,
+      "optimisticConcurrency": false,
+      "reminders": false,
+      "recurrence": false,
+      "subtasks": false,
+      "checklist": false,
+      "assignments": false,
+      "labels": false,
+      "attachments": false,
+      "linkedSources": false,
+      "ordering": false,
+      "dateOnly": false,
+      "floatingDateTime": false,
+      "zonedDateTime": false
+    },
+    "action": "create",
+    "listId": "list-1",
+    "taskId": "task-1",
+    "version": "task-version-1"
+  },
+  "preview": {
+    "token": "<token>",
+    "expiresAt": "<time>",
+    "operation": {
+      "name": "tasks.create",
+      "effect": "reversible_write",
+      "account": "acc_00000000000000000000000000000001",
+      "digest": "9999999999999999999999999999999999999999999999999999999999999999"
+    }
+  }
+}

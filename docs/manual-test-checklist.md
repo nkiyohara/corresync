@@ -495,12 +495,14 @@ corr integrations remove codex cursor
 ```
 
 Run `corr setup` with no address from a normal TTY and again with
-`CORRESYNC_ACCESSIBLE=true`. Confirm that preflight reports the exact config,
-completion, account/session, detected-host, and inspectable connection state;
-existing accounts can continue directly to agent setup; agent selection is a
-true multi-select; and one confirmation follows the complete per-host preview.
-Repeat after one successful and one failed host and confirm the Ready / Needs
-attention / Optional later summary resumes only unfinished work. Test EOF,
+`CORRESYNC_ACCESSIBLE=true`. Confirm that the first screen is the email
+prompt; an unknown domain offers the manual connection choices instead of
+stopping; a connection that needs preparation explains it and offers another
+way; answered prompts leave only a one-line record; existing accounts can
+continue directly to agent setup; agent selection is a true multi-select; and
+one confirmation follows the complete per-host preview. Repeat after one
+successful and one failed host and confirm the closing summary names the
+settings file once and resumes only unfinished work. Test EOF,
 Escape, Ctrl-C/SIGINT, a daemon replacement, and a failed later host: none may
 approve a completion or integration change, erase an earlier account, or hide
 the exact direct recovery command. Non-TTY, piped, and JSON forms must refuse
@@ -550,8 +552,10 @@ Pass criteria:
   authentication;
 - account removal review discloses any unshared Corresync-owned OAuth grant
   deletion and retains external standards credentials;
-- MCP cannot authenticate, configure monitoring/egress, scan imports, purge
-  queues, update the binary, or submit feedback.
+- MCP cannot authenticate without the user's approval in the MCP client
+  (`account_sign_in` asks; decline starts nothing), log out, clear browser
+  sign-in, configure monitoring/egress, scan imports, purge queues, update the
+  binary, or submit feedback.
 
 Do not share raw MCP frames.
 
