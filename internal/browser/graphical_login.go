@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"runtime"
 	"time"
 
 	"github.com/chromedp/cdproto/emulation"
@@ -41,9 +42,17 @@ func (browser *Browser) GraphicalLogin(ctx context.Context, action application.G
 			modifiers = 8
 		}
 		key := action.Key
+		// Select-all is Command+A on macOS and Ctrl+A elsewhere. The editing
+		// command is sent with the key because macOS Chromium does not derive
+		// it from a synthetic key event.
+		var commands []string
 		if key == "SelectAll" {
 			key = "a"
 			modifiers = 2
+			if runtime.GOOS == "darwin" {
+				modifiers = 4
+			}
+			commands = []string{"selectAll"}
 		}
 		// Enter needs its character: without it Chromium raises no keypress and
 		// a sign-in form is never submitted. Other keys act on key-down alone.
@@ -51,7 +60,7 @@ func (browser *Browser) GraphicalLogin(ctx context.Context, action application.G
 		if action.Key == "Enter" {
 			text = "\r"
 		}
-		_, err = chromedp.Call(operation, input.DispatchKeyEvent, input.DispatchKeyEventParams{Type: input.DispatchKeyEventTypeKeyDown, Key: key, Text: text, Modifiers: modifiers, WindowsVirtualKeyCode: graphicalKeyCode(action.Key)})
+		_, err = chromedp.Call(operation, input.DispatchKeyEvent, input.DispatchKeyEventParams{Type: input.DispatchKeyEventTypeKeyDown, Key: key, Text: text, Modifiers: modifiers, WindowsVirtualKeyCode: graphicalKeyCode(action.Key), Commands: commands})
 		if err == nil {
 			_, err = chromedp.Call(operation, input.DispatchKeyEvent, input.DispatchKeyEventParams{Type: input.DispatchKeyEventTypeKeyUp, Key: key, Modifiers: modifiers, WindowsVirtualKeyCode: graphicalKeyCode(action.Key)})
 		}
