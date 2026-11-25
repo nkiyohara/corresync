@@ -466,7 +466,7 @@ corr doctor --account personal</code></pre>
             </div>
           </div>
           <p class="step-foot">
-            Every client gets the same 43 tools and two read-only monitor resources. See
+            Every client gets the same 71 tools and two read-only monitor resources. See
             <a href="features.html#agents">what agents can and cannot do</a>. Codex and Claude Code
             users can also install the bundled plugin and Agent Skill.
           </p>
@@ -581,9 +581,9 @@ corr doctor --account personal</code></pre>
           <span class="status-dot" aria-hidden="true"></span>
           <p>
             <strong>Before you connect a sensitive account:</strong> provider routes are tested
-            against synthetic provider contracts. Google authorization and bounded reads have one
-            live observation, on macOS arm64 at a specific commit. Other providers and all writes
-            are live-unobserved.
+            against synthetic provider contracts. No route has a recorded check against a real
+            account for this release, so all of them are live-unobserved. An older Google
+            observation covered only the retired Gmail IMAP/SMTP transport.
           </p>
           <a href="features.html#evidence">How evidence works<span aria-hidden="true">
               →</span></a>

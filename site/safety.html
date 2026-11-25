@@ -375,8 +375,8 @@
           </li>
           <li>No generic provider property access or arbitrary provider actions</li>
           <li>
-            No Teams messaging in this release. Calls, recordings, presence, and meeting lifecycle
-            management are out of scope
+            No Teams calls, recordings, presence, or meeting lifecycle management. Teams chat and
+            channels are a preview without complete live evidence
           </li>
           <li>No automatic retry after an ambiguous write</li>
         </ul>
@@ -389,11 +389,10 @@
         </div>
         <div>
           <p>
-            v0.8 routes are built and tested against synthetic provider contracts. Google
-            authorization and bounded reads also have one live observation, on macOS arm64 at a
-            specific commit. Other providers and all writes are <strong>live-unobserved</strong>
-            until an authorized, content-free observation names the exact Corresync commit, provider
-            route, platform, and outcome.
+            v0.9 routes are built and tested against synthetic provider contracts. They are
+            <strong>live-unobserved</strong> until an authorized, content-free observation names the
+            exact Corresync commit, provider route, platform, and outcome. An older Google
+            observation covered only the retired Gmail IMAP/SMTP transport.
           </p>
           <p>
             A missing observation is never counted as a pass. The default tests and CI never touch a

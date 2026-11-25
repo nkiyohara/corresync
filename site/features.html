@@ -174,7 +174,7 @@
           <article aria-labelledby="cap-agents">
             <h3 id="cap-agents">AI agents (local stdio)</h3>
             <p>
-              Corresync provides 43 tools and two read-only monitor resources. There is no HTTP,
+              Corresync provides 71 tools and two read-only monitor resources. There is no HTTP,
               SSE, remote endpoint, or hosted relay.
             </p>
             <ul>
@@ -372,9 +372,9 @@
             are authorized to use.
           </li>
           <li>
-            <strong>Teams chat and channels are not enabled in this release.</strong> They stay off
-            until release evidence exists. Calls, recordings, presence, and meeting lifecycle
-            management are out of scope.
+            <strong>Teams chat and channels are a preview.</strong> You can select them in setup,
+            but they lack complete live compatibility evidence. Calls, recordings, presence, and
+            meeting lifecycle management are out of scope.
           </li>
           <li>
             <strong>No mailbox-rule or delegate-permission management</strong>, generic provider
@@ -398,13 +398,12 @@
         </div>
         <div>
           <p>
-            Every v0.8 provider route is tested against deterministic synthetic provider contracts
+            Every v0.9 provider route is tested against deterministic synthetic provider contracts
             and at the application level. That tells you the code does what the contract says. It
-            does not tell you a real provider behaves the same way. Google authorization and bounded
-            reads have one live observation, on macOS arm64 at a specific commit. Google writes and
-            other routes are <strong>live-unobserved</strong> until a separately authorized,
-            content-free observation is recorded for the exact Corresync commit, provider route, and
-            platform.
+            does not tell you a real provider behaves the same way. Every route is
+            <strong>live-unobserved</strong> until a separately authorized, content-free observation
+            is recorded for the exact Corresync commit, provider route, and platform. An older
+            Google observation covered only the retired Gmail IMAP/SMTP transport.
           </p>
           <p>
             A missing observation is never counted as a pass, and the default tests and CI never
