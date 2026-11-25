@@ -1,0 +1,54 @@
+{
+  "messages": [
+    {
+      "accountAlias": "work",
+      "message": {
+        "id": "all-message-1",
+        "subject": "Synthetic all-account search",
+        "from": {},
+        "receivedAt": "2026-07-28T10:00:00Z",
+        "isRead": false,
+        "hasAttachments": false,
+        "provenance": {
+          "accountId": "acc_00000000000000000000000000000001",
+          "provider": "microsoft-owa",
+          "mailboxId": "mailbox",
+          "sourceObjectId": "all-message-1"
+        }
+      }
+    }
+  ],
+  "accounts": [
+    {
+      "account": "acc_00000000000000000000000000000001",
+      "alias": "work",
+      "provider": "microsoft-owa",
+      "service": "mail",
+      "complete": true,
+      "fetchedItems": 1,
+      "exhausted": true,
+      "capabilities": {
+        "mail": true,
+        "calendar": false,
+        "tasks": false,
+        "messages": false,
+        "folders": false,
+        "labels": false,
+        "push": false,
+        "freeBusy": false,
+        "incrementalSync": false,
+        "scheduledSend": false,
+        "sharedMailboxes": false,
+        "sharedCalendars": false,
+        "attachmentReads": false,
+        "attachmentWrites": false,
+        "draftSend": false
+      }
+    }
+  ],
+  "failures": null,
+  "offset": 0,
+  "limit": 25,
+  "hasMore": false,
+  "complete": true
+}

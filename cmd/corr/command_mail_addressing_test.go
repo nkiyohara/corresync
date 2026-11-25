@@ -18,21 +18,24 @@ func TestMailHelpListsEveryCompositionMode(t *testing.T) {
 	}{
 		{
 			arguments: []string{"mail", "--help"},
-			want:      []string{"new, reply, reply-all, or forward draft", "reply-all keeps the other To/Cc"},
+			want: []string{
+				"Save a new message, reply, reply-all, or forward as a draft.",
+				"--mode reply addresses only the sender (or Reply-To), and --mode reply-all keeps everyone else on To and Cc",
+			},
 		},
 		{
 			arguments: []string{"mail", "draft", "--help"},
 			want: []string{
-				"new (explicit recipients)", "reply (sender or Reply-To only)",
-				"reply-all (sender plus the other To/Cc)", "forward (explicit recipients)",
-				"Choose from the intended audience",
+				"new or forward (the recipients you give)", "reply (sender or Reply-To only)",
+				"reply-all (sender plus the other To/Cc)",
+				"Replies take their recipients from the original message",
 			},
 		},
 		{
 			arguments: []string{"mail", "send", "--help"},
 			want: []string{
-				"new or forward with explicit recipients", "reply (sender or Reply-To only)",
-				"reply-all (sender plus the other To/Cc)", "require mail draft, then send-draft",
+				"new or forward: you give the recipients", "reply (sender or Reply-To only)",
+				"reply-all (sender plus the other To/Cc)", "use corr mail draft, then send-draft",
 			},
 		},
 	}
@@ -76,9 +79,9 @@ func TestWriteSavedDraftShowsResolvedAddressing(t *testing.T) {
 			name: "reply that drops participants", mode: application.MailComposeReply,
 			addressing: resolved([]string{"alice@example.invalid"}, []string{}, count(2)),
 			want: []string{
-				"Mode: reply", "Source message: source-1 (change key source-version-1)",
-				"Resolved To: alice@example.invalid", "Resolved Cc: (none)", "Resolved subject: Re: Plan",
-				"Note: 2 To/Cc participant(s) of the source message are not addressed",
+				"Mode: reply", "Original message: source-1 (change key source-version-1)",
+				"To: alice@example.invalid", "Cc: (none)", "Subject: Re: Plan",
+				"Note: 2 To/Cc recipients of the original message are not on this draft",
 				"--mode reply-all",
 			},
 			absent: []string{"\x1b"},
@@ -90,27 +93,27 @@ func TestWriteSavedDraftShowsResolvedAddressing(t *testing.T) {
 				[]string{"carol@example.invalid"}, count(0),
 			),
 			want: []string{
-				"Resolved To: alice@example.invalid, bob@example.invalid",
-				"Resolved Cc: carol@example.invalid",
+				"To: alice@example.invalid, bob@example.invalid",
+				"Cc: carol@example.invalid",
 			},
 			absent: []string{"Note:"},
 		},
 		{
 			name: "unknown source participants", mode: application.MailComposeReply,
 			addressing: resolved([]string{"alice@example.invalid"}, []string{}, nil),
-			want:       []string{"Resolved To: alice@example.invalid"},
+			want:       []string{"To: alice@example.invalid"},
 			absent:     []string{"Note:"},
 		},
 		{
 			name: "unresolved route", mode: application.MailComposeReply,
 			addressing: &application.MailDraftAddressingReview{Status: application.MailAddressingUnresolved},
-			want:       []string{"not reported by this provider route (unknown, not empty)"},
-			absent:     []string{"Resolved To:", "(none)"},
+			want:       []string{"did not report the saved To, Cc, and subject (unknown, not empty)"},
+			absent:     []string{" To:", "Cc: (none)"},
 		},
 		{
 			name: "older owner without addressing", mode: application.MailComposeReply,
 			want:   []string{"unknown, not empty"},
-			absent: []string{"Resolved To:"},
+			absent: []string{" To:"},
 		},
 	}
 	for _, test := range tests {
@@ -128,13 +131,14 @@ func TestWriteSavedDraftShowsResolvedAddressing(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			text := strings.Join(strings.Fields(output.String()), " ")
 			for _, want := range test.want {
-				if !strings.Contains(output.String(), want) {
+				if !strings.Contains(text, want) {
 					t.Errorf("output is missing %q:\n%s", want, output.String())
 				}
 			}
 			for _, absent := range test.absent {
-				if strings.Contains(output.String(), absent) {
+				if strings.Contains(text, absent) || strings.Contains(output.String(), absent) {
 					t.Errorf("output unexpectedly contains %q:\n%s", absent, output.String())
 				}
 			}

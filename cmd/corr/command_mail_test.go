@@ -59,7 +59,7 @@ func TestWriteMailTableNeverEmitsMailboxControls(t *testing.T) {
 		From:       application.MailAddress{Name: "Alice\nInjected"},
 		Subject:    "Synthetic\x1b[2Jsubject",
 	}}}
-	if err := writeMailTable(app, page); err != nil {
+	if err := writeMailTable(app, page, emptyResult{}); err != nil {
 		t.Fatalf("writeMailTable() error = %v", err)
 	}
 	if strings.ContainsAny(stdout.String(), "\x1b\r") {
@@ -82,7 +82,7 @@ func TestMailFolderTableSanitizesNamesAndPreservesIDs(t *testing.T) {
 		ID: "folder-1", DisplayName: "Synthetic\x1b]8;;https://example.invalid\x07 folder",
 		Class: "IPF.Note", TotalItemCount: 9, UnreadItemCount: 2,
 	}}}
-	if err := writeMailFolderTable(app, page); err != nil {
+	if err := writeMailFolderTable(app, page, emptyResult{}); err != nil {
 		t.Fatalf("writeMailFolderTable() error = %v", err)
 	}
 	if strings.Contains(stdout.String(), "\x1b") || !strings.Contains(stdout.String(), "folder-1") {
@@ -102,7 +102,7 @@ func TestCalendarFolderTableSanitizesNamesAndPreservesIDs(t *testing.T) {
 		}},
 		TotalCalendars: 1, IncludesLastItem: true,
 	}
-	if err := writeCalendarFolderTable(app, page); err != nil {
+	if err := writeCalendarFolderTable(app, page, emptyResult{}); err != nil {
 		t.Fatalf("writeCalendarFolderTable() error = %v", err)
 	}
 	if strings.Contains(stdout.String(), "\x1b") ||
@@ -131,7 +131,7 @@ func TestMailApprovalReviewsExposeExactSanitizedScope(t *testing.T) {
 	if err := writeDraftReview(&output, review, false); err != nil {
 		t.Fatalf("writeDraftReview() error = %v", err)
 	}
-	if !strings.Contains(output.String(), "no draft was saved") ||
+	if !strings.Contains(output.String(), "no draft has been saved") ||
 		!strings.Contains(output.String(), "alice@example.invalid") ||
 		strings.Contains(output.String(), "\x1b") {
 		t.Fatalf("unsafe or incomplete draft review: %q", output.String())

@@ -23,7 +23,7 @@ func TestWriteCalendarTableNeverEmitsEventControls(t *testing.T) {
 		Location:        "Room\t1",
 		IsOnlineMeeting: true,
 	}}}
-	if err := writeCalendarTable(app, page); err != nil {
+	if err := writeCalendarTable(app, page, emptyResult{}); err != nil {
 		t.Fatalf("writeCalendarTable() error = %v", err)
 	}
 	if strings.ContainsAny(stdout.String(), "\x1b\r") {
@@ -88,10 +88,11 @@ func TestWriteCalendarUpdateReviewShowsClearsAndRemovesControls(t *testing.T) {
 	if err := writeCalendarUpdateReview(&output, input.Review(), false); err != nil {
 		t.Fatalf("writeCalendarUpdateReview() error = %v", err)
 	}
+	text := strings.Join(strings.Fields(output.String()), " ")
 	if strings.Contains(output.String(), "\x1b") ||
-		!strings.Contains(output.String(), "Updated subject") ||
-		!strings.Contains(output.String(), "Location: (clear)") ||
-		!strings.Contains(output.String(), "Recurrence: none") ||
+		!strings.Contains(text, "Subject: Updated subject") ||
+		!strings.Contains(text, "Location: (clear)") ||
+		!strings.Contains(text, "Repeats: no") ||
 		!strings.Contains(output.String(), "line two") {
 		t.Fatalf("unsafe or incomplete update review: %q", output.String())
 	}
@@ -109,10 +110,11 @@ func TestWriteCalendarCancelReviewIsExplicitAndSanitized(t *testing.T) {
 	if err := writeCalendarCancelReview(&output, review, false); err != nil {
 		t.Fatalf("writeCalendarCancelReview() error = %v", err)
 	}
+	text := strings.Join(strings.Fields(output.String()), " ")
 	if strings.Contains(output.String(), "\x1b") ||
-		!strings.Contains(output.String(), "nothing was cancelled") ||
-		!strings.Contains(output.String(), "move_to_deleted_items") ||
-		!strings.Contains(output.String(), "Attendee notifications may be sent: no") {
+		!strings.Contains(text, "nothing has been cancelled") ||
+		!strings.Contains(text, "Provider action: move_to_deleted_items") ||
+		!strings.Contains(text, "May notify attendees: no") {
 		t.Fatalf("unsafe or incomplete cancel review: %q", output.String())
 	}
 }

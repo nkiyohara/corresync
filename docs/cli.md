@@ -307,9 +307,19 @@ corr mail attachment \
 
 Search syntax belongs to the selected provider. Gmail and Graph queries can
 differ from Outlook AQS; the authenticated capability/degradation report makes
-that visible. Lists return metadata only. Body and attachment operations are
-explicit sensitive reads and may require a second call with `--approve`,
-depending on policy.
+that visible. Lists show sender, subject, date, and flags (`U` unread, `A` has
+attachments), not message text. When `preview_sensitive_reads` is on, `mail
+body` and `mail attachment` first print a preview that ends with a `Next:`
+line: the same command with `--approve` added.
+
+Message IDs are in the last column of `mail list` and `mail search`. Change
+keys, which `move`, `mark`, `delete`, and replies also need, are in their
+`--json` output. An empty result says which folder and account were searched
+and, for a search, suggests the same search across all accounts.
+
+When an account needs to sign in again, the error names the account and the
+service and ends with a `Try:` line such as `Try: corr auth login --account
+work`. An unknown `--account` alias ends with `Try: corr account list`.
 
 Outlook Web accepts mail list pages of up to 25 items; request later pages with
 `--offset`. Its mail time-zone value is an Exchange/Windows identifier such as
@@ -317,7 +327,7 @@ Outlook Web accepts mail list pages of up to 25 items; request later pages with
 `--time-zone` to use the UTC default. Unsupported values and provider-side
 search failures return an actionable error instead of an opaque HTTP 500.
 
-Attachment output is bounded and never overwrites an existing path.
+`--output` must name a new file; an existing file is never overwritten.
 
 ## Cross-account reads
 
@@ -334,10 +344,12 @@ corr agenda list --all-accounts \
   --limit 50
 ```
 
-These are read-only fan-outs across isolated account services. Results are
-normalized, deterministically sorted, globally bounded, and tagged with account
-alias and provider provenance. Unsupported accounts and provider failures are
-reported explicitly alongside successful results. Mail search and task listing
+These commands only read. Every row is labelled with its account and
+provider, and the results are sorted the same way on every run. An account
+whose results are limited is listed under the table as `Limited results from
+…`, and one that could not be read as `Missing results from …`, followed by the
+sign-in command when that is the cause; JSON reports the same in `accounts` and
+`failures`. Mail search and task listing
 read each available source before applying the global page, up to 5,000 matches
 and 2 MiB per account. An account that exceeds either bound contributes a
 failure and no partial prefix. Narrow the mail query or task status filter, or
@@ -386,10 +398,13 @@ corr mail send-draft \
 ```
 
 Save-only draft composition supports new, reply, reply-all, and forward modes;
-text or HTML; and
-bounded repeatable attachments. Review output includes normalized source
-version, recipients, subject, body format/size/digest, and attachment
-size/digest. It does not print the body.
+text or HTML; and repeatable attachments. A preview starts with what has not
+happened yet (for example `Preview: this message has not been sent.`), then
+lists `Will send: yes` or `no`, the mode, To, Cc, Bcc, subject, body format,
+body size and SHA-256, the original message for a reply or forward, and each
+attachment with its size and SHA-256, followed by the start of the body. Its
+last line is `Next:` with the same command plus `--approve`. With `--approve`,
+the same preview is printed on standard error before the change is made.
 
 Choose `--mode` from the intended audience:
 
@@ -399,12 +414,14 @@ Choose `--mode` from the intended audience:
   participants, excluding this account.
 
 `reply` and `reply-all` derive recipients from the source message and reject
-explicit recipients; the error names `reply-all` when you tried to add people
-to a plain reply. A saved draft reports the provider-resolved To, Cc, and
-subject. When a `reply` leaves out source To/Cc participants, the output says
-how many and that `reply-all` keeps them. A route that cannot report the
-resolved addressing says it is unknown rather than showing an empty list.
-Check the resolved recipients before calling a draft ready. See
+explicit recipients; the error ends with a `Try:` line that saves the same
+draft with `--mode reply-all` and without `--to`, `--cc`, or `--bcc`. A saved
+draft reports the To, Cc, and subject as the provider saved them, and ends
+with the `corr mail send-draft` command for that draft version. When a `reply`
+leaves out source To/Cc recipients, the output says how many and that
+`reply-all` keeps them. A route that cannot report the saved addressing says
+it is unknown rather than showing an empty list. Check the recipients before
+sending the draft. See
 [the JSON contract](json.md#mail) for the `addressing` field.
 
 ```console
@@ -419,7 +436,9 @@ printf 'Synthetic reply.\n' | \
 ```
 
 Reply and reply-all must be saved as drafts before sending, so the send preview
-can show the resolved recipients and enforce `policy.max_recipients`. Create
+can show the resolved recipients and enforce `policy.max_recipients`. A direct
+`mail send --mode reply` or `reply-all` fails with a `Try:` line naming the
+matching `corr mail draft` command. Create
 one with `corr mail draft --mode reply-all` (or `reply`) and the exact
 reference message ID/version, then use the returned draft ID/version with
 `corr mail send-draft`. Review every recipient before approving. If the account
@@ -455,10 +474,12 @@ corr mail delete \
   --change-key opaque-change-key
 ```
 
-Reversible writes may preview according to policy. Permanent delete always
-previews and requires `--approve`. Provider degradations state when an atomic
-version precondition is unavailable. Corresync never treats that limitation as
-permission to retry an ambiguous request.
+Move and mark show a preview first when `preview_reversible_writes` is on.
+Permanent delete always shows a preview and needs `--approve`; its preview
+ends with the command to run. Without `--message-id` or `--change-key`, the
+error ends with `Try: corr mail list --json`. Provider degradations state
+when an atomic version precondition is unavailable. Corresync never treats
+that limitation as permission to retry an ambiguous request.
 
 ## Calendar
 
@@ -513,7 +534,9 @@ corr calendar cancel \
   --change-key opaque-change-key
 ```
 
-Repeat the exact reviewed command with `--approve` to commit. Supported fields
+Each preview ends with a `Next:` line: the same command with `--approve`
+added. Run it to carry out the change; the preview is printed again on
+standard error first. Supported fields
 include bounded subject/body, absolute start/end, time zone, location, all-day
 state, reminder, closed recurrence creation/replacement/removal, and complete
 required/optional attendee lists. Use `--recurrence none` with replacement
@@ -557,8 +580,10 @@ corr tasks complete --account work \
 
 The file must omit `account`; `--account` is the only routing selector. Unknown
 JSON fields, trailing values, oversized documents, unsupported capabilities,
-and mismatched replacement flags fail before provider access. Each write prints
-the exact typed review. Notes are represented by a bounded preview, byte count,
+and mismatched replacement flags fail before provider access. Each write
+preview lists the action, account, provider, list, task, version, and any
+limitation, then the full change as JSON, and ends with the `--approve`
+command. Notes are represented by a bounded preview, byte count,
 and digest while the approval binds the complete content.
 
 Complete, reopen, and delete require the exact version returned by a read.
@@ -576,7 +601,7 @@ Saved queries keep a bounded private definition for one exact account. They do
 not save message or event results and do not run in the background.
 
 ```console
-# Review, then save the exact mail definition.
+# Preview, then save the mail search.
 corr queries save mail priority 'is:unread importance:high' --account work
 corr queries save mail priority 'is:unread importance:high' \
   --account work --approve

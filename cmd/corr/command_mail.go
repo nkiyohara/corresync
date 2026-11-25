@@ -15,143 +15,175 @@ import (
 	"unicode/utf8"
 
 	"github.com/nkiyohara/corresync/internal/application"
+	"github.com/nkiyohara/corresync/internal/daemonapi"
 )
 
 type mailCommand struct {
-	Folders    mailFoldersCommand    `cmd:"" help:"Discover mail folders and their opaque IDs."`
-	List       mailListCommand       `cmd:"" help:"List message metadata in a folder."`
-	Search     mailSearchCommand     `cmd:"" help:"Search message metadata in one folder with the provider query language."`
-	Body       mailBodyCommand       `cmd:"" help:"Review and read plain text for one explicit message ID."`
-	Attachment mailAttachmentCommand `cmd:"" help:"Review and retrieve one bounded file attachment."`
-	Move       mailMoveCommand       `cmd:"" help:"Review and move one versioned message to one folder."`
-	Mark       mailMarkCommand       `cmd:"" help:"Review and mark one versioned message read or unread."`
-	Delete     mailDeleteCommand     `cmd:"" help:"Review and permanently delete one versioned message."`
-	Draft      mailDraftCommand      `cmd:"" help:"Review and save a new, reply, reply-all, or forward draft without sending; reply addresses only the sender, reply-all keeps the other To/Cc."`
-	Send       mailSendCommand       `cmd:"" help:"Review and send one new message or forward; reply and reply-all use draft then send-draft."`
-	SendDraft  mailSendDraftCommand  `cmd:"" help:"Review and send one exact saved draft version."`
+	Folders    mailFoldersCommand    `cmd:"" help:"List mail folders and their IDs."`
+	List       mailListCommand       `cmd:"" help:"List messages in a folder."`
+	Search     mailSearchCommand     `cmd:"" help:"Search messages in a folder, or in every account."`
+	Body       mailBodyCommand       `cmd:"" help:"Read the text of a message."`
+	Attachment mailAttachmentCommand `cmd:"" help:"Save a message attachment to a file."`
+	Move       mailMoveCommand       `cmd:"" help:"Move a message to another folder."`
+	Mark       mailMarkCommand       `cmd:"" help:"Mark a message as read or unread."`
+	Delete     mailDeleteCommand     `cmd:"" help:"Delete a message permanently."`
+	Draft      mailDraftCommand      `cmd:"" help:"Save a new message, reply, reply-all, or forward as a draft."`
+	Send       mailSendCommand       `cmd:"" help:"Send a new message, or forward one."`
+	SendDraft  mailSendDraftCommand  `cmd:"" help:"Send a saved draft."`
+}
+
+var mailHelpExamples = []helpExample{
+	{"Search the inbox of every account:", []string{"mail", "search", "--all-accounts", "--query", "quarterly report"}},
+	{"Read a message (IDs come from corr mail list --json):", []string{"mail", "body", "--message-id", "AAMkAGQ5NjE0Yz-message"}},
+	{"Save a reply-all as a draft; nothing is sent:", []string{
+		"mail", "draft", "--mode", "reply-all", "--reference-message-id", "AAMkAGQ5NjE0Yz-message",
+		"--reference-change-key", "CQAAABYAAAD-key", "--body-file", "reply.txt",
+	}},
+	{"Send a new message (the first run shows a preview):", []string{
+		"mail", "send", "--to", "ana@example.invalid", "--subject", "Lunch on Friday?", "--body-file", "note.txt",
+	}},
+}
+
+// Help is the detail text of `corr mail --help`.
+func (mailCommand) Help() string {
+	return helpWithExamples(`
+Commands that change mail show a preview first and change nothing. Run the
+same command again with --approve added to carry it out; the preview ends with
+that command. Sending and deleting always show a preview. Moving, marking, and
+saving a draft show one when the preview_reversible_writes setting is on, and
+reading a message or attachment does when preview_sensitive_reads is on.
+
+Message IDs and change keys come from corr mail list --json or corr mail
+search --json. A change key names one version of a message: if the message
+changed after you listed it, list it again.
+
+To answer a message, save a draft first: --mode reply addresses only the sender
+(or Reply-To), and --mode reply-all keeps everyone else on To and Cc. Check the
+recipients the draft shows, then send it with corr mail send-draft.`, mailHelpExamples)
 }
 
 type mailFoldersCommand struct {
-	Account   string `help:"Configured account alias; defaults to default_account."`
-	Parent    string `default:"msgfolderroot" help:"Well-known parent folder name."`
-	ParentID  string `name:"parent-id" help:"Opaque parent folder ID; takes precedence over parent."`
-	Traversal string `default:"deep" enum:"shallow,deep" help:"Folder hierarchy traversal."`
-	Offset    int    `default:"0" help:"Zero-based page offset."`
-	Limit     int    `default:"100" help:"Folders to return (1-100)."`
-	TimeZone  string `name:"time-zone" default:"UTC" help:"Provider time-zone identifier."`
-	JSON      bool   `help:"Write the stable machine-readable schema."`
+	Account   string `help:"Account alias (default: your default account)."`
+	Parent    string `default:"msgfolderroot" help:"Folder to list under, by name; the default is the top of the mailbox."`
+	ParentID  string `name:"parent-id" placeholder:"ID" help:"Folder to list under, by ID; overrides --parent."`
+	Traversal string `default:"deep" enum:"shallow,deep" help:"shallow lists direct subfolders only; deep lists all of them."`
+	Offset    int    `default:"0" help:"Skip this many results, for paging."`
+	Limit     int    `default:"100" help:"Most folders to show (1-100)."`
+	TimeZone  string `name:"time-zone" default:"UTC" help:"Time zone the provider uses for dates."`
+	JSON      bool   `help:"Print JSON for scripts and agents."`
 }
 
 type mailSendCommand struct {
-	Account            string   `help:"Configured account alias; defaults to default_account."`
-	To                 []string `help:"Bare To recipient; repeat for multiple recipients."`
-	CC                 []string `name:"cc" help:"Bare Cc recipient; repeat for multiple recipients."`
-	BCC                []string `name:"bcc" help:"Bare Bcc recipient; repeat for multiple recipients."`
-	Subject            string   `help:"Message subject; CR/LF are rejected."`
-	BodyFile           string   `name:"body-file" help:"Text or HTML body file, or - for stdin."`
-	BodyFormat         string   `name:"body-format" default:"text" enum:"text,html" help:"Message body format."`
-	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"Composition mode: new or forward with explicit recipients. reply (sender or Reply-To only) and reply-all (sender plus the other To/Cc) require mail draft, then send-draft."`
-	ReferenceMessageID string   `name:"reference-message-id" help:"Exact source message ID for replies or forwards."`
-	ReferenceChangeKey string   `name:"reference-change-key" help:"Exact source change key for replies or forwards."`
-	Attachments        []string `name:"attachment" type:"path" help:"File to attach; repeat as needed."`
-	Approve            bool     `help:"Send the exact preview generated from these arguments."`
-	JSON               bool     `help:"Write the stable machine-readable schema."`
+	Account            string   `help:"Account alias (default: your default account)."`
+	To                 []string `placeholder:"ADDRESS" help:"Recipient address; repeat for more."`
+	CC                 []string `name:"cc" placeholder:"ADDRESS" help:"Cc address; repeat for more."`
+	BCC                []string `name:"bcc" placeholder:"ADDRESS" help:"Bcc address; repeat for more."`
+	Subject            string   `help:"Subject, on one line."`
+	BodyFile           string   `name:"body-file" placeholder:"FILE" help:"File with the message text or HTML, or - to read standard input."`
+	BodyFormat         string   `name:"body-format" default:"text" enum:"text,html" help:"Format of the body file: text or html."`
+	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"new or forward: you give the recipients. To reply (sender or Reply-To only) or reply-all (sender plus the other To/Cc), use corr mail draft, then send-draft."`
+	ReferenceMessageID string   `name:"reference-message-id" placeholder:"ID" help:"ID of the message to forward, from corr mail list --json."`
+	ReferenceChangeKey string   `name:"reference-change-key" placeholder:"KEY" help:"Change key of that message, from the same output."`
+	Attachments        []string `name:"attachment" type:"path" placeholder:"FILE" help:"File to attach; repeat for more."`
+	Approve            bool     `help:"Send the message instead of showing a preview."`
+	JSON               bool     `help:"Print JSON for scripts and agents."`
 }
 
 type mailSendDraftCommand struct {
-	Account        string `help:"Configured account alias; defaults to default_account."`
-	DraftID        string `name:"draft-id" help:"Exact saved draft ID returned by mail draft or mail list."`
-	DraftChangeKey string `name:"draft-change-key" help:"Exact saved draft change key returned with the draft ID."`
-	Approve        bool   `help:"Send the exact saved draft preview generated from these arguments."`
-	JSON           bool   `help:"Write the stable machine-readable schema."`
+	Account        string `help:"Account alias (default: your default account)."`
+	DraftID        string `name:"draft-id" placeholder:"ID" help:"Draft ID, printed by corr mail draft or listed by corr mail list --folder drafts --json."`
+	DraftChangeKey string `name:"draft-change-key" placeholder:"KEY" help:"Change key of that draft; the draft must not have changed since."`
+	Approve        bool   `help:"Send the draft instead of showing a preview."`
+	JSON           bool   `help:"Print JSON for scripts and agents."`
 }
 
 type mailDraftCommand struct {
-	Account            string   `help:"Configured account alias; defaults to default_account."`
-	To                 []string `help:"Bare To recipient; repeat for multiple recipients."`
-	CC                 []string `name:"cc" help:"Bare Cc recipient; repeat for multiple recipients."`
-	BCC                []string `name:"bcc" help:"Bare Bcc recipient; repeat for multiple recipients."`
-	Subject            string   `help:"Draft subject; CR/LF are rejected."`
-	BodyFile           string   `name:"body-file" help:"Text or HTML body file, or - for stdin."`
-	BodyFormat         string   `name:"body-format" default:"text" enum:"text,html" help:"Draft body format."`
-	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"Composition mode: new (explicit recipients), reply (sender or Reply-To only), reply-all (sender plus the other To/Cc), or forward (explicit recipients). Choose from the intended audience; reply and reply-all derive recipients from the source."`
-	ReferenceMessageID string   `name:"reference-message-id" help:"Exact source message ID for replies or forwards."`
-	ReferenceChangeKey string   `name:"reference-change-key" help:"Exact source change key for replies or forwards."`
-	Attachments        []string `name:"attachment" type:"path" help:"File to attach; repeat as needed."`
-	Approve            bool     `help:"Save the exact preview generated from these arguments when policy requires approval."`
-	JSON               bool     `help:"Write the stable machine-readable schema."`
+	Account            string   `help:"Account alias (default: your default account)."`
+	To                 []string `placeholder:"ADDRESS" help:"Recipient address; repeat for more."`
+	CC                 []string `name:"cc" placeholder:"ADDRESS" help:"Cc address; repeat for more."`
+	BCC                []string `name:"bcc" placeholder:"ADDRESS" help:"Bcc address; repeat for more."`
+	Subject            string   `help:"Subject, on one line."`
+	BodyFile           string   `name:"body-file" placeholder:"FILE" help:"File with the draft text or HTML, or - to read standard input."`
+	BodyFormat         string   `name:"body-format" default:"text" enum:"text,html" help:"Format of the body file: text or html."`
+	Mode               string   `default:"new" enum:"new,reply,reply-all,forward" help:"Who the draft goes to: new or forward (the recipients you give), reply (sender or Reply-To only), or reply-all (sender plus the other To/Cc). Replies take their recipients from the original message."`
+	ReferenceMessageID string   `name:"reference-message-id" placeholder:"ID" help:"ID of the message to reply to or forward, from corr mail list --json."`
+	ReferenceChangeKey string   `name:"reference-change-key" placeholder:"KEY" help:"Change key of that message, from the same output."`
+	Attachments        []string `name:"attachment" type:"path" placeholder:"FILE" help:"File to attach; repeat for more."`
+	Approve            bool     `help:"Save the draft instead of showing a preview, when your settings ask for one."`
+	JSON               bool     `help:"Print JSON for scripts and agents."`
 }
 
 type mailBodyCommand struct {
-	Account   string `help:"Configured account alias; defaults to default_account."`
-	MessageID string `name:"message-id" help:"Exact message ID returned by mail list (required)."`
-	Approve   bool   `help:"Commit an in-process preview when sensitive reads require approval."`
-	JSON      bool   `help:"Write the stable machine-readable schema."`
+	Account   string `help:"Account alias (default: your default account)."`
+	MessageID string `name:"message-id" placeholder:"ID" help:"Message ID, from corr mail list --json (required)."`
+	Approve   bool   `help:"Read the message when your settings ask for a preview first."`
+	JSON      bool   `help:"Print JSON for scripts and agents."`
 }
 
 type mailAttachmentCommand struct {
-	Account      string `help:"Configured account alias; defaults to default_account."`
-	AttachmentID string `name:"attachment-id" help:"Exact attachment ID returned by mail body (required)."`
-	Output       string `type:"path" help:"New local output file; existing files are never overwritten."`
-	Approve      bool   `help:"Commit an in-process preview when sensitive reads require approval."`
-	JSON         bool   `help:"Write base64 content in the stable machine-readable schema instead of a file."`
+	Account      string `help:"Account alias (default: your default account)."`
+	AttachmentID string `name:"attachment-id" placeholder:"ID" help:"Attachment ID, listed by corr mail body (required)."`
+	Output       string `type:"path" placeholder:"FILE" help:"New file to save to; an existing file is never overwritten."`
+	Approve      bool   `help:"Read the attachment when your settings ask for a preview first."`
+	JSON         bool   `help:"Print the content as base64 in JSON instead of saving a file."`
 }
 
 type mailListCommand struct {
-	Account  string `help:"Configured account alias; defaults to default_account."`
-	Folder   string `default:"inbox" help:"Well-known folder name."`
-	FolderID string `name:"folder-id" help:"Opaque folder ID from folder discovery."`
-	Offset   int    `default:"0" help:"Zero-based page offset."`
-	Limit    int    `default:"25" help:"Messages to return (1-100)."`
-	TimeZone string `name:"time-zone" default:"UTC" help:"Provider time-zone identifier."`
-	JSON     bool   `help:"Write the stable machine-readable schema."`
+	Account  string `help:"Account alias (default: your default account)."`
+	Folder   string `default:"inbox" help:"Folder by name, such as inbox, sentitems, drafts, or archive."`
+	FolderID string `name:"folder-id" placeholder:"ID" help:"Folder by ID, from corr mail folders; overrides --folder."`
+	Offset   int    `default:"0" help:"Skip this many results, for paging."`
+	Limit    int    `default:"25" help:"Most messages to show (1-100)."`
+	TimeZone string `name:"time-zone" default:"UTC" help:"Time zone the provider uses for dates."`
+	JSON     bool   `help:"Print JSON for scripts and agents."`
 }
 
 type mailSearchCommand struct {
-	Account     string `help:"Configured account alias; defaults to default_account."`
-	AllAccounts bool   `name:"all-accounts" help:"Search every configured mail account as an isolated read-only projection."`
-	Folder      string `default:"inbox" help:"Well-known folder name."`
-	FolderID    string `name:"folder-id" help:"Opaque folder ID from folder discovery; unavailable with all-accounts."`
-	Query       string `help:"Provider search query (required; 1-1024 UTF-8 bytes)."`
-	Offset      int    `default:"0" help:"Zero-based page offset."`
-	Limit       int    `default:"25" help:"Messages to return (1-50)."`
-	TimeZone    string `name:"time-zone" default:"UTC" help:"Provider time-zone identifier; all-accounts requires UTC."`
-	JSON        bool   `help:"Write the stable machine-readable schema."`
+	Account     string `help:"Account alias (default: your default account)."`
+	AllAccounts bool   `name:"all-accounts" help:"Search every mail account; read-only, and results stay labelled by account."`
+	Folder      string `default:"inbox" help:"Folder by name, such as inbox, sentitems, drafts, or archive."`
+	FolderID    string `name:"folder-id" placeholder:"ID" help:"Folder by ID, from corr mail folders; not with --all-accounts."`
+	Query       string `help:"Search words, in your mail provider's search syntax (required; up to 1024 bytes)."`
+	Offset      int    `default:"0" help:"Skip this many results, for paging."`
+	Limit       int    `default:"25" help:"Most messages to show (1-50)."`
+	TimeZone    string `name:"time-zone" default:"UTC" help:"Time zone the provider uses for dates; --all-accounts needs UTC."`
+	JSON        bool   `help:"Print JSON for scripts and agents."`
 }
 
 type mailMoveCommand struct {
-	Account       string `help:"Configured account alias; defaults to default_account."`
-	MessageID     string `name:"message-id" help:"Exact message ID returned by mail list or search."`
-	ChangeKey     string `name:"change-key" help:"Exact change key returned with the message ID."`
-	Destination   string `default:"archive" help:"Well-known destination folder."`
-	DestinationID string `name:"destination-id" help:"Opaque destination folder ID; takes precedence."`
-	Approve       bool   `help:"Move the exact preview generated from these arguments when policy requires approval."`
-	JSON          bool   `help:"Write the stable machine-readable schema."`
+	Account       string `help:"Account alias (default: your default account)."`
+	MessageID     string `name:"message-id" placeholder:"ID" help:"Message ID, from corr mail list --json."`
+	ChangeKey     string `name:"change-key" placeholder:"KEY" help:"Change key of that message, from the same output."`
+	Destination   string `default:"archive" help:"Folder to move to, by name."`
+	DestinationID string `name:"destination-id" placeholder:"ID" help:"Folder to move to, by ID from corr mail folders; overrides --destination."`
+	Approve       bool   `help:"Move the message instead of showing a preview, when your settings ask for one."`
+	JSON          bool   `help:"Print JSON for scripts and agents."`
 }
 
 type mailMarkCommand struct {
-	Account   string `help:"Configured account alias; defaults to default_account."`
-	MessageID string `name:"message-id" help:"Exact message ID returned by mail list or search."`
-	ChangeKey string `name:"change-key" help:"Exact change key returned with the message ID."`
-	State     string `help:"Required target state: read or unread."`
-	Approve   bool   `help:"Apply the exact preview generated from these arguments when policy requires approval."`
-	JSON      bool   `help:"Write the stable machine-readable schema."`
+	Account   string `help:"Account alias (default: your default account)."`
+	MessageID string `name:"message-id" placeholder:"ID" help:"Message ID, from corr mail list --json."`
+	ChangeKey string `name:"change-key" placeholder:"KEY" help:"Change key of that message, from the same output."`
+	State     string `help:"read or unread (required)."`
+	Approve   bool   `help:"Mark the message instead of showing a preview, when your settings ask for one."`
+	JSON      bool   `help:"Print JSON for scripts and agents."`
 }
 
 type mailDeleteCommand struct {
-	Account   string `help:"Configured account alias; defaults to default_account."`
-	MessageID string `name:"message-id" help:"Exact message ID returned by mail list or search."`
-	ChangeKey string `name:"change-key" help:"Exact change key returned with the message ID."`
-	Approve   bool   `help:"Permanently delete the exact reviewed message version."`
-	JSON      bool   `help:"Write the stable machine-readable schema."`
+	Account   string `help:"Account alias (default: your default account)."`
+	MessageID string `name:"message-id" placeholder:"ID" help:"Message ID, from corr mail list --json."`
+	ChangeKey string `name:"change-key" placeholder:"KEY" help:"Change key of that message, from the same output."`
+	Approve   bool   `help:"Delete the message permanently instead of showing a preview."`
+	JSON      bool   `help:"Print JSON for scripts and agents."`
 }
 
 func (command *mailFoldersCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	alias, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
@@ -179,15 +211,18 @@ func (command *mailFoldersCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, page)
 	}
-	return writeMailFolderTable(app, page)
+	return writeMailFolderTable(app, page, emptyResult{message: fmt.Sprintf(
+		"No folders under %s in account %s.", mailFolderLabel(parent), sanitizeCell(alias, 64),
+	)})
 }
 
 func (command *mailListCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	alias, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
@@ -218,27 +253,34 @@ func (command *mailListCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, page)
 	}
-	return writeMailTable(app, page)
+	return writeMailTable(app, page, emptyResult{
+		message: fmt.Sprintf("No messages in %s in account %s.", mailFolderLabel(folder), sanitizeCell(alias, 64)),
+		next:    printableCommand(withAccount([]string{commandName, "mail", "folders"}, command.Account)...),
+	})
 }
 
 func (command *mailSearchCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	if command.AllAccounts {
 		if command.Account != "" {
-			return errors.New(
-				"mail search --all-accounts cannot select one account",
+			return withHint(
+				errors.New("mail search --all-accounts searches every account, so it cannot be combined with --account"),
+				"Leave out --account, or leave out --all-accounts to search one account.",
 			)
 		}
 		if command.FolderID != "" {
-			return errors.New(
-				"mail search --all-accounts cannot reuse one account-specific folder ID",
+			return withHint(
+				errors.New("mail search --all-accounts cannot use --folder-id, because a folder ID belongs to one account"),
+				"Use --folder with a folder name such as inbox or archive.",
 			)
 		}
+		folder := application.MailFolder{
+			Kind: application.MailFolderDistinguished,
+			ID:   command.Folder,
+		}
 		input := application.MailProjectionInput{
-			Folder: application.MailFolder{
-				Kind: application.MailFolderDistinguished,
-				ID:   command.Folder,
-			},
-			Query: command.Query, Offset: command.Offset,
+			Folder: folder,
+			Query:  command.Query, Offset: command.Offset,
 			Limit: command.Limit, TimeZone: command.TimeZone,
 		}
 		if err := input.Validate(); err != nil {
@@ -260,13 +302,16 @@ func (command *mailSearchCommand) Run(app *runtime) (returnErr error) {
 		if command.JSON {
 			return writeJSON(app.stdout, page)
 		}
-		return writeMailProjectionTable(app, page)
+		return writeMailProjectionTable(app, page, emptyResult{message: fmt.Sprintf(
+			"No messages in %s match %s in any account.",
+			mailFolderLabel(folder), quoteForSentence(command.Query),
+		)})
 	}
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	alias, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
@@ -294,45 +339,55 @@ func (command *mailSearchCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, page)
 	}
-	return writeMailTable(app, page)
+	empty := emptyResult{message: fmt.Sprintf(
+		"No messages in %s in account %s match %s.",
+		mailFolderLabel(folder), sanitizeCell(alias, 64), quoteForSentence(command.Query),
+	)}
+	if command.FolderID == "" {
+		empty.next = printableCommand(
+			commandName, "mail", "search", "--all-accounts", "--folder", command.Folder, "--query", command.Query,
+		)
+	}
+	return writeMailTable(app, page, empty)
+}
+
+// mailFolderLabel names a folder in a sentence: inbox, or folder ID AAMk….
+func mailFolderLabel(folder application.MailFolder) string {
+	if folder.Kind == application.MailFolderOpaque {
+		return "folder " + sanitizeCell(folder.ID, 80)
+	}
+	return sanitizeCell(folder.ID, 64)
 }
 
 func writeMailProjectionTable(
 	app *runtime,
 	page application.MailProjectionPage,
+	empty emptyResult,
 ) error {
 	if len(page.Messages) == 0 {
-		if _, err := fmt.Fprintln(app.stdout, "No messages."); err != nil {
+		if err := app.writeEmpty(empty); err != nil {
 			return err
 		}
 	} else {
 		writer := tabwriter.NewWriter(app.stdout, 0, 4, 2, ' ', 0)
 		if _, err := fmt.Fprintln(
 			writer,
-			"ACCOUNT\tPROVIDER\tRECEIVED\tFROM\tSUBJECT\tFLAGS\tID",
+			"ACCOUNT\tPROVIDER\tRECEIVED\tFROM\tSUBJECT\tFLAGS\tMESSAGE ID",
 		); err != nil {
 			return err
 		}
+		flagged := false
 		for _, projected := range page.Messages {
 			message := projected.Message
-			from := message.From.Name
-			if from == "" {
-				from = message.From.Address
-			}
-			flags := ""
-			if !message.IsRead {
-				flags += "U"
-			}
-			if message.HasAttachments {
-				flags += "A"
-			}
+			flags := mailFlags(message)
+			flagged = flagged || flags != ""
 			if _, err := fmt.Fprintf(
 				writer,
 				"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 				sanitizeCell(projected.AccountAlias, 64),
 				sanitizeCell(string(message.Provenance.Provider), 64),
 				sanitizeCell(message.ReceivedAt, 30),
-				sanitizeCell(from, 32),
+				sanitizeCell(mailSender(message), 32),
 				sanitizeCell(message.Subject, 72),
 				flags,
 				sanitizeCell(message.ID, 4096),
@@ -343,12 +398,25 @@ func writeMailProjectionTable(
 		if err := writer.Flush(); err != nil {
 			return err
 		}
+		if err := writeMailFlagLegend(app, flagged); err != nil {
+			return err
+		}
 	}
+	return writeProjectionNotices(app, page.Accounts, page.Failures)
+}
+
+// writeProjectionNotices reports, after an all-accounts table, each account
+// whose results are limited or missing.
+func writeProjectionNotices(
+	app *runtime,
+	accounts []application.ProjectionAccountStatus,
+	failures []application.ProjectionFailure,
+) error {
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
-	for _, status := range page.Accounts {
+	for _, status := range accounts {
 		for _, degradation := range status.Degradations {
 			if _, err := view.printf(
-				"%s  %s (%s): %s\n",
+				"%s  Limited results from %s (%s): %s\n",
 				view.warning(),
 				sanitizeCell(status.Alias, 64),
 				sanitizeCell(string(status.Provider), 64),
@@ -358,9 +426,9 @@ func writeMailProjectionTable(
 			}
 		}
 	}
-	for _, failure := range page.Failures {
+	for _, failure := range failures {
 		if _, err := view.printf(
-			"%s  Incomplete: %s (%s) · %s\n",
+			"%s  Missing results from %s (%s): %s\n",
 			view.warning(),
 			sanitizeCell(failure.Alias, 64),
 			sanitizeCell(string(failure.Provider), 64),
@@ -368,16 +436,24 @@ func writeMailProjectionTable(
 		); err != nil {
 			return err
 		}
+		if failure.Authentication != nil {
+			if _, err := fmt.Fprintln(app.stdout, view.nextStep(printableCommand(
+				commandName, "auth", "login", "--account", failure.Authentication.Alias,
+			))); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
 func (command *mailMoveCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	_, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
@@ -392,7 +468,7 @@ func (command *mailMoveCommand) Run(app *runtime) (returnErr error) {
 		Destination: destination,
 	}
 	if err := input.Validate(); err != nil {
-		return err
+		return withMessageIDHint(err, command.Account, command.MessageID, command.ChangeKey)
 	}
 
 	client, _, err := app.openDaemon(app.context)
@@ -412,7 +488,10 @@ func (command *mailMoveCommand) Run(app *runtime) (returnErr error) {
 			if command.JSON {
 				return writeJSON(app.stdout, access)
 			}
-			return writeMailMoveReview(app.stdout, access.Review, false)
+			if err := writeMailMoveReview(app.stdout, access.Review, false); err != nil {
+				return err
+			}
+			return app.writePreviewEnd(command, "mail", "move")
 		}
 		if err := writeMailMoveReview(app.stderr, access.Review, true); err != nil {
 			return err
@@ -428,16 +507,21 @@ func (command *mailMoveCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, access)
 	}
+	moved := access.Review.Destination
+	if moved.ID == "" {
+		moved = destination
+	}
 	if access.Moved.ID == "" {
 		_, err = fmt.Fprintf(
-			app.stdout, "Moved message to %s; the provider returned no new ID, so list the destination to refresh it.\n",
-			sanitizeCell(moveDestinationLabel(access.Review.Destination), 120),
+			app.stdout,
+			"Moved the message to %s. The provider did not return its new ID; list that folder to find it.\n",
+			sanitizeCell(moveDestinationLabel(moved), 120),
 		)
 		return err
 	}
 	_, err = fmt.Fprintf(
-		app.stdout, "Moved message to %s; new ID: %s\n",
-		sanitizeCell(moveDestinationLabel(access.Review.Destination), 120),
+		app.stdout, "Moved the message to %s. Its new ID is %s\n",
+		sanitizeCell(moveDestinationLabel(moved), 120),
 		sanitizeCell(access.Moved.ID, 4096),
 	)
 	return err
@@ -450,12 +534,30 @@ func moveDestinationLabel(folder application.MailFolder) string {
 	return folder.ID
 }
 
+// withMessageIDHint says where message IDs and change keys come from when a
+// command was run without them.
+func withMessageIDHint(err error, account, messageID, changeKey string) error {
+	if messageID != "" && changeKey != "" {
+		return err
+	}
+	return withHint(err, printableCommand(withAccount([]string{commandName, "mail", "list", "--json"}, account)...))
+}
+
+// withAccount adds --account to a suggested command when the user chose one.
+func withAccount(words []string, account string) []string {
+	if account == "" {
+		return words
+	}
+	return append(words, "--account", account)
+}
+
 func (command *mailMarkCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	_, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
@@ -464,7 +566,7 @@ func (command *mailMarkCommand) Run(app *runtime) (returnErr error) {
 		State: application.MailReadState(command.State),
 	}
 	if err := input.Validate(); err != nil {
-		return err
+		return withMessageIDHint(err, command.Account, command.MessageID, command.ChangeKey)
 	}
 	client, _, err := app.openDaemon(app.context)
 	if err != nil {
@@ -483,7 +585,10 @@ func (command *mailMarkCommand) Run(app *runtime) (returnErr error) {
 			if command.JSON {
 				return writeJSON(app.stdout, access)
 			}
-			return writeMailReadStateReview(app.stdout, access.Review, false)
+			if err := writeMailReadStateReview(app.stdout, access.Review, false); err != nil {
+				return err
+			}
+			return app.writePreviewEnd(command, "mail", "mark")
 		}
 		if err := writeMailReadStateReview(app.stderr, access.Review, true); err != nil {
 			return err
@@ -500,17 +605,18 @@ func (command *mailMarkCommand) Run(app *runtime) (returnErr error) {
 		return writeJSON(app.stdout, access)
 	}
 	_, err = fmt.Fprintf(
-		app.stdout, "Marked message %s.\n", sanitizeCell(string(access.Updated.State), 16),
+		app.stdout, "Marked the message as %s.\n", sanitizeCell(string(access.Updated.State), 16),
 	)
 	return err
 }
 
 func (command *mailDeleteCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	_, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
@@ -518,7 +624,7 @@ func (command *mailDeleteCommand) Run(app *runtime) (returnErr error) {
 		Account: accountID, MessageID: command.MessageID, ChangeKey: command.ChangeKey,
 	}
 	if err := input.Validate(); err != nil {
-		return err
+		return withMessageIDHint(err, command.Account, command.MessageID, command.ChangeKey)
 	}
 	client, _, err := app.openDaemon(app.context)
 	if err != nil {
@@ -536,7 +642,10 @@ func (command *mailDeleteCommand) Run(app *runtime) (returnErr error) {
 		if command.JSON {
 			return writeJSON(app.stdout, access)
 		}
-		return writeMailDeleteReview(app.stdout, access.Review, false)
+		if err := writeMailDeleteReview(app.stdout, access.Review, false); err != nil {
+			return err
+		}
+		return app.writePreviewEnd(command, "mail", "delete")
 	}
 	if err := writeMailDeleteReview(app.stderr, access.Review, true); err != nil {
 		return err
@@ -551,22 +660,23 @@ func (command *mailDeleteCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, access)
 	}
-	_, err = fmt.Fprintln(app.stdout, "Permanently deleted the exact message version.")
+	_, err = fmt.Fprintln(app.stdout, "Deleted the message permanently.")
 	return err
 }
 
 func (command *mailBodyCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	_, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
 	input := application.MailBodyInput{Account: accountID, MessageID: command.MessageID}
 	if err := input.Validate(); err != nil {
-		return err
+		return withMessageIDHint(err, command.Account, command.MessageID, "-")
 	}
 	client, _, err := app.openDaemon(app.context)
 	if err != nil {
@@ -585,7 +695,10 @@ func (command *mailBodyCommand) Run(app *runtime) (returnErr error) {
 			if command.JSON {
 				return writeJSON(app.stdout, access)
 			}
-			return writeMailBodyReview(app.stdout, command.MessageID, false)
+			if err := writeMailBodyReview(app.stdout, command.MessageID, false); err != nil {
+				return err
+			}
+			return app.writePreviewEnd(command, "mail", "body")
 		}
 		if err := writeMailBodyReview(app.stderr, command.MessageID, true); err != nil {
 			return err
@@ -603,7 +716,7 @@ func (command *mailBodyCommand) Run(app *runtime) (returnErr error) {
 	}
 	_, err = fmt.Fprintf(
 		app.stdout,
-		"Message %s (private, untrusted content):\n%s\n",
+		"Message %s (private; the text below comes from the sender and is not checked):\n%s\n",
 		sanitizeCell(access.Body.ID, 80),
 		sanitizeTerminalText(access.Body.Text),
 	)
@@ -611,12 +724,15 @@ func (command *mailBodyCommand) Run(app *runtime) (returnErr error) {
 		return err
 	}
 	if len(access.Body.Attachments) != 0 {
-		if _, err := fmt.Fprintln(app.stdout, "Attachments (private, untrusted metadata):"); err != nil {
+		if _, err := fmt.Fprintln(
+			app.stdout,
+			"Attachments (private; names and types come from the sender):",
+		); err != nil {
 			return err
 		}
 		for _, attachment := range access.Body.Attachments {
 			if _, err := fmt.Fprintf(
-				app.stdout, "- %s (%s, %s, %d bytes%s): %s\n",
+				app.stdout, "- %s (%s, %s, %d bytes%s), ID: %s\n",
 				sanitizeCell(attachment.Name, 128), sanitizeCell(attachment.Kind, 16),
 				sanitizeCell(attachment.ContentType, 128),
 				attachment.Size, inlineAttachmentLabel(attachment.IsInline),
@@ -625,24 +741,41 @@ func (command *mailBodyCommand) Run(app *runtime) (returnErr error) {
 				return err
 			}
 		}
+		view := newConsoleView(app, app.stdout, app.interactiveStdout())
+		if _, err := fmt.Fprintln(app.stdout, view.nextStep(printableCommand(withAccount(
+			[]string{commandName, "mail", "attachment", "--attachment-id", "ID", "--output", "FILE"},
+			command.Account,
+		)...))); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (command *mailAttachmentCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	if !command.JSON && command.Output == "" {
-		return errors.New("output is required unless json is selected")
+		return withHint(
+			errors.New("choose a file to save the attachment to with --output, or print it as base64 with --json"),
+			printableCommand(withAccount([]string{
+				commandName, "mail", "attachment", "--attachment-id", attachmentIDOrPlaceholder(command.AttachmentID),
+				"--output", "FILE",
+			}, command.Account)...),
+		)
 	}
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	_, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
 	input := application.MailAttachmentInput{Account: accountID, AttachmentID: command.AttachmentID}
 	if err := input.Validate(); err != nil {
+		if command.AttachmentID == "" {
+			return withHint(err, "Attachment IDs are listed by corr mail body --message-id ID.")
+		}
 		return err
 	}
 	client, _, err := app.openDaemon(app.context)
@@ -662,7 +795,10 @@ func (command *mailAttachmentCommand) Run(app *runtime) (returnErr error) {
 			if command.JSON {
 				return writeJSON(app.stdout, access)
 			}
-			return writeMailAttachmentReview(app.stdout, command.AttachmentID, false)
+			if err := writeMailAttachmentReview(app.stdout, command.AttachmentID, false); err != nil {
+				return err
+			}
+			return app.writePreviewEnd(command, "mail", "attachment")
 		}
 		if err := writeMailAttachmentReview(app.stderr, command.AttachmentID, true); err != nil {
 			return err
@@ -684,6 +820,12 @@ func (command *mailAttachmentCommand) Run(app *runtime) (returnErr error) {
 	}
 	file, err := os.OpenFile(command.Output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) // #nosec G304 -- explicit CLI output.
 	if err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return withHint(
+				fmt.Errorf("create attachment output: %w", err),
+				"Choose a new file name with --output; Corresync never overwrites a file.",
+			)
+		}
 		return fmt.Errorf("create attachment output: %w", err)
 	}
 	defer func() { returnErr = errors.Join(returnErr, file.Close()) }()
@@ -691,10 +833,17 @@ func (command *mailAttachmentCommand) Run(app *runtime) (returnErr error) {
 		return fmt.Errorf("write attachment output: %w", err)
 	}
 	_, err = fmt.Fprintf(
-		app.stdout, "Saved %d-byte attachment to %s.\n",
+		app.stdout, "Saved the attachment (%d bytes) to %s\n",
 		len(content), sanitizeCell(command.Output, 4096),
 	)
 	return err
+}
+
+func attachmentIDOrPlaceholder(id string) string {
+	if id == "" {
+		return "ID"
+	}
+	return id
 }
 
 func inlineAttachmentLabel(inline bool) string {
@@ -705,11 +854,12 @@ func inlineAttachmentLabel(inline bool) string {
 }
 
 func (command *mailDraftCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	_, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
@@ -731,7 +881,7 @@ func (command *mailDraftCommand) Run(app *runtime) (returnErr error) {
 		Attachments:        attachments,
 	}
 	if err := input.Validate(configuration.Policy.MaxRecipients); err != nil {
-		return err
+		return command.explainValidation(err, input, configuration.Policy.MaxRecipients)
 	}
 	client, _, err := app.openDaemon(app.context)
 	if err != nil {
@@ -750,7 +900,10 @@ func (command *mailDraftCommand) Run(app *runtime) (returnErr error) {
 			if command.JSON {
 				return writeJSON(app.stdout, access)
 			}
-			return writeDraftReview(app.stdout, access.Review, false)
+			if err := writeDraftReview(app.stdout, access.Review, false); err != nil {
+				return err
+			}
+			return app.writePreviewEnd(command, "mail", "draft")
 		}
 		if err := writeDraftReview(app.stderr, access.Review, true); err != nil {
 			return err
@@ -766,7 +919,42 @@ func (command *mailDraftCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, access)
 	}
-	return writeSavedDraft(app.stdout, access)
+	if err := writeSavedDraft(app.stdout, access); err != nil {
+		return err
+	}
+	if access.Draft.ChangeKey == "" {
+		return nil
+	}
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err = fmt.Fprintln(app.stdout, view.nextStep(printableCommand(withAccount([]string{
+		commandName, "mail", "send-draft", "--draft-id", access.Draft.ID,
+		"--draft-change-key", access.Draft.ChangeKey,
+	}, command.Account)...)))
+	return err
+}
+
+// explainValidation adds a next step when a reply draft was given its own
+// recipients: reply and reply-all take them from the original message.
+func (command *mailDraftCommand) explainValidation(
+	err error,
+	input application.MailDraftInput,
+	maxRecipients int,
+) error {
+	mode := input.EffectiveComposeMode()
+	if mode != application.MailComposeReply && mode != application.MailComposeReplyAll ||
+		len(input.To)+len(input.CC)+len(input.BCC) == 0 {
+		return err
+	}
+	withoutRecipients := input
+	withoutRecipients.To, withoutRecipients.CC, withoutRecipients.BCC = nil, nil, nil
+	if withoutRecipients.Validate(maxRecipients) != nil {
+		return err
+	}
+	suggested := *command
+	suggested.To, suggested.CC, suggested.BCC = nil, nil, nil
+	suggested.Mode = "reply-all"
+	flags, _ := commandLineWords(&suggested)
+	return withHint(err, printableCommand(append([]string{commandName, "mail", "draft"}, flags...)...))
 }
 
 // writeSavedDraft reports the provider-resolved addressing of a saved draft so
@@ -775,58 +963,67 @@ func writeSavedDraft(writer io.Writer, access application.MailDraftAccess) error
 	review := access.Review
 	if _, err := fmt.Fprintf(
 		writer,
-		"Saved draft %s; nothing was sent.\nMode: %s\n",
+		"Saved draft %s. Nothing was sent.\n",
 		sanitizeCell(access.Draft.ID, 80),
-		sanitizeCell(string(review.ComposeMode), 16),
 	); err != nil {
 		return err
 	}
+	fields := []reviewField{{"Mode", sanitizeCell(string(review.ComposeMode), 16)}}
 	if review.ReferenceMessageID != "" {
-		if _, err := fmt.Fprintf(
-			writer, "Source message: %s (change key %s)\n",
+		fields = append(fields, reviewField{"Original message", fmt.Sprintf(
+			"%s (change key %s)",
 			sanitizeCell(review.ReferenceMessageID, 4096),
 			sanitizeCell(review.ReferenceChangeKey, 4096),
-		); err != nil {
-			return err
-		}
+		)})
 	}
 	addressing := access.Addressing
 	if addressing == nil || addressing.Status != application.MailAddressingResolved ||
 		addressing.Resolved == nil {
-		_, err := fmt.Fprintf(
+		fields = append(fields, reviewField{"Bcc", mailReviewRecipientsOrNone(review.BCC)})
+		if err := writeReviewFields(writer, fields); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(
 			writer,
-			"Resolved To/Cc/subject: not reported by this provider route (unknown, not empty). "+
-				"Check the draft's recipients in the provider before calling it ready.\n"+
-				"Bcc: %s\n",
-			mailReviewRecipients(review.BCC),
+			"This provider did not report the saved To, Cc, and subject (unknown, not empty). "+
+				"Check the draft's recipients in your mail app before sending it.",
 		)
 		return err
 	}
 	resolved := addressing.Resolved
-	if _, err := fmt.Fprintf(
-		writer,
-		"Resolved To: %s\nResolved Cc: %s\nBcc: %s\nResolved subject: %s\n",
-		mailReviewRecipientsOrNone(resolved.To),
-		mailReviewRecipientsOrNone(resolved.CC),
-		mailReviewRecipients(review.BCC),
-		sanitizeCell(resolved.Subject, 4*application.MaxMailSubjectBytes),
-	); err != nil {
+	fields = append(fields,
+		reviewField{"To", mailReviewRecipientsOrNone(resolved.To)},
+		reviewField{"Cc", mailReviewRecipientsOrNone(resolved.CC)},
+		reviewField{"Bcc", mailReviewRecipientsOrNone(review.BCC)},
+		reviewField{"Subject", sanitizeCell(resolved.Subject, 4*application.MaxMailSubjectBytes)},
+	)
+	if err := writeReviewFields(writer, fields); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(writer, "To, Cc, and subject are shown as the provider saved them."); err != nil {
 		return err
 	}
 	if omitted := resolved.SourceParticipantsNotIncluded; omitted != nil && *omitted > 0 {
-		hint := "check the intended audience before calling the draft ready"
+		hint := "check that this is who you meant to write to before sending"
 		if review.ComposeMode == application.MailComposeReply {
-			hint = "save a new draft with --mode reply-all to keep them"
+			hint = "to include them, save a new draft with --mode reply-all"
 		}
 		if _, err := fmt.Fprintf(
 			writer,
-			"Note: %d To/Cc participant(s) of the source message are not addressed by this draft; %s.\n",
-			*omitted, hint,
+			"Note: %d To/Cc %s of the original message %s not on this draft; %s.\n",
+			*omitted, plural(*omitted, "recipient", "recipients"), plural(*omitted, "is", "are"), hint,
 		); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func plural(count int, one, many string) string {
+	if count == 1 {
+		return one
+	}
+	return many
 }
 
 func mailReviewRecipientsOrNone(recipients []string) string {
@@ -837,11 +1034,12 @@ func mailReviewRecipientsOrNone(recipients []string) string {
 }
 
 func (command *mailSendCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	_, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
@@ -872,7 +1070,7 @@ func (command *mailSendCommand) Run(app *runtime) (returnErr error) {
 	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
 	access, err := client.SendMail(app.context, input, app.caller())
 	if err != nil {
-		return err
+		return command.explainSendFailure(err)
 	}
 	if access.Status != "approval_required" || access.Preview == nil {
 		return errors.New("mail send did not produce its mandatory preview")
@@ -881,7 +1079,10 @@ func (command *mailSendCommand) Run(app *runtime) (returnErr error) {
 		if command.JSON {
 			return writeJSON(app.stdout, access)
 		}
-		return writeSendReview(app.stdout, access.Review, false)
+		if err := writeSendReview(app.stdout, access.Review, false); err != nil {
+			return err
+		}
+		return app.writePreviewEnd(command, "mail", "send")
 	}
 	if err := writeSendReview(app.stderr, access.Review, true); err != nil {
 		return err
@@ -896,19 +1097,42 @@ func (command *mailSendCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, access)
 	}
+	recipients := len(access.Review.To) + len(access.Review.CC) + len(access.Review.BCC)
 	_, err = fmt.Fprintf(
-		app.stdout, "Sent message to %d recipient(s); the network request was attempted once.\n",
-		len(access.Review.To)+len(access.Review.CC)+len(access.Review.BCC),
+		app.stdout, "Sent the message to %d %s. The request was made once and is not retried.\n",
+		recipients, plural(recipients, "recipient", "recipients"),
 	)
 	return err
 }
 
+// explainSendFailure points a reply or reply-all send, which the daemon
+// refuses, to the draft that shows its recipients first.
+func (command *mailSendCommand) explainSendFailure(err error) error {
+	var remote *daemonapi.Error
+	if command.Mode != "reply" && command.Mode != "reply-all" || !errors.As(err, &remote) ||
+		remote.Code != "operation_failed" {
+		return err
+	}
+	if _, signIn := signInRequest(err); signIn {
+		return err
+	}
+	draft := mailDraftCommand{
+		Account: command.Account, Subject: command.Subject, BodyFile: command.BodyFile,
+		BodyFormat: command.BodyFormat, Mode: command.Mode,
+		ReferenceMessageID: command.ReferenceMessageID, ReferenceChangeKey: command.ReferenceChangeKey,
+		Attachments: command.Attachments,
+	}
+	flags, _ := commandLineWords(&draft)
+	return withHint(err, printableCommand(append([]string{commandName, "mail", "draft"}, flags...)...))
+}
+
 func (command *mailSendDraftCommand) Run(app *runtime) (returnErr error) {
+	defer func() { returnErr = explainCommandError(returnErr, command.JSON) }()
 	configuration, _, err := app.loadConfig()
 	if err != nil {
 		return err
 	}
-	accountID, err := app.account(configuration, command.Account)
+	_, accountID, err := resolveAccount(configuration, command.Account)
 	if err != nil {
 		return err
 	}
@@ -917,6 +1141,11 @@ func (command *mailSendDraftCommand) Run(app *runtime) (returnErr error) {
 		DraftChangeKey: command.DraftChangeKey,
 	}
 	if err := input.Validate(); err != nil {
+		if command.DraftID == "" || command.DraftChangeKey == "" {
+			return withHint(err, printableCommand(withAccount(
+				[]string{commandName, "mail", "list", "--folder", "drafts", "--json"}, command.Account,
+			)...))
+		}
 		return err
 	}
 	client, _, err := app.openDaemon(app.context)
@@ -935,7 +1164,10 @@ func (command *mailSendDraftCommand) Run(app *runtime) (returnErr error) {
 		if command.JSON {
 			return writeJSON(app.stdout, access)
 		}
-		return writeSendDraftReview(app.stdout, access.Review, false)
+		if err := writeSendDraftReview(app.stdout, access.Review, false); err != nil {
+			return err
+		}
+		return app.writePreviewEnd(command, "mail", "send-draft")
 	}
 	if err := writeSendDraftReview(app.stderr, access.Review, true); err != nil {
 		return err
@@ -954,29 +1186,30 @@ func (command *mailSendDraftCommand) Run(app *runtime) (returnErr error) {
 	if command.JSON {
 		return writeJSON(app.stdout, access)
 	}
+	recipients := len(access.Review.To) + len(access.Review.CC) + len(access.Review.BCC)
 	_, err = fmt.Fprintf(
 		app.stdout,
-		"Sent saved draft %s to %d recipient(s); the exact version was attempted once.\n",
+		"Sent draft %s to %d %s. The request was made once, for the version you previewed, and is not retried.\n",
 		sanitizeCell(access.Review.DraftID, 80),
-		len(access.Review.To)+len(access.Review.CC)+len(access.Review.BCC),
+		recipients, plural(recipients, "recipient", "recipients"),
 	)
 	return err
 }
 
 func writeSendReview(writer io.Writer, review application.MailReview, committing bool) error {
-	action := "Preview only; nothing was sent. Rerun with --approve to send this exact content."
+	action := "Preview: this message has not been sent."
 	if committing {
-		action = "Committing this exact send now."
+		action = "Sending this message now:"
 	}
-	return writeMailContentReview(writer, review, action)
+	return writeMailContentReview(writer, review, action, true)
 }
 
 func writeDraftReview(writer io.Writer, review application.MailReview, committing bool) error {
-	action := "Preview only; no draft was saved. Rerun with --approve to save this exact draft."
+	action := "Preview: no draft has been saved."
 	if committing {
-		action = "Saving this exact draft now; no message will be sent."
+		action = "Saving this draft now; it will not be sent:"
 	}
-	return writeMailContentReview(writer, review, action)
+	return writeMailContentReview(writer, review, action, false)
 }
 
 func writeSendDraftReview(
@@ -984,72 +1217,93 @@ func writeSendDraftReview(
 	review application.MailDraftSendReview,
 	committing bool,
 ) error {
-	action := "Preview only; the saved draft was not sent. Rerun with --approve to send this exact version."
+	action := "Preview: this draft has not been sent."
 	if committing {
-		action = "Committing this exact saved draft version now."
+		action = "Sending this draft now:"
 	}
-	_, err := fmt.Fprintf(
-		writer,
-		"%s\nDraft ID: %s\nChange key: %s\nTo: %s\nCc: %s\nBcc: %s\nSubject: %s\nBody format: %s\nBody (%d bytes, SHA-256 %s):\n%s\n",
-		action,
-		sanitizeCell(review.DraftID, 4096),
-		sanitizeCell(review.DraftChangeKey, 4096),
-		mailReviewRecipients(review.To),
-		mailReviewRecipients(review.CC),
-		mailReviewRecipients(review.BCC),
-		sanitizeCell(review.Subject, 998),
-		sanitizeCell(string(review.BodyFormat), 16),
-		review.BodyBytes,
-		sanitizeCell(review.BodySHA256, 64),
-		sanitizeTerminalText(review.BodyPreview),
-	)
-	if err != nil {
+	if _, err := fmt.Fprintln(writer, action); err != nil {
 		return err
 	}
+	fields := []reviewField{
+		{"Will send", "yes"},
+		{"Draft ID", sanitizeCell(review.DraftID, 4096)},
+		{"Change key", sanitizeCell(review.DraftChangeKey, 4096)},
+		{"To", mailReviewRecipients(review.To)},
+		{"Cc", mailReviewRecipients(review.CC)},
+		{"Bcc", mailReviewRecipients(review.BCC)},
+		{"Subject", sanitizeCell(review.Subject, 998)},
+		{"Body format", sanitizeCell(string(review.BodyFormat), 16)},
+		{"Body size", bodySizeLabel(review.BodyBytes, review.BodySHA256)},
+	}
 	for _, attachment := range review.Attachments {
-		if _, err := fmt.Fprintf(
-			writer,
-			"Attachment: %s (%s, %d bytes, inline=%t)\n",
+		inline := ""
+		if attachment.Inline {
+			inline = ", inline"
+		}
+		fields = append(fields, reviewField{"Attachment", fmt.Sprintf(
+			"%s (%s, %d bytes%s)",
 			sanitizeCell(attachment.Name, 255),
 			sanitizeCell(attachment.ContentType, 255),
 			attachment.Bytes,
-			attachment.Inline,
-		); err != nil {
-			return err
-		}
+			inline,
+		)})
 	}
-	return nil
+	if err := writeReviewFields(writer, fields); err != nil {
+		return err
+	}
+	return writeReviewBody(writer, review.BodyPreview)
 }
 
 func writeMailContentReview(
 	writer io.Writer,
 	review application.MailReview,
 	action string,
+	sends bool,
 ) error {
-	_, err := fmt.Fprintf(
-		writer,
-		"%s\nMode: %s\nTo: %s\nCc: %s\nBcc: %s\nSubject: %s\nBody format: %s\nBody (%d bytes, SHA-256 %s):\n%s\n",
-		action,
-		sanitizeCell(string(review.ComposeMode), 16),
-		mailReviewRecipients(review.To),
-		mailReviewRecipients(review.CC),
-		mailReviewRecipients(review.BCC),
-		sanitizeCell(review.Subject, 998), sanitizeCell(string(review.BodyFormat), 16), review.BodyBytes,
-		sanitizeCell(review.BodySHA256, 64), sanitizeTerminalText(review.BodyPreview),
-	)
-	if err != nil {
+	if _, err := fmt.Fprintln(writer, action); err != nil {
 		return err
 	}
+	fields := []reviewField{
+		{"Will send", previewYesNo(sends)},
+		{"Mode", sanitizeCell(string(review.ComposeMode), 16)},
+		{"To", mailReviewRecipients(review.To)},
+		{"Cc", mailReviewRecipients(review.CC)},
+		{"Bcc", mailReviewRecipients(review.BCC)},
+		{"Subject", sanitizeCell(review.Subject, 998)},
+		{"Body format", sanitizeCell(string(review.BodyFormat), 16)},
+		{"Body size", bodySizeLabel(review.BodyBytes, review.BodySHA256)},
+	}
+	if review.ReferenceMessageID != "" {
+		fields = append(fields, reviewField{"Original message", fmt.Sprintf(
+			"%s (change key %s)",
+			sanitizeCell(review.ReferenceMessageID, 4096),
+			sanitizeCell(review.ReferenceChangeKey, 4096),
+		)})
+	}
 	for _, attachment := range review.Attachments {
-		if _, err := fmt.Fprintf(
-			writer, "Attachment: %s (%s, %d bytes, SHA-256 %s)\n",
+		fields = append(fields, reviewField{"Attachment", fmt.Sprintf(
+			"%s (%s, %d bytes, SHA-256 %s)",
 			sanitizeCell(attachment.Name, 255), sanitizeCell(attachment.ContentType, 255),
 			attachment.Bytes, sanitizeCell(attachment.SHA256, 64),
-		); err != nil {
-			return err
-		}
+		)})
 	}
-	return nil
+	if err := writeReviewFields(writer, fields); err != nil {
+		return err
+	}
+	return writeReviewBody(writer, review.BodyPreview)
+}
+
+func bodySizeLabel(bytes int, digest string) string {
+	return fmt.Sprintf("%d bytes (SHA-256 %s)", bytes, sanitizeCell(digest, 64))
+}
+
+// writeReviewBody prints the start of a body under the preview fields.
+func writeReviewBody(writer io.Writer, preview string) error {
+	if preview == "" {
+		return nil
+	}
+	_, err := fmt.Fprintf(writer, "Body:\n%s\n", sanitizeTerminalText(preview))
+	return err
 }
 
 // Recipient lists are already bounded by the application contract. Preserve
@@ -1118,18 +1372,18 @@ func writeMailMoveReview(
 	review application.MailMoveReview,
 	committing bool,
 ) error {
-	action := "Preview only; no message was moved. Rerun with --approve to move this exact version."
+	action := "Preview: the message has not been moved."
 	if committing {
-		action = "Moving this exact message version now."
+		action = "Moving this message now:"
 	}
-	_, err := fmt.Fprintf(
-		writer, "%s\nMessage ID: %s\nChange key: %s\nDestination: %s\n",
-		action,
-		sanitizeCell(review.MessageID, 4096),
-		sanitizeCell(review.ChangeKey, 4096),
-		sanitizeCell(moveDestinationLabel(review.Destination), 4096),
-	)
-	return err
+	if _, err := fmt.Fprintln(writer, action); err != nil {
+		return err
+	}
+	return writeReviewFields(writer, []reviewField{
+		{"Message ID", sanitizeCell(review.MessageID, 4096)},
+		{"Change key", sanitizeCell(review.ChangeKey, 4096)},
+		{"Move to", sanitizeCell(moveDestinationLabel(review.Destination), 4096)},
+	})
 }
 
 func writeMailReadStateReview(
@@ -1137,55 +1391,56 @@ func writeMailReadStateReview(
 	review application.MailReadStateReview,
 	committing bool,
 ) error {
-	action := "Preview only; read state was not changed. Rerun with --approve to change this exact version."
+	action := "Preview: the message has not been marked."
 	if committing {
-		action = "Changing this exact message version now."
+		action = "Marking this message now:"
 	}
-	_, err := fmt.Fprintf(
-		writer, "%s\nMessage ID: %s\nChange key: %s\nTarget state: %s\n",
-		action,
-		sanitizeCell(review.MessageID, 4096),
-		sanitizeCell(review.ChangeKey, 4096),
-		sanitizeCell(string(review.State), 16),
-	)
-	return err
+	if _, err := fmt.Fprintln(writer, action); err != nil {
+		return err
+	}
+	return writeReviewFields(writer, []reviewField{
+		{"Message ID", sanitizeCell(review.MessageID, 4096)},
+		{"Change key", sanitizeCell(review.ChangeKey, 4096)},
+		{"Mark as", sanitizeCell(string(review.State), 16)},
+	})
 }
 
 func writeMailDeleteReview(writer io.Writer, review application.MailDeleteReview, committing bool) error {
-	action := "Preview only; nothing was deleted. Rerun with --approve to permanently delete this exact version."
+	action := "Preview: nothing has been deleted. Approving deletes this message permanently; " +
+		"the provider cannot undo it."
 	if committing {
-		action = "Permanently deleting this exact message version now; the selected provider cannot undo it."
+		action = "Deleting this message permanently now; the provider cannot undo it:"
 	}
-	_, err := fmt.Fprintf(
-		writer, "%s\nMessage ID: %s\nChange key: %s\nDelete type: %s\n",
-		action, sanitizeCell(review.MessageID, 4096), sanitizeCell(review.ChangeKey, 4096),
-		sanitizeCell(review.DeleteType, 32),
-	)
-	return err
+	if _, err := fmt.Fprintln(writer, action); err != nil {
+		return err
+	}
+	return writeReviewFields(writer, []reviewField{
+		{"Message ID", sanitizeCell(review.MessageID, 4096)},
+		{"Change key", sanitizeCell(review.ChangeKey, 4096)},
+		{"Delete type", sanitizeCell(review.DeleteType, 32)},
+	})
 }
 
 func writeMailBodyReview(writer io.Writer, messageID string, committing bool) error {
-	action := "Preview only; the private body was not read. Rerun with --approve to read this exact message."
+	action := "Preview: the message has not been read. Your settings ask before message text is read."
 	if committing {
-		action = "Reading the private body of this exact message now."
+		action = "Reading this message now:"
 	}
-	_, err := fmt.Fprintf(
-		writer, "%s\nMessage ID: %s\n",
-		action, sanitizeCell(messageID, 4096),
-	)
-	return err
+	if _, err := fmt.Fprintln(writer, action); err != nil {
+		return err
+	}
+	return writeReviewFields(writer, []reviewField{{"Message ID", sanitizeCell(messageID, 4096)}})
 }
 
 func writeMailAttachmentReview(writer io.Writer, attachmentID string, committing bool) error {
-	action := "Preview only; the private attachment was not read. Rerun with --approve to retrieve it."
+	action := "Preview: the attachment has not been read. Your settings ask before attachments are read."
 	if committing {
-		action = "Reading this private attachment now."
+		action = "Reading this attachment now:"
 	}
-	_, err := fmt.Fprintf(
-		writer, "%s\nAttachment ID: %s\n",
-		action, sanitizeCell(attachmentID, 4096),
-	)
-	return err
+	if _, err := fmt.Fprintln(writer, action); err != nil {
+		return err
+	}
+	return writeReviewFields(writer, []reviewField{{"Attachment ID", sanitizeCell(attachmentID, 4096)}})
 }
 
 func readDraftBody(app *runtime, path string) (body string, returnErr error) {
@@ -1224,32 +1479,23 @@ func readPlainTextBody(
 	return string(data), nil
 }
 
-func writeMailTable(app *runtime, page application.MailPage) error {
+func writeMailTable(app *runtime, page application.MailPage, empty emptyResult) error {
 	if len(page.Messages) == 0 {
-		_, err := fmt.Fprintln(app.stdout, "No messages.")
-		return err
+		return app.writeEmpty(empty)
 	}
 	writer := tabwriter.NewWriter(app.stdout, 0, 4, 2, ' ', 0)
-	if _, err := fmt.Fprintln(writer, "RECEIVED\tFROM\tSUBJECT\tFLAGS\tID"); err != nil {
+	if _, err := fmt.Fprintln(writer, "RECEIVED\tFROM\tSUBJECT\tFLAGS\tMESSAGE ID"); err != nil {
 		return err
 	}
+	flagged := false
 	for _, message := range page.Messages {
-		from := message.From.Name
-		if from == "" {
-			from = message.From.Address
-		}
-		flags := ""
-		if !message.IsRead {
-			flags += "U"
-		}
-		if message.HasAttachments {
-			flags += "A"
-		}
+		flags := mailFlags(message)
+		flagged = flagged || flags != ""
 		if _, err := fmt.Fprintf(
 			writer,
 			"%s\t%s\t%s\t%s\t%s\n",
 			sanitizeCell(message.ReceivedAt, 30),
-			sanitizeCell(from, 32),
+			sanitizeCell(mailSender(message), 32),
 			sanitizeCell(message.Subject, 72),
 			flags,
 			sanitizeCell(message.ID, 4096),
@@ -1257,16 +1503,45 @@ func writeMailTable(app *runtime, page application.MailPage) error {
 			return err
 		}
 	}
-	return writer.Flush()
-}
-
-func writeMailFolderTable(app *runtime, page application.MailFolderPage) error {
-	if len(page.Folders) == 0 {
-		_, err := fmt.Fprintln(app.stdout, "No folders.")
+	if err := writer.Flush(); err != nil {
 		return err
 	}
+	return writeMailFlagLegend(app, flagged)
+}
+
+func mailSender(message application.MailSummary) string {
+	if message.From.Name != "" {
+		return message.From.Name
+	}
+	return message.From.Address
+}
+
+func mailFlags(message application.MailSummary) string {
+	flags := ""
+	if !message.IsRead {
+		flags += "U"
+	}
+	if message.HasAttachments {
+		flags += "A"
+	}
+	return flags
+}
+
+func writeMailFlagLegend(app *runtime, flagged bool) error {
+	if !flagged {
+		return nil
+	}
+	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	_, err := fmt.Fprintln(app.stdout, view.muted("Flags: U unread, A has attachments."))
+	return err
+}
+
+func writeMailFolderTable(app *runtime, page application.MailFolderPage, empty emptyResult) error {
+	if len(page.Folders) == 0 {
+		return app.writeEmpty(empty)
+	}
 	writer := tabwriter.NewWriter(app.stdout, 0, 4, 2, ' ', 0)
-	if _, err := fmt.Fprintln(writer, "NAME\tCLASS\tITEMS\tUNREAD\tCHILDREN\tID"); err != nil {
+	if _, err := fmt.Fprintln(writer, "NAME\tTYPE\tMESSAGES\tUNREAD\tSUBFOLDERS\tFOLDER ID"); err != nil {
 		return err
 	}
 	for _, folder := range page.Folders {

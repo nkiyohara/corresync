@@ -1,0 +1,17 @@
+{
+  "calendars": [
+    {
+      "id": "calendar-1",
+      "displayName": "Work",
+      "isDefault": true,
+      "canEdit": true,
+      "accessRole": "owner",
+      "provenance": {
+        "accountId": "",
+        "provider": ""
+      }
+    }
+  ],
+  "totalCalendars": 1,
+  "includesLastItem": true
+}

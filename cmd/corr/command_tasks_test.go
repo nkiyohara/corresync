@@ -50,7 +50,7 @@ func TestWriteTaskReviewIncludesExactRouteAndLoss(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, expected := range []string{
-		"Preview task update", `"account": "acc_00000000000000000000000000000001"`,
+		"Preview: the task has not been changed.", `"account": "acc_00000000000000000000000000000001"`,
 		`"provider": "todoist"`, `"version": "version-1"`, `"lossy": true`,
 	} {
 		if !strings.Contains(output.String(), expected) {

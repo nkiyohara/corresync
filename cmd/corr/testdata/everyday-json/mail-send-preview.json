@@ -1,0 +1,23 @@
+{
+  "status": "approval_required",
+  "review": {
+    "to": [
+      "ana@example.invalid"
+    ],
+    "subject": "Synthetic",
+    "bodyBytes": 0,
+    "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bodyFormat": "text",
+    "composeMode": "new"
+  },
+  "preview": {
+    "token": "<token>",
+    "expiresAt": "<time>",
+    "operation": {
+      "name": "mail.send",
+      "effect": "external_write",
+      "account": "acc_00000000000000000000000000000001",
+      "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+}

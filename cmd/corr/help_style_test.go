@@ -21,13 +21,7 @@ const maximumSummaryLength = 70
 // TestHelpStyleAllowlistHasNoCleanEntries fails once an entry is no longer
 // needed. Keys are top-level command names; the value names the work package
 // that owns the files.
-var helpStyleAllowlist = map[string]string{
-	"agenda":   "A. everyday commands",
-	"calendar": "A. everyday commands",
-	"mail":     "A. everyday commands",
-	"queries":  "A. everyday commands",
-	"tasks":    "A. everyday commands",
-}
+var helpStyleAllowlist = map[string]string{}
 
 // bannedHelpWords are review vocabulary that must not reach a reader. Text in
 // backticks (a literal flag value or protocol term) is exempt.

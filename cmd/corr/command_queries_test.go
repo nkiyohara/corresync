@@ -38,7 +38,7 @@ func TestSavedQueryCLIReviewsBeforePrivateStateChanges(t *testing.T) {
 	}
 	if strings.Contains(stdout.String(), "\x1b[31m") ||
 		!strings.Contains(stdout.String(), `\x1b[31m`) ||
-		!strings.Contains(stdout.String(), "No changes made") {
+		!strings.Contains(stdout.String(), `saved query "priority" has not been saved`) {
 		t.Fatalf("unsafe or incomplete saved query preview: %q", stdout.String())
 	}
 

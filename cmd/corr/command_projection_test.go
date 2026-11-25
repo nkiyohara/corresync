@@ -30,7 +30,7 @@ func TestProjectionCommandsRequireExplicitReadOnlyScope(t *testing.T) {
 		Account: "work", AllAccounts: true,
 		Folder: "inbox", Query: "synthetic",
 		Limit: 25, TimeZone: "UTC",
-	}).Run(app); err == nil || !strings.Contains(err.Error(), "cannot select one account") {
+	}).Run(app); err == nil || !strings.Contains(err.Error(), "cannot be combined with --account") {
 		t.Fatalf("ambiguous mail projection error = %v", err)
 	}
 }

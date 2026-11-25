@@ -1,0 +1,17 @@
+{
+  "messages": [
+    {
+      "id": "message-1",
+      "subject": "Synthetic",
+      "from": {},
+      "isRead": false,
+      "hasAttachments": false,
+      "provenance": {
+        "accountId": "",
+        "provider": ""
+      }
+    }
+  ],
+  "totalItemsInView": 0,
+  "includesLastItem": false
+}
