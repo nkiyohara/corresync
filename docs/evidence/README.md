@@ -42,6 +42,8 @@ message/calendar identifiers, subjects, recipients, attendees, bodies,
 queries, source paths, screenshots, provider payloads, credentials, approval
 values, join URLs, request IDs, or runner arguments.
 
-If the observed implementation surface changes after the recorded commit, the
-corresponding row in `docs/compatibility.md` returns to `live-unobserved` until
-the new commit is exercised.
+A record is linked from its entry in
+[`internal/compatcatalog/catalog.json`](../../internal/compatcatalog/catalog.json),
+which generates the tables in [`docs/compatibility.md`](../compatibility.md).
+If the observed implementation surface changes after the recorded commit, that
+entry stops being `live-observed` until the new commit is exercised.
