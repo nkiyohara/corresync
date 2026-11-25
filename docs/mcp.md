@@ -146,6 +146,11 @@ approval. Decline, cancellation, failure, or a host without terminal access
 leaves the action as an explicit blocker, and alternatives require the user's
 choice.
 
+A lost network, a provider outage, or a throttle is not an authentication
+failure. The tool returns an ordinary error without the action object, the
+account stays signed in, and a later read can succeed in the same daemon once
+the provider is reachable. Do not ask the user to sign in for it.
+
 The current local provider flows do not have a reviewed URL broker, so MCP
 elicitation is intentionally not advertised or used for authentication. A
 client that supports elicitation receives the same exact action object as a

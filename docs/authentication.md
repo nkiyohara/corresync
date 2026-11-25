@@ -256,6 +256,31 @@ receiving a generic replay whose session state cannot be proven. This lets a
 human repeat the same read after a network or sleep/wake interruption while
 keeping write reconciliation mandatory.
 
+### After sleep, network loss, or session expiry
+
+The daemon keeps running across sleep and network changes. You do not need to
+restart it.
+
+- **Network unavailable.** Reads fail with an ordinary error. Status still
+  shows the service as `authenticated`, and you are not asked to sign in.
+  When the network returns, the next read uses the same session. A write that
+  was interrupted is reported as having an unknown outcome and is never
+  repeated automatically: check the mailbox or calendar, then make a new
+  preview if it is still needed.
+- **After sleep.** A mail monitor that missed polls while the computer slept
+  runs one poll when it next gets a chance, then returns to its normal
+  interval. While the network is still down it tries once per interval and
+  keeps the session.
+- **Session expired.** If the provider rejects the session (for example, an
+  OAuth grant revoked while the computer slept, an Outlook Web browser that
+  exited, or Outlook Web rejecting its last browser authorization), only that
+  account's affected service changes to `reauthentication_required`. Reads
+  return the sign-in action with the exact command, such as
+  `corr auth login --account work`. Corresync stops contacting the provider
+  for that service and stops its monitor until you sign in. Other accounts
+  keep working. After signing in, repeat the read once; a write needs a new
+  preview.
+
 `corr auth logout --account work` closes only that account's adapters, browser,
 pending login, previews, and monitor after its in-flight operations finish.
 Other accounts and the config-scoped daemon remain active. Repeating the command

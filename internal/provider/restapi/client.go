@@ -293,6 +293,15 @@ func (client *Client) doOnce(
 		if response != nil && response.Body != nil {
 			_ = response.Body.Close()
 		}
+		// An authorizing transport (an OAuth token source or refresh) fails
+		// before dispatch, so a typed authentication rejection is definitive:
+		// it is neither retried nor reported as an unknown write outcome.
+		if reason, rejected := application.ProviderAuthenticationReason(err); rejected {
+			return Result{}, application.NewProviderAuthenticationFailure(
+				reason,
+				errors.New("API authorization was rejected before dispatch"),
+			)
+		}
 		if write {
 			return Result{}, fmt.Errorf(
 				"%w: API write transport failed after dispatch",
