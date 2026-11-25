@@ -114,16 +114,18 @@ legacy `initialize` / `notifications/initialized` handshake. The current
 compatibility floor is `2024-11-05`; `2025-03-26`, `2025-06-18`, and
 `2025-11-25` are also accepted. CI exercises the complete modern flow, the
 latest legacy flow, invalid modern metadata, unsupported-version errors, all
-71 tool schemas and structured results, both resource templates, and the real
+72 tool schemas and structured results, both resource templates, and the real
 `corr mcp serve` stdio process. Older accepted revisions remain compatibility
 paths rather than separate product surfaces.
 
 The server intentionally does not expose MCP Apps or UI resources, protocol
-Tasks, prompts, completions, elicitation, sampling, roots, logging, or a remote
-authorization flow. Corresync's `task_*` entries are ordinary typed tools for
-provider task services; they are unrelated to protocol Tasks. Local provider
-authentication stays browser- or credential-owner-controlled outside MCP, and
-MCP cannot initiate it. These omissions are deliberate and must not be inferred
+Tasks, prompts, completions, sampling, roots, logging, or a remote
+authorization flow. It uses form elicitation for one purpose only: the
+`account_sign_in` approval prompt. Corresync's `task_*` entries are ordinary
+typed tools for provider task services; they are unrelated to protocol Tasks.
+Local provider authentication stays browser- or credential-owner-controlled
+outside MCP. MCP can request a sign-in; it starts only after the user approves
+it in the MCP client. These omissions are deliberate and must not be inferred
 from an advertised SDK capability.
 
 ### Authentication recovery
@@ -136,7 +138,7 @@ Cross-account projections retain that object in the failed account member and
 mark the aggregate incomplete.
 
 Preserve the requested account and service. Check `account_status` once if
-needed, ask once before running the exact local argv action, and wait for the
+needed, call `account_sign_in` once for that account (below), and wait for the
 human-owned browser, terminal, MFA, or credential UI. Never ask for a password,
 app-specific password, OTP, cookie, or token in chat. After status confirms the
 same service, retry the same read once. Do not silently substitute another
@@ -151,11 +153,29 @@ failure. The tool returns an ordinary error without the action object, the
 account stays signed in, and a later read can succeed in the same daemon once
 the provider is reachable. Do not ask the user to sign in for it.
 
-The current local provider flows do not have a reviewed URL broker, so MCP
-elicitation is intentionally not advertised or used for authentication. A
-client that supports elicitation receives the same exact action object as a
-legacy client; only a future separately reviewed broker may add a consented
-multi-round-trip enhancement without changing this baseline.
+The action's additive `nextAction.mcpTool` names `account_sign_in`. That tool
+takes only the account alias. Corresync asks the person through MCP form
+elicitation with a prompt it writes itself from the configured alias, provider
+names, and services; no tool argument or provider text reaches it. Only an
+explicit accept starts the same browser sign-in as `corr auth login`. The tool
+returns at once with one of:
+
+- `started`: the browser is open; the daemon finishes the session itself or
+  closes the browser at `expiresAt`. Check `account_status`; do not call again.
+- `already_signed_in`: retry the original read once.
+- `in_progress`: a prompt or sign-in for this account is already pending.
+- `declined`: the person declined or cancelled, now or within the last ten
+  minutes. `nextAction` holds the CLI command; do not ask again.
+- `unavailable`: the client lacks form elicitation, the prompt failed, the host
+  has no display, or a recent MCP-started sign-in did not finish. `nextAction`
+  holds the CLI command; do not retry.
+
+On 2026-07-28 clients the prompt is an `input_required` result whose
+`requestState` is encrypted and bound to this server process, the account, and
+a five-minute one-use ticket; older clients receive `elicitation/create` during
+the call. URL-mode elicitation, headless or forwarded sign-in, logout, and
+browser clearing are not available through MCP. See
+[ADR 0039](adr/0039-user-approved-sign-in-from-mcp.md).
 
 Tool/resource names, schemas, annotations, deprecations, and negotiated
 compatibility follow the
@@ -201,12 +221,13 @@ aliases over the same reviewed command and rendering contracts.
 
 ## Tool catalog
 
-The server exposes 71 narrow tools.
+The server exposes 72 narrow tools.
 
 Accounts and local monitoring:
 
 - `settings_show`, `settings_update`, `settings_update_commit`;
 - `account_discover`, `account_list`, `account_show`, `account_status`;
+- `account_sign_in` (user-approved sign-in request);
 - `account_add`, `account_add_commit`;
 - `account_rename`, `account_rename_commit`;
 - `account_remove`, `account_remove_commit`;
@@ -236,7 +257,8 @@ configuration. Account aliases use the existing `account_rename` preview and
 `account_rename_commit` pair. Account onboarding and removal use the separate
 `account_add` / `account_add_commit` and `account_remove` /
 `account_remove_commit` preview pairs; provider sign-in remains an explicit
-local CLI action. Removing the final account leaves an empty provider-neutral
+local action: `corr auth login`, or `account_sign_in` after the user approves
+it in the MCP client. Removing the final account leaves an empty provider-neutral
 configuration, and a later `account_add` preview binds the new opaque identity
 before approval so the MCP lifecycle can populate it again.
 
@@ -308,7 +330,8 @@ stops and restarts the session owner around the atomic config change so no
 authenticated route can retain stale configuration. Addition never
 authenticates or resolves a credential, and its review says
 `explicit_cli_required`; `corr auth login --account ALIAS` remains a separate
-local human action. Account read views omit private credential-reference keys;
+local human action, and `account_sign_in` can only ask the person to approve
+the same sign-in. Account read views omit private credential-reference keys;
 the add review deliberately discloses the exact backend/key handles being bound
 and rejects a handle already owned by another account. The caller-bound
 operation digest commits to the complete input. All three lifecycle operations
@@ -317,8 +340,10 @@ execution audit phases. Removal previews its Corresync-owned state purge and
 never deletes an external standards credential. Its review discloses deletion
 of an unshared Corresync-owned OAuth grant; legacy shared grants are retained.
 
-Authentication, monitor enable/reconfigure, runner/egress consent, queue purge,
-local import reads, updates, and feedback external actions remain CLI-only.
+Authentication without the user's approval in the MCP client, logout, browser
+sign-in clearing, monitor enable/reconfigure, runner/egress consent, queue
+purge, local import reads, updates, and feedback external actions remain
+CLI-only.
 `settings_show` may display `feedbackAutoSubmit`; `settings_update` cannot
 change it. Automatic public feedback runs only after a separately consented,
 interactive CLI failure—never during an MCP tool call or MCP server exit.

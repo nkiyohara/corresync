@@ -110,7 +110,8 @@ single-user tool, not a remote gateway or tenant administration service.
   use Authorization Code with PKCE. TickTick uses the provider's documented
   confidential Authorization Code contract without inventing PKCE or refresh.
 - User-owned Google mail, calendar, and task routes are configured without
-  authentication and may authorize only from explicit local CLI login. Each
+  authentication and may authorize only from explicit local CLI login or a
+  sign-in the user approved in the MCP client. Each
   route pins its API base and cannot represent a password, app password,
   alternate host, or arbitrary Google API transport. Google Tasks uses an
   independent task-only scope set and authorization handle. The managed Google
@@ -129,6 +130,17 @@ single-user tool, not a remote gateway or tenant administration service.
   with a bounded reviewed handle and no password argument. The child owns the
   TTY prompt; `corr` receives only its exit status. MCP, JSON, pipes, and
   non-interactive setup cannot launch it.
+- MCP can request a sign-in; it starts only after the user approves it in the
+  MCP client ([ADR 0039](adr/0039-user-approved-sign-in-from-mcp.md)). Only
+  `account_sign_in` can ask, with a server-authored prompt built from the
+  configured alias, provider, and services. The daemon accepts the approved
+  start only through its separate MCP approval method with a one-use,
+  caller-bound ticket. One prompt and one running sign-in per account, a fixed
+  ten-minute cool-down after a refusal or unfinished sign-in, and content-free
+  audit records bound repetition. A local MCP client can falsely report
+  approval; that opens only the same browser sign-in, which still needs the
+  person's own credentials and MFA. Hosts without a display, logout, and
+  browser clearing stay CLI-only.
 - Account-add approval displays the exact external backend/key handles and
   rejects cross-account handle reuse before both preview and atomic commit.
 - Discovery cannot access credentials, start consent, or probe administrator

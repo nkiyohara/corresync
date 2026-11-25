@@ -404,3 +404,10 @@ The graphical login action gains the bounded `move` type (ADR 0038). Protocol
 31 replaces protocol 30 because the daemon accepts a value it rejected before.
 The SSH helper wire advances to version 2 for the same reason; a version 2
 helper still answers version 1 requests, which cannot carry `move`.
+
+### User-approved MCP sign-in
+
+The MCP catalog gains the additive `account_sign_in` tool and the
+authentication action gains the optional `nextAction.mcpTool` field (ADR 0039).
+Omission keeps its old meaning. Protocol 32 replaces protocol 31 because the
+private daemon adds the `login.mcp.request` and `login.mcp.resolve` methods.

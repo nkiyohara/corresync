@@ -95,6 +95,7 @@ same version-1 action:
       "executable": "corr",
       "args": ["auth", "login", "--account", "work"]
     },
+    "mcpTool": "account_sign_in",
     "requiresUserConsent": true,
     "requiresHumanInteraction": true,
     "secretsAllowedInMCP": false
@@ -109,7 +110,11 @@ same version-1 action:
 
 The other stable codes are `authentication_required` and
 `authentication_pending`. The command is executable-plus-argv, never shell
-text. The object contains only local routing metadata. Provider responses,
+text. The additive `mcpTool` names the one MCP tool that may ask the person to
+approve the same sign-in in an MCP client
+([ADR 0039](adr/0039-user-approved-sign-in-from-mcp.md)); it starts nothing by
+itself and older payloads omit it. The object contains only local routing
+metadata. Provider responses,
 addresses, credentials, factors, and remote identities are excluded. Unknown
 write outcome, permission denial, outage, throttling, and malformed
 configuration remain different failures.

@@ -53,7 +53,9 @@ review may cover several selected hosts, but application and verification stay
 independent so one failure neither rolls back nor hides another host. EOF,
 Escape, cancellation, and interruption never count as approval.
 
-Authentication remains a later, explicit, account-specific local CLI action.
+Authentication remains a later, explicit, account-specific local action: a
+CLI login, or a sign-in the user approves in an MCP client
+([ADR 0039](0039-user-approved-sign-in-from-mcp.md)).
 The first added account becomes the default; later additions cannot change the
 default unless the human requests it. Session-backed commands and MCP client
 registration fail with setup guidance while the account catalog is empty.
@@ -125,7 +127,9 @@ as a command-line flag or as the value of an inherited environment variable.
 
 Neither backend is consulted during discovery, capability probing, or automatic
 selection, and no MCP tool can read a secret, directly resolve a reference,
-trigger a credential prompt, or create or expand an authorization. An MCP
+or trigger a credential prompt. No MCP tool can create or expand an
+authorization unless the user approves that sign-in in the MCP client
+([ADR 0039](0039-user-approved-sign-in-from-mcp.md)). An MCP
 account-add preview may persist a reviewed private handle reference, but its
 result explicitly requires a later `corr auth login` invocation from the local
 CLI before a new authorization can use it. Once that explicit boundary has

@@ -12,6 +12,32 @@ corr auth logout
 The daemon is the only authenticated session owner. CLI and MCP call it through
 private local IPC and never receive provider credentials.
 
+## Signing in from an MCP client
+
+MCP can request a sign-in; it starts only after the user approves it in the MCP
+client. When a tool reports that an account needs sign-in, an agent may call
+`account_sign_in` with that account alias. Corresync then asks you, in the MCP
+client's own confirmation prompt, whether to open the sign-in browser for that
+account. The prompt is written by Corresync and names only the account alias,
+the provider, and the services. Nothing starts unless you accept.
+
+On acceptance the daemon starts the same sign-in as
+`corr auth login --account ALIAS`: the dedicated Outlook Web browser at the
+configured origin, or the provider's OAuth page in your browser. Enter your
+password, MFA, and consent only there. The tool returns immediately; the daemon
+completes the session when the browser sign-in finishes, or closes the browser
+when the browser login timeout expires. `corr auth status` and `account_status`
+show the account as pending meanwhile.
+
+Declining or cancelling blocks further prompts for that account from MCP for
+ten minutes, as does a sign-in that expires unfinished. Clients without
+elicitation support, and Linux hosts without `DISPLAY` or `WAYLAND_DISPLAY`,
+get the `corr auth login --account ALIAS` command instead; the forwarded login
+view for hosts without a display is not available from MCP. Logout and
+`--clear-browser` remain CLI-only. Each request, answer, start, completion, and
+expiry is recorded in the local content-free audit log. See
+[ADR 0039](adr/0039-user-approved-sign-in-from-mcp.md).
+
 ## Outlook Web
 
 Outlook Web login opens a dedicated visible browser profile for the account.

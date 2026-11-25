@@ -550,8 +550,10 @@ Pass criteria:
   authentication;
 - account removal review discloses any unshared Corresync-owned OAuth grant
   deletion and retains external standards credentials;
-- MCP cannot authenticate, configure monitoring/egress, scan imports, purge
-  queues, update the binary, or submit feedback.
+- MCP cannot authenticate without the user's approval in the MCP client
+  (`account_sign_in` asks; decline starts nothing), log out, clear browser
+  sign-in, configure monitoring/egress, scan imports, purge queues, update the
+  binary, or submit feedback.
 
 Do not share raw MCP frames.
 

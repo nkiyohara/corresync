@@ -41,6 +41,9 @@ selection or with an authorization the user already granted.
 - CLI and MCP must call the same typed application use cases. No provider gets
   an escape hatch, an arbitrary action, or a generic property API.
 - Where a web adapter is used, authentication is interactive and browser-owned.
+  MCP can request a sign-in; it starts only after the user approves it in the
+  MCP client, as recorded in
+  [ADR 0039](docs/adr/0039-user-approved-sign-in-from-mcp.md).
   Never request or persist a password, app-specific password, OAuth token,
   cookie, or refresh token in core, and never introduce TLS interception. The
   configuration schema cannot represent a secret; a standards provider that

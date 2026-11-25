@@ -37,7 +37,10 @@ Corresync separates the routes permanently:
   Cloud project, enables an API, opens OAuth, or submits an administrator
   request;
 - setup and account addition only persist reviewed route metadata. OAuth starts
-  later, only from an explicit local CLI login. MCP cannot initiate it.
+  later, only from an explicit local CLI login or from a sign-in the user
+  approved in the MCP client. MCP can request a sign-in; it starts only after
+  the user approves it in the MCP client
+  ([ADR 0039](0039-user-approved-sign-in-from-mcp.md)).
 
 The user supplies Google's downloaded `installed` client JSON. Corresync parses
 at most 32 KiB, rejects unknown fields, Web-application clients, non-Google
@@ -85,7 +88,7 @@ The setup has more steps than a managed client, so the guided wizard imports
 the downloaded client into the OS keyring and the documentation mirrors the
 current browser screens. A missing keyring value fails before a Google browser
 or API request. Ordinary discovery, account reads before login, doctor, and MCP
-calls never resolve it.
+calls other than a user-approved sign-in never resolve it.
 
 The adapters remain deterministic-only and live-unobserved until an authorized,
 commit-bound observation is recorded. Enabling a future Corresync-managed
