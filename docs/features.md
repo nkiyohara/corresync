@@ -6,7 +6,7 @@ not available through a raw protocol escape hatch.
 ## Provider routes
 
 <!-- markdownlint-disable MD013 -->
-| Provider ID | Mail | Calendar | Tasks | Authentication | v0.8 evidence |
+| Provider ID | Mail | Calendar | Tasks | Authentication | v0.9 evidence |
 | --- | --- | --- | --- | --- | --- |
 | `microsoft-owa` | Mail | Selectable calendars, Teams meeting link | — | Visible browser-owned Outlook Web session | Implemented; synthetic contracts; live-unobserved |
 | `google` / `google-tasks` | Gmail API; no permanent delete | Selectable Google calendars and Google Meet when advertised | Google Tasks with an independent task-only grant | Explicit user-owned Desktop OAuth client; external client-credential handle and OS-keyring grants | Implemented; synthetic API/application contracts; live-unobserved |
@@ -36,9 +36,11 @@ OS-owned app-specific-password enrollment prompt. The underlying route status,
 capabilities, and failures remain independent; this is a preset, not a new
 provider adapter or capability claim.
 
-“Implemented” means the typed route and synthetic contracts ship in v0.8. It is
+“Implemented” means the typed route and synthetic contracts ship in v0.9. It is
 not a universal provider-compatibility claim. See
 [compatibility evidence](compatibility.md) before connecting a live account.
+Each route's opt-in live harness or manual procedure is listed in the
+[live evidence index](evidence/README.md).
 
 Discovery uses DNS and well-known metadata without credentials. It returns
 ranked evidence, confidence, required authentication, and availability; it

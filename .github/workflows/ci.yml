@@ -41,6 +41,9 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Compile opt-in live harnesses without running them
+        run: go vet -tags live ./...
+
       - name: Require Chromium for synthetic browser contracts
         run: google-chrome --version
 

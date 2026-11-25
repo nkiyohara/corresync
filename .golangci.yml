@@ -2,6 +2,9 @@ version: "2"
 
 run:
   timeout: 5m
+  # Lint the opt-in live harnesses too. Linting compiles them; nothing runs.
+  build-tags:
+    - live
 
 linters:
   default: standard

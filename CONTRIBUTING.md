@@ -77,7 +77,8 @@ file. Run `mise exec -- task format` to apply the same formatters explicitly or
 - GitHub Actions syntax and security policy.
 
 Run the complete command before committing. Live mailbox tests are deliberately
-absent from it.
+absent from it: it compiles the `live`-tagged harnesses with `go vet` but never
+runs them, and a guard test fails if any task, hook, or workflow would.
 
 ## Branch and release lines
 
@@ -124,7 +125,8 @@ itself write authority.
 
 Use live testing only when the issue requires compatibility evidence and you
 are authorized to use the account and device. Follow the
-[manual test checklist](docs/manual-test-checklist.md).
+[manual test checklist](docs/manual-test-checklist.md) and the per-route
+harnesses in the [live evidence index](docs/evidence/README.md).
 
 Never commit or attach:
 

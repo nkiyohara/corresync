@@ -345,6 +345,78 @@ Register the exact fixed loopback port and apply the same no-CI, no-content,
 and commit-bound evidence rules. The harness does not establish an identity
 claim because TickTick's published Open API exposes no identity endpoint.
 
+Every shipped route also has a session-level harness that signs in through
+the same code the daemon uses, performs bounded reads, optionally makes and
+removes one synthetic item, and prints a content-free record. The
+[live evidence index](evidence/README.md#harness-index) lists the harness,
+variables, recorded fields, and cleanup for each route. The one route a Go
+test cannot drive is the forwarded login view below.
+
+### Forwarded login view observation
+
+This observes `corr auth login` for an Outlook Web account on a host without a
+display, where the sign-in page is shown in a browser on your own computer. A
+person must click and type in that view, so there is no Go harness. Use a
+Linux host you reach over SSH and an Outlook Web account you are allowed to
+test with.
+
+On the server, build the exact commit from a clean tree and use a live-only
+config and state directory:
+
+```console
+git switch --detach COMMIT
+mise exec -- task build
+export CORRESYNC_STATE_DIR="$HOME/corresync-live/state"
+LIVE_CONFIG="$HOME/corresync-live/config.toml"
+mkdir -p "$CORRESYNC_STATE_DIR"
+./bin/corr --config "$LIVE_CONFIG" config init
+./bin/corr --config "$LIVE_CONFIG" account add ADDRESS --alias ALIAS \
+  --mail-provider microsoft-owa --calendar-provider microsoft-owa
+```
+
+Start the login with no display variables:
+
+```console
+env -u DISPLAY -u WAYLAND_DISPLAY \
+  ./bin/corr --config "$LIVE_CONFIG" auth login --account ALIAS
+```
+
+On your own computer, run the `ssh -N -L ...` line the command prints and open
+the printed link. Check the site shown above the picture, then complete
+sign-in, MFA, and consent in the view. Do not copy the link, port, or host
+name anywhere: the link carries a one-time secret. When the page says sign-in
+is complete, stop the tunnel and run, on the server:
+
+```console
+./bin/corr --config "$LIVE_CONFIG" doctor --online --connection-only \
+  --account ALIAS --json
+./bin/corr --config "$LIVE_CONFIG" doctor --online --account ALIAS --json
+./bin/corr --config "$LIVE_CONFIG" daemon stop
+```
+
+Record with the template in the [live evidence index](evidence/README.md):
+
+- `Capability or operation`: forwarded login view, then online doctor;
+- `Content-free result stage`: the furthest stage reached (view opened,
+  provider page shown, sign-in completed, timed out, or cancelled), whether an
+  input was reported as possibly not delivered, and each doctor check name
+  with its `pass`, `fail`, or `skip` status;
+- `Harness`: manual procedure, route `outlook-web-forwarded-login`.
+
+Do not record the doctor's detail text, the link, the port, the SSH host, the
+alias, or anything shown in the view.
+
+Clean up on the server, reviewing the removal before approving it:
+
+```console
+./bin/corr --config "$LIVE_CONFIG" account remove ALIAS
+./bin/corr --config "$LIVE_CONFIG" account remove ALIAS --approve
+rm -r "$HOME/corresync-live"
+```
+
+If the login was left unfinished, `Cancel login` on the page or Ctrl-C in the
+terminal closes the remote browser before cleanup.
+
 ## 7. Read-only CLI
 
 Keep output on the test machine:
