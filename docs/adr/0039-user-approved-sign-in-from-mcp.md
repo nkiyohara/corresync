@@ -31,12 +31,30 @@ The exact boundary:
   alias. It is the only tool that can cause an elicitation. Read tools still
   never start, open, or focus a sign-in; their authentication action now also
   names the tool in the additive `nextAction.mcpTool` field.
-- The Corresync MCP server writes the whole prompt. It is built only from the
-  configured alias, fixed provider display names, and service names, plus fixed
-  text. Tool arguments, provider data, and model text never reach it. Unknown
-  aliases fail before any prompt. Aliases containing characters other than
-  letters, digits, `.`, `_`, `-`, `@`, and `+` are not quoted into a prompt;
-  the tool returns `unavailable` with the CLI command instead.
+- The tool is available only for an account whose current connection settings
+  have completed at least one sign-in that a person started from the CLI
+  (`corr auth login`, including its terminal and forwarded-view modes). When
+  such a sign-in completes, the daemon records the account ID and a SHA-256
+  over the account's enabled connection settings: address, providers, route
+  kinds, origins, endpoints, OAuth client IDs, clouds and tenants, and
+  credential handles. If there is no record, or the settings changed since,
+  through MCP or the CLI, the tool returns `unavailable` with reason
+  `cli_sign_in_required` and the CLI command, without prompting.
+- The Corresync MCP server writes the whole prompt from configuration and
+  fixed text: the configured alias, the configured address, and for each
+  released and enabled service its provider display name and where approving
+  signs in. A dedicated-browser route names its origin host, an OAuth route its
+  authorization host and client ID, and a stored-credential route its server
+  host. Each host is on its own line (`Sign-in page: outlook.office.com`). The
+  wording differs per route kind: Corresync's dedicated browser window, the
+  provider's authorization page in the person's browser, or "Corresync will
+  read the saved credential from your keyring; your system may ask for
+  permission". Tool arguments, provider data, and model text never reach it.
+  Unknown aliases fail before any prompt. A host that is not a lowercase ASCII
+  DNS name (IDNA names only in `xn--` form), an address that is not plain
+  ASCII, an alias with characters other than letters, ASCII digits, `.`, `_`,
+  `-`, `@`, and `+`, or an alias mixing Latin, Cyrillic, or Greek letters is
+  never displayed: the tool returns `unavailable` with the CLI command.
 - The form requests no data: an empty object schema. `accept` is approval.
   `decline` and `cancel` are refusals. An error, an unknown action, a missing
   answer, a client that did not declare form elicitation, or a host without a
@@ -59,7 +77,8 @@ The exact boundary:
 
 Protocol 32 adds two private methods. `login.mcp.request` reserves at most one
 approval prompt per account, bound to the requesting MCP caller, for five
-minutes, and returns an unguessable one-use ticket with the alias and routes.
+minutes, and returns an unguessable one-use ticket with the alias, address,
+and per-service route kind, host, and OAuth client ID.
 It never launches anything. `login.mcp.resolve` consumes that ticket with the
 observed decision. Only the decision `approved_by_user_elicitation` can start a
 sign-in, and only this MCP server's elicitation path sends it. The daemon
@@ -76,10 +95,26 @@ replayed, tampered, or cross-account state starts nothing.
   `corr auth login`, a terminal relay, or the forwarded login view, returns
   `in_progress` without prompting.
 - After `decline` or `cancel`, the same account cannot be prompted from any MCP
-  client for a fixed ten minutes; requests return `declined`. After an
-  MCP-started sign-in fails or expires unfinished, the same ten minutes apply
-  and requests return `unavailable`. The person can always run
-  `corr auth login` themselves.
+  client for a fixed ten minutes; requests return `declined`. The same ten
+  minutes apply, with `unavailable`, whenever a prompt was shown and did not
+  end in `accept` (a client error, a call cancelled or timed out while the
+  prompt was open, or an approval left unanswered until it expired) and when
+  an MCP-started sign-in fails, expires, or is cancelled. Only a client
+  without form elicitation, or a failure before any prompt, is exempt. The
+  person can always run `corr auth login` themselves.
+- Cool-downs and CLI verification records persist in the daemon's private
+  state directory (`sign-in/cooldowns.json` and
+  `sign-in/cli-verified-routes.json`, directory `0700`, files `0600`), so the
+  daemon restart that follows every configuration commit cannot clear them.
+  Expired cool-downs are pruned on load; records of removed accounts are
+  deleted on load. An unreadable or malformed cool-down file cools down every
+  account for the full period (`sign_in_state_unavailable`) and writes a
+  content-free audit event; an unreadable record file verifies nothing.
+- An MCP-started sign-in holds the daemon's activation lock until it ends. A
+  CLI sign-in, terminal relay, or logout that would wait behind it returns at
+  once naming the account and the time the sign-in ends.
+  `corr auth logout --account ALIAS` for that account cancels it: the browser
+  closes, the state clears, and the logout proceeds.
 - Every request, prompt, approval, decline, cancellation, prompt failure, start,
   completion, failure, and expiry is written to the local audit log as the
   content-free `account.sign_in` operation with a bounded reason code, the
@@ -93,8 +128,9 @@ replayed, tampered, or cross-account state starts nothing.
 
 **Prompt injection asking for sign-in.** Mail, calendar, or chat content can
 tell a model to call `account_sign_in`. The call can at most show the
-server-authored prompt for a configured account; it cannot change the prompt,
-choose a URL, or read the result of the sign-in. The person still has to accept
+server-authored prompt for a configured account whose current settings a
+person already signed in to from the CLI; it cannot change the prompt or read
+the result of the sign-in. The person still has to accept
 and then complete sign-in in the browser. An injected agent gains no data it
 could not already reach through an existing session.
 
@@ -105,30 +141,47 @@ person is asked. The prompt says declining is safe and names the CLI command.
 
 **A malicious local MCP client lying about approval.** The MCP client is the
 channel that relays the person's answer. A client, or any process that can act
-as the person's MCP host, can answer `accept` without asking. This control
-does not prove a human clicked anything; it proves only that the answer came
-through Corresync's own elicitation path in this MCP server process. The MCP
+as the person's MCP host, can answer `accept` without asking. The sealed
+request state and the one-use ticket prove that an answer belongs to this
+server's request for this account; they do not prove that a person produced
+it. A client that shows elicitation requests or `input_required` results to
+the model, or lets the model fill the retried call, lets the model approve,
+and neither the MCP server nor the daemon can detect that. Corresync does not
+claim any particular client is safe in this respect. The MCP
 server and the daemon are the same local, single-user trust domain, so a local
 process able to impersonate the MCP server could already reach the daemon
-socket. The concrete controls are that only this code path sends the approved
-decision, tickets are single-use and caller-bound, the browser still requires
-the person's own credentials and MFA, and every step is audited. A lying client
-can open a sign-in window; it cannot sign in, read the credentials, or skip the
-provider's own consent.
+socket. What still protects the person in that case: the sign-in can open only
+the destination their own CLI sign-in already verified, passwords and MFA are
+typed by a person in that browser, the cool-down bounds repetition, and every
+step is in the audit log. Only this code path sends the approved decision, and
+tickets are single-use and caller-bound. A lying client can open a sign-in
+window at a verified destination; it cannot sign in, read the credentials, or
+skip the provider's own consent.
 
-**Phishing through an unexpected browser window.** The prompt names the alias
-and provider before anything opens, and the window opens only after acceptance.
-For Outlook Web it is Corresync's dedicated profile at the configured origin
-only, exactly as `corr auth login` opens it; OAuth routes open only the fixed
-provider authorization endpoints already used by the CLI. No URL is accepted
-from the model, the client, or the prompt answer. A person who did not expect a
-window can close it; the sign-in then expires and the cool-down applies.
+**Phishing through an unexpected browser window.** Over MCP a caller can
+complete its own `account_add`, `account_rename`, and `settings_update`
+preview/commit pairs, and an Outlook Web origin may be any HTTPS host. Without
+a further control a prompt-injected model could rename `work` away, add a new
+`work` at a look-alike origin, and ask the person to approve "work". The
+CLI-verification requirement closes this: an account added or changed by
+anyone has no matching record until a person runs `corr auth login` for it, so
+the tool refuses without prompting. Destinations therefore come only from
+settings a person has already signed in to from the CLI; the model, the
+client, and the prompt answer cannot supply or alter a URL. The prompt also
+names the exact host, the OAuth client ID, and the address in plain ASCII
+before anything opens, and the window opens only after acceptance. A person
+who did not expect a window can close it; the sign-in then fails and the
+cool-down applies.
 
 ## Consequences
 
 People using an elicitation-capable client on a desktop session can recover a
 missing sign-in without leaving the client. Clients without elicitation, and
 people who decline, see the same CLI command as before.
+
+An account must be signed in once from the CLI, and again after any change to
+its connection settings, before `account_sign_in` works for it. Accounts
+signed in before this change need one more CLI sign-in.
 
 This first version covers hosts where the browser can be shown: non-Linux hosts,
 and Linux hosts with `DISPLAY` or `WAYLAND_DISPLAY`. On a host without a

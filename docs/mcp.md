@@ -154,9 +154,15 @@ account stays signed in, and a later read can succeed in the same daemon once
 the provider is reachable. Do not ask the user to sign in for it.
 
 The action's additive `nextAction.mcpTool` names `account_sign_in`. That tool
-takes only the account alias. Corresync asks the person through MCP form
-elicitation with a prompt it writes itself from the configured alias, provider
-names, and services; no tool argument or provider text reaches it. Only an
+takes only the account alias and works only for an account whose current
+connection settings a person has already signed in to once with
+`corr auth login`; after the account is added or any route changes, it returns
+`unavailable` with reason `cli_sign_in_required` until the person signs in from
+the CLI again. Corresync asks the person through MCP form elicitation with a
+prompt it writes itself from the configured alias and address and, for each
+enabled service, the provider, the exact sign-in host (or server host for a
+saved credential), and any OAuth client ID; no tool argument or provider text
+reaches it. Only an
 explicit accept starts the same browser sign-in as `corr auth login`. The tool
 returns at once with one of:
 
@@ -166,9 +172,11 @@ returns at once with one of:
 - `in_progress`: a prompt or sign-in for this account is already pending.
 - `declined`: the person declined or cancelled, now or within the last ten
   minutes. `nextAction` holds the CLI command; do not ask again.
-- `unavailable`: the client lacks form elicitation, the prompt failed, the host
-  has no display, or a recent MCP-started sign-in did not finish. `nextAction`
-  holds the CLI command; do not retry.
+- `unavailable`: the account needs a CLI sign-in first (`cli_sign_in_required`),
+  the client lacks form elicitation, the prompt failed or went unanswered, the
+  host has no display, a destination cannot be shown as plain ASCII, or a
+  recent request or MCP-started sign-in did not finish. `nextAction` holds the
+  CLI command; do not retry.
 
 On 2026-07-28 clients the prompt is an `input_required` result whose
 `requestState` is encrypted and bound to this server process, the account, and

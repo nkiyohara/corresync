@@ -16,11 +16,14 @@ private local IPC and never receive provider credentials.
 ## Signing in from an MCP client
 
 MCP can request a sign-in; it starts only after the user approves it in the MCP
-client. When a tool reports that an account needs sign-in, an agent may call
+client. This works only for an account you have already signed in to once with
+`corr auth login`, and again after any change to its connection settings.
+When a tool reports that an account needs sign-in, an agent may call
 `account_sign_in` with that account alias. Corresync then asks you, in the MCP
-client's own confirmation prompt, whether to open the sign-in browser for that
-account. The prompt is written by Corresync and names only the account alias,
-the provider, and the services. Nothing starts unless you accept.
+client's own confirmation prompt, whether to sign in. The prompt is written by
+Corresync and names the account alias and address, the services, and the exact
+sign-in page host (and OAuth client ID) or saved-credential server for each.
+Nothing starts unless you accept.
 
 On acceptance the daemon starts the same sign-in as
 `corr auth login --account ALIAS`: the dedicated Outlook Web browser at the
@@ -31,7 +34,11 @@ when the browser login timeout expires. `corr auth status` and `account_status`
 show the account as pending meanwhile.
 
 Declining or cancelling blocks further prompts for that account from MCP for
-ten minutes, as does a sign-in that expires unfinished. Clients without
+ten minutes, as does a prompt left unanswered or a sign-in that does not
+finish; the cool-down survives a daemon restart. While an MCP-started sign-in
+is open, `corr auth login` and `corr auth logout` for other accounts stop with
+a message naming it; `corr auth logout --account ALIAS` for that account
+cancels it and closes its browser. Clients without
 elicitation support, and Linux hosts without `DISPLAY` or `WAYLAND_DISPLAY`,
 get the `corr auth login --account ALIAS` command instead; the forwarded login
 view for hosts without a display is not available from MCP. Logout and
