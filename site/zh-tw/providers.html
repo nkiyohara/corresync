@@ -97,13 +97,13 @@
         </div>
       </section>
       <section
-        class="compatibility-相容性檢查工具"
+        class="compatibility-checker"
         id="check"
-        aria-labelledby="相容性檢查工具-title"
+        aria-labelledby="checker-title"
       >
-        <div class="相容性檢查工具-intro">
+        <div class="checker-intro">
           <p class="eyebrow"><span aria-hidden="true"></span>相容性檢查</p>
-          <h2 id="相容性檢查工具-title">
+          <h2 id="checker-title">
             不傳送完整位址也能檢查是否支援
           </h2>
           <p>
@@ -111,9 +111,8 @@
             後面的網域會送到檢查服務。
           </p>
         </div>
-        <form id="compatibility-form" class="相容性檢查工具-form" novalidate>
-          <label for="compatibility-email"
-          >信箱位址</label><div class="相容性檢查工具-fields">
+        <form id="compatibility-form" class="checker-form" novalidate>
+          <label for="compatibility-email">信箱位址</label><div class="checker-fields">
             <input
               id="compatibility-email"
               name="compatibility-email"
@@ -128,18 +127,18 @@
               檢查是否支援
             </button>
           </div>
-          <p id="compatibility-validation" class="相容性檢查工具-validation" hidden>
+          <p id="compatibility-validation" class="checker-validation" hidden>
             請輸入完整信箱位址，例如 you@example.com。@
             後有完整網域前不會查詢。
           </p>
         </form>
-        <p id="compatibility-privacy" class="相容性檢查工具-privacy">
+        <p id="compatibility-privacy" class="checker-privacy">
           <strong>只有網域會離開瀏覽器。</strong>@
           前的內容不會傳送、儲存、記錄或出現在網址列。檢查服務只讀取公開
           DNS
           記錄，不保留資料，也不會開始登入。也可以跳過，安裝後在本機執行
           <code>corr account discover you@example.com</code>。
-        </p><noscript><p class="相容性檢查工具-noscript">
+        </p><noscript><p class="checker-noscript">
             這個檢查需要 JavaScript。你也可以安裝後在本機執行 <code>corr account
               discover you@example.com</code>。
           </p></noscript><p
@@ -151,7 +150,7 @@
         </p>
         <article
           id="compatibility-result"
-          class="相容性檢查工具-result"
+          class="checker-result"
           tabindex="-1"
           aria-label="支援情況結果"
           hidden

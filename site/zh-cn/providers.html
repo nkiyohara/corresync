@@ -64,7 +64,7 @@
             aria-current="page"
           >支持服务</a><a href="features.html">功能</a><a href="safety.html">安全</a>
         </nav>
-        <nav class="language-nav" aria-label="語言">
+        <nav class="language-nav" aria-label="语言">
           <a href="../providers.html" lang="en" hreflang="en">EN</a><a
             href="../ja/providers.html"
             lang="ja"
@@ -95,22 +95,21 @@
         </div>
       </section>
       <section
-        class="compatibility-兼容性检查工具"
+        class="compatibility-checker"
         id="check"
-        aria-labelledby="兼容性检查工具-title"
+        aria-labelledby="checker-title"
       >
-        <div class="兼容性检查工具-intro">
+        <div class="checker-intro">
           <p class="eyebrow"><span aria-hidden="true"></span>检查邮箱地址</p>
-          <h2 id="兼容性检查工具-title">
+          <h2 id="checker-title">
             检查是否支持（不发送完整地址）
           </h2>
           <p>
             输入要连接的邮箱地址。浏览器只把 @ 后面的域名发给查询服务。
           </p>
         </div>
-        <form id="compatibility-form" class="兼容性检查工具-form" novalidate>
-          <label for="compatibility-email"
-          >邮箱地址</label><div class="兼容性检查工具-fields">
+        <form id="compatibility-form" class="checker-form" novalidate>
+          <label for="compatibility-email">邮箱地址</label><div class="checker-fields">
             <input
               id="compatibility-email"
               name="compatibility-email"
@@ -125,17 +124,17 @@
               检查支持情况
             </button>
           </div>
-          <p id="compatibility-validation" class="兼容性检查工具-validation" hidden>
+          <p id="compatibility-validation" class="checker-validation" hidden>
             请输入完整的邮箱地址，例如
             you@example.com。域名完整之前不会查询。
           </p>
         </form>
-        <p id="compatibility-privacy" class="兼容性检查工具-privacy">
+        <p id="compatibility-privacy" class="checker-privacy">
           <strong>只有域名会离开浏览器。</strong>@
           前面的部分不会被发送、保存、记录或放进地址栏。查询服务只读公共
           DNS，不保留记录，也不会开始登录。也可以安装后在本地运行
           <code>corr account discover you@example.com</code>。
-        </p><noscript><p class="兼容性检查工具-noscript">
+        </p><noscript><p class="checker-noscript">
             这个检查需要 JavaScript。也可以安装后在本地运行 <code>corr account
               discover you@example.com</code>。
           </p></noscript><p
@@ -147,7 +146,7 @@
         </p>
         <article
           id="compatibility-result"
-          class="兼容性检查工具-result"
+          class="checker-result"
           tabindex="-1"
           aria-label="支持情况结果"
           hidden
