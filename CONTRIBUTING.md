@@ -121,6 +121,60 @@ account-local data. Collection, runner execution, content inclusion, and remote
 egress remain separate consent boundaries. An automatic event may never grant
 itself write authority.
 
+## Writing for the command line
+
+Help text, prompts, and error messages are written for the person at the
+keyboard, not for a reviewer. Write what they will see happen.
+
+- A command summary says what the command does in the user's words. It starts
+  with a verb, is one sentence, ends with a period, and has at most 70
+  characters. The root help removes the period.
+- Do not use these words in help, prompts, or errors: "Review and" as an
+  opener, exact, explicit, explicitly, versioned, opaque, bounded, durable,
+  deterministic, deterministically, typed, guarded, provider-neutral,
+  canonical, normalized, session owner, secret-free, credential-free,
+  content-free, isolated. A literal flag value or protocol term may appear in
+  backticks. Say the plain thing instead: "asks for confirmation before it
+  runs", "the message's ID", "the local daemon", "without signing in".
+- When every command in a group shows a preview and waits for approval, say so
+  once in the group's help, not in each summary.
+- Plain words must not promise more or less than the code does. Keep
+  "permanently" for permanent deletion, and say "asks for confirmation" only
+  where a preview and approval really happen.
+- Errors say what happened, then what to do. Give a command when there is one:
+  return `withHint(err, "corr auth login --account work")` and the CLI prints
+  the message in sentence case with a `Try:` line under it. Go error strings
+  stay lower case. Never show an internal term as the only explanation.
+- Prompts are a short question or label with at most one line of help. Say
+  what happens next, not what does not happen.
+- Wrap long text with `wrapText` so paths, addresses, and commands are never
+  split. End a successful result with `view.nextStep(...)` when there is an
+  obvious next command.
+
+`TestHelpTextFollowsWritingRules` in `cmd/corr/help_style_test.go` checks every
+visible command, flag, and argument. Commands whose text has not been rewritten
+yet are listed in its allowlist; remove an entry once its help passes.
+
+Before and after:
+
+- "Review and move one versioned message to one folder." becomes "Move a
+  message to another folder."
+- "Inspect and acknowledge the durable local event queue." becomes "List,
+  acknowledge, and delete events found by monitoring."
+- "Run and inspect the local session owner." becomes "Start, stop, and check
+  the local daemon."
+- "Resume guided local setup, or add one account deterministically." becomes
+  "Set up Corresync step by step, or add one account from a script."
+- "Read one typed configuration value." becomes "Show one configuration value."
+- The prompt help "Used only for credential-free discovery and the local
+  account route. No sign-in starts." becomes "Used to find your mail
+  server. You sign in later."
+- The error "enter one bounded value" becomes "Enter one line of up to 512
+  characters, with no spaces at either end."
+- The error "discovery found no available route; use `corr account add ADDRESS
+  --help` for explicit advanced setup" becomes "Could not find how to connect
+  to example.com" with `Try: corr account add ana@example.com --help`.
+
 ## Optional live observations
 
 Use live testing only when the issue requires compatibility evidence and you
