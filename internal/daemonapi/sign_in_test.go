@@ -73,6 +73,10 @@ func TestSignInMethodsAreClosedTypedAndOptional(t *testing.T) {
 		t.Fatal("a session owner without the extension accepted a sign-in request")
 	}
 
+	if response := signInWireCall(t, plain, token, MethodSignInVerified, `{"account":"`+testAccountID+`"}`); response.Error == nil {
+		t.Fatal("a session owner without the extension answered a verification query")
+	}
+
 	backend := &signInFakeBackend{}
 	server := newTestServer(t, backend, token)
 	response := signInWireCall(t, server, token, MethodSignInRequest, `{"account":"`+testAccountID+`"}`)
@@ -105,6 +109,30 @@ func TestSignInMethodsAreClosedTypedAndOptional(t *testing.T) {
 	for _, caller := range backend.callers {
 		if caller != (domain.Caller{Surface: "mcp", Instance: "process-9"}) {
 			t.Fatalf("caller was not forwarded exactly: %+v", caller)
+		}
+	}
+}
+
+func (backend *signInFakeBackend) SignInVerified(
+	_ context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (SignInVerifiedResult, error) {
+	backend.callers = append(backend.callers, caller)
+	return SignInVerifiedResult{Account: account, Verified: true}, nil
+}
+
+func TestSignInVerificationIsOneBooleanPerAccount(t *testing.T) {
+	t.Parallel()
+	token := syntheticCredential("v")
+	server := newTestServer(t, &signInFakeBackend{}, token)
+	response := signInWireCall(t, server, token, MethodSignInVerified, `{"account":"`+testAccountID+`"}`)
+	if response.Error != nil || string(response.Result) != `{"account":"`+testAccountID+`","verified":true}` {
+		t.Fatalf("response = %+v %s", response.Error, response.Result)
+	}
+	for _, params := range []string{`{"account":"work"}`, `{"account":"` + testAccountID + `","extra":1}`} {
+		if response := signInWireCall(t, server, token, MethodSignInVerified, params); response.Error == nil {
+			t.Fatalf("malformed query accepted: %s", params)
 		}
 	}
 }

@@ -97,6 +97,26 @@ func (client *Client) RequestAccountSignIn(
 	return result, nil
 }
 
+// SignInVerified reports whether the account's current connection settings
+// already completed a sign-in started from the CLI.
+func (client *Client) SignInVerified(
+	ctx context.Context,
+	account domain.AccountID,
+	caller domain.Caller,
+) (bool, error) {
+	if err := account.ValidateOpaque(); err != nil {
+		return false, err
+	}
+	var result SignInVerifiedResult
+	if err := client.call(ctx, MethodSignInVerified, caller, SignInRequestInput{Account: account}, &result); err != nil {
+		return false, err
+	}
+	if result.Account != account {
+		return false, errors.New("daemon returned sign-in verification for a different account")
+	}
+	return result.Verified, nil
+}
+
 // ResolveAccountSignIn reports the person's elicitation answer for one
 // reserved approval request.
 func (client *Client) ResolveAccountSignIn(

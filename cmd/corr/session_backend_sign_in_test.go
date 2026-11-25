@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -94,6 +95,8 @@ type signInFixture struct {
 	noDisplay *atomic.Bool
 	stateDir  string
 	handle    browserHandle
+	// terminal, when set, is returned for headless (terminal relay) launches.
+	terminal browserHandle
 }
 
 type signInClock struct {
@@ -141,7 +144,7 @@ func (fixture signInFixture) restart(t *testing.T, configuration config.Config) 
 	t.Helper()
 	lifecycle, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	launches, handle := fixture.launches, fixture.handle
+	launches, handle, terminal := fixture.launches, fixture.handle, fixture.terminal
 	backend := &sessionBackend{
 		app: &runtime{
 			stderr: io.Discard,
@@ -149,6 +152,9 @@ func (fixture signInFixture) restart(t *testing.T, configuration config.Config) 
 				launches.mu.Lock()
 				defer launches.mu.Unlock()
 				launches.options = append(launches.options, options)
+				if options.Headless && terminal != nil {
+					return terminal, nil
+				}
 				return handle, nil
 			},
 		},
@@ -276,7 +282,7 @@ func TestApprovedMCPSignInStartsVisibleLoginAndFinishesWithoutAnotherCall(t *tes
 
 	approval := fixture.approval(t)
 	if approval.Alias != "work" || len(approval.Routes) != 2 ||
-		approval.Routes[0] != (application.AccountSignInRoute{
+		!reflect.DeepEqual(approval.Routes[0], application.AccountSignInRoute{
 			Service: "mail", Provider: domain.ProviderMicrosoftOWA,
 			Kind: application.AccountSignInDedicatedBrowser, Host: "outlook.cloud.microsoft",
 		}) {
@@ -575,7 +581,9 @@ func TestMCPCallerCannotStartSignInThroughAnyOtherPath(t *testing.T) {
 	}
 }
 
-func withOutlookOrigin(configuration config.Config, alias, origin string) config.Config {
+// withOutlookOrigin points the "work" account's Outlook Web routes at origin.
+func withOutlookOrigin(configuration config.Config, origin string) config.Config {
+	const alias = "work"
 	account := configuration.Accounts[alias]
 	mail, calendar := *account.Mail, *account.Calendar
 	mail.OutlookWeb = &config.OutlookWebRoute{Origin: origin}
@@ -615,9 +623,12 @@ func TestMCPSignInRequiresACLISignInWithTheCurrentRoutes(t *testing.T) {
 	}
 	original := fixture.backend.configuration
 	restarted := fixture.restart(t, cloneSignInConfig(original))
-	if approval := restarted.approval(t); approval.Routes[0].Host != "outlook.cloud.microsoft" {
+	approval := restarted.approval(t)
+	if approval.Routes[0].Host != "outlook.cloud.microsoft" {
 		t.Fatalf("approval = %+v", approval)
 	}
+	// Close the prompt without a cool-down so the restarts below start clean.
+	restarted.resolve(t, approval.Ticket, application.AccountSignInDecisionElicitationUnsupported)
 	info, err := os.Stat(filepath.Join(fixture.stateDir, signInVerifiedFile))
 	if err != nil || info.Mode().Perm() != 0o600 {
 		t.Fatalf("verification record = %v, %v", info, err)
@@ -628,7 +639,7 @@ func TestMCPSignInRequiresACLISignInWithTheCurrentRoutes(t *testing.T) {
 
 	changes := map[string]func(config.Config) config.Config{
 		"origin": func(configuration config.Config) config.Config {
-			return withOutlookOrigin(configuration, "work", "https://outlook.office.com")
+			return withOutlookOrigin(configuration, "https://outlook.office.com")
 		},
 		"provider": func(configuration config.Config) config.Config {
 			account := configuration.Accounts["work"]
@@ -671,9 +682,11 @@ func TestMCPSignInChangedOAuthClientRequiresCLISignInAgain(t *testing.T) {
 		Kind: application.AccountSignInProviderAuthorization, Host: "accounts.google.com",
 		ClientID: "synthetic-public-client-google-work",
 	}
-	if approval.Address != "Alice.Example@Example.com" || len(approval.Routes) != 2 || approval.Routes[1] != want {
+	if approval.Address != "Alice.Example@Example.com" || len(approval.Routes) != 2 || !reflect.DeepEqual(approval.Routes[1], want) {
 		t.Fatalf("approval = %+v", approval)
 	}
+	// Close the prompt without a cool-down so the restart below starts clean.
+	fixture.resolve(t, approval.Ticket, application.AccountSignInDecisionElicitationUnsupported)
 
 	changed := cloneSignInConfig(configuration)
 	account = changed.Accounts["work"]
@@ -698,7 +711,7 @@ func TestMCPLookAlikeAccountChainNeverPrompts(t *testing.T) {
 	lookAlike := configuration.Accounts["work"]
 	lookAlike.ID = "acc_0000000000000000000000000000000b"
 	configuration.Accounts["work"] = lookAlike
-	configuration = withOutlookOrigin(configuration, "work", "https://outlook-office.example")
+	configuration = withOutlookOrigin(configuration, "https://outlook-office.example")
 
 	attacked := fixture.restart(t, configuration)
 	if attacked.account == verifiedID {
@@ -731,7 +744,7 @@ func TestMCPLookAlikeAccountChainNeverPrompts(t *testing.T) {
 func TestMCPSignInRefusesUndisplayableDestinations(t *testing.T) {
 	for name, change := range map[string]func(config.Config) config.Config{
 		"cyrillic origin": func(configuration config.Config) config.Config {
-			return withOutlookOrigin(configuration, "work", "https://outlооk.example")
+			return withOutlookOrigin(configuration, "https://outlооk.example")
 		},
 		"unicode address": func(configuration config.Config) config.Config {
 			account := configuration.Accounts["work"]
@@ -849,5 +862,162 @@ func TestCLIDoesNotWaitSilentlyBehindAnMCPSignIn(t *testing.T) {
 	fixture.waitUntil(t, func() bool { return slices.Contains(fixture.audit.reasons(), "sign_in_cancelled") })
 	if _, err := fixture.backend.Logout(ctx, home.ID, signInCLICaller); err != nil {
 		t.Fatalf("logout after cancellation error = %v", err)
+	}
+}
+
+func TestMCPSignInPromptOpenAcrossRestartCoolsDown(t *testing.T) {
+	fixture := newSignInFixture(t, &gatedBrowserHandle{release: make(chan struct{})}, time.Minute)
+	approval := fixture.approval(t)
+	// A self-committed settings change restarts the daemon while the prompt
+	// is open; the restarted daemon cannot match the answer to a ticket.
+	restarted := fixture.restart(t, cloneSignInConfig(fixture.backend.configuration))
+	result := restarted.request(t, signInMCPCaller).Result
+	if result == nil || result.Reason != application.AccountSignInReasonRecentlyUnfinished {
+		t.Fatalf("request after a restart with an open prompt = %+v", result)
+	}
+	// The stale answer is refused and keeps the account cooled down.
+	if _, err := restarted.backend.ResolveAccountSignIn(t.Context(), application.AccountSignInResolution{
+		Account: restarted.account, Ticket: approval.Ticket, Decision: application.AccountSignInDecisionDeclinedByUser,
+	}, signInMCPCaller); !errors.Is(err, errInvalidSignInApproval) {
+		t.Fatalf("stale resolution error = %v", err)
+	}
+	if again := restarted.request(t, signInMCPCaller).Result; again == nil ||
+		again.Reason != application.AccountSignInReasonRecentlyDeclined {
+		t.Fatalf("request after a stale decline = %+v", again)
+	}
+	// The open prompt is not carried into a third start.
+	restarted.clock.advance(application.AccountSignInCooldown)
+	if third := restarted.restart(t, cloneSignInConfig(fixture.backend.configuration)).request(t, signInMCPCaller); third.Approval == nil {
+		t.Fatalf("request after the cool-down = %+v", third.Result)
+	}
+}
+
+func TestMCPSignInStaleRefusalCoolsDownEvenWithoutAPendingRecord(t *testing.T) {
+	ticket := "sit1_" + strings.Repeat("D", 43)
+	for _, test := range []struct {
+		decision application.AccountSignInDecision
+		reason   application.AccountSignInReason
+	}{
+		{application.AccountSignInDecisionDeclinedByUser, application.AccountSignInReasonRecentlyDeclined},
+		{application.AccountSignInDecisionCancelledByUser, application.AccountSignInReasonRecentlyDeclined},
+		{application.AccountSignInDecisionElicitationFailed, application.AccountSignInReasonRecentlyUnfinished},
+		{application.AccountSignInDecisionApprovedByUser, ""},
+		{application.AccountSignInDecisionElicitationUnsupported, ""},
+	} {
+		t.Run(string(test.decision), func(t *testing.T) {
+			fixture := newSignInFixture(t, &gatedBrowserHandle{release: make(chan struct{})}, time.Minute)
+			if _, err := fixture.backend.ResolveAccountSignIn(t.Context(), application.AccountSignInResolution{
+				Account: fixture.account, Ticket: ticket, Decision: test.decision,
+			}, signInMCPCaller); !errors.Is(err, errInvalidSignInApproval) {
+				t.Fatalf("stale resolution error = %v", err)
+			}
+			next := fixture.request(t, signInMCPCaller)
+			if test.reason == "" {
+				if next.Approval == nil {
+					t.Fatalf("a stale %s imposed a cool-down: %+v", test.decision, next.Result)
+				}
+			} else if next.Result == nil || next.Result.Reason != test.reason {
+				t.Fatalf("request after a stale %s = %+v", test.decision, next.Result)
+			}
+			if fixture.launches.count() != 0 {
+				t.Fatal("a stale resolution opened a browser")
+			}
+		})
+	}
+}
+
+func TestMCPSignInCooldownWriteFailureFailsClosedAfterRestart(t *testing.T) {
+	fixture := newSignInFixture(t, &gatedBrowserHandle{release: make(chan struct{})}, time.Minute)
+	approval := fixture.approval(t)
+	// Make cooldowns.json impossible to replace: a directory occupies it.
+	blocker := filepath.Join(fixture.stateDir, signInCooldownFile)
+	if err := os.Remove(blocker); err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(blocker, "blocked"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	fixture.resolve(t, approval.Ticket, application.AccountSignInDecisionDeclinedByUser)
+	if !slices.Contains(fixture.audit.reasons(), "cool_down_state_unwritable") {
+		t.Fatalf("write failure was not audited: %v", fixture.audit.reasons())
+	}
+	if _, err := os.Stat(filepath.Join(fixture.stateDir, signInFailureMarker)); err != nil {
+		t.Fatalf("failure marker = %v", err)
+	}
+	restarted := fixture.restart(t, cloneSignInConfig(fixture.backend.configuration))
+	if result := restarted.request(t, signInMCPCaller).Result; result == nil ||
+		result.Reason != application.AccountSignInReasonStateUnavailable {
+		t.Fatalf("request after restart with a failed write = %+v", result)
+	}
+	// Once the file can be written again, a later start trusts it.
+	if err := os.RemoveAll(blocker); err != nil {
+		t.Fatal(err)
+	}
+	restarted.clock.advance(application.AccountSignInCooldown)
+	recovered := restarted.restart(t, cloneSignInConfig(fixture.backend.configuration))
+	recovered.clock.advance(application.AccountSignInCooldown)
+	recovered = recovered.restart(t, cloneSignInConfig(fixture.backend.configuration))
+	if result := recovered.request(t, signInMCPCaller); result.Approval == nil {
+		t.Fatalf("request after recovery = %+v", result.Result)
+	}
+	if _, err := os.Stat(filepath.Join(fixture.stateDir, signInFailureMarker)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("failure marker after recovery = %v", err)
+	}
+}
+
+func TestCLIInteractionForAnotherAccountContinuesBehindAnMCPSignIn(t *testing.T) {
+	terminal := &fakeTerminalBrowser{}
+	fixture := newUnverifiedSignInFixture(t, &gatedBrowserHandle{release: make(chan struct{})}, time.Minute)
+	fixture.terminal = terminal
+	configuration := cloneSignInConfig(fixture.backend.configuration)
+	home := configuration.Accounts["work"]
+	home.ID = "acc_0000000000000000000000000000000c"
+	configuration.Accounts["home"] = home
+	fixture = fixture.restart(t, configuration)
+	fixture.verify()
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	started, err := fixture.backend.TerminalLogin(ctx, daemonapi.TerminalLoginInput{Account: home.ID}, signInCLICaller)
+	if err != nil || started.SessionID == "" {
+		t.Fatalf("terminal start = %+v, %v", started, err)
+	}
+	approval := fixture.approval(t)
+	fixture.resolve(t, approval.Ticket, application.AccountSignInDecisionApprovedByUser)
+	fixture.waitUntil(t, func() bool { return fixture.launches.count() == 2 })
+
+	poll, err := fixture.backend.TerminalLogin(ctx, daemonapi.TerminalLoginInput{
+		Account: home.ID, SessionID: started.SessionID, Action: &daemonapi.TerminalLoginAction{Type: "refresh"},
+	}, signInCLICaller)
+	if err != nil || poll.Status != "pending" {
+		t.Fatalf("polling behind an MCP sign-in = %+v, %v", poll, err)
+	}
+	cancelled, err := fixture.backend.TerminalLogin(ctx, daemonapi.TerminalLoginInput{
+		Account: home.ID, SessionID: started.SessionID, Action: &daemonapi.TerminalLoginAction{Type: "cancel"},
+	}, signInCLICaller)
+	if err != nil || cancelled.Status != "cancelled" || !terminal.closed {
+		t.Fatalf("cancelling behind an MCP sign-in = %+v, %v", cancelled, err)
+	}
+	if _, err := fixture.backend.TerminalLogin(ctx, daemonapi.TerminalLoginInput{Account: home.ID}, signInCLICaller); err == nil ||
+		!strings.Contains(err.Error(), `account "work"`) {
+		t.Fatalf("a new start behind an MCP sign-in = %v", err)
+	}
+}
+
+func TestSignInVerificationQueryIsCLIOnly(t *testing.T) {
+	fixture := newUnverifiedSignInFixture(t, &gatedBrowserHandle{release: make(chan struct{})}, time.Minute)
+	result, err := fixture.backend.SignInVerified(t.Context(), fixture.account, signInCLICaller)
+	if err != nil || result.Verified || result.Account != fixture.account {
+		t.Fatalf("unverified = %+v, %v", result, err)
+	}
+	fixture.verify()
+	if result, err := fixture.backend.SignInVerified(t.Context(), fixture.account, signInCLICaller); err != nil || !result.Verified {
+		t.Fatalf("verified = %+v, %v", result, err)
+	}
+	if _, err := fixture.backend.SignInVerified(t.Context(), fixture.account, signInMCPCaller); err == nil {
+		t.Fatal("the MCP surface read the verification record")
+	}
+	if _, err := fixture.backend.SignInVerified(t.Context(), "acc_ffffffffffffffffffffffffffffffff", signInCLICaller); err == nil {
+		t.Fatal("an unconfigured account was answered")
 	}
 }

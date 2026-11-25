@@ -87,6 +87,13 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 		return err
 	}
 	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
+	// Say where the sign-in goes before anything opens. A first sign-in with
+	// these settings asks for confirmation on a terminal; the SSH helper's
+	// standard input is the login view's channel, so it only prints.
+	canPrompt := !command.JSON && !command.WebStdio && app.interactiveInput() && app.interactiveStdout()
+	if err := reviewSignInDestination(app, client, alias, configured, canPrompt); err != nil {
+		return err
+	}
 	if command.WebStdio {
 		// The SSH helper's errors go back to the computer that ran --host.
 		return runGraphicalLogin(app, client, accountID, command.WebPort, true, time.Duration(configuration.Browser.LoginTimeout))

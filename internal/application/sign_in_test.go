@@ -1,6 +1,7 @@
 package application
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -82,5 +83,28 @@ func TestAccountSignInResultsAreCanonical(t *testing.T) {
 		if _, err := NewAccountSignInResult(test.status, test.reason, signInContractAccount, "work", test.expiresAt); err == nil {
 			t.Fatalf("%s/%s accepted", test.status, test.reason)
 		}
+	}
+}
+
+func TestCLISignInRequiredGuidanceLetsThePersonCheckThePage(t *testing.T) {
+	t.Parallel()
+	result, err := NewAccountSignInResult(
+		AccountSignInUnavailable, AccountSignInReasonCLISignInRequired, signInContractAccount, "work", nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Guidance != accountSignInCLIRequiredGuidance || result.NextAction == nil ||
+		result.NextAction.Command.Args[3] != "work" {
+		t.Fatalf("result = %+v", result)
+	}
+	for _, phrase := range []string{"shows the sign-in page", "compare that page", "Do not say the page is safe"} {
+		if !strings.Contains(result.Guidance, phrase) {
+			t.Fatalf("guidance lacks %q: %s", phrase, result.Guidance)
+		}
+	}
+	result.Guidance = accountSignInGuidance[AccountSignInUnavailable]
+	if result.Validate() == nil {
+		t.Fatal("generic guidance accepted for cli_sign_in_required")
 	}
 }

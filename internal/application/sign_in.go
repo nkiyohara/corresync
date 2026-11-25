@@ -127,6 +127,20 @@ var accountSignInGuidance = map[AccountSignInStatus]string{
 		"Wait for the person, then check account_status for this account.",
 }
 
+// accountSignInCLIRequiredGuidance replaces the generic unavailable guidance
+// when the account's settings were never signed in to from the CLI. The agent
+// must not vouch for the destination: the command shows it to the person.
+const accountSignInCLIRequiredGuidance = "This account's current connection settings have not been signed in to from the CLI, so Corresync will not offer a sign-in here. Nothing was started. " +
+	"Ask the person to run the nextAction command on the Corresync host themselves. It shows the sign-in page it will open and asks them to check it before anything opens; " +
+	"tell them to compare that page with the one they normally use. Do not say the page is safe and do not retry account_sign_in."
+
+func accountSignInGuidanceFor(status AccountSignInStatus, reason AccountSignInReason) string {
+	if reason == AccountSignInReasonCLISignInRequired {
+		return accountSignInCLIRequiredGuidance
+	}
+	return accountSignInGuidance[status]
+}
+
 // NewAccountSignInResult builds the canonical result for a status and reason.
 // ExpiresAt is required exactly for started results.
 func NewAccountSignInResult(
@@ -142,7 +156,7 @@ func NewAccountSignInResult(
 		Account:    account,
 		Alias:      alias,
 		Reason:     reason,
-		Guidance:   accountSignInGuidance[status],
+		Guidance:   accountSignInGuidanceFor(status, reason),
 		StatusTool: AccountStatusTool,
 	}
 	if expiresAt != nil {
@@ -179,7 +193,7 @@ func (result AccountSignInResult) Validate() error {
 	} else if status, known := accountSignInReasonStatus[result.Reason]; !known || status != result.Status {
 		return fmt.Errorf("account sign-in reason %q does not match status %q", result.Reason, result.Status)
 	}
-	if result.Guidance != accountSignInGuidance[result.Status] ||
+	if result.Guidance != accountSignInGuidanceFor(result.Status, result.Reason) ||
 		result.StatusTool != AccountStatusTool {
 		return errors.New("account sign-in result has non-canonical guidance")
 	}
@@ -234,6 +248,9 @@ type AccountSignInRoute struct {
 	Kind     AccountSignInRouteKind `json:"kind"`
 	Host     string                 `json:"host,omitempty"`
 	ClientID string                 `json:"clientId,omitempty"`
+	// AdditionalHosts names further servers a stored credential is sent to,
+	// such as the SMTP submission server of an IMAP/SMTP route.
+	AdditionalHosts []string `json:"additionalHosts,omitempty"`
 }
 
 func (route AccountSignInRoute) Validate() error {
@@ -251,6 +268,15 @@ func (route AccountSignInRoute) Validate() error {
 	}
 	if route.Host != "" && !AccountSignInHostDisplayable(route.Host) {
 		return errors.New("account sign-in host cannot be displayed safely")
+	}
+	if len(route.AdditionalHosts) > 2 ||
+		len(route.AdditionalHosts) > 0 && route.Kind != AccountSignInStoredCredential {
+		return errors.New("account sign-in route has unexpected additional hosts")
+	}
+	for _, host := range route.AdditionalHosts {
+		if !AccountSignInHostDisplayable(host) {
+			return errors.New("account sign-in host cannot be displayed safely")
+		}
 	}
 	if route.ClientID != "" && (route.Kind != AccountSignInProviderAuthorization ||
 		!accountSignInClientIDPattern.MatchString(route.ClientID)) {

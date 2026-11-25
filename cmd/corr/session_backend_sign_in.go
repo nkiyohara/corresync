@@ -12,6 +12,7 @@ import (
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/browser"
+	"github.com/nkiyohara/corresync/internal/daemonapi"
 	"github.com/nkiyohara/corresync/internal/domain"
 	"github.com/nkiyohara/corresync/internal/paths"
 )
@@ -123,13 +124,21 @@ func (backend *sessionBackend) initSignInState() {
 func (backend *sessionBackend) loadSignInStateLocked() {
 	coordinator := backend.signIn
 	now := coordinator.now()
-	cooldowns, err := coordinator.files.loadCooldowns(now)
+	loaded, err := coordinator.files.loadCooldowns(now)
+	coordinator.cooldowns = loaded.cooldowns
+	coordinator.stateFailedUntil = loaded.allUntil
 	if err != nil {
 		coordinator.stateFailedUntil = now.Add(application.AccountSignInCooldown)
 		backend.recordSignInStateEvent("cool_down_state_unreadable")
-		cooldowns = make(map[domain.AccountID]signInCooldown)
 	}
-	coordinator.cooldowns = cooldowns
+	// A prompt that was still open when the previous daemon stopped counts as
+	// not accepted: its answer can no longer be matched to a ticket.
+	for _, account := range loaded.pending {
+		coordinator.cooldowns[account] = signInCooldown{until: now.Add(application.AccountSignInCooldown)}
+	}
+	if err != nil || len(loaded.pending) > 0 {
+		backend.persistSignInCooldownsLocked()
+	}
 	verified, err := coordinator.files.loadVerified()
 	if err != nil {
 		backend.recordSignInStateEvent("verification_state_unreadable")
@@ -173,11 +182,23 @@ func (backend *sessionBackend) recordSignInStateEvent(reason string) {
 // persists it so a daemon restart cannot clear it.
 func (backend *sessionBackend) setSignInCooldownLocked(account domain.AccountID, declined bool) {
 	coordinator := backend.signInsLocked()
-	now := coordinator.now()
 	coordinator.cooldowns[account] = signInCooldown{
-		until: now.Add(application.AccountSignInCooldown), declined: declined,
+		until: coordinator.now().Add(application.AccountSignInCooldown), declined: declined,
 	}
-	if err := coordinator.files.saveCooldowns(coordinator.cooldowns, now); err != nil {
+	backend.persistSignInCooldownsLocked()
+}
+
+// persistSignInCooldownsLocked writes cool-downs, open prompts, and any
+// all-account cool-down. A failed write cools down every account now and,
+// through the failure marker, after the next start too.
+func (backend *sessionBackend) persistSignInCooldownsLocked() {
+	coordinator := backend.signInsLocked()
+	now := coordinator.now()
+	pending := make(map[domain.AccountID]time.Time, len(coordinator.approvals))
+	for account, approval := range coordinator.approvals {
+		pending[account] = approval.expiresAt
+	}
+	if err := coordinator.files.saveCooldowns(coordinator.cooldowns, pending, coordinator.stateFailedUntil, now); err != nil {
 		coordinator.stateFailedUntil = now.Add(application.AccountSignInCooldown)
 		backend.recordSignInStateEvent("cool_down_state_unwritable")
 	}
@@ -233,6 +254,61 @@ func (backend *sessionBackend) errBehindMCPSignIn(action string) error {
 		)
 	}
 	return nil
+}
+
+// SignInVerified answers the CLI's question whether the account's current
+// connection settings completed a CLI-started sign-in before. Only the CLI
+// surface may ask; MCP learns the same fact only as cli_sign_in_required.
+func (backend *sessionBackend) SignInVerified(
+	_ context.Context,
+	accountID domain.AccountID,
+	caller domain.Caller,
+) (daemonapi.SignInVerifiedResult, error) {
+	if err := caller.Validate(); err != nil {
+		return daemonapi.SignInVerifiedResult{}, err
+	}
+	if caller.Surface != "cli" {
+		return daemonapi.SignInVerifiedResult{}, errors.New("sign-in verification is available only to the local CLI")
+	}
+	if err := accountID.ValidateOpaque(); err != nil {
+		return daemonapi.SignInVerifiedResult{}, err
+	}
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	if backend.closed {
+		return daemonapi.SignInVerifiedResult{}, errors.New("session backend is closed")
+	}
+	if _, _, exists := backend.configuration.AccountByID(accountID); !exists {
+		return daemonapi.SignInVerifiedResult{}, fmt.Errorf("account %q is not configured", accountID)
+	}
+	return daemonapi.SignInVerifiedResult{Account: accountID, Verified: backend.cliVerifiedLocked(accountID)}, nil
+}
+
+// mcpSignInRunning reports whether any MCP-started sign-in is running.
+func (backend *sessionBackend) mcpSignInRunning() bool {
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	return backend.signIn != nil && len(backend.signIn.mcpRuns) > 0
+}
+
+// lockActivationForCLI acquires activationMu for a CLI sign-in or logout. It
+// never waits behind an MCP-started sign-in: while one holds or is about to
+// take the lock, it returns errBehindMCPSignIn instead. Waiting behind another
+// CLI operation keeps its old behaviour.
+func (backend *sessionBackend) lockActivationForCLI(ctx context.Context, action string) error {
+	for {
+		if backend.activationMu.TryLock() {
+			return nil
+		}
+		if err := backend.errBehindMCPSignIn(action); err != nil {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
 }
 
 // cancelMCPSignIn stops a running MCP-started sign-in for one account and
@@ -447,6 +523,7 @@ func (backend *sessionBackend) RequestAccountSignIn(
 	coordinator.approvals[accountID] = signInApproval{
 		ticket: ticket, caller: caller, expiresAt: approval.ExpiresAt,
 	}
+	backend.persistSignInCooldownsLocked()
 	backend.mu.Unlock()
 
 	events := append(
@@ -468,6 +545,7 @@ func (backend *sessionBackend) RequestAccountSignIn(
 		backend.mu.Lock()
 		if current, exists := coordinator.approvals[accountID]; exists && current.ticket == ticket {
 			delete(coordinator.approvals, accountID)
+			backend.persistSignInCooldownsLocked()
 		}
 		backend.mu.Unlock()
 		return application.AccountSignInRequest{}, err
@@ -537,10 +615,28 @@ func (backend *sessionBackend) ResolveAccountSignIn(
 	approval, exists := coordinator.approvals[accountID]
 	if !exists || approval.caller != caller ||
 		subtle.ConstantTimeCompare([]byte(approval.ticket), []byte(resolution.Ticket)) != 1 {
+		// The prompt may have been shown by a previous daemon (a restart
+		// forgets tickets). Its refusal or failure must still cool down.
+		var events []signInAuditEvent
+		if _, _, configured := backend.configuration.AccountByID(accountID); configured {
+			switch resolution.Decision {
+			case application.AccountSignInDecisionDeclinedByUser, application.AccountSignInDecisionCancelledByUser:
+				backend.setSignInCooldownLocked(accountID, true)
+				events = append(events, signInDeniedEvent("stale_prompt_refused"))
+			case application.AccountSignInDecisionElicitationFailed:
+				backend.setSignInCooldownLocked(accountID, false)
+				events = append(events, signInDeniedEvent("stale_prompt_failed"))
+			case application.AccountSignInDecisionApprovedByUser, application.AccountSignInDecisionElicitationUnsupported:
+			}
+		}
 		backend.mu.Unlock()
+		if len(events) > 0 {
+			_ = backend.recordSignInAudit(ctx, recorder, accountID, caller, events...)
+		}
 		return application.AccountSignInResult{}, errInvalidSignInApproval
 	}
 	delete(coordinator.approvals, accountID)
+	backend.persistSignInCooldownsLocked()
 	alias, configured, configuredExists := backend.configuration.AccountByID(accountID)
 	if !configuredExists {
 		backend.mu.Unlock()
@@ -671,7 +767,9 @@ func (backend *sessionBackend) runApprovedSignIn(
 	defer backend.active.Done()
 	defer close(run.done)
 	defer run.cancel()
-	_, err := backend.activateAccount(ctx, accountID)
+	backend.activationMu.Lock()
+	_, err := backend.activateAccountHeld(ctx, accountID)
+	backend.activationMu.Unlock()
 
 	backend.mu.Lock()
 	backend.endInteractiveLoginLocked(accountID)

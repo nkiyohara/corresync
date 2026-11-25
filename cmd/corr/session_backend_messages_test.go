@@ -20,7 +20,7 @@ func TestMessagingOnlyAccountFailsBeforeAuthentication(t *testing.T) {
 		accounts:      make(map[domain.AccountID]sessionAccount),
 	}
 
-	if _, err := backend.activateAccount(t.Context(), dormantMessagingAccountID); !errors.Is(err, rollout.ErrMessagingPending) {
+	if err := backend.activateAccount(t.Context(), dormantMessagingAccountID); !errors.Is(err, rollout.ErrMessagingPending) {
 		t.Fatalf("activateAccount() error = %v, want messaging release gate", err)
 	}
 	if len(backend.accounts) != 0 {

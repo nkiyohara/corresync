@@ -972,9 +972,6 @@ func (backend *sessionBackend) Login(
 			"authentication can only be started by an explicit local CLI command",
 		)
 	}
-	if err := backend.errBehindMCPSignIn("this sign-in"); err != nil {
-		return daemonapi.LoginResult{}, err
-	}
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
@@ -986,7 +983,11 @@ func (backend *sessionBackend) Login(
 	defer backend.active.Done()
 	defer backend.endInteractiveLogin(accountID)
 
-	account, err := backend.activateAccount(ctx, accountID)
+	if err := backend.lockActivationForCLI(ctx, "this sign-in"); err != nil {
+		return daemonapi.LoginResult{}, err
+	}
+	account, err := backend.activateAccountHeld(ctx, accountID)
+	backend.activationMu.Unlock()
 	if err != nil {
 		return daemonapi.LoginResult{}, err
 	}
@@ -1117,11 +1118,9 @@ func (backend *sessionBackend) LogoutWithOptions(ctx context.Context, input daem
 	if _, err := backend.cancelMCPSignIn(ctx, accountID); err != nil {
 		return daemonapi.LogoutResult{}, err
 	}
-	if err := backend.errBehindMCPSignIn("this logout"); err != nil {
+	if err := backend.lockActivationForCLI(ctx, "this logout"); err != nil {
 		return daemonapi.LogoutResult{}, err
 	}
-
-	backend.activationMu.Lock()
 	defer backend.activationMu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return daemonapi.LogoutResult{}, err
@@ -1278,9 +1277,6 @@ func (backend *sessionBackend) TerminalLogin(
 	if err := ctx.Err(); err != nil {
 		return daemonapi.TerminalLoginResult{}, err
 	}
-	if err := backend.errBehindMCPSignIn("this sign-in"); err != nil {
-		return daemonapi.TerminalLoginResult{}, err
-	}
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
@@ -1289,8 +1285,20 @@ func (backend *sessionBackend) TerminalLogin(
 	backend.active.Add(1)
 	backend.mu.Unlock()
 	defer backend.active.Done()
-	backend.activationMu.Lock()
-	defer backend.activationMu.Unlock()
+	// Polling, acting on, or cancelling an interaction that is already running
+	// continues while an MCP-started sign-in for another account holds the
+	// activation lock; that sign-in cannot be for this account, which has an
+	// interaction pending. A new start never waits silently behind it.
+	locked := backend.activationMu.TryLock()
+	if !locked && (input.SessionID == "" || !backend.mcpSignInRunning()) {
+		if err := backend.lockActivationForCLI(ctx, "this sign-in"); err != nil {
+			return daemonapi.TerminalLoginResult{}, err
+		}
+		locked = true
+	}
+	if locked {
+		defer backend.activationMu.Unlock()
+	}
 	if err := ctx.Err(); err != nil {
 		return daemonapi.TerminalLoginResult{}, err
 	}
@@ -3294,12 +3302,12 @@ func finishSessionCall[T any](
 	return result, backend.finishServiceUse(accountID, account, callErr)
 }
 
-func (backend *sessionBackend) activateAccount(
+// activateAccountHeld activates one account's provider routes. The caller
+// holds activationMu.
+func (backend *sessionBackend) activateAccountHeld(
 	ctx context.Context,
 	accountID domain.AccountID,
 ) (sessionAccount, error) {
-	backend.activationMu.Lock()
-	defer backend.activationMu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return sessionAccount{}, err
 	}

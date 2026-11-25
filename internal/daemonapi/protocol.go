@@ -39,6 +39,7 @@ const (
 	MethodTerminalLogin        Method = "login.terminal"
 	MethodSignInRequest        Method = "login.mcp.request"
 	MethodSignInResolve        Method = "login.mcp.resolve"
+	MethodSignInVerified       Method = "login.verified"
 	MethodMailFolders          Method = "mail.folders.list"
 	MethodMailList             Method = "mail.list"
 	MethodMailSearch           Method = "mail.search"
@@ -462,6 +463,19 @@ type SignInBackend interface {
 	ResolveAccountSignIn(context.Context, application.AccountSignInResolution, domain.Caller) (application.AccountSignInResult, error)
 }
 
+// SignInVerificationBackend answers, for the CLI only, whether one account's
+// current connection settings already completed a sign-in started from the
+// CLI. It exposes one boolean and is refused for every other caller surface.
+type SignInVerificationBackend interface {
+	SignInVerified(context.Context, domain.AccountID, domain.Caller) (SignInVerifiedResult, error)
+}
+
+// SignInVerifiedResult is the answer to MethodSignInVerified.
+type SignInVerifiedResult struct {
+	Account  domain.AccountID `json:"account"`
+	Verified bool             `json:"verified"`
+}
+
 // SignInRequestInput selects one configured account for an approval request.
 type SignInRequestInput struct {
 	Account domain.AccountID `json:"account"`
@@ -525,7 +539,7 @@ type MessagingBackend interface {
 func (method Method) valid() bool {
 	switch method {
 	case MethodStatus, MethodShutdown, MethodLogin, MethodLogout, MethodSessionStatus, MethodTerminalLogin,
-		MethodSignInRequest, MethodSignInResolve, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
+		MethodSignInRequest, MethodSignInResolve, MethodSignInVerified, MethodMailFolders, MethodMailList, MethodMailSearch, MethodMailSearchAll, MethodMailGetBody, MethodMailCommitBody,
 		MethodMailGetAttachment, MethodMailCommitAttachment,
 		MethodMailCreateDraft, MethodMailCommitDraft, MethodMailSend, MethodMailCommitSend,
 		MethodMailSendDraft, MethodMailCommitSendDraft,

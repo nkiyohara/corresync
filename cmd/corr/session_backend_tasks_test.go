@@ -29,7 +29,7 @@ func TestTaskRouteActivationFailsBeforeAuthenticationWithoutAdapter(t *testing.T
 		accounts:         make(map[domain.AccountID]sessionAccount),
 		terminalAccounts: make(map[domain.AccountID]string),
 	}
-	_, err := backend.activateAccount(t.Context(), accountID)
+	err := backend.activateAccount(t.Context(), accountID)
 	if err == nil || !strings.Contains(err.Error(), "task provider \"things\" is not available") {
 		t.Fatalf("activateAccount() error = %v", err)
 	}

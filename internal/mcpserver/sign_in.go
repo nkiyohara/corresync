@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -338,11 +339,12 @@ func signInElicitation(approval application.AccountSignInApproval) (*mcp.ElicitP
 
 // signInRouteGroup is one provider destination and the services it signs in.
 type signInRouteGroup struct {
-	provider string
-	kind     application.AccountSignInRouteKind
-	host     string
-	clientID string
-	services []string
+	provider   string
+	kind       application.AccountSignInRouteKind
+	host       string
+	clientID   string
+	additional []string
+	services   []string
 }
 
 func signInMessage(approval application.AccountSignInApproval) string {
@@ -373,7 +375,7 @@ func signInMessage(approval application.AccountSignInApproval) string {
 		case application.AccountSignInStoredCredential:
 			fmt.Fprintf(&message,
 				"\n%s (%s): Corresync will read the saved credential from your keyring; your system may ask for permission.\nServer: %s\n",
-				group.provider, services, group.host)
+				group.provider, services, strings.Join(append([]string{group.host}, group.additional...), ", "))
 		}
 	}
 	if opensPage {
@@ -393,7 +395,8 @@ func groupSignInRoutes(routes []application.AccountSignInRoute) []signInRouteGro
 		for index := range groups {
 			group := &groups[index]
 			if group.provider == provider && group.kind == route.Kind &&
-				group.host == route.Host && group.clientID == route.ClientID {
+				group.host == route.Host && group.clientID == route.ClientID &&
+				slices.Equal(group.additional, route.AdditionalHosts) {
 				group.services = append(group.services, string(route.Service))
 				matched = true
 				break
@@ -402,7 +405,8 @@ func groupSignInRoutes(routes []application.AccountSignInRoute) []signInRouteGro
 		if !matched {
 			groups = append(groups, signInRouteGroup{
 				provider: provider, kind: route.Kind, host: route.Host, clientID: route.ClientID,
-				services: []string{string(route.Service)},
+				additional: route.AdditionalHosts,
+				services:   []string{string(route.Service)},
 			})
 		}
 	}

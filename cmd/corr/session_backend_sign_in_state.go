@@ -25,6 +25,10 @@ const (
 	signInStateMaxBytes      = 1 << 20
 	signInCooldownFile       = "cooldowns.json"
 	signInVerifiedFile       = "cli-verified-routes.json"
+	// signInFailureMarker is left behind when cooldowns.json could not be
+	// written, so the next daemon start fails closed instead of trusting an
+	// out-of-date file.
+	signInFailureMarker = "cooldowns.failed"
 )
 
 var (
@@ -39,10 +43,23 @@ type signInStateFiles struct {
 	dir string
 }
 
-// signInCooldownDocument is cooldowns.json: account ID -> end of cool-down.
+// signInCooldownDocument is cooldowns.json: account ID -> end of cool-down,
+// the accounts that had an approval prompt open (with its expiry), and an
+// optional cool-down for every account after a state failure.
 type signInCooldownDocument struct {
 	Version   int                                       `json:"version"`
 	Cooldowns map[domain.AccountID]signInCooldownRecord `json:"cooldowns"`
+	Pending   map[domain.AccountID]time.Time            `json:"pending,omitempty"`
+	AllUntil  *time.Time                                `json:"allUntil,omitempty"`
+}
+
+// signInCooldownState is the loaded content of cooldowns.json.
+type signInCooldownState struct {
+	cooldowns map[domain.AccountID]signInCooldown
+	// pending lists accounts whose approval prompt was still open when the
+	// previous daemon stopped.
+	pending  []domain.AccountID
+	allUntil time.Time
 }
 
 type signInCooldownRecord struct {
@@ -132,31 +149,53 @@ func (files signInStateFiles) write(name string, value any) error {
 	return os.Rename(temporaryPath, path)
 }
 
-func (files signInStateFiles) loadCooldowns(now time.Time) (map[domain.AccountID]signInCooldown, error) {
+func (files signInStateFiles) loadCooldowns(now time.Time) (signInCooldownState, error) {
+	state := signInCooldownState{cooldowns: make(map[domain.AccountID]signInCooldown)}
+	marker, err := files.path(signInFailureMarker)
+	if err != nil {
+		return state, err
+	}
+	if _, err := os.Stat(marker); err == nil {
+		return state, errors.New("a previous sign-in cool-down write failed")
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return state, err
+	}
 	var document signInCooldownDocument
 	exists, err := files.read(signInCooldownFile, &document)
-	if err != nil {
-		return nil, err
-	}
-	cooldowns := make(map[domain.AccountID]signInCooldown)
-	if !exists {
-		return cooldowns, nil
+	if err != nil || !exists {
+		return state, err
 	}
 	if document.Version != signInStateFormatVersion {
-		return nil, errors.New("unsupported sign-in cool-down state version")
+		return state, errors.New("unsupported sign-in cool-down state version")
 	}
 	for account, record := range document.Cooldowns {
 		if err := account.ValidateOpaque(); err != nil {
-			return nil, err
+			return state, err
 		}
 		if now.Before(record.Until) {
-			cooldowns[account] = signInCooldown{until: record.Until, declined: record.Declined}
+			state.cooldowns[account] = signInCooldown{until: record.Until, declined: record.Declined}
 		}
 	}
-	return cooldowns, nil
+	for account := range document.Pending {
+		if err := account.ValidateOpaque(); err != nil {
+			return state, err
+		}
+		state.pending = append(state.pending, account)
+	}
+	if document.AllUntil != nil && now.Before(*document.AllUntil) {
+		state.allUntil = *document.AllUntil
+	}
+	return state, nil
 }
 
-func (files signInStateFiles) saveCooldowns(cooldowns map[domain.AccountID]signInCooldown, now time.Time) error {
+// saveCooldowns writes cooldowns.json. On failure it leaves the failure
+// marker so the next start fails closed; on success it removes the marker.
+func (files signInStateFiles) saveCooldowns(
+	cooldowns map[domain.AccountID]signInCooldown,
+	pending map[domain.AccountID]time.Time,
+	allUntil time.Time,
+	now time.Time,
+) error {
 	document := signInCooldownDocument{
 		Version:   signInStateFormatVersion,
 		Cooldowns: make(map[domain.AccountID]signInCooldownRecord, len(cooldowns)),
@@ -166,7 +205,30 @@ func (files signInStateFiles) saveCooldowns(cooldowns map[domain.AccountID]signI
 			document.Cooldowns[account] = signInCooldownRecord{Until: cooldown.until.UTC(), Declined: cooldown.declined}
 		}
 	}
-	return files.write(signInCooldownFile, document)
+	if len(pending) > 0 {
+		document.Pending = make(map[domain.AccountID]time.Time, len(pending))
+		for account, expiresAt := range pending {
+			document.Pending[account] = expiresAt.UTC()
+		}
+	}
+	if now.Before(allUntil) {
+		value := allUntil.UTC()
+		document.AllUntil = &value
+	}
+	marker, err := files.path(signInFailureMarker)
+	if err != nil {
+		return err
+	}
+	if err := files.write(signInCooldownFile, document); err != nil {
+		if markerErr := os.WriteFile(marker, nil, 0o600); markerErr != nil {
+			return errors.Join(err, markerErr)
+		}
+		return err
+	}
+	if err := os.Remove(marker); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 func (files signInStateFiles) loadVerified() (map[domain.AccountID]string, error) {
@@ -220,16 +282,28 @@ func signInRouteDigest(account config.Account) (string, error) {
 	return hex.EncodeToString(digest[:]), nil
 }
 
-func signInHost(raw string) (string, error) {
+func signInHost(raw string, withPort bool) (string, error) {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Host == "" || parsed.User != nil {
 		return "", errSignInDestinationUndisplayed
 	}
 	host := strings.ToLower(parsed.Host)
+	if withPort && parsed.Port() == "" {
+		switch parsed.Scheme {
+		case "https":
+			host += ":443"
+		case "http":
+			host += ":80"
+		}
+	}
 	if !application.AccountSignInHostDisplayable(host) {
 		return "", errSignInDestinationUndisplayed
 	}
 	return host, nil
+}
+
+func tlsEndpointHost(endpoint config.TLSEndpoint) string {
+	return fmt.Sprintf("tls://%s:%d", endpoint.Host, endpoint.Port)
 }
 
 func oauthServiceCovered(services oauthlocal.Services, service application.AuthenticationService) bool {
@@ -290,7 +364,12 @@ func signInDestinations(configured config.Account) ([]application.AccountSignInR
 		case route.Provider == domain.ProviderJMAP && active.Mail != nil && active.Mail.JMAP != nil:
 			hostSource = active.Mail.JMAP.SessionURL
 		case route.Provider == domain.ProviderIMAPSMTP && active.Mail != nil && active.Mail.IMAPSMTP != nil:
-			hostSource = "imaps://" + active.Mail.IMAPSMTP.IMAP.Host
+			hostSource = tlsEndpointHost(active.Mail.IMAPSMTP.IMAP)
+			submission, err := signInHost(tlsEndpointHost(active.Mail.IMAPSMTP.SMTP), true)
+			if err != nil {
+				return nil, err
+			}
+			route.AdditionalHosts = []string{submission}
 		case route.Provider == domain.ProviderCalDAV && service == application.AuthenticationServiceCalendar &&
 			active.Calendar != nil && active.Calendar.CalDAV != nil:
 			hostSource = active.Calendar.CalDAV.Endpoint
@@ -316,7 +395,7 @@ func signInDestinations(configured config.Account) ([]application.AccountSignInR
 				return nil, errSignInRouteUnsupported
 			}
 		}
-		host, err := signInHost(hostSource)
+		host, err := signInHost(hostSource, route.Kind == application.AccountSignInStoredCredential)
 		if err != nil {
 			return nil, err
 		}

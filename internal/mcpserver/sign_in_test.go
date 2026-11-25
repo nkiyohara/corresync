@@ -558,6 +558,17 @@ func TestAccountSignInPromptNamesEachDestinationByRouteKind(t *testing.T) {
 		t.Fatalf("prompt =\n%s\nwant\n%s", elicitation.Message, want)
 	}
 
+	imap := approval
+	imap.Routes = []application.AccountSignInRoute{{
+		Service: application.AuthenticationServiceMail, Provider: domain.ProviderIMAPSMTP,
+		Kind: application.AccountSignInStoredCredential, Host: "imap.example.com:993",
+		AdditionalHosts: []string{"smtp.example.com:465"},
+	}}
+	if elicitation, err := signInElicitation(imap); err != nil ||
+		!strings.Contains(elicitation.Message, "\nServer: imap.example.com:993, smtp.example.com:465\n") {
+		t.Fatalf("IMAP prompt = %v, %v", elicitation, err)
+	}
+
 	stored := approval
 	stored.Routes = approval.Routes[:1]
 	elicitation, err = signInElicitation(stored)
