@@ -185,7 +185,9 @@ func TestPendingMessagingCommandsStayHiddenButParseable(t *testing.T) {
 }
 
 func TestUpdateDefaultsToActionAndKeepsCheckOnlySubcommand(t *testing.T) {
-	t.Parallel()
+	// The failing run records diagnostics/last-error.json; keep it out of the
+	// developer's real state directory.
+	t.Setenv("CORRESYNC_STATE_DIR", t.TempDir())
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
