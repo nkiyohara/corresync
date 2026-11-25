@@ -32,15 +32,15 @@ corr account rename work primary
 corr account remove old --approve
 ```
 
-Use `corr setup` for the resumable first-run coordinator: current-state
-preflight, optional user-local completion, the multi-account loop, multi-agent
-selection, reviewed integration setup, verification, and a Ready / Needs
-attention / Optional later summary. Use `corr settings` to open the same
+Use `corr setup` for the resumable first run: it asks for the email address
+first, adds one or more accounts, then offers tab completion and AI agent
+connections as optional one-key steps, and ends with a Ready / Needs attention
+/ Later summary and the next command. Use `corr settings` to open the same
 account registration flow alongside everyday settings. The settings
 form is organized around accounts, updates, safety, and browser login. It can
 add an account from the nested Accounts category, whose account list leads to
-service checkboxes, login modes, rename, default, and removal actions for one account.
-Its top-level Setup guide entry resumes the same complete coordinator used by
+service checkboxes, sign-in, rename, default, and removal actions for one account.
+Its top-level Setup entry resumes the same complete flow used by
 `corr setup`; it does not duplicate completion or agent-host lifecycle logic.
 Removing an account requires an explicit local-state review. Removing the
 default requires selecting its replacement first, and the only configured
@@ -51,9 +51,13 @@ safely. Direct `account` and `config` commands remain available for scripts and
 advanced configuration.
 
 Interactive `corr setup` creates an empty, secret-free configuration when
-needed, but derives every later step from authoritative local state instead of
-a completed flag. Account discovery is credential-free, chosen routes are
-previewed, and persistence happens only after confirmation. Authentication,
+needed (its path is shown once, in the final summary), but derives every later
+step from authoritative local state instead of a completed flag. Account
+discovery is credential-free, chosen routes are previewed, and persistence
+happens only after confirmation. When discovery finds no route, the wizard
+offers the manual routes `corr account add` accepts instead of stopping, and a
+route that needs a prepared OAuth client or saved password is explained, with
+its guide, before any of its questions. Authentication,
 external-credential verification, completion installation, and agent-host
 configuration remain separately visible choices. Host changes use the same
 previewed lifecycle as direct `corr integrations` commands and continue

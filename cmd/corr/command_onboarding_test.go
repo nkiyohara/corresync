@@ -41,20 +41,26 @@ type sequenceOnboardingDiscoverer struct {
 	calls        int
 }
 
-type setupInputReader struct {
-	reader io.Reader
-	before func() error
+// setupLinesReader returns one answer per Read and can run a hook just before
+// a given answer is read, to change local state between two questions.
+type setupLinesReader struct {
+	lines  []string
+	before map[int]func() error
+	next   int
 }
 
-func (reader *setupInputReader) Read(buffer []byte) (int, error) {
-	if reader.before != nil {
-		before := reader.before
-		reader.before = nil
-		if err := before(); err != nil {
+func (reader *setupLinesReader) Read(buffer []byte) (int, error) {
+	if reader.next >= len(reader.lines) {
+		return 0, io.EOF
+	}
+	if hook := reader.before[reader.next]; hook != nil {
+		if err := hook(); err != nil {
 			return 0, err
 		}
 	}
-	return reader.reader.Read(buffer)
+	read := copy(buffer, reader.lines[reader.next])
+	reader.next++
+	return read, nil
 }
 
 func (discoverer *sequenceOnboardingDiscoverer) Discover(
@@ -102,11 +108,11 @@ func TestGuidedSetupAddsReviewedOutlookAccountWithoutAuthentication(t *testing.T
 		t.Fatalf("guided account = %+v", configured)
 	}
 	for _, expected := range []string{
-		"Guided account setup",
+		"Add your email account",
 		"Review account before adding",
 		"https://outlook.example.invalid",
-		"authentication and monitoring are still off",
-		"Continue to agent setup",
+		"It is not signed in yet",
+		"Continue setup",
 	} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("guided setup output missing %q: %q", expected, stdout.String())
@@ -148,8 +154,8 @@ func TestGuidedSetupLetsOutlookServicesBeSelectedIndependently(t *testing.T) {
 	}
 	for _, expected := range []string{
 		"Services to configure",
-		"Microsoft To Do · separate, explicit Graph authorization",
-		"Teams messaging · choose Teams Web or Microsoft Graph next",
+		"Microsoft To Do (needs your own Microsoft app registration)",
+		"Teams messaging (preview; you choose Teams Web or Graph next)",
 		"Tasks            not configured",
 	} {
 		if !strings.Contains(stdout.String(), expected) {
@@ -293,11 +299,11 @@ func TestGuidedSetupResumesAtAgentSetupWithoutReaddingAnAccount(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, expected := range []string{
-		"Setup preflight",
-		"Continue setup",
+		"Accounts on this computer: work",
+		"Add another account?",
 		"Setup summary",
 		"Account work",
-		"corr auth login --account 'work'",
+		"Next: corr auth login --account work",
 	} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("resumed setup output missing %q: %q", expected, stdout.String())
@@ -351,7 +357,7 @@ func TestGuidedSetupOffersIdempotentUserLocalCompletion(t *testing.T) {
 		t,
 		path,
 		failingOnboardingDiscoverer{err: errors.New("discovery must not run")},
-		"y\n1\n",
+		"1\ny\n",
 	)
 	app.lookupEnv = func(key string) (string, bool) {
 		switch key {
@@ -383,8 +389,8 @@ func TestGuidedSetupOffersIdempotentUserLocalCompletion(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(contents) != completionScripts["bash"] ||
-		!strings.Contains(stdout.String(), "Remove that generated file to uninstall") ||
-		!strings.Contains(stdout.String(), "bash completion · installed") {
+		!strings.Contains(stdout.String(), "remove it to uninstall") ||
+		!strings.Contains(stdout.String(), "bash tab completion · installed") {
 		t.Fatalf("completion setup output = %q, contents = %q", stdout.String(), contents)
 	}
 }
@@ -400,7 +406,7 @@ func TestGuidedSetupReturnsCompletionFailureAfterLaterCancellation(t *testing.T)
 		t,
 		path,
 		failingOnboardingDiscoverer{err: errors.New("discovery must not run")},
-		"y\n",
+		"1\ny\n",
 	)
 	app.lookupEnv = func(key string) (string, bool) {
 		switch key {
@@ -416,14 +422,28 @@ func TestGuidedSetupReturnsCompletionFailureAfterLaterCancellation(t *testing.T)
 			return "", false
 		}
 	}
-	app.detectAgentHosts = func(context.Context, agenthost.Request) (agenthost.Report, error) {
-		return agenthost.Report{SchemaVersion: 1}, nil
+	codex, ok := app.agentHosts.Lookup("codex")
+	if !ok {
+		t.Fatal("default agent-host catalog has no Codex entry")
 	}
-	app.stdin = &setupInputReader{
-		reader: app.stdin,
-		before: func() error {
+	// A found agent makes setup ask one more question after the failed
+	// completion install; EOF cancels it and must not hide the failure.
+	app.detectAgentHosts = func(context.Context, agenthost.Request) (agenthost.Report, error) {
+		return agenthost.Report{SchemaVersion: 1, Hosts: []agenthost.Detection{{
+			Host: codex, Status: agenthost.StatusConfirmed,
+		}}}, nil
+	}
+	app.runIntegrationCommand = func(context.Context, io.Writer, io.Writer, string, ...string) error {
+		t.Fatal("cancelled agent step changed an agent")
+		return nil
+	}
+	// Completion is offered after the accounts, so block its directory only
+	// once that question reads its answer.
+	app.stdin = &setupLinesReader{
+		lines: []string{"1\n", "y\n"},
+		before: map[int]func() error{1: func() error {
 			return os.WriteFile(blockedDataHome, []byte("fixture"), 0o600)
-		},
+		}},
 	}
 
 	err := (&setupCommand{}).Run(app)
@@ -501,7 +521,7 @@ func TestGuidedSetupConnectsSelectedDetectedAgentThroughReviewedPlan(t *testing.
 		t,
 		path,
 		discoverer,
-		"reader@example.invalid\n0\npersonal\ny\n4\n4\n3\n0\ny\n",
+		"reader@example.invalid\n0\npersonal\ny\n4\n3\ny\n0\ny\n",
 	)
 	codex, ok := app.agentHosts.Lookup("codex")
 	if !ok {
@@ -561,7 +581,7 @@ func TestGuidedSetupConnectsSelectedDetectedAgentThroughReviewedPlan(t *testing.
 		t.Fatal("reviewed setup did not register the selected detected host")
 	}
 	for _, expected := range []string{
-		"Which agents do you use?",
+		"Which agents should use Corresync?",
 		"Planned change",
 		"done; restart the agent",
 		"Setup summary",
@@ -610,6 +630,7 @@ func TestGuidedSetupConfiguresStandardsRoutesByExternalHandles(t *testing.T) {
 		strings.Join([]string{
 			"reader@example.invalid",
 			"1",
+			"1", // the saved-password explanation: continue
 			"0",
 			"standards",
 			"1",
@@ -675,6 +696,7 @@ func TestGuidedSetupAddsICloudMailAndCalendarWithOneExternalCredential(t *testin
 		strings.Join([]string{
 			"reader@icloud.com",
 			"1",
+			"1", // the app-specific password explanation: continue
 			"0",
 			"icloud-personal",
 			"reader@icloud.com",
@@ -740,11 +762,11 @@ func TestGuidedSetupAddsICloudMailAndCalendarWithOneExternalCredential(t *testin
 		t.Fatalf("OS credential command = %q %#v", commandName, commandArguments)
 	}
 	for _, expected := range []string{
-		"iCloud Mail + Calendar",
+		"iCloud needs an app-specific password",
 		"two-factor authentication",
-		"Mail identity",
-		"Calendar identity",
-		"OS-owned store completed the prompt",
+		"Mail sign-in",
+		"Calendar sign-in",
+		"Your system saved it",
 	} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("iCloud onboarding output missing %q: %q", expected, stdout.String())
@@ -869,7 +891,7 @@ func TestGuidedSetupCancellationLeavesNoPartialAccount(t *testing.T) {
 	if len(configured.Accounts) != 0 || configured.DefaultAccount != "" {
 		t.Fatalf("cancelled setup persisted an account: %+v", configured)
 	}
-	if !strings.Contains(stdout.String(), "new empty, secret-free configuration remains") {
+	if !strings.Contains(stdout.String(), "Settings file:") {
 		t.Fatalf("cancellation output = %q", stdout.String())
 	}
 }
@@ -892,7 +914,7 @@ func TestGuidedSetupAccessibleCancellationLeavesNoPartialAccount(t *testing.T) {
 		t.Fatalf("accessible cancellation config = %+v, %v", configured, err)
 	}
 	if !strings.Contains(stdout.String(), "type :cancel to cancel") ||
-		!strings.Contains(stdout.String(), "Guided setup stopped") {
+		!strings.Contains(stdout.String(), "Setup stopped") {
 		t.Fatalf("accessible cancellation output = %q", stdout.String())
 	}
 }
@@ -984,7 +1006,7 @@ func TestGuidedSetupDiscoveryFailureLeavesOnlyTheReportedEmptyConfig(t *testing.
 	if err != nil || len(configured.Accounts) != 0 {
 		t.Fatalf("failed discovery config = %+v, %v", configured, err)
 	}
-	if !strings.Contains(stdout.String(), "Provider-neutral configuration created") {
+	if !strings.Contains(stdout.String(), "Settings were saved in a new file") {
 		t.Fatalf("failed discovery did not report the durable change: %q", stdout.String())
 	}
 }
@@ -1239,4 +1261,258 @@ func guidedSetupRuntime(
 		return nil, nil
 	}
 	return app, &stdout
+}
+
+func noAgentHosts(context.Context, agenthost.Request) (agenthost.Report, error) {
+	return agenthost.Report{SchemaVersion: 1}, nil
+}
+
+func TestGuidedSetupWithoutDiscoveredRouteOffersManualIMAP(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	discoverer := &accountDiscovererStub{}
+	app, stdout := guidedSetupRuntime(t, path, discoverer, strings.Join([]string{
+		"reader@example.invalid",
+		"1", // IMAP/SMTP, chosen by hand
+		"1", // the saved-password explanation: continue
+		"0", // services: mail only (calendar starts unselected)
+		"manual",
+		"imap.example.invalid",
+		"993",
+		"1", // implicit TLS
+		"smtp.example.invalid",
+		"587",
+		"2", // STARTTLS
+		"1", // keyring
+		"manual-mail",
+		"y", // use that saved password
+		"y", // add the account
+		"4", // sign in later
+		"3", // continue setup
+	}, "\n")+"\n")
+	app.detectAgentHosts = noAgentHosts
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configured, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configured.Accounts["manual"]
+	if account.Mail == nil || account.Mail.IMAPSMTP == nil || account.Calendar != nil {
+		t.Fatalf("manual IMAP account = %+v", account)
+	}
+	imap := account.Mail.IMAPSMTP
+	if imap.IMAP.Host != "imap.example.invalid" || imap.IMAP.Port != 993 ||
+		imap.SMTP.Host != "smtp.example.invalid" || imap.SMTP.Mode != config.TLSStartTLS ||
+		imap.Credential.Key != "manual-mail" || !imap.Credential.Consent {
+		t.Fatalf("manual IMAP route = %+v", imap)
+	}
+	for _, expected := range []string{
+		"Corresync couldn't find how to connect to example.invalid.",
+		"This server needs a saved password",
+		standardsSetupGuide,
+		"Next: corr auth login --account manual",
+	} {
+		if !strings.Contains(stdout.String(), expected) {
+			t.Fatalf("manual route output missing %q: %q", expected, stdout.String())
+		}
+	}
+}
+
+func TestManualOnboardingRoutesListEveryRouteAccountAddAccepts(t *testing.T) {
+	t.Parallel()
+	routes := manualOnboardingRoutes(application.AccountDiscoveryResult{Domain: "example.invalid"}, nil)
+	got := make([]domain.ProviderID, 0, len(routes))
+	for _, route := range routes {
+		got = append(got, route.provider)
+		plan, known := manualOnboardingRoutePlan(route.provider, "example.invalid")
+		if !known || !plan.manual || !onboardingPlanRequiresSelection(plan) {
+			t.Fatalf("manual plan for %s = %+v, known = %t", route.provider, plan, known)
+		}
+		// The wizard builds the same manual candidate `corr account add
+		// --provider` accepts; selection must still be the person's choice.
+		if _, err := selectAccountCandidate(
+			application.AccountDiscoveryResult{Address: "reader@example.invalid", Domain: "example.invalid"},
+			string(route.provider),
+			"https://manual.example.invalid",
+		); err != nil {
+			t.Fatalf("account add rejects manual %s: %v", route.provider, err)
+		}
+	}
+	want := []domain.ProviderID{
+		domain.ProviderIMAPSMTP, domain.ProviderJMAP, domain.ProviderCalDAV,
+		domain.ProviderMicrosoftOWA, domain.ProviderMicrosoftGraph, domain.ProviderGoogle,
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("manual routes = %v, want %v", got, want)
+	}
+}
+
+func TestGuidedSetupStopsCleanlyWhenNoRouteIsFound(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	app, stdout := guidedSetupRuntime(
+		t, path, &accountDiscovererStub{}, "reader@example.invalid\n7\n",
+	)
+	app.detectAgentHosts = noAgentHosts
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatalf("stopping at the manual choice = %v", err)
+	}
+	configured, err := config.Load(path)
+	if err != nil || len(configured.Accounts) != 0 {
+		t.Fatalf("stopped setup config = %+v, %v", configured, err)
+	}
+	if !strings.Contains(stdout.String(), "Stop here and come back later") ||
+		!strings.Contains(stdout.String(), "Setup stopped") ||
+		!strings.Contains(stdout.String(), "Run corr setup again") {
+		t.Fatalf("stopped setup output = %q", stdout.String())
+	}
+}
+
+func outlookConsumerDiscovery() *accountDiscovererStub {
+	return &accountDiscovererStub{observation: application.AccountDiscoveryObservation{
+		Candidates: []application.ProviderCandidate{{
+			Provider: domain.ProviderMicrosoftGraph, Confidence: 92,
+			Authentication:            application.DiscoveryExplicitOAuth,
+			RequiresExplicitSelection: true,
+			Endpoints: []application.DiscoveredEndpoint{{
+				Kind: "api", Value: "https://graph.microsoft.com/v1.0",
+			}},
+			Evidence: []application.DiscoveryEvidence{{
+				Source: "known_domain", Detail: "outlook.com",
+			}},
+		}},
+	}}
+}
+
+func TestGuidedSetupExplainsTheMicrosoftAppRegistrationBeforeAskingForIt(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	app, stdout := guidedSetupRuntime(t, path, outlookConsumerDiscovery(), strings.Join([]string{
+		"reader@outlook.com",
+		"1", // Microsoft Graph
+		"3", // stop here and come back later
+	}, "\n")+"\n")
+	app.detectAgentHosts = noAgentHosts
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configured, err := config.Load(path)
+	if err != nil || len(configured.Accounts) != 0 {
+		t.Fatalf("stopped Graph setup config = %+v, %v", configured, err)
+	}
+	output := stdout.String()
+	for _, expected := range []string{
+		"Recommended: Microsoft Graph · needs your own app registration",
+		"Microsoft Graph needs your own app registration",
+		microsoftAppRegistrationGuide,
+		"Use another way to connect",
+		"Stop here and come back later",
+	} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("Graph prerequisite output missing %q: %q", expected, output)
+		}
+	}
+	for _, unexpected := range []string{"/100", "Use Outlook Web instead"} {
+		if strings.Contains(output, unexpected) {
+			t.Fatalf("Graph prerequisite output contains %q: %q", unexpected, output)
+		}
+	}
+}
+
+func TestGuidedSetupAnotherRouteForAConsumerMicrosoftDomainLeavesOutOutlookWeb(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	app, stdout := guidedSetupRuntime(t, path, outlookConsumerDiscovery(), strings.Join([]string{
+		"reader@outlook.com",
+		"1", // Microsoft Graph
+		"2", // use another way to connect
+		"6", // stop here (Graph, IMAP, JMAP, CalDAV, Google, then stop)
+	}, "\n")+"\n")
+	app.detectAgentHosts = noAgentHosts
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	output := stdout.String()
+	if !strings.Contains(output, "IMAP/SMTP: most mail servers") ||
+		strings.Contains(output, "Outlook Web: Microsoft 365") ||
+		!strings.Contains(output, "Setup stopped") {
+		t.Fatalf("another-route output = %q", output)
+	}
+}
+
+func TestGuidedSetupOffersOutlookWebInsteadOfGraphWhenDiscovered(t *testing.T) {
+	t.Setenv("CORRESYNC_STATE_DIR", filepath.Join(t.TempDir(), "state"))
+	path := filepath.Join(t.TempDir(), "config.toml")
+	discoverer := &accountDiscovererStub{observation: application.AccountDiscoveryObservation{
+		Candidates: []application.ProviderCandidate{
+			{
+				Provider: domain.ProviderMicrosoftOWA, Confidence: 55,
+				Authentication: application.DiscoveryBrowserFirstParty,
+				Endpoints: []application.DiscoveredEndpoint{{
+					Kind: "origin", Value: "https://outlook.cloud.microsoft",
+				}},
+				Evidence: []application.DiscoveryEvidence{{Source: "mx", Detail: "mail.protection.outlook.com"}},
+			},
+			{
+				Provider: domain.ProviderMicrosoftGraph, Confidence: 50,
+				Authentication:            application.DiscoveryExplicitOAuth,
+				RequiresExplicitSelection: true,
+				Endpoints: []application.DiscoveredEndpoint{{
+					Kind: "api", Value: "https://graph.microsoft.com/v1.0",
+				}},
+				Evidence: []application.DiscoveryEvidence{{Source: "mx", Detail: "mail.protection.outlook.com"}},
+			},
+		},
+	}}
+	app, stdout := guidedSetupRuntime(t, path, discoverer, strings.Join([]string{
+		"reader@example.invalid",
+		"2", // Microsoft Graph
+		"2", // use Outlook Web instead
+		"0",
+		"work",
+		"y",
+		"4",
+		"3",
+	}, "\n")+"\n")
+	app.detectAgentHosts = noAgentHosts
+
+	if err := (&setupCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	configured, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	account := configured.Accounts["work"]
+	if account.Mail == nil || account.Mail.Provider != domain.ProviderMicrosoftOWA ||
+		account.Mail.MicrosoftGraph != nil {
+		t.Fatalf("Outlook Web instead of Graph = %+v", account)
+	}
+	if !strings.Contains(stdout.String(), "Use Outlook Web instead") {
+		t.Fatalf("Graph prerequisite did not offer Outlook Web: %q", stdout.String())
+	}
+}
+
+func TestOnboardingValidationMessagesSayWhatToType(t *testing.T) {
+	t.Parallel()
+	for _, test := range []struct {
+		err  error
+		want string
+	}{
+		{validateSettingsEmailAddress("not an address"), "That doesn't look like an email address. Example: you@example.com"},
+		{validateOnboardingOpaqueInput(" padded "), "Type one line of up to 512 characters, with no spaces at either end."},
+		{validateOnboardingHTTPSURL("http://mail.example.invalid"), "Type an https:// address"},
+		{validateOnboardingHostname("127.0.0.1"), "Type a server name such as mail.example.com"},
+		{validateOnboardingServices(nil), "Select at least one service."},
+	} {
+		if test.err == nil || !strings.HasPrefix(test.err.Error(), test.want) {
+			t.Errorf("validation message = %v, want prefix %q", test.err, test.want)
+		}
+	}
 }

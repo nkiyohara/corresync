@@ -6,32 +6,45 @@ import (
 	"github.com/nkiyohara/corresync/internal/config"
 )
 
-// setupCommand is the provider-neutral first-run path. Without an address it
-// opens the shared interactive wizard; the address form stays deterministic
-// for scripts. Both paths delegate route validation and persistence to the same
-// account use case as `account add`.
+// setupCommand is the first-run path. Without an address it opens the shared
+// interactive wizard; with an address it adds one account without prompting,
+// for scripts and AI agents. Both paths delegate route validation and
+// persistence to the same account use case as `account add`.
 type setupCommand struct {
-	Address string `arg:"" optional:"" help:"Bare email address for deterministic setup; omit in an interactive terminal for guided setup."`
-	Alias   string `help:"Local account name; defaults to the address local part."`
+	Address string `arg:"" optional:"" help:"Email address to add without questions, for scripts. Leave it out to be guided step by step."`
+	Alias   string `help:"Name for the account; defaults to the part of the address before @."`
 	Default bool   `help:"Make this the default account when others already exist."`
 	JSON    bool   `help:"Write machine-readable JSON."`
+}
+
+func (command *setupCommand) Help() string {
+	return `Without an address, setup asks for your email address, finds how to connect, and adds the account. It then offers tab completion and AI agent connections, and ends with the command that signs you in. Run it again at any time to add or repair an account.
+
+With an address, setup adds that one account without asking anything and does not sign in. Use ` + "`corr account add ADDRESS --help`" + ` to choose the connection yourself.`
 }
 
 func (command *setupCommand) Run(app *runtime) error {
 	if command.Address == "" {
 		if command.JSON {
-			return errors.New("guided setup has no JSON mode; pass an address for deterministic setup")
+			return withHint(
+				errors.New("guided setup has no JSON mode; pass an address to add one account without prompts"),
+				"corr setup you@example.com --json",
+			)
 		}
 		if command.Alias != "" || command.Default {
-			return errors.New("--alias and --default require an address in deterministic setup")
+			return withHint(
+				errors.New("--alias and --default need an email address"),
+				"corr setup you@example.com --alias work",
+			)
 		}
 		if !app.interactiveInput() || !app.interactiveStdout() {
-			return errors.New(
-				"guided setup requires an interactive terminal; use `corr setup ADDRESS` in scripts",
+			return withHint(
+				errors.New("guided setup needs an interactive terminal"),
+				"corr setup you@example.com",
 			)
 		}
 	}
-	created, err := ensureSetupConfig(app, command.JSON)
+	created, err := ensureSetupConfig(app, command.JSON || command.Address == "")
 	if err != nil {
 		return err
 	}
@@ -48,7 +61,10 @@ func (command *setupCommand) Run(app *runtime) error {
 	}).Run(app)
 }
 
-func ensureSetupConfig(app *runtime, jsonOutput bool) (bool, error) {
+// ensureSetupConfig creates an empty configuration when none exists. quiet
+// suppresses the creation notice: JSON output stays one value, and guided
+// setup names the file once, in its summary.
+func ensureSetupConfig(app *runtime, quiet bool) (bool, error) {
 	path, err := app.resolvedConfigPath()
 	if err != nil {
 		return false, err
@@ -63,12 +79,12 @@ func ensureSetupConfig(app *runtime, jsonOutput bool) (bool, error) {
 		}
 	}
 
-	if created && !jsonOutput {
+	if created && !quiet {
 		view := newConsoleView(app, app.stdout, app.interactiveStdout())
 		if _, err := view.printf(
 			"%s  %s\n   %s\n\n",
 			view.success(),
-			view.strong("Provider-neutral configuration created"),
+			view.strong("Configuration created"),
 			view.muted(path),
 		); err != nil {
 			return false, err

@@ -18,12 +18,24 @@ owner. Consequential external writes require an exact preview followed by a
 separate commit.
 .SH COMMANDS
 .TP
+.B setup
+Set up Corresync step by step: asks for an email address, finds how to connect,
+adds the account, offers tab completion and AI agent connections, and ends with
+the command that signs you in.
+.B "corr setup ADDRESS"
+adds one account without questions, for scripts.
+.TP
+.B settings
+Change accounts, updates, safety, sign-in, and feedback settings from a menu.
+.TP
 .B config
-Create, locate, show, read, update, edit, and strictly validate the secret-free
-configuration.
+Create, show, change, edit, and check the settings file. It never holds a
+password or token.
 .TP
 .B account
-Discover and manage isolated accounts and their provider routes.
+Find how to connect an address, and add, list, rename, or remove accounts.
+Nothing signs in until you run
+.BR "corr auth login" .
 .TP
 .B doctor
 Check the configuration, browser, local daemon, and update status; with
@@ -97,7 +109,8 @@ Print build and version information.
 .nf
 corr --version
 corr help auth
-corr config init
+corr setup
+corr setup reader@example.com --alias work
 corr account discover reader@example.com
 corr auth login
 corr auth status

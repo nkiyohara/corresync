@@ -29,17 +29,28 @@ corr config set policy.max_recipients 25
 corr config edit
 ```
 
-Interactive `corr setup` is the user-first coordinator. Its preflight derives
-progress from the current configuration, account/session state, shell
-completion, agent detection, and inspectable integration state. It can install
-completion at a displayed user-local path, add and authenticate several
-accounts through the shared credential-free wizard, select several agent hosts,
-and reuse the typed integration lifecycle for preview, one confirmation,
-independent apply, and verification. Re-running it skips healthy work and
-offers repairable or optional steps. `corr setup ADDRESS` keeps the
-deterministic, non-interactive account contract for scripts; it never prompts
-or authenticates. `config init` is the lower-level alternative and creates a
-valid configuration with zero accounts and no selected provider.
+Interactive `corr setup` starts with one question: the email address. It
+creates the settings file silently when needed, looks up how to connect
+without signing in, and lists the ways it found as **Recommended** and **Also
+possible**. When it finds nothing, or you pick **Something else**, it offers the
+connections you can set up by hand (IMAP/SMTP, JMAP, CalDAV, Outlook Web,
+Microsoft Graph, and Google), each with what it will ask for. A connection that
+needs something prepared first — your own Microsoft app registration, a Google
+Desktop OAuth client, or a saved password — is explained with a link to its
+guide before any question, with **Use another way to connect** and **Stop here
+and come back later**. When discovery found Outlook Web for the same address,
+the Microsoft Graph explanation also offers it, because it needs nothing
+prepared. Nothing signs in automatically and Microsoft Graph is never chosen for
+you.
+
+After the accounts, setup asks two optional questions — install tab completion
+for your shell, and connect an AI agent it found — each answered with one key.
+The summary names the settings file once and ends with the next command, such
+as `corr auth login --account work`. Answered questions leave a one-line record
+(`Account: ana@example.com`), and a cancelled question is erased. Re-running
+setup skips finished work. `corr setup ADDRESS` adds one account without
+prompting, for scripts and AI agents; it never signs in, and its `--json`
+output is unchanged. `config init` only creates an empty settings file.
 
 Provider route changes belong to the account lifecycle:
 
@@ -55,23 +66,25 @@ corr account remove old --new-default primary --approve
 `corr settings` is the guided path for everyday changes. Its arrow-key form is
 organized around configured accounts, updates, safety, and browser sign-in.
 The top-level Accounts category opens a second level containing **Add account**
-and the configured account list. Selecting an account opens graphical or
-terminal sign-in, rename, default, and removal actions for that account; Back
+and the configured account list. Selecting an account opens its services,
+**Sign in** (`corr auth login`: a browser on this computer, or for Outlook Web
+on a computer without a display, a login view you open over SSH), **Sign in
+with text only** (`--terminal`), rename, default, and removal actions; Back
 returns to the account list. Removal shows the local-state impact, defaults to
 cancellation, and asks for a replacement before deleting the current default
 when another account will remain. The final account can be removed and leaves
-an empty provider-neutral configuration.
-The form stops and restarts a running session owner around account
-configuration changes. Every choice explains its effect and displays the exact
-direct command. Set `CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader
-prompts and type `:cancel` to leave an input step safely. The remaining
-commands are stable direct forms for scripts and advanced use.
+an empty configuration.
+The form stops and restarts a running daemon around account changes. Every
+choice explains its effect and shows the matching direct command. Set
+`CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader prompts (their help
+text is printed too) and type `:cancel` to leave an input step safely. The
+remaining commands are stable direct forms for scripts and advanced use.
 
-`account discover` uses no credentials and performs no authentication. Its
-ranked candidates explain DNS/well-known evidence, confidence, required auth,
-and whether the provider is available. `account add` requires an explicit route
-when evidence is ambiguous, generates a stable opaque account ID, and leaves
-authentication and monitoring off.
+`account discover` signs in to nothing. It lists the ways it found to connect,
+best first, with the evidence (DNS and well-known lookups) and what each needs
+to sign in. `account add` needs the connection chosen with flags when it cannot
+be picked automatically, generates a stable account ID, and leaves sign-in and
+monitoring off. `corr account add --help` groups its flags by connection type.
 
 Examples:
 

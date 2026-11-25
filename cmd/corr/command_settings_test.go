@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -445,4 +446,72 @@ func saveSettingsFixtureWithSecondAccount(t *testing.T) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+func TestCancelledFormEndsLikeASubmittedOneSoItsPromptIsErased(t *testing.T) {
+	t.Parallel()
+	form := huh.NewForm(huh.NewGroup(huh.NewConfirm().Title("Synthetic")))
+	filter := clearCancelledForm(form)
+
+	if message := filter(nil, tea.InterruptMsg{}); message != (tea.InterruptMsg{}) {
+		t.Fatalf("interrupt before the form was cancelled = %#v", message)
+	}
+	form.State = huh.StateAborted
+	if message := filter(nil, tea.InterruptMsg{}); message != (tea.QuitMsg{}) {
+		t.Fatalf("interrupt after Esc = %#v, want a normal quit", message)
+	}
+	if message := filter(nil, tea.KeyPressMsg{}); message != (tea.KeyPressMsg{}) {
+		t.Fatalf("other messages changed: %#v", message)
+	}
+}
+
+func TestSettingsHelpTextWrapsWithoutSplittingAddresses(t *testing.T) {
+	t.Parallel()
+	app := &runtime{
+		lookupEnv:     func(string) (string, bool) { return "", false },
+		terminalWidth: func(io.Writer) (int, error) { return 40, nil },
+	}
+	text := settingsHelpText(
+		app,
+		"Sign in for very-long-name@example.com from https://outlook.cloud.microsoft today.",
+		"Esc cancels.",
+	)
+	width := settingsFormWidth(app) - 4
+	for _, line := range strings.Split(text, "\n") {
+		if len(line) > width && strings.Contains(line, " ") {
+			t.Fatalf("line %q is wider than %d", line, width)
+		}
+	}
+	for _, word := range []string{"very-long-name@example.com", "https://outlook.cloud.microsoft", "Esc cancels."} {
+		if !strings.Contains(text, word) {
+			t.Fatalf("help %q split or lost %q", text, word)
+		}
+	}
+}
+
+func TestSettingsAccountMenuOffersOneSignInWithATextOnlyAlternative(t *testing.T) {
+	path := saveSettingsFixture(t)
+	var stdout bytes.Buffer
+	app := newRuntime(t.Context(), path, &stdout, &bytes.Buffer{}, buildinfo.Current())
+	app.stdin = strings.NewReader("1\n2\n")
+	app.interactiveInput = func() bool { return true }
+	app.interactiveStdout = func() bool { return true }
+	app.lookupEnv = settingsTestEnvironment
+
+	if err := (&settingsCommand{}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	output := stdout.String()
+	for _, expected := range []string{
+		"Sign in · corr auth login --account work",
+		"Sign in with text only, in this terminal · adds --terminal",
+		"login view you reach over SSH",
+	} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("account menu missing %q: %q", expected, output)
+		}
+	}
+	if strings.Contains(output, "Sign in here") {
+		t.Fatalf("account menu still offers the old terminal entry: %q", output)
+	}
 }

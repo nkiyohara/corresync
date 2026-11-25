@@ -22,13 +22,10 @@ const maximumSummaryLength = 70
 // needed. Keys are top-level command names; the value names the work package
 // that owns the files.
 var helpStyleAllowlist = map[string]string{
-	"account":  "B. setup, settings, accounts",
 	"agenda":   "A. everyday commands",
 	"calendar": "A. everyday commands",
-	"config":   "B. setup, settings, accounts",
 	"mail":     "A. everyday commands",
 	"queries":  "A. everyday commands",
-	"setup":    "B. setup, settings, accounts",
 	"tasks":    "A. everyday commands",
 }
 

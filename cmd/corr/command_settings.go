@@ -11,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/config"
@@ -183,13 +185,10 @@ func (command *settingsCommand) Run(app *runtime) error {
 		if err != nil {
 			return err
 		}
-		if err := writeSettingsOverview(app); err != nil {
-			return err
-		}
 		action, selected, err := runSettingsSelect(
 			app,
-			"What would you like to change?",
-			"↑/↓ move • enter select • esc finish",
+			"Corresync settings",
+			"Choose what to change. Each change shows the command that does the same thing.",
 			settingsMenuOptions(settings),
 		)
 		if err != nil {
@@ -250,23 +249,23 @@ func settingsMenuOptions(settings application.SettingsView) []huh.Option[string]
 	options = append(options,
 		huh.NewOption(accountsSettingsSummary(settings), settingsActionAccounts),
 		huh.NewOption(
-			fmt.Sprintf("Updates  %s · %s · %s", settings.UpdateChannel, checks, install),
+			fmt.Sprintf("Updates   %s · %s · %s", settings.UpdateChannel, checks, install),
 			settingsActionUpdates,
 		),
 		huh.NewOption(
-			"Safety   "+settings.SafetyMode+" · "+safetySummary(settings.SafetyMode),
+			"Safety    "+settings.SafetyMode+" · "+safetySummary(settings.SafetyMode),
 			settingsActionSafety,
 		),
 		huh.NewOption(
-			"Browser  "+settings.LoginTimeout+" · sign-in timeout",
+			"Browser   "+settings.LoginTimeout+" · sign-in timeout",
 			settingsActionLogin,
 		),
 		huh.NewOption(
-			"Feedback "+automaticFeedbackSummary(settings.FeedbackAutoSubmit),
+			"Feedback  "+automaticFeedbackSummary(settings.FeedbackAutoSubmit),
 			settingsActionFeedback,
 		),
-		huh.NewOption("Advanced  edit the complete validated config", settingsActionAdvanced),
-		huh.NewOption("Setup guide  resume accounts, completion, and agents", settingsActionSetup),
+		huh.NewOption("Advanced  edit the config file in your editor", settingsActionAdvanced),
+		huh.NewOption("Setup     add accounts, tab completion, and AI agents", settingsActionSetup),
 		huh.NewOption("Done", settingsActionDone),
 	)
 	return options
@@ -320,7 +319,7 @@ func accountsSettingsMenuOptions(
 	settings application.SettingsView,
 ) []huh.Option[string] {
 	options := []huh.Option[string]{huh.NewOption(
-		"Add account · corr setup <email-address>",
+		"Add an account · corr setup <email-address>",
 		settingsActionSetup,
 	)}
 	for _, account := range settings.Accounts {
@@ -367,28 +366,28 @@ func runAccountSettings(
 		return fmt.Errorf("account %q is no longer configured", alias)
 	}
 	options := []huh.Option[string]{
-		huh.NewOption("Services · enable or disable Mail, Calendar, Tasks, and Messaging", "services"),
+		huh.NewOption("Services · turn Mail, Calendar, Tasks, or Messaging on or off", "services"),
 		huh.NewOption(
-			"Sign in · corr auth login --account "+alias,
+			"Sign in · "+shellCommand("corr", "auth", "login", "--account", alias),
 			"login",
 		),
 		huh.NewOption(
-			"Sign in here · corr auth login --account "+alias+" --terminal",
+			"Sign in with text only, in this terminal · adds --terminal",
 			"login_terminal",
 		),
 		huh.NewOption(
-			"Rename · corr account rename "+alias+" <new-name>",
+			"Rename · "+shellCommand("corr", "account", "rename", alias)+" <new-name>",
 			"rename",
 		),
 	}
 	if !account.IsDefault {
 		options = append(options, huh.NewOption(
-			"Make default · corr config set default_account "+alias,
+			"Make default · "+shellCommand("corr", "config", "set", "default_account", alias),
 			"default",
 		))
 	}
 	options = append(options, huh.NewOption(
-		"Remove · deletes Corresync local state for "+alias,
+		"Remove · deletes what Corresync keeps for "+alias+" on this computer",
 		"remove",
 	))
 	options = append(options, huh.NewOption("Back", "back"))
@@ -427,7 +426,7 @@ func runAccountSettings(
 		64,
 		func(value string) error {
 			if value == alias {
-				return errors.New("enter a different account name")
+				return inputProblem("Type a name that is different from the current one.")
 			}
 			return domain.AccountAlias(value).Validate()
 		},
@@ -535,7 +534,7 @@ func runSettingsAccountMutation(app *runtime, change func() error) error {
 	}
 	if restartErr != nil {
 		return fmt.Errorf(
-			"account changed but the session owner did not restart: %w",
+			"account changed but the daemon did not restart: %w",
 			restartErr,
 		)
 	}
@@ -564,20 +563,31 @@ func waitForSettingsDaemonStop(app *runtime) error {
 		case <-app.context.Done():
 			return app.context.Err()
 		case <-deadline.C:
-			return errors.New("session owner did not stop before the account change")
+			return errors.New("the daemon did not stop before the account change; run corr daemon stop and try again")
 		case <-ticker.C:
 		}
 	}
 }
 
+// inputProblem is the message shown under a prompt when the typed value
+// cannot be used. Unlike a Go error string it is written for the reader: a
+// full sentence that says what is wrong and what to type instead.
+type inputProblem string
+
+func (problem inputProblem) Error() string { return string(problem) }
+
+const emailAddressProblem = inputProblem(
+	"That doesn't look like an email address. Example: you@example.com",
+)
+
 func validateSettingsEmailAddress(value string) error {
 	if value == "" || len(value) > 254 || strings.ContainsAny(value, "\r\n\x00") {
-		return errors.New("enter one bare email address")
+		return emailAddressProblem
 	}
 	parsed, err := mail.ParseAddress(value)
 	if err != nil || parsed.Name != "" || parsed.Address != value ||
 		!strings.Contains(value, "@") {
-		return errors.New("enter one bare email address")
+		return emailAddressProblem
 	}
 	return nil
 }
@@ -598,7 +608,7 @@ func runUpdateSettings(
 	action, selected, err := runSettingsSelect(
 		app,
 		"Updates",
-		"Choose a row to see its values and exact command.",
+		"Choose a row to see its choices and the matching command.",
 		[]huh.Option[string]{
 			huh.NewOption(
 				"Channel  "+settings.UpdateChannel+" · stable or preview releases",
@@ -662,7 +672,7 @@ func runSafetySettings(
 	return chooseAndApplySetting(
 		app, service, application.SettingSafetyMode,
 		"Safety mode",
-		"Guarded uses normal previews and approvals. Read-only blocks every write, including MCP writes.",
+		"Guarded keeps the usual preview and approval before each write. Read-only blocks every write, including writes from AI agents.",
 		[]huh.Option[string]{
 			huh.NewOption("Guarded · corr config set policy.mode guarded", "guarded").Selected(settings.SafetyMode == "guarded"),
 			huh.NewOption("Read-only · corr config set policy.mode read_only", "read_only").Selected(settings.SafetyMode == "read_only"),
@@ -778,10 +788,10 @@ func runLoginSettings(
 		func(candidate string) error {
 			duration, parseErr := time.ParseDuration(candidate)
 			if parseErr != nil {
-				return errors.New("enter a duration such as 5m or 10m")
+				return inputProblem("Type a duration such as 5m or 10m.")
 			}
 			if duration < time.Minute || duration > 30*time.Minute {
-				return errors.New("enter a duration from 1m through 30m")
+				return inputProblem("Type a duration from 1m to 30m.")
 			}
 			return nil
 		},
@@ -843,7 +853,7 @@ func applyLocalSetting(
 	if err == nil && review.RestartsSessions {
 		_, err = view.printf(
 			"   %s\n",
-			view.muted("If a session owner is running, use `corr daemon stop`; it restarts on next use."),
+			view.muted("If the daemon is running, run `corr daemon stop`; it starts again when needed."),
 		)
 	}
 	return err
@@ -855,18 +865,20 @@ func runSettingsSelect[T comparable](
 	description string,
 	options []huh.Option[T],
 ) (T, bool, error) {
-	if !strings.Contains(strings.ToLower(description), "esc") {
-		description += " Esc cancels."
-	}
 	var value T
 	restoreFallback := prepareAccessibleFieldFallback(app, "1\n")
 	defer restoreFallback()
+	help := settingsHelpText(app, description, "Esc cancels.")
+	labels := make([]string, 0, len(options))
+	for _, option := range options {
+		labels = append(labels, option.Key)
+	}
 	form := settingsForm(app, huh.NewSelect[T]().
 		Title(title).
-		Description(description).
+		Description(help).
 		Options(options...).
 		Value(&value).
-		Height(min(12, len(options)+2)))
+		Height(settingsFieldHeight(app, help, labels)))
 	if err := form.RunWithContext(app.context); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
 			return value, false, nil
@@ -889,18 +901,20 @@ func runSettingsMultiSelect[T comparable](
 	options []huh.Option[T],
 	validate func([]T) error,
 ) ([]T, bool, error) {
-	if !strings.Contains(strings.ToLower(description), "esc") {
-		description += " Esc cancels."
-	}
 	values := make([]T, 0, len(options))
 	restoreFallback := prepareAccessibleFieldFallback(app, "0\n")
 	defer restoreFallback()
+	help := settingsHelpText(app, description, "Press x or Space to select, Enter to continue, Esc to cancel.")
+	labels := make([]string, 0, len(options))
+	for _, option := range options {
+		labels = append(labels, option.Key)
+	}
 	field := huh.NewMultiSelect[T]().
 		Title(title).
-		Description(description).
+		Description(help).
 		Options(options...).
 		Value(&values).
-		Height(min(14, len(options)+2)).
+		Height(settingsFieldHeight(app, help, labels)).
 		Filterable(len(options) > 8)
 	if validate != nil {
 		field.Validate(validate)
@@ -929,14 +943,13 @@ func runSettingsInput(
 	limit int,
 	validate func(string) error,
 ) (bool, error) {
-	if !strings.Contains(strings.ToLower(description), "esc") {
-		description += " Esc cancels."
-	}
 	accessible := settingsAccessible(app)
+	cancelHint := "Esc cancels."
 	if accessible {
-		description += " Type :cancel to cancel."
+		cancelHint = "Type :cancel to cancel."
 		title += " (type :cancel to cancel)"
 	}
+	description = settingsHelpText(app, description, cancelHint)
 	restoreFallback := prepareAccessibleFieldFallback(app, settingsAccessibleCancel+"\n")
 	defer restoreFallback()
 	form := settingsForm(app, huh.NewInput().
@@ -976,7 +989,7 @@ func runSettingsConfirm(
 	defer restoreFallback()
 	form := settingsForm(app, huh.NewConfirm().
 		Title(title).
-		Description(description+" Esc goes back.").
+		Description(settingsHelpText(app, description, "Esc goes back.")).
 		Affirmative("Remove").
 		Negative("Keep account").
 		Value(&confirmed))
@@ -999,7 +1012,7 @@ func settingsForm(app *runtime, fields ...huh.Field) *huh.Form {
 	keymap := huh.NewDefaultKeyMap()
 	keymap.Quit.SetKeys("ctrl+c", "esc")
 	keymap.Quit.SetHelp("esc", "cancel")
-	return huh.NewForm(huh.NewGroup(fields...)).
+	form := huh.NewForm(huh.NewGroup(fields...)).
 		WithInput(app.stdin).
 		WithOutput(app.stdout).
 		WithAccessible(settingsAccessible(app)).
@@ -1007,6 +1020,60 @@ func settingsForm(app *runtime, fields ...huh.Field) *huh.Form {
 		WithShowHelp(true).
 		WithShowErrors(true).
 		WithWidth(settingsFormWidth(app))
+	return form.WithProgramOptions(tea.WithFilter(clearCancelledForm(form)))
+}
+
+// clearCancelledForm makes Esc and Ctrl+C end a form the way Enter does, so
+// the prompt is erased instead of its last frame staying on screen. huh still
+// reports the form as cancelled. Only an interrupt that follows the form's own
+// cancel key is converted; an interrupt from outside (a signal) is unchanged.
+func clearCancelledForm(form *huh.Form) func(tea.Model, tea.Msg) tea.Msg {
+	return func(_ tea.Model, message tea.Msg) tea.Msg {
+		if _, interrupted := message.(tea.InterruptMsg); interrupted &&
+			form.State == huh.StateAborted {
+			return tea.QuitMsg{}
+		}
+		return message
+	}
+}
+
+// settingsHelpText adds the key hint to a prompt's help and wraps it to the
+// form width, so huh never splits a path, address, or command mid-word.
+//
+// Line-oriented (accessible) prompts print only their title, so there the
+// help is written out first, without the arrow-key hints that do not apply.
+func settingsHelpText(app *runtime, description string, keyHint string) string {
+	text := strings.TrimSpace(description)
+	lower := strings.ToLower(text)
+	accessible := settingsAccessible(app)
+	if accessible && !strings.Contains(keyHint, ":cancel") {
+		keyHint = ""
+	}
+	if keyHint != "" && !strings.Contains(lower, "esc ") &&
+		!strings.Contains(lower, ":cancel") {
+		text = strings.TrimSpace(text + " " + keyHint)
+	}
+	text = wrapText(text, settingsFormWidth(app)-4, "")
+	if accessible && text != "" {
+		_, _ = fmt.Fprintln(app.stdout, text)
+	}
+	return text
+}
+
+// settingsFieldHeight is the height a select needs to show its title, help,
+// and every option. huh counts the title and help inside a field's height, so
+// a fixed height hid the options whenever the help wrapped to several lines.
+// A form taller than the terminal is still clamped by huh, which then scrolls.
+func settingsFieldHeight(app *runtime, help string, labels []string) int {
+	optionWidth := max(settingsFormWidth(app)-6, 1)
+	height := 1 // the title
+	if help != "" {
+		height += strings.Count(help, "\n") + 1
+	}
+	for _, label := range labels {
+		height += max(1, (lipgloss.Width(label)+optionWidth-1)/optionWidth)
+	}
+	return height
 }
 
 func settingsFormWidth(app *runtime) int {
@@ -1045,16 +1112,6 @@ func settingsAccessible(app *runtime) bool {
 func settingsInputExhausted(app *runtime) bool {
 	reader, ok := app.stdin.(*settingsAccessibleReader)
 	return ok && reader.exhausted
-}
-
-func writeSettingsOverview(app *runtime) error {
-	view := newConsoleView(app, app.stdout, true)
-	_, err := view.printf(
-		"\n%s  %s\n   %s\n\n",
-		view.info(), view.strong("Corresync settings"),
-		view.muted("Accounts, updates, safety, feedback, and sign-in — with the exact CLI command for every change."),
-	)
-	return err
 }
 
 func writeAdvancedSettingsHelp(app *runtime) error {
@@ -1115,11 +1172,15 @@ func findSettingsAccount(
 }
 
 func accountDescription(account application.SettingsAccount) string {
-	parts := []string{"Stable account identity and login are preserved when renaming."}
+	parts := make([]string, 0, 2)
 	if account.Address != "" {
-		parts = append(parts, "Address: "+sanitizeCell(account.Address, 254))
+		parts = append(parts, sanitizeCell(account.Address, 254))
 	}
-	return strings.Join(parts, " ")
+	parts = append(parts,
+		"Sign in uses a browser on this computer; without a display, Outlook Web "+
+			"opens a login view you reach over SSH. Renaming keeps the sign-in.",
+	)
+	return strings.Join(parts, "\n")
 }
 
 func safetySummary(mode string) string {
@@ -1135,7 +1196,7 @@ func runAccountServiceSettings(app *runtime, service *application.SettingsServic
 		options = append(options, huh.NewOption(item.Label, item.Name).Selected(item.Enabled))
 	}
 	values, selected, err := runSettingsMultiSelect(app, "Services · "+account.Alias,
-		"Configured services default to on. Turning one off retains its settings and blocks its authentication and operations. Add missing routes through setup; changing this selection does not sign in.", options, nil)
+		"A service you turn off keeps its settings but is not used.", options, nil)
 	if err != nil || !selected {
 		return err
 	}
@@ -1173,7 +1234,7 @@ func stopServiceSettingsOwner(app *runtime) (returnErr error) {
 		return nil
 	}
 	if len(endpoints) != 1 {
-		return errors.New("multiple session owners exist; run corr daemon stop before using the changed services")
+		return errors.New("more than one daemon is running; run corr daemon stop before using the changed services")
 	}
 	client, err := daemonapi.NewClient(endpoints[0])
 	if err != nil {

@@ -93,9 +93,9 @@ func TestSetupCreatesProviderNeutralConfigThenRequiresExplicitGoogleSelection(
 		t.Fatal("setup automatically selected a Google route")
 	}
 	for _, expected := range []string{
-		"no automatically selectable provider",
-		"--provider",
-		"explicit endpoint",
+		"can be picked automatically",
+		"--calendar-provider",
+		"--mail-provider",
 	} {
 		if !strings.Contains(err.Error(), expected) {
 			t.Fatalf("setup error missing %q: %v", expected, err)
@@ -109,7 +109,7 @@ func TestSetupCreatesProviderNeutralConfigThenRequiresExplicitGoogleSelection(
 		t.Fatalf("setup persisted a Google route = %+v", configuration)
 	}
 	for _, expected := range []string{
-		"Provider-neutral configuration created",
+		"Configuration created",
 	} {
 		if !strings.Contains(stdout.String(), expected) {
 			t.Fatalf("setup output missing %q: %q", expected, stdout.String())
@@ -170,7 +170,7 @@ func TestAccountAddCreatesDistinctStableIsolationKeysWithoutAuthentication(t *te
 	if firstProfile == secondProfile {
 		t.Fatalf("profile paths collided: %s", firstProfile)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("output did not state consent boundary: %q", stdout.String())
 	}
 }
@@ -381,7 +381,7 @@ func TestAccountAddPersistsJMAPRouteWithoutAuthenticating(t *testing.T) {
 		account.Calendar != nil {
 		t.Fatalf("persisted JMAP account = %#v", account)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("output did not preserve authentication boundary: %q", stdout.String())
 	}
 }
@@ -424,7 +424,7 @@ func TestAccountAddUsesDiscoveredJMAPSRVSessionURL(t *testing.T) {
 		t.Fatalf("persisted JMAP route = %#v", account)
 	}
 	if !strings.Contains(stdout.String(), "https://jmap.example.test:443/.well-known/jmap") ||
-		!strings.Contains(stdout.String(), "authentication has not started") {
+		!strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("account output = %q", stdout.String())
 	}
 }
@@ -468,7 +468,7 @@ func TestAccountAddPersistsMixedIMAPAndCalDAVRoutes(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "IMAP") ||
 		!strings.Contains(stdout.String(), "CalDAV") ||
-		!strings.Contains(stdout.String(), "authentication has not started") {
+		!strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("account output = %q", stdout.String())
 	}
 }
@@ -513,7 +513,7 @@ func TestAccountAddUsesDiscoveredCalDAVSRVEndpoint(t *testing.T) {
 		t.Fatalf("persisted CalDAV route = %#v", account)
 	}
 	if !strings.Contains(stdout.String(), "https://caldav.icloud.com:443/") ||
-		!strings.Contains(stdout.String(), "authentication has not started") {
+		!strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("account output = %q", stdout.String())
 	}
 }
@@ -587,7 +587,7 @@ func TestAccountAddPersistsExplicitBYOGoogleWithoutAuthorizing(t *testing.T) {
 		account.Calendar.Google.ClientSecret.Key != "google-reader-client" {
 		t.Fatalf("BYO Google route = %#v", configuration)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("BYO Google output = %q", stdout.String())
 	}
 }
@@ -667,7 +667,7 @@ func TestAccountAddPersistsExplicitGraphPublicClientWithoutAuthorizing(t *testin
 		account.Mail.MicrosoftGraph.Authorization.Backend != config.CredentialOSKeyring {
 		t.Fatalf("Graph account = %#v", account)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("account output = %q", stdout.String())
 	}
 }
@@ -703,7 +703,7 @@ func TestAccountAddPersistsTaskOnlyGraphGrantWithoutDiscoveryOrAuthentication(t 
 		route.MicrosoftGraph.OAuth.Authorization.Key != command.TaskAuthorizationKey {
 		t.Fatalf("task-only Graph route = %#v", route)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("task-only output = %q", stdout.String())
 	}
 }
@@ -737,7 +737,7 @@ func TestAccountAddPersistsTaskOnlyTodoistPublicClientWithoutDiscovery(t *testin
 		route.Todoist.OAuth.Authorization.Key != command.TaskAuthorizationKey {
 		t.Fatalf("task-only Todoist route = %#v", route)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("task-only output = %q", stdout.String())
 	}
 }
@@ -776,7 +776,7 @@ func TestAccountAddPersistsTaskOnlyTickTickConfidentialReferences(t *testing.T) 
 		route.TickTick.OAuth.ClientSecret.Key != "ticktick-client-secret" {
 		t.Fatalf("task-only TickTick route = %#v", route)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("task-only output = %q", stdout.String())
 	}
 }
@@ -830,7 +830,7 @@ func TestAccountAddPersistsBYOGoogleTasksWithoutAuthorizing(t *testing.T) {
 	if discoverer.address != "" {
 		t.Fatalf("task-only Google route started discovery for %q", discoverer.address)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("BYO Google Tasks output = %q", stdout.String())
 	}
 }
@@ -915,7 +915,7 @@ func TestAccountAddPersistsTaskOnlyCalDAVRouteWithoutDiscovery(t *testing.T) {
 		route.CalDAV.Credential.Key != command.TaskCredentialKey {
 		t.Fatalf("task-only CalDAV route = %#v", route)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("task-only output = %q", stdout.String())
 	}
 }
@@ -1043,7 +1043,7 @@ func TestAccountAddPersistsCalendarOnlyBYOGoogleWithoutAuthorizing(t *testing.T)
 		account.Calendar.Google.ClientSecret.Key != "calendar-only-google-client" {
 		t.Fatalf("calendar-only Google route = %#v", configuration)
 	}
-	if !strings.Contains(stdout.String(), "authentication has not started") {
+	if !strings.Contains(stdout.String(), "not signed in yet") {
 		t.Fatalf("calendar-only Google output = %q", stdout.String())
 	}
 }
