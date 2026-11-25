@@ -46,6 +46,28 @@ func TestUpdateCheckProducesHumanAndMachineReadableStatus(t *testing.T) {
 	}
 }
 
+// One failed lookup is cached for 24 hours so that ordinary commands stay
+// quiet. An explicit `corr update check` must not repeat that stale failure.
+func TestUpdateCheckIgnoresACachedFailedLookup(t *testing.T) {
+	var stdout bytes.Buffer
+	app := updateTestRuntime(t, &stdout, updatecheck.Result{
+		Status: updatecheck.StatusCurrent, CurrentVersion: "0.9.5", LatestVersion: "v0.9.5",
+	})
+	app.checkUpdate = func(context.Context) (updatecheck.Result, error) {
+		return updatecheck.Result{Status: updatecheck.StatusUnavailable, CurrentVersion: "0.9.5", Cached: true}, updatecheck.ErrUnavailable
+	}
+	if err := (&updateCheckCommand{JSON: true}).Run(app); err != nil {
+		t.Fatal(err)
+	}
+	var report updateReport
+	if err := json.Unmarshal(stdout.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.Status != updatecheck.StatusCurrent {
+		t.Fatalf("explicit check reported the cached failure: %s", stdout.String())
+	}
+}
+
 func TestCurrentUpdateJSONOmitsUpgradeInstructions(t *testing.T) {
 	result := updatecheck.Result{
 		Status:          updatecheck.StatusCurrent,

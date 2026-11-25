@@ -794,9 +794,11 @@ Package-managed installations print their owner command. Direct installs
 verify Sigstore identity, checksum, version, OS, and architecture before a
 rollback-capable replacement. No ambiguous update is retried.
 
-Eligible interactive CLI starts perform a bounded, 24-hour-cached check and
-show a short installation-specific notice. New standalone configurations enable
-the verified replacement path by default; existing preferences are preserved.
+`corr update check` asks the release endpoint each time it runs. Eligible
+interactive CLI starts perform a bounded, 24-hour-cached check instead, which
+also remembers a failed lookup, and show a short installation-specific notice.
+New standalone configurations enable the verified replacement path by default;
+existing preferences are preserved.
 Enable it explicitly for an existing configuration:
 
 ```console
