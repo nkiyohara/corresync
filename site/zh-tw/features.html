@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync 功能 — 能做什麼，邊界在哪裡</title>
+    <title>Corresync 功能與限制</title>
     <meta
       name="description"
-      content="用清晰語言瞭解 Corresync 的郵件、行事曆、AI 智慧體和指令碼功能，以及每一項明確限制。"
+      content="Corresync 的郵件、行事曆、AI 代理和指令碼功能說明，以及目前的各項限制。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Corresync 功能 — 能做什麼，邊界在哪裡">
+    <meta property="og:title" content="Corresync 功能與限制">
     <meta
       property="og:description"
-      content="跨帳號郵件、行事曆、智慧體和指令碼功能，連同限制一起說明。"
+      content="跨帳號的郵件、行事曆、AI 代理和指令碼功能，以及目前的限制。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -28,7 +28,7 @@
     <meta property="og:image:alt" content="Corresync 標誌和英文產品簡介">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Corresync 功能">
-    <meta name="twitter:description" content="功能和限制都說清楚。">
+    <meta name="twitter:description" content="Corresync 能做的事和目前的限制。">
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
     <link rel="canonical" href="https://corresync.org/zh-tw/features.html">
@@ -77,72 +77,72 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>功能</p>
-        <h1 id="page-title">所有能做的事，<em>以及絕不越過的邊界。</em></h1>
+        <h1 id="page-title">Corresync 能做的事<em>和不做的事</em></h1>
         <p class="lede">
-          跨收件匣和行事曆讀取時仍保留帳號身分；每次寫入只針對一個明確帳號。CLI
-          與 MCP 共用同一型別化操作、策略檢查和預覽→提交。
+          跨收件匣和行事曆讀取時，結果仍標示所屬帳號；每次寫入只針對一個帳號。CLI
+          和 MCP 使用相同的操作、政策檢查和預覽後送出流程。
         </p>
         <div class="actions">
-          <a class="button primary" href="getting-started.html">四步開始</a><a
+          <a class="button primary" href="getting-started.html">開始使用</a><a
             class="button secondary"
             href="providers.html#check"
-          >檢查支援服務</a>
+          >檢查是否支援</a>
         </div>
       </section>
       <section id="mail-calendar" aria-labelledby="mailcal-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>日常通訊</p>
-          <h2 id="mailcal-title">統一處理郵件和行事曆，不合併身分。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>郵件與行事曆</p>
+          <h2 id="mailcal-title">跨帳號處理郵件和行事曆</h2>
         </div>
         <div class="capability-grid">
           <article class="capability-card" id="mail">
             <p class="card-index" aria-hidden="true">01</p>
             <h3 id="cap-mail">郵件</h3>
             <ul>
-              <li>資料夾、標籤與能力發現</li>
-              <li>有上限的列表、搜尋與 thread 搜尋</li>
-              <li>按需讀取 header、內文和有上限的附件</li>
-              <li>建立和更新草稿、回覆、轉發與傳送</li>
-              <li>已讀/未讀、歸檔、移動與垃圾箱</li>
-              <li>跨帳號搜尋與明確的部分失敗</li>
+              <li>資料夾、標籤與功能探索</li>
+              <li>有上限的列表、搜尋與討論串搜尋</li>
+              <li>需要時讀取標頭、內文和有上限的附件</li>
+              <li>建立和更新草稿、回覆、轉寄和傳送</li>
+              <li>已讀/未讀、封存、移動與垃圾桶</li>
+              <li>跨帳號搜尋，部分失敗會標示</li>
             </ul>
             <p class="card-foot">
-              傳送、移動和刪除先回傳審閱，只有完全一致的內容才能提交一次。
+              傳送、移動和刪除先回傳預覽，內容完全相同才能送出一次。
             </p>
           </article>
           <article class="capability-card" id="calendar">
             <p class="card-index" aria-hidden="true">02</p>
-            <h3 id="cap-calendar">行事曆與日程</h3>
+            <h3 id="cap-calendar">行事曆與行程</h3>
             <ul>
-              <li>明確選擇可用行事曆</li>
-              <li>有上限的事件列表與跨帳號日程</li>
+              <li>選擇要使用的行事曆</li>
+              <li>有上限的活動列表與跨帳號行程</li>
               <li>保留時區和重複規則</li>
-              <li>建立、更新與取消事件</li>
-              <li>路徑報告支援時才請求 Teams 或 Google Meet</li>
-              <li>會議連結僅作為單個事件的屬性</li>
+              <li>建立、更新和取消活動</li>
+              <li>連線方式回報支援時才建立 Teams 或 Google Meet 連結</li>
+              <li>會議連結只是單一活動的屬性</li>
             </ul>
             <p class="card-foot">
-              目前版本尚未啟用 Teams
-              聊天與頻道。實作已置於發行證據閘門之後；通話、錄製、上線狀態監控與會議生命週期管理仍不在範圍內。
+              這個版本未啟用 Teams
+              聊天和頻道，相關實作仍須通過發行驗證。通話、錄影、上線狀態和會議生命週期管理不在範圍內。
             </p>
           </article>
         </div>
       </section>
       <section class="tinted-section" id="agents" aria-labelledby="agents-page-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>同一核心，兩種入口</p>
-          <h2 id="agents-page-title">AI 智慧體與指令碼遵守同一安全邊界。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>AI 代理與指令碼</p>
+          <h2 id="agents-page-title">AI 代理和指令碼使用相同的安全限制</h2>
         </div>
         <div class="capability-grid">
           <article class="capability-card">
             <p class="card-index" aria-hidden="true">03</p>
-            <h3 id="cap-agents">AI 智慧體 · 本機 stdio</h3>
+            <h3 id="cap-agents">AI 代理 · 本機 stdio</h3>
             <ul>
-              <li>只提供狹窄、型別化的郵件和行事曆工具</li>
-              <li>不暴露認證資料、Cookie、任意 action 或通用 property API</li>
-              <li>讀取與寫入預覽／提交明確分開</li>
-              <li>結果保留帳號和供應商來源</li>
-              <li>不建立 遠端 MCP 端點</li>
+              <li>只提供範圍有限的郵件和行事曆工具</li>
+              <li>不提供憑證、Cookie、任意操作或通用屬性存取</li>
+              <li>讀取與寫入的預覽／送出分開</li>
+              <li>結果標示帳號和服務</li>
+              <li>不建立遠端 MCP 端點</li>
             </ul>
             <div class="cmd" data-copy data-copy-label="Codex MCP 設定命令">
               <pre
@@ -154,13 +154,13 @@
           </article>
           <article class="capability-card" id="scripting">
             <p class="card-index" aria-hidden="true">04</p>
-            <h3 id="cap-scripting">指令碼 · 穩定 JSON</h3>
+            <h3 id="cap-scripting">指令碼 · 穩定的 JSON 格式</h3>
             <ul>
-              <li>人類輸出與機器 JSON 分離</li>
-              <li>使用同一帳號選擇和策略檢查</li>
-              <li>不隱藏部分失敗、降級或未知結果</li>
+              <li>人看的輸出與 JSON 分開</li>
+              <li>使用相同的帳號選擇和政策檢查</li>
+              <li>部分失敗、降級和結果不明都會回報</li>
               <li>stdout 輸出資料，stderr 輸出診斷</li>
-              <li>schema 遵循公開版本策略</li>
+              <li>schema 依公開版本政策變更</li>
             </ul>
             <div class="cmd" data-copy data-copy-label="JSON 日程命令">
               <pre
@@ -174,134 +174,132 @@
       </section>
       <section id="local-options" aria-labelledby="local-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>主動開啟的本機能力</p>
-          <h2 id="local-title">只在需要時，由你親自開啟。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>選用的本機功能</p>
+          <h2 id="local-title">需要時由你開啟</h2>
         </div>
         <div class="control-grid">
           <article>
-            <h3 id="cap-import">只讀匯入暫存</h3>
+            <h3 id="cap-import">唯讀匯入暫存</h3>
             <p>
-              掃描其他應用設定並顯示候選，不復用
-              機密資訊，不新增帳號，也不認證。
+              掃描其他應用程式的設定並列出候選，不沿用機密資訊，不新增帳號，也不登入。
             </p>
           </article>
           <article>
-            <h3 id="cap-monitoring">選擇性監控</h3>
+            <h3 id="cap-monitoring">監控（選用）</h3>
             <p>
-              預設關閉。只有明確設定帳號、查詢、間隔和目標後才在本機執行；MCP
-              無法啟用。
+              預設關閉。設定好帳號、查詢、間隔和對象後才在本機執行；MCP
+              無法開啟。
             </p>
           </article>
           <article>
-            <h3 id="cap-feedback">隱私保護意見回饋</h3>
+            <h3 id="cap-feedback">意見回饋</h3>
             <p>
-              絕不自動傳送。欄位先供你審閱，且不包含郵件內容、位址、權杖
-              或認證資料。
+              不會自動傳送。欄位先讓你檢查，不含郵件內容、位址、權杖或憑證。
             </p>
           </article>
           <article>
-            <h3>已驗證更新</h3>
+            <h3>更新驗證</h3>
             <p>
-              驗證簽名 checksum 與
-              來源證明；包管理器安裝仍由對應管理器更新。
+              驗證簽章的 checksum
+              和來源證明；套件管理工具安裝的版本仍由該工具更新。
             </p>
           </article>
         </div>
       </section>
       <section class="faq-section" id="faq" aria-labelledby="faq-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>安裝前常見問題</p>
-          <h2 id="faq-title">先把重要問題說清楚。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>常見問題</p>
+          <h2 id="faq-title">安裝前的常見問題</h2>
         </div>
         <div class="faq-grid">
           <article>
-            <h3 id="faq-provider">我的帳號能用嗎？</h3>
+            <h3 id="faq-provider">我的帳號可以用嗎？</h3>
             <p>
-              支援 Outlook Web、明確設定的 Graph、Todoist、TickTick、JMAP、IMAP/SMTP 和
-              CalDAV。Google 路徑使用你自行管理的 Google Cloud 專案中的桌面 OAuth
-              用戶端。可<a href="providers.html#check">只用網域檢查</a>。
+              支援 Outlook Web、另外設定的 Graph、Todoist、TickTick、JMAP、IMAP/SMTP 和
+              CalDAV。Google 使用你自己 Google Cloud 專案中的桌面版 OAuth
+              用戶端。可<a href="providers.html#check">只用網域檢查是否支援</a>。
             </p>
           </article>
           <article>
             <h3 id="faq-cost">需要付費嗎？</h3>
             <p>
-              Corresync 是 Apache-2.0
-              開源軟體；供應商、雲、智慧體和網路費用遵循各自條款。
+              Corresync 是以 Apache-2.0 授權的開源軟體；服務供應商、雲端、AI
+              代理和網路費用依各自條款。
             </p>
           </article>
           <article>
-            <h3 id="faq-data">郵件存在哪裡？</h3>
+            <h3 id="faq-data">郵件存放在哪裡？</h3>
             <p>
-              資料從裝置直接連線供應商，沒有 Corresync 託管信箱或權杖
-              中繼服務。本機快取和游標依帳號隔離。
+              你的電腦直接連到服務供應商，Corresync
+              沒有託管信箱或權杖中繼服務。本機快取和游標依帳號分開。
             </p>
           </article>
           <article>
-            <h3 id="faq-agent-send">AI 能自行傳送嗎？</h3>
+            <h3 id="faq-agent-send">AI 可以自己傳送郵件嗎？</h3>
             <p>
-              不能。第一次呼叫只回傳審閱，提交需要與內容繫結、短時、單次的核准。
+              不行。第一次呼叫只回傳預覽；送出需要只對該內容有效、有時效且只能用一次的核准。
             </p>
           </article>
           <article>
-            <h3 id="faq-phone-home">會偷偷聯網嗎？</h3>
+            <h3 id="faq-phone-home">會自己連網傳資料嗎？</h3>
             <p>
-              沒有 analytics 或 telemetry。只有目的明確的可選
-              相容性檢查工具、更新檢查、所選供應商操作與意見回饋。
+              沒有使用分析或遙測。只有選用的相容性檢查、更新檢查、所選服務的操作和意見回饋會連網。
             </p>
           </article>
           <article>
-            <h3 id="faq-unknown">傳送中途結果不明怎麼辦？</h3>
+            <h3 id="faq-unknown">傳送到一半結果不明怎麼辦？</h3>
             <p>
-              不會自動重試；會停在“結果未知”，要求核對，避免重複傳送。
+              不會自動重試，會停在「結果不明」並要求核對，以免重複傳送。
             </p>
           </article>
         </div>
       </section>
       <section class="absent-panel" id="limits" aria-labelledby="limits-title">
         <div>
-          <p class="eyebrow light"><span aria-hidden="true"></span>明確不做</p>
-          <h2 id="limits-title">不以便利為名擴大權限。</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>不做的事</p>
+          <h2 id="limits-title">Corresync 不做的事</h2>
         </div>
         <ul>
-          <li>託管中繼服務、多使用者伺服器、遠端 MCP 傳輸</li>
+          <li>託管中繼服務、多使用者伺服器、遠端 MCP 連線</li>
           <li>無人值守登入、儲存密碼、TLS 攔截</li>
-          <li>繞過 MFA、Conditional Access、管理員同意或停用服務</li>
-          <li>自動 替代路徑 到 Graph 或自動能力探測</li>
-          <li>目前版本中的 Teams 聊天與頻道功能</li>
-          <li>Teams 通話、錄製、上線狀態監控與會議生命週期管理</li>
+          <li>繞過 MFA、Conditional Access、管理員同意或已停用的服務</li>
+          <li>自動改用 Graph，或用 Graph 自動探測功能</li>
+          <li>這個版本的 Teams 聊天和頻道功能</li>
+          <li>Teams 通話、錄影、上線狀態監控和會議生命週期管理</li>
           <li>把郵件內容當成授權或指令</li>
-          <li>預設開啟監控、智慧體派發或資料外傳</li>
-          <li>Gmail 即時永久刪除</li>
+          <li>預設開啟監控、AI 代理派送或資料外傳</li>
+          <li>直接永久刪除 Gmail 郵件</li>
         </ul>
       </section>
       <section class="evidence-explainer" id="evidence" aria-labelledby="evidence-page-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>相容性證據</p>
-          <h2 id="evidence-page-title">合成測試不等於即時供應商驗證。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>相容性的驗證</p>
+          <h2 id="evidence-page-title">合成測試不等於實際環境驗證</h2>
           <p>
-            開發路徑使用確定性的合成測試資料契約。只有記錄了
-            opt-in、合成資料、確切 提交 與環境的觀測，才會標記為
-            live-observed。
+            開發中的連線方式用固定的合成資料做契約測試。只有經主動啟用（opt-in）、使用合成資料，並記錄確切
+            commit 與環境的觀察，才會標示為 live-observed。
           </p>
         </div>
         <div>
-          <p><strong>supported：</strong>已發布的執行檔中可以使用。</p>
+          <p><strong>supported：</strong>在已發布的執行檔中可以使用。</p>
           <p>
-            <strong>synthetic contract：</strong>使用模擬 服務供應商契約 的
-            測試資料 驗證。
+            <strong>synthetic contract：</strong>以模擬服務契約的測試資料驗證。
           </p>
-          <p><strong>live-observed：</strong>存在明確記錄的可選即時觀測。</p>
-          <p><strong>degraded：</strong>能力缺失會被如實回傳。</p>
+          <p>
+            <strong
+            >live-observed：</strong>有記錄在案、經主動啟用（opt-in）的實際環境觀察。
+          </p>
+          <p><strong>degraded：</strong>缺少的功能照實回報。</p>
         </div>
       </section>
       <section class="final-cta" aria-labelledby="features-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>四步即可開始</p>
-        <h2 id="features-cta-title">從安裝到跨帳號回答。</h2>
+        <p class="eyebrow"><span aria-hidden="true"></span>開始使用</p>
+        <h2 id="features-cta-title">從安裝到跨帳號查詢</h2>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html">開始設定</a><a
             class="button secondary"
             href="safety.html"
-          >閱讀安全模型</a>
+          >閱讀安全說明</a>
         </div>
       </section>
     </main>
@@ -313,7 +311,7 @@
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        獨立的本機優先郵件與行事曆工具。與所列廠商無隸屬或背書關係。
+        獨立的本機郵件與行事曆工具，與所列廠商無隸屬或背書關係。
       </p>
       <nav aria-label="頁尾">
         <a href="getting-started.html">開始使用</a><a href="providers.html">支援服務</a><a

@@ -13,7 +13,7 @@
     <meta property="og:title" content="設定 Gmail 與 Google 行事曆 OAuth — Corresync">
     <meta
       property="og:description"
-      content="在你自己的 Google Cloud 專案中，清楚、安全地完成 Google OAuth 設定。"
+      content="在你自己的 Google Cloud 專案中建立 OAuth 用戶端，並匯入 Corresync 的步驟。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -87,18 +87,18 @@
     </header>
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>你的專案，由你同意</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>Google OAuth 設定</p>
         <h1 id="page-title">
-          不用等待 Corresync 的 OAuth 審核，<em>現在就能連接 Google。</em>
+          不用等 Corresync 的 OAuth 審核，<em>也能連接 Google</em>
         </h1>
         <p class="lede">
           在你管理的 Google Cloud 專案中建立「桌面應用程式」OAuth
           用戶端。Corresync
-          會驗證下載檔，把其中產生的憑證存入作業系統鑰匙圈；登入、MFA
-          與同意仍在平常使用的 Google 瀏覽器頁面完成。
+          會驗證下載檔，把產生的憑證存入作業系統鑰匙圈；登入、MFA
+          和同意都在平常的 Google 瀏覽器頁面完成。
         </p>
         <div class="actions">
-          <a class="button primary" href="#steps">跟著圖解開始設定</a><a
+          <a class="button primary" href="#steps">看圖解設定步驟</a><a
             class="button secondary"
             href="providers.html#google"
           >查看支援狀態</a>
@@ -106,19 +106,20 @@
       </section>
       <section class="evidence-banner" aria-label="Google OAuth 狀態">
         <span class="status-dot" aria-hidden="true"></span><div>
-          <strong>自備 OAuth 已可使用；Corresync 代管 OAuth 暫不啟用。</strong><p>
-            介接器已有合成契約測試，但目前版本尚無實際環境觀測紀錄。Google
-            專案的對象、配額、警告與組織政策仍然適用。
+          <strong>可以使用自備的 OAuth 用戶端；Corresync 代管的 OAuth
+            目前停用。</strong><p>
+            介接器已有合成契約測試，但這個版本還沒有實際環境的觀察紀錄。Google
+            專案的對象、配額、警告和組織政策都照常適用。
           </p>
         </div>
       </section>
       <section id="steps" aria-labelledby="steps-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>四個瀏覽器頁面</p>
-          <h2 id="steps-title">只設定真正需要的 Google 功能。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>設定步驟</p>
+          <h2 id="steps-title">在 Google Cloud Console 中的四個步驟</h2>
           <p>
-            以下是加上標註的頁面示意，不含任何真實帳號資料。即使 Google
-            調整選單名稱，需要選取的對象與安全邊界仍相同。
+            以下是加上標註的頁面示意，不含真實帳號資料。即使 Google
+            改了選單名稱，要選的項目和注意事項仍相同。
           </p>
         </div>
         <div class="browser-guide">
@@ -128,7 +129,7 @@
               <h3>建立或選擇你擁有的專案</h3>
               <p>
                 開啟 Google Cloud
-                Console，使用頂端的專案選擇器建立或選取專案。不要挪用其他應用程式的用戶端或憑證。
+                Console，用頂端的專案選擇器建立或選取專案。不要挪用其他應用程式的用戶端或憑證。
               </p>
             </div>
             <figure class="browser-shot">
@@ -141,7 +142,7 @@
                 </div>
                 <div class="browser-action">新增專案</div>
                 <figcaption class="browser-note">
-                  同意畫面的身分與配額屬於這個專案。
+                  同意畫面的名稱和配額屬於這個專案。
                 </figcaption>
               </div>
             </figure>
@@ -149,10 +150,10 @@
           <article class="browser-step">
             <div class="browser-step-copy">
               <p class="chip">02 · API</p>
-              <h3>只啟用已選擇的服務</h3>
+              <h3>只啟用要用的 API</h3>
               <p>
                 郵件啟用 Gmail API；行事曆與 Meet 會議連結啟用 Google Calendar
-                API；只有選擇工作時才啟用 Google Tasks API。
+                API；選了工作時才啟用 Google Tasks API。
               </p>
             </div>
             <figure class="browser-shot">
@@ -173,11 +174,11 @@
           <article class="browser-step">
             <div class="browser-step-copy">
               <p class="chip">03 · 對象</p>
-              <h3>如實選擇對象與權限範圍</h3>
+              <h3>選擇對象與權限範圍</h3>
               <p>
-                只有同一個合資格 Workspace 組織內部使用時才選
-                Internal，其他情況選 External。處於 Testing
-                時，把要連接的帳號加入測試使用者；測試授權會在七天後失效。
+                只有在同一個符合資格的 Workspace 組織內部使用時才選
+                Internal，其他情況請選 External。發布狀態為 Testing
+                時，把要連接的帳號加入測試使用者；測試授權七天後失效。
               </p>
             </div>
             <figure class="browser-shot">
@@ -202,8 +203,8 @@
               <h3>建立桌面應用程式並下載 JSON</h3>
               <p>
                 在 Clients 選擇「桌面應用程式」，不要選 Web
-                應用程式、服務帳戶或 API 金鑰。下載後請將 JSON
-                視為私密檔案。
+                應用程式、服務帳戶或 API 金鑰。下載的 JSON
+                檔請當作私密檔案。
               </p>
             </div>
             <figure class="browser-shot">
@@ -216,7 +217,7 @@
                 </div>
                 <div class="browser-action">下載 JSON</div>
                 <figcaption class="browser-note">
-                  每次授權都使用 127.0.0.1 上新分配的本機連接埠。
+                  每次授權都會在 127.0.0.1 上使用新分配的本機連接埠。
                 </figcaption>
               </div>
             </figure>
@@ -225,48 +226,49 @@
       </section>
       <section aria-labelledby="connect-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>安全的本機交接</p>
-          <h2 id="connect-title">讓引導式設定處理容易出錯的細節。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>匯入 Corresync</p>
+          <h2 id="connect-title">用引導式設定匯入用戶端</h2>
           <p>
             執行 <code>corr setup</code>，選擇 Google
-            與所需服務，再選擇「匯入已下載的用戶端 JSON」。核對用戶端
+            和所需服務，再選「匯入已下載的用戶端 JSON」。核對用戶端
             ID、回送
-            URI、權限範圍，以及彼此分離的鑰匙圈控制代碼。新增帳號本身不會登入。
+            URI、權限範圍和分開的鑰匙圈控制代碼。新增帳號本身不會登入。
           </p>
         </div>
         <pre class="oauth-command" tabindex="0"><code>$ corr setup
 $ corr auth login --account personal
 $ corr doctor --account personal</code></pre>
         <p class="fine-print">
-          若要自動化，先執行 <code>corr auth google-client import FILE --key
-            HANDLE</code>。不要把產生的憑證貼進 TOML、命令參數、MCP、Issue
-          或支援資料。Corresync 不會擅自刪除你提供的下載檔。
+          如果要自動化，先執行 <code>corr auth google-client import FILE --key
+            HANDLE</code>。不要把產生的憑證貼到 TOML、指令參數、MCP、Issue
+          或支援請求中。Corresync 不會自行刪除你提供的下載檔。
         </p>
       </section>
       <section class="honest-edges" aria-labelledby="choices-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>變更發布狀態前</p>
-          <h2 id="choices-title">個人使用可能不必審核，但限制仍然存在。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>發布狀態與限制</p>
+          <h2 id="choices-title">個人使用可能不需要審核，但仍有限制</h2>
           <p class="fine-print">
             Google 目前將少於 100
-            名使用者的個人用途，以及符合資格的內部用途，列為不強制驗證的情況。未驗證應用程式警告、人數上限、受限權限範圍政策、組織控管與最新條款仍會適用。
+            名使用者的個人用途和符合資格的內部用途列為不強制驗證。未驗證應用程式警告、人數上限、受限權限範圍政策、組織管控和最新條款仍然適用。
           </p>
         </div>
         <ul>
           <li>Testing 只允許已登記的測試使用者，授權七天後失效。</li>
           <li>
-            Workspace 管理員可以阻擋或要求審查確切的用戶端 ID 與權限範圍。
+            Workspace 管理員可以封鎖確切的用戶端 ID
+            與權限範圍，或要求審查。
           </li>
           <li>不要用服務帳戶、全網域委派或降低安全性來繞過政策。</li>
-          <li>MCP 可以使用已驗證的工作階段，但不能啟動 Google OAuth。</li>
+          <li>MCP 可以使用已登入的工作階段，但不能開始 Google OAuth 登入。</li>
         </ul>
       </section>
       <section class="final-cta" aria-labelledby="oauth-cta">
-        <p class="eyebrow"><span aria-hidden="true"></span>準備好之後</p>
-        <h2 id="oauth-cta">建立用戶端，其餘都留在本機。</h2>
+        <p class="eyebrow"><span aria-hidden="true"></span>下一步</p>
+        <h2 id="oauth-cta">建立用戶端後安裝 Corresync</h2>
         <p>
-          Google 登入仍由 Google
-          瀏覽器頁面負責；郵件、行事曆、工作與憑證不會經過 Corresync
+          Google 登入在 Google
+          的瀏覽器頁面進行；郵件、行事曆、工作和憑證不會經過 Corresync
           伺服器。
         </p>
         <div class="actions centered">
@@ -285,7 +287,7 @@ $ corr doctor --account personal</code></pre>
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        獨立的本機優先工具，與 Google 沒有隸屬或背書關係。
+        獨立開發的本機工具，與 Google 沒有隸屬或背書關係。
       </p>
       <nav aria-label="頁尾">
         <a href="getting-started.html">開始使用</a><a href="providers.html"
