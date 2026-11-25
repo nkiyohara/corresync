@@ -6,47 +6,125 @@ authorized live observations.
 
 ## v0.9 evidence
 
+Every row below is generated from the canonical catalog in
+[`internal/compatcatalog/catalog.json`](../internal/compatcatalog/catalog.json).
+Edit the catalog, then run `task docs:generate`; `task verify` fails when a
+table here or in the [task contract](tasks.md) is stale. Tests also compare
+each messaging and Google row with the release gates in `internal/rollout`,
+require every provider identifier the domain declares to appear, and check
+that every named test exists.
+
+<!-- compatcatalog:begin evidence -->
 <!-- markdownlint-disable MD013 -->
-| Boundary | Deterministic evidence | Recorded live evidence | v0.9 status |
-| --- | --- | --- | --- |
-| CLI, stable JSON, configuration schema v12 | Unit, golden, migration, `NO_COLOR` | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
-| Account lifecycle and credential-free discovery | Unit, DNS/well-known fixtures, atomic-store tests | Not run | Deterministic only |
-| Public domain-only compatibility checker | Browser privacy/source checks; DNS, CORS, bounds, redirect, failure, and SSRF fixtures | Not run | Deterministic only; no provider authentication |
-| Authenticated local IPC | Unix adversarial tests, Windows contracts, cross-build | Historical macOS arm64 note, not commit-bound | Deterministic only; live-unobserved |
-| Outlook Web mail/calendar | Synthetic typed wire contracts | Historical Microsoft 365 notes, not commit-bound | Deterministic only; live-unobserved |
-| Legacy Google Web adapter | Synthetic semantic-DOM contracts retained; runtime sign-in disabled before browser launch | Live sign-in rejected by Google on 2026-07-29 | Unsupported |
-| User-owned OAuth Gmail and Google Calendar APIs/Google Meet field | Synthetic REST, credential-import, OAuth, migration, and application integration contracts | Prior [IMAP/SMTP observation](evidence/google-macos-arm64-2026-07-30.md) does not cover the new route | Available with user setup; deterministic only; live-unobserved |
-| User-owned OAuth Google Tasks API | Synthetic REST, identity, independent-scope, OAuth, ETag, assigned-task, polling/reset, and application integration contracts | Not run | Available with user setup; deterministic only; live-unobserved |
-| Microsoft Graph mail/calendar/Teams-link field | Synthetic REST and application integration contracts | Not run | Deterministic only |
-| Microsoft Graph To Do | Synthetic OAuth, national-cloud, REST CRUD/delta, recurrence/time-zone, cursor-restart, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
-| Todoist tasks | Synthetic public-client OAuth, refresh rotation, API v1 REST/Sync CRUD, plan, time, temporary-ID, cursor/isolation, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
-| TickTick tasks | Synthetic confidential-client OAuth, transient-secret, REST CRUD/search, time, recurrence, assignment, permission, bounds, polling/tombstone, cursor/isolation, and application integration contracts | Not run | Implemented; deterministic only; live-unobserved |
-| JMAP mail | Synthetic RFC 8620 session/query/write contracts | Not run | Deterministic only |
-| IMAP/SMTP mail | Synthetic protocol/MIME/capability contracts | Not run | Deterministic only |
-| CalDAV calendar | Synthetic WebDAV/iCalendar/conditional-write contracts | Not run | Deterministic only |
-| CalDAV VTODO tasks | Synthetic RFC 5545 mapping, WebDAV ETag writes, RFC 6578 sync/reset, account/session isolation, and extension-preservation contracts | Not run | Implemented; deterministic only; live-unobserved |
-| iCloud guided IMAP/SMTP + CalDAV preset | Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts | Not run | Deterministic only; live-unobserved |
-| Cross-account search and agenda | Isolation, ordering, bounds, partial-failure tests | Not run | Deterministic only |
-| Canonical task model, CLI, MCP, IPC, and cross-account projection | Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests | Not run | Implemented; Microsoft Graph adapter enabled separately |
-| Private saved mail/calendar queries and no-content-cache decision | Account isolation, strict bounded store, revision race, corrupt purge, CLI/MCP schema, live freshness, and resource-bound tests | Not run | Implemented; definitions only, provider results never persisted |
-| Account/service recovery and provider drift | Per-lease invalidation, concurrency/drain, preview/monitor cleanup, stateless API retry/circuit, throttle, browser-owner loss, and content-free error tests | Not run | Deterministic only; live-unobserved |
-| Provider-neutral messaging model, Teams Graph/Web, Slack API, and Mattermost REST/WebSocket adapters, schema, and release gate | Shared synthetic fixtures; account/workspace/actor isolation, Graph/Web parity, role/scope capability observation, semantic DOM bounds, SSRF/DNS pinning, redirect/compression/event bounds, cursor binding, malformed result, and preview/commit tests | Not run | Teams and Mattermost enabled as previews; live evidence pending; Slack disabled |
-| Read-only import staging | Format, identity, traversal, symlink, bound tests | Not run | Deterministic only |
-| Monitoring, queue, and local runner | Consent, recovery, dedup, loop, rate, circuit tests | Not run | Deterministic only |
-| Redacted feedback | Allowlist, secret corpus, malformed/oversized, action-order tests | Historical local-terminal note, not commit-bound | Deterministic only; live-unobserved |
-| Local agent-host detection | Catalog validation; Unix/Windows/macOS path, manager, app, symlink, cache, timeout, cancellation, and secret-free JSON fixtures | Not run | Deterministic only; live-unobserved |
-| MCP clients | Native setup-plan and schema tests | Historical Codex/Claude notes, not commit-bound | Deterministic only; live-unobserved |
-| Distribution | Archive/package/SBOM/inventory verification in candidate and tag workflows | Tagged release workflow and published assets provide release-bound evidence | Provider/platform observations remain separate |
+<!-- Generated by tools/compatcatalog from internal/compatcatalog/catalog.json; do not edit by hand. -->
+
+Availability means what you can do in the current source:
+
+- `available`: usable after an explicit sign-in.
+- `available-with-setup`: usable after you register your own OAuth client or store a credential outside Corresync.
+- `preview`: reachable as a preview; release evidence, including live observation, is still missing.
+- `disabled`: code exists, but a release gate keeps it off.
+- `planned`: reserved identifier with a tracking issue; no adapter yet.
+- `unsupported`: not offered and not planned.
+
+Live evidence states:
+
+- `live-observed`: a content-free record tied to the exact tested commit.
+- `historical-not-commit-bound`: an earlier note without an exact commit; context only, not evidence.
+- `not-run`: no authorized live observation exists.
+- `rejected`: the provider refused the observed route.
+
+Authentication kinds:
+
+- `none`: no provider authentication.
+- `browser-session`: visible, browser-owned provider sign-in.
+- `user-oauth-client`: OAuth through a client you register with the provider.
+- `managed-oauth-client`: OAuth through a Corresync-owned client.
+- `external-credential`: a credential you keep in the OS keyring or an explicitly configured helper.
+- `os-permission`: a local operating-system permission.
+- `local-automation`: documented local application automation.
+- `upstream-mcp`: the provider's own remote MCP server.
+
+### Mail
+
+| Provider | Route | Availability | Authentication | Deterministic evidence | Live evidence | Notes | Issue |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Microsoft Outlook on the web (`microsoft-owa`) | `outlook_web` | `available` | `browser-session` | Synthetic typed wire contracts for folders, list, search pagination, body, attachments, drafts, send, move, read state, and delete; tests: [`internal/provider/outlookweb`](../internal/provider/outlookweb), [`internal/application/mail_test.go`](../internal/application/mail_test.go) | `historical-not-commit-bound`: Microsoft 365 notes from 2026-07-18, 2026-07-19, and 2026-07-25 did not record the exact commit; a content-free v0.9.0-rc.4 check found that consumer accounts use an unsupported authorization scheme | Microsoft 365 work or school accounts. Consumer Outlook.com discovery is closed; Outlook.com uses `microsoft-graph`. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+| Microsoft Graph (`microsoft-graph`) | `microsoft_graph` | `available-with-setup` | `user-oauth-client` | Synthetic REST and application integration contracts; tests: [`internal/provider/graphapi`](../internal/provider/graphapi) | `not-run`: No recorded live observation | Your own public OAuth client with service-derived scopes. Global, GCC High, and DoD use closed endpoint and authority pairs. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+| Google (Gmail and Google Calendar APIs) (`google`) | `google` | `available-with-setup` | `user-oauth-client` | Synthetic Gmail REST, credential-import, OAuth, migration, and application integration contracts; tests: [`internal/provider/googleapi`](../internal/provider/googleapi), [`internal/googleoauthclient`](../internal/googleoauthclient) | `not-run`: No observation of this route; the 2026-07-30 macOS arm64 record covers only the retired IMAP/SMTP transport | Your own Google Desktop OAuth client. Adding the account starts no OAuth; explicit local login does. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+| Google (Gmail and Google Calendar APIs) (`google`) | `managed_oauth` | `disabled` | `managed-oauth-client` | The release-owned gate stays closed; no setting can open it; tests: [`internal/compatcatalog/drift_test.go`](../internal/compatcatalog/drift_test.go) | `not-run`: No observation | A Corresync-owned Google client needs an approved client and opt-in live evidence first. | — |
+| Google web adapter (legacy) (`google-web`) | `google_web` | `unsupported` | `browser-session` | Synthetic semantic-DOM contracts retained; runtime sign-in stops before browser launch; tests: [`internal/provider/googleweb`](../internal/provider/googleweb) | `rejected`: Google rejected the software-controlled browser sign-in on 2026-07-29 | Kept only to handle v0.8.0 and v0.8.1 configuration safely. Use the `google` route. | [#59](https://github.com/nkiyohara/corresync/issues/59) |
+| JMAP (`jmap`) | `jmap` | `available-with-setup` | `external-credential` | Synthetic RFC 8620 session, query, and write contracts; tests: [`internal/provider/jmap`](../internal/provider/jmap) | `not-run`: No recorded live observation | Server-specific behavior is reported through observed capabilities and degradations. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+| IMAP and SMTP (`imap-smtp`) | `imap_smtp` | `available-with-setup` | `external-credential` | Synthetic protocol, MIME, bounded-literal, and capability contracts; tests: [`internal/provider/imapmail`](../internal/provider/imapmail) | `not-run`: No recorded live observation | Server-specific behavior is reported through observed capabilities and degradations. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+| POP3 (`pop3`) | `pop3` | `unsupported` | `external-credential` | None; the identifier is reserved in discovery and configuration validation | `not-run`: No observation | Reserved unavailable identifier; its presence is not an adapter claim. | — |
+| Apple iCloud (guided preset) (`apple-icloud`) | `imap_smtp` | `available-with-setup` | `external-credential` | Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts; tests: [`internal/discovery`](../internal/discovery), [`cmd/corr`](../cmd/corr) | `not-run`: No recorded live observation | A guided preset over the `imap-smtp` route, not a separate adapter. Needs an Apple app-specific password entered through the OS-owned prompt. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+
+### Calendar
+
+| Provider | Route | Availability | Authentication | Deterministic evidence | Live evidence | Notes | Issue |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Microsoft Outlook on the web (`microsoft-owa`) | `outlook_web` | `available` | `browser-session` | Synthetic typed wire contracts for primary-calendar list, create, update, cancel, recurrence, reminders, attendees, and Teams join links; tests: [`internal/provider/outlookweb`](../internal/provider/outlookweb), [`internal/application/calendar_test.go`](../internal/application/calendar_test.go) | `historical-not-commit-bound`: Microsoft 365 notes from 2026-07-18, 2026-07-19, and 2026-07-25 did not record the exact commit | A Teams join link is returned only by a reviewed event creation when the calendar advertises that capability; calendar list does not reliably return it. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+| Microsoft Graph (`microsoft-graph`) | `microsoft_graph` | `available-with-setup` | `user-oauth-client` | Synthetic REST, time-zone, DST, and application integration contracts, including typed Teams-link creation; tests: [`internal/provider/graphapi`](../internal/provider/graphapi) | `not-run`: No recorded live observation | Selectable calendars and typed Teams-link creation as an event property. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+| Google (Gmail and Google Calendar APIs) (`google`) | `google` | `available-with-setup` | `user-oauth-client` | Synthetic Calendar REST, time-zone, all-day, OAuth, and application integration contracts, including the Google Meet field; tests: [`internal/provider/googleapi`](../internal/provider/googleapi), [`internal/googleoauthclient`](../internal/googleoauthclient) | `not-run`: No observation of this route | Selectable calendars; Google Meet creation only after the calendar capability is observed. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+| Google (Gmail and Google Calendar APIs) (`google`) | `managed_oauth` | `disabled` | `managed-oauth-client` | The release-owned gate stays closed; no setting can open it; tests: [`internal/compatcatalog/drift_test.go`](../internal/compatcatalog/drift_test.go) | `not-run`: No observation | A Corresync-owned Google client needs an approved client and opt-in live evidence first. | — |
+| Google web adapter (legacy) (`google-web`) | `google_web` | `unsupported` | `browser-session` | Synthetic semantic-DOM contracts retained; runtime sign-in stops before browser launch; tests: [`internal/provider/googleweb`](../internal/provider/googleweb) | `rejected`: Google rejected the software-controlled browser sign-in on 2026-07-29 | Kept only to handle v0.8.0 and v0.8.1 configuration safely. Use the `google` route. | [#59](https://github.com/nkiyohara/corresync/issues/59) |
+| CalDAV (`caldav`) | `caldav` | `available-with-setup` | `external-credential` | Synthetic WebDAV, iCalendar, and conditional-write contracts; tests: [`internal/provider/caldav/client_test.go`](../internal/provider/caldav/client_test.go), [`internal/provider/caldav/calendar_inherited_allday_test.go`](../internal/provider/caldav/calendar_inherited_allday_test.go) | `not-run`: No recorded live observation | Independent from the CalDAV VTODO task route. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+| Apple iCloud (guided preset) (`apple-icloud`) | `caldav` | `available-with-setup` | `external-credential` | Synthetic discovery, account-review, OS-prompt, and content-free doctor contracts; tests: [`internal/discovery`](../internal/discovery), [`cmd/corr`](../cmd/corr) | `not-run`: No recorded live observation | A guided preset over the `caldav` route, not a separate adapter. Shares one credential handle with Mail by default. | [#36](https://github.com/nkiyohara/corresync/issues/36) |
+
+### Tasks
+
+| Provider | Route | Availability | Authentication | Deterministic evidence | Live evidence | Notes | Issue |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Microsoft Graph (`microsoft-graph`) | `microsoft_graph` | `available-with-setup` | `user-oauth-client` | Synthetic OAuth, national-cloud, REST CRUD and delta, recurrence and time-zone, cursor-restart, and application integration contracts; tests: [`internal/provider/graphapi/task_test.go`](../internal/provider/graphapi/task_test.go), [`internal/application/task_service_test.go`](../internal/application/task_service_test.go) | `not-run`: An opt-in read-only harness exists; no record has been committed | Microsoft To Do. Microsoft Graph operated by 21Vianet is rejected before OAuth. | [#108](https://github.com/nkiyohara/corresync/issues/108) |
+| Outlook Web and Exchange Tasks (`microsoft-web-tasks`) | `microsoft_web_tasks` | `planned` | `browser-session` | None; provider identifier reserved | `not-run`: No observation | Configuration accepts the provider only; the adapter is unavailable. | [#109](https://github.com/nkiyohara/corresync/issues/109) |
+| Todoist (`todoist`) | `todoist` | `available-with-setup` | `user-oauth-client` | Synthetic public-client OAuth, refresh rotation, API v1 REST and Sync CRUD, plan, time, temporary-ID, cursor and isolation, and application integration contracts; tests: [`internal/provider/todoist`](../internal/provider/todoist) | `not-run`: An opt-in harness exists; no record has been committed | Your own public client with PKCE. No personal API token or client secret is accepted. | [#110](https://github.com/nkiyohara/corresync/issues/110) |
+| CalDAV (`caldav`) | `caldav` | `available-with-setup` | `external-credential` | Synthetic RFC 5545 mapping, WebDAV ETag writes, RFC 6578 sync and reset, account and session isolation, and extension-preservation contracts; tests: [`internal/provider/caldav/task_test.go`](../internal/provider/caldav/task_test.go) | `not-run`: No recorded live observation on a real server | VTODO collections; independent consent and session from the CalDAV calendar route. | [#111](https://github.com/nkiyohara/corresync/issues/111) |
+| Google Tasks (`google-tasks`) | `google_tasks` | `available-with-setup` | `user-oauth-client` | Synthetic REST, identity, independent-scope, OAuth, ETag, assigned-task, polling and reset, and application integration contracts; tests: [`internal/provider/googletasks`](../internal/provider/googletasks) | `not-run`: No recorded live observation | Your own Google Desktop OAuth client with a task-only grant that never widens a Gmail or Calendar grant. | [#112](https://github.com/nkiyohara/corresync/issues/112) |
+| Apple Reminders (`apple-reminders`) | `apple_reminders` | `planned` | `os-permission` | None; provider identifier reserved | `not-run`: No observation | Configuration accepts the provider only; the adapter is unavailable. | [#113](https://github.com/nkiyohara/corresync/issues/113) |
+| TickTick (`ticktick`) | `ticktick` | `available-with-setup` | `user-oauth-client` | Synthetic confidential-client OAuth, transient-secret, REST CRUD and search, time, recurrence, assignment, permission, bounds, polling and tombstone, cursor and isolation, and application integration contracts; tests: [`internal/provider/ticktick`](../internal/provider/ticktick) | `not-run`: An opt-in read-only harness exists; no record has been committed | Your own confidential client; its secret stays behind a separate external-credential consent. Identity, refresh, atomic-write, reopen, reminder, and complete-pagination gaps are reported. | [#114](https://github.com/nkiyohara/corresync/issues/114) |
+| Any.do (remote MCP) (`anydo-mcp`) | `anydo_mcp` | `planned` | `upstream-mcp` | None; provider identifier reserved | `not-run`: No observation | Configuration accepts the provider only; the adapter is unavailable. | [#115](https://github.com/nkiyohara/corresync/issues/115) |
+| Things 3 (`things`) | `things` | `planned` | `local-automation` | None; provider identifier reserved | `not-run`: No observation | Configuration accepts the provider only; the adapter is unavailable. | [#116](https://github.com/nkiyohara/corresync/issues/116) |
+| OmniFocus (`omnifocus`) | `omnifocus` | `planned` | `local-automation` | None; provider identifier reserved | `not-run`: No observation | Configuration accepts the provider only; the adapter is unavailable. | [#117](https://github.com/nkiyohara/corresync/issues/117) |
+
+### Messages
+
+| Provider | Route | Availability | Authentication | Deterministic evidence | Live evidence | Notes | Issue |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Microsoft Teams (`microsoft-teams`) | `teams_graph` | `preview` | `user-oauth-client` | Shared synthetic fixtures; account, workspace, and actor isolation, scope capability observation, cursor binding, malformed result, and preview/commit tests; tests: [`internal/provider/teamsgraph`](../internal/provider/teamsgraph), [`internal/provider/teamscontract`](../internal/provider/teamscontract), [`internal/rollout/messaging_test.go`](../internal/rollout/messaging_test.go) | `not-run`: No recorded live observation | Your own Microsoft public client. Graph and Web parity is not yet proven; an account uses exactly one Teams transport. | [#146](https://github.com/nkiyohara/corresync/issues/146) |
+| Microsoft Teams (`microsoft-teams`) | `teams_web` | `preview` | `browser-session` | Shared synthetic fixtures; semantic DOM bounds, account and workspace isolation, cursor binding, and preview/commit tests; tests: [`internal/provider/teamsweb`](../internal/provider/teamsweb), [`internal/provider/teamscontract`](../internal/provider/teamscontract), [`internal/rollout/messaging_test.go`](../internal/rollout/messaging_test.go) | `not-run`: No recorded live observation | Needs a visible browser; terminal login is not supported. | [#146](https://github.com/nkiyohara/corresync/issues/146) |
+| Slack (`slack`) | `slack_api` | `disabled` | `external-credential` | Synthetic Web API contracts for workspace and actor confirmation, installation scopes, bounded cursors and file reads, rate limits, and outcome-unknown writes; release-gate tests; tests: [`internal/provider/slackapi`](../internal/provider/slackapi), [`internal/rollout/messaging_test.go`](../internal/rollout/messaging_test.go) | `not-run`: No observation | The adapter stays dormant behind the release gate (ADR 0034). Use your agent host's own Slack connector. | — |
+| Mattermost (`mattermost`) | `mattermost_api` | `preview` | `external-credential` | Synthetic v4 REST and WebSocket contracts; DNS pinning, SSRF, redirect, compression, event-flood bounds, role capability observation, and preview/commit tests; tests: [`internal/provider/mattermostapi`](../internal/provider/mattermostapi), [`internal/rollout/messaging_test.go`](../internal/rollout/messaging_test.go) | `not-run`: No recorded live observation | One selected public HTTPS origin and team. Attachment sends and ID-bound mention writes are unavailable. | [#148](https://github.com/nkiyohara/corresync/issues/148) |
+
+### Product boundaries
+
+| Boundary | Availability | Deterministic evidence | Live evidence | Notes | Issue |
+| --- | --- | --- | --- | --- | --- |
+| CLI, stable JSON, configuration schema v12 | `available` | Unit, golden, migration, and `NO_COLOR` tests; tests: [`internal/config`](../internal/config), [`cmd/corr`](../cmd/corr) | `historical-not-commit-bound`: Local-terminal note without an exact commit | — | — |
+| Account lifecycle and credential-free discovery | `available` | Unit, DNS and well-known fixtures, and atomic-store tests; tests: [`internal/discovery`](../internal/discovery), [`internal/accountstore`](../internal/accountstore), [`internal/application/account_discovery_test.go`](../internal/application/account_discovery_test.go) | `not-run`: Not run | Discovery never starts OAuth or an administrator-consent flow. | — |
+| Public domain-only compatibility checker | `available` | Browser privacy and source checks; DNS, CORS, bounds, redirect, failure, and SSRF fixtures; tests: [`web/discovery-worker/test`](../web/discovery-worker/test), [`site/check.test.cjs`](../site/check.test.cjs) | `not-run`: Not run | No provider authentication; a result is a hint, not a capability. | — |
+| Authenticated local IPC | `available` | Unix adversarial tests, Windows contracts, and cross-build; tests: [`internal/localipc`](../internal/localipc), [`internal/daemonapi`](../internal/daemonapi) | `historical-not-commit-bound`: macOS arm64 note without an exact commit | — | — |
+| Cross-account search and agenda | `available` | Isolation, ordering, bounds, and partial-failure tests; tests: [`internal/application/projection_test.go`](../internal/application/projection_test.go), [`internal/application/projection_pagination_test.go`](../internal/application/projection_pagination_test.go) | `not-run`: Not run | — | — |
+| Canonical task model, CLI, MCP, IPC, and cross-account projection | `available` | Shared synthetic fixtures; isolation, cursor, bounds, capability, and preview/commit tests; tests: [`internal/application/task_contract_test.go`](../internal/application/task_contract_test.go), [`internal/application/task_service_test.go`](../internal/application/task_service_test.go), [`cmd/corr`](../cmd/corr) | `not-run`: Not run | Each task provider route is listed in the Tasks table. | — |
+| Private saved mail and calendar queries | `available` | Account isolation, strict bounded store, revision race, corrupt purge, CLI and MCP schema, live freshness, and resource-bound tests; tests: [`internal/savedquerystore`](../internal/savedquerystore), [`internal/application/saved_query_test.go`](../internal/application/saved_query_test.go) | `not-run`: Not run | Definitions only; provider results are never persisted. | — |
+| Account and service recovery and provider drift | `available` | Per-lease invalidation, concurrency and drain, preview and monitor cleanup, stateless API retry and circuit, throttle, browser-owner loss, and content-free error tests; tests: [`internal/session`](../internal/session), [`internal/provider/restapi`](../internal/provider/restapi) | `not-run`: Not run | — | [#45](https://github.com/nkiyohara/corresync/issues/45) |
+| Provider-neutral messaging model, schema, and release gate | `available` | Shared synthetic fixtures; isolation, Graph and Web parity, capability observation, cursor binding, and preview/commit tests; tests: [`internal/application/message_contract_test.go`](../internal/application/message_contract_test.go), [`internal/application/message_service_test.go`](../internal/application/message_service_test.go), [`internal/rollout`](../internal/rollout) | `not-run`: Not run | Route availability is listed in the Messages table. | [#149](https://github.com/nkiyohara/corresync/issues/149) |
+| Read-only import staging | `available` | Format, identity, traversal, symlink, and bound tests; tests: [`internal/importstage`](../internal/importstage), [`internal/application/import_test.go`](../internal/application/import_test.go) | `not-run`: Not run | — | — |
+| Monitoring, queue, and local runner | `available` | Consent, recovery, deduplication, loop, rate, and circuit tests; tests: [`internal/eventqueue`](../internal/eventqueue), [`internal/dispatch`](../internal/dispatch), [`internal/application/monitor_engine_test.go`](../internal/application/monitor_engine_test.go) | `not-run`: Not run | Separate opt-in that defaults to off; MCP cannot enable it. | — |
+| Redacted feedback | `available` | Allowlist, secret corpus, malformed and oversized input, and action-order tests; tests: [`internal/feedback`](../internal/feedback) | `historical-not-commit-bound`: Local-terminal note without an exact commit | — | — |
+| Local agent-host detection | `available` | Catalog validation; Unix, Windows, and macOS path, manager, app, symlink, cache, timeout, cancellation, and secret-free JSON fixtures; tests: [`internal/agenthost`](../internal/agenthost) | `not-run`: Not run | — | — |
+| MCP clients | `available` | Native setup-plan and schema tests; tests: [`internal/mcpserver`](../internal/mcpserver), [`internal/integrationlifecycle`](../internal/integrationlifecycle) | `historical-not-commit-bound`: Codex and Claude notes without an exact commit | — | — |
+| Distribution | `available` | Archive, package, SBOM, and inventory verification in candidate and tag workflows; the tagged release workflow and published assets are release-bound; tests: [`tools/releaseverify`](../tools/releaseverify), [`tools/catalogrender`](../tools/catalogrender) | `not-run`: Release-bound workflow evidence does not cover provider or native-platform observations | — | [#50](https://github.com/nkiyohara/corresync/issues/50) |
 <!-- markdownlint-enable MD013 -->
+<!-- compatcatalog:end evidence -->
 
 Historical Outlook Web notes were made on 2026-07-18, 2026-07-19, and
 2026-07-25 using synthetic content and no third-party recipient. Those notes did
 not record the exact commit, so they are context only and do not substantiate
-the current candidate. Google's retired IMAP/SMTP route has the bounded
-commit-bound observation linked above; it is not evidence for the staged Gmail
-API route. No current
-provider or native-platform boundary has a commit-bound live observation
-for the complete v0.9 candidate. The explicit marker and required template live
+the current candidate. Google's retired IMAP/SMTP route has one bounded
+[commit-bound observation](evidence/google-macos-arm64-2026-07-30.md); it is
+not evidence for the current Gmail API route. No current provider or
+native-platform boundary has a commit-bound live observation for the complete
+v0.9 candidate. The explicit marker and required template live
 in the [live evidence index](evidence/README.md).
 
 Cross-compilation proves platform-specific code builds; it does not replace
@@ -54,6 +132,14 @@ native browser, keyring, IPC, Gatekeeper, SmartScreen, or package-manager
 evidence.
 
 ## Provider claims
+
+In short: you can use Outlook on the web for Microsoft 365 mail and calendar
+after an explicit sign-in. Microsoft Graph, Google, Google Tasks, JMAP,
+IMAP/SMTP, CalDAV, the iCloud preset, Todoist, and TickTick work after you
+register your own OAuth client or store a credential outside Corresync. Teams
+and Mattermost messaging are previews without live evidence. Slack messaging,
+Corresync-managed Google OAuth, and the legacy Google web adapter are off. None
+of these routes has a commit-bound live observation for the current candidate.
 
 - `microsoft-owa`: mail and calendar are implemented; historical live notes
   exist. A content-free `v0.9.0-rc.4` observation found that Microsoft 365
@@ -69,8 +155,9 @@ evidence.
   explicitly selected user-owned Desktop OAuth client. Account addition starts
   no OAuth; explicit local login may resolve the external credential and grant.
   The route has synthetic contracts only and
-  remains live-unobserved. The linked macOS observation covers the retired
-  IMAP/SMTP transport and is historical context only.
+  remains live-unobserved. The
+  [macOS observation](evidence/google-macos-arm64-2026-07-30.md) covers the
+  retired IMAP/SMTP transport and is historical context only.
 - `google-tasks`: task-list discovery, typed task CRUD/state, subtasks,
   ordering, output-only source links, date-only due values, ETag conditions,
   and deletion-aware polling use the same user-owned Desktop client model.
@@ -79,11 +166,19 @@ evidence.
   Microsoft To Do are implemented with service-derived scopes and a BYO public
   OAuth client. Global, GCC High, and DoD use closed endpoint/authority pairs;
   China rejects To Do before OAuth. The route has no recorded live observation.
-- `slack`: supported Web API translation is implemented with exact workspace
+- `microsoft-teams`: Teams Graph and Teams Web are previews. An account uses
+  exactly one of them. Teams Graph needs your own Microsoft public client;
+  Teams Web needs a visible browser and does not support terminal login. Both
+  have synthetic contracts only, Graph/Web parity is not yet proven, and no
+  live observation is recorded.
+- `slack`: off. A synthetic Web API adapter exists, but the release gate keeps
+  it unreachable and ADR 0034 removed Slack from the v0.9 messaging cohort.
+  You cannot add or sign in to a Slack messaging route; use your agent host's
+  own Slack connector instead. Its synthetic contracts cover exact workspace
   and actor confirmation, observed installation scopes, bounded cursors and
-  file reads, rate-limit preservation, and outcome-unknown writes. Attachment
-  writes remain unavailable because upload and message creation are not one
-  atomic reviewed commit. The route is a live-unverified preview.
+  file reads, rate-limit preservation, and outcome-unknown writes; attachment
+  writes would remain unavailable because upload and message creation are not
+  one atomic reviewed commit.
 - `mattermost`: supported v4 REST translation and an explicitly opened,
   content-free WebSocket invalidation stream are implemented for one selected
   public HTTPS origin and team. DNS answers are validated and pinned before
@@ -214,6 +309,15 @@ folder/message/event/attachment/request IDs, subjects, recipients, attendees,
 bodies, queries, source paths, screenshots, provider payloads, cookies, tokens,
 canaries, grants, credential references, approval values, or runner arguments.
 Use `corr feedback --last-error` for a locally reviewable report.
+
+## Catalog review
+
+The maintainer reviews the catalog at every release and in every change to
+`internal/rollout`. The review confirms each availability state against the
+release gates, each live-evidence state against the
+[live evidence index](evidence/README.md), and each tracking issue. A provider
+contract change found in primary documentation updates the catalog in the same
+change as the code.
 
 ## Drift policy
 

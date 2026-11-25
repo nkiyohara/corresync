@@ -45,9 +45,15 @@ tasks:
       - prek run --all-files
 
   docs:
-    desc: Lint Markdown documentation
+    desc: Lint Markdown documentation and verify generated compatibility tables
     cmds:
+      - go run ./tools/compatcatalog --check
       - markdownlint-cli2 "**/*.md" "#.git" "#.release" "#dist" "#vendor"
+
+  docs:generate:
+    desc: Regenerate the compatibility tables from the canonical catalog
+    cmds:
+      - go run ./tools/compatcatalog
 
   site:
     desc: Verify Pages metadata, structured data, links, assets, and sitemap
