@@ -69,9 +69,9 @@ jobs:
           echo "Release source: $source_ref"
 
       - name: Install the locked release and signing toolchain
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
         with:
-          version: 2026.7.7
+          version: 2026.11.14
           experimental: true
           install_args: "go goreleaser syft cosign go:github.com/google/go-licenses/v2"
           cache: false
@@ -278,9 +278,9 @@ jobs:
           persist-credentials: false
 
       - name: Install locked cosign
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
         with:
-          version: 2026.7.7
+          version: 2026.11.14
           experimental: true
           install_args: cosign
           cache: false
@@ -332,15 +332,15 @@ jobs:
           persist-credentials: false
 
       - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
         with:
           go-version: "1.27.x"
           cache: false
 
       - name: Install locked cosign
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
         with:
-          version: 2026.7.7
+          version: 2026.11.14
           experimental: true
           install_args: cosign
           cache: false
@@ -576,7 +576,7 @@ jobs:
 
       - name: Set up .NET for WinGetCreate
         if: steps.winget_pr_guard.outputs.skip != 'true'
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: 6.0.428
 

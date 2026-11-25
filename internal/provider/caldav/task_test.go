@@ -151,7 +151,7 @@ func newTaskFixtureServerWithCapabilityStatus(
 		}
 		request.Body = io.NopCloser(bytes.NewReader(body))
 		if request.Method == "PROPFIND" && request.URL.Path == "/user/calendars/" &&
-			bytes.Contains(body, []byte("current-user-privilege-set")) {
+			bytes.Contains(body, []byte("supported-report-set")) {
 			if backend.capabilityStatus != http.StatusMultiStatus {
 				writer.WriteHeader(backend.capabilityStatus)
 				return
