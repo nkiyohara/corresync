@@ -88,7 +88,7 @@ while a sign-in started by another `corr auth login` is unfinished:
 `text_relay` (`--terminal`); treat any other value as an unfinished sign-in of
 an unknown kind. `expiresAt` is the UTC time at which the local daemon ends
 the sign-in if it is not finished. The member is omitted when no such sign-in
-exists and by daemons older than private protocol 31; a sign-in that opens a
+exists and by daemons older than private protocol 33; a sign-in that opens a
 browser window on this computer is not reported. It never contains a session
 ID, pairing link, page address, or page content. MCP `account_status` does not
 include it.

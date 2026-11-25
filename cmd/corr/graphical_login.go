@@ -343,7 +343,7 @@ func runSSHGraphicalLogin(app *runtime, host, account string, port int) error {
 	if err := command.Start(); err != nil {
 		_ = input.Close()
 		_ = output.Close()
-		return errors.New("cannot start SSH; check installation and SSH host configuration")
+		return fmt.Errorf("cannot start ssh (%w); check that OpenSSH is installed and that %s is the name you use with ssh", err, host)
 	}
 	defer func() { _ = input.Close(); cancel(); _ = command.Wait() }()
 	scanner := bufio.NewScanner(output)

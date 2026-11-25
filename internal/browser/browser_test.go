@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -272,5 +273,28 @@ func TestSessionOriginMismatchDiagnosticIsBounded(t *testing.T) {
 	failure := &sessionOriginMismatchError{configured: "https://outlook.office.com", observed: "https://" + strings.Repeat("synthetic", 1000)}
 	if len(failure.Error()) > 256 || strings.Contains(failure.Error(), "synthetic") {
 		t.Fatal("unbounded observed origin escaped into diagnostics")
+	}
+}
+
+func TestLaunchFailureIsOneReadableLine(t *testing.T) {
+	t.Parallel()
+	crash := errors.New("chrome failed to start:\n[1:1:FATAL:zygote_host.cc] synthetic stack frame\n#0 0x0000 frame\n#1 0x0001 frame")
+	failure := launchFailure(t.Context(), "start the browser", crash)
+	if strings.Contains(failure.Error(), "\n") || strings.Contains(failure.Error(), "stack frame") ||
+		!strings.HasPrefix(failure.Error(), "start the browser: chrome failed to start") {
+		t.Fatalf("failure = %q", failure)
+	}
+	long := launchFailure(t.Context(), "open the sign-in page", errors.New(strings.Repeat("x", 5000)))
+	if len(long.Error()) > 260 {
+		t.Fatalf("failure length = %d", len(long.Error()))
+	}
+	if cancelled := launchFailure(t.Context(), "start the browser", context.Canceled); !errors.Is(cancelled, context.Canceled) {
+		t.Fatalf("cancellation lost: %v", cancelled)
+	}
+	if runtime.GOOS == "linux" {
+		sandbox := launchFailure(t.Context(), "start the browser", errors.New("chrome failed to start:\nNo usable sandbox! details follow"))
+		if !errors.Is(sandbox, ErrLinuxSandboxUnavailable) {
+			t.Fatalf("sandbox failure = %v", sandbox)
+		}
 	}
 }
