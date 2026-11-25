@@ -243,6 +243,110 @@ func TestGraphicalWireBoundsAndCompletion(t *testing.T) {
 	}
 }
 
+// The helper does not send an unchanged screen over SSH again. An older local
+// side, which ignores the unchanged flag, simply sees no frame.
+func TestGraphicalWireOmitsUnchangedFrames(t *testing.T) {
+	frames := []*application.GraphicalLoginFrame{
+		{JPEG: []byte("picture-1"), Origin: "https://login.example", Width: 1280, Height: 900},
+		{JPEG: []byte("picture-1"), Origin: "https://login.example", Width: 1280, Height: 900},
+		nil, // navigating
+		{JPEG: []byte("picture-1"), Origin: "https://login.example", Width: 1280, Height: 900},
+		{JPEG: []byte("picture-2"), Origin: "https://login.example", Width: 1280, Height: 900},
+		{JPEG: []byte("picture-2"), Origin: "https://other.example", Width: 1280, Height: 900},
+	}
+	var input strings.Builder
+	input.WriteString(`{"version":1,"action":null}` + "\n")
+	for range frames[1:] {
+		input.WriteString(`{"version":1,"action":{"type":"refresh"}}` + "\n")
+	}
+	calls := 0
+	exchange := func(_ context.Context, action *application.GraphicalLoginAction) (loginui.Result, error) {
+		if action != nil && action.Type == "cancel" {
+			return loginui.Result{Status: "cancelled"}, nil // The helper's cleanup on exit.
+		}
+		frame := frames[calls]
+		calls++
+		return loginui.Result{Status: "pending", Frame: frame}, nil
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	var output bytes.Buffer
+	if err := serveGraphicalStdio(ctx, strings.NewReader(input.String()), &output, exchange); err != nil {
+		t.Fatal(err)
+	}
+	want := []struct {
+		frame     string
+		unchanged bool
+	}{{"picture-1", false}, {"", true}, {"", false}, {"", true}, {"picture-2", false}, {"picture-2", false}}
+	decoder := json.NewDecoder(&output)
+	for index, expected := range want {
+		var got graphicalWireResponse
+		if err := decoder.Decode(&got); err != nil {
+			t.Fatal(err)
+		}
+		frame := ""
+		if got.Result.Frame != nil {
+			frame = string(got.Result.Frame.JPEG)
+		}
+		if frame != expected.frame || got.Result.Unchanged != expected.unchanged || got.Result.ExpiresIn < 55 || got.Result.ExpiresIn > 60 {
+			t.Fatalf("response %d = %+v", index, got.Result)
+		}
+	}
+	// An older local side decodes the same line without the new fields.
+	var legacy struct {
+		Version int `json:"version"`
+		Result  struct {
+			Status string                           `json:"status"`
+			Frame  *application.GraphicalLoginFrame `json:"frame,omitempty"`
+		} `json:"result"`
+	}
+	line, _ := json.Marshal(graphicalWireResponse{Version: graphicalWireVersion, Result: loginui.Result{Status: "pending", Unchanged: true, ExpiresIn: 30}})
+	if err := json.Unmarshal(line, &legacy); err != nil || legacy.Result.Status != "pending" || legacy.Result.Frame != nil {
+		t.Fatalf("legacy decode = %+v, %v", legacy, err)
+	}
+}
+
+// Version 2 carries pointer moves. A version 1 local side is still answered
+// in version 1, and a move in version 1 is refused before it reaches the login.
+func TestGraphicalWireVersions(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		requests string
+		versions []int
+		moves    int
+		fails    bool
+	}{
+		{"version 2 with a move", `{"version":2,"action":null}` + "\n" + `{"version":2,"action":{"type":"move","x":5,"y":6}}` + "\n", []int{2, 2}, 1, false},
+		{"version 1 without moves", `{"version":1,"action":null}` + "\n" + `{"version":1,"action":{"type":"refresh"}}` + "\n", []int{1, 1}, 0, false},
+		{"version 1 with a move", `{"version":1,"action":null}` + "\n" + `{"version":1,"action":{"type":"move","x":5,"y":6}}` + "\n", []int{1}, 0, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			moves := 0
+			exchange := func(_ context.Context, action *application.GraphicalLoginAction) (loginui.Result, error) {
+				if action != nil && action.Type == "move" {
+					moves++
+				}
+				return loginui.Result{Status: "pending"}, nil
+			}
+			var output bytes.Buffer
+			err := serveGraphicalStdio(t.Context(), strings.NewReader(test.requests), &output, exchange)
+			if (err != nil) != test.fails || moves != test.moves {
+				t.Fatalf("err=%v moves=%d", err, moves)
+			}
+			decoder := json.NewDecoder(&output)
+			for index, version := range test.versions {
+				var got graphicalWireResponse
+				if err := decoder.Decode(&got); err != nil || got.Version != version {
+					t.Fatalf("response %d = %+v, %v", index, got, err)
+				}
+			}
+			if decoder.More() {
+				t.Fatal("unexpected response")
+			}
+		})
+	}
+}
+
 // A --host login must survive an unreadable screen or a rejected input the
 // way a local view does. Only a failed start or cancellation ends the helper.
 func TestGraphicalWireKeepsTheLoginOpenAfterAFailedInteraction(t *testing.T) {

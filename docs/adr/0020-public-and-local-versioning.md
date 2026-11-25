@@ -397,3 +397,10 @@ effects, approval binding, and the configuration schema are unchanged. Explicit
 recipients in `reply` and `reply_all` are still rejected; only the error text
 now names `reply_all`. Protocol 30 replaces protocol 29 because the private
 daemon response shape changes.
+
+### Graphical login pointer move
+
+The graphical login action gains the bounded `move` type (ADR 0038). Protocol
+31 replaces protocol 30 because the daemon accepts a value it rejected before.
+The SSH helper wire advances to version 2 for the same reason; a version 2
+helper still answers version 1 requests, which cannot carry `move`.

@@ -31,6 +31,12 @@ func (action GraphicalLoginAction) Validate() error {
 		if action.X != 0 || action.Y != 0 || action.Delta != 0 || action.Text != "" || action.Key != "" || action.Shift {
 			return invalid
 		}
+	case "move":
+		// Pointer movement only, so hover menus open. It carries a position and
+		// nothing else; the page drops it rather than queueing it.
+		if action.Delta != 0 || action.Text != "" || action.Key != "" || action.Shift {
+			return invalid
+		}
 	case "click", "scroll":
 		if action.Text != "" || action.Key != "" || action.Shift || action.Delta < -1000 || action.Delta > 1000 || action.Type == "click" && action.Delta != 0 {
 			return invalid

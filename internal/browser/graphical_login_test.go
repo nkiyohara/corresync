@@ -158,3 +158,51 @@ func TestGraphicalLoginEditingKeys(t *testing.T) {
 		}
 	}
 }
+
+// Hover menus open on pointer movement. A move must reach the page as a
+// mouseover without pressing a button, so it never activates anything.
+func TestGraphicalLoginMoveHoversWithoutClicking(t *testing.T) {
+	executable, err := ResolveExecutable("")
+	if err != nil {
+		t.Skipf("Chromium unavailable: %v", err)
+	}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`<html><body style="margin:0"><div id="menu" style="width:200px;height:200px"></div><script>
+window.hovers=0;window.presses=0;
+const menu=document.getElementById('menu');
+menu.addEventListener('mouseover',()=>window.hovers++);
+document.addEventListener('mousedown',()=>window.presses++);
+document.addEventListener('click',()=>window.presses++);
+</script></body></html>`))
+	}))
+	defer server.Close()
+	options := append([]chromedp.ExecAllocatorOption{}, chromedp.DefaultExecAllocatorOptions[:]...)
+	options = append(options, chromedp.ExecPath(executable), chromedp.Flag("headless", true), chromedp.Flag("ignore-certificate-errors", true)) // Synthetic TLS fixture only.
+	allocator, stop := chromedp.NewExecAllocator(t.Context(), options...)
+	defer stop()
+	ctx, closeBrowser := chromedp.NewContext(allocator)
+	defer closeBrowser()
+	if err := chromedp.Do(ctx, chromedp.Navigate(server.URL+"/login")); err != nil {
+		t.Fatal(err)
+	}
+	handle := &Browser{context: ctx}
+	for _, action := range []application.GraphicalLoginAction{{Type: "move", X: 600, Y: 600}, {Type: "move", X: 50, Y: 50}, {Type: "move", X: 60, Y: 60}} {
+		frame, err := handle.GraphicalLogin(context.Background(), action)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if frame.Origin != server.URL || len(frame.JPEG) == 0 {
+			t.Fatal("a move must return the bounded frame like other input")
+		}
+	}
+	var hovers, presses int
+	if err := chromedp.Do(ctx, evaluateInto(`window.hovers`, &hovers), evaluateInto(`window.presses`, &presses)); err != nil {
+		t.Fatal(err)
+	}
+	if hovers != 1 || presses != 0 {
+		t.Fatalf("hovers=%d presses=%d, want one hover and no press", hovers, presses)
+	}
+	if _, err := handle.GraphicalLogin(context.Background(), application.GraphicalLoginAction{Type: "move", X: 1, Y: 1, Text: "x"}); err == nil {
+		t.Fatal("a move carrying text was accepted")
+	}
+}

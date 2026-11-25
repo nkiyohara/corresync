@@ -2,29 +2,194 @@
 <html lang="en">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>Corresync sign-in</title>
   <style>
+  :root {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --text: #1a2230;
+    --muted: #4a5566;
+    --border: #c7ced8;
+    --accent: #1d5bb8;
+    --accent-text: #ffffff;
+    --focus: #1d5bb8;
+    --info: #1d5bb8;
+    --ok: #1d7a3e;
+    --warn: #8a5a00;
+    --error: #b42318;
+    --tone-bg: #eef3fb;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11151b;
+      --surface: #1a2028;
+      --text: #e7ebf1;
+      --muted: #aab4c2;
+      --border: #3a4452;
+      --accent: #8ab4ff;
+      --accent-text: #0d1520;
+      --focus: #8ab4ff;
+      --info: #8ab4ff;
+      --ok: #6fd391;
+      --warn: #f2c14e;
+      --error: #ff8a80;
+      --tone-bg: #1f2935;
+      color-scheme: dark;
+    }
+  }
+  * {
+    box-sizing: border-box;
+  }
   body {
-    font: 16px system-ui;
-    margin: 1rem;
-    background: #f6f7fb;
-    color: #18202d;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .page {
+    max-width: 1312px;
+    margin: 0 auto;
+    padding: 16px;
   }
   header {
     display: flex;
-    gap: 1rem;
-    align-items: center;
     flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 16px;
+    margin-bottom: 12px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+  #timer {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  #timer.low {
+    color: var(--warn);
+    font-weight: 600;
+  }
+  #status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 8px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--tone, var(--info));
+    border-radius: 6px;
+    background: var(--tone-bg);
+  }
+  #status[data-tone="ok"] {
+    --tone: var(--ok);
+  }
+  #status[data-tone="warn"] {
+    --tone: var(--warn);
+  }
+  #status[data-tone="error"] {
+    --tone: var(--error);
+  }
+  #state-title {
+    font-weight: 600;
+  }
+  #note {
+    flex-basis: 100%;
+    color: var(--muted);
+  }
+  #note:empty {
+    display: none;
+  }
+  #origin {
+    margin: 12px 0;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    overflow-wrap: anywhere;
+  }
+  #origin-host {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
   }
   button {
-    padding: 0.6rem 1rem;
+    min-height: 44px;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+  button.primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-text);
+  }
+  button.danger {
+    color: var(--error);
+  }
+  button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  button:focus-visible,
+  summary:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .stage {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .stage.typing {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
   }
   #screen {
     display: block;
-    max-width: 100%;
+    width: 100%;
     height: auto;
-    border: 1px solid #aab;
+    aspect-ratio: 1280 / 900;
     cursor: default;
+    touch-action: pan-y;
+    user-select: none;
+  }
+  .badge {
+    position: absolute;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: rgba(17, 21, 27, 0.82);
+    color: #ffffff;
+    font-size: 0.875rem;
+    pointer-events: none;
+  }
+  #loading {
+    top: 8px;
+    right: 8px;
+  }
+  .caption {
+    margin: 8px 0 0;
+    font-weight: 600;
+  }
+  .caption.typing {
+    color: var(--focus);
+  }
+  [hidden] {
+    display: none !important;
   }
   #keys {
     position: fixed;
@@ -32,35 +197,81 @@
     width: 1px;
     height: 1px;
   }
-  #status {
-    min-height: 1.5em;
+  .help {
+    margin: 12px 0 0;
+    color: var(--muted);
   }
-  #origin {
+  details {
+    margin-top: 12px;
+  }
+  summary {
+    cursor: pointer;
     font-weight: 600;
-    overflow-wrap: anywhere;
+  }
+  details ul {
+    margin: 8px 0 0;
+    padding-left: 1.25rem;
+  }
+  @media (max-width: 600px) {
+    .page {
+      padding: 12px 16px;
+    }
+    .toolbar button {
+      flex: 1 1 auto;
+    }
   }
   </style>
-  <header>
-    <strong>Corresync sign-in</strong><button id="refresh">Refresh view</button>
-    <button id="cancel">Cancel login</button>
-  </header>
-  <p>
-    Click the remote screen, then type or paste normally. Passwords and MFA stay in the remote
-    browser. This page does not save screen images or typed input.
-  </p>
-  <p id="origin"></p>
-  <p id="status" role="status">Connecting…</p>
-  <img id="screen" alt="Remote sign-in screen" draggable="false">
-  <textarea
-    id="keys"
-    aria-label="Keyboard input for the remote login"
-    autocomplete="off"
-    autocapitalize="off"
-    spellcheck="false"
-  ></textarea>
-  <p>
-    Touch ID, local passkeys, USB security keys, and client certificates are not forwarded. Closing
-    this tab does not cancel immediately; use Cancel or wait for the login timeout.
-  </p>
+  <div class="page">
+    <header>
+      <h1>Corresync sign-in</h1>
+      <span id="timer" hidden></span>
+    </header>
+    <div id="status" role="status" aria-live="polite" data-tone="info">
+      <span id="state-title">Starting</span>
+      <span id="state-text">Starting the remote browser. This can take a few seconds.</span>
+      <span id="note"></span>
+    </div>
+    <p id="origin" hidden>
+      Signing in at <span id="origin-host"></span>. Check this before you type a password.
+    </p>
+    <div class="toolbar">
+      <button id="paste" type="button" class="primary">Paste</button>
+      <button id="refresh" type="button">Refresh view</button>
+      <button id="cancel" type="button" class="danger">Cancel login</button>
+    </div>
+    <div class="stage" id="stage">
+      <img
+        id="screen"
+        alt="Picture of the remote sign-in page. Click it to type."
+        draggable="false"
+      >
+      <span id="loading" class="badge" hidden>Loading…</span>
+    </div>
+    <p id="focus-hint" class="caption">Click the picture to type.</p>
+    <textarea
+      id="keys"
+      aria-label="Keyboard input for the remote sign-in page"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+    ></textarea>
+    <p class="help">
+      Type as you would on the page itself. To paste, press Paste or Ctrl+V (⌘V on a Mac). This
+      page keeps neither the pictures nor what you type. Closing the tab does not cancel the login;
+      use Cancel login.
+    </p>
+    <details>
+      <summary>What does not work here</summary>
+      <ul>
+        <li>Passkeys and Touch ID or Windows Hello on your own computer.</li>
+        <li>USB security keys.</li>
+        <li>Client certificates installed on your own computer.</li>
+      </ul>
+      <p class="help">
+        If your organization requires one of these, sign in on a computer where the provider's own
+        sign-in can use it.
+      </p>
+    </details>
+  </div>
   <script src="/client.js" defer></script>
 </html>

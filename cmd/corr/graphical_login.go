@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,7 +21,16 @@ import (
 	"github.com/nkiyohara/corresync/internal/loginui"
 )
 
-const graphicalWireVersion = 1
+// graphicalWireVersion is the SSH helper protocol. Version 2 adds the pointer
+// move action, so a newer local side stops at the first request against an
+// older helper instead of ending the login at the first move. The helper
+// still answers version 1, which never carries a move, in version 1.
+// Unchanged frames are omitted in both; a version 1 local side sees no frame
+// and keeps its picture.
+const (
+	graphicalWireVersion   = 2
+	graphicalWireVersionV1 = 1
+)
 const graphicalLoginLifetime = 10 * time.Minute
 
 type graphicalWireRequest struct {
@@ -78,6 +88,9 @@ func reportGraphicalFailures(app *runtime, exchange loginui.Exchange) loginui.Ex
 		switch {
 		case err == nil:
 			last = ""
+		case action != nil && action.Type == "move":
+			// A pointer move that did not arrive is dropped by the page; it is
+			// not worth a line in the terminal.
 		case action != nil && err.Error() != last:
 			last = err.Error()
 			_, _ = fmt.Fprintf(app.stderr, "login view: %s\n", last)
@@ -114,25 +127,32 @@ func serveGraphicalUI(ctx context.Context, app *runtime, exchange loginui.Exchan
 		return err
 	}
 	// Print the capability only to the explicitly invoked human CLI, never logs.
+	// Each line fits 80 columns except the link and a long host name, which
+	// stand on lines of their own so a terminal wraps nothing else with them.
 	if sshHost == "" {
 		host := sshHostGuess()
-		_, err = fmt.Fprintf(app.stdout, `Sign in from a browser on your own computer:
+		_, err = fmt.Fprintf(app.stdout, `Sign in from a browser on your own computer.
 
-1. On your own computer, forward the login port over SSH and leave it running:
-     ssh -N -L 127.0.0.1:%d:127.0.0.1:%d %s
-   Use the name you normally pass to ssh if %s is not it.
-2. Open this link in a browser on your own computer:
-     %s
+1. On your own computer, start this SSH tunnel and leave it running:
 
-The link is private and expires in %s. Ctrl-C cancels.
+   ssh -N -L 127.0.0.1:%d:127.0.0.1:%d %s
+
+   If you reach this server by another name, use that instead of %s.
+
+2. Open this link in a browser there. It is private; do not share it.
+
+%s
+
+The link expires in %s. Press Ctrl-C here to cancel.
 The account session stays on this host.
 `, server.Port(), server.Port(), host, host, server.URL(), formatLoginLifetime(lifetime))
 	} else {
-		_, err = fmt.Fprintf(app.stdout, `Opening the sign-in view in your browser. If it does not open, visit:
-  %s
+		_, err = fmt.Fprintf(app.stdout, `Opening the sign-in page in your browser. If it does not open, visit:
 
-The link is private and expires in at most %s. Ctrl-C cancels.
-The account session stays on %s.
+%s
+
+The link is private and expires in at most %s.
+Press Ctrl-C here to cancel. The account session stays on %s.
 `, server.URL(), formatLoginLifetime(lifetime), sshHost)
 		if err == nil {
 			openGraphicalLoginBrowser(ctx, server.URL())
@@ -182,6 +202,7 @@ func serveGraphicalStdio(ctx context.Context, reader io.Reader, writer io.Writer
 		defer cancel()
 		_, _ = exchange(cleanup, &application.GraphicalLoginAction{Type: "cancel"})
 	}()
+	var sent sentFrame
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 1024), 8<<10)
 	lines := make(chan []byte)
@@ -210,7 +231,7 @@ func serveGraphicalStdio(ctx context.Context, reader io.Reader, writer io.Writer
 		var request graphicalWireRequest
 		decoder := json.NewDecoder(bytes.NewReader(line))
 		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&request); err != nil || request.Version != graphicalWireVersion {
+		if err := decoder.Decode(&request); err != nil || request.Version != graphicalWireVersion && request.Version != graphicalWireVersionV1 {
 			return errors.New("incompatible graphical login protocol; update Corresync on both computers")
 		}
 		if err := decoder.Decode(new(any)); err != io.EOF {
@@ -220,9 +241,17 @@ func serveGraphicalStdio(ctx context.Context, reader io.Reader, writer io.Writer
 			if err := request.Action.Validate(); err != nil {
 				return err
 			}
+			if request.Version == graphicalWireVersionV1 && request.Action.Type == "move" {
+				return errors.New("invalid graphical login request")
+			}
 		}
 		result, err := exchange(ctx, request.Action)
-		response := graphicalWireResponse{Version: graphicalWireVersion, Result: result, Failed: err != nil}
+		if err == nil {
+			result = sent.skipUnchanged(result)
+			result.ExpiresIn = remainingSeconds(ctx)
+		}
+		// Answer in the version that was asked: an older local side still works.
+		response := graphicalWireResponse{Version: request.Version, Result: result, Failed: err != nil}
 		if err := json.NewEncoder(writer).Encode(response); err != nil {
 			return errors.New("login connection closed")
 		}
@@ -236,6 +265,44 @@ func serveGraphicalStdio(ctx context.Context, reader io.Reader, writer io.Writer
 			return nil
 		}
 	}
+}
+
+// sentFrame remembers a digest of the last frame the helper sent, so an
+// unchanged screen is not sent over SSH again. The local side keeps its copy
+// of that frame. An older local side, which does not know the unchanged
+// flag, sees no frame and keeps its picture as it does while a page loads.
+type sentFrame struct {
+	known  bool
+	digest [sha256.Size]byte
+	origin string
+}
+
+func (sent *sentFrame) skipUnchanged(result loginui.Result) loginui.Result {
+	if result.Frame == nil {
+		return result
+	}
+	digest := sha256.Sum256(result.Frame.JPEG)
+	if sent.known && digest == sent.digest && result.Frame.Origin == sent.origin {
+		result.Frame = nil
+		result.Unchanged = true
+		return result
+	}
+	sent.known, sent.digest, sent.origin = true, digest, result.Frame.Origin
+	return result
+}
+
+// remainingSeconds reports the helper's remaining lifetime, rounded up, so
+// the local page can show when the remote login ends.
+func remainingSeconds(ctx context.Context) int {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return 0
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 || remaining > graphicalLoginLifetime {
+		return 0
+	}
+	return int((remaining + time.Second - 1) / time.Second)
 }
 
 var graphicalSSHHostPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.@-]*$`)
