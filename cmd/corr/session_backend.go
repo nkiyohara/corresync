@@ -1352,7 +1352,10 @@ func (backend *sessionBackend) TerminalLogin(
 			if err != nil {
 				return daemonapi.TerminalLoginResult{}, err
 			}
-			frame = &observed
+			// No frame while the page navigates; the next refresh supplies it.
+			if len(observed.JPEG) > 0 {
+				frame = &observed
+			}
 		}
 	}
 	progressChecked := false
@@ -1501,10 +1504,20 @@ func (backend *sessionBackend) terminalInteraction(
 	}
 	if existingID, exists := backend.terminalAccounts[input.Account]; exists {
 		interaction := backend.terminalSessions[existingID]
-		if interaction == nil || interaction.caller != caller || interaction.graphical != input.Graphical {
-			return nil, false, errors.New("a terminal login is already active for this account")
+		if interaction != nil && interaction.caller == caller && interaction.graphical == input.Graphical {
+			return interaction, false, nil
 		}
-		return interaction, false, nil
+		// A new explicit start replaces an unfinished login of the same account,
+		// such as one whose terminal or SSH connection was lost. The earlier
+		// browser is closed, never handed over: its session ID stays bound to
+		// the earlier caller and stops working.
+		if interaction != nil {
+			if err := backend.dropTerminalInteraction(interaction, true); err != nil {
+				return nil, false, err
+			}
+		} else {
+			delete(backend.terminalAccounts, input.Account)
+		}
 	}
 	_, configured, exists := backend.configuration.AccountByID(input.Account)
 	if !exists {

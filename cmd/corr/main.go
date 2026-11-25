@@ -268,8 +268,20 @@ func completionEnvironmentActive() bool {
 	return os.Getenv("COMP_LINE") != ""
 }
 
+// terminationSignals lists the signals that cancel the running command. A lost
+// terminal or SSH connection (SIGHUP) cancels like Ctrl-C, so an unfinished
+// login is closed instead of waiting for the daemon timeout. A process
+// started under nohup keeps ignoring SIGHUP.
+func terminationSignals() []os.Signal {
+	signals := []os.Signal{os.Interrupt, syscall.SIGTERM}
+	if !signal.Ignored(syscall.SIGHUP) {
+		signals = append(signals, syscall.SIGHUP)
+	}
+	return signals
+}
+
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), terminationSignals()...)
 	code := runWithCrashBoundary(
 		ctx,
 		os.Args[1:],

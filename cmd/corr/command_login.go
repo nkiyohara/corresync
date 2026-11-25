@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/browser"
 )
@@ -10,8 +11,8 @@ import (
 type loginCommand struct {
 	Account  string `help:"Configured account alias; defaults to default_account."`
 	JSON     bool   `help:"Write machine-readable JSON."`
-	Web      bool   `help:"Open a temporary graphical Outlook Web login view; use SSH forwarding from a remote host."`
-	Host     string `help:"SSH host for graphical login; run this command on your local computer."`
+	Web      bool   `help:"Show the Outlook Web sign-in page through a temporary loopback login view that you open over SSH port forwarding. Used automatically when this host has no display."`
+	Host     string `help:"SSH host whose account to sign in; run this on your own computer to open the login view in its browser."`
 	WebPort  int    `help:"Local loopback port for the temporary login view; defaults to an available port."`
 	WebStdio bool   `hidden:""`
 	Terminal bool   `help:"Experimentally complete browser sign-in through a text-only terminal relay."`
@@ -45,11 +46,9 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	accountID := configured.ID
 	if !command.Terminal && !command.Web && !command.WebStdio && hasOutlookRoute(configured) {
 		if err := browser.RequireGraphicalSession(); err != nil {
-			return fmt.Errorf(
-				"%w; use `corr auth login --account %s --terminal` for text input, or replace --terminal with --web for guided SSH graphical login",
-				err,
-				shellSingleQuote(alias),
-			)
+			if err := command.useForwardedViewWithoutDisplay(app, alias, err); err != nil {
+				return err
+			}
 		}
 	}
 	if command.Terminal {
@@ -66,7 +65,7 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 	}
 	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
 	if command.Web || command.WebStdio {
-		return runGraphicalLogin(app, client, accountID, command.WebPort, command.WebStdio)
+		return runGraphicalLogin(app, client, accountID, command.WebPort, command.WebStdio, time.Duration(configuration.Browser.LoginTimeout))
 	}
 	if command.Terminal {
 		return runTerminalLogin(app, client, accountID)
@@ -95,4 +94,22 @@ func (command *loginCommand) Run(app *runtime) (returnErr error) {
 		)
 	}
 	return err
+}
+
+// useForwardedViewWithoutDisplay switches a default login to the forwarded
+// login view when this host cannot show a browser window. --json has no such
+// fallback because the view prints a private link instead of one JSON value.
+func (command *loginCommand) useForwardedViewWithoutDisplay(app *runtime, alias string, displayErr error) error {
+	if command.JSON {
+		return fmt.Errorf(
+			"%w; --json needs a visible browser on this host. Run `corr auth login --account %s` without --json to sign in through the forwarded login view",
+			displayErr,
+			shellSingleQuote(alias),
+		)
+	}
+	if _, err := fmt.Fprintln(app.stderr, "This host has no display, so the sign-in page is shown through a forwarded login view (same as --web)."); err != nil {
+		return err
+	}
+	command.Web = true
+	return nil
 }

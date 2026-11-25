@@ -54,3 +54,36 @@ certificates, and device policy cannot be forwarded or bypassed. Orca is optiona
 its own port-forwarding behavior is not claimed verified. Synthetic contracts
 cover transport and browser input; real Mac-to-Linux provider login remains
 live-unobserved until the maintainer explicitly performs it.
+
+## Amendment: 0.9.5
+
+The 0.9.1 to 0.9.4 implementation never completed against a real daemon: the
+client rejected every pending graphical result because it carried a frame and no
+text view. The synthetic tests used a stand-in client and missed it. The fix
+keeps the decision above and changes these details:
+
+- A default `corr auth login` on a Linux host without a display starts the
+  `--web` view itself. `--json` still stops with an explanation.
+- A pending graphical result carries a frame or, while the page navigates, no
+  frame. It never carries a text view. A frame taken across a navigation is
+  retried briefly and each screenshot request is bounded, because Chromium
+  does not answer one whose page was replaced. Input is still dispatched at
+  most once; a missing frame after input is not an error.
+- A new explicit start for an account replaces its unfinished login, whether
+  the earlier command is gone or still running. The earlier browser is closed.
+  Its session ID stays bound to the earlier caller and is never handed over, so
+  this is equivalent to cancelling and starting again. SIGHUP now cancels the
+  command like Ctrl-C, unless the process was started with SIGHUP ignored.
+- The login view ends with the daemon's reason when the login cannot start, or
+  after five consecutive failed screen reads. The human CLI prints that reason;
+  the page shows fixed guidance only.
+- The `--host` helper appends the usual install directories to the remote
+  `PATH`, because a non-interactive SSH command does not read the login profile.
+- A reused profile's restored tabs are closed at launch so the owned tab is the
+  only page.
+
+The private daemon protocol is unchanged: the wire fields are the same and no
+released client accepted a graphical result before. On 2026-11-25 the view was
+run on a Linux host without a display against the real Outlook Web sign-in
+page, up to credential entry. A completed provider login from a Mac remains
+unobserved.

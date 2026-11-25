@@ -45,8 +45,16 @@ type Server struct {
 	controller string
 	started    bool
 	finished   bool
+	outcome    string
+	failure    error
+	unreadable int
 	done       chan struct{}
 }
+
+// maxUnreadableScreens is how many screen reads in a row may fail before the
+// view gives up. One read per second means the remote login is gone: it
+// expired, or a newer login for the same account replaced it.
+const maxUnreadableScreens = 5
 
 func New(ctx context.Context, port int, exchange Exchange) (*Server, error) {
 	if port < 0 || port > 65535 || exchange == nil {
@@ -71,6 +79,14 @@ func (server *Server) URL() string {
 }
 func (server *Server) Port() int { return server.port }
 
+// Outcome reports how the interaction ended: "authenticated", "cancelled", or
+// empty when Run returned for another reason.
+func (server *Server) Outcome() string {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	return server.outcome
+}
+
 // Run returns after completion, cancellation, expiry, or server failure.
 func (server *Server) Run(ctx context.Context) error {
 	failure := make(chan error, 1)
@@ -80,6 +96,9 @@ func (server *Server) Run(ctx context.Context) error {
 	case <-ctx.Done():
 		result = ctx.Err()
 	case <-server.done:
+		server.mu.Lock()
+		result = server.failure
+		server.mu.Unlock()
 	case result = <-failure:
 	}
 	shutdown, cancel := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Second)
@@ -154,11 +173,11 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	server.mu.Lock()
 	defer server.mu.Unlock()
 	if server.finished || server.token == "" || subtle.ConstantTimeCompare([]byte(bearer), []byte(server.token)) != 1 {
-		http.Error(writer, "login link expired or invalid", http.StatusUnauthorized)
+		http.Error(writer, "This login link has expired or is not valid. Run the corr command again for a new link.", http.StatusUnauthorized)
 		return
 	}
 	if server.controller != "" && server.controller != controller {
-		http.Error(writer, "login already controlled by another tab", http.StatusConflict)
+		http.Error(writer, "Another browser tab already controls this login. Continue there, or cancel and run the corr command again.", http.StatusConflict)
 		return
 	}
 	var action application.GraphicalLoginAction
@@ -188,14 +207,41 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	if !server.started {
 		result, err = server.exchange(ctx, nil)
 		// A failed start is not retried automatically: its outcome may be unknown.
+		// Nothing in this view can recover from it, so the command ends with the
+		// reason instead of serving a dead page until the link expires.
 		server.started = true
+		if err != nil {
+			server.finished = true
+			server.failure = err
+			close(server.done)
+			http.Error(writer, "The login could not start. The terminal running corr shows the reason.", http.StatusBadGateway)
+			return
+		}
 	} else {
 		result, err = server.exchange(ctx, &action)
 	}
 	if err != nil {
-		http.Error(writer, "login interaction failed; refresh only, do not automatically repeat input", http.StatusBadGateway)
+		if action.Type == "refresh" {
+			server.unreadable++
+			if server.unreadable < maxUnreadableScreens {
+				http.Error(writer, "The remote screen could not be read.", http.StatusBadGateway)
+				return
+			}
+			// Close whatever is left of the remote login, then end the command
+			// with the reason instead of serving a view that cannot recover.
+			cleanup, stop := context.WithTimeout(context.WithoutCancel(request.Context()), 3*time.Second)
+			_, _ = server.exchange(cleanup, &application.GraphicalLoginAction{Type: "cancel"})
+			stop()
+			server.finished = true
+			server.failure = fmt.Errorf("the remote login ended before sign-in completed; run the command again: %w", err)
+			close(server.done)
+			http.Error(writer, "This login has ended. The terminal running corr shows the reason.", http.StatusBadGateway)
+			return
+		}
+		http.Error(writer, "The last input may not have reached the remote page. Check the screen before typing again; input is never repeated automatically.", http.StatusBadGateway)
 		return
 	}
+	server.unreadable = 0
 	if result.Frame != nil && len(result.Frame.JPEG) > application.MaxGraphicalLoginFrameBytes {
 		http.Error(writer, "frame exceeds bound", http.StatusBadGateway)
 		return
@@ -204,6 +250,7 @@ func (server *Server) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	_ = json.NewEncoder(writer).Encode(result)
 	if result.Status == "authenticated" || result.Status == "cancelled" {
 		server.finished = true
+		server.outcome = result.Status
 		close(server.done)
 	}
 }

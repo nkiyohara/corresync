@@ -154,6 +154,21 @@ func (*fakeBackend) LogoutWithOptions(_ context.Context, input LogoutInput, _ do
 
 func (backend *fakeBackend) TerminalLogin(_ context.Context, input TerminalLoginInput, caller domain.Caller) (TerminalLoginResult, error) {
 	backend.terminalInput, backend.caller = input, caller
+	if input.Graphical {
+		// The real backend answers a graphical interaction with a frame and no
+		// text view, or with no frame while the page is navigating.
+		result := TerminalLoginResult{Account: input.Account, SessionID: "tls1_" + strings.Repeat("c", 32), Status: "pending"}
+		switch {
+		case input.GraphicalAction == nil:
+			result.Frame = &application.GraphicalLoginFrame{
+				JPEG: []byte("synthetic frame"), Origin: "https://login.example",
+				Width: application.GraphicalLoginWidth, Height: application.GraphicalLoginHeight,
+			}
+		case input.GraphicalAction.Type == "text":
+			return TerminalLoginResult{Account: input.Account, Status: "authenticated", CapturedAt: time.Unix(4, 0)}, nil
+		}
+		return result, nil
+	}
 	if input.SessionID == "" {
 		return TerminalLoginResult{
 			Account: input.Account, SessionID: "tls1_" + strings.Repeat("a", 32), Status: "pending",
@@ -890,6 +905,25 @@ func TestClientAndServerRoundTripOverLocalIPC(t *testing.T) {
 	}, caller)
 	if err != nil || terminalLogin.Status != "authenticated" || backend.terminalInput.Action.Key != "a" {
 		t.Fatalf("TerminalLogin(continue) = %+v, %v; input=%+v", terminalLogin, err, backend.terminalInput)
+	}
+	// Graphical login must survive the real client validation: a frame without
+	// a text view, then a frameless reply while navigating, then completion.
+	graphical, err := client.TerminalLogin(t.Context(), TerminalLoginInput{Account: testAccountID, Graphical: true}, caller)
+	if err != nil || graphical.Status != "pending" || graphical.View != nil || graphical.Frame == nil ||
+		string(graphical.Frame.JPEG) != "synthetic frame" || graphical.Frame.Origin != "https://login.example" {
+		t.Fatalf("TerminalLogin(graphical start) = %+v, %v", graphical, err)
+	}
+	for _, step := range []struct{ action, status string }{{"refresh", "pending"}, {"text", "authenticated"}} {
+		action := &application.GraphicalLoginAction{Type: step.action}
+		if step.action == "text" {
+			action.Text = "synthetic input"
+		}
+		next, err := client.TerminalLogin(t.Context(), TerminalLoginInput{
+			Account: testAccountID, SessionID: graphical.SessionID, Graphical: true, GraphicalAction: action,
+		}, caller)
+		if err != nil || next.Status != step.status || next.Frame != nil || next.View != nil {
+			t.Fatalf("TerminalLogin(graphical %s) = %+v, %v", step.action, next, err)
+		}
 	}
 	page, err := client.ListMail(t.Context(), application.MailListInput{
 		Account: testAccountID, Folder: application.MailFolder{Kind: application.MailFolderDistinguished, ID: "inbox"},
