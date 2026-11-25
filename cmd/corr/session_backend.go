@@ -1050,9 +1050,35 @@ func (backend *sessionBackend) SessionStatus(
 		} else if backend.interactiveLoginPendingLocked(accountID) {
 			state.State = "pending"
 		}
+		if pending, exists := backend.pendingSignInLocked(accountID); exists {
+			result.PendingSignIns = append(result.PendingSignIns, pending)
+		}
 		result.Accounts = append(result.Accounts, state)
 	}
 	return result, nil
+}
+
+// pendingSignInLocked describes the unfinished terminal or forwarded-view
+// sign-in of account by its kind and expiry only. The session ID, the
+// caller, and anything about the page stay in the daemon.
+func (backend *sessionBackend) pendingSignInLocked(
+	account domain.AccountID,
+) (daemonapi.PendingSignIn, bool) {
+	id, exists := backend.terminalAccounts[account]
+	if !exists {
+		return daemonapi.PendingSignIn{}, false
+	}
+	interaction := backend.terminalSessions[id]
+	if interaction == nil || interaction.deadline.IsZero() {
+		return daemonapi.PendingSignIn{}, false
+	}
+	kind := daemonapi.PendingSignInTextRelay
+	if interaction.graphical {
+		kind = daemonapi.PendingSignInLoginView
+	}
+	return daemonapi.PendingSignIn{
+		Account: account, Kind: kind, ExpiresAt: interaction.deadline.UTC().Truncate(time.Second),
+	}, true
 }
 
 func (backend *sessionBackend) Logout(

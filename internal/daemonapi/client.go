@@ -151,8 +151,20 @@ func (client *Client) LogoutWithOptions(ctx context.Context, input LogoutInput, 
 	return result, nil
 }
 
-// SessionStatus returns content-free in-memory authentication state.
-func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (SessionStatusResult, error) {
+// SessionStatus returns content-free in-memory authentication state. It
+// leaves out unfinished sign-ins, so the MCP server, which uses this method,
+// receives exactly what it received before protocol 31.
+func (client *Client) SessionStatus(ctx context.Context, caller domain.Caller) (application.SessionStatusResult, error) {
+	result, err := client.SessionStatusWithSignIns(ctx, caller)
+	if err != nil {
+		return application.SessionStatusResult{}, err
+	}
+	return result.Application(), nil
+}
+
+// SessionStatusWithSignIns returns the same state as SessionStatus plus the
+// kind and expiry of each unfinished human sign-in, for `corr auth status`.
+func (client *Client) SessionStatusWithSignIns(ctx context.Context, caller domain.Caller) (SessionStatusResult, error) {
 	var result SessionStatusResult
 	if err := client.call(ctx, MethodSessionStatus, caller, struct{}{}, &result); err != nil {
 		return SessionStatusResult{}, err
@@ -371,6 +383,34 @@ func validateSessionStatusResult(result SessionStatusResult) error {
 			}
 		default:
 			return errors.New("daemon returned unknown session state")
+		}
+	}
+	return validatePendingSignIns(result.PendingSignIns, seen)
+}
+
+func validatePendingSignIns(
+	pending []PendingSignIn,
+	accounts map[domain.AccountID]struct{},
+) error {
+	if len(pending) > len(accounts) {
+		return errors.New("daemon returned more pending sign-ins than accounts")
+	}
+	listed := make(map[domain.AccountID]struct{}, len(pending))
+	for _, signIn := range pending {
+		if _, exists := accounts[signIn.Account]; !exists {
+			return errors.New("daemon returned a pending sign-in for an unknown account")
+		}
+		if _, exists := listed[signIn.Account]; exists {
+			return errors.New("daemon returned duplicate pending sign-ins")
+		}
+		listed[signIn.Account] = struct{}{}
+		switch signIn.Kind {
+		case PendingSignInLoginView, PendingSignInTextRelay:
+		default:
+			return errors.New("daemon returned an unknown pending sign-in kind")
+		}
+		if signIn.ExpiresAt.IsZero() {
+			return errors.New("daemon returned a pending sign-in without an expiry")
 		}
 	}
 	return nil

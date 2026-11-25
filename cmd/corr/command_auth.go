@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/credential"
@@ -103,6 +104,15 @@ type sessionStatusView struct {
 	CapturedAt        string                                    `json:"capturedAt,omitempty"`
 	Capabilities      *domain.Capabilities                      `json:"capabilities,omitempty"`
 	Degradations      []domain.Degradation                      `json:"degradations,omitempty"`
+	PendingSignIn     *pendingSignInView                        `json:"pendingSignIn,omitempty"`
+}
+
+// pendingSignInView is an unfinished `corr auth login` for the account: how
+// it is shown and when the local daemon ends it. Nothing else about the
+// sign-in or its page is reported.
+type pendingSignInView struct {
+	Kind      daemonapi.PendingSignInKind `json:"kind"`
+	ExpiresAt string                      `json:"expiresAt"`
 }
 
 func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
@@ -123,10 +133,22 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 		return err
 	}
 	defer func() { returnErr = errors.Join(returnErr, client.Close()) }()
-	result, err := client.SessionStatus(app.context, app.caller())
+	result, err := client.SessionStatusWithSignIns(app.context, app.caller())
 	if err != nil {
 		return err
 	}
+	report := newAuthStatusReport(daemonStatus, result, selectedAccount)
+	if command.JSON {
+		return writeJSON(app.stdout, report)
+	}
+	return writeAuthStatus(app, report, time.Now())
+}
+
+func newAuthStatusReport(
+	daemonStatus daemonapi.Status,
+	result daemonapi.SessionStatusResult,
+	selectedAccount string,
+) authStatusReport {
 	report := authStatusReport{
 		DaemonVersion: daemonStatus.Version,
 		ProcessID:     daemonStatus.ProcessID,
@@ -153,30 +175,45 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 		if account.CapturedAt != nil {
 			item.CapturedAt = account.CapturedAt.UTC().Format("2006-01-02T15:04:05Z")
 		}
+		if pending, exists := result.PendingSignIn(account.Account); exists {
+			item.PendingSignIn = &pendingSignInView{
+				Kind:      pending.Kind,
+				ExpiresAt: pending.ExpiresAt.UTC().Format("2006-01-02T15:04:05Z"),
+			}
+		}
 		report.Accounts = append(report.Accounts, item)
 	}
-	if command.JSON {
-		return writeJSON(app.stdout, report)
-	}
+	return report
+}
+
+func writeAuthStatus(app *runtime, report authStatusReport, now time.Time) error {
 	view := newConsoleView(app, app.stdout, app.interactiveStdout())
+	width := app.textWidth(app.stdout)
 	if _, err := view.printf(
 		"%s  %s  %s\n",
 		view.info(),
-		view.strong("Provider sessions"),
-		view.muted(fmt.Sprintf("daemon %s · PID %d", report.DaemonVersion, report.ProcessID)),
+		view.strong("Sign-in status"),
+		view.muted(fmt.Sprintf("local daemon %s · PID %d", report.DaemonVersion, report.ProcessID)),
 	); err != nil {
 		return err
 	}
 	for _, account := range report.Accounts {
-		detail := account.State
+		detail := strings.ReplaceAll(account.State, "_", " ")
 		icon := view.muted("–")
 		switch account.State {
 		case "authenticated":
 			icon = view.success()
-			detail = "authenticated · captured " + account.CapturedAt
+			detail = "signed in at " + account.CapturedAt
 		case "pending":
 			icon = view.warning()
-			detail = "interactive sign-in pending"
+			detail = "sign-in in progress"
+		}
+		pending := ""
+		if account.PendingSignIn != nil {
+			pending = pendingSignInLabel(*account.PendingSignIn, now)
+			if account.State != "authenticated" {
+				icon, detail, pending = view.warning(), pending, ""
+			}
 		}
 		if _, err := view.printf(
 			"   %s  %s %s\n",
@@ -186,9 +223,22 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 		); err != nil {
 			return err
 		}
+		if pending != "" {
+			if _, err := view.printf("      %s  %s\n", view.warning(), pending); err != nil {
+				return err
+			}
+		}
+		if account.PendingSignIn != nil {
+			if _, err := view.printf(
+				"%s\n         %s\n",
+				wrapText("Finish it where it was started, or start again:", width, "         "),
+				view.nextStep(shellCommand("corr", "auth", "login", "--account", account.Alias)),
+			); err != nil {
+				return err
+			}
+		}
 		for _, service := range account.Services.Values() {
 			serviceIcon := view.muted("–")
-			detail := strings.ReplaceAll(string(service.State), "_", " ")
 			switch service.State {
 			case application.AuthenticationStateAuthenticated:
 				serviceIcon = view.success()
@@ -202,7 +252,7 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 				serviceIcon,
 				service.Service,
 				service.Provider,
-				detail,
+				serviceAuthenticationLabel(service.State),
 			); err != nil {
 				return err
 			}
@@ -210,13 +260,10 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 				service.State != application.AuthenticationStatePending {
 				if _, err := view.printf(
 					"         %s\n",
-					view.muted("Next: "+strings.Join(
-						append(
-							[]string{service.Action.NextAction.Command.Executable},
-							service.Action.NextAction.Command.Args...,
-						),
-						" ",
-					)),
+					view.nextStep(shellCommand(append(
+						[]string{service.Action.NextAction.Command.Executable},
+						service.Action.NextAction.Command.Args...,
+					)...)),
 				); err != nil {
 					return err
 				}
@@ -234,6 +281,55 @@ func (command *authStatusCommand) Run(app *runtime) (returnErr error) {
 		}
 	}
 	return nil
+}
+
+// pendingSignInLabel reads, for example, "Sign-in in progress (forwarded
+// login view), expires in 3 min".
+func pendingSignInLabel(pending pendingSignInView, now time.Time) string {
+	line := "Sign-in in progress (" + pendingSignInKindLabel(pending.Kind) + ")"
+	if expiresAt, err := time.Parse(time.RFC3339, pending.ExpiresAt); err == nil {
+		line += ", " + expiryLabel(expiresAt.Sub(now))
+	}
+	return line
+}
+
+func pendingSignInKindLabel(kind daemonapi.PendingSignInKind) string {
+	switch kind {
+	case daemonapi.PendingSignInLoginView:
+		return "forwarded login view"
+	case daemonapi.PendingSignInTextRelay:
+		return "text relay in a terminal"
+	default:
+		return string(kind)
+	}
+}
+
+// expiryLabel says when an unfinished sign-in ends, rounded up to minutes.
+func expiryLabel(remaining time.Duration) string {
+	switch {
+	case remaining <= 0:
+		return "expiring now"
+	case remaining < time.Minute:
+		return "expires in less than a minute"
+	default:
+		minutes := int((remaining + time.Minute - 1) / time.Minute)
+		return fmt.Sprintf("expires in %d min", minutes)
+	}
+}
+
+func serviceAuthenticationLabel(state application.AuthenticationState) string {
+	switch state {
+	case application.AuthenticationStateAuthenticated:
+		return "signed in"
+	case application.AuthenticationStatePending:
+		return "sign-in in progress"
+	case application.AuthenticationStateSignedOut:
+		return "signed out"
+	case application.AuthenticationStateReauthenticationNeeded:
+		return "needs to sign in again"
+	default:
+		return strings.ReplaceAll(string(state), "_", " ")
+	}
 }
 
 type authLogoutCommand struct {

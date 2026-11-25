@@ -305,7 +305,7 @@ func (command *doctorCommand) addOAuthScopes(
 }
 
 func authenticatedAccountSession(
-	sessions daemonapi.SessionStatusResult,
+	sessions application.SessionStatusResult,
 	account domain.AccountID,
 ) (application.SessionStatus, bool) {
 	for _, session := range sessions.Accounts {

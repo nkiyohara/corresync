@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	ProtocolVersion   = 32
+	ProtocolVersion   = 33
 	maxRequestBytes   = 40 << 20
 	maxResponseBytes  = 48 << 20
 	contentType       = "application/json"
@@ -240,8 +240,51 @@ type LogoutResult struct {
 // SessionStatus is the application-owned, content-free session status schema.
 type SessionStatus = application.SessionStatus
 
-// SessionStatusResult is the application-owned bounded account status result.
-type SessionStatusResult = application.SessionStatusResult
+// SessionStatusResult is the daemon's account status: the application-owned
+// result plus the human sign-ins that are still unfinished. MCP receives only
+// the application-owned part (see Client.SessionStatus).
+type SessionStatusResult struct {
+	Accounts []SessionStatus `json:"accounts"`
+	// PendingSignIns lists, at most once per account, a sign-in that a human
+	// CLI command started and has not finished. It carries no session ID,
+	// pairing capability, page origin, or page content. Daemons before
+	// protocol 31 omit it, as does a daemon with nothing pending.
+	PendingSignIns []PendingSignIn `json:"pendingSignIns,omitempty"`
+}
+
+// PendingSignInKind names how an unfinished sign-in is shown to the person.
+type PendingSignInKind string
+
+const (
+	// PendingSignInLoginView is the forwarded graphical login view
+	// (`corr auth login --web` or `--host`).
+	PendingSignInLoginView PendingSignInKind = "login_view"
+	// PendingSignInTextRelay is the text-only terminal relay
+	// (`corr auth login --terminal`).
+	PendingSignInTextRelay PendingSignInKind = "text_relay"
+)
+
+// PendingSignIn is one unfinished human sign-in and when the daemon ends it.
+type PendingSignIn struct {
+	Account   domain.AccountID  `json:"account"`
+	Kind      PendingSignInKind `json:"kind"`
+	ExpiresAt time.Time         `json:"expiresAt"`
+}
+
+// Application returns the application-owned part of the result.
+func (result SessionStatusResult) Application() application.SessionStatusResult {
+	return application.SessionStatusResult{Accounts: result.Accounts}
+}
+
+// PendingSignIn returns the unfinished sign-in of account, if any.
+func (result SessionStatusResult) PendingSignIn(account domain.AccountID) (PendingSignIn, bool) {
+	for _, pending := range result.PendingSignIns {
+		if pending.Account == account {
+			return pending, true
+		}
+	}
+	return PendingSignIn{}, false
+}
 
 // MonitorStatusInput selects one stable account.
 type MonitorStatusInput struct {
