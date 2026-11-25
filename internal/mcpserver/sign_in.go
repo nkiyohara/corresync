@@ -204,7 +204,7 @@ func accountSignIn(
 		})
 		if err != nil {
 			return resolveSignIn(ctx, signer, caller, approval.Account, approval.Ticket,
-				application.AccountSignInDecisionElicitationFailed)
+				application.AccountSignInDecisionElicitationUnsupported)
 		}
 		return &mcp.CallToolResult{
 			InputRequests: mcp.InputRequestMap{signInInputRequestID: elicitation},
@@ -328,7 +328,7 @@ func signInElicitation(approval application.AccountSignInApproval) (*mcp.ElicitP
 	}
 	return &mcp.ElicitParams{
 		Mode:    "form",
-		Message: signInMessage(approval.Alias, approval.Routes),
+		Message: signInMessage(approval),
 		RequestedSchema: map[string]any{
 			"type":       "object",
 			"properties": map[string]any{},
@@ -336,33 +336,77 @@ func signInElicitation(approval application.AccountSignInApproval) (*mcp.ElicitP
 	}, nil
 }
 
-func signInMessage(alias string, routes []application.AccountSignInRoute) string {
-	return fmt.Sprintf(
-		"Corresync sign-in request for account %q (%s).\n\n"+
-			"An assistant asked Corresync to sign in to this account. If you accept, Corresync opens the same browser sign-in as "+
-			"`corr auth login --account %s` on this computer: its dedicated browser window at the configured sign-in page, "+
-			"or the provider's sign-in page in your browser.\n\n"+
-			"Enter your password, MFA code, and consent only in that browser, never in this chat. Nothing you type there is shared with the assistant.\n\n"+
-			"Accept only if you expected this request. Declining is safe; you can sign in later yourself with the command above.",
-		alias, describeSignInRoutes(routes), alias,
-	)
+// signInRouteGroup is one provider destination and the services it signs in.
+type signInRouteGroup struct {
+	provider string
+	kind     application.AccountSignInRouteKind
+	host     string
+	clientID string
+	services []string
 }
 
-func describeSignInRoutes(routes []application.AccountSignInRoute) string {
-	order := make([]string, 0, len(routes))
-	services := make(map[string][]string, len(routes))
-	for _, route := range routes {
-		name := providerDisplayName(route.Provider)
-		if _, seen := services[name]; !seen {
-			order = append(order, name)
+func signInMessage(approval application.AccountSignInApproval) string {
+	address := approval.Address
+	if address == "" {
+		address = "not configured"
+	}
+	var message strings.Builder
+	fmt.Fprintf(&message, "Corresync sign-in request for account %q.\nAccount address: %s\n\n", approval.Alias, address)
+	fmt.Fprintf(&message,
+		"An assistant asked Corresync to sign in to this account. If you accept, Corresync does exactly what "+
+			"`corr auth login --account %s` does on this computer:\n", approval.Alias)
+	opensPage := false
+	for _, group := range groupSignInRoutes(approval.Routes) {
+		services := strings.Join(group.services, ", ")
+		switch group.kind {
+		case application.AccountSignInDedicatedBrowser:
+			opensPage = true
+			fmt.Fprintf(&message, "\n%s (%s): Corresync opens its dedicated sign-in browser window.\nSign-in page: %s\n",
+				group.provider, services, group.host)
+		case application.AccountSignInProviderAuthorization:
+			opensPage = true
+			fmt.Fprintf(&message, "\n%s (%s): your browser opens the provider's authorization page.\nSign-in page: %s\n",
+				group.provider, services, group.host)
+			if group.clientID != "" {
+				fmt.Fprintf(&message, "OAuth client ID: %s\n", group.clientID)
+			}
+		case application.AccountSignInStoredCredential:
+			fmt.Fprintf(&message,
+				"\n%s (%s): Corresync will read the saved credential from your keyring; your system may ask for permission.\nServer: %s\n",
+				group.provider, services, group.host)
 		}
-		services[name] = append(services[name], string(route.Service))
 	}
-	parts := make([]string, 0, len(order))
-	for _, name := range order {
-		parts = append(parts, name+": "+strings.Join(services[name], ", "))
+	if opensPage {
+		message.WriteString("\nCheck that each sign-in page above is the one you normally use. " +
+			"Enter your password, MFA code, and consent only on that page, never in this chat. " +
+			"Nothing you type there is shared with the assistant.\n")
 	}
-	return strings.Join(parts, "; ")
+	message.WriteString("\nAccept only if you expected this request. Declining is safe; you can sign in yourself with the command above.")
+	return message.String()
+}
+
+func groupSignInRoutes(routes []application.AccountSignInRoute) []signInRouteGroup {
+	groups := make([]signInRouteGroup, 0, len(routes))
+	for _, route := range routes {
+		provider := providerDisplayName(route.Provider)
+		matched := false
+		for index := range groups {
+			group := &groups[index]
+			if group.provider == provider && group.kind == route.Kind &&
+				group.host == route.Host && group.clientID == route.ClientID {
+				group.services = append(group.services, string(route.Service))
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			groups = append(groups, signInRouteGroup{
+				provider: provider, kind: route.Kind, host: route.Host, clientID: route.ClientID,
+				services: []string{string(route.Service)},
+			})
+		}
+	}
+	return groups
 }
 
 // providerDisplayName maps closed provider IDs to fixed labels. Unknown IDs

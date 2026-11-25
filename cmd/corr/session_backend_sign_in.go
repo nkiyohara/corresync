@@ -7,11 +7,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/domain"
+	"github.com/nkiyohara/corresync/internal/paths"
 )
 
 // errInvalidSignInApproval is returned for a resolution that does not match
@@ -19,6 +21,9 @@ import (
 var errInvalidSignInApproval = errors.New(
 	"sign-in approval is invalid, already used, or bound to another caller; nothing was started",
 )
+
+// signInStateCaller attributes daemon-internal state events in the audit log.
+var signInStateCaller = domain.Caller{Surface: "daemon", Instance: "sign-in-state"}
 
 // signInApproval is one reserved approval prompt for one account and one MCP
 // caller. At most one exists per account.
@@ -29,23 +34,40 @@ type signInApproval struct {
 }
 
 // signInCooldown blocks further MCP prompts for one account after the person
-// declined or cancelled, or after an MCP-started sign-in did not finish.
+// declined or cancelled, after a prompt went unanswered or failed, or after an
+// MCP-started sign-in did not finish.
 type signInCooldown struct {
 	until    time.Time
 	declined bool
 }
 
+// mcpSignInRun is one daemon-owned sign-in started after MCP approval.
+type mcpSignInRun struct {
+	alias  string
+	endsAt time.Time
+	cancel context.CancelFunc
+	done   chan struct{}
+}
+
 // signInCoordinator holds the daemon-owned state for interactive sign-ins:
 // running visible logins from either surface, pending MCP approval prompts,
-// and per-account cool-downs. It is guarded by sessionBackend.mu.
+// persisted per-account cool-downs, and the persisted record of connection
+// settings verified by a CLI-started sign-in. It is guarded by
+// sessionBackend.mu.
 type signInCoordinator struct {
 	running   map[domain.AccountID]int
 	approvals map[domain.AccountID]signInApproval
 	cooldowns map[domain.AccountID]signInCooldown
-	now       func() time.Time
-	display   func() error
-	audit     application.AuditRecorder
-	newTicket func() (string, error)
+	verified  map[domain.AccountID]string
+	mcpRuns   map[domain.AccountID]*mcpSignInRun
+	// stateFailedUntil cools down every account when persisted state could
+	// not be read or written.
+	stateFailedUntil time.Time
+	files            signInStateFiles
+	now              func() time.Time
+	display          func() error
+	audit            application.AuditRecorder
+	newTicket        func() (string, error)
 }
 
 func newSignInCoordinator() *signInCoordinator {
@@ -53,6 +75,8 @@ func newSignInCoordinator() *signInCoordinator {
 		running:   make(map[domain.AccountID]int),
 		approvals: make(map[domain.AccountID]signInApproval),
 		cooldowns: make(map[domain.AccountID]signInCooldown),
+		verified:  make(map[domain.AccountID]string),
+		mcpRuns:   make(map[domain.AccountID]*mcpSignInRun),
 		now:       time.Now,
 		display:   browser.RequireGraphicalSession,
 		newTicket: newSignInTicket,
@@ -67,16 +91,169 @@ func newSignInTicket() (string, error) {
 	return "sit1_" + base64.RawURLEncoding.EncodeToString(value), nil
 }
 
-// signInsLocked returns the coordinator, creating it on first use so test
-// backends built as literals keep working.
+// signInsLocked returns the coordinator. A backend built without
+// initSignInState gets one without persisted state, which fails closed.
 func (backend *sessionBackend) signInsLocked() *signInCoordinator {
 	if backend.signIn == nil {
 		backend.signIn = newSignInCoordinator()
-		if backend.recorder != nil {
-			backend.signIn.audit = backend.recorder
-		}
+		backend.loadSignInStateLocked()
 	}
 	return backend.signIn
+}
+
+// initSignInState loads persisted sign-in state from <state>/sign-in.
+func (backend *sessionBackend) initSignInState() {
+	coordinator := newSignInCoordinator()
+	if backend.recorder != nil {
+		coordinator.audit = backend.recorder
+	}
+	if state, err := paths.StateDir(); err == nil {
+		coordinator.files = signInStateFiles{dir: filepath.Join(state, "sign-in")}
+	}
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	backend.signIn = coordinator
+	backend.loadSignInStateLocked()
+}
+
+// loadSignInStateLocked reads persisted cool-downs and CLI verification
+// records. Unreadable cool-down state cools down every account for the full
+// period; unreadable verification state verifies nothing. Records for
+// accounts no longer configured are removed.
+func (backend *sessionBackend) loadSignInStateLocked() {
+	coordinator := backend.signIn
+	now := coordinator.now()
+	cooldowns, err := coordinator.files.loadCooldowns(now)
+	if err != nil {
+		coordinator.stateFailedUntil = now.Add(application.AccountSignInCooldown)
+		backend.recordSignInStateEvent("cool_down_state_unreadable")
+		cooldowns = make(map[domain.AccountID]signInCooldown)
+	}
+	coordinator.cooldowns = cooldowns
+	verified, err := coordinator.files.loadVerified()
+	if err != nil {
+		backend.recordSignInStateEvent("verification_state_unreadable")
+		verified = make(map[domain.AccountID]string)
+	}
+	pruned := false
+	for account := range verified {
+		if _, _, exists := backend.configuration.AccountByID(account); !exists {
+			delete(verified, account)
+			pruned = true
+		}
+	}
+	coordinator.verified = verified
+	if pruned {
+		if err := coordinator.files.saveVerified(verified); err != nil {
+			backend.recordSignInStateEvent("verification_state_unwritable")
+		}
+	}
+}
+
+// recordSignInStateEvent audits daemon-internal state failures. They belong
+// to no request, so they use the daemon lifecycle rather than a caller context.
+//
+//nolint:contextcheck,nolintlint // contextcheck reports this on every caller.
+func (backend *sessionBackend) recordSignInStateEvent(reason string) {
+	recorder := backend.signIn.audit
+	if recorder == nil {
+		return
+	}
+	operation, err := domain.NewGlobalOperation("account.sign_in.state", domain.EffectReversibleWrite, struct{}{})
+	if err != nil {
+		return
+	}
+	_ = recorder.Record(context.WithoutCancel(backend.lifecycle), application.AuditEvent{
+		Phase: application.AuditPhaseExecuted, Outcome: application.AuditOutcomeFailure,
+		Reason: reason, Caller: signInStateCaller, Operation: operation.View(),
+	})
+}
+
+// setSignInCooldownLocked starts the fixed cool-down for one account and
+// persists it so a daemon restart cannot clear it.
+func (backend *sessionBackend) setSignInCooldownLocked(account domain.AccountID, declined bool) {
+	coordinator := backend.signInsLocked()
+	now := coordinator.now()
+	coordinator.cooldowns[account] = signInCooldown{
+		until: now.Add(application.AccountSignInCooldown), declined: declined,
+	}
+	if err := coordinator.files.saveCooldowns(coordinator.cooldowns, now); err != nil {
+		coordinator.stateFailedUntil = now.Add(application.AccountSignInCooldown)
+		backend.recordSignInStateEvent("cool_down_state_unwritable")
+	}
+}
+
+// recordCLISignInLocked marks the account's current connection settings as
+// verified by a sign-in that a person started from the CLI.
+func (backend *sessionBackend) recordCLISignInLocked(accountID domain.AccountID) {
+	_, configured, exists := backend.configuration.AccountByID(accountID)
+	if !exists {
+		return
+	}
+	digest, err := signInRouteDigest(configured)
+	if err != nil {
+		return
+	}
+	coordinator := backend.signInsLocked()
+	if coordinator.verified[accountID] == digest {
+		return
+	}
+	coordinator.verified[accountID] = digest
+	if err := coordinator.files.saveVerified(coordinator.verified); err != nil {
+		backend.recordSignInStateEvent("verification_state_unwritable")
+	}
+}
+
+// cliVerifiedLocked reports whether the account's current settings match the
+// record of its last CLI-completed sign-in.
+func (backend *sessionBackend) cliVerifiedLocked(accountID domain.AccountID) bool {
+	_, configured, exists := backend.configuration.AccountByID(accountID)
+	if !exists {
+		return false
+	}
+	digest, err := signInRouteDigest(configured)
+	recorded := backend.signInsLocked().verified[accountID]
+	return err == nil && recorded != "" &&
+		subtle.ConstantTimeCompare([]byte(recorded), []byte(digest)) == 1
+}
+
+// errBehindMCPSignIn explains that a CLI sign-in operation would wait behind
+// a running MCP-started sign-in, which holds the daemon's activation lock.
+func (backend *sessionBackend) errBehindMCPSignIn(action string) error {
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	if backend.signIn == nil {
+		return nil
+	}
+	for _, run := range backend.signIn.mcpRuns {
+		return fmt.Errorf(
+			"%s would wait for the sign-in an MCP client started for account %q, which stays open in its browser until %s; "+
+				"finish or close it there, or cancel it with `corr auth logout --account %s`",
+			action, run.alias, run.endsAt.Local().Format("15:04:05 MST"), run.alias,
+		)
+	}
+	return nil
+}
+
+// cancelMCPSignIn stops a running MCP-started sign-in for one account and
+// waits until its browser is closed and its state cleared.
+func (backend *sessionBackend) cancelMCPSignIn(ctx context.Context, accountID domain.AccountID) (bool, error) {
+	backend.mu.Lock()
+	var run *mcpSignInRun
+	if backend.signIn != nil {
+		run = backend.signIn.mcpRuns[accountID]
+	}
+	backend.mu.Unlock()
+	if run == nil {
+		return false, nil
+	}
+	run.cancel()
+	select {
+	case <-run.done:
+		return true, nil
+	case <-ctx.Done():
+		return true, ctx.Err()
+	}
 }
 
 // beginInteractiveLoginLocked marks one visible sign-in as running so status
@@ -208,12 +385,27 @@ func (backend *sessionBackend) RequestAccountSignIn(
 		status, reason = application.AccountSignInDeclined, application.AccountSignInReasonRecentlyDeclined
 	case cooling && now.Before(cooldown.until):
 		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonRecentlyUnfinished
-	case len(configuredAuthenticationServices(configured)) == 0 || hasGoogleWebRoute(configured):
-		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonRouteUnsupported
+	case now.Before(coordinator.stateFailedUntil):
+		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonStateUnavailable
+	case !backend.cliVerifiedLocked(accountID):
+		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonCLISignInRequired
 	case !application.AccountSignInAliasDisplayable(alias):
 		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonAliasNotDisplayable
-	case coordinator.display() != nil:
-		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonDisplayUnavailable
+	case configured.Address != "" && !application.AccountSignInAddressDisplayable(configured.Address):
+		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonDestinationNotDisplayable
+	}
+	var routes []application.AccountSignInRoute
+	if status == "" {
+		var routeErr error
+		routes, routeErr = signInDestinations(configured)
+		switch {
+		case errors.Is(routeErr, errSignInDestinationUndisplayed):
+			status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonDestinationNotDisplayable
+		case routeErr != nil:
+			status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonRouteUnsupported
+		case coordinator.display() != nil:
+			status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonDisplayUnavailable
+		}
 	}
 	if status != "" {
 		backend.mu.Unlock()
@@ -245,13 +437,8 @@ func (backend *sessionBackend) RequestAccountSignIn(
 		return application.AccountSignInRequest{}, err
 	}
 	approval := application.AccountSignInApproval{
-		Ticket: ticket, Account: accountID, Alias: alias,
-		ExpiresAt: now.Add(application.AccountSignInApprovalTTL).UTC(),
-	}
-	for _, service := range configuredAuthenticationServices(configured) {
-		approval.Routes = append(approval.Routes, application.AccountSignInRoute{
-			Service: service, Provider: configuredServiceProvider(configured, service),
-		})
+		Ticket: ticket, Account: accountID, Alias: alias, Address: configured.Address,
+		Routes: routes, ExpiresAt: now.Add(application.AccountSignInApprovalTTL).UTC(),
 	}
 	if err := approval.Validate(); err != nil {
 		backend.mu.Unlock()
@@ -302,6 +489,7 @@ func (backend *sessionBackend) expireSignInApprovalsLocked() []expiredSignInAppr
 	for account, approval := range coordinator.approvals {
 		if !now.Before(approval.expiresAt) {
 			delete(coordinator.approvals, account)
+			backend.setSignInCooldownLocked(account, false)
 			expired = append(expired, expiredSignInApproval{account: account, caller: approval.caller})
 		}
 	}
@@ -377,6 +565,7 @@ func (backend *sessionBackend) ResolveAccountSignIn(
 	}
 
 	if !now.Before(approval.expiresAt) {
+		backend.setSignInCooldownLocked(accountID, false)
 		backend.mu.Unlock()
 		return finish(
 			application.AccountSignInUnavailable, application.AccountSignInReasonApprovalExpired, nil,
@@ -385,9 +574,7 @@ func (backend *sessionBackend) ResolveAccountSignIn(
 	}
 	switch resolution.Decision {
 	case application.AccountSignInDecisionDeclinedByUser, application.AccountSignInDecisionCancelledByUser:
-		coordinator.cooldowns[accountID] = signInCooldown{
-			until: now.Add(application.AccountSignInCooldown), declined: true,
-		}
+		backend.setSignInCooldownLocked(accountID, true)
 		backend.mu.Unlock()
 		reason := application.AccountSignInReasonUserDeclined
 		if resolution.Decision == application.AccountSignInDecisionCancelledByUser {
@@ -398,11 +585,14 @@ func (backend *sessionBackend) ResolveAccountSignIn(
 			committed(application.AuditOutcomeDenied, string(reason)),
 		)
 	case application.AccountSignInDecisionElicitationFailed, application.AccountSignInDecisionElicitationUnsupported:
-		backend.mu.Unlock()
-		reason := application.AccountSignInReasonElicitationFailed
-		if resolution.Decision == application.AccountSignInDecisionElicitationUnsupported {
-			reason = application.AccountSignInReasonElicitationUnsupported
+		// A prompt that was shown but not accepted cools the account down;
+		// a client that could not show one does not.
+		reason := application.AccountSignInReasonElicitationUnsupported
+		if resolution.Decision == application.AccountSignInDecisionElicitationFailed {
+			reason = application.AccountSignInReasonElicitationFailed
+			backend.setSignInCooldownLocked(accountID, false)
 		}
+		backend.mu.Unlock()
 		return finish(
 			application.AccountSignInUnavailable, reason, nil,
 			committed(application.AuditOutcomeDenied, string(reason)),
@@ -423,6 +613,11 @@ func (backend *sessionBackend) ResolveAccountSignIn(
 		reason := application.AccountSignInReasonSignInRunning
 		return finish(application.AccountSignInInProgress, reason, nil, approved, signInDeniedEvent(reason))
 	}
+	if !backend.cliVerifiedLocked(accountID) {
+		backend.mu.Unlock()
+		reason := application.AccountSignInReasonCLISignInRequired
+		return finish(application.AccountSignInUnavailable, reason, nil, approved, signInDeniedEvent(reason))
+	}
 	if coordinator.display() != nil {
 		backend.mu.Unlock()
 		reason := application.AccountSignInReasonDisplayUnavailable
@@ -434,6 +629,9 @@ func (backend *sessionBackend) ResolveAccountSignIn(
 		return application.AccountSignInResult{}, errors.New("browser login timeout is not configured")
 	}
 	expiresAt := now.Add(timeout).UTC()
+	runContext, cancel := context.WithTimeout(backend.lifecycle, timeout)
+	run := &mcpSignInRun{alias: alias, endsAt: expiresAt, cancel: cancel, done: make(chan struct{})}
+	coordinator.mcpRuns[accountID] = run
 	backend.beginInteractiveLoginLocked(accountID)
 	backend.active.Add(1)
 	backend.mu.Unlock()
@@ -446,38 +644,43 @@ func (backend *sessionBackend) ResolveAccountSignIn(
 		},
 	)
 	if err != nil {
-		backend.endInteractiveLogin(accountID)
+		backend.mu.Lock()
+		delete(coordinator.mcpRuns, accountID)
+		backend.endInteractiveLoginLocked(accountID)
+		backend.mu.Unlock()
+		cancel()
+		close(run.done)
 		backend.active.Done()
 		return application.AccountSignInResult{}, err
 	}
 	// The sign-in belongs to the daemon lifecycle, not this request: the MCP
-	// tool returns now and the daemon finishes or expires the session itself.
-	go backend.runApprovedSignIn(accountID, caller, timeout, recorder) //nolint:contextcheck
+	// tool returns now and the daemon finishes, expires, or cancels it itself.
+	go backend.runApprovedSignIn(runContext, accountID, caller, run, recorder) //nolint:contextcheck
 	return result, nil
 }
 
 // runApprovedSignIn runs the CLI's visible sign-in for one account under the
 // configured login timeout and records its content-free outcome.
 func (backend *sessionBackend) runApprovedSignIn(
+	ctx context.Context,
 	accountID domain.AccountID,
 	caller domain.Caller,
-	timeout time.Duration,
+	run *mcpSignInRun,
 	recorder application.AuditRecorder,
 ) {
 	defer backend.active.Done()
-	ctx, cancel := context.WithTimeout(backend.lifecycle, timeout)
-	defer cancel()
+	defer close(run.done)
+	defer run.cancel()
 	_, err := backend.activateAccount(ctx, accountID)
 
 	backend.mu.Lock()
 	backend.endInteractiveLoginLocked(accountID)
 	coordinator := backend.signInsLocked()
+	if coordinator.mcpRuns[accountID] == run {
+		delete(coordinator.mcpRuns, accountID)
+	}
 	if err != nil {
-		coordinator.cooldowns[accountID] = signInCooldown{
-			until: coordinator.now().Add(application.AccountSignInCooldown),
-		}
-	} else {
-		delete(coordinator.cooldowns, accountID)
+		backend.setSignInCooldownLocked(accountID, false)
 	}
 	backend.mu.Unlock()
 
@@ -489,8 +692,10 @@ func (backend *sessionBackend) runApprovedSignIn(
 	case err == nil:
 	case errors.Is(err, context.DeadlineExceeded):
 		event.outcome, event.reason = application.AuditOutcomeFailure, "sign_in_expired"
+	case errors.Is(err, context.Canceled):
+		event.outcome, event.reason = application.AuditOutcomeFailure, "sign_in_cancelled"
 	default:
 		event.outcome, event.reason = application.AuditOutcomeFailure, "sign_in_failed"
 	}
-	_ = backend.recordSignInAudit(backend.lifecycle, recorder, accountID, caller, event)
+	_ = backend.recordSignInAudit(ctx, recorder, accountID, caller, event)
 }

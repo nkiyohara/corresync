@@ -562,7 +562,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	accountAddTool := &mcp.Tool{
 		Name:        "account_add",
 		Title:       "Preview adding an account route",
-		Description: "Validate one complete, explicit, secret-free mail/calendar/task route and return a caller-bound approval preview. No authentication, credential lookup, OAuth, browser, or configuration write occurs. The review states that a later explicit local CLI login is required. Commit restarts the local session owner so no route uses stale configuration.",
+		Description: "Validate one complete, explicit, secret-free mail/calendar/task route and return a caller-bound approval preview. No authentication, credential lookup, OAuth, browser, or configuration write occurs. A first sign-in started from the local CLI (`corr auth login --account ALIAS`) is required before account_sign_in can be used for this account. Commit restarts the local session owner so no route uses stale configuration.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Review an account addition",
 			ReadOnlyHint:    false,
@@ -575,7 +575,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 		},
 	}
 	if messagingEnabled {
-		accountAddTool.Description = "Validate one complete, explicit, secret-free service route and return a caller-bound approval preview. No authentication, credential lookup, OAuth, browser, or configuration write occurs. The review states that a later explicit local CLI login is required. Commit restarts the local session owner so no route uses stale configuration."
+		accountAddTool.Description = "Validate one complete, explicit, secret-free service route and return a caller-bound approval preview. No authentication, credential lookup, OAuth, browser, or configuration write occurs. A first sign-in started from the local CLI (`corr auth login --account ALIAS`) is required before account_sign_in can be used for this account. Commit restarts the local session owner so no route uses stale configuration."
 		mcp.AddTool(server, accountAddTool, func(ctx context.Context, _ *mcp.CallToolRequest, input application.AccountAddInput) (*mcp.CallToolResult, application.AccountChangeAccess, error) {
 			result, err := backend.PreviewAccountAdd(ctx, input, caller)
 			return nil, result, err
@@ -589,7 +589,7 @@ func New(backend Backend, options Options) (*mcp.Server, error) {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "account_add_commit",
 		Title:       "Commit an approved account addition",
-		Description: "Consume exactly one account_add approval, atomically save the reviewed route without authenticating or resolving a credential, and restart the local session owner. A later explicit local CLI login remains required. The token is caller-bound, short-lived, single-use, and bound to the complete route payload, including private credential references omitted from read views.",
+		Description: "Consume exactly one account_add approval, atomically save the reviewed route without authenticating or resolving a credential, and restart the local session owner. A first sign-in started from the local CLI remains required before account_sign_in can be used for this account, and again after any route change. The token is caller-bound, short-lived, single-use, and bound to the complete route payload, including private credential references omitted from read views.",
 		Annotations: &mcp.ToolAnnotations{
 			Title:           "Commit the reviewed account addition",
 			ReadOnlyHint:    false,

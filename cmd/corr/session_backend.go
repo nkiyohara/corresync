@@ -562,6 +562,7 @@ func newSessionBackend(app *runtime) (*sessionBackend, error) {
 	}
 	backend.monitor = monitor
 	backend.monitorEngine = engine
+	backend.initSignInState()
 	return backend, nil
 }
 
@@ -971,6 +972,9 @@ func (backend *sessionBackend) Login(
 			"authentication can only be started by an explicit local CLI command",
 		)
 	}
+	if err := backend.errBehindMCPSignIn("this sign-in"); err != nil {
+		return daemonapi.LoginResult{}, err
+	}
 	backend.mu.Lock()
 	if backend.closed {
 		backend.mu.Unlock()
@@ -986,6 +990,9 @@ func (backend *sessionBackend) Login(
 	if err != nil {
 		return daemonapi.LoginResult{}, err
 	}
+	backend.mu.Lock()
+	backend.recordCLISignInLocked(accountID)
+	backend.mu.Unlock()
 	return daemonapi.LoginResult{
 		Account: accountID, Authenticated: true, CapturedAt: account.captured,
 	}, nil
@@ -1103,6 +1110,14 @@ func (backend *sessionBackend) LogoutWithOptions(ctx context.Context, input daem
 		)
 	}
 	if err := accountID.ValidateOpaque(); err != nil {
+		return daemonapi.LogoutResult{}, err
+	}
+	// Logout of an account cancels its MCP-started sign-in, closing that
+	// browser; any other MCP-started sign-in would block this logout.
+	if _, err := backend.cancelMCPSignIn(ctx, accountID); err != nil {
+		return daemonapi.LogoutResult{}, err
+	}
+	if err := backend.errBehindMCPSignIn("this logout"); err != nil {
 		return daemonapi.LogoutResult{}, err
 	}
 
@@ -1261,6 +1276,9 @@ func (backend *sessionBackend) TerminalLogin(
 		)
 	}
 	if err := ctx.Err(); err != nil {
+		return daemonapi.TerminalLoginResult{}, err
+	}
+	if err := backend.errBehindMCPSignIn("this sign-in"); err != nil {
 		return daemonapi.TerminalLoginResult{}, err
 	}
 	backend.mu.Lock()
@@ -1437,6 +1455,7 @@ func (backend *sessionBackend) TerminalLogin(
 		}
 		backend.accounts[input.Account] = account
 		backend.clearAuthenticationReasonsLocked(input.Account, account)
+		backend.recordCLISignInLocked(input.Account)
 		// The monitor belongs to the daemon lifecycle, not this login request.
 		backend.startMonitorLocked(input.Account, account) //nolint:contextcheck
 		_ = backend.dropTerminalInteraction(interaction, false)

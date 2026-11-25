@@ -68,22 +68,35 @@ const (
 	AccountSignInReasonRouteUnsupported        AccountSignInReason = "route_unsupported"
 	AccountSignInReasonAliasNotDisplayable     AccountSignInReason = "alias_not_displayable"
 	AccountSignInReasonSessionOwnerUnsupported AccountSignInReason = "session_owner_unsupported"
+	// AccountSignInReasonCLISignInRequired means the account's current
+	// connection settings have never completed a sign-in started from the
+	// CLI, so MCP may not offer one (ADR 0039).
+	AccountSignInReasonCLISignInRequired AccountSignInReason = "cli_sign_in_required"
+	// AccountSignInReasonDestinationNotDisplayable means a sign-in host,
+	// client ID, or address cannot be shown as plain ASCII in the prompt.
+	AccountSignInReasonDestinationNotDisplayable AccountSignInReason = "destination_not_displayable"
+	// AccountSignInReasonStateUnavailable means the persisted cool-down or
+	// verification state could not be read; every account is cooled down.
+	AccountSignInReasonStateUnavailable AccountSignInReason = "sign_in_state_unavailable"
 )
 
 var accountSignInReasonStatus = map[AccountSignInReason]AccountSignInStatus{
-	AccountSignInReasonUserDeclined:            AccountSignInDeclined,
-	AccountSignInReasonUserCancelled:           AccountSignInDeclined,
-	AccountSignInReasonRecentlyDeclined:        AccountSignInDeclined,
-	AccountSignInReasonRecentlyUnfinished:      AccountSignInUnavailable,
-	AccountSignInReasonElicitationUnsupported:  AccountSignInUnavailable,
-	AccountSignInReasonElicitationFailed:       AccountSignInUnavailable,
-	AccountSignInReasonDisplayUnavailable:      AccountSignInUnavailable,
-	AccountSignInReasonApprovalExpired:         AccountSignInUnavailable,
-	AccountSignInReasonRouteUnsupported:        AccountSignInUnavailable,
-	AccountSignInReasonAliasNotDisplayable:     AccountSignInUnavailable,
-	AccountSignInReasonSessionOwnerUnsupported: AccountSignInUnavailable,
-	AccountSignInReasonApprovalPending:         AccountSignInInProgress,
-	AccountSignInReasonSignInRunning:           AccountSignInInProgress,
+	AccountSignInReasonUserDeclined:              AccountSignInDeclined,
+	AccountSignInReasonUserCancelled:             AccountSignInDeclined,
+	AccountSignInReasonRecentlyDeclined:          AccountSignInDeclined,
+	AccountSignInReasonRecentlyUnfinished:        AccountSignInUnavailable,
+	AccountSignInReasonElicitationUnsupported:    AccountSignInUnavailable,
+	AccountSignInReasonElicitationFailed:         AccountSignInUnavailable,
+	AccountSignInReasonDisplayUnavailable:        AccountSignInUnavailable,
+	AccountSignInReasonApprovalExpired:           AccountSignInUnavailable,
+	AccountSignInReasonRouteUnsupported:          AccountSignInUnavailable,
+	AccountSignInReasonAliasNotDisplayable:       AccountSignInUnavailable,
+	AccountSignInReasonSessionOwnerUnsupported:   AccountSignInUnavailable,
+	AccountSignInReasonCLISignInRequired:         AccountSignInUnavailable,
+	AccountSignInReasonDestinationNotDisplayable: AccountSignInUnavailable,
+	AccountSignInReasonStateUnavailable:          AccountSignInUnavailable,
+	AccountSignInReasonApprovalPending:           AccountSignInInProgress,
+	AccountSignInReasonSignInRunning:             AccountSignInInProgress,
 }
 
 // AccountSignInResult is the content-free structured result of
@@ -188,11 +201,84 @@ func (result AccountSignInResult) Validate() error {
 	return nil
 }
 
-// AccountSignInRoute names one configured service and its provider. It is the
-// only route detail shown in the approval prompt.
+// AccountSignInRouteKind is how approving a service signs it in.
+type AccountSignInRouteKind string
+
+const (
+	// AccountSignInDedicatedBrowser opens Corresync's dedicated browser
+	// profile at the configured origin (Outlook Web, Teams Web).
+	AccountSignInDedicatedBrowser AccountSignInRouteKind = "dedicated_browser"
+	// AccountSignInProviderAuthorization opens the provider's OAuth
+	// authorization page in the system browser.
+	AccountSignInProviderAuthorization AccountSignInRouteKind = "provider_authorization"
+	// AccountSignInStoredCredential reads an already consented credential
+	// from the OS keyring or credential helper; no page opens.
+	AccountSignInStoredCredential AccountSignInRouteKind = "stored_credential" //nolint:gosec // Route kind name, not a credential.
+)
+
+func (kind AccountSignInRouteKind) Validate() error {
+	switch kind {
+	case AccountSignInDedicatedBrowser, AccountSignInProviderAuthorization, AccountSignInStoredCredential:
+		return nil
+	default:
+		return fmt.Errorf("invalid account sign-in route kind %q", kind)
+	}
+}
+
+// AccountSignInRoute names one released, enabled service, its provider, and
+// where approving it signs in. Host and ClientID come only from configuration
+// and fixed provider endpoints and are the route details shown in the prompt.
 type AccountSignInRoute struct {
-	Service  AuthenticationService `json:"service"`
-	Provider domain.ProviderID     `json:"provider"`
+	Service  AuthenticationService  `json:"service"`
+	Provider domain.ProviderID      `json:"provider"`
+	Kind     AccountSignInRouteKind `json:"kind"`
+	Host     string                 `json:"host,omitempty"`
+	ClientID string                 `json:"clientId,omitempty"`
+}
+
+func (route AccountSignInRoute) Validate() error {
+	if err := route.Service.Validate(); err != nil {
+		return err
+	}
+	if err := route.Provider.Validate(); err != nil {
+		return err
+	}
+	if err := route.Kind.Validate(); err != nil {
+		return err
+	}
+	if route.Kind != AccountSignInStoredCredential && route.Host == "" {
+		return errors.New("a browser sign-in route must name its host")
+	}
+	if route.Host != "" && !AccountSignInHostDisplayable(route.Host) {
+		return errors.New("account sign-in host cannot be displayed safely")
+	}
+	if route.ClientID != "" && (route.Kind != AccountSignInProviderAuthorization ||
+		!accountSignInClientIDPattern.MatchString(route.ClientID)) {
+		return errors.New("account sign-in client ID cannot be displayed safely")
+	}
+	return nil
+}
+
+var (
+	accountSignInHostPattern = regexp.MustCompile(
+		`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::[0-9]{1,5})?$`,
+	)
+	accountSignInClientIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,200}$`)
+	accountSignInAddressPattern  = regexp.MustCompile(
+		`^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$`,
+	)
+)
+
+// AccountSignInHostDisplayable accepts only lowercase ASCII DNS names (IDNA
+// names in their xn-- form) with an optional port, so a look-alike host can
+// never be rendered from Unicode.
+func AccountSignInHostDisplayable(host string) bool {
+	return len(host) <= 253 && accountSignInHostPattern.MatchString(host)
+}
+
+// AccountSignInAddressDisplayable accepts only a plain ASCII mailbox address.
+func AccountSignInAddressDisplayable(address string) bool {
+	return len(address) <= 254 && accountSignInAddressPattern.MatchString(address)
 }
 
 var accountSignInTicketPattern = regexp.MustCompile(`^sit1_[A-Za-z0-9_-]{43}$`)
@@ -203,6 +289,7 @@ type AccountSignInApproval struct {
 	Ticket    string               `json:"ticket"`
 	Account   domain.AccountID     `json:"account"`
 	Alias     string               `json:"alias"`
+	Address   string               `json:"address,omitempty"`
 	Routes    []AccountSignInRoute `json:"routes"`
 	ExpiresAt time.Time            `json:"expiresAt"`
 }
@@ -217,14 +304,14 @@ func (approval AccountSignInApproval) Validate() error {
 	if err := domain.AccountAlias(approval.Alias).Validate(); err != nil {
 		return err
 	}
+	if approval.Address != "" && !AccountSignInAddressDisplayable(approval.Address) {
+		return errors.New("account sign-in address cannot be displayed safely")
+	}
 	if len(approval.Routes) == 0 || len(approval.Routes) > 4 {
 		return errors.New("account sign-in approval must name one to four services")
 	}
 	for _, route := range approval.Routes {
-		if err := route.Service.Validate(); err != nil {
-			return err
-		}
-		if err := route.Provider.Validate(); err != nil {
+		if err := route.Validate(); err != nil {
 			return err
 		}
 	}
@@ -317,19 +404,32 @@ func (resolution AccountSignInResolution) Validate() error {
 
 // AccountSignInAliasDisplayable reports whether an alias is safe to quote in
 // a server-authored approval prompt. Aliases with punctuation that could frame
-// prompt text are refused instead of being shown.
+// prompt text, or that mix Latin, Cyrillic, and Greek letters into a
+// look-alike, are refused instead of being shown.
 func AccountSignInAliasDisplayable(alias string) bool {
 	if domain.AccountAlias(alias).Validate() != nil {
 		return false
 	}
+	confusableScripts := map[string]bool{}
 	for _, character := range alias {
 		switch {
-		case unicode.IsLetter(character), unicode.IsDigit(character):
+		case unicode.IsLetter(character):
+			for name, table := range map[string]*unicode.RangeTable{
+				"latin": unicode.Latin, "cyrillic": unicode.Cyrillic, "greek": unicode.Greek,
+			} {
+				if unicode.Is(table, character) {
+					confusableScripts[name] = true
+				}
+			}
+		case unicode.IsDigit(character):
+			if character > unicode.MaxASCII {
+				return false
+			}
 		case character == '.', character == '_', character == '-',
 			character == '@', character == '+':
 		default:
 			return false
 		}
 	}
-	return true
+	return len(confusableScripts) <= 1
 }

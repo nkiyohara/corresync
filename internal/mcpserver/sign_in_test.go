@@ -57,12 +57,8 @@ func (backend *signInBackend) RequestAccountSignIn(
 		return application.AccountSignInRequest{Result: &result}, nil
 	}
 	return application.AccountSignInRequest{Approval: &application.AccountSignInApproval{
-		Ticket: signInTestTicket, Account: account, Alias: "work",
-		Routes: []application.AccountSignInRoute{
-			{Service: application.AuthenticationServiceMail, Provider: domain.ProviderMicrosoftOWA},
-			{Service: application.AuthenticationServiceCalendar, Provider: domain.ProviderMicrosoftOWA},
-			{Service: application.AuthenticationServiceTasks, Provider: domain.ProviderTodoist},
-		},
+		Ticket: signInTestTicket, Account: account, Alias: "work", Address: "alice@example.com",
+		Routes:    signInTestRoutes,
 		ExpiresAt: time.Now().Add(application.AccountSignInApprovalTTL),
 	}}, nil
 }
@@ -196,12 +192,28 @@ func callSignIn(t *testing.T, session *mcp.ClientSession, arguments map[string]a
 
 var signInProtocols = []string{modernProtocolVersion, legacyProtocolVersion}
 
-const expectedSignInPrompt = "Corresync sign-in request for account \"work\" (Outlook Web: mail, calendar; Todoist: tasks).\n\n" +
-	"An assistant asked Corresync to sign in to this account. If you accept, Corresync opens the same browser sign-in as " +
-	"`corr auth login --account work` on this computer: its dedicated browser window at the configured sign-in page, " +
-	"or the provider's sign-in page in your browser.\n\n" +
-	"Enter your password, MFA code, and consent only in that browser, never in this chat. Nothing you type there is shared with the assistant.\n\n" +
-	"Accept only if you expected this request. Declining is safe; you can sign in later yourself with the command above."
+var signInTestRoutes = []application.AccountSignInRoute{
+	{Service: application.AuthenticationServiceMail, Provider: domain.ProviderMicrosoftOWA,
+		Kind: application.AccountSignInDedicatedBrowser, Host: "outlook.office.com"},
+	{Service: application.AuthenticationServiceCalendar, Provider: domain.ProviderMicrosoftOWA,
+		Kind: application.AccountSignInDedicatedBrowser, Host: "outlook.office.com"},
+	{Service: application.AuthenticationServiceTasks, Provider: domain.ProviderTodoist,
+		Kind: application.AccountSignInProviderAuthorization, Host: "todoist.com", ClientID: "synthetic-client"},
+}
+
+const expectedSignInPrompt = "Corresync sign-in request for account \"work\".\n" +
+	"Account address: alice@example.com\n\n" +
+	"An assistant asked Corresync to sign in to this account. If you accept, Corresync does exactly what " +
+	"`corr auth login --account work` does on this computer:\n" +
+	"\nOutlook Web (mail, calendar): Corresync opens its dedicated sign-in browser window.\n" +
+	"Sign-in page: outlook.office.com\n" +
+	"\nTodoist (tasks): your browser opens the provider's authorization page.\n" +
+	"Sign-in page: todoist.com\n" +
+	"OAuth client ID: synthetic-client\n" +
+	"\nCheck that each sign-in page above is the one you normally use. " +
+	"Enter your password, MFA code, and consent only on that page, never in this chat. " +
+	"Nothing you type there is shared with the assistant.\n" +
+	"\nAccept only if you expected this request. Declining is safe; you can sign in yourself with the command above."
 
 func answer(action string) func() (*mcp.ElicitResult, error) {
 	return func() (*mcp.ElicitResult, error) { return &mcp.ElicitResult{Action: action}, nil }
@@ -356,6 +368,8 @@ func TestAccountSignInFinalAnswersNeverPrompt(t *testing.T) {
 		{application.AccountSignInAlreadySignedIn, ""},
 		{application.AccountSignInDeclined, application.AccountSignInReasonRecentlyDeclined},
 		{application.AccountSignInUnavailable, application.AccountSignInReasonDisplayUnavailable},
+		{application.AccountSignInUnavailable, application.AccountSignInReasonCLISignInRequired},
+		{application.AccountSignInUnavailable, application.AccountSignInReasonDestinationNotDisplayable},
 	} {
 		final, err := application.NewAccountSignInResult(status.status, status.reason, signInTestAccount, "work", nil)
 		if err != nil {
@@ -500,9 +514,90 @@ func TestAccountSignInAliasesThatCouldFramePromptTextAreNotShown(t *testing.T) {
 			t.Errorf("%q should be displayable", alias)
 		}
 	}
-	for _, alias := range []string{"work mail", "work\"", "a:b", "click `accept`", "x\ny"} {
+	for _, alias := range []string{
+		"work mail", "work\"", "a:b", "click `accept`", "x\ny",
+		"w\u043erk", "\u0440aypal", "work\u0391", "\uff57ork\uff11",
+	} {
 		if application.AccountSignInAliasDisplayable(alias) {
 			t.Errorf("%q should not be displayable", alias)
+		}
+	}
+}
+
+func TestAccountSignInPromptNamesEachDestinationByRouteKind(t *testing.T) {
+	t.Parallel()
+	approval := application.AccountSignInApproval{
+		Ticket: signInTestTicket, Account: signInTestAccount, Alias: "work",
+		Routes: []application.AccountSignInRoute{
+			{Service: application.AuthenticationServiceMail, Provider: domain.ProviderJMAP,
+				Kind: application.AccountSignInStoredCredential, Host: "jmap.example.com"},
+			{Service: application.AuthenticationServiceCalendar, Provider: domain.ProviderGoogle,
+				Kind: application.AccountSignInProviderAuthorization, Host: "accounts.google.com",
+				ClientID: "1234.apps.googleusercontent.com"},
+		},
+		ExpiresAt: time.Now().Add(time.Minute),
+	}
+	elicitation, err := signInElicitation(approval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "Corresync sign-in request for account \"work\".\n" +
+		"Account address: not configured\n\n" +
+		"An assistant asked Corresync to sign in to this account. If you accept, Corresync does exactly what " +
+		"`corr auth login --account work` does on this computer:\n" +
+		"\nJMAP (mail): Corresync will read the saved credential from your keyring; your system may ask for permission.\n" +
+		"Server: jmap.example.com\n" +
+		"\nGoogle (calendar): your browser opens the provider's authorization page.\n" +
+		"Sign-in page: accounts.google.com\n" +
+		"OAuth client ID: 1234.apps.googleusercontent.com\n" +
+		"\nCheck that each sign-in page above is the one you normally use. " +
+		"Enter your password, MFA code, and consent only on that page, never in this chat. " +
+		"Nothing you type there is shared with the assistant.\n" +
+		"\nAccept only if you expected this request. Declining is safe; you can sign in yourself with the command above."
+	if elicitation.Message != want {
+		t.Fatalf("prompt =\n%s\nwant\n%s", elicitation.Message, want)
+	}
+
+	stored := approval
+	stored.Routes = approval.Routes[:1]
+	elicitation, err = signInElicitation(stored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(elicitation.Message, "Sign-in page:") || strings.Contains(elicitation.Message, "MFA") {
+		t.Fatalf("a stored-credential prompt promised a browser: %s", elicitation.Message)
+	}
+
+	for _, bad := range []application.AccountSignInApproval{
+		func() application.AccountSignInApproval {
+			copy := approval
+			copy.Routes = []application.AccountSignInRoute{{
+				Service: application.AuthenticationServiceMail, Provider: domain.ProviderMicrosoftOWA,
+				Kind: application.AccountSignInDedicatedBrowser, Host: "outl\u043eok.example",
+			}}
+			return copy
+		}(),
+		func() application.AccountSignInApproval {
+			copy := approval
+			copy.Address = "alice@ex\u0430mple.com"
+			return copy
+		}(),
+		func() application.AccountSignInApproval {
+			copy := approval
+			copy.Routes = []application.AccountSignInRoute{{
+				Service: application.AuthenticationServiceMail, Provider: domain.ProviderMicrosoftOWA,
+				Kind: application.AccountSignInDedicatedBrowser,
+			}}
+			return copy
+		}(),
+		func() application.AccountSignInApproval {
+			copy := approval
+			copy.Alias = "w\u043erk"
+			return copy
+		}(),
+	} {
+		if _, err := signInElicitation(bad); err == nil {
+			t.Fatalf("undisplayable approval was rendered: %+v", bad)
 		}
 	}
 }
