@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync — 用一个本地 MCP 连接邮件、日历与任务</title>
+    <title>Corresync：在本地用 MCP 和 CLI 处理邮件、日历和任务</title>
     <meta
       name="description"
-      content="面向 Outlook、Gmail、Google 日历、Microsoft To Do、Google Tasks、Todoist、TickTick、JMAP、IMAP/SMTP 与 CalDAV 的本地优先 MCP 服务器和 CLI。"
+      content="在本机运行的 MCP 服务器和 CLI，支持 Outlook、Gmail、Google 日历、Microsoft To Do、Google Tasks、Todoist、TickTick、JMAP、IMAP/SMTP 和 CalDAV。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync — 用一个本地 MCP 连接邮件、日历与任务"
+      content="Corresync：在本地用 MCP 和 CLI 处理邮件、日历和任务"
     >
     <meta
       property="og:description"
-      content="把邮件、日历与任务接入一个本地 CLI 和 MCP，同时保持工作与个人账号彼此隔离。"
+      content="在本地通过 CLI 和 MCP 访问邮件、日历和任务，工作账号和个人账号分开管理。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
@@ -35,11 +35,11 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta
       name="twitter:title"
-      content="Corresync — 用一个本地 MCP 连接邮件、日历与任务"
+      content="Corresync：在本地用 MCP 和 CLI 处理邮件、日历和任务"
     >
     <meta
       name="twitter:description"
-      content="把邮件、日历与任务接入一个本地 CLI 和 MCP，同时隔离每个账号的身份与授权。"
+      content="在本地通过 CLI 和 MCP 访问邮件、日历和任务，每个账号单独登录、单独授权。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -79,7 +79,7 @@
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
           "inLanguage": "zh-Hans",
-          "description": "本地优先、提供商中立的邮件、日历与任务 MCP 服务器和 CLI。"
+          "description": "在本机运行、不绑定特定服务商的邮件、日历和任务 MCP 服务器和 CLI。"
         }
       ]
     }
@@ -100,7 +100,7 @@
           >快速开始</a><a href="providers.html">支持服务</a><a href="features.html"
           >功能</a><a href="safety.html">安全</a>
         </nav>
-        <nav class="language-nav" aria-label="語言">
+        <nav class="language-nav" aria-label="语言">
           <a href="../" lang="en" hreflang="en">EN</a><a href="../ja/" lang="ja" hreflang="ja"
           >日本語</a><a href="./" lang="zh-Hans" hreflang="zh-Hans" aria-current="page"
           >简中</a><a href="../zh-tw/" lang="zh-Hant" hreflang="zh-Hant">繁中</a><a
@@ -119,17 +119,18 @@
             <span aria-hidden="true"></span>邮件 · 日历 · 任务
           </p>
           <h1 id="hero-title">
-            散落在各个账号中的工作，<em>汇入一个本地 MCP。</em>
+            在本地统一处理<em>多个账号的邮件、日历和任务</em>
           </h1>
           <p class="lede">
-            把工作与个人邮件、日历和任务接入 Codex、Claude Code、任何 MCP
-            智能体和终端。Corresync
-            始终隔离每个账号的身份与授权，再用同一套类型化操作帮你查找、规划、跟进和执行。
+            Corresync 把工作和个人账号的邮件、日历和任务接入 Codex、Claude
+            Code、其他 MCP
+            智能体和终端。各账号分开登录和授权，查找、安排、跟进和执行都用同一组工具。
           </p>
           <p class="hero-providers">
-            <strong>围绕你每天使用的服务：</strong>Outlook · Gmail · Google 日历 ·
-            Microsoft To Do · Todoist · TickTick ·
-            开放标准。连接路径与功能按账号明确展示——<a href="providers.html"
+            <strong>支持的服务：</strong>Outlook · Gmail · Google 日历 · Microsoft To Do
+            · Todoist · TickTick ·
+            开放标准。每个账号的连接方式和功能都会单独列出。<a
+              href="providers.html"
             >查看服务详情</a>。
           </p>
           <div class="actions">
@@ -139,66 +140,60 @@
             >检查邮箱是否支持</a>
           </div>
           <p class="hero-note">
-            登录留在浏览器或系统钥匙串中，智能体不会持有由 Corresync
-            管理的凭据，也不存在托管中继。重要写操作会先显示准确预览，只有确认后才会提交。
+            登录在浏览器或系统钥匙串中完成，智能体拿不到 Corresync
+            管理的凭据，也没有中继服务器。重要写操作先显示具体内容，经你批准才执行。
           </p>
         </div>
         <div class="install-panel" id="install" aria-labelledby="install-title">
           <div class="install-head">
             <h2 id="install-title">设置 Corresync</h2>
             <p>
-              用你已经在用的 AI 智能体，在这台电脑上安装或更新
-              Corresync。每一步都由你确认。
+              用你现有的 AI 智能体在这台电脑上安装或更新
+              Corresync，每一步都由你确认。
             </p>
           </div>
           <div class="agent-setup">
             <p>
               推荐使用独立版
-              CLI。新设置会开启经过验证的自动更新。如果已经安装，设置会保留原来的包管理器、配置和更新设置，除非你选择更改。
+              CLI。新安装会开启经过校验的自动更新。已安装的会沿用原来的包管理器、配置和更新设置，除非你更改。
             </p>
             <div class="actions">
               <a
                 id="setup-chatgpt"
                 class="button primary"
-                href="codex://new?prompt=Help%20me%20install%20or%20update%20Corresync%20and%20connect%20it%20to%20this%20local%20desktop%20agent.%20First%20confirm%20that%20your%20command%20execution%20targets%20the%20computer%20I%20want%20to%20set%20up%3B%20do%20not%20install%20into%20a%20cloud%20sandbox%20or%20a%20remote%20server%20by%20mistake.%20If%20you%20cannot%20run%20local%20commands%2C%20explain%20how%20I%20can%20continue%20in%20a%20desktop%20agent.%0A%0ARead%20https%3A%2F%2Fcorresync.org%2Fgetting-started.html%20and%20the%20official%20documentation%20linked%20there.%20Inspect%20the%20OS%2C%20architecture%2C%20existing%20corr%20installation%20and%20its%20installation%20owner.%20For%20a%20new%20installation%2C%20use%20the%20official%20stable%20standalone%20installer%20for%20the%20current%20user%2C%20without%20administrator%20privileges%2C%20preserving%20its%20checksum%20and%20signature%20verification.%20For%20an%20existing%20standalone%20installation%20use%20corr%20update%3B%20for%20a%20package-managed%20installation%20use%20its%20package%20manager.%20Do%20not%20silently%20replace%20a%20package-managed%20installation.%0A%0AUse%20corr%20setup%20and%20the%20installed%20CLI%20help%20to%20guide%20configuration%20and%20agent%20integration.%20For%20a%20new%20configuration%2C%20use%20the%20stable%20update%20channel%20and%20ensure%20automatic%20checks%20and%20verified%20automatic%20installation%20are%20enabled.%20Verify%20updates.auto_install%20is%20true%20%28corr%20config%20set%20updates.auto_install%20true%20is%20the%20supported%20opt-in%29.%20Preserve%20existing%20account%2C%20agent%20and%20update%20settings%3B%20if%20automatic%20updates%20were%20disabled%2C%20ask%20before%20enabling%20them.%20Explain%20that%20automatic%20update%20checks%20happen%20on%20eligible%20interactive%20corr%20invocations%2C%20not%20as%20a%20continuous%20background%20updater.%0A%0APreview%20configuration%20changes%20and%20let%20me%20approve%20permissions%20and%20consequential%20actions.%20I%20will%20handle%20browser%20sign-in%20and%20MFA%20myself.%20Never%20request%20passwords%2C%20tokens%2C%20cookies%20or%20verification%20codes%20in%20chat.%20Do%20not%20enable%20provider%20authorization%2C%20administrator%20consent%2C%20monitoring%20or%20message%20sending%20without%20my%20explicit%20choice.%20Verify%20the%20installed%20version%2C%20update%20settings%20and%20daemon%20state%20using%20the%20supported%20CLI%20commands.%20Ensure%20any%20daemon%20running%20an%20old%20version%20is%20updated%20through%20the%20supported%20update%20flow.%20Do%20not%20read%20or%20send%20live%20account%20content%20just%20to%20test%20installation.%20Report%20what%20succeeded%20and%20anything%20I%20still%20need%20to%20do.%0A"
+                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
               >用 ChatGPT 设置</a>
               <a
                 id="setup-claude"
                 class="button secondary"
-                href="claude://code/new?q=Help%20me%20install%20or%20update%20Corresync%20and%20connect%20it%20to%20this%20local%20desktop%20agent.%20First%20confirm%20that%20your%20command%20execution%20targets%20the%20computer%20I%20want%20to%20set%20up%3B%20do%20not%20install%20into%20a%20cloud%20sandbox%20or%20a%20remote%20server%20by%20mistake.%20If%20you%20cannot%20run%20local%20commands%2C%20explain%20how%20I%20can%20continue%20in%20a%20desktop%20agent.%0A%0ARead%20https%3A%2F%2Fcorresync.org%2Fgetting-started.html%20and%20the%20official%20documentation%20linked%20there.%20Inspect%20the%20OS%2C%20architecture%2C%20existing%20corr%20installation%20and%20its%20installation%20owner.%20For%20a%20new%20installation%2C%20use%20the%20official%20stable%20standalone%20installer%20for%20the%20current%20user%2C%20without%20administrator%20privileges%2C%20preserving%20its%20checksum%20and%20signature%20verification.%20For%20an%20existing%20standalone%20installation%20use%20corr%20update%3B%20for%20a%20package-managed%20installation%20use%20its%20package%20manager.%20Do%20not%20silently%20replace%20a%20package-managed%20installation.%0A%0AUse%20corr%20setup%20and%20the%20installed%20CLI%20help%20to%20guide%20configuration%20and%20agent%20integration.%20For%20a%20new%20configuration%2C%20use%20the%20stable%20update%20channel%20and%20ensure%20automatic%20checks%20and%20verified%20automatic%20installation%20are%20enabled.%20Verify%20updates.auto_install%20is%20true%20%28corr%20config%20set%20updates.auto_install%20true%20is%20the%20supported%20opt-in%29.%20Preserve%20existing%20account%2C%20agent%20and%20update%20settings%3B%20if%20automatic%20updates%20were%20disabled%2C%20ask%20before%20enabling%20them.%20Explain%20that%20automatic%20update%20checks%20happen%20on%20eligible%20interactive%20corr%20invocations%2C%20not%20as%20a%20continuous%20background%20updater.%0A%0APreview%20configuration%20changes%20and%20let%20me%20approve%20permissions%20and%20consequential%20actions.%20I%20will%20handle%20browser%20sign-in%20and%20MFA%20myself.%20Never%20request%20passwords%2C%20tokens%2C%20cookies%20or%20verification%20codes%20in%20chat.%20Do%20not%20enable%20provider%20authorization%2C%20administrator%20consent%2C%20monitoring%20or%20message%20sending%20without%20my%20explicit%20choice.%20Verify%20the%20installed%20version%2C%20update%20settings%20and%20daemon%20state%20using%20the%20supported%20CLI%20commands.%20Ensure%20any%20daemon%20running%20an%20old%20version%20is%20updated%20through%20the%20supported%20update%20flow.%20Do%20not%20read%20or%20send%20live%20account%20content%20just%20to%20test%20installation.%20Report%20what%20succeeded%20and%20anything%20I%20still%20need%20to%20do.%0A"
+                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
               >用 Claude 设置</a>
             </div>
             <p>
-              选择你使用的桌面应用，它会打开并预先填好设置请求。确认内容后，由你自己发送。
+              点击你使用的桌面应用，应用会打开并填好设置请求。检查内容后由你自己发送。
             </p>
             <p class="install-note">
               你需要能访问本机的 ChatGPT Codex 或 Claude Code
-              桌面应用。出现权限提示时，请逐一批准。无需管理员权限。账户登录和多重验证请自己完成，不要在聊天中粘贴密码或验证码。
+              桌面应用。出现权限提示时逐一确认，无需管理员权限。登录和多重验证由你自己完成，不要在聊天中粘贴密码或验证码。
             </p>
             <p class="install-note">
-              如果你在用手机浏览，请在要设置的电脑上打开此页面，或把说明复制到那台电脑上。
+              如果你在用手机浏览，请在要安装的电脑上打开本页，或把说明复制到那台电脑。
             </p>
             <details class="setup-request">
               <summary>
-                如果桌面应用没有打开，请复制下方的设置请求，粘贴到你的智能体中。
+                桌面应用没有打开时，复制下面的设置请求，粘贴给智能体。
               </summary>
               <div class="cmd" data-copy data-copy-label="Corresync setup request">
                 <pre
                   tabindex="0"
                   aria-label="Corresync setup request"
-                ><code>Help me install or update Corresync and connect it to this local desktop agent. First confirm that your command execution targets the computer I want to set up; do not install into a cloud sandbox or a remote server by mistake. If you cannot run local commands, explain how I can continue in a desktop agent.
-
-Read https://corresync.org/getting-started.html and the official documentation linked there. Inspect the OS, architecture, existing corr installation and its installation owner. For a new installation, use the official stable standalone installer for the current user, without administrator privileges, preserving its checksum and signature verification. For an existing standalone installation use corr update; for a package-managed installation use its package manager. Do not silently replace a package-managed installation.
-
-Use corr setup and the installed CLI help to guide configuration and agent integration. For a new configuration, use the stable update channel and ensure automatic checks and verified automatic installation are enabled. Verify updates.auto_install is true (corr config set updates.auto_install true is the supported opt-in). Preserve existing account, agent and update settings; if automatic updates were disabled, ask before enabling them. Explain that automatic update checks happen on eligible interactive corr invocations, not as a continuous background updater.
-
-Preview configuration changes and let me approve permissions and consequential actions. I will handle browser sign-in and MFA myself. Never request passwords, tokens, cookies or verification codes in chat. Do not enable provider authorization, administrator consent, monitoring or message sending without my explicit choice. Verify the installed version, update settings and daemon state using the supported CLI commands. Ensure any daemon running an old version is updated through the supported update flow. Do not read or send live account content just to test installation. Report what succeeded and anything I still need to do.
+                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
 </code></pre>
               </div>
             </details>
           </div>
           <details class="manual-setup">
-            <summary>可选：手动安装及后续设置步骤</summary>
+            <summary>可选：手动安装和后续设置</summary>
             <div class="install-block">
               <p class="os-label" id="install-unix">macOS · Linux</p>
               <div class="cmd" data-copy data-copy-label="macOS 和 Linux 安装命令">
@@ -240,8 +235,9 @@ Preview configuration changes and let me approve permissions and consequential a
               </div>
             </div>
             <p class="install-note">
-              设置会从当前本地状态继续，在不使用凭据的情况下发现账号路径，并在应用前预览账号与智能体配置；登录仍是独立操作。其他安装方式和各
-              MCP 客户端命令请见<a href="getting-started.html">快速开始</a>。
+              corr setup
+              从本地当前状态继续，不用凭据查找连接方式，写入前预览账号和智能体配置。登录是单独的一步。其他安装方式和各
+              MCP 客户端命令见<a href="getting-started.html">快速开始</a>。
             </p>
           </details>
         </div>
@@ -249,13 +245,13 @@ Preview configuration changes and let me approve permissions and consequential a
 
       <section class="service-landscape" aria-labelledby="service-landscape-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>一天的工作，一个入口</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>支持的服务</p>
           <h2 id="service-landscape-title">
-            邮件、日历和任务，都不必改变原来的登录方式。
+            沿用原有登录方式访问邮件、日历和任务
           </h2>
           <p>
-            用一个本地 CLI 和 MCP
-            服务器连接你自己掌控的账号。不同服务和账号开放的功能各不相同，因此设置过程会明确展示连接路径与可用范围。
+            用本地 CLI 和 MCP
+            服务器连接你自己的账号。各服务、各账号的功能不同，设置时会列出连接方式和可用功能。
           </p>
         </div>
         <div class="service-grid">
@@ -337,30 +333,30 @@ Preview configuration changes and let me approve permissions and consequential a
 
       <section class="trust-row" aria-label="为什么选择 Corresync">
         <div>
-          <strong>一个 MCP，连接每个账号</strong><span
-          >工作和个人身份始终隔离；每条结果都会保留来源账号和提供商。</span>
+          <strong>一个 MCP 连接所有账号</strong><span
+          >工作账号和个人账号分开管理，每条结果都标明来自哪个账号和服务商。</span>
         </div>
         <div>
-          <strong>智能体不接触凭据</strong><span
-          >登录由可见浏览器或系统钥匙串管理，没有托管中继或远程
-            MCP。</span>
+          <strong>智能体拿不到凭据</strong><span
+          >在可见浏览器或系统钥匙串中登录，没有中继服务器或远程 MCP
+            端点。</span>
         </div>
         <div>
-          <strong>先预览，再提交</strong><span
-          >发送和破坏性操作先返回服务器强制的审阅；批准短时且仅可使用一次。</span>
+          <strong>执行前先确认</strong><span
+          >发送和删除类写操作先由服务器返回具体内容供确认。批准有时效，只能用一次。</span>
         </div>
       </section>
 
       <section class="policy-callout" aria-labelledby="policy-callout-title">
         <div>
           <p class="eyebrow"><span aria-hidden="true"></span>Google 支持状态</p>
-          <h2 id="policy-callout-title">用你自己的 OAuth 客户端连接 Google。</h2>
+          <h2 id="policy-callout-title">用自己的 OAuth 客户端连接 Google</h2>
           <p>
             在你自己的 Google Cloud 项目中创建桌面 OAuth
-            客户端，用引导设置导入下载的 JSON，
-            再在常用浏览器中登录。客户端凭据与账号授权都保存在系统钥匙串；Corresync
-            管理的 Google OAuth 保持关闭。
-            <a href="google-oauth.html">按图解完成设置</a>。
+            客户端，用引导设置导入下载的
+            JSON，再在常用浏览器中登录。客户端凭据和账号授权都保存在系统钥匙串中。Corresync
+            管理的 Google OAuth 处于关闭状态。
+            <a href="google-oauth.html">按图示设置</a>。
           </p>
         </div>
         <div class="actions">
@@ -373,11 +369,11 @@ Preview configuration changes and let me approve permissions and consequential a
 
       <section class="journey" id="quickstart" aria-labelledby="journey-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>安装后只需三组短命令</p>
-          <h2 id="journey-title">选择。登录。提问。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>安装之后</p>
+          <h2 id="journey-title">添加账号并开始使用</h2>
           <p>
             Corresync
-            不会预选提供商。它先为地址收集无凭据证据，添加你明确选择的账号路径，然后才允许启动该账号的登录。
+            不预选服务商。它先不用凭据查找这个地址可用的连接方式，添加你选定的一种，之后才能登录该账号。
           </p>
         </div>
         <div class="journey-grid">
@@ -392,7 +388,8 @@ Preview configuration changes and let me approve permissions and consequential a
 corr auth login --account personal</code></pre>
             </div>
             <p>
-              发现过程不会打开任何页面；单独的 login 命令只使用已选路径。
+              查找时不打开任何页面。之后单独运行
+              login，用选定的方式登录。
             </p>
           </div>
           <div class="journey-step">
@@ -404,7 +401,7 @@ corr auth login --account personal</code></pre>
                 aria-labelledby="journey-connect"
               ><code>corr mcp setup codex</code></pre>
             </div>
-            <p>在智能体中注册本地 stdio 服务器，重启客户端一次即可。</p>
+            <p>把本地 stdio 服务器注册到智能体中，然后重启一次客户端。</p>
           </div>
           <div class="journey-step">
             <p class="os-label" id="journey-ask">3 · 提问</p>
@@ -414,26 +411,30 @@ corr auth login --account personal</code></pre>
               aria-labelledby="journey-ask"
             ><code><span class="t-ask">›</span> 汇总所有账号里今天中午前
   需要我处理的事情</code></pre>
-            <p>智能体调用类型化工具，回答会标明每条信息来自哪个账号。</p>
+            <p>
+              智能体调用工具，回答会注明信息来自哪个账号。
+            </p>
           </div>
         </div>
         <p class="center-link">
-          <a href="getting-started.html">查看完整快速开始指南<span aria-hidden="true">
+          <a href="getting-started.html">查看完整的快速开始指南<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
 
       <section class="outcomes" id="outcomes" aria-labelledby="outcomes-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>第一天就能完成</p>
-          <h2 id="outcomes-title">一次提问，覆盖多个收件箱和日历。</h2>
-          <p>CLI 与 MCP 共享相同的类型化操作、账号隔离和策略检查。</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>使用示例</p>
+          <h2 id="outcomes-title">跨账号搜索邮件、查看日程、预览发送</h2>
+          <p>
+            CLI 和 MCP 使用同一组操作、账号隔离和策略检查。
+          </p>
         </div>
         <div class="outcome-grid">
           <article class="outcome-card">
             <h3>同时搜索所有收件箱</h3>
             <p class="outcome-ask">
-              “找出季度计划邮件，我忘了它在工作还是个人邮箱。”
+              “找一下季度计划那封邮件，我忘了在工作邮箱还是个人邮箱。”
             </p>
             <pre
               tabindex="0"
@@ -444,12 +445,12 @@ corr auth login --account personal</code></pre>
 <span class="t-unread">●</span> <span class="t-dim">work · microsoft-owa</span>  Ana Ruiz  Plan review
 <span class="t-read">·</span> <span class="t-dim">personal · jmap</span>   Finance      Plan receipt</code></pre>
             <p class="outcome-note">
-              某个账号失败时会明确显示为部分结果，不会悄悄隐藏。
+              某个账号失败时，结果会标为不完整，不会被悄悄省略。
             </p>
           </article>
           <article class="outcome-card">
-            <h3>查看统一日程</h3>
-            <p class="outcome-ask">“工作和个人日历里的今天安排是什么？”</p>
+            <h3>查看合并后的日程</h3>
+            <p class="outcome-ask">“我今天在两个日历上都有什么安排？”</p>
             <pre
               tabindex="0"
               role="region"
@@ -460,12 +461,14 @@ corr auth login --account personal</code></pre>
 09:30 <span class="t-dim">work</span>      Design review · Teams
 12:30 <span class="t-dim">personal</span>  Dentist</code></pre>
             <p class="outcome-note">
-              时区、日历和提供商来源会保留在每个事件上。
+              每个事件都带有时区、所属日历和服务商信息。
             </p>
           </article>
           <article class="outcome-card">
-            <h3>发送前先看清内容</h3>
-            <p class="outcome-ask">“替我起草给 Ana 的回复，发送由我确认。”</p>
+            <h3>发送前预览邮件</h3>
+            <p class="outcome-ask">
+              “帮我起草给 Ana 的回复，发送前我自己确认。”
+            </p>
             <pre
               tabindex="0"
               role="region"
@@ -477,22 +480,22 @@ corr auth login --account personal</code></pre>
   body  text/plain · 412 B
 <span class="t-dim">确认这份内容之前不会发送。</span></code></pre>
             <p class="outcome-note">
-              提交必须与审阅过的账号、收件人和字节完全一致。
+              执行时的账号、收件人和内容必须与预览时逐字节一致。
             </p>
           </article>
         </div>
         <p class="center-link">
-          <a href="features.html">查看全部功能与明确限制<span aria-hidden="true">
+          <a href="features.html">查看全部功能和限制<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
 
-      <section class="safety safety-预览" aria-labelledby="safety-title">
+      <section class="safety safety-preview" aria-labelledby="safety-title">
         <div class="safety-head">
-          <p class="eyebrow light"><span aria-hidden="true"></span>看得见的安全设计</p>
-          <h2 id="safety-title">第一次调用绝不会直接发送。</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>安全机制</p>
+          <h2 id="safety-title">第一次调用不会直接发送</h2>
           <p class="safety-lede">
-            重要操作先返回审阅。批准会绑定调用方、账号、提供商、目标、内容、有效期，并且只能使用一次。
+            重要操作第一次调用只返回待确认内容。批准与调用方、账号、服务商、目标、内容和有效期绑定，只能使用一次。
           </p>
         </div>
         <div class="safety-body">
@@ -500,7 +503,7 @@ corr auth login --account personal</code></pre>
             <figcaption class="term-bar">
               <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
                 class="term-title"
-              >操作前审阅</span>
+              >执行前预览</span>
             </figcaption>
             <pre
               tabindex="0"
@@ -520,66 +523,67 @@ corr auth login --account personal</code></pre>
           </figure>
           <ul class="safety-points">
             <li>
-              <strong>智能体只拿到类型化工具。</strong>密码、Cookie 和 OAuth 授权
-              不会出现在 MCP 或配置里。
+              <strong>智能体只能调用工具，拿不到凭据。</strong>密码、Cookie 和
+              OAuth 授权不经过 MCP，配置文件里也没有对应的字段。
             </li>
             <li>
-              <strong>只在本地运行。</strong>MCP 通过本机 stdio
-              通信，没有托管中继或远程端点。
-            </li>
-            <li>
-              <strong
-              >结果不明就停止。</strong>不会自动重试状态不确定的远程写入。
+              <strong>只在本机运行。</strong>MCP 服务器在本机通过 stdio 通信。
             </li>
             <li>
               <strong
-              >邮件内容是不可信数据。</strong>它不能授予执行命令或启动智能体的权限。
+              >结果不确定时停止。</strong>远程写入结果不明确时不会自动重试。
+            </li>
+            <li>
+              <strong
+              >邮件内容按不可信数据处理。</strong>邮件里的内容不能触发命令，也不能启动智能体。
             </li>
           </ul>
         </div>
         <p class="safety-links">
-          <a href="safety.html">了解完整安全模型<span aria-hidden="true"> →</span></a>
+          <a href="safety.html">查看完整的安全模型<span aria-hidden="true"> →</span></a>
         </p>
       </section>
 
-      <section class="provider-预览" aria-labelledby="provider-预览-title">
+      <section class="provider-preview" aria-labelledby="provider-preview-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>使用你已有的连接方式</p>
-          <h2 id="provider-预览-title">
-            需要时用原生 API，可以时优先开放标准。
+          <p class="eyebrow"><span aria-hidden="true"></span>连接方式</p>
+          <h2 id="provider-preview-title">
+            优先使用开放标准，必要时使用服务商原生接口
           </h2>
           <p>
-            邮件和日历路径分别选择，因此一个账号可以把 IMAP/SMTP 邮件与
-            CalDAV 日历组合起来。
+            邮件和日历的连接方式分开选择，所以同一个账号可以用 IMAP/SMTP
+            收发邮件，同时用 CalDAV 访问日历。
           </p>
         </div>
         <div class="route-family-grid">
           <article class="route-family">
-            <p class="chip">浏览器管理</p>
+            <p class="chip">浏览器登录</p>
             <h3>Outlook Web</h3>
             <p>
-              交互式 Outlook
-              登录留在专用可见浏览器中，同时提供类型化邮件和日历操作。
+              Outlook
+              登录在一个专用的可见浏览器窗口中完成，支持邮件和日历操作。
             </p>
           </article>
           <article class="route-family accent-card">
-            <p class="chip">明确 OAuth</p>
-            <h3>Microsoft Graph · Google 使用你自己的客户端</h3>
+            <p class="chip">OAuth（需自行选择）</p>
+            <h3>Microsoft Graph · 使用自有客户端的 Google</h3>
             <p>
-              Graph 使用你有权使用的公开客户端。Google 使用你自己的桌面 OAuth
-              客户端。
+              Microsoft Graph 使用你有权使用的公开客户端。Google
+              使用你自己的桌面 OAuth 客户端。
             </p>
           </article>
           <article class="route-family">
             <p class="chip">开放标准</p>
             <h3>JMAP、IMAP/SMTP、CalDAV</h3>
-            <p>使用加密端点，以及系统钥匙串或明确批准的凭据助手。</p>
+            <p>
+              连接加密端点，凭据来自系统钥匙串或一个经你批准的凭据助手。
+            </p>
           </article>
         </div>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span><p>
-            <strong>选择前先看清细节。</strong>
-            服务指南会列出准确的登录方式、设置要求，以及因账号而异的功能。
+            <strong>先了解详情再添加。</strong>
+            服务指南列出具体的登录方式、设置要求和随账号而异的功能。
           </p><a href="providers.html#check">私密检查邮箱地址<span aria-hidden="true">
               →</span></a>
         </div>
@@ -587,37 +591,37 @@ corr auth login --account personal</code></pre>
 
       <section class="honest-edges" aria-labelledby="edges-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>限制同样透明</p>
-          <h2 id="edges-title">做不到什么，也是产品的一部分。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>已知限制</p>
+          <h2 id="edges-title">当前版本的限制</h2>
           <p class="fine-print">
-            完整能力、限制和证据范围请见<a href="features.html">功能页面</a>。
+            完整的功能、限制和验证范围见<a href="features.html">功能页面</a>。
           </p>
         </div>
         <ul>
           <li>
-            <strong>Gmail、Google 日历和 Google Tasks 可使用你自己的 OAuth
+            <strong>Gmail、Google 日历和 Google Tasks 使用你自己的 OAuth
               客户端。</strong>
-            引导设置会在明确登录前将桌面客户端凭据导入系统钥匙串。
+            引导设置会在你登录前把桌面客户端凭据导入系统钥匙串。
           </li>
           <li>
-            <strong>Microsoft Graph 需自备 OAuth。</strong>Corresync
-            不运营令牌中继服务。
+            <strong>Microsoft Graph 需要自备 OAuth 客户端。</strong>Corresync
+            不提供令牌中继服务。
           </li>
           <li>
-            <strong>Windows 桌面通知暂不可用。</strong>队列与已批准 执行器
-            仍可使用。
+            <strong>Windows
+              上暂不支持桌面通知。</strong>队列模式和已批准的执行器模式仍可使用。
           </li>
           <li>
-            <strong>功能以账号为准。</strong>
-            设置过程会显示该账号的连接路径与服务，而不会只凭邮箱品牌猜测。
+            <strong>功能按账号确定。</strong>
+            设置时显示该账号实际可用的连接方式和服务，不按邮箱品牌推测。
           </li>
         </ul>
       </section>
 
       <section class="final-cta" aria-labelledby="final-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>准备好整理收件箱时</p>
-        <h2 id="final-title">把所有往来带进一场本地对话。</h2>
-        <p>一条命令安装，再用一条命令连接智能体。</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>开始使用</p>
+        <h2 id="final-title">安装 Corresync</h2>
+        <p>用一条命令安装，再用一条命令连接智能体。</p>
         <div class="actions centered">
           <a class="button primary" href="#install">查看安装命令</a><a
             class="button secondary"
@@ -634,8 +638,8 @@ corr auth login --account personal</code></pre>
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        独立的本地优先邮件与日历工具。与此处提到的
-        Google、Microsoft、提供商或智能体厂商无隶属或背书关系。
+        独立开发的本地邮件和日历工具，与本站提到的 Google、Microsoft
+        及其他服务商或智能体厂商没有隶属或背书关系。
       </p>
       <nav aria-label="页脚">
         <a href="getting-started.html">快速开始</a><a href="providers.html">支持服务</a><a

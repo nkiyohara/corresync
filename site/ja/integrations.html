@@ -6,7 +6,7 @@
     <title>CorresyncのAI連携 — ローカルMCP・プラグイン・公開状況</title>
     <meta
       name="description"
-      content="CorresyncをAIエージェントで使う方法を、MCP、Skill、プラグイン、拡張機能、マーケット掲載の違いまで含めて正確に確認できます。"
+      content="CorresyncをAIエージェントから使う方法と、MCPの直接設定、Skill、プラグイン、拡張機能ごとの提供状況やマーケットへの掲載状況をまとめています。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="CorresyncをAIエージェントで使う方法を、MCP、Skill、プラグイン、拡張機能、マーケット掲載の違いまで含めて正確に確認できます。"
+      content="CorresyncをAIエージェントから使う方法と、MCPの直接設定、Skill、プラグイン、拡張機能ごとの提供状況やマーケットへの掲載状況をまとめています。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ja_JP">
@@ -30,7 +30,7 @@
     <meta property="og:image:height" content="630">
     <meta
       property="og:image:alt"
-      content="Corresyncのロゴと、ローカルで動くプロバイダー中立MCPという説明。"
+      content="Corresyncのロゴと、ローカルで動くMCPサーバーであることを示す説明。"
     >
     <meta name="twitter:card" content="summary_large_image">
     <meta
@@ -39,12 +39,12 @@
     >
     <meta
       name="twitter:description"
-      content="CorresyncをAIエージェントで使う方法を、MCP、Skill、プラグイン、拡張機能、マーケット掲載の違いまで含めて正確に確認できます。"
+      content="CorresyncをAIエージェントから使う方法と、MCPの直接設定、Skill、プラグイン、拡張機能ごとの提供状況やマーケットへの掲載状況をまとめています。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
-      content="Corresyncのロゴと、ローカルで動くプロバイダー中立MCPという説明。"
+      content="Corresyncのロゴと、ローカルで動くMCPサーバーであることを示す説明。"
     >
     <link rel="canonical" href="https://corresync.org/ja/integrations.html">
     <link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html">
@@ -92,34 +92,31 @@
 
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow">
-          <span aria-hidden="true"></span>誇張しないAIエージェント連携
-        </p>
+        <p class="eyebrow"><span aria-hidden="true"></span>AI連携</p>
         <h1 id="page-title">
-          いつものエージェントで使える。 <em
-          >導入方法も、公開状況も明確に。</em>
+          AIエージェントとの連携 <em>導入方法と公開状況</em>
         </h1>
         <p class="lede">
-          Corresyncは、端末上のAIエージェントとstdioでつながります。この一覧では、MCPの直接設定、Skill、専用パッケージ、リポジトリでの提供、公式マーケット掲載を分けて表示します。「対応」と「公式掲載」を混同しません。
+          Corresyncは、このコンピューター上のAIエージェントとstdioで接続します。この表では、MCPの直接設定、Skill、専用パッケージ、リポジトリでの提供、公式マーケットへの掲載を分けて表示しています。対応していることと、公式に掲載されていることは別です。
         </p>
         <div class="actions">
           <a class="button primary" href="getting-started.html"
           >検出したエージェントを設定</a>
-          <a class="button secondary" href="#matrix">対応表を見る</a>
+          <a class="button secondary" href="#matrix">対応表</a>
         </div>
       </section>
 
       <section class="publication-snapshot" aria-labelledby="snapshot-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>バージョンの見方</p>
-          <h2 id="snapshot-title">3つの数字は、それぞれ別の事実です。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>バージョン</p>
+          <h2 id="snapshot-title">3つのバージョン番号の意味</h2>
           <p>
-            開発中のソースは安定版より先に進み、外部レジストリには確認済みの旧版が残ることがあります。意図的に別々に表示しています。
+            開発中のソースは最新の安定版より新しいことがあり、外部のレジストリには確認済みの古い版が表示されたままのことがあります。そのため3つを分けて表示しています。
           </p>
         </div>
         <dl class="version-strip">
           <div>
-            <dt>ソース内パッケージ</dt>
+            <dt>ソース内のパッケージ</dt>
             <dd><code>0.9.0-rc.3</code></dd>
           </div>
           <div>
@@ -127,7 +124,7 @@
             <dd><code>0.8.6</code></dd>
           </div>
           <div>
-            <dt>MCP Registryで確認</dt>
+            <dt>MCP Registryで確認した版</dt>
             <dd><code>0.8.6</code></dd>
           </div>
         </dl>
@@ -136,9 +133,9 @@
       <section id="matrix" class="publication-matrix" aria-labelledby="matrix-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>公開・配布状況</p>
-          <h2 id="matrix-title">いま、どこから何を使えるか。</h2>
+          <h2 id="matrix-title">提供先ごとの対応状況</h2>
           <p>
-            実際に使える連携はすべてローカルです。「ソースで提供」は、このリポジトリに検証対象のパッケージがあるという意味で、各社の公式マーケット掲載や推奨を意味しません。
+            使える連携はすべてローカルで動きます。「ソースで提供」は、このリポジトリに検証済みのパッケージがあるという意味です。各社の公式マーケットへの掲載や推奨を意味するものではありません。
           </p>
         </div>
         <div class="legal-table-wrap publication-table-wrap">
@@ -171,7 +168,7 @@
               </tr>
               <tr>
                 <td><strong>Official MCP Registry</strong></td>
-                <td>自己完結MCPB</td>
+                <td>自己完結型MCPB</td>
                 <td>ローカルデスクトップ</td>
                 <td><span class="publication-state published">公開済み</span></td>
                 <td><code>0.8.6</code></td>
@@ -184,7 +181,7 @@
               </tr>
               <tr>
                 <td><strong>OpenAI plugin directory</strong></td>
-                <td>薄いプラグイン</td>
+                <td>軽量プラグイン</td>
                 <td>ローカルCLI</td>
                 <td><span class="publication-state not_listed">未掲載</span></td>
                 <td><code>表明なし</code></td>
@@ -202,7 +199,7 @@
                 <td>ローカルCLI</td>
                 <td><span class="publication-state source_available">ソースで提供</span></td>
                 <td><code>0.9.0-rc.3</code></td>
-                <td>版付きリポジトリソース</td>
+                <td>バージョン付きのリポジトリソース</td>
                 <td>
                   <a
                     href="https://github.com/nkiyohara/corresync/tree/main/.claude-plugin"
@@ -215,7 +212,7 @@
                 <td>ローカルCLI・ローカルIDE</td>
                 <td><span class="publication-state source_available">ソースで提供</span></td>
                 <td><code>0.9.0-rc.3</code></td>
-                <td>版付きリポジトリソース</td>
+                <td>バージョン付きのリポジトリソース</td>
                 <td>
                   <a
                     href="https://github.com/nkiyohara/corresync/tree/main/plugins/corresync"
@@ -224,11 +221,11 @@
               </tr>
               <tr>
                 <td><strong>Gemini CLI extension gallery</strong></td>
-                <td>薄い拡張機能</td>
+                <td>軽量な拡張機能</td>
                 <td>ローカルCLI</td>
                 <td><span class="publication-state source_available">ソースで提供</span></td>
                 <td><code>0.9.0-rc.3</code></td>
-                <td>版付きリポジトリソース</td>
+                <td>バージョン付きのリポジトリソース</td>
                 <td>
                   <a
                     href="https://github.com/nkiyohara/corresync/tree/main/integrations/gemini-cli/corresync"
@@ -237,11 +234,11 @@
               </tr>
               <tr>
                 <td><strong>Kiro Powers</strong></td>
-                <td>薄いPower</td>
+                <td>軽量なPower</td>
                 <td>ローカルIDE</td>
                 <td><span class="publication-state source_available">ソースで提供</span></td>
                 <td><code>0.9.0-rc.3</code></td>
-                <td>版付きリポジトリソース</td>
+                <td>バージョン付きのリポジトリソース</td>
                 <td>
                   <a
                     href="https://github.com/nkiyohara/corresync/tree/main/integrations/kiro/corresync"
@@ -335,13 +332,13 @@
       <section class="tinted-section publication-meanings" aria-labelledby="meaning-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>表示の意味</p>
-          <h2 id="meaning-title">対応・パッケージ・公開は別々です。</h2>
+          <h2 id="meaning-title">対応、パッケージ、公開はそれぞれ別</h2>
         </div>
         <div class="benefit-grid publication-card-grid">
           <article class="benefit-card featured">
             <span class="publication-state published">公開済み</span><h3>公開済み</h3>
             <p>
-              表示した版の外部レコードを確認済みです。安定版の公開処理でも、公開後に同じ内容を再検証します。
+              表示しているバージョンの外部の公開情報を確認済みです。安定版のリリース処理でも、公開後に同じ確認をもう一度行います。
             </p>
           </article>
           <article class="benefit-card">
@@ -349,14 +346,14 @@
               ソースで提供
             </h3>
             <p>
-              版付きの専用パッケージをリポジトリで生成・テストしています。各社の公式ディレクトリ掲載は主張しません。
+              バージョン付きの専用パッケージを、このリポジトリで生成してテストしています。各社の公式ディレクトリに掲載されているとはしていません。
             </p>
           </article>
           <article class="benefit-card">
             <span class="publication-state not_listed">未掲載</span><h3>未掲載</h3>
             <p>
-              現時点ではcorr
-              setupによる検証済みのMCP直接設定を使えます。専用メタデータと審査が整ってから申請します。
+              今はcorr
+              setupで、検証済みのMCP直接設定を使えます。専用のメタデータと先方の審査の準備ができてから申請します。
             </p>
           </article>
         </div>
@@ -364,33 +361,34 @@
 
       <section class="honest-edges publication-boundary" aria-labelledby="boundary-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>ローカルは、端末の中</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>ローカルでの動作</p>
           <h2 id="boundary-title">
-            掲載されても、ホスト型エージェントや非公開トンネルは有効になりません。
+            掲載されても、ホスト型のエージェントや非公開トンネルから使えるようにはなりません
           </h2>
         </div>
         <div>
           <p>
-            Corresyncが公開するのは、ローカルのstdioサーバーとローカルのアカウント状態だけです。プラグイン形式があっても、ChatGPTのホスト環境、クラウドエージェント、Kiro
-            Web、リモートサンドボックスからは到達できません。
+            Corresyncが提供するのは、ローカルのstdioサーバーとローカルのアカウント状態だけです。プラグインの形式があっても、ChatGPTのホスト環境、クラウドのエージェント、Kiro
+            Web、リモートのサンドボックスからは接続できません。
           </p>
           <p class="fine-print">
-            リレーや非公開MCPトンネルは新しいデータ経路になります。導入には、別の設計判断、明示的な同意、プライバシー開示、失効方法、セキュリティ審査が必要です。
+            ホスト型のリレーや非公開のMCPトンネルを使うと、新しいデータの通り道ができます。導入するには、別途の設計判断、利用者の同意、プライバシーに関する開示、取り消しの仕組み、セキュリティ審査が必要です。
           </p>
         </div>
       </section>
 
       <section class="final-cta" aria-labelledby="integrations-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>いちばん短い始め方</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>はじめ方</p>
         <h2 id="integrations-cta-title">
-          この端末のエージェントはcorr setupに検出・接続を任せられます。
+          corr
+          setupで、このコンピューターのエージェントを検出して接続できます
         </h2>
         <p>
-          対応表は確認用です。最初はガイドに沿って進めれば、検証済みのローカル経路だけが提示されます。
+          対応表は参照用です。まずはガイド付き設定から始めてください。検証済みのローカルでの接続方法だけが表示されます。
         </p>
         <div class="actions centered">
-          <a class="button primary" href="getting-started.html">スタートガイドを開く</a>
-          <a class="button secondary" href="providers.html">プロバイダー経路を確認</a>
+          <a class="button primary" href="getting-started.html">スタートガイド</a>
+          <a class="button secondary" href="providers.html">プロバイダーの接続方法</a>
         </div>
       </section>
     </main>

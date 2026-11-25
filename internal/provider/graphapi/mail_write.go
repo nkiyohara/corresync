@@ -33,7 +33,31 @@ func (client *Client) CreateMailDraft(
 	}
 	return application.MailDraft{
 		ID: id, ChangeKey: encodeETag(response.ODataETag),
+		Addressing: graphDraftAddressing(response),
 	}, nil
+}
+
+// graphDraftAddressing reports the recipients and subject Graph returned for
+// the created draft. A response that omitted either recipient list leaves the
+// addressing unresolved. Graph's response does not identify the reference
+// message's other participants, so that count stays unknown.
+func graphDraftAddressing(message graphMessage) *application.MailDraftAddressing {
+	if message.ToRecipients == nil || message.CcRecipients == nil {
+		return nil
+	}
+	return &application.MailDraftAddressing{
+		To:      graphRecipientAddresses(*message.ToRecipients),
+		CC:      graphRecipientAddresses(*message.CcRecipients),
+		Subject: message.Subject,
+	}
+}
+
+func graphRecipientAddresses(recipients []graphRecipient) []string {
+	addresses := make([]string, 0, len(recipients))
+	for _, recipient := range recipients {
+		addresses = append(addresses, recipient.EmailAddress.Address)
+	}
+	return addresses
 }
 
 func (client *Client) createNewDraft(
@@ -115,6 +139,9 @@ func (client *Client) assembleDraft(
 			"graph assembled draft omitted current identity",
 		))
 	}
+	// Adding attachments does not change recipients; keep the lists the
+	// creation response reported instead of widening the read selection.
+	updated.ToRecipients, updated.CcRecipients = draft.ToRecipients, draft.CcRecipients
 	return updated, nil
 }
 

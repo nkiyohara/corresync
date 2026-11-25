@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync integrations — local MCP, plugins, and verified availability</title>
+    <title>Corresync agent integrations — MCP setup, plugins, and where they are published</title>
     <meta
       name="description"
-      content="See which Corresync MCP, plugin, extension, Power, and marketplace paths are published, source-available, or not yet listed for local AI agents."
+      content="Which Corresync MCP, plugin, extension, Power, and marketplace packages for local AI agents are published, available in the repository, or not yet listed."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync integrations — local MCP, plugins, and verified availability"
+      content="Corresync agent integrations — MCP setup, plugins, and where they are published"
     >
     <meta
       property="og:description"
-      content="See which Corresync MCP, plugin, extension, Power, and marketplace paths are published, source-available, or not yet listed for local AI agents."
+      content="Which Corresync MCP, plugin, extension, Power, and marketplace packages for local AI agents are published, available in the repository, or not yet listed."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -30,21 +30,21 @@
     <meta property="og:image:height" content="630">
     <meta
       property="og:image:alt"
-      content="Corresync mark beside its local, provider-neutral MCP promise."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <meta name="twitter:card" content="summary_large_image">
     <meta
       name="twitter:title"
-      content="Corresync integrations — local MCP, plugins, and verified availability"
+      content="Corresync agent integrations — MCP setup, plugins, and where they are published"
     >
     <meta
       name="twitter:description"
-      content="See which Corresync MCP, plugin, extension, Power, and marketplace paths are published, source-available, or not yet listed for local AI agents."
+      content="Which Corresync MCP, plugin, extension, Power, and marketplace packages for local AI agents are published, available in the repository, or not yet listed."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
-      content="Corresync mark beside its local, provider-neutral MCP promise."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <link rel="canonical" href="https://corresync.org/integrations.html">
     <link rel="alternate" hreflang="en" href="https://corresync.org/integrations.html">
@@ -91,30 +91,27 @@
 
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow">
-          <span aria-hidden="true"></span>Agent integrations, without inflated claims
-        </p>
-        <h1 id="page-title">
-          Use Corresync where your agent runs. <em>See exactly how it is packaged.</em>
-        </h1>
+        <p class="eyebrow"><span aria-hidden="true"></span>Agent integrations</p>
+        <h1 id="page-title">How Corresync is packaged <em>for each agent</em></h1>
         <p class="lede">
-          Corresync connects to local AI agents over stdio. This matrix separates direct MCP setup,
-          Skills, native packages, source availability, and actual marketplace publication—so a
-          compatible client is never mistaken for an official listing.
+          Corresync connects to local AI agents over stdio. The table below lists direct MCP setup,
+          Skills, native packages, what is in the repository, and what is actually published in a
+          marketplace. A client that works with Corresync does not mean there is an official
+          listing.
         </p>
         <div class="actions">
           <a class="button primary" href="getting-started.html">Set up detected agents</a>
-          <a class="button secondary" href="#matrix">Read the matrix</a>
+          <a class="button secondary" href="#matrix">See the table</a>
         </div>
       </section>
 
       <section class="publication-snapshot" aria-labelledby="snapshot-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Version snapshot</p>
-          <h2 id="snapshot-title">Three versions, three different facts.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Versions</p>
+          <h2 id="snapshot-title">Current versions</h2>
           <p>
-            The source bundle can be ahead of the latest stable release, while an external registry
-            can still show an older verified record. They are displayed separately on purpose.
+            The source bundle can be newer than the latest stable release, and an external registry
+            can still show an older verified record, so the three are listed separately.
           </p>
         </div>
         <dl class="version-strip">
@@ -135,12 +132,11 @@
 
       <section id="matrix" class="publication-matrix" aria-labelledby="matrix-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Publication matrix</p>
-          <h2 id="matrix-title">What is available now—and where.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Publication table</p>
+          <h2 id="matrix-title">What is available and where</h2>
           <p>
-            Every working integration below is local. “Source available” means the reviewed
-            package is in this repository; it does not mean the upstream vendor lists or endorses
-            it.
+            Every integration below runs locally. “Source available” means the reviewed package
+            is in this repository. It does not mean the vendor lists or endorses it.
           </p>
         </div>
         <div class="legal-table-wrap publication-table-wrap">
@@ -331,15 +327,15 @@
 
       <section class="tinted-section publication-meanings" aria-labelledby="meaning-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Read the labels literally</p>
-          <h2 id="meaning-title">Compatibility, packaging, and publication are separate.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Labels</p>
+          <h2 id="meaning-title">What the labels mean</h2>
         </div>
         <div class="benefit-grid publication-card-grid">
           <article class="benefit-card featured">
             <span class="publication-state published">Published</span><h3>Published</h3>
             <p>
-              An externally visible record was checked at the version shown. Stable release
-              automation must verify it again after publishing.
+              A public record was checked at the version shown. The stable release automation must
+              check it again after publishing.
             </p>
           </article>
           <article class="benefit-card">
@@ -347,15 +343,15 @@
               Source available
             </h3>
             <p>
-              A versioned native package is generated and tested in this repository. An official
-              vendor directory has not been claimed.
+              A versioned native package is built and tested in this repository. We do not claim a
+              listing in the vendor’s official directory.
             </p>
           </article>
           <article class="benefit-card">
             <span class="publication-state not_listed">Not listed</span><h3>Not listed</h3>
             <p>
-              Use corr setup for the reviewed direct MCP path. Marketplace submission waits for
-              native metadata and upstream review.
+              Use corr setup to add Corresync directly as an MCP server. Marketplace submission
+              waits for native metadata and the vendor’s review.
             </p>
           </article>
         </div>
@@ -363,35 +359,35 @@
 
       <section class="honest-edges publication-boundary" aria-labelledby="boundary-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>Local means local</p>
-          <h2 id="boundary-title">No hosted agent or private tunnel is enabled by a listing.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Local only</p>
+          <h2 id="boundary-title">A listing does not enable hosted agents or tunnels</h2>
         </div>
         <div>
           <p>
-            Corresync exposes one local stdio server and local account state. Hosted ChatGPT, cloud
-            agents, Kiro Web, and remote sandboxes cannot reach it merely because a plugin format
-            exists.
+            Corresync runs one local stdio server and keeps account state on your computer. Hosted
+            ChatGPT, cloud agents, Kiro Web, and remote sandboxes cannot reach it just because a
+            plugin format exists for them.
           </p>
           <p class="fine-print">
-            A hosted relay or private MCP tunnel would introduce a new data path and requires its
-            own architecture decision, consent, privacy disclosure, revocation design, and security
-            review.
+            A hosted relay or private MCP tunnel would add a new path for your data. It would need
+            its own architecture decision, consent, privacy disclosure, revocation design, and
+            security review.
           </p>
         </div>
       </section>
 
       <section class="final-cta" aria-labelledby="integrations-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>The shortest path</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>Setup</p>
         <h2 id="integrations-cta-title">
-          Let corr setup detect and connect the agents on this machine.
+          corr setup finds and connects the agents on this computer
         </h2>
         <p>
-          The matrix is reference material. The guided command remains the natural starting point
-          and only offers reviewed local paths.
+          The table is for reference. Start with the guided command; it only offers reviewed local
+          setups.
         </p>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html">Open getting started</a>
-          <a class="button secondary" href="providers.html">Check provider routes</a>
+          <a class="button secondary" href="providers.html">See provider routes</a>
         </div>
       </section>
     </main>

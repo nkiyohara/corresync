@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync 安全模型 — 本機權限與寫入審閱</title>
+    <title>Corresync 安全說明：本機權限與寫入確認</title>
     <meta
       name="description"
-      content="瞭解 Corresync 如何讓登入歸瀏覽器或鑰匙圈管理、隔離帳號，並在每項重要寫入提交前顯示準確預覽。"
+      content="說明 Corresync 如何把登入交給瀏覽器或鑰匙圈處理、如何分開管理各帳號，以及重要寫入在送出前如何顯示預覽。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Corresync 安全模型">
+    <meta property="og:title" content="Corresync 安全說明">
     <meta
       property="og:description"
-      content="認證資料歸屬、帳號隔離、預覽→提交 與不可信資料邊界。"
+      content="憑證存放位置、帳號隔離、先預覽再送出的流程，以及如何處理不可信的資料。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -27,8 +27,8 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Corresync 標誌和英文產品簡介">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Corresync 安全模型">
-    <meta name="twitter:description" content="本機權限、帳號隔離與寫入審閱。">
+    <meta name="twitter:title" content="Corresync 安全說明">
+    <meta name="twitter:description" content="本機權限、帳號隔離與寫入前的確認。">
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
     <link rel="canonical" href="https://corresync.org/zh-tw/safety.html">
@@ -77,95 +77,93 @@
     </header>
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>安全模型</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>安全說明</p>
         <h1 id="page-title">
-          智慧體獲得型別化工具，<em>絕不獲得你的認證資料。</em>
+          AI 代理只能使用工具，<em>拿不到你的憑證</em>
         </h1>
         <p class="lede">
-          Corresync 只在本機使用你已經擁有的帳號權限。密碼、Cookie 和 OAuth
-          權杖不會進入 MCP；每次寫入都先確認目標與內容，再單次提交。
+          Corresync 只在本機使用你帳號原有的權限。密碼、Cookie 和 OAuth
+          權杖不會經過 MCP；每次寫入都先確認對象和內容，再送出一次。
         </p>
         <div class="actions">
-          <a class="button primary" href="#promises">查看核心保證</a><a
+          <a class="button primary" href="#promises">查看安全原則</a><a
             class="button secondary"
             href="privacy.html"
-          >查看資料處理</a>
+          >資料如何處理</a>
         </div>
       </section>
       <section id="promises" aria-labelledby="promises-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>不變的保證</p>
-          <h2 id="promises-title">權限保持狹窄，效果始終可見。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>安全原則</p>
+          <h2 id="promises-title">六項安全原則</h2>
         </div>
         <div class="promise-grid">
           <article>
             <span class="promise-mark" aria-hidden="true">01</span><h3>
-              認證資料留在應有的位置
+              憑證存放在固定的位置
             </h3>
             <p>
-              瀏覽器會話留在專用可見瀏覽器，API 授權 與標準協議 機密資訊
-              留在系統鑰匙圈或明確核准的輔助程式。核心設定不會儲存機密資訊。
+              瀏覽器登入狀態留在專用瀏覽器中，API
+              授權和標準協定的機密資訊存放在作業系統鑰匙圈或經你核准的輔助程式。設定檔不儲存機密資訊。
             </p>
           </article>
           <article>
             <span class="promise-mark" aria-hidden="true">02</span><h3>
-              每次寫入只選一個帳號
+              每次寫入只針對一個帳號
             </h3>
             <p>
-              讀取可跨帳號；寫入前必須從穩定 opaque identity
-              解析出一個準確帳號和容器。
+              讀取可以跨帳號；寫入前會用固定的內部識別碼找出確切的一個帳號和資料夾或行事曆。
             </p>
           </article>
           <article>
-            <span class="promise-mark" aria-hidden="true">03</span><h3>重要操作先審閱</h3>
+            <span class="promise-mark" aria-hidden="true">03</span><h3>重要操作先預覽</h3>
             <p>
-              傳送、事件更改、移動和刪除先回傳伺服器繫結的預覽；目標或
-              內容不一致就無法提交。
+              傳送、修改活動、移動和刪除會先回傳由伺服器檢查的預覽；對象或內容不同就無法送出。
             </p>
           </article>
           <article>
-            <span class="promise-mark" aria-hidden="true">04</span><h3>結果未知就停止</h3>
+            <span class="promise-mark" aria-hidden="true">04</span><h3>結果不明時停止</h3>
             <p>
-              遠端寫入結果不明確時不自動重試，避免重複傳送或二次修改。
+              無法確定遠端寫入是否成功時不會自動重試，以免重複傳送或重複修改。
             </p>
           </article>
           <article>
             <span class="promise-mark" aria-hidden="true">05</span><h3>預設不監控</h3>
             <p>
-              匯入掃描只讀；monitoring、agent dispatch、data egress
-              分別選擇啟用，初始關閉，MCP 無法開啟。
+              匯入掃描是唯讀的。監控、AI
+              代理派送和資料外傳要分別開啟，預設關閉，MCP 無法開啟。
             </p>
           </article>
           <article>
-            <span class="promise-mark" aria-hidden="true">06</span><h3>不掩蓋限制</h3>
+            <span class="promise-mark" aria-hidden="true">06</span><h3>照實顯示限制</h3>
             <p>
-              能力在登入後按帳號觀測，不從品牌推斷；降級和部分失敗會明確回傳。
+              登入後才依帳號確認實際能用的功能，不會從品牌推測。功能降級和部分失敗都會回報。
             </p>
           </article>
         </div>
       </section>
       <section class="architecture-panel" aria-labelledby="architecture-title">
         <div>
-          <p class="eyebrow light"><span aria-hidden="true"></span>一個 application core</p>
-          <h2 id="architecture-title">人、指令碼、智慧體都遵守同一邊界。</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>架構</p>
+          <h2 id="architecture-title">人、指令碼和 AI 代理走同一套檢查</h2>
           <p>
-            CLI 和 MCP 呼叫同一型別化 use case。服務供應商介接層
-            只做協議翻譯，不持有策略。
+            CLI 和 MCP
+            呼叫相同的應用層功能。服務供應商的介接層只負責轉換協定，不做任何政策判斷。
           </p>
         </div>
         <div class="flow" aria-label="Corresync 信任邊界">
           <span class="flow-in">CLI · MCP</span><span class="flow-edge" aria-hidden="true"
           >→</span><span class="flow-core">typed application use cases<br><small>account · policy
-              · 預覽／提交</small></span><span class="flow-edge" aria-hidden="true"
+              · 預覽／送出</small></span><span class="flow-edge" aria-hidden="true"
           >→</span><span class="flow-in">服務供應商介接層</span>
         </div>
       </section>
       <section id="review" aria-labelledby="review-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>預覽 → 提交</p>
-          <h2 id="review-title">第一次顯示效果，第二次必須完全匹配。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>預覽與送出</p>
+          <h2 id="review-title">先看預覽，送出時內容必須一致</h2>
           <p>
-            核准繫結呼叫者、帳號、供應商、目標、版本、內容、操作效果、有效期與單次使用。
+            核准只對同一個呼叫者、帳號、服務、對象、版本、內容和操作有效，有期限，而且只能使用一次。
           </p>
         </div>
         <div class="review-grid">
@@ -192,126 +190,129 @@
           </figure>
           <div class="review-copy">
             <article>
-              <h3>短時有效</h3>
-              <p>舊審閱不能以後複用。</p>
+              <h3>有時效</h3>
+              <p>過期的預覽不能再拿來送出。</p>
             </article>
             <article>
-              <h3>僅可一次</h3>
-              <p>同一核准不能提交兩次。</p>
+              <h3>只能用一次</h3>
+              <p>同一個核准不能送出兩次。</p>
             </article>
             <article>
-              <h3>繫結目標</h3>
-              <p>帳號、收件人或位元組改變就需要新審閱。</p>
+              <h3>只對預覽的內容有效</h3>
+              <p>帳號、收件人或內容有任何變動，就要重新預覽。</p>
             </article>
             <article>
-              <h3>CLI 與 MCP 共用</h3>
-              <p>核心強制策略，不依賴 annotation。</p>
+              <h3>CLI 和 MCP 相同</h3>
+              <p>由核心程式執行政策檢查，不依賴 MCP 的 annotation。</p>
             </article>
           </div>
         </div>
       </section>
       <section class="tinted-section" id="authentication" aria-labelledby="auth-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>誰管理認證</p>
-          <h2 id="auth-title">先選路徑，只在你要求時認證。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>登入與憑證</p>
+          <h2 id="auth-title">先選連線方式，你要求時才登入</h2>
           <p>
-            發現過程不使用認證資料，要求有效
-            TLS，也不會啟動管理員同意流程。
+            查詢連線方式時不使用憑證，需要有效的
+            TLS，也不會要求管理員同意。
           </p>
         </div>
         <div class="auth-grid">
           <article>
             <h3>Outlook Web</h3>
             <p>
-              專用可見瀏覽器管理互動式登入，不把密碼或 Cookie
-              匯入核心，也不繞過 SSO、MFA 或 Conditional Access。
+              互動式登入在專用瀏覽器中進行。密碼和 Cookie
+              不會進入核心，也不繞過 SSO、MFA 或 Conditional Access。
             </p>
           </article>
           <article>
-            <h3>Google 與 Graph</h3>
+            <h3>Google 和 Graph</h3>
             <p>
-              使用一般系統瀏覽器 OAuth 與 PKCE，授權存入系統鑰匙圈。Graph
-              必須明確選擇；Google 使用你自己的桌面 OAuth
-              用戶端，其認證資料也存入獨立的鑰匙圈項目。
+              在系統的預設瀏覽器中用 OAuth 和 PKCE
+              登入，授權存放在作業系統鑰匙圈。Graph
+              要你自己選擇才會使用。Google 使用你自己的桌面版 OAuth
+              用戶端，用戶端憑證存放在另一個鑰匙圈項目。
             </p>
           </article>
           <article>
             <h3>JMAP、IMAP/SMTP、CalDAV</h3>
             <p>
-              設定只儲存認證資料參照；機密資訊
-              透過已同意的外部認證資料介面讀取。始終要求有效 TLS，不做 TLS
-              攔截。
+              設定檔只存放憑證的參照，機密資訊透過你同意使用的外部憑證介面讀取。一律需要有效的
+              TLS，也不做 TLS 攔截。
             </p>
           </article>
         </div>
       </section>
       <section id="untrusted-data" aria-labelledby="data-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>信箱是不可信輸入</p>
-          <h2 id="data-title">一封郵件永遠不能給自己授權。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>不可信的資料</p>
+          <h2 id="data-title">郵件內容不能授權任何操作</h2>
           <p>
-            內文、附件、事件與供應商回應都是不可信資料。其中的文字不能授權工具呼叫、新增帳號、啟動監控或代替核准。
+            內文、附件、活動和服務供應商的回應都是不可信資料。其中的文字不能呼叫工具、新增帳號、開始監控或代替核准。
           </p>
         </div>
         <div class="control-grid">
           <article>
-            <h3>後設資料優先</h3>
-            <p>選定訊息前不讀取內文和附件，所有讀取都有上限。</p>
+            <h3>先讀中繼資料</h3>
+            <p>選定郵件之前不讀取內文和附件，每次讀取都有大小上限。</p>
           </article>
           <article>
-            <h3>只讀匯入</h3>
-            <p>不復用其他應用的 機密資訊，只顯示候選。</p>
+            <h3>唯讀匯入</h3>
+            <p>不沿用其他應用程式的機密資訊，只列出可匯入的項目。</p>
           </article>
           <article>
-            <h3>選擇性監控</h3>
-            <p>只有明確設定查詢、帳號、間隔與目標後才執行。</p>
+            <h3>監控（選用）</h3>
+            <p>你設定好查詢條件、帳號、間隔和通知對象後才會執行。</p>
           </article>
           <article>
-            <h3>明確意見回饋</h3>
-            <p>分享前審閱，不包含郵件、位址、權杖或認證資料。</p>
+            <h3>意見回饋</h3>
+            <p>分享前會先讓你檢查，不包含郵件、位址、權杖或憑證。</p>
           </article>
         </div>
       </section>
       <section class="absent-panel" id="out-of-scope" aria-labelledby="absent-title">
         <div>
-          <p class="eyebrow light"><span aria-hidden="true"></span>不存在的能力</p>
-          <h2 id="absent-title">Corresync 不會擴大帳號權限。</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>不提供的功能</p>
+          <h2 id="absent-title">Corresync 不會擴大帳號原有的權限</h2>
         </div>
         <ul>
-          <li>託管權杖與郵件中繼服務、多使用者伺服器、遠端 MCP 端點</li>
-          <li>在核心設定中儲存密碼、應用程式密碼、OAuth權杖或 Cookie</li>
-          <li>無人登入、TLS 攔截、繞過 MFA 或 Conditional Access</li>
-          <li>tenant-wide 或 administrator access</li>
-          <li>自動 替代路徑 到 Graph 或自動探測</li>
-          <li>目前版本中的 Teams 聊天與頻道功能</li>
-          <li>Teams 通話、錄製、上線狀態監控與會議生命週期管理</li>
+          <li>託管的權杖或郵件中繼服務、多使用者伺服器、遠端 MCP 端點</li>
+          <li>
+            在 Corresync 設定檔中儲存密碼、應用程式密碼、OAuth 權杖或 Cookie
+          </li>
+          <li>無人操作的自動登入、TLS 攔截、繞過 MFA 或 Conditional Access</li>
+          <li>整個租用戶範圍或系統管理員層級的存取</li>
+          <li>自動改用 Graph，或用 Graph 自動探測</li>
+          <li>Teams 聊天和頻道的正式支援（目前是預覽功能）</li>
+          <li>Teams 通話、錄影、上線狀態監控和會議生命週期管理</li>
         </ul>
       </section>
       <section class="evidence-explainer" id="evidence" aria-labelledby="evidence-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>證據邊界</p>
-          <h2 id="evidence-title">合成 coverage 不是即時供應商承諾。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>測試範圍</p>
+          <h2 id="evidence-title">合成測試不代表實際服務一定能用</h2>
           <p>
-            預設測試和 CI 只用不含認證資料與個人資訊的合成測試資料。live
-            mailbox 測試必須選擇啟用，無法從預設命令或 CI 執行。
+            預設測試和 CI
+            只使用不含憑證和個人資料的合成測試資料。連到實際信箱的測試必須手動開啟，預設的測試指令和
+            CI 都不會執行。
           </p>
         </div>
         <div>
-          <p><strong>Provider-native 宣告：</strong>按官方資料與合成契約驗證。</p>
+          <p><strong>服務原生功能：</strong>依官方文件和合成契約測試驗證。</p>
           <p>
-            <strong>Live-observed 宣告：</strong>只有繫結
-            提交、release、環境和合成資料的記錄才可使用。
+            <strong>Live-observed：</strong>只有記錄了確切
+            commit、release、環境和合成資料的觀察紀錄，才能這樣標示。
           </p>
-          <p><strong>Capability：</strong>登入後按帳號觀測，不根據品牌猜測。</p>
+          <p><strong>可用功能：</strong>登入後依帳號確認，不從品牌推測。</p>
         </div>
       </section>
       <section class="final-cta" aria-labelledby="safety-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>設計公開，檢查可執行</p>
-        <h2 id="safety-cta-title">邊界寫在文件裡，也寫在測試裡。</h2>
+        <p class="eyebrow"><span aria-hidden="true"></span>原始碼</p>
+        <h2 id="safety-cta-title">這些限制都寫在文件和測試中</h2>
         <div class="actions centered">
           <a class="button primary" href="https://github.com/nkiyohara/corresync"
           >查看原始碼</a><a class="button secondary" href="getting-started.html"
-          >安全開始</a>
+          >開始使用</a>
         </div>
       </section>
     </main>
@@ -323,7 +324,7 @@
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        獨立的本機優先郵件與行事曆工具。與所列廠商無隸屬或背書關係。
+        獨立開發的本機郵件與行事曆工具，與這裡列出的廠商沒有隸屬或背書關係。
       </p>
       <nav aria-label="頁尾">
         <a href="getting-started.html">開始使用</a><a href="providers.html">支援服務</a><a

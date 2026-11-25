@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/mail"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/nkiyohara/corresync/internal/approval"
@@ -83,7 +84,59 @@ type MailDraft struct {
 	ID         string            `json:"id"`
 	ChangeKey  string            `json:"changeKey,omitempty"`
 	Provenance domain.Provenance `json:"provenance,omitempty"`
+	// Addressing is the adapter's report of the saved draft's visible
+	// addressing. Nil means the route did not report it. The application
+	// validates it and exposes it as MailDraftAccess.Addressing.
+	Addressing *MailDraftAddressing `json:"-"`
 }
+
+// MailDraftAddressing is the visible addressing an adapter composed for, or
+// read back from, one exact saved draft version. It deliberately has no Bcc
+// field: hidden source recipients are never inferred or exposed.
+type MailDraftAddressing struct {
+	To      []string
+	CC      []string
+	Subject string
+	// SourceParticipants are the reference message's visible To and Cc
+	// addresses other than this account. They are meaningful only when
+	// SourceParticipantsKnown is true.
+	SourceParticipants      []string
+	SourceParticipantsKnown bool
+}
+
+// MailAddressingStatus distinguishes provider-confirmed addressing from a
+// route that did not report it. Unresolved never means an empty list.
+type MailAddressingStatus string
+
+const (
+	MailAddressingResolved   MailAddressingStatus = "resolved"
+	MailAddressingUnresolved MailAddressingStatus = "unresolved"
+)
+
+// MailDraftAddressingReview is the saved draft's resolved addressing.
+// Resolved is present exactly when Status is "resolved".
+type MailDraftAddressingReview struct {
+	Status   MailAddressingStatus    `json:"status"`
+	Resolved *MailResolvedAddressing `json:"resolved,omitempty"`
+}
+
+// MailResolvedAddressing is the visible To, Cc, and subject of a saved draft.
+// Empty lists are verified empty. SourceParticipantsNotIncluded counts the
+// reference message's visible To/Cc addresses, other than this account, that
+// the draft does not address; it is present only for reply and reply_all
+// when the route verified the source participants.
+type MailResolvedAddressing struct {
+	To                            []string `json:"to"`
+	CC                            []string `json:"cc"`
+	Subject                       string   `json:"subject"`
+	SourceParticipantsNotIncluded *int     `json:"sourceParticipantsNotIncluded,omitempty"`
+}
+
+const (
+	maxReviewAddressBytes     = 320
+	maxReviewSubjectBytes     = 4 * MaxMailSubjectBytes
+	maxReviewSourceRecipients = 2 * MaxMailRecipients
+)
 
 // MailReview is safe to show before saving or sending an exact composition.
 type MailReview struct {
@@ -102,11 +155,13 @@ type MailReview struct {
 }
 
 // MailDraftAccess represents a completed save or an approval preview.
+// Addressing is present only for a completed save.
 type MailDraftAccess struct {
-	Status  string            `json:"status"`
-	Draft   *MailDraft        `json:"draft,omitempty"`
-	Review  MailReview        `json:"review"`
-	Preview *approval.Preview `json:"preview,omitempty"`
+	Status     string                     `json:"status"`
+	Draft      *MailDraft                 `json:"draft,omitempty"`
+	Review     MailReview                 `json:"review"`
+	Addressing *MailDraftAddressingReview `json:"addressing,omitempty"`
+	Preview    *approval.Preview          `json:"preview,omitempty"`
 }
 
 // MailDraftWriter is the narrow provider-neutral port for save-only drafts.
@@ -144,7 +199,7 @@ func (service *MailService) CreateDraft(
 		if err != nil {
 			return MailDraftAccess{}, err
 		}
-		return MailDraftAccess{Status: "completed", Draft: &draft, Review: review}, nil
+		return completedDraftAccess(input, draft, review), nil
 	case policy.VerdictPreview:
 		return MailDraftAccess{Status: "approval_required", Review: review, Preview: prepared.Preview}, nil
 	case policy.VerdictDeny:
@@ -177,7 +232,76 @@ func (service *MailService) CommitDraft(
 	if err != nil {
 		return MailDraftAccess{}, err
 	}
-	return MailDraftAccess{Status: "completed", Draft: &draft, Review: input.Review()}, nil
+	return completedDraftAccess(input, draft, input.Review()), nil
+}
+
+func completedDraftAccess(input MailDraftInput, draft MailDraft, review MailReview) MailDraftAccess {
+	addressing := draftAddressingReview(input.EffectiveComposeMode(), draft.Addressing)
+	draft.Addressing = nil
+	return MailDraftAccess{
+		Status: "completed", Draft: &draft, Review: review, Addressing: &addressing,
+	}
+}
+
+// draftAddressingReview validates an adapter report before it is shown. A
+// missing or malformed report is unresolved rather than an empty list.
+func draftAddressingReview(mode MailComposeMode, reported *MailDraftAddressing) MailDraftAddressingReview {
+	unresolved := MailDraftAddressingReview{Status: MailAddressingUnresolved}
+	if reported == nil ||
+		len(reported.To)+len(reported.CC) > MaxMailRecipients ||
+		!utf8.ValidString(reported.Subject) || len(reported.Subject) > maxReviewSubjectBytes ||
+		strings.ContainsRune(reported.Subject, '\x00') {
+		return unresolved
+	}
+	for _, address := range append(append([]string(nil), reported.To...), reported.CC...) {
+		if !validReviewAddress(address) {
+			return unresolved
+		}
+	}
+	resolved := MailResolvedAddressing{
+		To:      append([]string{}, reported.To...),
+		CC:      append([]string{}, reported.CC...),
+		Subject: reported.Subject,
+	}
+	if (mode == MailComposeReply || mode == MailComposeReplyAll) && reported.SourceParticipantsKnown {
+		if omitted, ok := sourceParticipantsNotIncluded(reported); ok {
+			resolved.SourceParticipantsNotIncluded = &omitted
+		}
+	}
+	return MailDraftAddressingReview{Status: MailAddressingResolved, Resolved: &resolved}
+}
+
+func sourceParticipantsNotIncluded(reported *MailDraftAddressing) (int, bool) {
+	if len(reported.SourceParticipants) > maxReviewSourceRecipients {
+		return 0, false
+	}
+	included := make(map[string]struct{}, len(reported.To)+len(reported.CC))
+	for _, address := range append(append([]string(nil), reported.To...), reported.CC...) {
+		included[strings.ToLower(address)] = struct{}{}
+	}
+	omitted := make(map[string]struct{}, len(reported.SourceParticipants))
+	for _, address := range reported.SourceParticipants {
+		if !validReviewAddress(address) {
+			return 0, false
+		}
+		key := strings.ToLower(address)
+		if _, exists := included[key]; !exists {
+			omitted[key] = struct{}{}
+		}
+	}
+	return len(omitted), true
+}
+
+func validReviewAddress(address string) bool {
+	if address == "" || len(address) > maxReviewAddressBytes || !utf8.ValidString(address) {
+		return false
+	}
+	for _, character := range address {
+		if unicode.IsControl(character) || unicode.IsSpace(character) {
+			return false
+		}
+	}
+	return true
 }
 
 func (service *MailService) executeDraft(
@@ -242,7 +366,7 @@ func (input MailDraftInput) Validate(maxRecipients int) error {
 			return err
 		}
 		if count != 0 {
-			return errors.New("reply recipients are derived from the reference message")
+			return derivedReplyRecipientsError(mode)
 		}
 	case MailComposeForward:
 		if err := validateOpaqueValue("reference message ID", input.ReferenceMessageID); err != nil {
@@ -306,6 +430,23 @@ func (input MailDraftInput) Validate(maxRecipients int) error {
 		}
 	}
 	return nil
+}
+
+// derivedReplyRecipientsError explains the closed response modes when a caller
+// supplies explicit recipients that reply and reply_all derive themselves.
+func derivedReplyRecipientsError(mode MailComposeMode) error {
+	if mode == MailComposeReply {
+		return errors.New(
+			"reply recipients are derived from the reference message: reply addresses only the sender " +
+				"(or Reply-To); to keep the other To/Cc participants use reply_all (CLI --mode reply-all) " +
+				"without explicit recipients, or use new or forward for an explicit audience",
+		)
+	}
+	return errors.New(
+		"reply_all recipients are derived from the reference message: it addresses the sender plus " +
+			"the other visible To/Cc participants; omit explicit recipients, or use new or forward " +
+			"for an explicit audience",
+	)
 }
 
 func validateMailAddress(value string) error {

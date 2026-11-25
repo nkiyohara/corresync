@@ -41,6 +41,10 @@ type graphMessage struct {
 	HasAttachments bool           `json:"hasAttachments"`
 	IsDraft        bool           `json:"isDraft"`
 	Body           graphItemBody  `json:"body"`
+	// ToRecipients and CcRecipients are nil when the response omitted them,
+	// which is distinct from a returned empty list.
+	ToRecipients *[]graphRecipient `json:"toRecipients"`
+	CcRecipients *[]graphRecipient `json:"ccRecipients"`
 }
 
 type graphMessagePage struct {

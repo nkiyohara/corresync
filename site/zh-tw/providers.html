@@ -6,7 +6,7 @@
     <title>支援的郵件、行事曆與待辦事項服務 — Corresync</title>
     <meta
       name="description"
-      content="比較 Outlook、Microsoft 365、Gmail、Google 行事曆、Google Tasks、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 與 CalDAV 支援，以及自備 OAuth 設定。"
+      content="比較 Outlook、Microsoft 365、Gmail、Google 行事曆、Google Tasks、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 與 CalDAV 的支援範圍，以及自備 OAuth 用戶端的設定方式。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="查看 Todoist、TickTick、iCloud 與 CalDAV VTODO 等路徑，以及使用你自己的桌面 OAuth 用戶端的 Google 支援。"
+      content="Todoist、TickTick、iCloud、CalDAV VTODO 等連線方式，以及用你自己的桌面版 OAuth 用戶端連接 Google 的說明。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -36,7 +36,7 @@
     >
     <meta
       name="twitter:description"
-      content="查看 Outlook、Todoist、TickTick、iCloud、標準協定與使用你自己的桌面 OAuth 用戶端的 Google 支援。"
+      content="Outlook、Todoist、TickTick、iCloud、標準協定的支援範圍，以及用你自己的桌面版 OAuth 用戶端連接 Google 的說明。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
@@ -83,11 +83,11 @@
     </header>
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>路徑明確，取捨可見</p>
-        <h1 id="page-title">選擇真正適合<em>你的帳號</em>的路徑。</h1>
+        <p class="eyebrow"><span aria-hidden="true"></span>支援服務</p>
+        <h1 id="page-title">選擇適合<em>你的帳號</em>的連線方式</h1>
         <p class="lede">
           Corresync
-          不會根據標誌猜測能力。發現階段只收集無認證資料證據；你在認證開始前選擇郵件和行事曆路徑。
+          不會依品牌推測功能。查詢連線方式時不用憑證，郵件和行事曆的連線方式由你在登入前選定。
         </p>
         <div class="actions">
           <a class="button primary" href="#check">檢查信箱位址</a><a
@@ -97,23 +97,22 @@
         </div>
       </section>
       <section
-        class="compatibility-相容性檢查工具"
+        class="compatibility-checker"
         id="check"
-        aria-labelledby="相容性檢查工具-title"
+        aria-labelledby="checker-title"
       >
-        <div class="相容性檢查工具-intro">
-          <p class="eyebrow"><span aria-hidden="true"></span>這個位址能用嗎？</p>
-          <h2 id="相容性檢查工具-title">
-            無需傳送完整位址，也能檢查支援情況。
+        <div class="checker-intro">
+          <p class="eyebrow"><span aria-hidden="true"></span>相容性檢查</p>
+          <h2 id="checker-title">
+            不傳送完整位址也能檢查是否支援
           </h2>
           <p>
-            輸入要連線的信箱。瀏覽器會保留完整位址，只把 @
-            後面的網域交給檢查服務。
+            輸入要連接的信箱。完整位址留在瀏覽器，只有 @
+            後面的網域會送到檢查服務。
           </p>
         </div>
-        <form id="compatibility-form" class="相容性檢查工具-form" novalidate>
-          <label for="compatibility-email"
-          >信箱位址</label><div class="相容性檢查工具-fields">
+        <form id="compatibility-form" class="checker-form" novalidate>
+          <label for="compatibility-email">信箱位址</label><div class="checker-fields">
             <input
               id="compatibility-email"
               name="compatibility-email"
@@ -125,22 +124,23 @@
               aria-describedby="compatibility-privacy compatibility-validation"
               required
             ><button id="compatibility-submit" class="button primary" type="submit" disabled>
-              檢查支援情況
+              檢查是否支援
             </button>
           </div>
-          <p id="compatibility-validation" class="相容性檢查工具-validation" hidden>
+          <p id="compatibility-validation" class="checker-validation" hidden>
             請輸入完整信箱位址，例如 you@example.com。@
-            後有完整網域之前不會查詢。
+            後有完整網域前不會查詢。
           </p>
         </form>
-        <p id="compatibility-privacy" class="相容性檢查工具-privacy">
+        <p id="compatibility-privacy" class="checker-privacy">
           <strong>只有網域會離開瀏覽器。</strong>@
-          前的內容不會傳送、儲存、記錄或放進位址列。服務只讀取公共
-          DNS，不保留記錄，也不會啟動登入。你也可以跳過網頁檢查，安裝後在本機執行
+          前的內容不會傳送、儲存、記錄或出現在網址列。檢查服務只讀取公開
+          DNS
+          記錄，不保留資料，也不會開始登入。也可以跳過，安裝後在本機執行
           <code>corr account discover you@example.com</code>。
-        </p><noscript><p class="相容性檢查工具-noscript">
-            這項可選檢查需要 JavaScript。也可以安裝後在本機執行 <code>corr
-              account discover you@example.com</code>。
+        </p><noscript><p class="checker-noscript">
+            這個檢查需要 JavaScript。你也可以安裝後在本機執行 <code>corr account
+              discover you@example.com</code>。
           </p></noscript><p
           id="compatibility-live"
           class="visually-hidden"
@@ -150,7 +150,7 @@
         </p>
         <article
           id="compatibility-result"
-          class="相容性檢查工具-result"
+          class="checker-result"
           tabindex="-1"
           aria-label="支援情況結果"
           hidden
@@ -159,27 +159,27 @@
       </section>
       <section class="evidence-banner" aria-label="供應商證據狀態">
         <span class="status-dot" aria-hidden="true"></span><div>
-          <strong>v0.8 證據是確定且按路徑區分的。</strong><p>
-            下列可用或準備中的路徑都有合成 服務供應商契約 與 application
-            測試。Google API 路徑已通過合成契約測試，尚未即時觀測。
+          <strong>v0.9 的驗證範圍依連線方式分別列出。</strong><p>
+            下列已提供或準備中的連線方式都有合成服務契約測試和應用層測試。Google
+            API 連線方式已通過合成契約測試，尚未在實際環境中觀察。
           </p>
-        </div><a href="features.html#evidence">證據如何解讀<span aria-hidden="true">
+        </div><a href="features.html#evidence">驗證範圍說明<span aria-hidden="true">
             →</span></a>
       </section>
       <section id="route-cards" aria-labelledby="microsoft-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Microsoft 路徑</p>
-          <h2 id="microsoft-title">使用你信任的瀏覽器，或明確選擇 Graph。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Microsoft</p>
+          <h2 id="microsoft-title">Outlook Web 或 Microsoft Graph</h2>
           <p>
-            Outlook Web 的登入由瀏覽器管理。Microsoft Graph 是單獨設定的公開 OAuth
-            用戶端，絕不會成為自動 替代路徑。
+            Outlook Web 在瀏覽器中登入。Microsoft Graph 需另外設定公開 OAuth
+            用戶端，不會被自動改用。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card" id="microsoft-owa">
             <header>
               <span class="route-icon" aria-hidden="true">OW</span><div>
-                <p class="chip">瀏覽器管理</p>
+                <p class="chip">瀏覽器登入</p>
                 <h3>Outlook Web</h3>
               </div>
             </header>
@@ -190,21 +190,21 @@
               </div>
               <div>
                 <dt>行事曆</dt>
-                <dd>選擇行事曆與供應商支援的 Teams 加入連結</dd>
+                <dd>選擇行事曆；服務支援時可用 Teams 會議連結</dd>
               </div>
               <div>
                 <dt>登入</dt>
-                <dd>專用可見瀏覽器設定</dd>
+                <dd>專用的可見瀏覽器設定檔</dd>
               </div>
             </dl>
             <p class="route-foot">
-              SSO、MFA、Conditional Access 與組織提示都留在瀏覽器中。
+              SSO、MFA、Conditional Access 和組織通知都在瀏覽器中處理。
             </p>
           </article>
           <article class="route-card accent-card" id="microsoft-graph">
             <header>
               <span class="route-icon" aria-hidden="true">G</span><div>
-                <p class="chip">明確 OAuth</p>
+                <p class="chip">OAuth</p>
                 <h3>Microsoft Graph</h3>
               </div>
             </header>
@@ -215,33 +215,35 @@
               </div>
               <div>
                 <dt>行事曆</dt>
-                <dd>選擇行事曆與型別化 Teams 連結建立</dd>
+                <dd>選擇行事曆，並建立 Teams 會議連結</dd>
               </div>
               <div>
                 <dt>登入</dt>
-                <dd>你有權使用的公開用戶端；授權 存入系統鑰匙圈</dd>
+                <dd>你有權使用的公開用戶端；授權存放在作業系統鑰匙圈</dd>
               </div>
             </dl>
-            <p class="route-foot">Graph 僅在明確選擇或已有授權時提供。</p>
+            <p class="route-foot">
+              只有你選擇或先前已授權時，才會使用 Graph。
+            </p>
           </article>
         </div>
       </section>
       <section id="icloud" aria-labelledby="icloud-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Apple iCloud</p>
-          <h2 id="icloud-title">在同一套引導中設定 iCloud 郵件與行事曆。</h2>
+          <h2 id="icloud-title">用引導式設定一次設好 iCloud 郵件和行事曆</h2>
           <p>
-            <code>corr setup</code>會辨識 Apple
-            公布的信箱位址類型，以及具備完整且已驗證服務記錄的 iCloud
-            自訂網域。它使用 Apple 官方 IMAP、SMTP 和 CalDAV
-            端點，並在新增帳號前顯示所有登入名稱與連線路徑供你確認。
+            <code>corr setup</code> 會辨識 Apple
+            公布的信箱位址類型，以及服務記錄完整且通過驗證的 iCloud
+            自訂網域。它使用 Apple 公布的 IMAP、SMTP 和 CalDAV
+            端點，並在新增帳號前列出所有登入名稱和連線方式供你確認。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">iC</span><div>
-                <p class="chip">現已支援 · 引導預設</p>
+                <p class="chip">已支援 · 引導式設定</p>
                 <h3>iCloud 郵件與行事曆</h3>
               </div>
             </header>
@@ -252,56 +254,56 @@
               </div>
               <div>
                 <dt>行事曆</dt>
-                <dd>透過 CalDAV 探索和讀取行事曆，並執行需確認的寫入</dd>
+                <dd>透過 CalDAV 尋找和讀取行事曆，寫入前需要確認</dd>
               </div>
               <div>
                 <dt>登入</dt>
-                <dd>在作業系統認證資料介面中直接輸入 Apple App 專用密碼</dd>
+                <dd>Apple App 專用密碼直接輸入到作業系統的憑證儲存區</dd>
               </div>
             </dl>
             <p class="route-foot">
               Corresync
-              只向系統提示介面傳遞固定服務名稱和經過確認的參照，絕不讀取密碼。系統會分別顯示郵件和行事曆最近一次認證狀態，且不讀取郵件內文或行程內容。
+              只把固定的服務名稱和確認過的參照交給系統提示，不會讀取密碼。郵件和行事曆最近一次的驗證狀態分開顯示，不讀取內容。
             </p>
           </article>
           <article class="route-card">
             <header>
               <span class="route-icon" aria-hidden="true">2F</span><div>
-                <p class="chip">Apple 帳號要求</p>
+                <p class="chip">Apple 帳號需求</p>
                 <h3>雙重認證</h3>
               </div>
             </header>
             <p>
               先啟用雙重認證，再到 Apple 帳號頁面建立 App
-              專用密碼。只有在經過確認的本機帳號新增完成後，而且你明確選擇開啟時，引導程式才會前往該頁面。
+              專用密碼。引導程式只在本機帳號確認並新增後、且你選擇開啟時，才會開啟該頁面。
             </p>
             <p class="route-foot">
               請參閱 Apple 官方的<a href="https://support.apple.com/zh-tw/102525"
               >iCloud 郵件設定</a>和<a href="https://support.apple.com/zh-tw/102654"
               >App
-                專用密碼說明</a>。此預設已通過合成契約測試；在記錄明確選擇加入的實機觀察前，仍標記為尚未實機觀察。
+                專用密碼說明</a>。此預設已通過合成契約測試；在記錄經主動啟用（opt-in）的實際觀察前，仍標示為尚未實際觀察。
             </p>
           </article>
         </div>
       </section>
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Google 路徑</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>Google</p>
           <h2 id="google-title">
-            Gmail、Google 行事曆和 Google Tasks 可使用你自己的 OAuth 用戶端。
+            用你自己的 OAuth 用戶端連接 Gmail、Google 行事曆和 Google Tasks
           </h2>
           <p>
-            在你自行管理的 Google Cloud 專案中建立桌面 OAuth
-            用戶端，然後在引導設定中匯入 JSON。 Corresync 管理的 OAuth
-            保持休眠；你自己的用戶端會開啟 Google 的一般瀏覽器流程。
+            在你自己管理的 Google Cloud 專案中建立桌面版 OAuth
+            用戶端，再於引導式設定中匯入 JSON。Corresync 管理的 OAuth
+            維持停用；你的用戶端會開啟一般的 Google 瀏覽器登入。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">GA</span><div>
-                <p class="chip">設定後可用 · 自備 OAuth</p>
-                <h3>Google API 路徑</h3>
+                <p class="chip">設定後可用 · 自備 OAuth 用戶端</p>
+                <h3>Google API</h3>
               </div>
             </header>
             <dl>
@@ -309,12 +311,12 @@
                 <dt>郵件</dt>
                 <dd>
                   Gmail API
-                  標籤、搜尋、按需讀取、撰寫、傳送和整理；移入垃圾箱而非永久刪除
+                  標籤、搜尋、讀取選定郵件、撰寫、傳送和整理；移到垃圾桶，不永久刪除
                 </dd>
               </div>
               <div>
                 <dt>行事曆</dt>
-                <dd>選擇行事曆，並在支援時建立 Google Meet</dd>
+                <dd>可選擇行事曆；行事曆支援時可建立 Google Meet</dd>
               </div>
               <div>
                 <dt>待辦事項</dt>
@@ -323,28 +325,28 @@
               <div>
                 <dt>登入</dt>
                 <dd>
-                  你自己的桌面 OAuth
-                  用戶端；用戶端認證資料與帳號授權分別存入系統鑰匙圈
+                  你自己的桌面版 OAuth
+                  用戶端；用戶端憑證和帳號授權分別存放在作業系統鑰匙圈
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              一般瀏覽器負責 OAuth，裝置直接連結固定的 Google API。<a
+              OAuth 在一般瀏覽器中進行，各服務使用固定的 Google API。<a
                 href="google-oauth.html"
-              >查看 Google Cloud 畫面與全部步驟</a>。
+              >查看 Google Cloud 畫面和所有步驟</a>。
             </p>
           </article>
           <article class="route-card">
             <header>
               <span class="route-icon" aria-hidden="true">✓</span><div>
-                <p class="chip">現已可用</p>
+                <p class="chip">已可使用</p>
                 <h3>Google Workspace MCP</h3>
               </div>
             </header>
             <dl>
               <div>
                 <dt>提供者</dt>
-                <dd>Google 營運的遠端 MCP 伺服器</dd>
+                <dd>由 Google 營運的遠端 MCP 伺服器</dd>
               </div>
               <div>
                 <dt>狀態</dt>
@@ -352,11 +354,11 @@
               </div>
               <div>
                 <dt>設定</dt>
-                <dd>需要 Google Cloud 與 OAuth 設定</dd>
+                <dd>需要設定 Google Cloud 和 OAuth</dd>
               </div>
             </dl>
             <p class="route-foot">
-              請參閱 Google 官方<a
+              請參考 Google 官方的<a
                 href="https://developers.google.com/workspace/guides/configure-mcp-servers"
               >設定指南</a>。
             </p>
@@ -365,55 +367,55 @@
       </section>
       <section id="tasks" aria-labelledby="tasks-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>待辦事項路徑</p>
-          <h2 id="tasks-title">連接你原本就在使用的待辦服務。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>待辦事項</p>
+          <h2 id="tasks-title">連接你使用的待辦服務</h2>
           <p>
-            待辦事項可獨立於郵件和行事曆選擇。每個帳號的授權、功能、同步游標與確認後寫入都彼此隔離。
+            待辦服務與郵件、行事曆分開選擇。授權、功能、同步游標和寫入都依帳號分開。
           </p>
         </div>
         <div class="route-grid three">
           <article class="route-card" id="microsoft-todo">
             <header>
               <span class="route-icon" aria-hidden="true">To</span><div>
-                <p class="chip">目前可用 · 明確 OAuth</p>
+                <p class="chip">已可使用 · OAuth</p>
                 <h3>Microsoft To Do</h3>
               </div>
             </header>
             <p>
-              支援待辦清單、建立與更新、完成與重新開啟、刪除、重複規則、檢查清單、分類，以及有上限的
+              待辦清單、建立和更新、完成和重新開啟、刪除、重複規則、檢查清單、類別，以及有上限的
               Graph 差異同步。
             </p>
             <p class="route-foot">
-              使用你有權註冊並選擇的 Microsoft Graph 公開用戶端。
+              使用你有權註冊和選用的 Microsoft Graph 公開用戶端。
             </p>
           </article>
           <article class="route-card" id="todoist">
             <header>
               <span class="route-icon" aria-hidden="true">Td</span><div>
-                <p class="chip">目前可用 · 明確 OAuth</p>
+                <p class="chip">已可使用 · OAuth</p>
                 <h3>Todoist</h3>
               </div>
             </header>
             <p>
-              支援專案、待辦寫入與狀態、提醒、重複規則、子任務、標籤、負責人、精確的日期時間語意，以及有上限的同步。
+              專案、待辦寫入和狀態、提醒、重複規則、子任務、標籤、指派、精確的日期時間，以及有上限的同步。
             </p>
             <p class="route-foot">
-              使用具備 PKCE 的公開 OAuth 用戶端；方案限制會如實顯示。
+              使用搭配 PKCE 的公開 OAuth 用戶端；方案限制會照實顯示。
             </p>
           </article>
           <article class="route-card accent-card" id="ticktick">
             <header>
               <span class="route-icon" aria-hidden="true">Ti</span><div>
-                <p class="chip">目前可用 · 明確 OAuth</p>
+                <p class="chip">已可使用 · OAuth</p>
                 <h3>TickTick</h3>
               </div>
             </header>
             <p>
-              支援專案與收集箱、搜尋、建立、更新、完成、刪除、重複規則、檢查清單、標籤、單一負責人、排序及有上限的輪詢。
+              專案和收集箱、搜尋、建立、更新、完成、刪除、重複規則、檢查清單、標籤、單一負責人、排序和有上限的輪詢。
             </p>
             <p class="route-foot">
-              使用你自行註冊、採用用戶端密鑰的 OAuth
-              應用程式。密鑰留在核准的認證資料儲存區；不會宣稱支援重新開啟或替換提醒。
+              使用你自己註冊、帶有用戶端密鑰的 OAuth
+              應用程式。密鑰存放在你核准的憑證儲存區。不提供重新開啟待辦和替換提醒的功能。
             </p>
           </article>
         </div>
@@ -421,10 +423,10 @@
       <section aria-labelledby="standards-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>開放標準</p>
-          <h2 id="standards-title">按供應商真正開放的服務自由組合。</h2>
+          <h2 id="standards-title">依服務實際提供的協定組合使用</h2>
           <p>
-            標準路徑要求有效
-            TLS，並使用系統鑰匙圈或明確核准的認證資料輔助程式。
+            標準協定需要有效的
+            TLS，憑證放在作業系統鑰匙圈，或經你核准、以絕對路徑指定的輔助程式。
           </p>
         </div>
         <div class="route-grid three">
@@ -436,11 +438,11 @@
               </div>
             </header>
             <p>
-              透過型別化 RFC 8620
-              契約讀取、草稿、支援時提交、移動、狀態更改和需確認的刪除。
+              依照 RFC 8620
+              讀取、草稿、支援時送出、移動、變更狀態，刪除前需確認。
             </p>
             <p class="route-foot">
-              只讀帳號或缺少 Submission 能力會明確顯示不可用。
+              唯讀帳號或沒有 Submission 功能時，會顯示為無法使用。
             </p>
           </article>
           <article class="route-card" id="imap-smtp">
@@ -451,11 +453,12 @@
               </div>
             </header>
             <p>
-              資料夾、讀取、MIME、草稿、安全移動，以及能確認已傳送信箱結果的
-              SMTP 提交。
+              IMAP
+              資料夾、讀取、MIME、草稿、安全的移動，以及能在寄件備份中確認結果的
+              SMTP 傳送。
             </p>
             <p class="route-foot">
-              需要 UIDPLUS 或 Sent 信箱的操作會在不安全模擬前失敗。
+              需要 UIDPLUS 或寄件備份的操作會直接失敗，不做不安全的模擬。
             </p>
           </article>
           <article class="route-card" id="caldav">
@@ -466,31 +469,30 @@
               </div>
             </header>
             <p>
-              分別探索 VEVENT 行事曆與 VTODO
-              待辦清單，提供受限讀取、重複規則、
-              同步權杖，以及確認後的條件式 WebDAV/iCalendar 寫入。
+              分別尋找 VEVENT 行事曆和 VTODO
+              待辦清單，支援有上限的讀取、重複規則、同步權杖，以及確認後的條件式
+              WebDAV/iCalendar 寫入。
             </p>
             <p class="route-foot">
-              登入後會分別確認行事曆排程能力與待辦事項功能。
+              登入後會分別確認行事曆排程和待辦事項功能。
             </p>
           </article>
         </div>
       </section>
       <section class="mix-panel" aria-labelledby="mix-title">
         <div>
-          <p class="eyebrow light"><span aria-hidden="true"></span>一個帳號，兩條路徑</p>
-          <h2 id="mix-title">郵件和行事曆不必來自同一協議。</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>混合使用</p>
+          <h2 id="mix-title">郵件和行事曆可以使用不同協定</h2>
           <p>
-            可組合 IMAP/SMTP 與
-            CalDAV，也可只設定郵件或行事曆。穩定帳號身分會隔離設定、認證資料、游標、預覽
-            與 audit context。
+            可以把 IMAP/SMTP 和 CalDAV
+            搭配，也可只設定郵件或行事曆。帳號有固定識別碼，設定檔、憑證、游標、預覽和稽核紀錄都依帳號分開。
           </p>
         </div>
         <figure class="terminal">
           <figcaption class="term-bar">
             <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
               class="term-title"
-            >無認證資料探索</span>
+            >不使用憑證的探索</span>
           </figcaption>
           <pre
             tabindex="0"
@@ -503,24 +505,24 @@
       </section>
       <section class="honest-edges" aria-labelledby="provider-limits-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>沒有隱藏 替代路徑</p>
-          <h2 id="provider-limits-title">缺少的能力會保持缺少。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>不自動改用其他方式</p>
+          <h2 id="provider-limits-title">不支援的功能會直接顯示為不支援</h2>
         </div>
         <ul>
-          <li>限制會作為型別化能力或降級明確回傳。</li>
+          <li>服務的限制會以功能清單或降級狀態回報。</li>
           <li>
-            自動探索不會啟動 Google
-            OAuth；只有明確的本機登入才可開啟瀏覽器。
+            自動探索不會開始 Google
+            OAuth；只有你在本機執行登入時才會開啟瀏覽器。
           </li>
-          <li>自動發現不會啟動 Graph 授權。</li>
-          <li>只有所選行事曆路徑報告支援時才請求會議連結。</li>
-          <li>未知寫入結果需要核對，絕不自動重試。</li>
+          <li>自動探索不會開始 Graph 授權。</li>
+          <li>所選行事曆連線方式回報支援時，才會要求會議連結。</li>
+          <li>寫入結果不明時需要人工核對，不會自動重試。</li>
         </ul>
       </section>
       <section class="final-cta" aria-labelledby="provider-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>明確選擇</p>
-        <h2 id="provider-cta-title">先看證據，再認證。</h2>
-        <p>發現過程不讀取認證資料，也不新增帳號。</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>下一步</p>
+        <h2 id="provider-cta-title">設定第一個帳號</h2>
+        <p>查詢連線方式時不會讀取憑證，也不會新增帳號。</p>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html">設定第一個帳號</a><a
             class="button secondary"
@@ -537,7 +539,7 @@
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        獨立的本機優先郵件與行事曆工具。與所列廠商無隸屬或背書關係。
+        獨立開發的本機郵件與行事曆工具，與這裡列出的廠商沒有隸屬或背書關係。
       </p>
       <nav aria-label="頁尾">
         <a href="getting-started.html">開始使用</a><a href="providers.html">支援服務</a><a

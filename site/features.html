@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync features — what you can do, in plain language</title>
+    <title>Corresync features and limits</title>
     <meta
       name="description"
-      content="What you can do with Corresync across mail, calendars, AI agents, and scripts—in plain language, with every limit stated explicitly."
+      content="What Corresync can do with mail, calendars, AI agents, and scripts, and what it cannot do."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Corresync features — what you can do, in plain language">
+    <meta property="og:title" content="Corresync features and limits">
     <meta
       property="og:description"
-      content="What you can do with Corresync across mail, calendars, AI agents, and scripts—in plain language, with every limit stated explicitly."
+      content="What Corresync can do with mail, calendars, AI agents, and scripts, and what it cannot do."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -28,18 +28,18 @@
     <meta property="og:image:height" content="630">
     <meta
       property="og:image:alt"
-      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Corresync features — what you can do, in plain language">
+    <meta name="twitter:title" content="Corresync features and limits">
     <meta
       name="twitter:description"
-      content="What you can do with Corresync across mail, calendars, AI agents, and scripts—in plain language, with every limit stated explicitly."
+      content="What Corresync can do with mail, calendars, AI agents, and scripts, and what it cannot do."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
-      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <link rel="canonical" href="https://corresync.org/features.html">
     <link rel="alternate" hreflang="en" href="https://corresync.org/features.html">
@@ -89,70 +89,72 @@
 
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>Features in plain language</p>
-        <h1 id="page-title">Everything you can do—<em>and exactly where the edges are.</em></h1>
+        <p class="eyebrow"><span aria-hidden="true"></span>Features</p>
+        <h1 id="page-title">What Corresync does <em>and where it stops</em></h1>
         <p class="lede">
-          The CLI, your scripts, and MCP agents all call one typed application core, so every
-          capability below works the same way everywhere. What each account can actually do depends
-          on its provider route—<a href="providers.html">check yours first</a>—and any missing
-          capability is reported explicitly instead of being hidden or emulated.
+          The CLI, your scripts, and MCP agents all use the same code, so everything below works the
+          same way from each of them. What an account can do depends on its provider route (<a
+            href="providers.html"
+          >check yours first</a>). If something is missing, Corresync says so instead of hiding it
+          or faking it.
         </p>
         <div class="actions">
-          <a class="button primary" href="getting-started.html">Set it up in four steps</a>
-          <a class="button secondary" href="#evidence">How these claims are backed</a>
+          <a class="button primary" href="getting-started.html">Set it up</a>
+          <a class="button secondary" href="#evidence">How these claims are tested</a>
         </div>
       </section>
 
       <section aria-labelledby="mailcal-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Across your accounts</p>
-          <h2 id="mailcal-title">Mail and calendars, without merging your identities.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Mail and calendar</p>
+          <h2 id="mailcal-title">Mail and calendars across accounts</h2>
           <p>
-            Reads span every account you connect while keeping each result's account, provider, and
-            time-zone provenance. Writes are deliberately different: each one targets exactly one
-            account and consequential effects are previewed first.
+            Reads can cover every account you connect, and each result shows its account, provider,
+            and time zone. Each write targets exactly one account, and important changes are
+            previewed first.
           </p>
         </div>
         <div class="capability-grid">
           <article aria-labelledby="cap-mail">
             <h3 id="cap-mail">Mail</h3>
             <p>
-              Metadata comes first: lists and searches never include bodies or attachments, which
-              are separate, explicit, bounded reads.
+              Lists and searches never include bodies or attachments. You read a body or an
+              attachment with a separate, size-limited request.
             </p>
             <ul>
-              <li>Search one account or all of them, with explicit partial-failure reporting</li>
+              <li>Search one account or all of them; if some fail, the result says which</li>
               <li>List folders and messages; read a body or one attachment on request</li>
               <li>Save drafts that can never send themselves</li>
-              <li>Send, reply, reply-all, and forward—text or HTML, bounded file attachments</li>
               <li>
-                Move messages, set read state, and—where the provider reports
-                support—permanently delete, each with a review
+                Send, reply, reply-all, and forward, as text or HTML, with size-limited attachments
+              </li>
+              <li>
+                Move messages, set read state, and permanently delete where the provider supports
+                it, each with a review
               </li>
             </ul>
             <p>
-              Every write is attempted exactly once. An unknown remote outcome is reported for
-              reconciliation, never retried automatically.
+              Every write is attempted once. If the result is unknown, Corresync tells you to check
+              it and does not retry automatically.
             </p>
           </article>
           <article aria-labelledby="cap-calendar">
             <h3 id="cap-calendar">Calendar and agenda</h3>
             <p>
-              One agenda projection across every account, with original calendars, time zones, and
-              provider provenance attached to each event.
+              One agenda for all accounts. Each event shows its original calendar, time zone, and
+              provider.
             </p>
             <ul>
               <li>Discover selectable calendars per account</li>
-              <li>List bounded windows or one cross-account agenda</li>
-              <li>Create, update, and cancel events with preview → commit</li>
-              <li>Supported recurrence creation, replacement, and removal</li>
+              <li>List a time range, or one agenda across accounts</li>
+              <li>Create, update, and cancel events, with a preview before each change</li>
+              <li>Create, replace, and remove recurrence where supported</li>
               <li>
-                Required and optional attendees, with the route's notification behavior named in the
-                review
+                Required and optional attendees; the review says whether the route notifies them
               </li>
               <li>
-                Meeting links only where native: Teams on Microsoft routes, Google Meet when the
-                calendar advertises it
+                Meeting links only where the provider offers them: Teams on Microsoft routes, Google
+                Meet when the calendar advertises it
               </li>
             </ul>
           </article>
@@ -161,42 +163,47 @@
 
       <section class="tinted-section" id="agents" aria-labelledby="agents-page-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Agents and automation</p>
-          <h2 id="agents-page-title">The same core for AI agents and your scripts.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Agents and scripts</p>
+          <h2 id="agents-page-title">AI agents and scripts</h2>
           <p>
-            Nothing here is a second implementation. MCP tools and <code>--json</code> output call
-            the identical use cases and pass the identical policy checks as the interactive CLI.
+            MCP tools and <code>--json</code> output run the same code and the same checks as the
+            interactive CLI.
           </p>
         </div>
         <div class="capability-grid">
           <article aria-labelledby="cap-agents">
-            <h3 id="cap-agents">For AI agents, over local stdio</h3>
+            <h3 id="cap-agents">AI agents (local stdio)</h3>
             <p>
-              Corresync exposes 43 narrow, typed tools and two read-only monitor resources. There is
-              no HTTP, SSE, remote endpoint, or hosted relay.
+              Corresync provides 71 tools and two read-only monitor resources. There is no HTTP,
+              SSE, remote endpoint, or hosted relay.
             </p>
             <ul>
-              <li>Metadata-first tools with per-account provenance in every result</li>
-              <li>Preview and commit are separate tools for every consequential write</li>
-              <li>Account lifecycle and everyday settings use preview → commit pairs too</li>
-              <li>Agents can add, rename, and remove accounts through those lifecycle tools</li>
+              <li>Tools return metadata before content, and every result names its account</li>
+              <li>Every important write has separate preview and commit tools</li>
               <li>
-                Signing in, enabling monitoring, approving a runner or remote egress, purging
-                queues, imports, and binary updates stay CLI-only human actions
+                Adding or removing accounts and changing settings also use a preview and a commit
               </li>
-              <li>Tool annotations inform client UX but never replace server-side policy</li>
+              <li>Agents can add, rename, and remove accounts through those tools</li>
+              <li>
+                Signing in, turning on monitoring, approving a runner or remote egress, purging
+                queues, imports, and binary updates can only be done by a person in the CLI
+              </li>
+              <li>
+                Tool annotations help the client’s interface but never replace Corresync’s own
+                checks
+              </li>
             </ul>
             <p>
-              <a href="getting-started.html#connect">Connect your client</a> — Codex, Claude Code,
+              <a href="getting-started.html#connect">Connect your client</a>: Codex, Claude Code,
               GitHub Copilot CLI, Gemini CLI, Qwen Code, Qoder, Kimi Code CLI, or any stdio MCP
               client.
             </p>
           </article>
           <article id="scripting" aria-labelledby="cap-scripting">
-            <h3 id="cap-scripting">For scripts, with stable JSON</h3>
+            <h3 id="cap-scripting">Scripts (stable JSON)</h3>
             <p>
-              Add <code>--json</code> to a command and it emits exactly one unstyled JSON value on
-              stdout—same isolation, bounds, and preview rules as everywhere else.
+              Add <code>--json</code> to a command and it prints exactly one plain JSON value on
+              stdout.
             </p>
             <div class="cmd" data-copy data-copy-label="JSON search example">
               <pre
@@ -207,7 +214,8 @@
     --query 'subject:"quarterly plan"' --json</code></pre>
             </div>
             <p>
-              The same account isolation, bounds, and preview rules apply to every JSON response.
+              JSON output follows the same account separation, size limits, and preview rules as the
+              rest of the CLI.
             </p>
           </article>
         </div>
@@ -215,61 +223,59 @@
 
       <section aria-labelledby="local-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>On your machine, on your terms</p>
-          <h2 id="local-title">Local capabilities you switch on deliberately.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Local features</p>
+          <h2 id="local-title">Features that are off until you turn them on</h2>
         </div>
         <div class="capability-grid">
           <article aria-labelledby="cap-import">
             <h3 id="cap-import">Read-only import staging</h3>
             <p>
-              Inspect one explicitly approved local source—recognized archives and exports, a
-              Maildir tree, or a Thunderbird profile—into bounded account-local staging.
+              Scan one local source you approved (a recognized archive or export, a Maildir tree, or
+              a Thunderbird profile) into a size-limited staging area for one account.
             </p>
             <ul>
-              <li>Nothing is scanned until you re-run with the explicit read approval</li>
-              <li>Never authenticates, uploads, sends, or mutates the source</li>
-              <li>Purge removes only Corresync-owned staging, never your files</li>
+              <li>Nothing is scanned until you run the command again with read approval</li>
+              <li>It never signs in, uploads, sends, or changes the source</li>
+              <li>Purge removes only Corresync’s staging data, never your files</li>
             </ul>
           </article>
           <article aria-labelledby="cap-monitoring">
             <h3 id="cap-monitoring">Opt-in monitoring</h3>
             <p>
-              Monitoring starts <strong>off</strong> for every account and advances one consent
-              boundary at a time: off → local notification → durable queue → one approved
-              runner.
+              Monitoring is <strong>off</strong> for every account. You turn it on one step at a
+              time: off → local notification → durable queue → one approved runner.
             </p>
             <ul>
               <li>Quiet hours, debounce, hourly limits, deduplication, and a circuit breaker</li>
               <li>
-                Desktop notifications use local tools on Linux and macOS; on Windows they are
-                unavailable (no registered AppUserModelID), while queue and runner modes work
+                Desktop notifications use local tools on Linux and macOS. They don’t work on
+                Windows (no registered AppUserModelID), but queue and runner modes do
               </li>
               <li>
-                The runner is one absolute executable, invoked without a shell, fed bounded JSON;
-                remote egress is a separate explicit approval
+                The runner is one program, given by absolute path, started without a shell and given
+                size-limited JSON. Sending data off the machine needs its own approval
               </li>
             </ul>
           </article>
           <article aria-labelledby="cap-feedback">
-            <h3 id="cap-feedback">Privacy-preserving feedback</h3>
+            <h3 id="cap-feedback">Feedback reports</h3>
             <p>
-              <code>corr feedback</code> builds a redacted, allowlisted report locally—build,
-              platform, install method, config validity, aggregate capabilities, and optionally a
-              sanitized error class.
+              <code>corr feedback</code> builds a report on your computer that contains only
+              allowlisted fields: build, platform, install method, whether the config is valid,
+              summary capabilities, and optionally a sanitized error class.
             </p>
             <ul>
               <li>
-                Addresses, credentials, content, queries, and private paths are excluded by
-                construction
+                Addresses, credentials, content, queries, and private paths can’t be included
               </li>
-              <li>Generation makes no network request</li>
+              <li>Building the report makes no network request</li>
               <li>
-                Copying, saving, or opening a prefilled GitHub page each require an explicit flag;
-                that manual flow never submits
+                Copying, saving, or opening a prefilled GitHub page each needs its own flag, and
+                none of them submits anything
               </li>
               <li>
-                A separate default-off choice may submit a smaller allowlist-only public issue
-                through your authenticated GitHub CLI after an interactive failure
+                A separate option, off by default, can submit a smaller public issue with only
+                allowlisted fields through your signed-in GitHub CLI after an interactive failure
               </li>
             </ul>
           </article>
@@ -278,8 +284,8 @@
 
       <section class="tinted-section" id="faq" aria-labelledby="faq-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Common questions</p>
-          <h2 id="faq-title">Answers before you install anything.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>FAQ</p>
+          <h2 id="faq-title">Common questions</h2>
         </div>
         <div class="faq-grid">
           <article aria-labelledby="faq-provider">
@@ -287,11 +293,11 @@
             <p>
               Outlook Web, Microsoft Graph, Todoist, TickTick, JMAP, IMAP/SMTP, and CalDAV routes
               are available now; Gmail, Google Calendar, and Google Tasks use a Desktop OAuth client
-              in a Google Cloud project you control. You pick mail and calendar routes independently
-              per account, and any degradation is explicit. The optional <a
+              in a Google Cloud project you control. You pick mail and calendar routes separately
+              for each account, and anything that doesn’t work is reported. The optional <a
                 href="providers.html#check"
-              >private compatibility checker</a> sends only the domain after the @, or you can skip
-              it and discover locally after installation.
+              >compatibility checker</a> sends only the domain after the @, or you can skip it and
+              run the lookup locally after installing.
             </p>
           </article>
           <article aria-labelledby="faq-cost">
@@ -299,46 +305,47 @@
             <p>
               No. Corresync is open source under the Apache-2.0 license. You bring the accounts you
               already have. Microsoft Graph needs a public OAuth client you are authorized to use;
-              Google needs your own Desktop OAuth client. Corresync-managed Google OAuth stays
-              dormant.
+              Google needs your own Desktop OAuth client. Corresync’s own managed Google OAuth is
+              not active.
             </p>
           </article>
           <article aria-labelledby="faq-data">
             <h3 id="faq-data">Where does my mail live?</h3>
             <p>
-              With your provider, as before. Corresync runs entirely on your machine—there is no
-              hosted relay and no cloud copy. Local state such as cursors, staging, queues, and
-              pending previews stays in local, account-isolated storage.
+              With your provider, as before. Corresync runs entirely on your computer. There is no
+              hosted relay and no cloud copy. Local state such as sync cursors, staging, queues, and
+              pending previews is stored locally, separately for each account.
             </p>
           </article>
           <article aria-labelledby="faq-agent-send">
             <h3 id="faq-agent-send">Can an AI agent send something without me?</h3>
             <p>
-              A consequential write first returns a review of the exact effect. Committing requires
-              that exact reviewed payload; approval is short-lived, single-use, and bound to the
-              caller, account, target, and content.
+              An important write first returns a review of exactly what will happen. It only goes
+              ahead with that exact reviewed content. The approval is short-lived, works once, and
+              only for that caller, account, target, and content.
               <a href="safety.html">Read the safety model</a>.
             </p>
           </article>
           <article aria-labelledby="faq-phone-home">
             <h3 id="faq-phone-home">Does Corresync phone home?</h3>
             <p>
-              There is no telemetry pipeline or raw crash upload. An interactive CLI may quietly
-              check for a newer public release—sending only the Corresync version string, cached
-              for 24 hours, disabled for MCP, pipes, and JSON output—and you can turn that off in
-              configuration. A separate default-off feedback choice can use your authenticated
-              GitHub CLI to post a small allowlist-only public issue after an interactive failure.
-              From 0.9.2, new standalone configurations enable verified automatic updates; existing
-              preferences remain unchanged and installation can be disabled. Signed preview releases
-              remain opt-in; package catalogs stay stable-only and Corresync never mixes ownership.
+              There is no telemetry pipeline or raw crash upload. The interactive CLI may check for
+              a newer public release. That check sends only the Corresync version string, is cached
+              for 24 hours, does not run for MCP, pipes, or JSON output, and can be turned off in
+              the configuration. A separate feedback option, off by default, can use your signed-in
+              GitHub CLI to post a small public issue with only allowlisted fields after an
+              interactive failure. Since 0.9.2, new standalone configurations turn on verified
+              automatic updates; existing settings are not changed and installation can be turned
+              off. Signed preview releases are opt-in. Package managers get stable releases only,
+              and Corresync does not update an install that a package manager owns.
             </p>
           </article>
           <article aria-labelledby="faq-unknown">
             <h3 id="faq-unknown">What if a send fails halfway?</h3>
             <p>
-              Every write is attempted once. If the provider may have changed remote state but
-              confirmation failed, Corresync stops and reports reconciliation instead of risking a
-              duplicate through an automatic retry.
+              Every write is attempted once. If the provider may have made the change but did not
+              confirm it, Corresync stops and asks you to check, rather than retrying and risking a
+              duplicate.
             </p>
           </article>
         </div>
@@ -346,28 +353,28 @@
 
       <section class="honest-edges" id="limits" aria-labelledby="limits-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>Honest limits</p>
-          <h2 id="limits-title">What Corresync deliberately does not do.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Limits</p>
+          <h2 id="limits-title">What Corresync does not do</h2>
           <p class="fine-print">
-            Per-account differences—like a JMAP server without submission or an IMAP server
-            without UIDPLUS—surface as typed capabilities and degradations, never as silent
-            fallback to another route.
+            Differences between accounts, such as a JMAP server without submission or an IMAP server
+            without UIDPLUS, are reported as capabilities and degradations. Corresync does not
+            quietly switch to another route.
           </p>
         </div>
         <ul>
           <li>
-            <strong>Google connections require your own OAuth client.</strong> Guided setup
-            validates a downloaded Desktop client and keeps its credential and each account grant in
-            the OS keyring. <a href="google-oauth.html">Follow the illustrated guide</a>.
+            <strong>Google connections require your own OAuth client.</strong> Guided setup checks a
+            downloaded Desktop client and stores its credential and each account grant in the OS
+            keyring. <a href="google-oauth.html">Setup guide</a>.
           </li>
           <li>
             <strong>No token relay.</strong> Microsoft Graph uses a public client you register and
             are authorized to use.
           </li>
           <li>
-            <strong>Teams chat and channels are not enabled in this release.</strong> Their
-            implementation remains behind release evidence gates. Calls, recordings, presence, and
-            meeting lifecycle management remain out of scope.
+            <strong>Teams chat and channels are a preview.</strong> You can select them in setup,
+            but they lack complete live compatibility evidence. Calls, recordings, presence, and
+            meeting lifecycle management are out of scope.
           </li>
           <li>
             <strong>No mailbox-rule or delegate-permission management</strong>, generic provider
@@ -375,44 +382,44 @@
           </li>
           <li>
             <strong>No unattended login, tenant-wide access, or TLS interception.</strong>
-            Sign-in stays visible and provider-owned.
+            Sign-in is visible and handled by the provider.
           </li>
           <li>
-            <strong>No Windows desktop notifications yet</strong>—queue and approved runner modes
-            remain available.
+            <strong>No Windows desktop notifications yet.</strong> Queue and approved runner modes
+            work.
           </li>
         </ul>
       </section>
 
       <section class="evidence-explainer" id="evidence" aria-labelledby="evidence-page-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>Claims follow evidence</p>
-          <h2 id="evidence-page-title">How compatibility is stated—and what it is not.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Evidence</p>
+          <h2 id="evidence-page-title">How compatibility is tested</h2>
         </div>
         <div>
           <p>
-            Every v0.8 provider route ships with deterministic synthetic provider-contract and
-            application coverage. That is a strong statement about the implementation—and a
-            deliberately limited one. Google authorization and bounded reads now have one
-            commit-bound macOS arm64 observation; Google writes and other routes remain <strong
-            >live-unobserved</strong> until a separately authorized, content-free observation is
-            recorded against the exact Corresync commit, provider route, and platform.
+            Every v0.9 provider route is tested against deterministic synthetic provider contracts
+            and at the application level. That tells you the code does what the contract says. It
+            does not tell you a real provider behaves the same way. Every route is
+            <strong>live-unobserved</strong> until a separately authorized, content-free observation
+            is recorded for the exact Corresync commit, provider route, and platform. An older
+            Google observation covered only the retired Gmail IMAP/SMTP transport.
           </p>
           <p>
-            A missing observation is never reported as a pass, and default tests and CI never
-            activate a live mailbox or calendar. Check the current evidence before connecting an
+            A missing observation is never counted as a pass, and the default tests and CI never
+            touch a real mailbox or calendar. Check the current evidence before connecting an
             account you consider sensitive.
           </p>
           <p class="deep-refs">
-            <a href="safety.html">See the safety boundaries behind every provider route</a>.
+            <a href="safety.html">Read the safety page</a>.
           </p>
         </div>
       </section>
 
       <section class="final-cta" aria-labelledby="features-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>Try it on your own accounts</p>
-        <h2 id="features-cta-title">Four clear steps from install to a cross-account answer.</h2>
-        <p>Install with one command, sign in visibly, and connect the agent you already use.</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>Get started</p>
+        <h2 id="features-cta-title">Four steps to set it up</h2>
+        <p>Install with one command, sign in through your browser, and connect your agent.</p>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html">Follow getting started</a>
           <a class="button secondary" href="providers.html">Choose your provider route</a>

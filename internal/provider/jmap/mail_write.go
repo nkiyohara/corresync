@@ -352,6 +352,7 @@ func (client *Client) createDraftFrom(
 	}
 	return application.MailDraft{
 		ID: created.ID, ChangeKey: response.NewState,
+		Addressing: composition.draftAddressing(),
 	}, nil
 }
 
@@ -372,6 +373,29 @@ type composition struct {
 	BodyType   string
 	InReplyTo  []string
 	References []string
+	// SourceParticipants are the reference email's To and Cc addresses other
+	// than the configured username, when they parse (reply modes only).
+	SourceParticipants      []string
+	SourceParticipantsKnown bool
+}
+
+// draftAddressing reports the visible addressing written into the draft.
+// Bcc is deliberately absent.
+func (value composition) draftAddressing() *application.MailDraftAddressing {
+	return &application.MailDraftAddressing{
+		To: emailAddressStrings(value.To), CC: emailAddressStrings(value.CC),
+		Subject:                 value.Subject,
+		SourceParticipants:      append([]string(nil), value.SourceParticipants...),
+		SourceParticipantsKnown: value.SourceParticipantsKnown,
+	}
+}
+
+func emailAddressStrings(values []emailAddress) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		result = append(result, value.Email)
+	}
+	return result
 }
 
 func (client *Client) composition(
@@ -451,6 +475,12 @@ func (client *Client) composition(
 	}
 	if mode == application.MailComposeReply ||
 		mode == application.MailComposeReplyAll {
+		participants, participantsErr := uniqueDerivedAddresses(
+			append(append([]emailAddress{}, source.To...), source.CC...),
+			client.username,
+		)
+		result.SourceParticipants = emailAddressStrings(participants)
+		result.SourceParticipantsKnown = participantsErr == nil
 		count := len(result.To) + len(result.CC)
 		if count == 0 {
 			return composition{}, errors.New(

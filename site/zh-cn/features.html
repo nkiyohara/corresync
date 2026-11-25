@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync 功能 — 能做什么，边界在哪里</title>
+    <title>Corresync 功能和限制</title>
     <meta
       name="description"
-      content="用清晰语言了解 Corresync 的邮件、日历、AI 智能体和脚本功能，以及每一项明确限制。"
+      content="Corresync 的邮件、日历、AI 智能体和脚本功能说明，以及各项限制。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Corresync 功能 — 能做什么，边界在哪里">
+    <meta property="og:title" content="Corresync 功能和限制">
     <meta
       property="og:description"
-      content="跨账号邮件、日历、智能体和脚本功能，连同限制一起说明。"
+      content="跨账号的邮件、日历、智能体和脚本功能，以及相应的限制。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
@@ -28,7 +28,7 @@
     <meta property="og:image:alt" content="Corresync 标志和英文产品简介">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Corresync 功能">
-    <meta name="twitter:description" content="功能和限制都说清楚。">
+    <meta name="twitter:description" content="Corresync 能做什么、不能做什么。">
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 标志和英文产品简介">
     <link rel="canonical" href="https://corresync.org/zh-cn/features.html">
@@ -63,7 +63,7 @@
             href="safety.html"
           >安全</a>
         </nav>
-        <nav class="language-nav" aria-label="語言">
+        <nav class="language-nav" aria-label="语言">
           <a href="../features.html" lang="en" hreflang="en">EN</a><a
             href="../ja/features.html"
             lang="ja"
@@ -84,72 +84,72 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>功能</p>
-        <h1 id="page-title">所有能做的事，<em>以及绝不越过的边界。</em></h1>
+        <h1 id="page-title">功能<em>和限制</em></h1>
         <p class="lede">
-          跨收件箱和日历读取时仍保留账号身份；每次写入只针对一个明确账号。CLI
-          与 MCP 共用同一类型化操作、策略检查和预览→提交。
+          跨收件箱和日历读取时，结果注明来自哪个账号；每次写入只针对一个账号。CLI
+          和 MCP 使用同一组操作和策略检查，写入都要先预览再确认。
         </p>
         <div class="actions">
-          <a class="button primary" href="getting-started.html">四步开始</a><a
+          <a class="button primary" href="getting-started.html">查看快速开始</a><a
             class="button secondary"
             href="providers.html#check"
-          >检查支持服务</a>
+          >检查邮箱是否支持</a>
         </div>
       </section>
       <section id="mail-calendar" aria-labelledby="mailcal-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>日常通信</p>
-          <h2 id="mailcal-title">统一处理邮件和日历，不合并身份。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>邮件和日历</p>
+          <h2 id="mailcal-title">在多个账号间处理邮件和日历</h2>
         </div>
         <div class="capability-grid">
           <article class="capability-card" id="mail">
             <p class="card-index" aria-hidden="true">01</p>
             <h3 id="cap-mail">邮件</h3>
             <ul>
-              <li>文件夹、标签与能力发现</li>
-              <li>有上限的列表、搜索与 thread 搜索</li>
-              <li>按需读取 header、正文和有上限的附件</li>
-              <li>创建和更新草稿、回复、转发与发送</li>
-              <li>已读/未读、归档、移动与垃圾箱</li>
-              <li>跨账号搜索与明确的部分失败</li>
+              <li>文件夹、标签和功能查询</li>
+              <li>有上限的列表、搜索和会话搜索</li>
+              <li>按需读取邮件头、正文和有上限的附件</li>
+              <li>创建和更新草稿，回复、转发和发送</li>
+              <li>已读/未读、归档、移动和移入垃圾箱</li>
+              <li>跨账号搜索；某个账号失败时标为部分结果</li>
             </ul>
             <p class="card-foot">
-              发送、移动和删除先返回审阅，只有完全一致的内容才能提交一次。
+              发送、移动和删除先返回预览，只有完全一致的内容才能执行一次。
             </p>
           </article>
           <article class="capability-card" id="calendar">
             <p class="card-index" aria-hidden="true">02</p>
-            <h3 id="cap-calendar">日历与日程</h3>
+            <h3 id="cap-calendar">日历和日程</h3>
             <ul>
-              <li>明确选择可用日历</li>
-              <li>有上限的事件列表与跨账号日程</li>
+              <li>选择要用的日历</li>
+              <li>有上限的事件列表和跨账号日程</li>
               <li>保留时区和重复规则</li>
-              <li>创建、更新与取消事件</li>
-              <li>路径报告支持时才请求 Teams 或 Google Meet</li>
-              <li>会议链接仅作为单个事件的属性</li>
+              <li>创建、更新和取消事件</li>
+              <li>连接方式支持时才请求 Teams 或 Google Meet 链接</li>
+              <li>会议链接只作为单个事件的属性</li>
             </ul>
             <p class="card-foot">
-              当前版本尚未启用 Teams
-              聊天与频道。实现已置于发布证据门控之后；通话、录制、在线状态监视和会议生命周期管理仍不在范围内。
+              Teams
+              聊天和频道目前是预览功能，可以在设置中选择，但实机验证还不完整。通话、录制、在线状态监视和会议生命周期管理不在范围内。
             </p>
           </article>
         </div>
       </section>
       <section class="tinted-section" id="agents" aria-labelledby="agents-page-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>同一核心，两种入口</p>
-          <h2 id="agents-page-title">AI 智能体与脚本遵守同一安全边界。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>智能体和脚本</p>
+          <h2 id="agents-page-title">AI 智能体和脚本使用同一套规则</h2>
         </div>
         <div class="capability-grid">
           <article class="capability-card">
             <p class="card-index" aria-hidden="true">03</p>
             <h3 id="cap-agents">AI 智能体 · 本地 stdio</h3>
             <ul>
-              <li>只提供狭窄、类型化的邮件和日历工具</li>
-              <li>不暴露凭据、Cookie、任意 action 或通用 property API</li>
-              <li>读取与写入预览/提交明确分开</li>
-              <li>结果保留账号和提供商来源</li>
-              <li>不创建 远程 MCP 端点</li>
+              <li>只提供用途单一的邮件和日历工具</li>
+              <li>不提供凭据、Cookie、任意操作或通用属性 API</li>
+              <li>读取和写入分开；写入要先预览再确认</li>
+              <li>结果注明来自哪个账号和服务商</li>
+              <li>不创建远程 MCP 端点</li>
             </ul>
             <div class="cmd" data-copy data-copy-label="Codex MCP 设置命令">
               <pre
@@ -161,13 +161,13 @@
           </article>
           <article class="capability-card" id="scripting">
             <p class="card-index" aria-hidden="true">04</p>
-            <h3 id="cap-scripting">脚本 · 稳定 JSON</h3>
+            <h3 id="cap-scripting">脚本 · JSON 输出</h3>
             <ul>
-              <li>人类输出与机器 JSON 分离</li>
-              <li>使用同一账号选择和策略检查</li>
-              <li>不隐藏部分失败、降级或未知结果</li>
-              <li>stdout 输出数据，stderr 输出诊断</li>
-              <li>schema 遵循公开版本策略</li>
+              <li>人读输出和机读 JSON 分开</li>
+              <li>账号选择和策略检查与 MCP 相同</li>
+              <li>部分失败、降级和未知结果都会输出</li>
+              <li>数据写 stdout，诊断写 stderr</li>
+              <li>schema 按公开的版本策略变更</li>
             </ul>
             <div class="cmd" data-copy data-copy-label="JSON 日程命令">
               <pre
@@ -181,129 +181,125 @@
       </section>
       <section id="local-options" aria-labelledby="local-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>主动开启的本地能力</p>
-          <h2 id="local-title">只在需要时，由你亲自打开。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>可选的本地功能</p>
+          <h2 id="local-title">需要手动开启的功能</h2>
         </div>
         <div class="control-grid">
           <article>
-            <h3 id="cap-import">只读导入暂存</h3>
+            <h3 id="cap-import">只读导入</h3>
             <p>
-              扫描其他应用设置并显示候选，不复用
-              机密信息，不添加账号，也不认证。
+              扫描其他应用的设置并列出候选项，不复用机密信息，不添加账号，也不登录。
             </p>
           </article>
           <article>
-            <h3 id="cap-monitoring">选择性监控</h3>
+            <h3 id="cap-monitoring">监控（需开启）</h3>
             <p>
-              默认关闭。只有明确设置账号、查询、间隔和目标后才在本地运行；MCP
-              无法启用。
+              默认关闭。设置账号、查询条件、间隔和目标后才在本地运行；MCP
+              无法开启。
             </p>
           </article>
           <article>
-            <h3 id="cap-feedback">隐私保护反馈</h3>
+            <h3 id="cap-feedback">反馈</h3>
             <p>
-              绝不自动发送。字段先供你审阅，且不包含邮件内容、地址、令牌
-              或凭据。
+              不会自动发送。发送前可检查每个字段，不含邮件内容、地址、令牌或凭据。
             </p>
           </article>
           <article>
-            <h3>已验证更新</h3>
+            <h3>更新校验</h3>
             <p>
-              校验签名 校验和 与
-              来源证明；包管理器安装仍由对应管理器更新。
+              校验签名、校验和与来源证明；包管理器安装的仍由包管理器更新。
             </p>
           </article>
         </div>
       </section>
       <section class="faq-section" id="faq" aria-labelledby="faq-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>安装前常见问题</p>
-          <h2 id="faq-title">先把重要问题说清楚。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>常见问题</p>
+          <h2 id="faq-title">安装前常见问题</h2>
         </div>
         <div class="faq-grid">
           <article>
             <h3 id="faq-provider">我的账号能用吗？</h3>
             <p>
-              支持 Outlook Web、明确配置的 Graph、Todoist、TickTick、JMAP、IMAP/SMTP 和
-              CalDAV。Google 路径使用你自己的 Google Cloud 项目中的桌面 OAuth
-              客户端。可<a href="providers.html#check">只用域名检查</a>。
+              支持 Outlook Web、自行配置的 Graph、Todoist、TickTick、JMAP、IMAP/SMTP 和
+              CalDAV。Google 使用你自己 Google Cloud 项目中的桌面 OAuth
+              客户端。可<a href="providers.html#check">只用域名检查是否支持</a>。
             </p>
           </article>
           <article>
             <h3 id="faq-cost">需要付费吗？</h3>
             <p>
               Corresync 是 Apache-2.0
-              开源软件；提供商、云、智能体和网络费用遵循各自条款。
+              开源软件。服务商、云、智能体和网络费用按各自条款收取。
             </p>
           </article>
           <article>
             <h3 id="faq-data">邮件存在哪里？</h3>
             <p>
-              数据从设备直接连接提供商，没有 Corresync 托管邮箱或令牌
-              中继服务。本地缓存和游标按账号隔离。
+              本机直接连接服务商，Corresync
+              不托管邮箱，也没有令牌中继。本地缓存和游标按账号分开。
             </p>
           </article>
           <article>
-            <h3 id="faq-agent-send">AI 能自行发送吗？</h3>
+            <h3 id="faq-agent-send">AI 能自己发送邮件吗？</h3>
             <p>
-              不能。第一次调用只返回审阅，提交需要与内容绑定、短时、单次的批准。
+              不能。第一次调用只返回预览；执行需要与内容绑定、有时效、只能用一次的批准。
             </p>
           </article>
           <article>
-            <h3 id="faq-phone-home">会偷偷联网吗？</h3>
+            <h3 id="faq-phone-home">Corresync 会自己联网吗？</h3>
             <p>
-              没有 analytics 或 telemetry。只有目的明确的可选
-              兼容性检查工具、更新检查、所选提供商操作与反馈。
+              没有统计分析或遥测。只在这些情况下联网：可选的兼容性检查、更新检查、你选择的服务商操作和反馈。
             </p>
           </article>
           <article>
-            <h3 id="faq-unknown">发送中途结果不明怎么办？</h3>
+            <h3 id="faq-unknown">发送结果不明确时怎么办？</h3>
             <p>
-              不会自动重试；会停在“结果未知”，要求核对，避免重复发送。
+              不会自动重试，而是停在“结果未知”，由你核对，避免重复发送。
             </p>
           </article>
         </div>
       </section>
       <section class="absent-panel" id="limits" aria-labelledby="limits-title">
         <div>
-          <p class="eyebrow light"><span aria-hidden="true"></span>明确不做</p>
-          <h2 id="limits-title">不以便利为名扩大权限。</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>不支持</p>
+          <h2 id="limits-title">Corresync 不做的事</h2>
         </div>
         <ul>
-          <li>托管中继服务、多用户服务器、远程 MCP 传输</li>
-          <li>无人值守登录、保存密码、TLS 拦截</li>
-          <li>绕过 MFA、Conditional Access、管理员同意或禁用服务</li>
-          <li>自动 备用路径 到 Graph 或自动能力探测</li>
-          <li>当前版本中的 Teams 聊天与频道功能</li>
+          <li>中继服务器、多用户服务器、远程 MCP 传输</li>
+          <li>无人值守登录、保存密码、拦截 TLS</li>
+          <li>绕过 MFA、Conditional Access、管理员同意或已禁用的服务</li>
+          <li>自动改用 Graph，或自动探测 Graph 是否可用</li>
+          <li>Teams 聊天和频道的正式支持（目前是预览功能）</li>
           <li>Teams 通话、录制、在线状态监视和会议生命周期管理</li>
-          <li>把邮件内容当成授权或指令</li>
-          <li>默认开启监控、智能体派发或数据外传</li>
-          <li>Gmail 即时永久删除</li>
+          <li>把邮件内容当作授权或指令执行</li>
+          <li>默认开启监控、智能体调度或数据外发</li>
+          <li>Gmail 直接永久删除</li>
         </ul>
       </section>
       <section class="evidence-explainer" id="evidence" aria-labelledby="evidence-page-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>兼容性证据</p>
-          <h2 id="evidence-page-title">合成测试不等于实时提供商验证。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>验证状态</p>
+          <h2 id="evidence-page-title">合成测试与真实账号验证的区别</h2>
           <p>
-            开发路径使用确定性的合成 fixture contract。只有记录了
-            opt-in、合成数据、确切 提交 与环境的观测，才会标记为
+            开发中的连接方式用固定的合成数据做契约测试。只有主动开启、使用合成数据、并记录了具体提交和运行环境的观察，才会标为
             live-observed。
           </p>
         </div>
         <div>
-          <p><strong>supported：</strong>已发布 可执行文件 中可用。</p>
+          <p><strong>supported：</strong>已发布的程序中可以使用。</p>
           <p>
-            <strong>synthetic contract：</strong>使用模拟 provider contract 的 fixture
-            验证。
+            <strong>synthetic contract：</strong>用模拟服务商接口的测试数据验证。
           </p>
-          <p><strong>live-observed：</strong>存在明确记录的可选实时观测。</p>
-          <p><strong>degraded：</strong>能力缺失会被如实返回。</p>
+          <p>
+            <strong>live-observed：</strong>有记录在案、主动开启的实机观察。
+          </p>
+          <p><strong>degraded：</strong>缺少的功能会直接报告出来。</p>
         </div>
       </section>
       <section class="final-cta" aria-labelledby="features-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>四步即可开始</p>
-        <h2 id="features-cta-title">从安装到跨账号回答。</h2>
+        <p class="eyebrow"><span aria-hidden="true"></span>开始使用</p>
+        <h2 id="features-cta-title">安装并完成第一次跨账号查询</h2>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html">开始设置</a><a
             class="button secondary"
@@ -320,7 +316,7 @@
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        独立的本地优先邮件与日历工具。与所列厂商无隶属或背书关系。
+        独立开发的本地邮件和日历工具，与本页提到的厂商没有隶属或背书关系。
       </p>
       <nav aria-label="页脚">
         <a href="getting-started.html">快速开始</a><a href="providers.html">支持服务</a><a

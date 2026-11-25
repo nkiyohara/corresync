@@ -8,8 +8,8 @@
 </p>
 
 <p align="center">
-  <strong>Mail, calendars, and tasks. One local MCP server and CLI.</strong><br>
-  Provider-neutral, local-first tooling for AI agents, scripts, and you.
+  <strong>A local CLI and MCP server for mail, calendars, and tasks.</strong><br>
+  It runs on your computer and works across providers.
 </p>
 
 <p align="center">
@@ -35,29 +35,31 @@
 </p>
 <!-- markdownlint-enable MD013 MD033 -->
 
-`corr` brings isolated mail, calendar, and task accounts into one terminal—and
-one local
-[Model Context Protocol](https://modelcontextprotocol.io/) server.
-Gmail, Google Calendar, and Google Tasks are available through a Desktop OAuth
-client in a Google Cloud project you control. Corresync-managed Google OAuth
-remains dormant. The canonical task tools also include explicit Microsoft To
-Do, Todoist, TickTick, and CalDAV VTODO routes; remaining task-provider adapters
-stay unavailable until their contracts are implemented.
+`corr` is a command-line tool and a local
+[Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server that
+reaches all your mail, calendar, and task accounts while keeping them separate.
 
-- Search mail and build one agenda across accounts without collapsing their
-  identity or provider provenance.
-- Use one stable, provenance-preserving task model as provider adapters become
-  available.
-- Save private account-local mail searches and relative calendar windows, then
-  run them live without creating a shadow mailbox or calendar cache.
-- Use the same typed operations from a human-friendly CLI, stable JSON, or an
-  AI agent.
-- Keep sign-in in a visible browser, an explicit public-client OAuth flow, or
-  an approved local credential store.
-- Review consequential effects before they happen. Unknown remote outcomes
-  stop for reconciliation instead of being retried automatically.
+Gmail, Google Calendar, and Google Tasks use a Desktop OAuth client in a
+Google Cloud project you control. Corresync-managed Google OAuth is dormant.
+Tasks also work with Microsoft To Do, Todoist, TickTick, and CalDAV VTODO, each
+a route you select yourself. Other task providers are unavailable until their
+contracts are implemented.
 
-## What it feels like
+- Search mail and list one agenda across accounts. Each result shows which
+  account and provider it came from.
+- Use one task format across providers as their adapters become available.
+  Each task records where it came from.
+- Save private, per-account mail searches and relative calendar windows. Each
+  run reads live from the provider and creates no local mailbox or calendar
+  copy.
+- Run the same operations from the CLI, as stable JSON, or through an AI agent.
+- Sign in through a visible browser window, an OAuth flow with a public client
+  you choose, or a local credential store you approve.
+- Preview sends, moves, deletes, and other writes before they run. If a
+  write's outcome is unknown, Corresync stops for you to check instead of
+  retrying.
+
+## Example
 
 ```console
 $ corr mail search --all-accounts \
@@ -70,7 +72,7 @@ $ corr agenda list --all-accounts \
     --end 2026-07-30T00:00:00Z
 ```
 
-Connect an agent to the same local core:
+Connect an agent to the same local server:
 
 ```console
 corr integrations detect
@@ -79,20 +81,20 @@ corr integrations setup codex claude-code
 # Phase A also includes github-copilot, gemini-cli, qwen-code, qoder, kimi-code
 ```
 
-Then ask naturally:
+Then ask it something like:
 
 ```text
 Check my inboxes, calendars, and task lists and summarize what needs attention today.
 ```
 
-One failed provider becomes an explicit partial failure. Successful results
-remain available, and writes still require one exact account.
+If one provider fails, the output reports a partial failure and still shows
+the results that succeeded. Writes always target exactly one account.
 
-## Choose the route that fits
+## Providers
 
-Mail, calendar, and task routes are selected independently. For example, an
-account can pair IMAP/SMTP mail with a CalDAV calendar; its task route remains a
-separate explicit choice.
+Mail, calendar, and tasks each have their own route. For example, an account
+can use IMAP/SMTP for mail and CalDAV for its calendar, and pick a task route
+separately.
 
 <!-- markdownlint-disable MD013 -->
 | Route | Mail | Calendar | Tasks | Authentication |
@@ -107,35 +109,36 @@ separate explicit choice.
 | CalDAV | — | Typed calendar operations and conditional scheduling | VTODO lists, search, sync, and reviewed writes | OS keyring or approved credential helper |
 <!-- markdownlint-enable MD013 -->
 
-Discovery gathers DNS, well-known, and provider metadata without credentials.
-It never authenticates or adds an account. Microsoft Graph and user-owned
-Google authorization remain explicit choices and are never automatic
-fallbacks. Google discovery can offer guided Desktop-client setup, but no
-Google sign-in starts until a later explicit `corr auth login`. See the
+Discovery reads DNS, well-known, and provider metadata without credentials. It
+never signs in or adds an account. Corresync never falls back to Microsoft
+Graph or your own Google authorization; you must choose them. Google discovery
+can guide you through creating the Desktop client, but no Google sign-in starts
+until you run `corr auth login`. See the
 [annotated Google setup guide](docs/google-oauth-setup.md).
 
-iCloud has a first-class guided preset over the same provider-neutral
-IMAP/SMTP and CalDAV adapters. `corr setup` recognizes documented iCloud Mail
-address families or the complete verified Apple SRV endpoint set, reviews both
-routes as one account, and uses one external credential handle by default.
-After the account is added, an explicit handoff can open Apple's app-password
-page and the OS-owned credential prompt; the `corr` process never reads the
-app-specific password.
+iCloud has a guided preset over the standard IMAP/SMTP and CalDAV adapters.
+`corr setup` recognizes documented iCloud Mail address families, or a domain
+with the complete verified set of Apple SRV endpoints. It reviews mail and
+calendar as one account and uses one external credential handle by default.
+After the account is added, you can have it open Apple's app-password page and
+the OS credential prompt. The `corr` process never reads the app-specific
+password.
 
 Every available v0.9 route above has synthetic provider-contract and
-application coverage. The user-owned Google API route is available but
-live-unobserved. Other provider and platform implementations remain
-**live-unobserved** until an authorized, content-free observation is bound to
-the exact commit. See [compatibility evidence](docs/compatibility.md) before
-connecting a sensitive account.
+application tests. The user-owned Google API route is available but
+live-unobserved. Other provider and platform implementations stay
+**live-unobserved** until an authorized observation record with no account
+content is tied to the exact commit. Live-unobserved means the code passes
+synthetic tests, but no real-account check is on record for that commit. Read
+the [compatibility evidence](docs/compatibility.md) before you connect a
+sensitive account.
 
 ## Set up Corresync
 
 The setup buttons on the Corresync website open your desktop agent with a
 request already filled in. The request installs Corresync or updates an existing
 install. Nothing is sent until you review it and send it yourself. Manual
-commands, package managers and downloads are still available below as optional
-alternatives.
+commands, package managers, and downloads are below.
 
 [**Set up with ChatGPT**](https://corresync.org/#setup-chatgpt) ·
 [**Set up with Claude**](https://corresync.org/#setup-claude)
@@ -157,14 +160,14 @@ the instructions to it.
 <summary>Optional: manual installation and later setup steps</summary>
 <!-- markdownlint-enable MD033 -->
 
-Prefer a guided page? Follow
+For a guided page, follow
 [getting started on the website](https://corresync.org/getting-started.html).
 
 ### 1. Install
 
-The official standalone installers are the shortest path on every platform.
-They select the latest stable release, verify its archive and candidate binary,
-install for the current user without elevation, and leave account setup untouched.
+The standalone installers are the quickest option on every platform. They pick
+the latest stable release, verify the archive and the binary, install for the
+current user without admin rights, and do not touch account setup.
 
 #### macOS and Linux
 
@@ -180,9 +183,9 @@ powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"
 corr --version
 ```
 
-Review [`install.sh`](https://corresync.org/install.sh) or
-[`install.ps1`](https://corresync.org/install.ps1) before running it if you
-prefer. Package managers remain fully supported alternatives:
+You can read [`install.sh`](https://corresync.org/install.sh) or
+[`install.ps1`](https://corresync.org/install.ps1) before running it. Package
+managers are fully supported too:
 
 ```console
 # Homebrew · macOS or Linux
@@ -198,54 +201,55 @@ scoop install corresync/corresync
 
 Direct archives, native Linux packages, version pinning, checksums, and
 Sigstore provenance are in the [installation guide](docs/install.md). The
-[guided website](https://corresync.org/getting-started.html#step-install) keeps
-the same copy-paste choices visible for people who do not use GitHub regularly.
+[guided website](https://corresync.org/getting-started.html#step-install) shows
+the same commands for people who don't use GitHub much.
 
 Claude Desktop users can also install the platform-universal `.mcpb` from the
 [latest release](https://github.com/nkiyohara/corresync/releases/latest).
-The bundle runs the same verified `corr mcp serve` binary locally over stdio;
-it does not deploy Corresync or relay mailbox data. Install the CLI first for
-the explicit account setup and sign-in steps below, then open or drag the
-`.mcpb` into Claude Desktop.
+It runs the same verified `corr mcp serve` binary locally over stdio. It does
+not deploy Corresync or relay mailbox data. Install the CLI first to add
+accounts and sign in (steps below), then open or drag the `.mcpb` into Claude
+Desktop.
 
-### Stay current
+### Updates
 
-Interactive commands make a quiet, cached release check at startup. If an
-update exists, Corresync shows the exact command for your installation:
-`corr update` for the standalone build, or the matching Homebrew, Scoop, or
-WinGet command. Package-managed files are never changed by Corresync.
+Interactive commands do a quiet, cached release check at startup. If an update
+exists, Corresync prints the command for your install: `corr update` for the
+standalone build, or the matching Homebrew, Scoop, or WinGet command. It never
+changes package-managed files.
 
-Stable releases are selected by default. Standalone users who want signed
-release candidates can choose the preview channel interactively:
+Stable releases are the default. Standalone users who want signed release
+candidates can choose the preview channel in:
 
 ```console
 corr settings
 ```
 
-The equivalent copy-paste commands for scripts are:
+For scripts, the same change is:
 
 ```console
 corr config set updates.channel preview
 corr update
 ```
 
-Switch back with `corr config set updates.channel stable`; Corresync never
-downgrades the running binary. Preview releases do not enter package-manager
-catalogs.
+To switch back, run `corr config set updates.channel stable`. Corresync never
+downgrades the running binary. Preview releases are not published to
+package-manager catalogs.
 
-New standalone configurations enable verified automatic installation. Existing
-configurations retain their preference; enable it explicitly with:
+New standalone configurations install verified updates automatically. Existing
+configurations keep their current setting. To turn it on:
 
 ```console
 corr config set updates.auto_install true
 ```
 
-It never runs during MCP tool calls, configuration changes, daemon work, JSON
-output, pipes, or other non-interactive paths. Bare `corr` also checks when
-interactive. After verification, the updater stops and restarts the current
-session owner and runs the requested command with the updated executable.
-Owners from 0.9.2 also retire after an external executable replacement, once
-admitted operations finish. Disable installation with
+Automatic installation never runs during MCP tool calls, configuration changes,
+daemon work, JSON output, pipes, or other non-interactive use. Bare `corr` also
+checks when interactive. After verifying an update, the updater restarts the
+session owner (the local process that holds your sign-in sessions) and runs
+your command with the new executable. Session owners from 0.9.2 also
+exit after something else replaces the executable, once accepted operations
+finish. To turn installation off, run
 `corr config set updates.auto_install false`.
 
 ### 2. Add and sign in to your account
@@ -254,43 +258,40 @@ admitted operations finish. Disable installation with
 corr setup
 ```
 
-The guided setup derives a resumable preflight from current local state,
-optionally installs shell completion at a displayed user-local path, and then
-performs credential-free account discovery. It previews the selected
-mail/calendar/task routes and adds an account only after confirmation.
-Authentication or external-credential access remains a separate choice. The
-same run can add more accounts, select several detected agent hosts, preview
-their independent local integration plans, apply only one confirmed plan, and
-verify each result. Re-running `corr setup` skips healthy work and offers the
-missing or repairable steps.
+`corr setup` reads your local state to see what is already done, so you can
+resume it. It can install shell completion at a user-local path it shows you.
+It then discovers routes without credentials, previews the mail, calendar, and
+task routes, and adds the account only after you confirm. Signing in, or
+allowing access to an external credential, is a separate choice. The same run
+can add more accounts, select several detected agent hosts, preview their local
+integration plans, apply them after one confirmation, and check each result.
+Running it again skips what already works and offers missing or repairable
+steps.
 
-After choosing a connection route, the wizard presents a service checklist.
-For a Microsoft account, Outlook Mail and Calendar are preselected and can be
-changed independently; Microsoft To Do is an optional, explicit Graph
-authorization. Teams messaging is selectable as a preview through Teams Web
-or explicitly authorized Graph. Mattermost is also available as a preview;
-these routes still lack complete live compatibility evidence. Discovery is only
-route evidence: it never proves that any checked service is enabled for the
-account, and it never triggers a Graph fallback.
+After you choose a connection route, the wizard shows a checklist of services.
+For a Microsoft account, Outlook Mail and Calendar are checked by default, and
+you can change each one. Microsoft To Do is optional and needs its own Graph
+authorization. Teams messaging can be selected as a preview, through Teams Web
+or a Graph authorization you grant. Mattermost is also available as a preview.
+These previews lack complete live compatibility evidence. Discovery only shows
+which routes exist; it does not prove that a checked service is enabled for
+the account.
 
-Run `corr settings` to open the same account wizard; sign in to, rename,
-select, or remove accounts; and manage updates, safety, and browser sign-in
-from an arrow-key form. Its Setup guide entry resumes the complete coordinator
-instead of maintaining another implementation. The
-top-level Accounts category contains Add account and the configured account
-list; selecting an account opens only actions for that account. Removal
-previews the local data it deletes and asks for confirmation; removing the
-default first asks which remaining account should replace it. Each choice also
-displays the equivalent command, so the interactive flow teaches the direct
-CLI.
-Set `CORRESYNC_ACCESSIBLE=true` for line-oriented screen-reader prompts; type
-`:cancel` to leave an input step safely. The direct rename form remains:
+`corr settings` opens the same account wizard in an arrow-key form. Use it to
+sign in to, rename, select, or remove accounts, and to manage updates, safety,
+and browser sign-in. Its Setup guide entry resumes the full `corr setup` flow.
+The top-level Accounts category holds Add account and your accounts; selecting
+one shows only its actions. Removal shows the local data it deletes and asks
+you to confirm; removing the default first asks which account replaces it.
+Each choice also shows the equivalent command. Set `CORRESYNC_ACCESSIBLE=true`
+for line-by-line screen-reader prompts, and type `:cancel` to leave an input
+step safely. To rename directly:
 
 ```console
 corr account rename personal work
 ```
 
-Scripts and advanced users retain the deterministic form:
+For scripts, use the non-interactive form:
 
 ```console
 corr setup you@example.com --alias personal
@@ -298,13 +299,12 @@ corr auth login --account personal
 corr doctor --account personal
 ```
 
-The direct `setup ADDRESS` form creates the same provider-neutral, secret-free
-local configuration, performs credential-free discovery, and adds only an
-automatically selectable first-party route. It never opens a sign-in page.
-Authentication is a separate, account-specific action.
+`corr setup ADDRESS` writes the same secret-free local configuration, runs
+discovery without credentials, and adds only a first-party route that can be
+selected automatically. It never opens a sign-in page.
 
-If no route can be selected safely—or if you want an API or standards route—
-inspect the evidence and choose the exact provider settings:
+If no route can be selected safely, or you want an API or standards route, look
+at the discovery results and choose the provider settings yourself:
 
 ```console
 corr account discover reader@example.invalid
@@ -312,30 +312,28 @@ corr account add reader@example.invalid --help
 ```
 
 For Gmail, Google Calendar, and Google Tasks, create a Desktop OAuth client in
-a Google Cloud project you control. Guided setup validates the downloaded
-client JSON and places its generated credential in the OS keyring; account
-addition still does not authenticate. Follow the
-[Google OAuth setup guide](docs/google-oauth-setup.md) for current Cloud
-Console screens, audience choices, exact APIs, scopes, import, and login.
+a Google Cloud project you control. Guided setup checks the client JSON you
+download and stores the credential generated from it in the OS keyring. The
+[Google OAuth setup guide](docs/google-oauth-setup.md) covers the current Cloud
+Console screens, audience choices, exact APIs and scopes, import, and login.
 
-Before installing, the optional
+Before you install, you can use the optional
 [provider compatibility checker](https://corresync.org/providers.html#check)
-can classify public evidence for an address. The browser sends only the domain
-after the `@` in a request body; it never sends the local part, persists the
-address, or starts sign-in. The public service uses only a fixed DNS resolver
-and returns no raw DNS record. Skip it whenever you prefer and run `corr account
-discover ADDRESS` locally.
+to classify public evidence for an address. Your browser sends only the
+domain after the `@`, in a request body. It never sends the part before the
+`@`, stores the address, or starts sign-in. The service uses one fixed DNS
+resolver and returns no raw DNS records. You can skip it and run
+`corr account discover ADDRESS` locally.
 
-Account addition does not authenticate. OAuth routes require a client
-registration you are authorized to use. Google additionally requires a
-separate external handle for its generated Desktop client credential.
-Standards routes use a keyring entry
-or explicitly approved helper reference. Passwords and tokens never enter
-`config.toml`. See [account and provider configuration](docs/configuration.md).
-The Outlook Web route opens a dedicated visible profile during the later
-`auth login`; that window remains the browser-owned session until account
-logout or daemon shutdown. SSO, MFA, Conditional Access, and organization
-notices remain inside the provider-owned flow.
+Adding an account does not sign you in. OAuth routes need a client registration
+you are authorized to use. Google also needs a separate external handle for its
+generated Desktop client credential. Standards routes use a keyring entry or an
+approved helper reference. Passwords and tokens never go into `config.toml`.
+See [account and provider configuration](docs/configuration.md). For Outlook
+Web, the later `auth login` opens a dedicated, visible browser profile. That
+window holds the session until account logout or daemon shutdown. SSO, MFA,
+Conditional Access, and organization notices stay in the provider's own sign-in
+flow.
 
 ### 3. Connect an agent
 
@@ -343,18 +341,18 @@ notices remain inside the provider-owned flow.
 corr mcp setup codex
 ```
 
-Use `corr mcp --help` for Claude Code, GitHub Copilot CLI, Gemini CLI, Qwen
-Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 45
-narrow tools and two read-only monitor resources; there is no HTTP, SSE,
-remote MCP endpoint, or hosted relay.
+Run `corr mcp --help` for Claude Code, GitHub Copilot CLI, Gemini CLI, Qwen
+Code, Qoder, Kimi Code CLI, and generic stdio clients. Corresync exposes 71
+narrow tools and two read-only monitor resources. There is no HTTP, SSE, or
+remote MCP endpoint, and no hosted relay.
 
 </details>
 
-## Nothing sends on the first attempt
+## Previewing writes
 
-Consequential writes use a server-enforced `preview -> commit` protocol. The
-first command shows the normalized account, provider, target, recipients,
-content digest, and version preconditions without performing the effect.
+Writes such as sending mail use a server-enforced `preview -> commit`
+protocol. The first command shows the normalized account, provider, target,
+recipients, content digest, and version preconditions, and changes nothing.
 
 ```console
 printf 'Synthetic body.\n' | \
@@ -365,7 +363,7 @@ printf 'Synthetic body.\n' | \
     --body-file -
 ```
 
-After reviewing every field, repeat the exact command with approval:
+Check every field, then run the same command again with `--approve`:
 
 ```console
 printf 'Synthetic body.\n' | \
@@ -377,57 +375,54 @@ printf 'Synthetic body.\n' | \
     --approve
 ```
 
-Approval is short-lived, single-use, and bound to the caller, account,
+Approval is short-lived, single-use, and tied to the caller, account,
 provider, target, payload, and effect. Changing any reviewed field invalidates
-it. MCP keeps preview and commit as separate typed tools.
+it. Over MCP, preview and commit are separate tools.
 
 [See the complete safety model](https://corresync.org/safety.html).
-Corresync's public [Privacy Policy](https://corresync.org/privacy.html)
-explains Google data access, local storage, disclosure, retention, and removal;
-the [Terms of Use](https://corresync.org/terms.html) preserve
-the software rights granted by Apache-2.0.
+The [Privacy Policy](https://corresync.org/privacy.html) covers Google data
+access, local storage, disclosure, retention, and removal. The
+[Terms of Use](https://corresync.org/terms.html) keep the software rights
+that Apache-2.0 grants.
 
-## More than one inbox
+## Other features
 
-- **Cross-account views:** bounded mail search and agenda projections retain
-  original account, provider, calendar, time-zone, and partial-failure
-  provenance.
-- **Read-only import staging:** inspect an explicitly approved local archive,
-  Maildir tree, or supported export without uploading or mutating the source.
-- **Opt-in monitoring:** move deliberately from `off` to local notification,
-  durable queueing, and finally one approved no-shell runner. Remote egress is
-  a separate consent.
-- **Privacy-preserving feedback:** generate an allowlisted report locally,
-  review it, then explicitly copy, save, or open a prefilled GitHub page. A
-  separate default-off setting can submit an even smaller allowlist-only public
-  issue through your authenticated `gh` client after an interactive failure.
+- **Cross-account views:** size-limited mail search and agenda results keep
+  the original account, provider, calendar, time zone, and partial failures.
+- **Read-only import staging:** inspect an approved local archive, Maildir
+  tree, or supported export without uploading or changing it.
+- **Opt-in monitoring:** step up from `off` to local notifications, a durable
+  queue, and finally one approved runner that uses no shell. Sending data off
+  your computer needs separate consent.
+- **Feedback reports:** build a report locally from an allowlist, review it,
+  then copy, save, or open a prefilled GitHub page. A separate default-off
+  setting can file an even smaller allowlist-only public issue through your
+  signed-in `gh` client after an interactive failure.
 
-Mailbox, calendar, import, and event-queue values are private, untrusted
-external data. Their content is never authority to run a command or start an
-agent.
+Corresync treats mailbox, calendar, import, and event-queue content as private,
+untrusted data. That content can never run a command or start an agent.
 
-## Honest edges
+## Limits
 
-- Gmail, Google Calendar, and Google Tasks require a user-owned Google Desktop
-  OAuth client. Corresync-managed Google OAuth stays disabled; the user-owned
-  route is synthetic-contract covered and live-unobserved.
-- Microsoft Graph requires your own authorized public-client registration.
+- Gmail, Google Calendar, and Google Tasks need your own Google Desktop OAuth
+  client. Corresync-managed Google OAuth is disabled. The user-owned route has
+  synthetic contract tests and is live-unobserved.
+- Microsoft Graph needs your own authorized public-client registration.
   Corresync ships no token relay.
-- Windows desktop notification setup is unavailable because Corresync does
-  not install an AppUserModelID; queue and approved runner modes remain
-  available.
+- Windows desktop notifications are unavailable because Corresync does not
+  install an AppUserModelID. Queue and approved-runner modes still work.
 - Provider meeting links are requested only when the selected calendar route
   reports native support.
-- Cross-compilation and synthetic fixtures do not prove native browser,
-  keyring, IPC, provider, package-manager, Gatekeeper, or SmartScreen behavior.
-- Teams calls, recordings, and meeting lifecycle management;
+- Cross-compilation and synthetic fixtures do not prove how native browsers,
+  keyrings, IPC, providers, package managers, Gatekeeper, or SmartScreen
+  behave.
+- Out of scope: Teams calls, recordings, and meeting lifecycle management;
   tenant-wide access; unattended login; TLS interception; arbitrary provider
-  actions; automatic telemetry; and raw crash upload are outside scope.
+  actions; automatic telemetry; and raw crash upload.
 
-The exact action matrix and typed provider degradations are in
-[features.md](docs/features.md).
+[features.md](docs/features.md) lists each provider's actions and gaps.
 
-## One local safety boundary
+## Architecture
 
 ```text
 AI agents ───────── MCP over stdio ─┐
@@ -440,14 +435,15 @@ Humans and scripts ──────── corr ───┘              │
                                             └── standards adapters
 ```
 
-The session owner exposes no TCP listener. On Unix, clients authenticate and
-pin the environment-independent private runtime directory, singleton lock,
-socket, and peer UID before the local bearer can be sent. On Windows, clients
-verify the protected named pipe, owner, DACL, server process, and SID first.
+The session owner has no TCP listener. On Unix, before a client
+sends the local bearer token, it checks and pins the private runtime directory
+(which does not depend on environment variables), the singleton lock, the
+socket, and the peer UID. On Windows, clients first check the protected named
+pipe, its owner and DACL, the server process, and the SID.
 
-Read the [architecture](docs/architecture.md),
+See the [architecture](docs/architecture.md),
 [authentication model](docs/authentication.md), and
-[threat model](docs/threat-model.md) for the complete boundaries.
+[threat model](docs/threat-model.md) for details.
 
 ## Documentation
 
@@ -468,10 +464,10 @@ Read the [architecture](docs/architecture.md),
 | Review the dormant managed-client plan | [Google verification runbook](docs/google-oauth-verification.md) |
 | Review every guide | [Documentation map](docs/README.md) |
 
-Users upgrading from versions before v0.7 can follow the
-[historical migration guide](docs/migration-v0.7.md). `corr` is the primary
+If you are upgrading from a version before v0.7, see the
+[historical migration guide](docs/migration-v0.7.md). `corr` is the main
 command. The product, package, repository, configuration roots, plugin, and MCP
-server remain named Corresync.
+server are still named Corresync.
 
 ## Contributing and security
 
@@ -483,6 +479,6 @@ mise exec -- task verify
 ```
 
 Please report vulnerabilities through
-[GitHub private vulnerability reporting](SECURITY.md), never a public issue.
+[GitHub private vulnerability reporting](SECURITY.md), not in a public issue.
 
 For remote terminals, see [graphical login over SSH](docs/remote-login.md).

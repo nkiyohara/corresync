@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>支持的邮件、日历与任务服务 — Corresync</title>
+    <title>Corresync 支持的邮件、日历和任务服务</title>
     <meta
       name="description"
-      content="比较 Outlook、Microsoft 365、Gmail、Google 日历、Google Tasks、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 和 CalDAV 支持，以及自备 OAuth 设置。"
+      content="Outlook、Microsoft 365、Gmail、Google 日历、Google Tasks、Todoist、TickTick、iCloud、JMAP、IMAP/SMTP 和 CalDAV 的支持情况对比，以及自备 OAuth 客户端的设置方法。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="支持的邮件、日历与任务服务 — Corresync">
+    <meta property="og:title" content="Corresync 支持的邮件、日历和任务服务">
     <meta
       property="og:description"
-      content="查看 Todoist、TickTick、iCloud 与 CalDAV VTODO 等路径，以及使用你自己的桌面 OAuth 客户端的 Google 支持。"
+      content="Todoist、TickTick、iCloud、CalDAV VTODO 等连接方式，以及用你自己的桌面 OAuth 客户端连接 Google。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
@@ -27,10 +27,10 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Corresync 标志和英文产品简介">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="支持的邮件、日历与任务服务 — Corresync">
+    <meta name="twitter:title" content="Corresync 支持的邮件、日历和任务服务">
     <meta
       name="twitter:description"
-      content="查看 Outlook、Todoist、TickTick、iCloud、标准协议与使用你自己的桌面 OAuth 客户端的 Google 支持。"
+      content="Outlook、Todoist、TickTick、iCloud 和标准协议的支持情况，以及用你自己的桌面 OAuth 客户端连接 Google。"
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 标志和英文产品简介">
@@ -64,7 +64,7 @@
             aria-current="page"
           >支持服务</a><a href="features.html">功能</a><a href="safety.html">安全</a>
         </nav>
-        <nav class="language-nav" aria-label="語言">
+        <nav class="language-nav" aria-label="语言">
           <a href="../providers.html" lang="en" hreflang="en">EN</a><a
             href="../ja/providers.html"
             lang="ja"
@@ -81,11 +81,11 @@
     </header>
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>路径明确，取舍可见</p>
-        <h1 id="page-title">选择真正适合<em>你的账号</em>的路径。</h1>
+        <p class="eyebrow"><span aria-hidden="true"></span>支持的服务</p>
+        <h1 id="page-title">为<em>你的账号</em>选择连接方式</h1>
         <p class="lede">
           Corresync
-          不会根据标志猜测能力。发现阶段只收集无凭据证据；你在认证开始前选择邮件和日历路径。
+          不按邮箱品牌推测功能。它先不用凭据查找公开信息，再由你在登录前选择邮件和日历的连接方式。
         </p>
         <div class="actions">
           <a class="button primary" href="#check">检查邮箱地址</a><a
@@ -95,23 +95,21 @@
         </div>
       </section>
       <section
-        class="compatibility-兼容性检查工具"
+        class="compatibility-checker"
         id="check"
-        aria-labelledby="兼容性检查工具-title"
+        aria-labelledby="checker-title"
       >
-        <div class="兼容性检查工具-intro">
-          <p class="eyebrow"><span aria-hidden="true"></span>这个地址能用吗？</p>
-          <h2 id="兼容性检查工具-title">
-            无需发送完整地址，也能检查支持情况。
+        <div class="checker-intro">
+          <p class="eyebrow"><span aria-hidden="true"></span>检查邮箱地址</p>
+          <h2 id="checker-title">
+            检查是否支持（不发送完整地址）
           </h2>
           <p>
-            输入要连接的邮箱。浏览器会保留完整地址，只把 @
-            后面的域名交给查询服务。
+            输入要连接的邮箱地址。浏览器只把 @ 后面的域名发给查询服务。
           </p>
         </div>
-        <form id="compatibility-form" class="兼容性检查工具-form" novalidate>
-          <label for="compatibility-email"
-          >邮箱地址</label><div class="兼容性检查工具-fields">
+        <form id="compatibility-form" class="checker-form" novalidate>
+          <label for="compatibility-email">邮箱地址</label><div class="checker-fields">
             <input
               id="compatibility-email"
               name="compatibility-email"
@@ -126,19 +124,19 @@
               检查支持情况
             </button>
           </div>
-          <p id="compatibility-validation" class="兼容性检查工具-validation" hidden>
-            请输入完整邮箱地址，例如 you@example.com。@
-            后有完整域名之前不会查询。
+          <p id="compatibility-validation" class="checker-validation" hidden>
+            请输入完整的邮箱地址，例如
+            you@example.com。域名完整之前不会查询。
           </p>
         </form>
-        <p id="compatibility-privacy" class="兼容性检查工具-privacy">
+        <p id="compatibility-privacy" class="checker-privacy">
           <strong>只有域名会离开浏览器。</strong>@
-          前的内容不会发送、保存、记录或放进地址栏。服务只读取公共
-          DNS，不保留记录，也不会启动登录。你也可以跳过网页查询，安装后在本地运行
+          前面的部分不会被发送、保存、记录或放进地址栏。查询服务只读公共
+          DNS，不保留记录，也不会开始登录。也可以安装后在本地运行
           <code>corr account discover you@example.com</code>。
-        </p><noscript><p class="兼容性检查工具-noscript">
-            这项可选检查需要 JavaScript。也可以安装后在本地运行 <code>corr
-              account discover you@example.com</code>。
+        </p><noscript><p class="checker-noscript">
+            这个检查需要 JavaScript。也可以安装后在本地运行 <code>corr account
+              discover you@example.com</code>。
           </p></noscript><p
           id="compatibility-live"
           class="visually-hidden"
@@ -148,7 +146,7 @@
         </p>
         <article
           id="compatibility-result"
-          class="兼容性检查工具-result"
+          class="checker-result"
           tabindex="-1"
           aria-label="支持情况结果"
           hidden
@@ -157,90 +155,92 @@
       </section>
       <section class="evidence-banner" aria-label="提供商证据状态">
         <span class="status-dot" aria-hidden="true"></span><div>
-          <strong>v0.8 证据是确定且按路径区分的。</strong><p>
-            下列可用或准备中的路径都有合成 provider contract 与 application
-            测试。Google API 路径已通过合成契约测试，尚未实时观测。
+          <strong>v0.9 的验证情况（按连接方式区分）</strong><p>
+            下列已可用和准备中的连接方式都有合成数据的服务商契约测试和应用层测试。Google
+            API 已通过合成契约测试，尚未在真实环境中观察。
           </p>
-        </div><a href="features.html#evidence">证据如何解读<span aria-hidden="true">
+        </div><a href="features.html#evidence">验证状态说明<span aria-hidden="true">
             →</span></a>
       </section>
       <section id="route-cards" aria-labelledby="microsoft-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Microsoft 路径</p>
-          <h2 id="microsoft-title">使用你信任的浏览器，或明确选择 Graph。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Microsoft</p>
+          <h2 id="microsoft-title">Outlook Web 和 Microsoft Graph</h2>
           <p>
-            Outlook Web 的登录由浏览器管理。Microsoft Graph 是单独配置的公开 OAuth
-            客户端，绝不会成为自动 备用路径。
+            Outlook Web 在浏览器中登录。Microsoft Graph 需要单独配置公开 OAuth
+            客户端，不会被自动用作备选。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card" id="microsoft-owa">
             <header>
               <span class="route-icon" aria-hidden="true">OW</span><div>
-                <p class="chip">浏览器管理</p>
+                <p class="chip">浏览器登录</p>
                 <h3>Outlook Web</h3>
               </div>
             </header>
             <dl>
               <div>
                 <dt>邮件</dt>
-                <dd>读取、撰写、整理和需确认的破坏性操作</dd>
+                <dd>读取、撰写、整理和需确认的删除</dd>
               </div>
               <div>
                 <dt>日历</dt>
-                <dd>选择日历与提供商支持的 Teams 加入链接</dd>
+                <dd>选择日历，服务商支持时提供 Teams 加入链接</dd>
               </div>
               <div>
                 <dt>登录</dt>
-                <dd>专用可见浏览器配置</dd>
+                <dd>专用的可见浏览器配置</dd>
               </div>
             </dl>
             <p class="route-foot">
-              SSO、MFA、Conditional Access 与组织提示都留在浏览器中。
+              SSO、MFA、Conditional Access 和组织提示都在浏览器中处理。
             </p>
           </article>
           <article class="route-card accent-card" id="microsoft-graph">
             <header>
               <span class="route-icon" aria-hidden="true">G</span><div>
-                <p class="chip">明确 OAuth</p>
+                <p class="chip">OAuth（需自行选择）</p>
                 <h3>Microsoft Graph</h3>
               </div>
             </header>
             <dl>
               <div>
                 <dt>邮件</dt>
-                <dd>读取、撰写、整理和需确认的破坏性操作</dd>
+                <dd>读取、撰写、整理和需确认的删除</dd>
               </div>
               <div>
                 <dt>日历</dt>
-                <dd>选择日历与类型化 Teams 链接创建</dd>
+                <dd>选择日历，创建 Teams 会议链接</dd>
               </div>
               <div>
                 <dt>登录</dt>
-                <dd>你有权使用的公开客户端；授权 存入系统钥匙串</dd>
+                <dd>你有权使用的公开客户端；授权保存在系统钥匙串中</dd>
               </div>
             </dl>
-            <p class="route-foot">Graph 仅在明确选择或已有授权时提供。</p>
+            <p class="route-foot">
+              只在你选择或已授权时使用 Graph。
+            </p>
           </article>
         </div>
       </section>
       <section id="icloud" aria-labelledby="icloud-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Apple iCloud</p>
-          <h2 id="icloud-title">在同一套引导中配置 iCloud 邮件与日历。</h2>
+          <h2 id="icloud-title">在一次引导中设置 iCloud 邮件和日历</h2>
           <p>
             <code>corr setup</code>会识别 Apple
-            公布的邮箱地址类型，以及具备完整且已验证服务记录的 iCloud
-            自定义域名。它使用 Apple 官方 IMAP、SMTP 和 CalDAV
-            端点，并在添加账号前展示全部登录名与连接路径供你确认。
+            公布的邮箱地址类型，以及服务记录完整且已验证的 iCloud
+            自定义域名，使用 Apple 官方的 IMAP、SMTP 和 CalDAV
+            端点，添加账号前列出所有登录名和连接方式供你确认。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">iC</span><div>
-                <p class="chip">现已支持 · 引导预设</p>
-                <h3>iCloud 邮件与日历</h3>
+                <p class="chip">已支持 · 引导预设</p>
+                <h3>iCloud 邮件和日历</h3>
               </div>
             </header>
             <dl>
@@ -250,16 +250,16 @@
               </div>
               <div>
                 <dt>日历</dt>
-                <dd>通过 CalDAV 发现和读取日历，并执行需确认的写入</dd>
+                <dd>通过 CalDAV 查找和读取日历，写入前需确认</dd>
               </div>
               <div>
                 <dt>登录</dt>
-                <dd>在操作系统凭据界面中直接输入 Apple App 专用密码</dd>
+                <dd>在操作系统的凭据窗口中直接输入 Apple App 专用密码</dd>
               </div>
             </dl>
             <p class="route-foot">
               Corresync
-              只向系统提示界面传递固定服务名和经过确认的引用，从不读取密码。系统会分别显示邮件和日历最近一次认证状态，且不读取邮件正文或日程内容。
+              只把固定服务名和经你确认的引用传给系统凭据窗口，不读取密码。邮件和日历的最近认证状态分别显示，不读取邮件正文或日程内容。
             </p>
           </article>
           <article class="route-card">
@@ -270,36 +270,36 @@
               </div>
             </header>
             <p>
-              先启用双重认证，再到 Apple 账号页面创建 App
-              专用密码。只有在经过确认的本地账号添加完成后，并且你明确选择打开时，引导程序才会访问该页面。
+              先开启双重认证，再到 Apple 账号页面创建 App
+              专用密码。引导程序只在本地账号添加完成、且你选择打开时才打开这个页面。
             </p>
             <p class="route-foot">
               请参阅 Apple 官方的<a href="https://support.apple.com/zh-cn/102525"
               >iCloud 邮件设置</a>和<a href="https://support.apple.com/zh-cn/102654"
               >App
-                专用密码说明</a>。此预设已通过合成契约测试；在记录明确选择加入的实机观察之前，仍标记为尚未实机观察。
+                专用密码说明</a>。这个预设已通过合成契约测试；在记录到一次主动开启的实机观察之前，仍标为未经实机观察。
             </p>
           </article>
         </div>
       </section>
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Google 路径</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>Google</p>
           <h2 id="google-title">
-            Gmail、Google 日历和 Google Tasks 可使用你自己的 OAuth 客户端。
+            用你自己的 OAuth 客户端连接 Gmail、Google 日历和 Google Tasks
           </h2>
           <p>
             在你自己管理的 Google Cloud 项目中创建桌面 OAuth
-            客户端，然后在引导设置中导入 JSON。 Corresync 管理的 OAuth
-            保持休眠；你自己的客户端会打开 Google 的常规浏览器流程。
+            客户端，然后在引导设置中导入 JSON。Corresync 管理的 OAuth
+            未启用；登录时用你自己的客户端走 Google 的常规浏览器流程。
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">GA</span><div>
-                <p class="chip">设置后可用 · 自备 OAuth</p>
-                <h3>Google API 路径</h3>
+                <p class="chip">设置后可用 · 自备 OAuth 客户端</p>
+                <h3>Google API</h3>
               </div>
             </header>
             <dl>
@@ -312,30 +312,32 @@
               </div>
               <div>
                 <dt>日历</dt>
-                <dd>选择日历，并在支持时创建 Google Meet</dd>
+                <dd>选择日历；支持时可创建 Google Meet 链接</dd>
               </div>
               <div>
                 <dt>任务</dt>
-                <dd>仅日期的截止时间、子任务、排序、来源链接和安全轮询</dd>
+                <dd>
+                  只含日期的截止时间、子任务、排序、来源链接和安全轮询
+                </dd>
               </div>
               <div>
                 <dt>登录</dt>
                 <dd>
                   你自己的桌面 OAuth
-                  客户端；客户端凭据与账号授权分别存入系统钥匙串
+                  客户端；客户端凭据和账号授权分别保存在系统钥匙串中
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              常用浏览器负责 OAuth，设备直接连接固定的 Google API。<a
+              OAuth 在常用浏览器中完成，本机直接连接固定的 Google API。<a
                 href="google-oauth.html"
-              >查看 Google Cloud 界面与全部步骤</a>。
+              >查看 Google Cloud 界面和全部步骤</a>。
             </p>
           </article>
           <article class="route-card">
             <header>
               <span class="route-icon" aria-hidden="true">✓</span><div>
-                <p class="chip">现已可用</p>
+                <p class="chip">已可用</p>
                 <h3>Google Workspace MCP</h3>
               </div>
             </header>
@@ -350,11 +352,11 @@
               </div>
               <div>
                 <dt>设置</dt>
-                <dd>需要 Google Cloud 与 OAuth 配置</dd>
+                <dd>需要配置 Google Cloud 和 OAuth</dd>
               </div>
             </dl>
             <p class="route-foot">
-              请参阅 Google 官方<a
+              见 Google 官方<a
                 href="https://developers.google.com/workspace/guides/configure-mcp-servers"
               >设置指南</a>。
             </p>
@@ -363,55 +365,55 @@
       </section>
       <section id="tasks" aria-labelledby="tasks-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>任务路径</p>
-          <h2 id="tasks-title">连接你一直在用的任务服务。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>任务</p>
+          <h2 id="tasks-title">任务服务</h2>
           <p>
-            任务路径可独立于邮件和日历选择。每个账号的授权、能力、同步游标和确认后写入均保持隔离。
+            任务连接方式与邮件、日历分开选择。各账号的授权、功能、同步游标和写入确认互相隔离。
           </p>
         </div>
         <div class="route-grid three">
           <article class="route-card" id="microsoft-todo">
             <header>
               <span class="route-icon" aria-hidden="true">To</span><div>
-                <p class="chip">现已可用 · 明确 OAuth</p>
+                <p class="chip">已可用 · OAuth</p>
                 <h3>Microsoft To Do</h3>
               </div>
             </header>
             <p>
-              支持任务列表、创建与更新、完成与重新打开、删除、重复规则、检查清单、分类以及有上限的
+              支持任务列表、创建和更新、完成和重新打开、删除、重复规则、检查清单、分类，以及有上限的
               Graph 增量同步。
             </p>
             <p class="route-foot">
-              使用你有权注册并选择的 Microsoft Graph 公共客户端。
+              使用你有权注册并选择的 Microsoft Graph 公开客户端。
             </p>
           </article>
           <article class="route-card" id="todoist">
             <header>
               <span class="route-icon" aria-hidden="true">Td</span><div>
-                <p class="chip">现已可用 · 明确 OAuth</p>
+                <p class="chip">已可用 · OAuth</p>
                 <h3>Todoist</h3>
               </div>
             </header>
             <p>
-              支持项目、任务写入与状态、提醒、重复规则、子任务、标签、负责人、准确的日期时间语义和有上限的同步。
+              支持项目、任务的写入和状态、提醒、重复规则、子任务、标签、负责人，准确处理日期和时间，同步有上限。
             </p>
             <p class="route-foot">
-              使用带 PKCE 的公共 OAuth 客户端；套餐限制会如实显示。
+              使用带 PKCE 的公开 OAuth 客户端；套餐限制会直接显示。
             </p>
           </article>
           <article class="route-card accent-card" id="ticktick">
             <header>
               <span class="route-icon" aria-hidden="true">Ti</span><div>
-                <p class="chip">现已可用 · 明确 OAuth</p>
+                <p class="chip">已可用 · OAuth</p>
                 <h3>TickTick</h3>
               </div>
             </header>
             <p>
-              支持项目与收集箱、搜索、创建、更新、完成、删除、重复规则、检查清单、标签、单一负责人、排序和有上限的轮询。
+              支持项目和收集箱、搜索、创建、更新、完成、删除、重复规则、检查清单、标签、单个负责人、排序，以及有上限的轮询。
             </p>
             <p class="route-foot">
-              使用你自行注册、基于客户端密钥的 OAuth
-              应用。密钥留在经批准的凭据存储中；不会声称支持重新打开或替换提醒。
+              使用你自己注册的、带客户端密钥的 OAuth
+              应用，密钥保存在经批准的凭据存储中。不声明支持重新打开任务和替换提醒。
             </p>
           </article>
         </div>
@@ -419,9 +421,9 @@
       <section aria-labelledby="standards-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>开放标准</p>
-          <h2 id="standards-title">按提供商真正开放的服务自由组合。</h2>
+          <h2 id="standards-title">按服务商实际提供的协议组合使用</h2>
           <p>
-            标准路径要求有效 TLS，并使用系统钥匙串或明确批准的凭据助手。
+            要求有效的 TLS，凭据来自系统钥匙串或经你批准的凭据助手。
           </p>
         </div>
         <div class="route-grid three">
@@ -433,11 +435,11 @@
               </div>
             </header>
             <p>
-              通过类型化 RFC 8620
-              契约读取、草稿、支持时提交、移动、状态更改和需确认的删除。
+              基于 RFC
+              8620，支持读取、草稿、提交（服务器支持时）、移动、更改状态，以及需确认的删除。
             </p>
             <p class="route-foot">
-              只读账号或缺少 Submission 能力会明确显示不可用。
+              只读账号或不支持 Submission 时直接显示为不可用。
             </p>
           </article>
           <article class="route-card" id="imap-smtp">
@@ -448,11 +450,12 @@
               </div>
             </header>
             <p>
-              文件夹、读取、MIME、草稿、安全移动，以及能确认已发送邮箱结果的
-              SMTP 提交。
+              文件夹、读取、MIME、草稿、安全移动，以及可在已发送邮箱确认结果的
+              SMTP 发送。
             </p>
             <p class="route-foot">
-              需要 UIDPLUS 或 Sent 邮箱的操作会在不安全模拟前失败。
+              缺少 UIDPLUS
+              或已发送邮箱时，相关操作直接失败，不做不安全的模拟。
             </p>
           </article>
           <article class="route-card" id="caldav">
@@ -463,24 +466,24 @@
               </div>
             </header>
             <p>
-              分别发现 VEVENT 日历与 VTODO
-              任务列表，提供受限读取、重复规则、
-              同步令牌，以及确认后的条件式 WebDAV/iCalendar 写入。
+              分别查找 VEVENT 日历和 VTODO
+              任务列表，支持有上限的读取、重复规则、同步令牌，以及确认后带条件的
+              WebDAV/iCalendar 写入。
             </p>
             <p class="route-foot">
-              登录后会分别确认日历调度能力与任务能力。
+              登录后分别检查日历调度和任务功能是否可用。
             </p>
           </article>
         </div>
       </section>
       <section class="mix-panel" aria-labelledby="mix-title">
         <div>
-          <p class="eyebrow light"><span aria-hidden="true"></span>一个账号，两条路径</p>
-          <h2 id="mix-title">邮件和日历不必来自同一协议。</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>组合连接方式</p>
+          <h2 id="mix-title">邮件和日历可以使用不同协议</h2>
           <p>
-            可组合 IMAP/SMTP 与
-            CalDAV，也可只设置邮件或日历。稳定账号身份会隔离配置、凭据、游标、预览
-            与 audit context。
+            可以组合 IMAP/SMTP 和
+            CalDAV，也可以只设置邮件或日历。每个账号有固定的内部
+            ID，配置、凭据、游标、预览和审计上下文按账号分开。
           </p>
         </div>
         <figure class="terminal">
@@ -500,24 +503,24 @@
       </section>
       <section class="honest-edges" aria-labelledby="provider-limits-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>没有隐藏 备用路径</p>
-          <h2 id="provider-limits-title">缺少的能力会保持缺少。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>限制</p>
+          <h2 id="provider-limits-title">不支持的功能不会被替代</h2>
         </div>
         <ul>
-          <li>限制会作为类型化能力或降级明确返回。</li>
+          <li>服务商的限制会以功能列表或降级信息的形式返回。</li>
           <li>
-            自动发现不会启动 Google
-            OAuth；只有明确的本地登录才可打开浏览器。
+            自动查找不会启动 Google
+            OAuth；只有在本地明确登录时才可能打开浏览器。
           </li>
-          <li>自动发现不会启动 Graph 授权。</li>
-          <li>只有所选日历路径报告支持时才请求会议链接。</li>
-          <li>未知写入结果需要核对，绝不自动重试。</li>
+          <li>自动查找不会启动 Graph 授权。</li>
+          <li>只有所选的日历连接方式报告支持时，才会请求会议链接。</li>
+          <li>写入结果不明确时需要核对，不会自动重试。</li>
         </ul>
       </section>
       <section class="final-cta" aria-labelledby="provider-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>明确选择</p>
-        <h2 id="provider-cta-title">先看证据，再认证。</h2>
-        <p>发现过程不读取凭据，也不添加账号。</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>下一步</p>
+        <h2 id="provider-cta-title">先查找，再登录</h2>
+        <p>查找过程不读取凭据，也不添加账号。</p>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html">设置第一个账号</a><a
             class="button secondary"
@@ -534,7 +537,7 @@
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        独立的本地优先邮件与日历工具。与所列厂商无隶属或背书关系。
+        独立开发的本地邮件和日历工具，与本页列出的厂商没有隶属或背书关系。
       </p>
       <nav aria-label="页脚">
         <a href="getting-started.html">快速开始</a><a href="providers.html">支持服务</a><a

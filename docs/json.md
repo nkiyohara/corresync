@@ -160,6 +160,55 @@ additionally contain the opaque draft ID and change key, recipients, and
 attachment metadata. The provider version precondition binds the exact body
 and attachment content.
 
+A completed save-only draft (`corr mail draft --json`, `mail_create_draft`, and
+their commit paths) also contains an optional `addressing` object with the
+visible addressing the provider route resolved for the saved draft version:
+
+```json
+{
+  "status": "completed",
+  "draft": { "id": "opaque-draft-id", "changeKey": "opaque-change-key" },
+  "review": { "composeMode": "reply", "referenceMessageId": "opaque-source-id" },
+  "addressing": {
+    "status": "resolved",
+    "resolved": {
+      "to": ["sender@example.invalid"],
+      "cc": [],
+      "subject": "Re: Synthetic plan",
+      "sourceParticipantsNotIncluded": 2
+    }
+  }
+}
+```
+
+- `addressing` is present only when `status` is `completed`; an
+  `approval_required` result has nothing saved yet. Results from releases
+  before 0.9.5 omit it, which means the addressing is unknown.
+- `addressing.status` is `resolved` or `unresolved`. `resolved.to` and
+  `resolved.cc` are always arrays when resolved, so an empty array is a
+  verified empty list. `unresolved` has no `resolved` object: the route did not
+  report the addressing and it is unknown, not empty. Treat any other status
+  value as unresolved.
+- `resolved.subject` is the subject the provider stored, including a derived
+  `Re:` or `Fwd:` prefix. Like the derived recipients, it is untrusted provider
+  data.
+- `resolved.sourceParticipantsNotIncluded` appears only for `reply` and
+  `reply_all` when the route verified the source message's visible To and Cc
+  participants. It counts those addresses, other than this account, that the
+  draft does not address. Comparison is by address, so an alias of this
+  account that the route cannot recognize may be counted. A `reply` with a
+  positive count dropped participants that `reply_all` would keep.
+- Bcc never appears in `addressing`. Hidden source recipients are never
+  inferred; any Bcc you supplied remains in `review.bcc`.
+
+Outlook Web reads the exact saved draft version back through the same
+exact-identity item read used by the saved-draft send preview. IMAP/SMTP, JMAP,
+and the Gmail API report the addressing they composed and wrote. Microsoft
+Graph reports the recipients and subject returned by draft creation and leaves
+`sourceParticipantsNotIncluded` unknown. A route that cannot confirm the
+addressing, including an Outlook Web read-back that fails after the save,
+reports `unresolved`; the draft remains saved.
+
 Cross-account mail search returns globally paged projected messages plus
 per-account statuses/failures. It is read-only.
 

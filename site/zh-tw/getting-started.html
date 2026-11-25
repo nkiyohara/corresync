@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync 開始使用 — 從安裝到第一次回答</title>
+    <title>Corresync 入門：從安裝到第一次查詢</title>
     <meta
       name="description"
-      content="安裝 Corresync，新增 Outlook、iCloud 郵件與行事曆或標準協定帳號，連線本機 MCP 用戶端，並完成第一次跨帳號查詢。"
+      content="安裝 Corresync，新增 Outlook、iCloud 郵件與行事曆或標準協定帳號，連接本機 MCP 用戶端，然後試一次跨帳號查詢。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Corresync 開始使用 — 四步完成設定">
+    <meta property="og:title" content="Corresync 入門：四個步驟完成設定">
     <meta
       property="og:description"
-      content="安裝、登入、連線本機 MCP，再跨所有信箱和行事曆提問。"
+      content="安裝 Corresync、登入帳號、連接本機 MCP，然後查詢所有已連接的信箱和行事曆。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_TW">
@@ -27,8 +27,8 @@
     <meta property="og:image:height" content="630">
     <meta property="og:image:alt" content="Corresync 標誌和英文產品簡介">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Corresync 開始使用">
-    <meta name="twitter:description" content="四步完成本機 MCP 設定。">
+    <meta name="twitter:title" content="Corresync 入門">
+    <meta name="twitter:description" content="用四個步驟完成本機 MCP 設定。">
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 標誌和英文產品簡介">
     <link rel="canonical" href="https://corresync.org/zh-tw/getting-started.html">
@@ -87,18 +87,19 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>開始使用</p>
-        <h1 id="page-title">從安裝到第一次回答，<em>清晰的四個步驟。</em></h1>
+        <h1 id="page-title">從安裝到第一次查詢，<em>共四個步驟</em></h1>
         <p class="lede">
-          安裝 <code>corr</code>，新增工作或個人帳號，把本機 MCP
-          註冊到智慧體，然後提出跨帳號問題。即使結果合併展示，每個帳號的身分和授權仍然隔離。Outlook
-          Web 登入由瀏覽器管理；API 和標準協議的 授權 留在系統鑰匙圈；MCP
-          只透過本機 stdio 通訊。
+          安裝 <code>corr</code>，新增工作或個人帳號，把本機 MCP 註冊到 AI
+          代理，再查詢多個帳號。結果合併顯示時，各帳號的登入和授權仍然分開。Outlook
+          Web 在瀏覽器中登入；API
+          和標準協定的授權存放在作業系統鑰匙圈。MCP 只透過本機 stdio
+          通訊。
         </p>
         <div class="actions">
           <a class="button primary" href="#step-install">從第 1 步開始</a><a
             class="button secondary"
             href="providers.html#check"
-          >先檢查支援情況</a>
+          >先檢查是否支援</a>
         </div>
       </section>
       <ol class="gs-steps">
@@ -106,7 +107,7 @@
           <header>
             <span class="step-badge" aria-hidden="true">1</span><div>
               <h2 id="install-title">安裝 <code>corr</code></h2>
-              <p>這裡只安裝程式，不新增帳號，也不會登入。</p>
+              <p>這一步只安裝程式，不會新增帳號，也不會登入。</p>
             </div>
           </header>
           <div class="install-grid primary-install-grid">
@@ -120,7 +121,7 @@
                 ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
               </div>
               <p class="block-note">
-                為目前使用者安裝已驗證的 stable 版本。執行前可閱讀<a
+                為目前使用者安裝經過驗證的 stable 版本。執行前可以先看<a
                   href="../install.sh"
                 >指令碼</a>。
               </p>
@@ -135,8 +136,8 @@
                 ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
               </div>
               <p class="block-note">
-                無需管理員權限，只更新目前使用者的 <code
-                >PATH</code>。可先閱讀<a href="../install.ps1">指令碼</a>。
+                不需要系統管理員權限，只會更新目前使用者的 <code
+                >PATH</code>。可以先看<a href="../install.ps1">指令碼</a>。
               </p>
             </div>
           </div>
@@ -147,7 +148,7 @@
           >
             <div class="install-alternatives-head">
               <h3 id="other-install-title">其他安裝方式</h3>
-              <p>交給包管理器管理升級與解除安裝。</p>
+              <p>由套件管理工具負責更新和解除安裝。</p>
             </div>
             <div class="install-grid">
               <div class="install-block">
@@ -184,10 +185,11 @@ scoop install corresync/corresync</code></pre>
             </div>
             <p class="install-alternatives-note">
               Linux 的 <code>.deb</code>、<code>.rpm</code>、<code
-              >.apk</code>，直接下載包、checksum、Sigstore 來源證明 和 Claude Desktop
-              <code>.mcpb</code> 都在<a
+              >.apk</code>、直接下載的封存檔、checksum、Sigstore 來源證明和 Claude
+              Desktop
+              <code>.mcpb</code> 都放在<a
                 href="https://github.com/nkiyohara/corresync/releases/latest"
-              >最新版本</a>中。
+              >最新版本</a>頁面。
             </p>
           </section>
           <div class="install-block verify-block">
@@ -201,7 +203,7 @@ scoop install corresync/corresync</code></pre>
             </div>
           </div>
           <div class="install-block verify-block">
-            <p class="os-label" id="gs-updates">自動更新 · 為既有設定啟用</p>
+            <p class="os-label" id="gs-updates">自動更新 · 在既有設定中啟用</p>
             <div class="cmd" data-copy data-copy-label="啟用已驗證自動更新">
               <pre
                 tabindex="0"
@@ -210,57 +212,60 @@ scoop install corresync/corresync</code></pre>
               ><code>corr config set updates.auto_install true</code></pre>
             </div>
             <p class="block-note">
-              從0.9.2起，新設定預設啟用已簽名、已驗證的自動更新，既有設定保持不變。此命令可為既有設定啟用更新。MCP或機器可讀輸出不會觸發安裝。關閉指令：<code
-              >corr config set updates.auto_install false</code>。
+              從 0.9.2
+              起，新設定預設啟用經簽章和驗證的自動更新，既有設定不變。上面的指令可為既有設定啟用。MCP
+              或機器可讀輸出不會觸發安裝。關閉請執行 <code>corr config set
+                updates.auto_install false</code>。
             </p>
           </div>
         </li>
         <li class="gs-step" id="sign-in" aria-labelledby="signin-title">
           <header>
             <span class="step-badge" aria-hidden="true">2</span><div>
-              <h2 id="signin-title">設定郵件與行事曆帳號</h2>
+              <h2 id="signin-title">設定郵件和行事曆帳號</h2>
               <p>
-                第一次只需執行一個指令。引導程式會詢問電子郵件地址，在不讀取認證資料的情況下尋找郵件與行事曆服務、說明可選路徑，並在新增帳號前顯示完整預覽。
+                先執行一個指令。引導程式會詢問電子郵件地址，不用憑證就找出郵件和行事曆服務，說明可選的連線方式，並在新增帳號前顯示確認畫面。
               </p>
               <p>
-                登入或讀取外部認證資料始終是確認後的獨立選擇。接著還可檢查連線或繼續新增其他帳號。<code
-                >corr
-                  settings</code>使用同一套鍵盤友善流程；螢幕閱讀器使用者可設定<code
-                >CORRESYNC_ACCESSIBLE=true</code>，改用逐行提示；輸入<code
-                >:cancel</code>即可安全離開目前的輸入步驟。
+                確認後，登入或讀取外部憑證是另外的選項。接著可以檢查連線或新增其他帳號。<code
+                >corr settings</code>
+                使用同一套鍵盤操作流程。螢幕閱讀器使用者可設定 <code
+                >CORRESYNC_ACCESSIBLE=true</code>，改成逐行提示。輸入 <code>:cancel</code>
+                可以離開目前的輸入步驟。
               </p>
             </div>
           </header>
           <div class="duo">
             <div>
               <p>
-                Outlook Web 使用由服務供應商掌控的瀏覽器登入。Microsoft
-                Graph、JMAP、IMAP/SMTP 與 CalDAV
-                也可在服務供應商支援，且你明確選擇相應路徑或認證資料存放位置時使用。探索過程不會開啟瀏覽器、讀取鑰匙圈，也不會啟動管理員同意流程。
+                Outlook Web
+                使用服務供應商的瀏覽器登入。服務支援、且你選了對應的連線方式或憑證存放位置時，也可以用
+                Microsoft Graph、JMAP、IMAP/SMTP 和
+                CalDAV。查詢連線方式時不會開啟瀏覽器、讀取鑰匙圈或要求管理員同意。
               </p>
               <p>
-                <strong>使用 iCloud？</strong><code>corr setup</code>會辨識<code
-                >@icloud.com</code>、<code>@me.com</code>、<code
-                >@mac.com</code>，以及具備完整且已驗證服務記錄的 iCloud
-                自訂網域，並一次設定郵件與行事曆。新增帳號後，引導程式會說明
+                <strong>使用 iCloud？</strong><code>corr setup</code> 會辨識 <code
+                >@icloud.com</code>、<code>@me.com</code>、<code>@mac.com</code>
+                位址，以及服務記錄完整且通過驗證的 iCloud
+                自訂網域，並同時設定郵件和行事曆。核准帳號後，引導程式會說明
                 Apple 雙重認證和 App
-                專用密碼要求。密碼由作業系統的認證資料介面直接接收，不會經過
-                Corresync。
+                專用密碼的要求。密碼由作業系統直接詢問，Corresync
+                不會收到。
               </p>
               <p>
-                <strong>使用 Google？</strong>在你自行管理的 Google Cloud
-                專案中建立桌面 OAuth 用戶端。 引導設定會驗證下載的
-                JSON，並在明確的瀏覽器登入前將認證資料匯入系統鑰匙圈。
+                <strong>使用 Google？</strong>在你自己管理的 Google Cloud
+                專案中建立桌面版 OAuth 用戶端。引導式設定會檢查下載的
+                JSON，先把憑證匯入作業系統鑰匙圈，再由你在瀏覽器登入。
               </p>
               <p class="step-links">
-                <a href="providers.html#check">不傳送完整位址即可檢查</a> · <a
+                <a href="providers.html#check">不傳送完整位址也能檢查</a> · <a
                   href="safety.html"
-                >瞭解登入歸屬</a>
+                >登入由誰處理</a>
               </p>
             </div>
             <div class="stack">
               <div class="install-block">
-                <p class="os-label" id="gs-signin-default">引導設定 · 建議</p>
+                <p class="os-label" id="gs-signin-default">引導式設定 · 建議</p>
                 <div class="cmd" data-copy data-copy-label="引導帳號設定指令">
                   <pre
                     tabindex="0"
@@ -269,8 +274,9 @@ scoop install corresync/corresync</code></pre>
                   ><code>corr setup</code></pre>
                 </div>
                 <p class="block-note">
-                  引導程式會先檢查目前的本機狀態，視需要安裝 Shell
-                  補全，並從尚未完成的步驟繼續。帳號路徑會在儲存前預覽，登入仍是獨立操作；接著可複選偵測到的代理程式，統一確認本機整合計畫，再逐一套用與驗證。
+                  引導程式會先檢查目前的本機狀態，可選擇安裝 Shell
+                  補全，並從第一個未完成的步驟繼續。帳號的連線方式會在儲存前預覽，登入另外進行。接著可勾選多個偵測到的
+                  AI 代理，確認本機整合計畫後逐一套用並驗證。
                 </p>
               </div>
               <div class="install-block">
@@ -281,13 +287,13 @@ corr auth login --account personal
 corr doctor --account personal</code></pre>
                 </div>
                 <p class="block-note">
-                  原有指令維持非互動行為，適合指令碼與自動化。
+                  這些指令不會互動詢問，適合指令碼和自動化。
                 </p>
               </div>
               <div class="install-block">
-                <p class="os-label">iCloud 郵件與行事曆 · 現已支援</p>
+                <p class="os-label">iCloud 郵件與行事曆 · 已支援</p>
                 <p class="block-note">
-                  引導預設會新增兩項服務，可共用一個經過確認的認證資料參照，並在不讀取郵件內文或行程內容的情況下顯示最近一次認證狀態。連線前請閱讀
+                  引導式設定預設會新增兩項服務，可共用一個確認過的憑證參照，並在不讀取內容的情況下顯示最近一次驗證狀態。連線前請先看
                   Apple 官方的<a href="https://support.apple.com/zh-tw/102654"
                   >App 專用密碼說明</a>。
                 </p>
@@ -295,9 +301,9 @@ corr doctor --account personal</code></pre>
               <div class="install-block">
                 <p class="os-label">Gmail · Google 行事曆 · Google Tasks</p>
                 <p class="block-note">
-                  請參閱<a href="google-oauth.html">Google OAuth 圖解指南</a>，
-                  只選需要的
-                  API，並讓用戶端認證資料與帳號授權留在本機鑰匙圈。
+                  請參考<a href="google-oauth.html"
+                  >Google OAuth 圖解說明</a>。只啟用需要的
+                  API，用戶端憑證和帳號授權都存放在本機鑰匙圈。
                 </p>
               </div>
             </div>
@@ -306,10 +312,10 @@ corr doctor --account personal</code></pre>
         <li class="gs-step" id="connect" aria-labelledby="connect-title">
           <header>
             <span class="step-badge" aria-hidden="true">3</span><div>
-              <h2 id="connect-title">連線你常用的智慧體</h2>
+              <h2 id="connect-title">連接你使用的 AI 代理</h2>
               <p>
-                命令會把本機 stdio MCP
-                的絕對路徑寫入用戶端自己的設定，不建立遠端端點。之後重啟用戶端。
+                指令會把本機 stdio MCP
+                的絕對路徑寫入用戶端設定，不建立遠端端點。完成後重新啟動用戶端。
               </p>
             </div>
           </header>
@@ -385,7 +391,7 @@ corr doctor --account personal</code></pre>
               </div>
             </div>
             <div class="client">
-              <h3>任意 MCP 用戶端</h3>
+              <h3>其他 MCP 用戶端</h3>
               <div class="cmd" data-copy data-copy-label="通用 MCP 啟動命令">
                 <pre
                   tabindex="0"
@@ -399,30 +405,30 @@ corr doctor --account personal</code></pre>
         <li class="gs-step" id="first-asks" aria-labelledby="ask-title">
           <header>
             <span class="step-badge" aria-hidden="true">4</span><div>
-              <h2 id="ask-title">跨所有帳號提問</h2>
+              <h2 id="ask-title">查詢所有帳號</h2>
               <p>
-                讀取可以跨帳號但不會合併身分；寫入則先審閱，再單獨提交。
+                讀取可以跨帳號，但帳號不會合併；寫入要先確認預覽再送出。
               </p>
             </div>
           </header>
           <div class="duo">
             <div>
               <ul class="prompt-list">
-                <li>“在所有帳號裡找 Ana 發來的季度計劃郵件。”</li>
-                <li>“明天上午所有行事曆裡有什麼安排？”</li>
-                <li>“起草給 Ana 的回覆，傳送前讓我確認。”</li>
+                <li>「在所有帳號裡找 Ana 寄來、關於季度計畫的郵件。」</li>
+                <li>「明天上午我所有的行事曆裡有哪些行程？」</li>
+                <li>「草擬給 Ana 的回覆，傳送前先讓我看預覽。」</li>
               </ul>
               <p>
-                結果保留帳號和供應商；失敗路徑顯示為部分失敗。傳送時，只有與審閱過的帳號、收件人和位元組完全一致的內容才能透過
-                CLI <code>--approve</code> 或 MCP 提交
-                工具提交。核准短時且單次有效。
+                結果會標示帳號和服務；某個連線方式失敗時標示為部分失敗。傳送時，只有帳號、收件人和內容與預覽完全一致，才能用
+                CLI 的 <code>--approve</code> 或 MCP
+                的送出工具送出。核准有時效且只能用一次。
               </p>
             </div>
             <figure class="terminal">
               <figcaption class="term-bar">
                 <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
                   class="term-title"
-                >操作前審閱</span>
+                >執行前預覽</span>
               </figcaption>
               <pre
                 tabindex="0"
@@ -444,43 +450,45 @@ corr doctor --account personal</code></pre>
       </ol>
       <section aria-labelledby="next-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>繼續瞭解</p>
-          <h2 id="next-title">需要時，再深入細節。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>延伸閱讀</p>
+          <h2 id="next-title">其他說明</h2>
         </div>
         <div class="control-grid">
           <article>
             <h3>支援服務與限制</h3>
-            <p><a href="providers.html">比較每條路徑</a>的能力。</p>
+            <p><a href="providers.html">比較各連線方式</a>的功能。</p>
           </article>
           <article>
             <h3>安全模型</h3>
-            <p><a href="safety.html">瞭解認證資料、隔離和預覽→提交</a>。</p>
+            <p>
+              <a href="safety.html">憑證、帳號隔離，以及預覽後送出的流程</a>。
+            </p>
           </article>
           <article>
             <h3>全部功能</h3>
             <p>
-              <a href="features.html">瀏覽郵件、行事曆、指令碼與監控功能</a>。
+              <a href="features.html">郵件、行事曆、指令碼與監控功能</a>。
             </p>
           </article>
           <article>
             <h3>AI 代理整合</h3>
             <p>
               <a href="integrations.html"
-              >分清直接 MCP、Skill、原生封裝與實際上架狀態</a>。
+              >直接 MCP、Skill、原生套件與實際上架狀態</a>。
             </p>
           </article>
           <article>
             <h3>指令碼與 JSON</h3>
-            <p><a href="features.html#scripting">使用同一核心自動化</a>。</p>
+            <p><a href="features.html#scripting">用同一套核心功能寫自動化</a>。</p>
           </article>
         </div>
       </section>
       <section class="final-cta" aria-labelledby="gs-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>完整流程</p>
-        <h2 id="gs-cta-title">安裝、登入、連線、提問。</h2>
-        <p>其餘細節可以在需要時再讀。</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>下一步</p>
+        <h2 id="gs-cta-title">閱讀安全說明與功能列表</h2>
+        <p>其他細節可以等需要時再看。</p>
         <div class="actions centered">
-          <a class="button primary" href="safety.html">閱讀安全模型</a><a
+          <a class="button primary" href="safety.html">閱讀安全說明</a><a
             class="button secondary"
             href="features.html"
           >查看全部功能</a>
@@ -495,7 +503,7 @@ corr doctor --account personal</code></pre>
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        獨立的本機優先郵件與行事曆工具。與此處提到的廠商無隸屬或背書關係。
+        獨立開發的本機郵件與行事曆工具，與這裡提到的廠商沒有隸屬或背書關係。
       </p>
       <nav aria-label="頁尾">
         <a href="getting-started.html">開始使用</a><a href="providers.html">支援服務</a><a

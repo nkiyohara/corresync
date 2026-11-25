@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"regexp"
 	goruntime "runtime"
@@ -45,33 +46,94 @@ func graphicalExchange(app *runtime, client terminalLoginClient, account domain.
 		started = true
 		result, err := client.TerminalLogin(ctx, daemonapi.TerminalLoginInput{Account: account, SessionID: sessionID, Graphical: true, GraphicalAction: action}, app.caller())
 		if err != nil {
-			return loginui.Result{}, errors.New("remote browser login failed")
+			return loginui.Result{}, err
 		}
 		sessionID = result.SessionID
 		return loginui.Result{Status: result.Status, Frame: result.Frame}, nil
 	}
 }
 
-func runGraphicalLogin(app *runtime, client terminalLoginClient, account domain.AccountID, port int, stdio bool) error {
-	ctx, cancel := context.WithTimeout(app.context, graphicalLoginLifetime)
+func runGraphicalLogin(app *runtime, client terminalLoginClient, account domain.AccountID, port int, stdio bool, loginTimeout time.Duration) error {
+	lifetime := graphicalLoginLifetime
+	if loginTimeout > 0 && loginTimeout < lifetime {
+		lifetime = loginTimeout
+	}
+	ctx, cancel := context.WithTimeout(app.context, lifetime)
 	defer cancel()
 	exchange := graphicalExchange(app, client, account)
 	if stdio {
-		return serveGraphicalStdio(ctx, app.stdin, app.stdout, exchange)
+		// stderr travels back over SSH to the terminal that ran `--host`.
+		return serveGraphicalStdio(ctx, app.stdin, app.stdout, reportGraphicalFailures(app, exchange))
 	}
-	return serveGraphicalUI(ctx, app, exchange, port, true)
+	return serveGraphicalUI(ctx, app, exchange, port, "", lifetime)
 }
 
-func serveGraphicalUI(ctx context.Context, app *runtime, exchange loginui.Exchange, port int, remote bool) error {
-	server, err := loginui.New(ctx, port, exchange)
+// reportGraphicalFailures writes each new interaction failure to the human
+// CLI. The login page only shows fixed guidance; the terminal has the reason.
+// A failed start is returned by the command itself and is not repeated here.
+func reportGraphicalFailures(app *runtime, exchange loginui.Exchange) loginui.Exchange {
+	last := ""
+	return func(ctx context.Context, action *application.GraphicalLoginAction) (loginui.Result, error) {
+		result, err := exchange(ctx, action)
+		switch {
+		case err == nil:
+			last = ""
+		case action != nil && err.Error() != last:
+			last = err.Error()
+			_, _ = fmt.Fprintf(app.stderr, "login view: %s\n", last)
+		}
+		return result, err
+	}
+}
+
+// sshHostGuess suggests this host's name for the printed SSH command. It is
+// only a hint: the user's own SSH alias may differ.
+func sshHostGuess() string {
+	if name, err := os.Hostname(); err == nil && graphicalSSHHostPattern.MatchString(name) {
+		return name
+	}
+	return "SSH_HOST"
+}
+
+func formatLoginLifetime(lifetime time.Duration) string {
+	if lifetime < time.Minute {
+		return fmt.Sprintf("%d seconds", int(lifetime.Round(time.Second)/time.Second))
+	}
+	if minutes := int(lifetime.Round(time.Minute) / time.Minute); minutes > 1 {
+		return fmt.Sprintf("%d minutes", minutes)
+	}
+	return "1 minute"
+}
+
+// serveGraphicalUI serves the login view. sshHost is empty when the view runs
+// on the remote host itself and needs a forwarded port; otherwise it names the
+// SSH host that owns the browser and the view opens in the local browser.
+func serveGraphicalUI(ctx context.Context, app *runtime, exchange loginui.Exchange, port int, sshHost string, lifetime time.Duration) error {
+	server, err := loginui.New(ctx, port, reportGraphicalFailures(app, exchange))
 	if err != nil {
 		return err
 	}
 	// Print the capability only to the explicitly invoked human CLI, never logs.
-	if remote {
-		_, err = fmt.Fprintf(app.stdout, "On your Mac/local computer, run (replace SSH_HOST with its reachable SSH alias):\n  ssh -N -L 127.0.0.1:%d:127.0.0.1:%d SSH_HOST\nThen open on your Mac/local computer:\n  %s\nThe account session stays on this remote host. Keep this link private. Expires in 10 minutes; Ctrl-C cancels.\n", server.Port(), server.Port(), server.URL())
+	if sshHost == "" {
+		host := sshHostGuess()
+		_, err = fmt.Fprintf(app.stdout, `Sign in from a browser on your own computer:
+
+1. On your own computer, forward the login port over SSH and leave it running:
+     ssh -N -L 127.0.0.1:%d:127.0.0.1:%d %s
+   Use the name you normally pass to ssh if %s is not it.
+2. Open this link in a browser on your own computer:
+     %s
+
+The link is private and expires in %s. Ctrl-C cancels.
+The account session stays on this host.
+`, server.Port(), server.Port(), host, host, server.URL(), formatLoginLifetime(lifetime))
 	} else {
-		_, err = fmt.Fprintf(app.stdout, "Open locally: %s\nThe account session stays on the SSH host. Keep this link private. Expires in 10 minutes; Ctrl-C cancels.\n", server.URL())
+		_, err = fmt.Fprintf(app.stdout, `Opening the sign-in view in your browser. If it does not open, visit:
+  %s
+
+The link is private and expires in at most %s. Ctrl-C cancels.
+The account session stays on %s.
+`, server.URL(), formatLoginLifetime(lifetime), sshHost)
 		if err == nil {
 			openGraphicalLoginBrowser(ctx, server.URL())
 		}
@@ -82,9 +144,21 @@ func serveGraphicalUI(ctx context.Context, app *runtime, exchange loginui.Exchan
 		_ = server.Run(cancelled)
 		return err
 	}
-	err = server.Run(ctx)
-	if err == nil {
-		_, err = fmt.Fprintln(app.stdout, "Login view closed. If sign-in completed, the authenticated account remains on the remote host.")
+	if err := server.Run(ctx); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return errors.New("the login view expired before sign-in completed; run the command again")
+		}
+		return err
+	}
+	owner := "this host"
+	if sshHost != "" {
+		owner = sshHost
+	}
+	switch server.Outcome() {
+	case "authenticated":
+		_, err = fmt.Fprintf(app.stdout, "Signed in. The account session stays on %s.\n", owner)
+	case "cancelled":
+		_, err = fmt.Fprintln(app.stdout, "Login cancelled.")
 	}
 	return err
 }
@@ -152,8 +226,14 @@ func serveGraphicalStdio(ctx context.Context, reader io.Reader, writer io.Writer
 		if err := json.NewEncoder(writer).Encode(response); err != nil {
 			return errors.New("login connection closed")
 		}
-		if err != nil || result.Status == "authenticated" || result.Status == "cancelled" {
+		// A failed start or cancellation ends the helper. Any later failure is
+		// reported and the login stays open, as it does for a local view: the
+		// local side counts unreadable screens and cancels when it gives up.
+		if err != nil && (request.Action == nil || request.Action.Type == "cancel") {
 			return err
+		}
+		if err == nil && (result.Status == "authenticated" || result.Status == "cancelled") {
+			return nil
 		}
 	}
 }
@@ -167,8 +247,14 @@ func graphicalSSHArguments(host, account string) ([]string, error) {
 	if account == "" {
 		return nil, errors.New("--host requires an explicit --account on the remote host")
 	}
-	return []string{"-T", "-o", "ClearAllForwardings=yes", host, "corr auth login --web-stdio --account " + shellSingleQuote(account)}, nil
+	return []string{"-T", "-o", "ClearAllForwardings=yes", host, graphicalRemoteCommand + shellSingleQuote(account)}, nil
 }
+
+// graphicalRemoteCommand starts the remote helper. A non-interactive SSH
+// command does not read the login profile, so the usual install directories
+// are appended to PATH; a corr already on PATH still wins. The account is
+// passed as $1 and never interpolated into the script.
+const graphicalRemoteCommand = `exec sh -c 'PATH="$PATH:$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin"; exec corr auth login --web-stdio --account "$1"' corr-remote-login `
 
 func runSSHGraphicalLogin(app *runtime, host, account string, port int) error {
 	args, err := graphicalSSHArguments(host, account)
@@ -199,17 +285,21 @@ func runSSHGraphicalLogin(app *runtime, host, account string, port int) error {
 		// An interrupted exchange closes this SSH invocation; input is never retried.
 		stop := context.AfterFunc(callCtx, cancel)
 		defer stop()
+		closed := fmt.Errorf("the SSH connection to %s closed before the login answered; any message above is from that host. Check that it is reachable and that the same Corresync version is installed there", host)
 		if err := json.NewEncoder(input).Encode(graphicalWireRequest{Version: graphicalWireVersion, Action: action}); err != nil {
-			return loginui.Result{}, errors.New("SSH login connection closed")
+			return loginui.Result{}, closed
 		}
 		if !scanner.Scan() {
-			return loginui.Result{}, errors.New("SSH login connection closed; check host and matching Corresync versions")
+			return loginui.Result{}, closed
 		}
 		var response graphicalWireResponse
-		if err := json.Unmarshal(scanner.Bytes(), &response); err != nil || response.Version != graphicalWireVersion || response.Failed {
-			return loginui.Result{}, errors.New("SSH login failed; update Corresync on both computers and check the remote account")
+		if err := json.Unmarshal(scanner.Bytes(), &response); err != nil || response.Version != graphicalWireVersion {
+			return loginui.Result{}, fmt.Errorf("%s answered with a different login protocol; install the same Corresync version on both computers", host)
+		}
+		if response.Failed {
+			return loginui.Result{}, fmt.Errorf("the login on %s failed; any message above is from that host", host)
 		}
 		return response.Result, nil
 	}
-	return serveGraphicalUI(ctx, app, exchange, port, false)
+	return serveGraphicalUI(ctx, app, exchange, port, host, graphicalLoginLifetime)
 }

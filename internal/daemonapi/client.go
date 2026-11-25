@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 
 	"github.com/nkiyohara/corresync/internal/application"
 	"github.com/nkiyohara/corresync/internal/domain"
@@ -357,12 +358,22 @@ func validateTerminalLoginResult(input TerminalLoginInput, result TerminalLoginR
 	}
 	switch result.Status {
 	case "pending":
-		if !terminalSessionIDPattern.MatchString(result.SessionID) || result.View == nil ||
-			!result.CapturedAt.IsZero() {
+		if !terminalSessionIDPattern.MatchString(result.SessionID) || !result.CapturedAt.IsZero() {
 			return errors.New("daemon returned invalid pending terminal login state")
 		}
 		if input.SessionID != "" && result.SessionID != input.SessionID {
 			return errors.New("daemon returned a different terminal login session")
+		}
+		if input.Graphical {
+			// A graphical interaction carries a viewport frame, never a text
+			// projection. The frame is absent while the page is navigating.
+			if result.View != nil {
+				return errors.New("daemon returned invalid pending graphical login state")
+			}
+			return validateGraphicalLoginFrame(result.Frame)
+		}
+		if result.View == nil || result.Frame != nil {
+			return errors.New("daemon returned invalid pending terminal login state")
 		}
 		for _, control := range result.View.Controls {
 			if !terminalControlIDPattern.MatchString(control.ID) ||
@@ -372,18 +383,32 @@ func validateTerminalLoginResult(input TerminalLoginInput, result TerminalLoginR
 		}
 		return nil
 	case "authenticated":
-		if result.CapturedAt.IsZero() || result.View != nil {
+		if result.CapturedAt.IsZero() || result.View != nil || result.Frame != nil {
 			return errors.New("daemon returned invalid authenticated terminal login state")
 		}
 		return nil
 	case "cancelled":
-		if !result.CapturedAt.IsZero() || result.View != nil {
+		if !result.CapturedAt.IsZero() || result.View != nil || result.Frame != nil {
 			return errors.New("daemon returned invalid cancelled terminal login state")
 		}
 		return nil
 	default:
 		return errors.New("daemon returned an unknown terminal login status")
 	}
+}
+
+func validateGraphicalLoginFrame(frame *application.GraphicalLoginFrame) error {
+	if frame == nil {
+		return nil
+	}
+	origin, err := url.Parse(frame.Origin)
+	if len(frame.JPEG) == 0 || len(frame.JPEG) > application.MaxGraphicalLoginFrameBytes ||
+		frame.Width != application.GraphicalLoginWidth || frame.Height != application.GraphicalLoginHeight ||
+		err != nil || origin.Scheme != "https" || origin.Host == "" || origin.User != nil ||
+		frame.Origin != "https://"+origin.Host {
+		return errors.New("daemon returned an invalid graphical login frame")
+	}
+	return nil
 }
 
 func (client *Client) ListMail(ctx context.Context, input application.MailListInput, caller domain.Caller) (application.MailPage, error) {

@@ -3,17 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Gmail 및 Google 캘린더 OAuth 설정 — Corresync</title>
+    <title>Gmail·Google 캘린더용 OAuth 클라이언트 만들기 — Corresync</title>
     <meta
       name="description"
-      content="직접 관리하는 Google 데스크톱 OAuth 클라이언트로 Gmail, Google 캘린더, Meet 링크, Google Tasks를 Corresync에 연결하세요. Cloud Console 화면, API, 범위, 안전한 가져오기와 로그인을 안내합니다."
+      content="직접 만든 Google 데스크톱 OAuth 클라이언트로 Gmail, Google 캘린더, Meet 링크, Google Tasks를 Corresync에 연결하는 방법입니다. Cloud Console 화면, API, 범위, 가져오기와 로그인을 설명합니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Gmail 및 Google 캘린더 OAuth 설정 — Corresync">
+    <meta
+      property="og:title"
+      content="Gmail·Google 캘린더용 OAuth 클라이언트 만들기 — Corresync"
+    >
     <meta
       property="og:description"
-      content="내 Google Cloud 프로젝트에서 Google OAuth를 쉽고 안전하게 설정하는 화면 안내서."
+      content="본인의 Google Cloud 프로젝트에서 Corresync용 OAuth 클라이언트를 만드는 과정을 화면별로 설명합니다."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ko_KR">
@@ -30,10 +33,13 @@
       content="로컬 우선 메일 및 캘린더 CLI와 MCP 서버 Corresync."
     >
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Gmail 및 Google 캘린더 OAuth 설정 — Corresync">
+    <meta
+      name="twitter:title"
+      content="Gmail·Google 캘린더용 OAuth 클라이언트 만들기 — Corresync"
+    >
     <meta
       name="twitter:description"
-      content="직접 관리하는 데스크톱 OAuth 클라이언트로 Google을 연결하세요."
+      content="직접 만든 데스크톱 OAuth 클라이언트로 Google 계정을 Corresync에 연결하는 방법."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -55,7 +61,7 @@
     <link rel="stylesheet" href="../styles.css">
   </head>
   <body>
-    <a class="skip-link" href="#main">본문으로 이동</a><div
+    <a class="skip-link" href="#main">본문으로 건너뛰기</a><div
       class="airmail"
       aria-hidden="true"
     >
@@ -71,7 +77,7 @@
         <nav class="site-nav" aria-label="주요 메뉴">
           <a href="./">홈</a><a href="getting-started.html">시작하기</a><a
             href="providers.html"
-          >서비스</a><a href="features.html">기능</a><a href="safety.html">안전</a>
+          >지원 서비스</a><a href="features.html">기능</a><a href="safety.html">보안</a>
         </nav>
         <nav class="language-nav" aria-label="언어">
           <a href="../google-oauth.html" lang="en" hreflang="en">EN</a><a
@@ -87,18 +93,18 @@
     </header>
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>내 프로젝트, 내 동의</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>Google OAuth 설정</p>
         <h1 id="page-title">
-          Corresync의 OAuth 심사를 기다리지 않고 <em>Google을 연결하세요.</em>
+          직접 만든 OAuth 클라이언트로 <em>Google 계정 연결하기</em>
         </h1>
         <p class="lede">
-          직접 관리하는 Google Cloud 프로젝트에 ‘데스크톱 앱’ OAuth
-          클라이언트를 만듭니다. Corresync는 다운로드 파일을 검증하고
-          생성된 자격 증명을 OS 키링에 저장합니다. 로그인, MFA, 동의는
-          평소처럼 Google 브라우저 화면에서 진행됩니다.
+          본인이 관리하는 Google Cloud 프로젝트에 ‘데스크톱 앱’ OAuth
+          클라이언트를 만듭니다. Corresync는 내려받은 파일을 검사해 자격
+          증명을 OS 키링에 저장합니다. 로그인, MFA, 동의는 평소처럼 Google
+          화면에서 합니다.
         </p>
         <div class="actions">
-          <a class="button primary" href="#steps">화면을 보며 설정하기</a><a
+          <a class="button primary" href="#steps">단계별 화면 보기</a><a
             class="button secondary"
             href="providers.html#google"
           >지원 상태 보기</a>
@@ -106,32 +112,31 @@
       </section>
       <section class="evidence-banner" aria-label="Google OAuth 상태">
         <span class="status-dot" aria-hidden="true"></span><div>
-          <strong>사용자 소유 OAuth는 사용 가능하며, Corresync 관리형 OAuth는
-            비활성 상태입니다.</strong><p>
-            어댑터는 합성 계약 테스트를 통과했지만 현재 버전의 실제 환경
-            관측 기록은 없습니다. Google 프로젝트의 대상, 할당량, 경고, 조직
+          <strong>직접 만든 OAuth 클라이언트로 사용할 수 있습니다. Corresync가
+            관리하는 OAuth는 꺼져 있습니다.</strong><p>
+            어댑터는 합성 계약 테스트를 통과했지만 현재 버전의 실환경
+            확인 기록은 없습니다. Google 프로젝트의 대상, 할당량, 경고, 조직
             정책은 그대로 적용됩니다.
           </p>
         </div>
       </section>
       <section id="steps" aria-labelledby="steps-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>브라우저 화면 네 개</p>
-          <h2 id="steps-title">필요한 Google 기능만 최소한으로 설정합니다.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>설정 화면 네 개</p>
+          <h2 id="steps-title">필요한 항목만 설정하는 Google 프로젝트</h2>
           <p>
-            아래 화면은 실제 계정 캡처가 아닌 주석이 달린 안내도입니다.
-            Google이 메뉴 이름을 바꾸더라도 선택할 대상과 보안 경계는
-            같습니다.
+            아래 그림은 실제 계정 캡처가 아닌 안내도입니다. Google이 메뉴
+            이름을 바꿔도 찾아갈 화면과 선택할 항목은 같습니다.
           </p>
         </div>
         <div class="browser-guide">
           <article class="browser-step">
             <div class="browser-step-copy">
               <p class="chip">01 · 프로젝트</p>
-              <h3>내가 소유한 프로젝트 만들기 또는 선택하기</h3>
+              <h3>본인 소유 프로젝트 만들기 또는 선택</h3>
               <p>
-                Google Cloud Console 상단의 프로젝트 선택기에서 만들거나
-                선택합니다. 다른 앱의 클라이언트나 자격 증명을 재사용하지
+                Google Cloud Console 위쪽의 프로젝트 선택 메뉴에서 만들거나
+                고릅니다. 다른 앱의 클라이언트나 자격 증명은 다시 쓰지
                 마세요.
               </p>
             </div>
@@ -145,7 +150,7 @@
                 </div>
                 <div class="browser-action">새 프로젝트</div>
                 <figcaption class="browser-note">
-                  동의 화면의 주체와 할당량은 이 프로젝트에 속합니다.
+                  동의 화면의 앱 정보와 할당량은 이 프로젝트에 속합니다.
                 </figcaption>
               </div>
             </figure>
@@ -153,10 +158,10 @@
           <article class="browser-step">
             <div class="browser-step-copy">
               <p class="chip">02 · API</p>
-              <h3>선택한 서비스만 활성화하기</h3>
+              <h3>쓸 서비스의 API만 활성화</h3>
               <p>
-                메일에는 Gmail API, 캘린더와 Meet 링크에는 Google Calendar API, 할
-                일을 선택했을 때만 Google Tasks API를 활성화합니다.
+                메일에는 Gmail API, 캘린더와 Meet 링크에는 Google Calendar API를, 할
+                일을 쓸 때만 Google Tasks API를 활성화합니다.
               </p>
             </div>
             <figure class="browser-shot">
@@ -177,12 +182,11 @@
           <article class="browser-step">
             <div class="browser-step-copy">
               <p class="chip">03 · 대상</p>
-              <h3>대상과 범위를 사실대로 선택하기</h3>
+              <h3>대상(Audience)과 범위 선택</h3>
               <p>
-                자격을 갖춘 하나의 Workspace 조직 안에서만 사용할 때 Internal을
-                선택하고, 그 밖에는 External을 선택합니다. Testing 중에는 연결할
-                계정을 테스트 사용자로 추가하세요. 테스트 승인은 7일 뒤
-                만료됩니다.
+                조건을 갖춘 Workspace 조직 하나 안에서만 쓸 때는 Internal을, 그
+                밖에는 External을 고릅니다. Testing 중에는 연결할 계정을 테스트
+                사용자로 추가하세요. 테스트 승인은 7일 뒤 만료됩니다.
               </p>
             </div>
             <figure class="browser-shot">
@@ -203,11 +207,11 @@
           <article class="browser-step">
             <div class="browser-step-copy">
               <p class="chip">04 · 클라이언트</p>
-              <h3>데스크톱 앱을 만들고 JSON 다운로드하기</h3>
+              <h3>데스크톱 앱 클라이언트를 만들고 JSON 내려받기</h3>
               <p>
-                Clients에서 ‘데스크톱 앱’을 선택하세요. 웹 애플리케이션,
-                서비스 계정, API 키가 아닙니다. 다운로드한 JSON은 비공개로
-                보관합니다.
+                Clients에서 ‘데스크톱 앱’을 고르세요. 웹 애플리케이션,
+                서비스 계정, API 키가 아닙니다. 내려받은 JSON은 비공개로
+                두세요.
               </p>
             </div>
             <figure class="browser-shot">
@@ -230,15 +234,15 @@
       </section>
       <section aria-labelledby="connect-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>안전한 로컬 전달</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>Corresync로 가져오기</p>
           <h2 id="connect-title">
-            실수하기 쉬운 부분은 안내형 설정에 맡기세요.
+            안내 설정으로 클라이언트 가져오기
           </h2>
           <p>
-            <code>corr setup</code>을 실행하고 Google과 사용할 서비스를 고른 뒤
+            <code>corr setup</code>을 실행하고 Google과 사용할 서비스를 고른 다음
             ‘다운로드한 클라이언트 JSON 가져오기’를 선택합니다.
-            클라이언트 ID, 루프백 URI, 범위, 서로 분리된 키링 핸들을
-            검토합니다. 계정을 추가하는 단계에서는 로그인하지 않습니다.
+            클라이언트 ID, 루프백 URI, 범위, 분리된 키링 핸들을 확인합니다.
+            계정 추가 단계에서는 로그인하지 않습니다.
           </p>
         </div>
         <pre class="oauth-command" tabindex="0"><code>$ corr setup
@@ -246,49 +250,49 @@ $ corr auth login --account personal
 $ corr doctor --account personal</code></pre>
         <p class="fine-print">
           스크립트에서는 먼저 <code>corr auth google-client import FILE --key
-            HANDLE</code>을 실행하세요. 생성된 자격 증명을 TOML, 명령 인수, MCP,
-          이슈, 지원 출력에 붙여 넣지 마세요. Corresync는 입력한 다운로드
-          파일을 임의로 삭제하지 않습니다.
+            HANDLE</code>을 실행하세요. 자격 증명을 TOML, 명령 인수, MCP, 이슈,
+          지원 출력에 붙여 넣지 마세요. Corresync는 내려받은 파일을 삭제하지
+          않습니다.
         </p>
       </section>
       <section class="honest-edges" aria-labelledby="choices-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>게시 상태를 바꾸기 전에</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>게시 상태와 Google 정책</p>
           <h2 id="choices-title">
-            개인 사용은 심사가 필요 없을 수 있지만 제한은 남습니다.
+            개인 용도라면 앱 인증이 필요 없을 수 있지만 제한은 있습니다
           </h2>
           <p class="fine-print">
-            Google은 현재 100명 미만의 개인 사용과 자격을 갖춘 내부 사용을
-            검증이 의무가 아닌 사례로 안내합니다. 미확인 앱 경고, 사용자
-            수 제한, 제한 범위 정책, 조직 통제, 최신 약관은 별도로
-            적용됩니다.
+            Google은 현재 사용자 100명 미만의 개인 용도와 조건을 갖춘 내부
+            용도를 앱 인증이 필수가 아닌 경우로 안내합니다. 미확인 앱
+            경고, 사용자 수 제한, 제한 범위 정책, 조직 통제, 최신 약관은
+            따로 적용됩니다.
           </p>
         </div>
         <ul>
           <li>
-            Testing에서는 등록한 테스트 사용자만 사용할 수 있고 승인은 7일
-            후 만료됩니다.
+            Testing에서는 등록한 테스트 사용자만 쓸 수 있고 승인은 7일 뒤
+            만료됩니다.
           </li>
           <li>
-            Workspace 관리자는 정확한 클라이언트 ID와 범위를 차단하거나 검토
+            Workspace 관리자는 특정 클라이언트 ID와 범위를 차단하거나 검토
             대상으로 지정할 수 있습니다.
           </li>
           <li>
-            정책을 우회하려고 서비스 계정, 도메인 전체 위임, 약한 보안
-            설정을 사용하지 마세요.
+            정책을 피하려고 서비스 계정, 도메인 전체 위임, 약한 보안
+            설정을 쓰지 마세요.
           </li>
           <li>
-            MCP는 인증된 세션을 사용할 수 있지만 Google OAuth를 시작할 수
+            MCP는 이미 인증된 세션을 쓸 수는 있지만 Google OAuth를 시작할 수는
             없습니다.
           </li>
         </ul>
       </section>
       <section class="final-cta" aria-labelledby="oauth-cta">
-        <p class="eyebrow"><span aria-hidden="true"></span>준비가 되면</p>
-        <h2 id="oauth-cta">클라이언트를 만들고, 나머지는 로컬에 두세요.</h2>
+        <p class="eyebrow"><span aria-hidden="true"></span>다음 단계</p>
+        <h2 id="oauth-cta">클라이언트를 만든 뒤 Corresync 설치하기</h2>
         <p>
-          Google 로그인은 Google 브라우저 화면에 남고 메일, 캘린더, 할 일,
-          자격 증명은 Corresync 서버를 거치지 않습니다.
+          Google 로그인은 브라우저의 Google 화면에서 하고, 메일, 캘린더, 할
+          일, 자격 증명은 Corresync 서버를 거치지 않습니다.
         </p>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html">Corresync 설치하기</a><a
@@ -306,17 +310,17 @@ $ corr doctor --account personal</code></pre>
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        독립적인 로컬 우선 도구이며 Google의 제휴나 보증을 받지 않습니다.
+        독립적인 로컬 도구이며 Google과 제휴하거나 보증받지 않았습니다.
       </p>
       <nav aria-label="바닥글">
-        <a href="getting-started.html">시작하기</a><a href="providers.html">서비스</a><a
-          href="features.html"
-        >기능</a><a href="safety.html">안전</a><a href="privacy.html">개인정보 보호</a><a
-          href="terms.html"
-        >이용 약관</a><a href="https://github.com/nkiyohara/corresync">GitHub 소스</a><a
-          href="https://github.com/nkiyohara/corresync/security/advisories/new"
-        >보안 신고</a><a href="https://github.com/nkiyohara/corresync/releases">릴리스</a><a
-          href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
+        <a href="getting-started.html">시작하기</a><a href="providers.html"
+        >지원 서비스</a><a href="features.html">기능</a><a href="safety.html">보안</a><a
+          href="privacy.html"
+        >개인정보</a><a href="terms.html">이용 약관</a><a
+          href="https://github.com/nkiyohara/corresync"
+        >소스 코드</a><a href="https://github.com/nkiyohara/corresync/security/advisories/new"
+        >보안 문제 신고</a><a href="https://github.com/nkiyohara/corresync/releases"
+        >릴리스</a><a href="https://github.com/nkiyohara/corresync/blob/main/LICENSE"
         >Apache-2.0</a>
       </nav>
     </footer>

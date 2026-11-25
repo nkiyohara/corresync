@@ -11,8 +11,11 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/remote"
 
@@ -119,7 +122,30 @@ func Launch(parent context.Context, options Options) (*Browser, error) {
 		_ = instance.Close()
 		return nil, fmt.Errorf("navigate to Outlook Web: %w", err)
 	}
+	closeRestoredPages(browserContext)
 	return instance, nil
+}
+
+// closeRestoredPages closes the tabs Chromium reopens from the profile's
+// previous run. They would otherwise pile up on every launch of a reused
+// profile and can leave the owned tab hidden behind them. Failures are left
+// alone: a stray tab is not worth failing a launch.
+func closeRestoredPages(browserContext context.Context) {
+	owned := chromedp.FromContext(browserContext)
+	if owned == nil || owned.Target == nil || owned.Browser == nil {
+		return
+	}
+	bounded, cancel := context.WithTimeout(browserContext, 3*time.Second)
+	defer cancel()
+	pages, err := chromedp.Targets(bounded)
+	if err != nil {
+		return
+	}
+	for _, info := range pages {
+		if info.Type == "page" && info.TargetID != owned.Target.TargetID {
+			_, _ = cdp.Call(bounded, owned.Browser, target.CloseTarget, target.CloseTargetParams{TargetID: info.TargetID})
+		}
+	}
 }
 
 func allocatorOptions(executable, profileDirectory string, headless bool) []chromedp.ExecAllocatorOption {

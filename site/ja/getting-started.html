@@ -10,7 +10,10 @@
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Corresyncのはじめ方 — 4ステップで準備完了">
+    <meta
+      property="og:title"
+      content="Corresyncのはじめ方 — インストールから質問まで4ステップ"
+    >
     <meta
       property="og:description"
       content="インストール、サインイン、MCPクライアントへの接続、最初の質問までを順番に説明します。"
@@ -31,7 +34,10 @@
       content="Corresyncのロゴと製品概要を示す英語のメッセージ"
     >
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Corresyncのはじめ方 — 4ステップで準備完了">
+    <meta
+      name="twitter:title"
+      content="Corresyncのはじめ方 — インストールから質問まで4ステップ"
+    >
     <meta
       name="twitter:description"
       content="インストールから最初の質問までを順番に説明します。"
@@ -98,16 +104,15 @@
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>スタートガイド</p>
         <h1 id="page-title">
-          インストールから最初の回答まで、<em>迷わない4ステップ。</em>
+          インストールから最初の質問まで<em>4つの手順</em>
         </h1>
         <p class="lede">
           <code
-          >corr</code>を入れ、仕事用や個人用のアカウントを追加し、ローカルMCPをエージェントに登録します。
-          横断検索してもアカウントの本人性と認可は別々です。Outlook
-          Webのサインインはブラウザ、APIや標準経路の認可情報はOSキーチェーンが管理し、MCPは端末上のstdioだけで動きます。
+          >corr</code>をインストールし、仕事用や個人用のアカウントを追加して、ローカルのMCPサーバーをエージェントに登録します。複数のアカウントをまとめて検索しても、サインインと権限はアカウントごとに別です。Outlook
+          Webのサインインはブラウザが、APIやオープン標準で使う認可情報はOSキーチェーンが管理します。MCPはこのコンピューター上のstdioだけで動きます。
         </p>
         <div class="actions">
-          <a class="button primary" href="#step-install">ステップ1から始める</a><a
+          <a class="button primary" href="#step-install">手順1から始める</a><a
             class="button secondary"
             href="providers.html#check"
           >先に対応状況を確認</a>
@@ -120,7 +125,7 @@
             <span class="step-badge" aria-hidden="true">1</span><div>
               <h2 id="install-title"><code>corr</code>をインストール</h2>
               <p>
-                ここではソフトウェアを入れるだけです。アカウント追加もサインインも、まだ行いません。
+                この手順ではcorrコマンドを入れるだけです。アカウントの追加やサインインはまだ行いません。
               </p>
             </div>
           </header>
@@ -139,9 +144,9 @@
                 ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
               </div>
               <p class="block-note">
-                現在のユーザー向けに検証済み安定版版を入れます。実行前に<a
+                検証済みの安定版を現在のユーザー向けにインストールします。実行前に<a
                   href="../install.sh"
-                >スクリプト本体</a>も確認できます。
+                >スクリプト</a>の中身を確認できます。
               </p>
             </div>
             <div class="install-block">
@@ -158,9 +163,9 @@
                 ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
               </div>
               <p class="block-note">
-                管理者権限を使わず、ユーザーの<code
-                >PATH</code>だけを更新します。<a href="../install.ps1"
-                >スクリプト本体</a>を先に読めます。
+                管理者権限は使わず、ユーザーの<code
+                >PATH</code>だけを更新します。実行前に<a href="../install.ps1"
+                >スクリプト</a>の中身を確認できます。
               </p>
             </div>
           </div>
@@ -170,8 +175,12 @@
             aria-labelledby="other-install-title"
           >
             <div class="install-alternatives-head">
-              <h3 id="other-install-title">パッケージマネージャーから入れる</h3>
-              <p>更新と削除も同じツールに任せられます。</p>
+              <h3 id="other-install-title">
+                パッケージマネージャーでインストール
+              </h3>
+              <p>
+                この場合、更新と削除もパッケージマネージャーで行います。
+              </p>
             </div>
             <div class="install-grid">
               <div class="install-block">
@@ -187,7 +196,7 @@
                     aria-labelledby="gs-winget"
                   ><code>winget install --id nkiyohara.Corresync --exact</code></pre>
                 </div>
-                <p class="block-note">Microsoft審査済みのmanifestを使います。</p>
+                <p class="block-note">Microsoftの審査を通ったmanifestを使います。</p>
               </div>
               <div class="install-block">
                 <p class="os-label" id="gs-homebrew">macOS · Linux · Homebrew</p>
@@ -203,7 +212,7 @@
                   ><code>brew install nkiyohara/corresync/corresync</code></pre>
                 </div>
                 <p class="block-note">
-                  最新の安定版タグからHomebrewがビルドします。
+                  Homebrewが最新の安定版タグのソースからビルドします。
                 </p>
               </div>
               <div class="install-block">
@@ -216,13 +225,15 @@
                   ><code>scoop bucket add corresync https://github.com/nkiyohara/scoop-corresync
 scoop install corresync/corresync</code></pre>
                 </div>
-                <p class="block-note">チェックサム固定済みのbucketを使います。</p>
+                <p class="block-note">
+                  チェックサムを固定したCorresync用のbucketを使います。
+                </p>
               </div>
             </div>
             <p class="install-alternatives-note">
               Linux向け<code>.deb</code>、<code>.rpm</code>、<code
-              >.apk</code>、直接配布アーカイブ、チェックサム、Sigstore
-              来歴、Claude Desktop用<code>.mcpb</code>は<a
+              >.apk</code>パッケージ、アーカイブ、チェックサム、Sigstoreの来歴情報、Claude
+              Desktop用の<code>.mcpb</code>は<a
                 href="https://github.com/nkiyohara/corresync/releases/latest"
               >最新リリース</a>にあります。
             </p>
@@ -239,7 +250,7 @@ scoop install corresync/corresync</code></pre>
           </div>
           <div class="install-block verify-block">
             <p class="os-label" id="gs-updates">
-              自動更新 · 既存の設定で有効にする
+              自動更新 · 既存の設定で有効にする場合
             </p>
             <div
               class="cmd"
@@ -253,12 +264,14 @@ scoop install corresync/corresync</code></pre>
               ><code>corr config set updates.auto_install true</code></pre>
             </div>
             <p class="block-note">
-              0.9.2から、新規設定では署名・検証済みの自動更新が有効です。既存設定は維持され、このコマンドで有効化できます。MCPや機械可読出力からは更新を開始しません。無効化は<code
-              >corr config set updates.auto_install false</code>。
+              0.9.2以降、新しく作った設定では、署名を検証した自動更新が有効になります。既存の設定は変わらないので、有効にする場合はこのコマンドを実行してください。MCPや機械可読出力から更新が始まることはありません。無効にするには<code
+              >corr config set updates.auto_install false</code>を実行します。
             </p>
           </div>
           <div class="install-block verify-block">
-            <p class="os-label" id="gs-preview">任意 · 署名済みプレビューを使う</p>
+            <p class="os-label" id="gs-preview">
+              任意 · 署名済みのプレビュー版を使う場合
+            </p>
             <div class="cmd" data-copy data-copy-label="previewリリースを選ぶコマンド">
               <pre
                 tabindex="0"
@@ -268,13 +281,14 @@ scoop install corresync/corresync</code></pre>
 corr update</code></pre>
             </div>
             <p class="block-note">
-              既定は安定版です。戻すときは<code>corr config set updates.channel
-                stable</code>。自動downgradeはしません。
+              既定は安定版です。安定版に戻すには<code>corr config set
+                updates.channel
+                stable</code>を実行します。自動でダウングレードすることはありません。
             </p>
           </div>
           <p class="step-foot">
-            macOS版はDeveloper ID署名とApple
-            notarization済みです。Windows版はまだAuthenticode未署名なので、警告を無視せずチェックサムと署名済み来歴を確認してください。
+            macOS版はDeveloper
+            IDで署名し、Appleの公証（notarization）を受けています。Windows版はまだAuthenticodeで署名していません。警告を無視して実行せず、チェックサムと署名付きの来歴情報を確認してください。
           </p>
         </li>
 
@@ -283,13 +297,13 @@ corr update</code></pre>
             <span class="step-badge" aria-hidden="true">2</span><div>
               <h2 id="signin-title">メールとカレンダーのアカウントを設定</h2>
               <p>
-                はじめに実行するのは1コマンドだけです。ガイドがメールアドレスを尋ね、認証情報なしでメールとカレンダーの候補を探し、内容を確認してからアカウントを追加します。
+                実行するコマンドは1つです。メールアドレスを入力すると、認証情報を使わずにメールとカレンダーのサービスを調べ、最後に確認画面を出してからアカウントを追加します。
               </p>
               <p>
-                サインインや外部認証情報へのアクセスは、追加後に改めて選ぶ別の操作です。接続確認や2つ目のアカウント追加も続けて案内します。<code
+                サインインや外部の認証情報へのアクセスは、追加した後に別の操作として選びます。続けて接続の確認や2つ目のアカウントの追加もできます。<code
                 >corr
-                  settings</code>からも同じ画面を開けます。スクリーンリーダーでは<code
-                >CORRESYNC_ACCESSIBLE=true</code>を指定すると行単位で操作できます。入力途中で安全に戻るには<code
+                  settings</code>でも同じ画面を開けます。スクリーンリーダーを使う場合は<code
+                >CORRESYNC_ACCESSIBLE=true</code>を設定すると、1行ずつの対話形式になります。入力の途中でやめるには<code
                 >:cancel</code>と入力してください。
               </p>
             </div>
@@ -298,24 +312,22 @@ corr update</code></pre>
             <div>
               <p>
                 Outlook
-                Webはプロバイダー所有のブラウザでサインインできます。Microsoft
-                Graph、JMAP、IMAP/SMTP、CalDAVも、プロバイダーが対応していて必要な経路や認証情報の保管先を明示的に選んだ場合に利用できます。候補検索だけでブラウザやキーチェーンを開いたり、管理者の同意を求めたりすることはありません。
+                Webは、プロバイダーのサインイン画面をブラウザで開いてサインインします。Microsoft
+                Graph、JMAP、IMAP/SMTP、CalDAVは、プロバイダーが対応していて、必要な接続方法や認証情報の保存先を自分で選んだ場合に使えます。サービスを調べる段階で、ブラウザを開いたり、キーチェーンを読んだり、管理者の同意を求めたりすることはありません。
               </p>
               <p>
-                <strong>iCloudを使う場合：</strong><code>corr setup</code>は<code
+                <strong>iCloudの場合：</strong><code>corr setup</code>は、<code
                 >@icloud.com</code>、<code>@me.com</code>、<code
-                >@mac.com</code>、または必要なサービス記録がすべて確認できたカスタムiCloudドメインから、メールとカレンダーをまとめて提案します。アカウント追加後にAppleの2ファクタ認証とアプリ用パスワードを案内し、パスワードはOSの資格情報画面が直接受け取ります。Corresyncには渡りません。
+                >@mac.com</code>のアドレスと、必要なサービスレコードがすべて確認できたカスタムiCloudドメインについて、iCloudのメールとカレンダーをまとめて提案します。アカウントを追加した後、Appleの2ファクタ認証とアプリ用パスワードについて説明します。パスワードはOSの入力画面に直接入力するので、Corresyncには渡りません。
               </p>
               <p>
-                <strong>Googleを使う場合：</strong>自分で管理するGoogle
-                Cloudプロジェクトに
-                デスクトップOAuthクライアントを作ります。ガイド付き設定がダウンロードしたJSONを検証し、
-                生成された認証情報をOSキーチェーンへ保存します。
+                <strong>Googleの場合：</strong>自分で管理するGoogle
+                CloudプロジェクトでデスクトップOAuthクライアントを作ります。ガイド付き設定が、ダウンロードしたJSONを検証してから、その認証情報をOSキーチェーンに保存します。
               </p>
               <p class="step-links">
-                <a href="providers.html#check">アドレスを送らずに対応確認</a> · <a
-                  href="safety.html"
-                >認証の持ち主を確認</a>
+                <a href="providers.html#check"
+                >アドレスを送信せずに対応状況を確認</a> · <a href="safety.html"
+                >サインインの仕組み</a>
               </p>
             </div>
             <div class="stack">
@@ -333,11 +345,11 @@ corr update</code></pre>
                   ><code>corr setup</code></pre>
                 </div>
                 <p class="block-note">
-                  現在のローカル状態を確認し、必要ならシェル補完を追加して、未完了のところから再開します。アカウント経路は保存前に確認でき、認証は別の操作です。検出した複数のエージェントを選び、ローカル設定の変更内容を一度確認してから、接続先ごとに適用・検証します。
+                  ローカルの設定状況を確認し、必要ならシェル補完を追加して、終わっていない手順から再開します。アカウントの接続方法は保存前に確認でき、認証は別の操作です。見つかったエージェントの中から複数を選ぶと、ローカル設定の変更内容をまとめて確認した後、エージェントごとに適用して動作を確認します。
                 </p>
               </div>
               <div class="install-block">
-                <p class="os-label">上級者向け・スクリプトでの設定</p>
+                <p class="os-label">スクリプトで設定する場合</p>
                 <div
                   class="cmd"
                   data-copy
@@ -348,22 +360,23 @@ corr auth login --account personal
 corr doctor --account personal</code></pre>
                 </div>
                 <p class="block-note">
-                  従来のコマンドは非対話のままなので、自動化にも利用できます。
+                  これらのコマンドは対話なしで動くので、スクリプトから使えます。
                 </p>
               </div>
               <div class="install-block">
-                <p class="os-label">iCloudメール＋カレンダー · 現在利用可能</p>
+                <p class="os-label">iCloudメール＋カレンダー · 利用可能</p>
                 <p class="block-note">
-                  ガイド付きプリセットで両方のサービスを追加し、確認済みの認証情報ハンドルを共有できます。本文を読まず、最後に認証できた状態も確認できます。接続前にApple公式の<a
+                  ガイド付きのプリセットで両方のサービスを追加し、確認済みの認証情報ハンドルを1つ共有できます。最後に認証できた状態は、メールの内容を読まずに確認できます。接続する前にAppleの<a
                     href="https://support.apple.com/ja-jp/102654"
-                  >アプリ用パスワードの案内</a>を確認してください。
+                  >アプリ用パスワードの説明</a>を読んでください。
                 </p>
               </div>
               <div class="install-block">
                 <p class="os-label">Gmail · Googleカレンダー · Google Tasks</p>
                 <p class="block-note">
-                  <a href="google-oauth.html">Google OAuthの画面付きガイド</a>で、
-                  必要なAPIだけを選び、認証情報と認可を端末の外へ出さずに設定できます。
+                  <a href="google-oauth.html"
+                  >Google
+                    OAuthの設定ガイド</a>（画面付き）に沿って、デスクトップクライアントを作り、必要なサービスだけを選びます。クライアントの認証情報とアカウントの認可はOSキーチェーンに保存されます。
                 </p>
               </div>
             </div>
@@ -373,10 +386,10 @@ corr doctor --account personal</code></pre>
         <li class="gs-step" id="connect" aria-labelledby="connect-title">
           <header>
             <span class="step-badge" aria-hidden="true">3</span><div>
-              <h2 id="connect-title">いつものエージェントにつなぐ</h2>
+              <h2 id="connect-title">エージェントに接続</h2>
               <p>
-                クライアント自身の設定に、ローカルstdio
-                MCPの絶対パスを登録します。遠隔エンドポイントは作りません。登録後にクライアントを再起動してください。
+                クライアントの設定ファイルに、ローカルのstdio
+                MCPサーバーを絶対パスで登録します。リモートのエンドポイントは作りません。登録したらクライアントを再起動してください。
               </p>
             </div>
           </header>
@@ -390,7 +403,7 @@ corr doctor --account personal</code></pre>
                   aria-label="Codex設定コマンド"
                 ><code>corr mcp setup codex</code></pre>
               </div>
-              <p><code>codex mcp get corresync</code>で確認。</p>
+              <p><code>codex mcp get corresync</code>で確認できます。</p>
             </div>
             <div class="client">
               <h3>Claude Code</h3>
@@ -401,7 +414,7 @@ corr doctor --account personal</code></pre>
                   aria-label="Claude Code設定コマンド"
                 ><code>corr mcp setup claude-code</code></pre>
               </div>
-              <p>ユーザー単位・プロジェクト単位に対応。</p>
+              <p>ユーザー単位かプロジェクト単位で登録できます。</p>
             </div>
             <div class="client">
               <h3>GitHub Copilot CLI</h3>
@@ -412,7 +425,7 @@ corr doctor --account personal</code></pre>
                   aria-label="GitHub Copilot CLI設定コマンド"
                 ><code>corr mcp setup github-copilot</code></pre>
               </div>
-              <p><code>copilot mcp get corresync</code>で確認。</p>
+              <p><code>copilot mcp get corresync</code>で確認できます。</p>
             </div>
             <div class="client">
               <h3>Gemini CLI</h3>
@@ -423,7 +436,7 @@ corr doctor --account personal</code></pre>
                   aria-label="Gemini CLI設定コマンド"
                 ><code>corr mcp setup gemini-cli</code></pre>
               </div>
-              <p><code>gemini mcp list</code>で確認。</p>
+              <p><code>gemini mcp list</code>で確認できます。</p>
             </div>
             <div class="client">
               <h3>Qwen Code</h3>
@@ -434,7 +447,7 @@ corr doctor --account personal</code></pre>
                   aria-label="Qwen Code設定コマンド"
                 ><code>corr mcp setup qwen-code</code></pre>
               </div>
-              <p><code>qwen mcp list</code>で確認。</p>
+              <p><code>qwen mcp list</code>で確認できます。</p>
             </div>
             <div class="client">
               <h3>Qoder</h3>
@@ -445,7 +458,7 @@ corr doctor --account personal</code></pre>
                   aria-label="Qoder設定コマンド"
                 ><code>corr mcp setup qoder</code></pre>
               </div>
-              <p><code>qodercli mcp list</code>で確認。</p>
+              <p><code>qodercli mcp list</code>で確認できます。</p>
             </div>
             <div class="client">
               <h3>Kimi Code CLI</h3>
@@ -456,7 +469,7 @@ corr doctor --account personal</code></pre>
                   aria-label="Kimi Code設定コマンド"
                 ><code>corr mcp config kimi-code</code></pre>
               </div>
-              <p>追加するMCP設定を表示します。</p>
+              <p>KimiのMCP設定に追加する内容を表示します。</p>
             </div>
             <div class="client">
               <h3>その他のMCPクライアント</h3>
@@ -467,11 +480,13 @@ corr doctor --account personal</code></pre>
                   aria-label="汎用MCP起動コマンド"
                 ><code>corr mcp serve</code></pre>
               </div>
-              <p>汎用stdio 通信経路として登録できます。</p>
+              <p>
+                stdioで通信するコマンドとして、任意のクライアントに登録できます。
+              </p>
             </div>
           </div>
           <p class="step-foot">
-            どのクライアントも同じ型付きツールと同じポリシーチェックを使います。CodexとClaude
+            どのクライアントからも同じツールを使い、同じポリシーチェックがかかります。CodexとClaude
             Code向けにはPluginとAgent Skillも同梱しています。
           </p>
         </li>
@@ -479,9 +494,9 @@ corr doctor --account personal</code></pre>
         <li class="gs-step" id="first-asks" aria-labelledby="ask-title">
           <header>
             <span class="step-badge" aria-hidden="true">4</span><div>
-              <h2 id="ask-title">複数アカウントをまたいで質問</h2>
+              <h2 id="ask-title">複数アカウントにまたがる質問</h2>
               <p>
-                読み取りはアカウントを混ぜずに横断できます。書き込みは、必ず別の確認段階を通ります。
+                読み取りは複数のアカウントにまたがって実行でき、結果はアカウントごとに区別されます。書き込みには必ず確認の手順が入ります。
               </p>
             </div>
           </header>
@@ -497,11 +512,11 @@ corr doctor --account personal</code></pre>
                 <li>「Anaへの返信を下書きして。送る前に自分で確認する」</li>
               </ul>
               <p>
-                結果にはアカウントとプロバイダーが残ります。一部の経路が失敗しても、成功分を隠さず部分失敗として示します。
+                結果にはアカウントとプロバイダーが表示されます。一部のアカウントで失敗した場合は、成功した分の結果と合わせて、失敗したことを示します。
               </p>
               <p>
-                送信では、正確な本文を含むレビューが先に返ります。同じアカウント・宛先・バイト列に一致する操作だけを、CLIの<code
-                >--approve</code>またはMCPの実行ツールで確定できます。承認は短時間・一回限りです。
+                送信を頼むと、まず送信する内容そのものを示す確認画面が返ります。アカウント、宛先、本文のバイト列が一致する場合だけ、CLIの<code
+                >--approve</code>かMCPの確定用ツールで送信できます。承認の有効期限は短く、1回しか使えません。
               </p>
             </div>
             <figure class="terminal">
@@ -535,63 +550,67 @@ corr doctor --account personal</code></pre>
 
       <section aria-labelledby="next-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>次に読むなら</p>
-          <h2 id="next-title">必要になったところから、詳しく。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>関連ページ</p>
+          <h2 id="next-title">詳しい情報</h2>
         </div>
         <div class="control-grid">
           <article>
             <h3>対応サービスと制限</h3>
             <p>
-              経路ごとに何ができるかを確認。<a href="providers.html"
-              >対応サービスを見る</a>。
+              接続方法ごとにできることとできないこと。<a href="providers.html"
+              >対応サービス</a>
             </p>
           </article>
           <article>
-            <h3>安全設計</h3>
+            <h3>安全性</h3>
             <p>
-              認証情報、分離、プレビュー→実行を確認。<a href="safety.html"
-              >安全性を読む</a>。
+              認証情報の扱い、アカウントの分離、送信前の確認の仕組み。<a
+                href="safety.html"
+              >安全性</a>
             </p>
           </article>
           <article>
             <h3>できること</h3>
             <p>
-              メール、予定、agent、script、モニタリングを一覧。<a
+              メール、予定、エージェント、スクリプト、モニタリングの機能一覧。<a
                 href="features.html"
-              >機能を見る</a>。
+              >できること</a>
             </p>
           </article>
           <article>
             <h3>AIエージェント連携</h3>
             <p>
-              MCP直接設定、Skill、専用パッケージ、公式掲載を区別して確認。<a
+              MCPの直接設定、Skill、専用パッケージ、公式マーケットへの掲載状況。<a
                 href="integrations.html"
-              >正確な連携一覧を見る</a>。
+              >連携の一覧</a>
             </p>
           </article>
           <article>
             <h3>スクリプトとJSON</h3>
             <p>
-              同じコアとポリシーで自動化。<a href="features.html#scripting"
-              >スクリプト利用を見る</a>。
+              エージェントと同じ処理とポリシーチェックを使った自動化。<a
+                href="features.html#scripting"
+              >スクリプトでの利用</a>
             </p>
           </article>
         </div>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span><p>
             <strong
-            >機密性の高いアカウントをつなぐ前に：</strong>各経路には決定的な合成データによる契約テストがあります。合成テストだけの経路は、実環境で確認済みとは表現しません。
-          </p><a href="features.html#evidence">根拠の読み方<span aria-hidden="true">
+            >重要なアカウントを接続する前に：</strong>どの接続方法にも、合成データを使った決定的な契約テストがあります。合成データでしかテストしていない接続方法を、実環境で確認済みとは書きません。
+          </p><a href="features.html#evidence">テストと確認状況について<span
+              aria-hidden="true"
+            >
               →</span></a>
         </div>
       </section>
 
       <section class="final-cta" aria-labelledby="gs-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>操作はこれだけ</p>
-        <h2 id="gs-cta-title">入れる。サインインする。つなぐ。質問する。</h2>
-        <p>細かな仕様は、必要になったときに読めます。</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>まとめ</p>
+        <h2 id="gs-cta-title">インストール、サインイン、接続、質問の4手順</h2>
+        <p>細かい仕様は必要になったときに読めば十分です。</p>
         <div class="actions centered">
-          <a class="button primary" href="safety.html">安全設計を読む</a><a
+          <a class="button primary" href="safety.html">安全性について読む</a><a
             class="button secondary"
             href="features.html"
           >できることを見る</a>

@@ -39,9 +39,12 @@ cancellation screens remain visible and human-owned. Ordinary CLI and MCP
 reads never open or focus this flow.
 
 On Linux, visible login checks for an available X11 or Wayland session before
-starting Chromium. If both `DISPLAY` and `WAYLAND_DISPLAY` are unset, Corresync
-stops before launching the browser and prints the exact account-specific
-`--terminal` command to use over SSH.
+starting Chromium. If both `DISPLAY` and `WAYLAND_DISPLAY` are unset, the same
+command runs the browser headless and shows its sign-in page through a login
+view that you open from your own computer over SSH port forwarding. See
+[signing in on a host without a display](remote-login.md). `--json` has no such
+fallback and stops with an explanation; `--terminal` remains the text-only
+alternative.
 
 The browser profile is isolated by stable account ID, not mutable alias. Shared
 or delegated mailbox routing reuses the signed-in user session and grants no

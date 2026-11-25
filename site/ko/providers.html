@@ -6,7 +6,7 @@
     <title>지원하는 메일·캘린더·할 일 서비스 — Corresync</title>
     <meta
       name="description"
-      content="Outlook, Microsoft 365, Gmail, Google 캘린더, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, CalDAV 지원과 사용자 소유 OAuth 설정을 비교하세요."
+      content="Outlook, Microsoft 365, Gmail, Google 캘린더, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, CalDAV의 지원 기능과 직접 만든 OAuth 클라이언트 설정을 비교합니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
@@ -16,7 +16,7 @@
     >
     <meta
       property="og:description"
-      content="Todoist, TickTick, iCloud, CalDAV VTODO를 포함한 경로와 직접 소유한 데스크톱 OAuth 클라이언트를 쓰는 Google 지원을 확인합니다."
+      content="Todoist, TickTick, iCloud, CalDAV VTODO 등 서비스별 연결 방식과, 직접 만든 데스크톱 OAuth 클라이언트로 Google을 쓰는 방법을 정리했습니다."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ko_KR">
@@ -33,7 +33,7 @@
     <meta name="twitter:title" content="Corresync 메일·캘린더·할 일 지원">
     <meta
       name="twitter:description"
-      content="Outlook, Todoist, TickTick, iCloud, 표준 프로토콜과 직접 소유한 데스크톱 OAuth 클라이언트를 쓰는 Google 지원을 확인하세요."
+      content="Outlook, Todoist, TickTick, iCloud, 표준 프로토콜 지원 현황과 직접 만든 데스크톱 OAuth 클라이언트로 Google을 쓰는 방법입니다."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 로고와 영문 제품 소개">
@@ -85,12 +85,12 @@
     </header>
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>경로도 근거도 명확하게</p>
-        <h1 id="page-title"><em>내 계정</em>에 맞는 연결 방식을 고르세요.</h1>
+        <p class="eyebrow"><span aria-hidden="true"></span>지원 서비스</p>
+        <h1 id="page-title"><em>계정</em>별 연결 방식</h1>
         <p class="lede">
-          Corresync는 브랜드만 보고 기능을 추측하지 않습니다. 로그인 전에
-          자격 증명 없는 공개 근거를 모으고, 사용자가 메일과 캘린더
-          경로를 직접 선택합니다.
+          브랜드만 보고 기능을 추측하지 않습니다. 로그인 전에 자격 증명
+          없이 공개 정보를 확인하고, 메일과 캘린더의 연결 방식은 직접
+          고릅니다.
         </p>
         <div class="actions">
           <a class="button primary" href="#check">메일 주소 확인</a><a
@@ -102,14 +102,14 @@
       <section class="compatibility-checker" id="check" aria-labelledby="checker-title">
         <div class="checker-intro">
           <p class="eyebrow">
-            <span aria-hidden="true"></span>이 주소도 사용할 수 있을까요?
+            <span aria-hidden="true"></span>지원 여부 확인
           </p>
           <h2 id="checker-title">
-            전체 주소를 보내지 않고 지원 여부를 확인하세요.
+            메일 주소의 도메인만으로 지원 여부를 확인합니다
           </h2>
           <p>
-            연결할 메일 주소를 입력하세요. 브라우저 안에서 주소를 나눈 뒤
-            @ 뒤의 도메인만 확인 서비스로 보냅니다.
+            메일 주소를 입력하면 브라우저에서 @ 뒤의 도메인만 떼어 확인
+            서비스로 보냅니다.
           </p>
         </div>
         <form id="compatibility-form" class="checker-form" novalidate>
@@ -135,12 +135,12 @@
         </form>
         <p id="compatibility-privacy" class="checker-privacy">
           <strong>브라우저 밖으로 나가는 정보는 도메인뿐입니다.</strong> @
-          앞부분은 전송, 저장, 기록하거나 주소 표시줄에 넣지 않습니다.
-          서비스는 공개 DNS만 읽고 기록을 남기지 않으며 로그인도 시작하지
-          않습니다. 웹 확인을 건너뛰고 설치 후 <code>corr account discover
-            you@example.com</code>을 로컬에서 실행해도 됩니다.
+          앞부분은 전송, 저장, 기록하지 않고 주소 표시줄에도 넣지
+          않습니다. 확인 서비스는 공개 DNS만 조회하며 기록을 남기거나
+          로그인을 시작하지 않습니다. 설치 후 로컬에서 <code>corr account
+            discover you@example.com</code>을 실행해도 됩니다.
         </p><noscript><p class="checker-noscript">
-            이 선택 기능에는 JavaScript가 필요합니다. 설치 후 <code>corr account
+            이 확인 기능에는 JavaScript가 필요합니다. 설치 후 <code>corr account
               discover you@example.com</code>을 로컬에서 실행할 수도 있습니다.
           </p></noscript><p
           id="compatibility-live"
@@ -160,31 +160,33 @@
       </section>
       <section class="evidence-banner" aria-label="서비스 경로 근거 현황">
         <span class="status-dot" aria-hidden="true"></span><div>
-          <strong>v0.8의 근거는 경로별로 구분됩니다.</strong><p>
-            아래의 사용 가능 또는 준비 중인 경로에는 결정적인 합성 공급자
-            계약과 애플리케이션 테스트가 있습니다. Gmail API 경로는 합성
-            계약 테스트를 통과했지만 아직 실사용 관찰 전입니다.
+          <strong>v0.9 테스트 현황은 연결 방식마다 다릅니다.</strong><p>
+            아래의 사용 가능하거나 준비 중인 연결 방식은 모두 합성 서비스
+            계약 테스트와 애플리케이션 테스트를 거쳤습니다. 본인 OAuth
+            클라이언트를 쓰는 Google API 경로는 실환경 확인이 아직 없습니다.
+            예전 실환경 확인은 지금은 쓰지 않는 Gmail IMAP/SMTP 방식만
+            다뤘습니다.
           </p>
-        </div><a href="features.html#evidence">근거를 읽는 방법<span aria-hidden="true">
+        </div><a href="features.html#evidence">테스트 현황 읽는 법<span aria-hidden="true">
             →</span></a>
       </section>
       <section id="route-cards" aria-labelledby="microsoft-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Microsoft 경로</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>Microsoft</p>
           <h2 id="microsoft-title">
-            신뢰하는 브라우저를 쓰거나 Graph를 명시적으로 선택하세요.
+            Outlook Web과 Microsoft Graph
           </h2>
           <p>
-            Outlook Web 로그인은 브라우저가 맡습니다. Microsoft Graph는 별도로
-            설정한 공개 OAuth 클라이언트이며 자동 대체 경로가 되지
-            않습니다.
+            Outlook Web은 브라우저에서 로그인합니다. Microsoft Graph는 따로
+            설정한 공개 OAuth 클라이언트로 연결하며 자동 대체 경로가
+            아닙니다.
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card" id="microsoft-owa">
             <header>
               <span class="route-icon" aria-hidden="true">OW</span><div>
-                <p class="chip">브라우저 소유</p>
+                <p class="chip">브라우저 로그인</p>
                 <h3>Outlook Web</h3>
               </div>
             </header>
@@ -199,17 +201,18 @@
               </div>
               <div>
                 <dt>로그인</dt>
-                <dd>전용으로 보이는 브라우저 프로필</dd>
+                <dd>화면에 보이는 전용 브라우저 프로필</dd>
               </div>
             </dl>
             <p class="route-foot">
-              SSO, MFA, Conditional Access, 조직 안내는 모두 브라우저에 남습니다.
+              SSO, MFA, Conditional Access, 조직 안내는 모두 브라우저에서
+              처리됩니다.
             </p>
           </article>
           <article class="route-card accent-card" id="microsoft-graph">
             <header>
               <span class="route-icon" aria-hidden="true">G</span><div>
-                <p class="chip">명시적 OAuth</p>
+                <p class="chip">직접 설정하는 OAuth</p>
                 <h3>Microsoft Graph</h3>
               </div>
             </header>
@@ -220,18 +223,18 @@
               </div>
               <div>
                 <dt>캘린더</dt>
-                <dd>캘린더 선택과 명확히 정의된 Teams 링크 생성</dd>
+                <dd>캘린더 선택, Teams 참여 링크 생성</dd>
               </div>
               <div>
                 <dt>로그인</dt>
                 <dd>
-                  사용 권한이 있는 공개 클라이언트, 운영체제 키체인에
-                  보관하는 권한
+                  사용 권한이 있는 공개 클라이언트. 받은 권한은 운영체제
+                  키체인에 저장
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              Graph는 명시적으로 선택하거나 이미 권한을 부여한 경우에만
+              Graph는 사용자가 직접 선택했거나 이미 권한을 준 경우에만
               사용합니다.
             </p>
           </article>
@@ -241,20 +244,20 @@
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Apple iCloud</p>
           <h2 id="icloud-title">
-            하나의 안내 흐름에서 iCloud Mail과 캘린더를 설정하세요.
+            iCloud Mail과 캘린더를 함께 설정
           </h2>
           <p>
-            <code>corr setup</code>은 Apple이 문서화한 주소 계열과 서비스 레코드가
-            모두 검증된 iCloud 사용자 도메인을 인식합니다. Apple 공식 IMAP, SMTP,
-            CalDAV 엔드포인트를 제안하고 계정을 추가하기 전에 모든 로그인
-            이름과 경로를 검토할 수 있게 합니다.
+            <code>corr setup</code>은 Apple 문서의 주소 도메인과 서비스 레코드가
+            모두 확인된 iCloud 사용자 도메인을 알아보고, Apple 공식 IMAP, SMTP,
+            CalDAV 엔드포인트를 제안합니다. 계정 추가 전에 로그인 이름과
+            연결 방식을 모두 확인할 수 있습니다.
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">iC</span><div>
-                <p class="chip">현재 사용 가능 · 안내 프리셋</p>
+                <p class="chip">지금 사용 가능 · 안내 프리셋</p>
                 <h3>iCloud Mail + 캘린더</h3>
               </div>
             </header>
@@ -273,10 +276,9 @@
               </div>
             </dl>
             <p class="route-foot">
-              Corresync는 고정된 서비스 이름과 검토한 참조만 시스템 화면에
-              전달하며 암호를 읽지 않습니다. Mail과 캘린더의 마지막 인증
-              상태는 메시지 본문이나 일정 내용을 읽지 않고 각각
-              표시됩니다.
+              Corresync는 시스템 입력 창에 정해진 서비스 이름과 검토한 참조만
+              넘기고 암호는 읽지 않습니다. Mail과 캘린더의 마지막 인증
+              상태는 메일 본문이나 일정 내용을 읽지 않고 각각 표시합니다.
             </p>
           </article>
           <article class="route-card">
@@ -287,41 +289,41 @@
               </div>
             </header>
             <p>
-              이중 인증을 켠 뒤 Apple 계정 페이지에서 앱 암호를 만드세요.
-              안내 흐름은 검토한 로컬 계정을 추가한 후 사용자가 명시적으로
-              선택한 경우에만 그 페이지를 엽니다.
+              이중 인증을 켠 다음 Apple 계정 페이지에서 앱 암호를 만드세요.
+              안내 설정은 계정을 추가한 뒤 직접 선택했을 때만 그 페이지를
+              엽니다.
             </p>
             <p class="route-foot">
               Apple 공식 <a href="https://support.apple.com/ko-kr/102525"
               >iCloud Mail 설정</a>과
               <a href="https://support.apple.com/ko-kr/102654">앱 암호 안내</a>를
               확인하세요. 이 프리셋은 합성 계약 테스트를 통과했으며,
-              명시적으로 동의한 실제 환경 관찰이 기록되기 전까지는 실제
-              환경 미관찰 상태입니다.
+              옵트인 실환경 확인을 실행해 기록하기 전까지는 실환경 미확인
+              상태입니다.
             </p>
           </article>
         </div>
       </section>
       <section class="tinted-section" id="google" aria-labelledby="google-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>Google 경로</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>Google</p>
           <h2 id="google-title">
-            Gmail, Google 캘린더, Google Tasks는 직접 소유한 OAuth 클라이언트로
-            사용할 수 있습니다.
+            Gmail, Google 캘린더, Google Tasks는 직접 만든 OAuth 클라이언트로
+            연결합니다
           </h2>
           <p>
-            직접 관리하는 Google Cloud 프로젝트에 데스크톱 OAuth 클라이언트를
-            만들고 안내 설정에서 JSON을 가져오세요. Corresync 관리형 OAuth는
-            휴면 상태로 남고, 직접 소유한 클라이언트가 Google의 일반
-            브라우저 흐름을 엽니다.
+            본인이 관리하는 Google Cloud 프로젝트에 데스크톱 OAuth
+            클라이언트를 만들고 안내 설정에서 JSON을 가져오세요. 그
+            클라이언트로 Google의 일반 브라우저 로그인이 열리며, Corresync
+            관리형 OAuth는 쓰지 않습니다.
           </p>
         </div>
         <div class="route-grid two">
           <article class="route-card accent-card">
             <header>
               <span class="route-icon" aria-hidden="true">GA</span><div>
-                <p class="chip">설정 후 사용 가능 · 사용자 소유 OAuth</p>
-                <h3>Google API 경로</h3>
+                <p class="chip">설정 후 사용 가능 · 직접 만든 OAuth</p>
+                <h3>Google API</h3>
               </div>
             </header>
             <dl>
@@ -334,26 +336,26 @@
               </div>
               <div>
                 <dt>캘린더</dt>
-                <dd>캘린더 선택과 지원 시 Google Meet 생성</dd>
+                <dd>캘린더 선택, 지원되는 경우 Google Meet 생성</dd>
               </div>
               <div>
                 <dt>할 일</dt>
                 <dd>
-                  날짜형 마감일, 하위 할 일, 순서, 출처 링크, 안전한 폴링
+                  날짜 단위 마감일, 하위 할 일, 순서, 원본 링크, 안전한 폴링
                 </dd>
               </div>
               <div>
                 <dt>로그인</dt>
                 <dd>
-                  직접 소유한 데스크톱 OAuth 클라이언트. 클라이언트 자격
-                  증명과 계정별 권한을 별도의 키체인 항목에 보관
+                  직접 만든 데스크톱 OAuth 클라이언트. 클라이언트 자격 증명과
+                  계정별 권한은 별도 키체인 항목에 저장
                 </dd>
               </div>
             </dl>
             <p class="route-foot">
-              일반 브라우저가 OAuth를 담당하고 기기에서 고정된 Google API로
-              직접 연결합니다. <a href="google-oauth.html"
-              >Google Cloud 화면과 전체 단계 보기</a>.
+              OAuth는 평소 쓰는 브라우저에서 하고, 이 컴퓨터에서 고정된 Google
+              API로 직접 연결합니다. <a href="google-oauth.html"
+              >Google Cloud 화면별 설정 안내 보기</a>.
             </p>
           </article>
           <article class="route-card">
@@ -387,62 +389,62 @@
       </section>
       <section id="tasks" aria-labelledby="tasks-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>할 일 경로</p>
-          <h2 id="tasks-title">평소 쓰는 할 일 서비스를 그대로 연결하세요.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>할 일</p>
+          <h2 id="tasks-title">할 일 서비스</h2>
           <p>
-            할 일 경로는 메일·캘린더와 별도로 선택합니다. 계정마다 권한,
-            기능, 동기화 커서, 검토 후 쓰기를 분리합니다.
+            할 일 서비스는 메일·캘린더와 따로 선택합니다. 권한, 기능,
+            동기화 위치, 쓰기 전 검토는 계정마다 분리됩니다.
           </p>
         </div>
         <div class="route-grid three">
           <article class="route-card" id="microsoft-todo">
             <header>
               <span class="route-icon" aria-hidden="true">To</span><div>
-                <p class="chip">지금 사용 가능 · 명시적 OAuth</p>
+                <p class="chip">지금 사용 가능 · 직접 설정하는 OAuth</p>
                 <h3>Microsoft To Do</h3>
               </div>
             </header>
             <p>
               할 일 목록, 만들기·수정, 완료·다시 열기, 삭제, 반복,
-              체크리스트, 범주와 제한된 Graph 델타 동기화를 지원합니다.
+              체크리스트, 범주, 제한된 Graph 델타 동기화를 지원합니다.
             </p>
             <p class="route-foot">
-              직접 등록하고 선택할 권한이 있는 Microsoft Graph 공개
-              클라이언트를 사용합니다.
+              등록하고 선택할 권한이 있는 Microsoft Graph 공개 클라이언트를
+              씁니다.
             </p>
           </article>
           <article class="route-card" id="todoist">
             <header>
               <span class="route-icon" aria-hidden="true">Td</span><div>
-                <p class="chip">지금 사용 가능 · 명시적 OAuth</p>
+                <p class="chip">지금 사용 가능 · 직접 설정하는 OAuth</p>
                 <h3>Todoist</h3>
               </div>
             </header>
             <p>
               프로젝트, 쓰기와 상태 변경, 알림, 반복, 하위 할 일, 라벨,
-              담당자, 정확한 날짜·시간 의미와 제한된 동기화를 지원합니다.
+              담당자, 정확한 날짜·시간 구분, 제한된 동기화를 지원합니다.
             </p>
             <p class="route-foot">
-              PKCE 공개 OAuth 클라이언트를 사용하며 요금제에 따른 제한도
+              PKCE 공개 OAuth 클라이언트를 씁니다. 요금제에 따른 제한은
               그대로 표시합니다.
             </p>
           </article>
           <article class="route-card accent-card" id="ticktick">
             <header>
               <span class="route-icon" aria-hidden="true">Ti</span><div>
-                <p class="chip">지금 사용 가능 · 명시적 OAuth</p>
+                <p class="chip">지금 사용 가능 · 직접 설정하는 OAuth</p>
                 <h3>TickTick</h3>
               </div>
             </header>
             <p>
               프로젝트와 받은 편지함, 검색, 만들기, 수정, 완료, 삭제, 반복,
-              체크리스트, 라벨, 한 명의 담당자, 순서와 제한된 폴링을
+              체크리스트, 라벨, 담당자 한 명, 순서, 제한된 폴링을
               지원합니다.
             </p>
             <p class="route-foot">
-              직접 등록한 클라이언트 시크릿 방식의 OAuth 앱을 사용합니다.
-              시크릿은 승인한 자격 증명 저장소에 두며 다시 열기나 알림
-              교체를 지원한다고 표시하지 않습니다.
+              직접 등록한 OAuth 앱(클라이언트 시크릿 방식)을 씁니다.
+              시크릿은 승인한 자격 증명 저장소에 저장합니다. 다시 열기와
+              알림 교체는 지원한다고 표시하지 않습니다.
             </p>
           </article>
         </div>
@@ -450,10 +452,11 @@
       <section aria-labelledby="standards-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>개방형 표준</p>
-          <h2 id="standards-title">서비스가 실제로 공개한 기능만 조합합니다.</h2>
+          <h2 id="standards-title">JMAP, IMAP/SMTP, CalDAV</h2>
           <p>
-            표준 경로는 유효한 TLS와 운영체제 키체인 또는 명시적으로
-            승인한 자격 증명 도우미를 요구합니다.
+            유효한 TLS가 필요하고, 자격 증명은 운영체제 키체인이나 승인한
+            자격 증명 도우미에서 가져옵니다. 서버가 제공하는 기능만
+            씁니다.
           </p>
         </div>
         <div class="route-grid three">
@@ -465,12 +468,12 @@
               </div>
             </header>
             <p>
-              RFC 8620 계약으로 읽기, 초안, 지원 시 제출, 이동, 상태 변경, 승인
-              후 삭제를 제공합니다.
+              RFC 8620에 따라 읽기, 초안, 서버가 지원하면 전송, 이동, 상태
+              변경, 승인 후 삭제를 지원합니다.
             </p>
             <p class="route-foot">
-              읽기 전용 계정이나 Submission 기능이 없으면 해당 기능을 사용할
-              수 없다고 명시합니다.
+              읽기 전용 계정이거나 Submission 기능이 없으면 그 기능은 사용할
+              수 없다고 표시합니다.
             </p>
           </article>
           <article class="route-card" id="imap-smtp">
@@ -481,12 +484,12 @@
               </div>
             </header>
             <p>
-              폴더, MIME 읽기, 초안, 안전한 이동과 보낸편지함 결과를 확인할
-              수 있는 SMTP 제출을 제공합니다.
+              폴더, MIME 읽기, 초안, 안전한 이동, 보낸편지함에서 결과를
+              확인할 수 있는 SMTP 전송을 지원합니다.
             </p>
             <p class="route-foot">
-              UIDPLUS나 보낸편지함 기능이 필요한 작업은 불안전한 흉내를 내지
-              않고 실패합니다.
+              UIDPLUS나 보낸편지함 기능이 필요한 작업은 안전하지 않게 흉내
+              내지 않고 실패합니다.
             </p>
           </article>
           <article class="route-card" id="caldav">
@@ -497,26 +500,28 @@
               </div>
             </header>
             <p>
-              VEVENT 캘린더와 VTODO 할 일 목록을 따로 탐색하고, 제한된 읽기,
-              반복, 동기화 토큰, 검토 후 조건부 WebDAV/iCalendar 쓰기를
-              제공합니다.
+              VEVENT 캘린더와 VTODO 할 일 목록을 따로 찾고, 제한된 읽기, 반복,
+              동기화 토큰, 검토 후 조건부 WebDAV/iCalendar 쓰기를 지원합니다.
             </p>
             <p class="route-foot">
-              캘린더 일정 조율과 할 일 기능은 로그인한 뒤 각각 확인합니다.
+              캘린더 일정 조율 기능과 할 일 기능은 로그인한 뒤 각각
+              확인합니다.
             </p>
           </article>
         </div>
       </section>
       <section class="mix-panel" aria-labelledby="mix-title">
         <div>
-          <p class="eyebrow light"><span aria-hidden="true"></span>계정 하나, 경로 둘</p>
+          <p class="eyebrow light">
+            <span aria-hidden="true"></span>메일과 캘린더를 따로 연결
+          </p>
           <h2 id="mix-title">
-            메일과 캘린더가 같은 프로토콜일 필요는 없습니다.
+            메일과 캘린더에 서로 다른 프로토콜을 쓸 수 있습니다
           </h2>
           <p>
-            IMAP/SMTP와 CalDAV를 조합하거나 메일 또는 캘린더만 설정할 수
-            있습니다. 안정적인 계정 신원이 설정, 자격 증명, 커서,
-            미리보기와 감사 맥락을 분리합니다.
+            IMAP/SMTP와 CalDAV를 함께 쓰거나 메일 또는 캘린더만 설정할 수
+            있습니다. 설정, 자격 증명, 동기화 위치, 미리보기, 감사 기록은
+            계정 ID별로 분리됩니다.
           </p>
         </div>
         <figure class="terminal">
@@ -536,22 +541,23 @@
       </section>
       <section class="honest-edges" aria-labelledby="provider-limits-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>숨은 대체 경로 없음</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>제한 사항</p>
           <h2 id="provider-limits-title">
-            없는 기능을 있는 것처럼 만들지 않습니다.
+            서비스가 지원하지 않는 기능
           </h2>
         </div>
         <ul>
           <li>
-            제한은 명확히 정의된 기능 또는 성능 저하로 명확히 반환됩니다.
+            서비스의 제한은 기능 없음 또는 기능 제한으로 결과에
+            표시합니다.
           </li>
           <li>
-            자동 탐색은 Google OAuth를 시작하지 않으며 명시적인 로컬 로그인만
+            자동 탐색은 Google OAuth를 시작하지 않으며, 로컬 로그인 명령만
             브라우저를 열 수 있습니다.
           </li>
           <li>자동 탐색은 Graph 권한 요청을 시작하지 않습니다.</li>
           <li>
-            선택한 캘린더 경로가 지원한다고 보고할 때만 회의 링크를
+            회의 링크는 선택한 캘린더 연결 방식이 지원한다고 응답할 때만
             요청합니다.
           </li>
           <li>
@@ -561,9 +567,9 @@
         </ul>
       </section>
       <section class="final-cta" aria-labelledby="provider-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>직접 선택</p>
-        <h2 id="provider-cta-title">근거를 먼저 보고 로그인하세요.</h2>
-        <p>탐색은 자격 증명을 읽거나 계정을 추가하지 않습니다.</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>다음 단계</p>
+        <h2 id="provider-cta-title">연결 방식을 확인한 뒤 로그인하기</h2>
+        <p>탐색은 자격 증명을 읽지 않고 계정도 추가하지 않습니다.</p>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html">첫 계정 설정</a><a
             class="button secondary"
@@ -580,8 +586,8 @@
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        독립적인 로컬 우선 메일·캘린더 도구입니다. 여기에 언급된 업체와
-        제휴하거나 보증받지 않았습니다.
+        독립적으로 개발한 로컬 메일·캘린더 도구입니다. 이 사이트에
+        나오는 업체와 제휴 관계가 없으며 보증을 받지도 않았습니다.
       </p>
       <nav aria-label="바닥글">
         <a href="getting-started.html">시작하기</a><a href="providers.html" aria-current="page"

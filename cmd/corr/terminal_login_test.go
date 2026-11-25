@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nkiyohara/corresync/internal/browser"
 	"github.com/nkiyohara/corresync/internal/buildinfo"
 	"github.com/nkiyohara/corresync/internal/config"
 	"github.com/nkiyohara/corresync/internal/daemonapi"
@@ -55,7 +56,7 @@ func TestLoginRejectsTerminalJSONBeforeLoadingConfig(t *testing.T) {
 	}
 }
 
-func TestLoginExplainsTerminalFallbackWithoutGraphicalSession(t *testing.T) {
+func TestLoginWithoutDisplayNeedsNoFlagExceptForJSON(t *testing.T) {
 	if stdruntime.GOOS != "linux" {
 		t.Skip("graphical display environment variables are Linux-specific")
 	}
@@ -72,17 +73,27 @@ func TestLoginExplainsTerminalFallbackWithoutGraphicalSession(t *testing.T) {
 		&bytes.Buffer{},
 		buildinfo.Current(),
 	)
-	err := (&loginCommand{Account: "work"}).Run(app)
+	err := (&loginCommand{Account: "work", JSON: true}).Run(app)
 	if err == nil {
 		t.Fatal("Run() unexpectedly started a visible browser without a display")
 	}
 	for _, expected := range []string{
 		"DISPLAY and WAYLAND_DISPLAY are both unset",
-		"corr auth login --account 'work' --terminal",
+		"corr auth login --account 'work'",
+		"without --json",
 	} {
 		if !strings.Contains(err.Error(), expected) {
 			t.Fatalf("Run() error missing %q: %v", expected, err)
 		}
+	}
+
+	var stderr bytes.Buffer
+	command := &loginCommand{Account: "work"}
+	if err := command.useForwardedViewWithoutDisplay(&runtime{stderr: &stderr}, "work", browser.ErrGraphicalSessionUnavailable); err != nil {
+		t.Fatal(err)
+	}
+	if !command.Web || !strings.Contains(stderr.String(), "no display") {
+		t.Fatalf("web=%v stderr=%q", command.Web, stderr.String())
 	}
 }
 

@@ -3,6 +3,28 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.5 - 2026-11-25
+
+- Fix sign-in on hosts without a display. The forwarded login view (`--web`
+  and `--host`) never completed in 0.9.1 through 0.9.4, because the client
+  rejected every screen frame the daemon returned. On Linux without a display,
+  `corr auth login` now uses that view by itself.
+- In the login view, Enter now submits sign-in forms, and a page that redirects
+  while its picture is taken no longer stalls the login. Signing in again with
+  a saved browser profile was the common case that hung.
+- A new `corr auth login` replaces an unfinished login for the same account, a
+  dropped terminal or SSH connection cancels it, and the terminal prints why a
+  login failed. `--host` finds `corr` in the usual install directories.
+- Saving a draft now reports the To, Cc, and subject the provider resolved, and
+  says when a reply leaves out people from the original message. Help and
+  errors name `reply-all` (#221). The private daemon protocol is now 30.
+- Pin Go 1.27.4 and the fixed gorilla/websocket revision for GO-2026-6859 and
+  GO-2026-6278.
+- Rewrite the README and the website in plainer language, in all five
+  languages, and correct outdated statements found on the way.
+
+See the [release notes](docs/releases/v0.9.5.md) for details and limits.
+
 ## 0.9.4 - 2026-11-06
 
 - Fix Outlook Web search result windows so later pages and shrinking lookahead

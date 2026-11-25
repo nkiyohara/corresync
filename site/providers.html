@@ -6,14 +6,14 @@
     <title>Email, calendar, and task providers — Corresync</title>
     <meta
       name="description"
-      content="Compare Corresync support for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV, including user-owned OAuth setup."
+      content="What Corresync supports for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV, and how to set up your own OAuth client."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta property="og:title" content="Email, calendar, and task providers — Corresync">
     <meta
       property="og:description"
-      content="Compare Corresync support for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV, including user-owned OAuth setup."
+      content="What Corresync supports for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV, and how to set up your own OAuth client."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="en_GB">
@@ -28,18 +28,18 @@
     <meta property="og:image:height" content="630">
     <meta
       property="og:image:alt"
-      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Email, calendar, and task providers — Corresync">
     <meta
       name="twitter:description"
-      content="Compare Corresync support for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV, including user-owned OAuth setup."
+      content="What Corresync supports for Outlook, Microsoft 365, Gmail, Google Calendar, Google Tasks, Todoist, TickTick, iCloud, JMAP, IMAP/SMTP, and CalDAV, and how to set up your own OAuth client."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
       name="twitter:image:alt"
-      content="Corresync mark beside the words: one local MCP for your email and calendars — provider-neutral, preview before commit."
+      content="Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit."
     >
     <link rel="canonical" href="https://corresync.org/providers.html">
     <link rel="alternate" hreflang="en" href="https://corresync.org/providers.html">
@@ -89,11 +89,12 @@
 
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>Explicit routes, visible tradeoffs</p>
-        <h1 id="page-title">Choose the route that matches <em>your account.</em></h1>
+        <p class="eyebrow"><span aria-hidden="true"></span>Providers</p>
+        <h1 id="page-title">Supported services <em>and how each one connects</em></h1>
         <p class="lede">
-          Corresync never guesses capability from a logo. Discovery gathers credential-free
-          evidence; you select mail and calendar routes before authentication begins.
+          Corresync doesn’t guess what an account supports from the provider’s name. It looks up
+          public records without using credentials, and you choose the mail and calendar routes
+          before signing in.
         </p>
         <div class="actions">
           <a class="button primary" href="#check">Check an address</a>
@@ -103,11 +104,11 @@
 
       <section class="compatibility-checker" id="check" aria-labelledby="checker-title">
         <div class="checker-intro">
-          <p class="eyebrow"><span aria-hidden="true"></span>Will it work with my address?</p>
-          <h2 id="checker-title">Check your address — without sending it anywhere.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Compatibility check</p>
+          <h2 id="checker-title">Check whether your address works</h2>
           <p>
-            Type the email address you want to connect. Your browser keeps the address to itself and
-            asks our lookup service about only the domain—the part after the @.
+            Type the email address you want to connect. Your browser sends only the domain (the part
+            after the @) to our lookup service and keeps the rest.
           </p>
         </div>
         <form id="compatibility-form" class="checker-form" novalidate>
@@ -134,11 +135,11 @@
           </p>
         </form>
         <p id="compatibility-privacy" class="checker-privacy">
-          <strong>Only the domain leaves your browser.</strong> Everything before the @ stays on
-          this page—it is never sent, stored, logged, or placed in the address bar. The lookup
-          service reads public DNS records, keeps nothing, and never starts a sign-in. Prefer to
-          skip it entirely? <code>corr account discover you@example.com</code> runs credential-free
-          discovery locally.
+          <strong>Only the domain leaves your browser.</strong> The part before the @ stays on this
+          page. It is not sent, stored, logged, or put in the address bar. The lookup service reads
+          public DNS records, keeps nothing, and never starts a sign-in. To skip it, <code>corr
+            account discover you@example.com</code> does the same lookup on your computer without
+          credentials.
         </p>
         <noscript>
           <p class="checker-noscript">
@@ -160,11 +161,12 @@
       <section class="evidence-banner" aria-label="Provider evidence status">
         <span class="status-dot" aria-hidden="true"></span>
         <div>
-          <strong>v0.8 evidence: deterministic and route-specific.</strong>
+          <strong>v0.9 test status, per route</strong>
           <p>
-            All available and staged routes below have synthetic provider-contract and application
-            coverage. The user-owned Google API routes are live-unobserved; an older observation
-            covers only the retired Gmail IMAP/SMTP transport.
+            Every available and staged route below is tested against synthetic provider contracts
+            and at the application level. The Google API routes that use your own OAuth client are
+            live-unobserved; an older live observation covers only the retired Gmail IMAP/SMTP
+            transport.
           </p>
         </div>
         <a href="features.html#evidence">How evidence works<span aria-hidden="true"> →</span></a>
@@ -173,10 +175,10 @@
       <section id="route-cards" aria-labelledby="microsoft-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Microsoft routes</p>
-          <h2 id="microsoft-title">Use the browser you already trust—or opt into Graph.</h2>
+          <h2 id="microsoft-title">Outlook Web or Microsoft Graph</h2>
           <p>
-            Outlook Web is browser-owned. Microsoft Graph is a separate, explicitly configured
-            public OAuth client and is never an automatic fallback.
+            Outlook Web signs in through a browser. Microsoft Graph needs a public OAuth client that
+            you configure yourself, and Corresync never falls back to it automatically.
           </p>
         </div>
         <div class="route-grid two">
@@ -184,7 +186,7 @@
             <header>
               <span class="route-icon" aria-hidden="true">OW</span>
               <div>
-                <p class="chip">Browser-owned</p>
+                <p class="chip">Browser sign-in</p>
                 <h3>Outlook Web</h3>
               </div>
             </header>
@@ -203,14 +205,14 @@
               </div>
             </dl>
             <p class="route-foot">
-              SSO, MFA, Conditional Access, and organization notices remain inside the browser.
+              SSO, MFA, Conditional Access, and organization notices are handled in the browser.
             </p>
           </article>
           <article class="route-card accent-card" id="microsoft-graph">
             <header>
               <span class="route-icon" aria-hidden="true">G</span>
               <div>
-                <p class="chip">Explicit OAuth</p>
+                <p class="chip">OAuth</p>
                 <h3>Microsoft Graph</h3>
               </div>
             </header>
@@ -221,7 +223,7 @@
               </div>
               <div>
                 <dt>Calendar</dt>
-                <dd>Selectable calendars and typed Teams join-link creation</dd>
+                <dd>Selectable calendars and Teams join-link creation</dd>
               </div>
               <div>
                 <dt>Sign-in</dt>
@@ -229,8 +231,7 @@
               </div>
             </dl>
             <p class="route-foot">
-              Graph is offered only as an explicit choice or for an authorization you already
-              granted.
+              Graph is used only when you choose it or for an authorization you already granted.
             </p>
           </article>
         </div>
@@ -239,12 +240,12 @@
       <section class="tinted-section" id="icloud" aria-labelledby="icloud-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Apple iCloud</p>
-          <h2 id="icloud-title">Set up iCloud Mail and Calendar in one guided flow.</h2>
+          <h2 id="icloud-title">iCloud Mail and Calendar</h2>
           <p>
-            <code>corr setup</code> recognises Apple’s documented address families and complete
-            verified service records for custom iCloud domains. It proposes Apple’s published
-            IMAP, SMTP, and CalDAV endpoints, then lets you review every identity and route before
-            adding the account.
+            <code>corr setup</code> recognises Apple’s documented address types, and custom iCloud
+            domains whose service records are complete and verified. It suggests Apple’s published
+            IMAP, SMTP, and CalDAV servers, and you review each identity and route before the
+            account is added.
           </p>
         </div>
         <div class="route-grid two">
@@ -271,9 +272,9 @@
               </div>
             </dl>
             <p class="route-foot">
-              Corresync passes only a fixed service name and reviewed handle to the system prompt;
-              it never reads the password. The last-authenticated Mail and Calendar status is shown
-              independently without reading message or event content.
+              Corresync passes only a fixed service name and the handle you reviewed to the system
+              prompt, and never reads the password. It shows when Mail and Calendar last signed in,
+              separately, without reading any message or event content.
             </p>
           </article>
           <article class="route-card">
@@ -285,16 +286,16 @@
               </div>
             </header>
             <p>
-              Enable two-factor authentication, then create an app-specific password on Apple’s
-              account page. The guided flow opens that page only when you explicitly choose it,
-              after the reviewed local account has been added.
+              Turn on two-factor authentication, then create an app-specific password on Apple’s
+              account page. Guided setup opens that page only if you ask it to, after the account
+              has been added locally.
             </p>
             <p class="route-foot">
               Check Apple’s official
               <a href="https://support.apple.com/en-us/102525">iCloud Mail settings</a> and
               <a href="https://support.apple.com/en-gb/102654">app-specific password guide</a>. This
-              preset has synthetic contract coverage and remains live-unobserved until an opt-in
-              observation is recorded.
+              preset is tested against synthetic contracts and is live-unobserved until someone
+              records an opt-in observation.
             </p>
           </article>
         </div>
@@ -304,13 +305,13 @@
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Google routes</p>
           <h2 id="google-title">
-            Gmail, Calendar, and Tasks work with your own Google OAuth client.
+            Gmail, Google Calendar, and Google Tasks
           </h2>
           <p>
             Create a Desktop OAuth client in a Google Cloud project you control, then import its
-            JSON during guided setup. Corresync-managed OAuth stays dormant; your own client opens
-            the normal Google browser flow. The route is synthetic-contract covered and
-            live-unobserved.
+            JSON during guided setup. Corresync’s own managed OAuth is not active; your client
+            opens the normal Google sign-in in your browser. The route is tested against synthetic
+            contracts and is live-unobserved.
           </p>
         </div>
         <div class="route-grid two">
@@ -318,7 +319,7 @@
             <header>
               <span class="route-icon" aria-hidden="true">GA</span>
               <div>
-                <p class="chip">Available with setup · user-owned OAuth</p>
+                <p class="chip">Available with setup · your own OAuth client</p>
                 <h3>Google API route</h3>
               </div>
             </header>
@@ -336,7 +337,9 @@
               </div>
               <div>
                 <dt>Tasks</dt>
-                <dd>Date-only due dates, subtasks, ordering, source links, and safe polling</dd>
+                <dd>
+                  Date-only due dates, subtasks, ordering, source links, and polling for changes
+                </dd>
               </div>
               <div>
                 <dt>Sign-in</dt>
@@ -347,9 +350,9 @@
               </div>
             </dl>
             <p class="route-foot">
-              The normal browser owns OAuth. Gmail, Calendar, Meet, and Tasks use pinned Google
-              APIs.
-              <a href="google-oauth.html">See every Google Cloud screen and setup step</a>.
+              OAuth sign-in happens in your normal browser. Gmail, Calendar, Meet, and Tasks use
+              pinned Google API versions.
+              <a href="google-oauth.html">Google Cloud setup, step by step</a>.
             </p>
           </article>
           <article class="route-card">
@@ -386,10 +389,10 @@
       <section id="tasks" aria-labelledby="tasks-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Task routes</p>
-          <h2 id="tasks-title">Connect the task service you already use.</h2>
+          <h2 id="tasks-title">Task services</h2>
           <p>
-            Task routes are selected independently from mail and calendar. Their authorization,
-            capabilities, cursors, and reviewed writes stay isolated per account.
+            You choose the task route separately from mail and calendar. Sign-in, features, sync
+            state, and reviewed writes are kept per account.
           </p>
         </div>
         <div class="route-grid three">
@@ -397,13 +400,13 @@
             <header>
               <span class="route-icon" aria-hidden="true">To</span>
               <div>
-                <p class="chip">Available now · explicit OAuth</p>
+                <p class="chip">Available now · OAuth</p>
                 <h3>Microsoft To Do</h3>
               </div>
             </header>
             <p>
-              Task lists, typed create and update, complete and reopen, delete, recurrence,
-              checklists, categories, and bounded Graph delta sync.
+              Task lists, create and update, complete and reopen, delete, recurrence, checklists,
+              categories, and Graph delta sync with limits.
             </p>
             <p class="route-foot">
               Uses a Microsoft Graph public client you are authorized to register and select.
@@ -413,33 +416,34 @@
             <header>
               <span class="route-icon" aria-hidden="true">Td</span>
               <div>
-                <p class="chip">Available now · explicit OAuth</p>
+                <p class="chip">Available now · OAuth</p>
                 <h3>Todoist</h3>
               </div>
             </header>
             <p>
-              Task projects, typed writes and state, reminders, recurrence, subtasks, labels,
-              assignment, exact date and time meanings, and bounded sync-token changes.
+              Projects, task writes and completion state, reminders, recurrence, subtasks, labels,
+              assignment, exact date and time handling, and sync-token changes with limits.
             </p>
             <p class="route-foot">
-              Uses your public OAuth client with PKCE; plan-dependent features remain visible.
+              Uses your public OAuth client with PKCE. Features that depend on your Todoist plan are
+              shown as such.
             </p>
           </article>
           <article class="route-card accent-card" id="ticktick">
             <header>
               <span class="route-icon" aria-hidden="true">Ti</span>
               <div>
-                <p class="chip">Available now · explicit OAuth</p>
+                <p class="chip">Available now · OAuth</p>
                 <h3>TickTick</h3>
               </div>
             </header>
             <p>
               Projects and Inbox, search, create, update, complete, delete, recurrence, checklists,
-              labels, one assignee, ordering, and bounded polling.
+              labels, one assignee, ordering, and polling with limits.
             </p>
             <p class="route-foot">
-              Uses your confidential OAuth client. Its secret stays in an approved credential store;
-              reopen and reminder replacement are not claimed.
+              Uses your confidential OAuth client. Its secret is kept in an approved credential
+              store. Reopening tasks and replacing reminders are not claimed to work.
             </p>
           </article>
         </div>
@@ -448,10 +452,11 @@
       <section aria-labelledby="standards-title">
         <div class="section-heading">
           <p class="eyebrow"><span aria-hidden="true"></span>Open standards</p>
-          <h2 id="standards-title">Mix the services your provider actually exposes.</h2>
+          <h2 id="standards-title">JMAP, IMAP/SMTP, and CalDAV</h2>
           <p>
-            Standards routes use valid TLS and an OS-keyring entry or one explicitly approved
-            absolute credential-helper reference.
+            Use the services your provider offers, in any combination. These routes require valid
+            TLS. The credential comes from an OS keyring entry or from one approved credential
+            helper, given by absolute path.
           </p>
         </div>
         <div class="route-grid three">
@@ -464,11 +469,12 @@
               </div>
             </header>
             <p>
-              Mail reads, drafts, submission where advertised, moves, state changes, and reviewed
-              deletion through typed RFC 8620 contracts.
+              Mail reads, drafts, sending where the server offers it, moves, state changes, and
+              reviewed deletion, following RFC 8620.
             </p>
             <p class="route-foot">
-              A read-only account or missing Submission capability stays explicitly unavailable.
+              If the account is read-only or the server lacks Submission, those actions are reported
+              as unavailable.
             </p>
           </article>
           <article class="route-card" id="imap-smtp">
@@ -480,11 +486,12 @@
               </div>
             </header>
             <p>
-              IMAP folders, reads, MIME, drafts, safe moves, and SMTP submission with a resolvable
-              Sent-mailbox outcome.
+              IMAP folders, reads, MIME, drafts, safe moves, and SMTP sending, with a Sent-mailbox
+              result that can be checked.
             </p>
             <p class="route-foot">
-              Operations that need UIDPLUS or a Sent mailbox fail before unsafe emulation.
+              Operations that need UIDPLUS or a Sent mailbox fail early instead of being emulated
+              unsafely.
             </p>
           </article>
           <article class="route-card" id="caldav">
@@ -496,11 +503,11 @@
               </div>
             </header>
             <p>
-              Separate VEVENT calendars and VTODO task lists, with bounded reads, recurrence, sync
-              tokens, and reviewed conditional WebDAV/iCalendar writes.
+              Separate VEVENT calendars and VTODO task lists, with size-limited reads, recurrence,
+              sync tokens, and reviewed conditional WebDAV/iCalendar writes.
             </p>
             <p class="route-foot">
-              Calendar scheduling and task capabilities are observed independently after sign-in.
+              After sign-in, Corresync checks calendar scheduling and task support separately.
             </p>
           </article>
         </div>
@@ -509,11 +516,12 @@
       <section class="mix-panel" aria-labelledby="mix-title">
         <div>
           <p class="eyebrow light"><span aria-hidden="true"></span>One account, two routes</p>
-          <h2 id="mix-title">Mail and calendar do not have to come from the same protocol.</h2>
+          <h2 id="mix-title">Mail and calendar can use different protocols</h2>
           <p>
-            Pair IMAP/SMTP with CalDAV or configure a mail-only or calendar-only account today. The
-            unified Google route uses your Desktop OAuth client. Stable account identity keeps
-            profiles, credentials, cursors, previews, and audit context isolated.
+            You can pair IMAP/SMTP with CalDAV, or set up an account with only mail or only a
+            calendar. The combined Google route uses your Desktop OAuth client. Each account has a
+            stable internal ID, and its profiles, credentials, sync state, previews, and audit
+            records are kept separate.
           </p>
         </div>
         <figure class="terminal">
@@ -524,7 +532,7 @@
           <pre
             tabindex="0"
             role="region"
-            aria-label="Discover and add an explicit provider route"
+            aria-label="Look up an address and add a provider route"
           ><code><span class="t-prompt">$</span> corr account discover reader@example.invalid
 <span class="t-dim">evidence  DNS · well-known · provider metadata</span>
 <span class="t-dim">action    none — discovery never authenticates</span>
@@ -536,36 +544,38 @@
 
       <section class="honest-edges" aria-labelledby="provider-limits-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>No hidden fallback</p>
-          <h2 id="provider-limits-title">A missing capability stays missing.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>Limits</p>
+          <h2 id="provider-limits-title">What Corresync does when a feature is missing</h2>
           <p class="fine-print">
-            See the <a href="features.html">plain-language feature tour</a> for the actions agents
-            can take and how partial provider support is shown.
+            The <a href="features.html">features page</a> lists what agents can do and how partial
+            provider support is shown.
           </p>
         </div>
         <ul>
-          <li>Provider limitations are returned as typed capabilities or degradations.</li>
+          <li>Provider limits are reported as capabilities or degradations in the result.</li>
           <li>
-            Automatic discovery never starts Google OAuth; only explicit local login may open it.
+            Automatic discovery never starts Google OAuth. Only a local login command you run can
+            open it.
           </li>
           <li>Graph authorization never starts from automatic discovery.</li>
           <li>
-            Meeting links are requested only from the selected calendar route when it reports
-            support.
+            Meeting links are requested only from the calendar route you selected, and only when it
+            reports support.
           </li>
           <li>
-            Unknown write outcomes require reconciliation and are never retried automatically.
+            If the result of a write is unknown, you need to check it; it is never retried
+            automatically.
           </li>
         </ul>
       </section>
 
       <section class="final-cta" aria-labelledby="provider-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>Choose deliberately</p>
-        <h2 id="provider-cta-title">Start with evidence, then authenticate.</h2>
-        <p>Discovery reads no credentials and adds no account.</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>Next step</p>
+        <h2 id="provider-cta-title">Look up your address, then sign in</h2>
+        <p>The lookup reads no credentials and adds no account.</p>
         <div class="actions centered">
           <a class="button primary" href="getting-started.html">Set up your first account</a>
-          <a class="button secondary" href="features.html">See everything you can do</a>
+          <a class="button secondary" href="features.html">See the features</a>
         </div>
       </section>
     </main>

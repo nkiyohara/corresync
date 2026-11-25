@@ -251,6 +251,16 @@ Mail writes:
 - `mail_set_read_state`, `mail_set_read_state_commit`;
 - `mail_delete`, `mail_delete_commit`.
 
+Choose `mail_create_draft.composeMode` from the intended audience: `reply`
+addresses only the source sender (or Reply-To), `reply_all` adds the source's
+other visible To and Cc participants, and `new` or `forward` use only the
+explicit recipients supplied. Reply modes reject explicit recipients. A
+completed draft returns `addressing`: `resolved` with the provider-resolved
+`to`, `cc`, and `subject` (plus `sourceParticipantsNotIncluded` for replies when
+known), or `unresolved` when the route did not report them, which is unknown
+rather than empty. Check those recipients before calling a draft ready; see
+[the JSON contract](json.md#mail).
+
 Calendar writes:
 
 - `calendar_create`, `calendar_create_commit`;

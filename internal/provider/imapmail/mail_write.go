@@ -50,7 +50,9 @@ func (client *Client) CreateMailDraft(
 	if err != nil {
 		return application.MailDraft{}, err
 	}
-	return application.MailDraft{ID: id, ChangeKey: changeKey}, nil
+	return application.MailDraft{
+		ID: id, ChangeKey: changeKey, Addressing: composition.draftAddressing(),
+	}, nil
 }
 
 func (client *Client) SendMail(
@@ -493,6 +495,21 @@ type mailComposition struct {
 	Attachments []application.MailFileAttachment
 	InReplyTo   string
 	References  string
+	// SourceParticipants are the reference envelope's To and Cc addresses
+	// other than the configured sender, when they parse (reply modes only).
+	SourceParticipants      []string
+	SourceParticipantsKnown bool
+}
+
+// draftAddressing reports the visible addressing that was written into the
+// draft. Bcc is deliberately absent.
+func (composition mailComposition) draftAddressing() *application.MailDraftAddressing {
+	return &application.MailDraftAddressing{
+		To: append([]string(nil), composition.To...), CC: append([]string(nil), composition.CC...),
+		Subject:                 composition.Subject,
+		SourceParticipants:      append([]string(nil), composition.SourceParticipants...),
+		SourceParticipantsKnown: composition.SourceParticipantsKnown,
+	}
 }
 
 const (
@@ -580,6 +597,9 @@ func (client *Client) compose(
 	}
 	if input.EffectiveComposeMode() == application.MailComposeReply ||
 		input.EffectiveComposeMode() == application.MailComposeReplyAll {
+		participants, participantsErr := derivedIMAPAddresses(envelope.To, envelope.Cc, client.sender)
+		result.SourceParticipants = participants
+		result.SourceParticipantsKnown = participantsErr == nil
 		count := len(result.To) + len(result.CC)
 		if count == 0 {
 			return mailComposition{}, errors.New(

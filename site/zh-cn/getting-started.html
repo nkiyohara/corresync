@@ -3,17 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync 快速开始 — 从安装到第一次回答</title>
+    <title>Corresync 快速开始：安装、添加账号、连接智能体</title>
     <meta
       name="description"
-      content="安装 Corresync，添加 Outlook、iCloud 邮件与日历或标准协议账号，连接本地 MCP 客户端，并完成第一次跨账号查询。"
+      content="安装 Corresync，添加 Outlook、iCloud 邮件和日历或标准协议账号，把本地 MCP 注册到客户端，然后做第一次跨账号查询。"
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
-    <meta property="og:title" content="Corresync 快速开始 — 四步完成设置">
+    <meta property="og:title" content="Corresync 快速开始：四个步骤">
     <meta
       property="og:description"
-      content="安装、登录、连接本地 MCP，再跨所有邮箱和日历提问。"
+      content="安装、登录、注册本地 MCP，然后查询所有邮箱和日历。"
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
@@ -28,7 +28,7 @@
     <meta property="og:image:alt" content="Corresync 标志和英文产品简介">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Corresync 快速开始">
-    <meta name="twitter:description" content="四步完成本地 MCP 设置。">
+    <meta name="twitter:description" content="分四步设置本地 MCP。">
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta name="twitter:image:alt" content="Corresync 标志和英文产品简介">
     <link rel="canonical" href="https://corresync.org/zh-cn/getting-started.html">
@@ -69,7 +69,7 @@
           >快速开始</a><a href="providers.html">支持服务</a><a href="features.html"
           >功能</a><a href="safety.html">安全</a>
         </nav>
-        <nav class="language-nav" aria-label="語言">
+        <nav class="language-nav" aria-label="语言">
           <a href="../getting-started.html" lang="en" hreflang="en">EN</a><a
             href="../ja/getting-started.html"
             lang="ja"
@@ -87,11 +87,11 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>快速开始</p>
-        <h1 id="page-title">从安装到第一次回答，<em>清晰的四个步骤。</em></h1>
+        <h1 id="page-title">从安装到第一次查询：<em>四个步骤</em></h1>
         <p class="lede">
           安装 <code>corr</code>，添加工作或个人账号，把本地 MCP
-          注册到智能体，然后提出跨账号问题。即使结果合并展示，每个账号的身份和授权仍然隔离。Outlook
-          Web 登录由浏览器管理；API 和标准协议的 授权 留在系统钥匙串；MCP
+          注册到智能体，然后提一个跨账号的问题。结果合并显示时，各账号仍分开登录和授权。Outlook
+          Web 在浏览器中登录；API 和标准协议的授权保存在系统钥匙串；MCP
           只通过本地 stdio 通信。
         </p>
         <div class="actions">
@@ -106,7 +106,7 @@
           <header>
             <span class="step-badge" aria-hidden="true">1</span><div>
               <h2 id="install-title">安装 <code>corr</code></h2>
-              <p>这里只安装程序，不添加账号，也不会登录。</p>
+              <p>这一步只安装程序，不添加账号，也不登录。</p>
             </div>
           </header>
           <div class="install-grid primary-install-grid">
@@ -120,7 +120,7 @@
                 ><code>curl -LsSf https://corresync.org/install.sh | sh</code></pre>
               </div>
               <p class="block-note">
-                为当前用户安装已验证的 stable 版本。运行前可阅读<a
+                为当前用户安装经过校验的 stable 版本。可先阅读<a
                   href="../install.sh"
                 >脚本</a>。
               </p>
@@ -135,7 +135,7 @@
                 ><code>powershell -NoProfile -Command "irm https://corresync.org/install.ps1 | iex"</code></pre>
               </div>
               <p class="block-note">
-                无需管理员权限，只更新当前用户的 <code>PATH</code>。可先阅读<a
+                无需管理员权限，只修改当前用户的 <code>PATH</code>。可先阅读<a
                   href="../install.ps1"
                 >脚本</a>。
               </p>
@@ -148,7 +148,7 @@
           >
             <div class="install-alternatives-head">
               <h3 id="other-install-title">其他安装方式</h3>
-              <p>交给包管理器管理升级与卸载。</p>
+              <p>升级和卸载由包管理器负责。</p>
             </div>
             <div class="install-grid">
               <div class="install-block">
@@ -192,7 +192,7 @@ scoop install corresync/corresync</code></pre>
             </p>
           </section>
           <div class="install-block verify-block">
-            <p class="os-label" id="gs-verify">验证</p>
+            <p class="os-label" id="gs-verify">确认安装</p>
             <div class="cmd" data-copy data-copy-label="版本检查命令">
               <pre
                 tabindex="0"
@@ -202,7 +202,7 @@ scoop install corresync/corresync</code></pre>
             </div>
           </div>
           <div class="install-block verify-block">
-            <p class="os-label" id="gs-updates">自动更新 · 为现有配置启用</p>
+            <p class="os-label" id="gs-updates">自动更新 · 为已有配置开启</p>
             <div class="cmd" data-copy data-copy-label="启用已验证自动更新">
               <pre
                 tabindex="0"
@@ -211,52 +211,55 @@ scoop install corresync/corresync</code></pre>
               ><code>corr config set updates.auto_install true</code></pre>
             </div>
             <p class="block-note">
-              从0.9.2起，新配置默认启用已签名、已验证的自动更新，现有设置保持不变。此命令可为现有配置启用更新。MCP或机器可读输出不会触发安装。关闭命令：<code
-              >corr config set updates.auto_install false</code>。
+              从 0.9.2
+              起，新配置默认开启经过签名校验的自动更新，已有设置不变；已有配置可用这条命令开启。MCP
+              调用和机器可读输出不会触发安装。关闭命令：<code>corr config set
+                updates.auto_install false</code>。
             </p>
           </div>
         </li>
         <li class="gs-step" id="sign-in" aria-labelledby="signin-title">
           <header>
             <span class="step-badge" aria-hidden="true">2</span><div>
-              <h2 id="signin-title">设置邮件与日历账号</h2>
+              <h2 id="signin-title">添加邮件和日历账号</h2>
               <p>
-                第一次只需运行一条命令。引导程序会询问邮箱地址，在不读取凭据的前提下查找邮件和日历服务，说明可选路径，并在添加账号前显示完整预览。
+                第一次只需运行一条命令。引导程序询问邮箱地址，不读取凭据就查找邮件和日历服务，说明可选的连接方式，并在添加账号前显示完整预览。
               </p>
               <p>
-                登录或读取外部凭据始终是确认之后的独立选择。随后还可以检查连接或继续添加其他账号。<code
+                登录和读取外部凭据都要在确认后单独选择。之后可检查连接或继续添加账号。<code
                 >corr
-                  settings</code>使用同一套键盘友好流程；屏幕阅读器用户可设置<code
-                >CORRESYNC_ACCESSIBLE=true</code>，改用逐行提示；输入<code
-                >:cancel</code>即可安全退出当前输入步骤。
+                  settings</code>使用同样的键盘流程；使用屏幕阅读器时可设置<code
+                >CORRESYNC_ACCESSIBLE=true</code>，改为逐行提示；输入<code
+                >:cancel</code>可以退出当前输入步骤。
               </p>
             </div>
           </header>
           <div class="duo">
             <div>
               <p>
-                Outlook Web 使用由服务商掌控的浏览器登录。Microsoft
-                Graph、JMAP、IMAP/SMTP 和 CalDAV
-                也可在服务商支持且你明确选择相应路径或凭据存储位置时使用。发现过程不会打开浏览器、读取钥匙串，也不会发起管理员同意流程。
+                Outlook Web
+                在服务商提供的浏览器页面中登录。服务商支持、且你选择了对应连接方式或凭据存储位置时，也可以用
+                Microsoft Graph、JMAP、IMAP/SMTP 和
+                CalDAV。查找服务时不打开浏览器、不读取钥匙串，也不发起管理员同意流程。
               </p>
               <p>
                 <strong>使用 iCloud？</strong><code>corr setup</code>会识别<code
                 >@icloud.com</code>、<code>@me.com</code>、<code
                 >@mac.com</code>，以及具备完整且已验证服务记录的 iCloud
-                自定义域名，并一次配置邮件与日历。添加账号后，引导程序会说明
+                自定义域名，并同时配置邮件和日历。添加账号后，引导程序会说明
                 Apple 双重认证和 App
-                专用密码要求。密码由操作系统凭据界面直接接收，不会经过
-                Corresync。
+                专用密码的要求。密码由操作系统凭据窗口直接接收，Corresync
+                拿不到。
               </p>
               <p>
                 <strong>使用 Google？</strong>在你自己管理的 Google Cloud
-                项目中创建桌面 OAuth 客户端。 引导设置会验证下载的
-                JSON，并在明确的浏览器登录前将凭据导入系统钥匙串。
+                项目中创建桌面 OAuth 客户端。引导设置会检查下载的
+                JSON，在你从浏览器登录前把凭据导入系统钥匙串。
               </p>
               <p class="step-links">
                 <a href="providers.html#check">不发送完整地址即可检查</a> · <a
                   href="safety.html"
-                >了解登录归属</a>
+                >登录由谁负责</a>
               </p>
             </div>
             <div class="stack">
@@ -270,8 +273,8 @@ scoop install corresync/corresync</code></pre>
                   ><code>corr setup</code></pre>
                 </div>
                 <p class="block-note">
-                  引导程序先检查当前本地状态，可按需安装 Shell
-                  补全，并从尚未完成的步骤继续。账号路径会在保存前预览，登录仍是独立操作；随后可多选已检测到的智能体，统一确认本地集成计划，再逐个应用和验证。
+                  引导程序先检查本地状态，可按需安装 Shell
+                  补全，并从未完成的步骤继续。连接方式在保存前预览，登录是单独的一步。之后可勾选检测到的多个智能体，确认本地配置计划，再逐个应用并检查。
                 </p>
               </div>
               <div class="install-block">
@@ -282,13 +285,13 @@ corr auth login --account personal
 corr doctor --account personal</code></pre>
                 </div>
                 <p class="block-note">
-                  原有命令仍保持非交互行为，适合脚本和自动化。
+                  这些命令无需交互，适合脚本和自动化。
                 </p>
               </div>
               <div class="install-block">
-                <p class="os-label">iCloud 邮件与日历 · 现已支持</p>
+                <p class="os-label">iCloud 邮件和日历 · 已支持</p>
                 <p class="block-note">
-                  引导预设会添加两项服务，可共用一个经过确认的凭据引用，并在不读取邮件正文或日程内容的情况下显示最近一次认证状态。连接前请阅读
+                  引导预设添加两项服务，可共用一个经你确认的凭据引用，并显示最近一次认证状态，不读取邮件正文或日程内容。连接前请阅读
                   Apple 官方的<a href="https://support.apple.com/zh-cn/102654"
                   >App 专用密码说明</a>。
                 </p>
@@ -296,8 +299,9 @@ corr doctor --account personal</code></pre>
               <div class="install-block">
                 <p class="os-label">Gmail · Google 日历 · Google Tasks</p>
                 <p class="block-note">
-                  请参阅<a href="google-oauth.html">Google OAuth 图解指南</a>，
-                  只选需要的 API，并让客户端凭据与账号授权留在本机钥匙串。
+                  按<a href="google-oauth.html"
+                  >Google OAuth 图解指南</a>操作，只启用需要的
+                  API。客户端凭据和账号授权保存在本机钥匙串中。
                 </p>
               </div>
             </div>
@@ -306,10 +310,10 @@ corr doctor --account personal</code></pre>
         <li class="gs-step" id="connect" aria-labelledby="connect-title">
           <header>
             <span class="step-badge" aria-hidden="true">3</span><div>
-              <h2 id="connect-title">连接你常用的智能体</h2>
+              <h2 id="connect-title">连接智能体</h2>
               <p>
-                命令会把本地 stdio MCP
-                的绝对路径写入客户端自己的配置，不创建远程端点。之后重启客户端。
+                命令把本地 stdio MCP
+                服务器的绝对路径写入客户端配置，不创建远程端点。完成后重启客户端。
               </p>
             </div>
           </header>
@@ -399,9 +403,9 @@ corr doctor --account personal</code></pre>
         <li class="gs-step" id="first-asks" aria-labelledby="ask-title">
           <header>
             <span class="step-badge" aria-hidden="true">4</span><div>
-              <h2 id="ask-title">跨所有账号提问</h2>
+              <h2 id="ask-title">查询所有账号</h2>
               <p>
-                读取可以跨账号但不会合并身份；写入则先审阅，再单独提交。
+                读取可以跨账号，但账号之间不混用。写入要先预览，再单独确认。
               </p>
             </div>
           </header>
@@ -413,16 +417,16 @@ corr doctor --account personal</code></pre>
                 <li>“起草给 Ana 的回复，发送前让我确认。”</li>
               </ul>
               <p>
-                结果保留账号和提供商；失败路径显示为部分失败。发送时，只有与审阅过的账号、收件人和字节完全一致的内容才能通过
-                CLI <code>--approve</code> 或 MCP 提交
-                工具提交。批准短时且单次有效。
+                结果注明账号和服务商；某个连接失败时标为部分失败。发送时，只有账号、收件人和内容与预览逐字节一致，才能通过
+                CLI 的 <code>--approve</code> 或 MCP
+                的提交工具执行。批准有时效，且只能用一次。
               </p>
             </div>
             <figure class="terminal">
               <figcaption class="term-bar">
                 <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span
                   class="term-title"
-                >操作前审阅</span>
+                >执行前预览</span>
               </figcaption>
               <pre
                 tabindex="0"
@@ -444,39 +448,39 @@ corr doctor --account personal</code></pre>
       </ol>
       <section aria-labelledby="next-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>继续了解</p>
-          <h2 id="next-title">需要时，再深入细节。</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>更多内容</p>
+          <h2 id="next-title">相关页面</h2>
         </div>
         <div class="control-grid">
           <article>
-            <h3>支持服务与限制</h3>
-            <p><a href="providers.html">比较每条路径</a>的能力。</p>
+            <h3>支持的服务和限制</h3>
+            <p><a href="providers.html">比较各连接方式</a>支持的功能。</p>
           </article>
           <article>
             <h3>安全模型</h3>
-            <p><a href="safety.html">了解凭据、隔离和预览→提交</a>。</p>
+            <p><a href="safety.html">凭据保存、账号隔离和发送前确认</a>。</p>
           </article>
           <article>
             <h3>全部功能</h3>
-            <p><a href="features.html">浏览邮件、日历、脚本与监控功能</a>。</p>
+            <p><a href="features.html">邮件、日历、脚本和监控功能</a>。</p>
           </article>
           <article>
             <h3>AI 代理集成</h3>
             <p>
               <a href="integrations.html"
-              >区分直接 MCP、Skill、原生封装和实际上架状态</a>。
+              >直接 MCP、Skill、原生封装各自的发布状态</a>。
             </p>
           </article>
           <article>
             <h3>脚本与 JSON</h3>
-            <p><a href="features.html#scripting">使用同一核心自动化</a>。</p>
+            <p><a href="features.html#scripting">用同一套命令编写自动化脚本</a>。</p>
           </article>
         </div>
       </section>
       <section class="final-cta" aria-labelledby="gs-cta-title">
-        <p class="eyebrow"><span aria-hidden="true"></span>完整流程</p>
-        <h2 id="gs-cta-title">安装、登录、连接、提问。</h2>
-        <p>其余细节可以在需要时再读。</p>
+        <p class="eyebrow"><span aria-hidden="true"></span>小结</p>
+        <h2 id="gs-cta-title">四个步骤完成设置</h2>
+        <p>其他细节可以在需要时再看。</p>
         <div class="actions centered">
           <a class="button primary" href="safety.html">阅读安全模型</a><a
             class="button secondary"
@@ -493,7 +497,7 @@ corr doctor --account personal</code></pre>
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        独立的本地优先邮件与日历工具。与此处提到的厂商无隶属或背书关系。
+        独立开发的本地邮件和日历工具，与本站提到的厂商没有隶属或背书关系。
       </p>
       <nav aria-label="页脚">
         <a href="getting-started.html">快速开始</a><a href="providers.html">支持服务</a><a

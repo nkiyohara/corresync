@@ -19,7 +19,7 @@ func (client *Client) SendMail(
 		return application.MailSendResult{}, err
 	}
 	if len(input.Attachments) != 0 {
-		draft, err := client.CreateMailDraft(ctx, sendDraftInput(input))
+		draft, err := client.createDraft(ctx, sendDraftInput(input))
 		if err != nil {
 			return application.MailSendResult{}, errors.Join(application.ErrWriteOutcomeUnknown, err)
 		}

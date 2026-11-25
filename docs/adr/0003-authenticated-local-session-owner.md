@@ -152,3 +152,10 @@ Version 29 raises the authenticated request envelope to 40 MiB to carry up to
 body. Responses retain their 48 MiB bound. Only Outlook Web attachment uploads
 use the larger provider request bound; other OWA actions retain 8 MiB.
 Read limits do not change. Exact-version owner replacement remains mandatory.
+
+## Protocol 30: resolved draft addressing
+
+Version 30 adds the optional `addressing` object to the save-only draft
+response so the client can show the provider-resolved To, Cc, and subject.
+Requests, bounds, and every other method are unchanged. The shape change still
+requires exact-version owner replacement; no draft write is replayed across it.

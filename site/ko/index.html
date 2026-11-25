@@ -3,20 +3,20 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Corresync — 메일·캘린더·할 일을 하나의 로컬 MCP로</title>
+    <title>Corresync — 메일·캘린더·할 일용 로컬 MCP 서버와 CLI</title>
     <meta
       name="description"
-      content="Outlook, Gmail, Google 캘린더, Microsoft To Do, Google Tasks, Todoist, TickTick, JMAP, IMAP/SMTP, CalDAV를 아우르는 로컬 우선 MCP 서버와 CLI입니다."
+      content="Outlook, Gmail, Google 캘린더, Microsoft To Do, Google Tasks, Todoist, TickTick, JMAP, IMAP/SMTP, CalDAV 계정을 다루는 로컬 MCP 서버와 CLI입니다."
     >
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f7f4ed">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#10141b">
     <meta
       property="og:title"
-      content="Corresync — 메일·캘린더·할 일을 하나의 로컬 MCP로"
+      content="Corresync — 메일·캘린더·할 일용 로컬 MCP 서버와 CLI"
     >
     <meta
       property="og:description"
-      content="메일, 캘린더, 할 일을 하나의 로컬 CLI와 MCP로 모으면서 업무용과 개인용 계정은 서로 격리합니다."
+      content="여러 계정의 메일, 캘린더, 할 일을 로컬 CLI와 MCP 서버 하나로 다룹니다. 업무용과 개인용 계정은 서로 섞이지 않습니다."
     >
     <meta property="og:type" content="website">
     <meta property="og:locale" content="ko_KR">
@@ -39,7 +39,7 @@
     >
     <meta
       name="twitter:description"
-      content="메일, 캘린더, 할 일을 하나의 로컬 CLI와 MCP로 모으면서 계정별 신원과 권한은 분리합니다."
+      content="여러 계정의 메일, 캘린더, 할 일을 로컬 CLI와 MCP 서버 하나로 다룹니다. 로그인과 권한은 계정마다 따로 관리합니다."
     >
     <meta name="twitter:image" content="https://corresync.org/social-card.png">
     <meta
@@ -79,7 +79,7 @@
           "runtimePlatform": ["macOS", "Linux", "Windows"],
           "license": "https://www.apache.org/licenses/LICENSE-2.0",
           "inLanguage": "ko",
-          "description": "로컬 우선 방식의 제공자 중립 메일·캘린더·할 일 MCP 서버 및 CLI."
+          "description": "특정 서비스에 묶이지 않고 로컬에서 실행되는 메일·캘린더·할 일용 MCP 서버와 CLI."
         }
       ]
     }
@@ -120,17 +120,19 @@
           <p class="eyebrow">
             <span aria-hidden="true"></span>메일 · 캘린더 · 할 일
           </p>
-          <h1 id="hero-title">계정마다 흩어진 일을, <em>하나의 로컬 MCP로.</em></h1>
+          <h1 id="hero-title">
+            여러 계정의 메일, 일정, 할 일을 <em>로컬에서 한 번에
+              다룹니다</em>
+          </h1>
           <p class="lede">
-            업무용과 개인용 메일, 캘린더, 할 일을 Codex, Claude Code, MCP
-            에이전트와 터미널에 연결하세요. Corresync는 계정별 신원과 권한을
-            분리한 채 하나의 타입화된 인터페이스로 찾기, 계획하기, 후속
-            처리와 실행을 이어 줍니다.
+            업무용과 개인용 메일, 캘린더, 할 일을 Codex, Claude Code, 다른 MCP
+            에이전트, 터미널에서 씁니다. 로그인과 권한은 계정마다 따로
+            두고, 검색, 일정 확인, 답장은 정해진 명령과 도구로 처리합니다.
           </p>
           <p class="hero-providers">
-            <strong>매일 쓰는 서비스를 중심으로:</strong> Outlook · Gmail · Google
-            캘린더 · Microsoft To Do · Todoist · TickTick · 개방형 표준. 연결
-            경로와 기능은 계정별로 명확히 표시합니다. <a href="providers.html"
+            <strong>지원 서비스:</strong> Outlook · Gmail · Google 캘린더 · Microsoft To
+            Do · Todoist · TickTick · 개방형 표준. 어떤 방식으로 연결되고
+            무엇을 할 수 있는지는 계정마다 표시됩니다. <a href="providers.html"
             >서비스 상세 보기</a>
           </p>
           <div class="actions">
@@ -140,37 +142,36 @@
             >내 메일 지원 여부 확인</a>
           </div>
           <p class="hero-note">
-            로그인은 브라우저나 운영체제 키체인이 맡습니다. Corresync가
-            관리하는 비밀 정보를 에이전트에 넘기지 않으며, 중계 서버도
-            없습니다. 중요한 쓰기 작업은 정확한 미리보기를 확인하고
-            승인한 뒤에만 실행됩니다.
+            로그인은 브라우저나 운영체제 키체인에서 처리하며, Corresync가
+            관리하는 비밀 정보는 에이전트에 넘기지 않습니다. 메일
+            전송처럼 영향이 큰 작업은 미리보기를 확인하고 승인해야
+            실행됩니다.
           </p>
         </div>
         <div class="install-panel" id="install" aria-labelledby="install-title">
           <div class="install-head">
             <h2 id="install-title">Corresync 설정</h2>
             <p>
-              이미 사용 중인 AI 에이전트로 이 컴퓨터에 Corresync를 설치하거나
-              업데이트할 수 있습니다. 각 단계는 직접 확인할 수 있습니다.
+              사용 중인 AI 에이전트에게 이 컴퓨터에 Corresync를 설치하거나
+              업데이트하도록 맡길 수 있습니다. 각 단계는 직접 확인합니다.
             </p>
           </div>
           <div class="agent-setup">
             <p>
               독립 실행형 CLI를 권장합니다. 새로 설정하면 검증된 자동
-              업데이트가 켜집니다. 이미 설치되어 있다면 직접 변경하지 않는
-              한 패키지 관리자, 기존 구성, 업데이트 설정을 그대로
-              유지합니다.
+              업데이트가 켜집니다. 이미 설치되어 있으면 직접 바꾸지 않는
+              한 패키지 관리자, 구성, 업데이트 설정을 그대로 둡니다.
             </p>
             <div class="actions">
               <a
                 id="setup-chatgpt"
                 class="button primary"
-                href="codex://new?prompt=Help%20me%20install%20or%20update%20Corresync%20and%20connect%20it%20to%20this%20local%20desktop%20agent.%20First%20confirm%20that%20your%20command%20execution%20targets%20the%20computer%20I%20want%20to%20set%20up%3B%20do%20not%20install%20into%20a%20cloud%20sandbox%20or%20a%20remote%20server%20by%20mistake.%20If%20you%20cannot%20run%20local%20commands%2C%20explain%20how%20I%20can%20continue%20in%20a%20desktop%20agent.%0A%0ARead%20https%3A%2F%2Fcorresync.org%2Fgetting-started.html%20and%20the%20official%20documentation%20linked%20there.%20Inspect%20the%20OS%2C%20architecture%2C%20existing%20corr%20installation%20and%20its%20installation%20owner.%20For%20a%20new%20installation%2C%20use%20the%20official%20stable%20standalone%20installer%20for%20the%20current%20user%2C%20without%20administrator%20privileges%2C%20preserving%20its%20checksum%20and%20signature%20verification.%20For%20an%20existing%20standalone%20installation%20use%20corr%20update%3B%20for%20a%20package-managed%20installation%20use%20its%20package%20manager.%20Do%20not%20silently%20replace%20a%20package-managed%20installation.%0A%0AUse%20corr%20setup%20and%20the%20installed%20CLI%20help%20to%20guide%20configuration%20and%20agent%20integration.%20For%20a%20new%20configuration%2C%20use%20the%20stable%20update%20channel%20and%20ensure%20automatic%20checks%20and%20verified%20automatic%20installation%20are%20enabled.%20Verify%20updates.auto_install%20is%20true%20%28corr%20config%20set%20updates.auto_install%20true%20is%20the%20supported%20opt-in%29.%20Preserve%20existing%20account%2C%20agent%20and%20update%20settings%3B%20if%20automatic%20updates%20were%20disabled%2C%20ask%20before%20enabling%20them.%20Explain%20that%20automatic%20update%20checks%20happen%20on%20eligible%20interactive%20corr%20invocations%2C%20not%20as%20a%20continuous%20background%20updater.%0A%0APreview%20configuration%20changes%20and%20let%20me%20approve%20permissions%20and%20consequential%20actions.%20I%20will%20handle%20browser%20sign-in%20and%20MFA%20myself.%20Never%20request%20passwords%2C%20tokens%2C%20cookies%20or%20verification%20codes%20in%20chat.%20Do%20not%20enable%20provider%20authorization%2C%20administrator%20consent%2C%20monitoring%20or%20message%20sending%20without%20my%20explicit%20choice.%20Verify%20the%20installed%20version%2C%20update%20settings%20and%20daemon%20state%20using%20the%20supported%20CLI%20commands.%20Ensure%20any%20daemon%20running%20an%20old%20version%20is%20updated%20through%20the%20supported%20update%20flow.%20Do%20not%20read%20or%20send%20live%20account%20content%20just%20to%20test%20installation.%20Report%20what%20succeeded%20and%20anything%20I%20still%20need%20to%20do.%0A"
+                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
               >ChatGPT로 설정</a>
               <a
                 id="setup-claude"
                 class="button secondary"
-                href="claude://code/new?q=Help%20me%20install%20or%20update%20Corresync%20and%20connect%20it%20to%20this%20local%20desktop%20agent.%20First%20confirm%20that%20your%20command%20execution%20targets%20the%20computer%20I%20want%20to%20set%20up%3B%20do%20not%20install%20into%20a%20cloud%20sandbox%20or%20a%20remote%20server%20by%20mistake.%20If%20you%20cannot%20run%20local%20commands%2C%20explain%20how%20I%20can%20continue%20in%20a%20desktop%20agent.%0A%0ARead%20https%3A%2F%2Fcorresync.org%2Fgetting-started.html%20and%20the%20official%20documentation%20linked%20there.%20Inspect%20the%20OS%2C%20architecture%2C%20existing%20corr%20installation%20and%20its%20installation%20owner.%20For%20a%20new%20installation%2C%20use%20the%20official%20stable%20standalone%20installer%20for%20the%20current%20user%2C%20without%20administrator%20privileges%2C%20preserving%20its%20checksum%20and%20signature%20verification.%20For%20an%20existing%20standalone%20installation%20use%20corr%20update%3B%20for%20a%20package-managed%20installation%20use%20its%20package%20manager.%20Do%20not%20silently%20replace%20a%20package-managed%20installation.%0A%0AUse%20corr%20setup%20and%20the%20installed%20CLI%20help%20to%20guide%20configuration%20and%20agent%20integration.%20For%20a%20new%20configuration%2C%20use%20the%20stable%20update%20channel%20and%20ensure%20automatic%20checks%20and%20verified%20automatic%20installation%20are%20enabled.%20Verify%20updates.auto_install%20is%20true%20%28corr%20config%20set%20updates.auto_install%20true%20is%20the%20supported%20opt-in%29.%20Preserve%20existing%20account%2C%20agent%20and%20update%20settings%3B%20if%20automatic%20updates%20were%20disabled%2C%20ask%20before%20enabling%20them.%20Explain%20that%20automatic%20update%20checks%20happen%20on%20eligible%20interactive%20corr%20invocations%2C%20not%20as%20a%20continuous%20background%20updater.%0A%0APreview%20configuration%20changes%20and%20let%20me%20approve%20permissions%20and%20consequential%20actions.%20I%20will%20handle%20browser%20sign-in%20and%20MFA%20myself.%20Never%20request%20passwords%2C%20tokens%2C%20cookies%20or%20verification%20codes%20in%20chat.%20Do%20not%20enable%20provider%20authorization%2C%20administrator%20consent%2C%20monitoring%20or%20message%20sending%20without%20my%20explicit%20choice.%20Verify%20the%20installed%20version%2C%20update%20settings%20and%20daemon%20state%20using%20the%20supported%20CLI%20commands.%20Ensure%20any%20daemon%20running%20an%20old%20version%20is%20updated%20through%20the%20supported%20update%20flow.%20Do%20not%20read%20or%20send%20live%20account%20content%20just%20to%20test%20installation.%20Report%20what%20succeeded%20and%20anything%20I%20still%20need%20to%20do.%0A"
+                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
               >Claude로 설정</a>
             </div>
             <p>
@@ -178,11 +179,10 @@
               상태로 열립니다. 내용을 확인한 뒤 직접 보내세요.
             </p>
             <p class="install-note">
-              이 컴퓨터에 로컬로 접근할 수 있는 ChatGPT Codex 또는 Claude Code
-              데스크톱 앱이 필요합니다. 권한 확인 창이 나타나면
-              승인하세요. 관리자 권한은 필요하지 않습니다. 계정 로그인과
-              다단계 인증은 직접 완료하세요. 비밀번호나 인증 코드는 채팅에
-              붙여넣지 마세요.
+              이 컴퓨터에서 명령을 실행할 수 있는 ChatGPT Codex 또는 Claude Code
+              데스크톱 앱이 필요합니다. 권한 확인 창이 뜨면 승인하세요.
+              관리자 권한은 필요 없습니다. 로그인과 다단계 인증은 직접
+              하고, 비밀번호나 인증 코드는 채팅에 붙여넣지 마세요.
             </p>
             <p class="install-note">
               휴대폰으로 보고 있다면 설정할 컴퓨터에서 이 페이지를 열거나,
@@ -197,19 +197,13 @@
                 <pre
                   tabindex="0"
                   aria-label="Corresync setup request"
-                ><code>Help me install or update Corresync and connect it to this local desktop agent. First confirm that your command execution targets the computer I want to set up; do not install into a cloud sandbox or a remote server by mistake. If you cannot run local commands, explain how I can continue in a desktop agent.
-
-Read https://corresync.org/getting-started.html and the official documentation linked there. Inspect the OS, architecture, existing corr installation and its installation owner. For a new installation, use the official stable standalone installer for the current user, without administrator privileges, preserving its checksum and signature verification. For an existing standalone installation use corr update; for a package-managed installation use its package manager. Do not silently replace a package-managed installation.
-
-Use corr setup and the installed CLI help to guide configuration and agent integration. For a new configuration, use the stable update channel and ensure automatic checks and verified automatic installation are enabled. Verify updates.auto_install is true (corr config set updates.auto_install true is the supported opt-in). Preserve existing account, agent and update settings; if automatic updates were disabled, ask before enabling them. Explain that automatic update checks happen on eligible interactive corr invocations, not as a continuous background updater.
-
-Preview configuration changes and let me approve permissions and consequential actions. I will handle browser sign-in and MFA myself. Never request passwords, tokens, cookies or verification codes in chat. Do not enable provider authorization, administrator consent, monitoring or message sending without my explicit choice. Verify the installed version, update settings and daemon state using the supported CLI commands. Ensure any daemon running an old version is updated through the supported update flow. Do not read or send live account content just to test installation. Report what succeeded and anything I still need to do.
+                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
 </code></pre>
               </div>
             </details>
           </div>
           <details class="manual-setup">
-            <summary>선택 사항: 수동 설치 및 이후 설정 단계</summary>
+            <summary>직접 설치하기(선택)</summary>
             <div class="install-block">
               <p class="os-label" id="install-unix">macOS · Linux</p>
               <div class="cmd" data-copy data-copy-label="macOS 및 Linux 설치 명령">
@@ -241,7 +235,7 @@ Preview configuration changes and let me approve permissions and consequential a
               </div>
             </div>
             <div class="install-block">
-              <p class="os-label" id="install-connect">다음 단계 · 안내 설정 완료</p>
+              <p class="os-label" id="install-connect">설치 후 · 설정 마무리</p>
               <div class="cmd" data-copy data-copy-label="계정 설정 명령">
                 <pre
                   tabindex="0"
@@ -251,25 +245,25 @@ Preview configuration changes and let me approve permissions and consequential a
               </div>
             </div>
             <p class="install-note">
-              현재 로컬 상태에서 이어서 시작하고, 자격 증명 없이 계정
-              경로를 찾습니다. 계정과 에이전트 설정은 적용 전에 미리 보여
-              주며, 로그인은 별도 선택입니다. 다른 설치 방법과 MCP
-              클라이언트별 명령은 <a href="getting-started.html">시작 안내</a>에서
-              확인할 수 있습니다.
+              하던 설정이 있으면 이어서 진행합니다. 연결 방식은 자격 증명
+              없이 찾고, 계정과 에이전트 설정은 적용 전에 보여 줍니다.
+              로그인은 따로 실행합니다. 다른 설치 방법과 MCP 클라이언트별
+              명령은 <a href="getting-started.html">시작 안내</a>에서 확인할 수
+              있습니다.
             </p>
           </details>
         </div>
       </section>
       <section class="service-landscape" aria-labelledby="service-landscape-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>하루의 일을 한곳에서</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>지원 서비스</p>
           <h2 id="service-landscape-title">
-            메일, 캘린더, 할 일을 위해 로그인 방식을 바꿀 필요는 없습니다.
+            지금 쓰는 로그인 방식 그대로 메일, 캘린더, 할 일을 연결합니다
           </h2>
           <p>
-            직접 관리하는 계정을 하나의 로컬 CLI와 MCP 서버에서 연결합니다.
-            서비스와 계정마다 제공하는 기능이 다르므로 설정 과정에서 연결
-            경로와 이용 범위를 분명히 보여 줍니다.
+            본인 계정을 로컬 CLI와 MCP 서버 하나에 연결합니다. 서비스와
+            계정마다 기능이 다르므로, 설정할 때 연결 방식과 쓸 수 있는
+            기능을 보여 줍니다.
           </p>
         </div>
         <div class="service-grid">
@@ -344,38 +338,40 @@ Preview configuration changes and let me approve permissions and consequential a
           </article>
         </div>
         <p class="service-cta">
-          <a href="providers.html">서비스와 연결 방식 살펴보기<span aria-hidden="true">
+          <a href="providers.html">서비스별 연결 방식 보기<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
       <section class="trust-row" aria-label="Corresync를 선택하는 이유">
         <div>
-          <strong>MCP 하나로 모든 계정 연결</strong><span>업무용과 개인용 신원은
-            분리하고, 결과에는 원래 계정과 서비스가 표시됩니다.</span>
+          <strong>여러 계정을 MCP 서버 하나로</strong><span>업무용과 개인용
+            계정은 섞이지 않고, 결과마다 어느 계정과 서비스에서 왔는지
+            표시됩니다.</span>
         </div>
         <div>
-          <strong>에이전트에 비밀 정보 없음</strong><span>로그인은 보이는
-            브라우저나 운영체제 키체인이 맡으며, 원격 중계 서버가
-            없습니다.</span>
+          <strong>에이전트는 자격 증명을 받지 않음</strong><span>로그인은
+            화면에 보이는 브라우저나 운영체제 키체인에서 처리합니다. 원격
+            중계 서버는 없습니다.</span>
         </div>
         <div>
-          <strong>미리보기 후 실행</strong><span>전송과 파괴적 작업은 서버가
-            만든 검토 화면과 짧은 일회성 승인을 거칩니다.</span>
+          <strong>확인 후 실행</strong><span>전송이나 삭제 같은 작업은 먼저
+            서버가 검토 내용을 보여 주며, 승인은 한 번만 쓸 수
+            있습니다.</span>
         </div>
       </section>
       <section class="policy-callout" aria-labelledby="policy-callout-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>Google 지원 현황</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>Google 계정</p>
           <h2 id="policy-callout-title">
-            직접 소유한 OAuth 클라이언트로 Google을 연결하세요.
+            Google은 직접 만든 OAuth 클라이언트로 연결합니다
           </h2>
           <p>
-            직접 관리하는 Google Cloud 프로젝트에 데스크톱 OAuth 클라이언트를
-            만들고, 안내 설정에서 다운로드한 JSON을 가져온 뒤 평소 쓰는
-            브라우저에서 로그인합니다. 클라이언트 자격 증명과 계정 권한은
-            키체인에 남고, Corresync 관리형 Google OAuth는 비활성 상태를
-            유지합니다.
-            <a href="google-oauth.html">화면별 안내를 따라하세요</a>.
+            본인이 관리하는 Google Cloud 프로젝트에 데스크톱 OAuth
+            클라이언트를 만들고, 내려받은 JSON을 안내 설정에서 가져온 뒤
+            평소 쓰는 브라우저에서 로그인합니다. 클라이언트 자격 증명과
+            계정 권한은 키체인에 저장되고, Corresync 관리형 Google OAuth는 꺼져
+            있습니다.
+            <a href="google-oauth.html">화면별 설정 안내 보기</a>.
           </p>
         </div>
         <div class="actions">
@@ -387,12 +383,12 @@ Preview configuration changes and let me approve permissions and consequential a
       </section>
       <section class="journey" id="quickstart" aria-labelledby="journey-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>설치 후 세 단계</p>
-          <h2 id="journey-title">선택하고, 로그인하고, 물어보세요.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>설치 후 명령 세 개</p>
+          <h2 id="journey-title">계정 추가부터 첫 질문까지</h2>
           <p>
-            Corresync는 서비스 경로를 미리 고르지 않습니다. 먼저 자격 증명
-            없이 공개 정보를 확인하고, 사용자가 명시적으로 선택한 계정
-            경로만 추가한 뒤 해당 계정의 로그인을 시작합니다.
+            서비스를 미리 정하지 않습니다. 자격 증명 없이 메일 주소의 공개
+            정보를 확인하고, 고른 연결 방식으로 계정을 추가한 뒤에야
+            로그인을 시작할 수 있습니다.
           </p>
         </div>
         <div class="journey-grid">
@@ -407,8 +403,8 @@ Preview configuration changes and let me approve permissions and consequential a
 corr auth login --account personal</code></pre>
             </div>
             <p>
-              탐색 단계에서는 페이지를 열지 않습니다. 별도의 로그인 명령은
-              선택한 경로만 사용합니다.
+              탐색 단계에서는 아무 페이지도 열지 않습니다. 로그인 명령은
+              고른 연결 방식만 사용합니다.
             </p>
           </div>
           <div class="journey-step">
@@ -421,8 +417,8 @@ corr auth login --account personal</code></pre>
               ><code>corr mcp setup codex</code></pre>
             </div>
             <p>
-              로컬 stdio 서버를 등록한 뒤 클라이언트를 한 번 다시
-              시작하세요.
+              에이전트에 로컬 stdio 서버를 등록합니다. 등록 후 클라이언트를
+              한 번 다시 시작하세요.
             </p>
           </div>
           <div class="journey-step">
@@ -433,61 +429,60 @@ corr auth login --account personal</code></pre>
               aria-labelledby="journey-ask"
             ><code><span class="t-ask">›</span> 모든 계정에서 오늘 정오 전까지
   처리해야 할 일을 정리해 줘</code></pre>
-            <p>답변의 각 항목에는 출처 계정이 그대로 표시됩니다.</p>
+            <p>답변의 각 항목에는 어느 계정에서 왔는지 표시됩니다.</p>
           </div>
         </div>
         <p class="center-link">
-          <a href="getting-started.html">전체 시작 안내 보기<span aria-hidden="true">
+          <a href="getting-started.html">시작 안내 전체 보기<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
       <section class="outcomes" id="outcomes" aria-labelledby="outcomes-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>첫날부터 가능한 일</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>바로 할 수 있는 일</p>
           <h2 id="outcomes-title">
-            한 번의 질문으로 여러 받은편지함과 캘린더를.
+            여러 받은편지함과 캘린더를 한 번에 조회합니다
           </h2>
           <p>
-            CLI와 MCP는 같은 명확히 정의된 작업, 계정 격리, 정책 검사를
-            공유합니다.
+            CLI와 MCP 에이전트는 같은 작업을 같은 방식으로 실행하며, 계정
+            분리와 정책 검사도 똑같이 적용됩니다.
           </p>
         </div>
         <div class="outcome-grid">
           <article class="outcome-card">
             <h3>모든 받은편지함 검색</h3>
             <p>
-              어느 계정에 있는지 몰라도 한꺼번에 찾고, 결과마다 출처를
-              확인할 수 있습니다. 한 계정이 실패하면 부분 결과라고
-              명시합니다.
+              어느 계정에 있는지 몰라도 한꺼번에 찾고, 결과마다 계정이
+              표시됩니다. 일부 계정이 실패하면 부분 결과라고 알려 줍니다.
             </p>
           </article>
           <article class="outcome-card">
-            <h3>통합 일정 보기</h3>
+            <h3>일정 한 번에 보기</h3>
             <p>
-              업무용과 개인용 일정을 모아 보면서도 시간대, 캘린더, 서비스
-              출처를 각 일정에 유지합니다.
+              업무용과 개인용 일정을 함께 보여 주며, 일정마다 시간대와
+              캘린더, 서비스가 표시됩니다.
             </p>
           </article>
           <article class="outcome-card">
-            <h3>보내기 전 정확히 확인</h3>
+            <h3>보내기 전에 확인</h3>
             <p>
-              승인은 미리 본 계정, 받는 사람, 첨부 파일과 본문 바이트에
-              묶입니다. 내용이 달라지면 다시 승인해야 합니다.
+              승인은 미리 본 계정, 받는 사람, 첨부 파일, 본문과 정확히 같을
+              때만 유효합니다. 내용이 바뀌면 다시 승인해야 합니다.
             </p>
           </article>
         </div>
         <p class="center-link">
-          <a href="features.html">전체 기능과 명확한 제한 보기<span aria-hidden="true">
+          <a href="features.html">기능과 제한 사항 전체 보기<span aria-hidden="true">
               →</span></a>
         </p>
       </section>
       <section class="safety safety-preview" aria-labelledby="safety-title">
         <div class="safety-head">
-          <p class="eyebrow light"><span aria-hidden="true"></span>보이는 안전장치</p>
-          <h2 id="safety-title">첫 호출에서 바로 전송하지 않습니다.</h2>
+          <p class="eyebrow light"><span aria-hidden="true"></span>안전장치</p>
+          <h2 id="safety-title">처음 실행하면 검토 내용만 보여 줍니다</h2>
           <p class="safety-lede">
-            중요한 작업은 먼저 검토 화면을 반환합니다. 승인은 호출자,
-            계정, 서비스, 대상, 내용, 만료 시각에 묶이며 한 번만 쓸 수
+            영향이 큰 명령은 먼저 검토 내용을 돌려줍니다. 승인은 요청자,
+            계정, 서비스, 대상, 내용에 묶이고, 만료되며 한 번만 쓸 수
             있습니다.
           </p>
         </div>
@@ -511,36 +506,36 @@ corr auth login --account personal</code></pre>
           </figure>
           <ul class="safety-points">
             <li>
-              <strong>에이전트에는 명확히 정의된 도구만 제공합니다.</strong>
+              <strong>에이전트는 정해진 도구만 씁니다.</strong>
               비밀번호, Cookie, OAuth 권한은 MCP나 설정에 들어가지 않습니다.
             </li>
             <li>
-              <strong>로컬에서만 실행됩니다.</strong> MCP는 로컬 stdio로 통신하며
-              호스팅 중계가 없습니다.
+              <strong>로컬에서만 실행됩니다.</strong> MCP 서버는 이 컴퓨터에서
+              stdio로 통신합니다.
             </li>
             <li>
-              <strong>결과가 불확실하면 멈춥니다.</strong> 상태를 알 수 없는
-              원격 쓰기를 자동 재시도하지 않습니다.
+              <strong>결과를 모르면 멈춥니다.</strong> 성공했는지 알 수 없는
+              원격 쓰기는 자동으로 다시 시도하지 않습니다.
             </li>
             <li>
-              <strong>메일 내용은 신뢰하지 않는 데이터입니다.</strong> 명령
-              실행이나 에이전트 시작 권한을 줄 수 없습니다.
+              <strong>메일 내용은 데이터로만 취급합니다.</strong> 메일에 적힌
+              내용으로 명령을 실행하거나 에이전트를 시작할 수 없습니다.
             </li>
           </ul>
         </div>
         <p class="safety-links">
-          <a href="safety.html">전체 보안 모델 보기<span aria-hidden="true"> →</span></a>
+          <a href="safety.html">보안 설명 전체 보기<span aria-hidden="true"> →</span></a>
         </p>
       </section>
       <section class="provider-preview" aria-labelledby="provider-preview-title">
         <div class="section-heading">
-          <p class="eyebrow"><span aria-hidden="true"></span>기존 연결 방식 그대로</p>
+          <p class="eyebrow"><span aria-hidden="true"></span>연결 방식</p>
           <h2 id="provider-preview-title">
-            필요하면 기본 API를, 가능하면 개방형 표준을.
+            서비스 자체 API와 개방형 표준을 지원합니다
           </h2>
           <p>
-            메일과 캘린더 경로를 따로 선택할 수 있어 IMAP/SMTP 메일과 CalDAV
-            캘린더를 한 계정에서 조합할 수도 있습니다.
+            메일과 캘린더의 연결 방식은 따로 고릅니다. 한 계정에서 IMAP/SMTP
+            메일과 CalDAV 캘린더를 함께 쓸 수도 있습니다.
           </p>
         </div>
         <div class="route-family-grid">
@@ -548,33 +543,33 @@ corr auth login --account personal</code></pre>
             <p class="chip">브라우저 소유</p>
             <h3>Outlook Web</h3>
             <p>
-              대화형 로그인은 전용으로 보이는 브라우저에 남고, 메일과
-              캘린더에는 명확히 정의된 작업을 제공합니다.
+              Outlook 로그인은 화면에 보이는 전용 브라우저에서 직접 합니다.
+              메일과 캘린더 작업을 지원합니다.
             </p>
           </article>
           <article class="route-family accent-card">
             <p class="chip">명시적 OAuth</p>
             <h3>Microsoft Graph · Google은 직접 소유한 클라이언트로</h3>
             <p>
-              Graph는 사용 권한이 있는 공개 클라이언트를 씁니다. Google은 직접
-              소유한 데스크톱 OAuth 클라이언트를 사용합니다.
+              Microsoft Graph는 사용 권한이 있는 공개 클라이언트를 씁니다.
+              Google은 본인이 만든 데스크톱 OAuth 클라이언트를 씁니다.
             </p>
           </article>
           <article class="route-family">
             <p class="chip">개방형 표준</p>
             <h3>JMAP · IMAP/SMTP · CalDAV</h3>
             <p>
-              암호화된 엔드포인트와 운영체제 키체인 또는 명시적으로
-              승인한 자격 증명 도우미를 사용합니다.
+              암호화된 엔드포인트에 연결합니다. 자격 증명은 운영체제
+              키체인이나 사용자가 승인한 자격 증명 도우미에서 가져옵니다.
             </p>
           </article>
         </div>
         <div class="evidence-note">
           <span class="status-dot" aria-hidden="true"></span><p>
-            <strong>선택하기 전에 세부 정보를 확인하세요.</strong>
-            서비스 안내에서 정확한 로그인 방식, 설정 요건, 계정별 기능을
-            함께 볼 수 있습니다.
-          </p><a href="providers.html#check">메일 주소를 비공개로 확인하기<span
+            <strong>계정을 추가하기 전에 확인하세요.</strong>
+            서비스 안내에서 로그인 방식, 필요한 설정, 계정에 따라 달라지는
+            기능을 볼 수 있습니다.
+          </p><a href="providers.html#check">메일 주소로 지원 여부 확인하기<span
               aria-hidden="true"
             >
               →</span></a>
@@ -582,15 +577,15 @@ corr auth login --account personal</code></pre>
       </section>
       <section class="honest-edges" aria-labelledby="edges-title">
         <div>
-          <p class="eyebrow"><span aria-hidden="true"></span>한계도 투명하게</p>
-          <h2 id="edges-title">할 수 없는 일까지 제품의 일부입니다.</h2>
+          <p class="eyebrow"><span aria-hidden="true"></span>제한 사항</p>
+          <h2 id="edges-title">현재 지원하지 않거나 직접 준비해야 하는 것</h2>
         </div>
         <ul>
           <li>
-            <strong>Gmail, Google 캘린더, Google Tasks는 직접 소유한 OAuth
-              클라이언트로 사용할 수 있습니다.</strong>
-            안내 설정이 명시적 로그인 전에 데스크톱 클라이언트 자격
-            증명을 키체인으로 가져옵니다.
+            <strong>Gmail, Google 캘린더, Google Tasks에는 본인이 만든 OAuth
+              클라이언트가 필요합니다.</strong>
+            안내 설정에서 데스크톱 클라이언트 자격 증명을 키체인으로
+            가져온 다음 로그인합니다.
           </li>
           <li>
             <strong>Microsoft Graph OAuth 클라이언트는 사용자가 준비합니다.</strong>
@@ -599,17 +594,17 @@ corr auth login --account personal</code></pre>
           <li><strong>Windows 데스크톱 알림은 아직 지원하지 않습니다.</strong></li>
           <li>
             <strong>기능은 계정별로 확인합니다.</strong>
-            이메일 브랜드만으로 추측하지 않고 설정 과정에서 해당 계정의
-            연결 경로와 서비스를 보여 줍니다.
+            메일 주소의 브랜드만 보고 추측하지 않습니다. 설정할 때 그
+            계정의 연결 방식과 서비스를 보여 줍니다.
           </li>
         </ul>
       </section>
       <section class="final-cta" aria-labelledby="final-title">
         <p class="eyebrow">
-          <span aria-hidden="true"></span>받은편지함을 정리할 준비가 됐다면
+          <span aria-hidden="true"></span>시작하기
         </p>
-        <h2 id="final-title">모든 연락을 하나의 로컬 대화로 가져오세요.</h2>
-        <p>명령 하나로 설치하고, 명령 하나로 에이전트를 연결합니다.</p>
+        <h2 id="final-title">설치하고 에이전트에 연결하기</h2>
+        <p>설치에 명령 하나, 에이전트 연결에 명령 하나가 필요합니다.</p>
         <div class="actions centered">
           <a class="button primary" href="#install">설치 명령 보기</a><a
             class="button secondary"
@@ -626,8 +621,8 @@ corr auth login --account personal</code></pre>
           width="64"
           height="64"
         ><span class="brand-name">corresync</span></a><p>
-        독립적인 로컬 우선 메일·캘린더 도구입니다. 여기에 언급된 업체와
-        제휴하거나 보증받지 않았습니다.
+        독립적으로 개발한 로컬 메일·캘린더 도구입니다. 이 사이트에
+        나오는 업체와 제휴 관계가 없으며 보증을 받지도 않았습니다.
       </p>
       <nav aria-label="바닥글">
         <a href="getting-started.html">시작하기</a><a href="providers.html"
