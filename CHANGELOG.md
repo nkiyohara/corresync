@@ -3,6 +3,33 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.0 - 2026-11-25
+
+- Rewrite the command line in plain language: grouped `corr --help`, shorter
+  command and flag help with examples, clearer previews and empty results, and
+  errors that say what happened and what to run next. Command names, flags,
+  JSON output, and exit statuses are unchanged.
+- `corr setup` starts with your email address, offers the other ways to connect
+  when nothing is found, and explains what a connection needs before asking
+  for it. `corr settings` no longer leaves cancelled prompts on screen.
+- An AI agent can ask to sign you in: the new `account_sign_in` MCP tool makes
+  your MCP client ask you, names the sign-in page, and starts the usual browser
+  sign-in only if you accept. It works for accounts you already signed in to
+  from the terminal with the same connection settings (ADR 0039).
+- The forwarded login view shows its state and the time left, has a Paste
+  button, relays pointer movement, and skips unchanged frames. `--host` needs
+  0.10.0 on both computers.
+- `corr auth status` shows a sign-in that is still in progress.
+- Fix OAuth providers reporting "outcome unknown" for a write that was never
+  sent when a token was revoked during sleep; they now ask you to sign in.
+- `corr update check` asks again instead of repeating a cached failure, and
+  says why a check failed.
+- Update all dependencies; generate the compatibility tables from one catalog
+  checked against the code; add opt-in live observation harnesses.
+- The private daemon protocol is now 33; the MCP catalog has 72 tools.
+
+See the [release notes](docs/releases/v0.10.0.md) for details and limits.
+
 ## 0.9.5 - 2026-11-25
 
 - Fix sign-in on hosts without a display. The forwarded login view (`--web`

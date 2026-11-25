@@ -1,7 +1,7 @@
 # Install and verify
 
 The package is Corresync and the primary executable is `corr`. Releases in the
-finite v0.8–v0.9 command-transition window also contain the identical
+finite command-transition window that began with v0.8 also contain the identical
 `corresync` compatibility executable; scripts and new documentation should use
 `corr`.
 
@@ -24,7 +24,7 @@ macOS binaries require macOS 13 Ventura or later. The installer:
   available, or reports clearly that provenance was not checked;
 - bounds archive size, entry count, extraction, candidate output, and time;
 - validates candidate version, operating system, and architecture;
-- installs `corr` and the v0.8-v0.9 `corresync` compatibility entry in
+- installs `corr` and the `corresync` compatibility entry in
   `~/.local/bin` through a rollback-capable same-filesystem transaction.
 
 If `~/.local/bin` is not already on `PATH`, the installer adds one marked,
@@ -265,12 +265,14 @@ corr setup
 corr auth status
 ```
 
-The wizard reports current local state, optionally installs shell completion,
-creates a provider-neutral local configuration, performs credential-free
-discovery, and adds a reviewed route only after confirmation. Sign-in and
-doctor remain separate account-scoped choices. It then supports multi-select
-agent setup through one preview and confirmation, verifies hosts independently,
-and groups remaining work as Ready, Needs attention, or Optional later. For a
+The wizard starts by asking for your email address. It creates the settings
+file, looks up how the address can connect without signing in, and adds the
+account only after you confirm the connection it shows. When nothing is found,
+or a connection needs something you must prepare first, it explains what and
+offers the other ways to connect. Signing in is a separate step you choose at
+the end. After the first account it offers tab completion and, through one
+preview and confirmation, connecting the AI agents it found; it checks each
+agent separately and finishes with a summary and the next command to run. For a
 non-interactive script, use `corr setup ADDRESS --alias NAME`, followed by the
 explicit account-specific `corr auth login`, `corr doctor`, and `corr
 integrations setup HOST --yes` commands.
