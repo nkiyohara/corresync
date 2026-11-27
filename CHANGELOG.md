@@ -3,6 +3,16 @@
 All notable user-facing changes are recorded here. The project follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.1 - 2026-11-27
+
+- Start first sign-in from an agent on a supported desktop. Review new or
+  changed destinations in the local Corresync dialog before signing in.
+- An interactive CLI upgrade offers to refresh installed managed Skills.
+  The running release supplies its matching Skill, including after a binary-only
+  update. Corresync preserves edited copies and reports when a reload is needed.
+
+See the [release notes](docs/releases/v0.10.1.md).
+
 ## 0.10.0 - 2026-11-25
 
 - Rewrite the command line in plain language: grouped `corr --help`, shorter
