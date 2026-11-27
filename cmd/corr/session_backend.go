@@ -992,7 +992,7 @@ func (backend *sessionBackend) Login(
 		return daemonapi.LoginResult{}, err
 	}
 	backend.mu.Lock()
-	backend.recordCLISignInLocked(accountID)
+	backend.recordVerifiedSignInLocked(accountID)
 	backend.mu.Unlock()
 	return daemonapi.LoginResult{
 		Account: accountID, Authenticated: true, CapturedAt: account.captured,
@@ -1463,7 +1463,7 @@ func (backend *sessionBackend) TerminalLogin(
 		}
 		backend.accounts[input.Account] = account
 		backend.clearAuthenticationReasonsLocked(input.Account, account)
-		backend.recordCLISignInLocked(input.Account)
+		backend.recordVerifiedSignInLocked(input.Account)
 		// The monitor belongs to the daemon lifecycle, not this login request.
 		backend.startMonitorLocked(input.Account, account) //nolint:contextcheck
 		_ = backend.dropTerminalInteraction(interaction, false)

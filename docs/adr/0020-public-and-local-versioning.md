@@ -426,3 +426,7 @@ without the list keeps its old meaning and still validates. `auth status
 --json` adds the optional per-account `pendingSignIn` member; MCP
 `account_status` is unchanged and does not receive it. Protocol 33 replaces
 protocol 32 because the private daemon response shape changes.
+
+Protocol 34 ships with 0.10.1. The sign-in decision for unverified routes and
+the validated guidance for a started flow now include host-owned destination
+review. An older peer cannot validate the new canonical guidance.

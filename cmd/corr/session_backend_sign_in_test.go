@@ -170,6 +170,7 @@ func (fixture signInFixture) restart(t *testing.T, configuration config.Config) 
 	}
 	noDisplay := fixture.noDisplay
 	coordinator := newSignInCoordinator()
+	coordinator.review = nil
 	coordinator.now = fixture.clock.Now
 	coordinator.audit = fixture.audit
 	coordinator.files = signInStateFiles{dir: fixture.stateDir}
@@ -202,7 +203,7 @@ func (fixture signInFixture) restart(t *testing.T, configuration config.Config) 
 func (fixture signInFixture) verify() {
 	fixture.backend.mu.Lock()
 	defer fixture.backend.mu.Unlock()
-	fixture.backend.recordCLISignInLocked(fixture.account)
+	fixture.backend.recordVerifiedSignInLocked(fixture.account)
 }
 
 func (fixture signInFixture) request(t *testing.T, caller domain.Caller) application.AccountSignInRequest {
@@ -1019,5 +1020,52 @@ func TestSignInVerificationQueryIsCLIOnly(t *testing.T) {
 	}
 	if _, err := fixture.backend.SignInVerified(t.Context(), "acc_ffffffffffffffffffffffffffffffff", signInCLICaller); err == nil {
 		t.Fatal("an unconfigured account was answered")
+	}
+}
+
+func TestFirstSignInRequiresIndependentDestinationReview(t *testing.T) {
+	for _, accept := range []bool{false, true} {
+		released := make(chan struct{})
+		close(released)
+		fixture := newUnverifiedSignInFixture(t, &gatedBrowserHandle{release: released}, time.Minute)
+		notices := make(chan string, 1)
+		fixture.backend.signIn.review = func(_ context.Context, notice string) error {
+			notices <- notice
+			if !accept {
+				return errors.New("cancelled")
+			}
+			return nil
+		}
+		approval := fixture.approval(t)
+		result := fixture.resolve(t, approval.Ticket, application.AccountSignInDecisionApprovedByUser)
+		if result.Status != application.AccountSignInStarted {
+			t.Fatalf("unexpected result %v", result.Status)
+		}
+		fixture.backend.active.Wait()
+		select {
+		case notice := <-notices:
+			if !strings.Contains(notice, "work") || !strings.Contains(notice, "outlook.cloud.microsoft") {
+				t.Fatalf("destination notice %q", notice)
+			}
+		default:
+			t.Fatal("local confirmation was skipped")
+		}
+		if (fixture.launches.count() == 1) != accept || fixture.backend.signInVerifiedLocked(fixture.account) != accept {
+			t.Fatalf("launch/verification did not follow desktop approval %t", accept)
+		}
+	}
+}
+
+func TestFirstSignInRejectsRouteChangeAfterMCPPreview(t *testing.T) {
+	fixture := newUnverifiedSignInFixture(t, &gatedBrowserHandle{release: make(chan struct{})}, time.Minute)
+	fixture.backend.signIn.review = func(context.Context, string) error {
+		t.Error("unexpected local approval for changed settings")
+		return errors.New("unexpected confirmation")
+	}
+	approval := fixture.approval(t)
+	fixture.backend.configuration = withOutlookOrigin(fixture.backend.configuration, "https://other.example.com")
+	result := fixture.resolve(t, approval.Ticket, application.AccountSignInDecisionApprovedByUser)
+	if result.Status != application.AccountSignInUnavailable || fixture.launches.count() != 0 {
+		t.Fatalf("changed route resolution = %+v", result)
 	}
 }

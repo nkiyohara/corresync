@@ -41,17 +41,16 @@ When a tool returns `authentication_required`, `authentication_pending`, or
 3. Call `account_sign_in` once with that exact account alias. Corresync itself
    asks the person in this client whether to open the sign-in browser; nothing
    starts unless they accept.
-   - `started`: tell the person to finish sign-in in the browser window that
-     opened. Do not call `account_sign_in` again.
+   - `started`: tell the person to review any destination confirmation on the
+     Corresync host and finish authentication there. Do not request it again.
    - `in_progress`: a sign-in is already pending. Do not request it again.
-   - `already_signed_in`: go to step 7.
+   - `already_signed_in`: go to step 6.
    - `declined` or `unavailable`: tell the person the exact `nextAction`
      command (`corr auth login --account ALIAS`) to run on the Corresync host,
      then stop. Do not retry `account_sign_in` or ask again. With reason
-     `cli_sign_in_required`, explain that this account must be signed in once
-     from the CLI with that command (and again after its settings change)
-     before it can be approved from here. The command prints the sign-in page
-     before it opens it; ask them to compare that page with the one they
+     `cli_sign_in_required`, explain that this host requires the CLI to verify
+     the current settings. The command prints the page before opening it; ask
+     the person to compare that page with the one they
      normally use. Never say the page is safe.
 4. Never ask the user to paste a password, app-specific password, OTP, cookie,
    or token into chat.
