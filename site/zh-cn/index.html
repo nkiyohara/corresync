@@ -148,8 +148,8 @@
           <div class="install-head">
             <h2 id="install-title">设置 Corresync</h2>
             <p>
-              用你现有的 AI 智能体在这台电脑上安装或更新
-              Corresync，每一步都由你确认。
+              使用本机智能体安装或更新 Corresync，并安装随附的 Agent
+              Skill。每项更改由你确认和批准。
             </p>
           </div>
           <div class="agent-setup">
@@ -161,13 +161,13 @@
               <a
                 id="setup-chatgpt"
                 class="button primary"
-                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
-              >用 ChatGPT 设置</a>
+                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+              >用 Codex 设置</a>
               <a
                 id="setup-claude"
                 class="button secondary"
-                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
-              >用 Claude 设置</a>
+                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+              >用 Claude Code 设置</a>
             </div>
             <p>
               点击你使用的桌面应用，应用会打开并填好设置请求。检查内容后由你自己发送。
@@ -187,7 +187,7 @@
                 <pre
                   tabindex="0"
                   aria-label="Corresync setup request"
-                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
+                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent, including installing and verifying the Corresync Agent Skill. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
 </code></pre>
               </div>
             </details>
@@ -399,7 +399,7 @@ corr auth login --account personal</code></pre>
                 tabindex="0"
                 role="region"
                 aria-labelledby="journey-connect"
-              ><code>corr mcp setup codex</code></pre>
+              ><code>corr integrations setup codex</code></pre>
             </div>
             <p>把本地 stdio 服务器注册到智能体中，然后重启一次客户端。</p>
           </div>

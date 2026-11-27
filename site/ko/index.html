@@ -152,8 +152,8 @@
           <div class="install-head">
             <h2 id="install-title">Corresync 설정</h2>
             <p>
-              사용 중인 AI 에이전트에게 이 컴퓨터에 Corresync를 설치하거나
-              업데이트하도록 맡길 수 있습니다. 각 단계는 직접 확인합니다.
+              데스크톱 에이전트가 Corresync를 설치하거나 업데이트하고 번들
+              Agent Skill을 설치합니다. 변경 사항은 직접 검토하고 승인하세요.
             </p>
           </div>
           <div class="agent-setup">
@@ -166,13 +166,13 @@
               <a
                 id="setup-chatgpt"
                 class="button primary"
-                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
-              >ChatGPT로 설정</a>
+                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+              >Codex로 설정</a>
               <a
                 id="setup-claude"
                 class="button secondary"
-                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
-              >Claude로 설정</a>
+                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+              >Claude Code로 설정</a>
             </div>
             <p>
               사용하는 데스크톱 앱을 선택하면 설정 요청이 미리 입력된
@@ -197,7 +197,7 @@
                 <pre
                   tabindex="0"
                   aria-label="Corresync setup request"
-                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
+                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent, including installing and verifying the Corresync Agent Skill. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
 </code></pre>
               </div>
             </details>
@@ -414,7 +414,7 @@ corr auth login --account personal</code></pre>
                 tabindex="0"
                 role="region"
                 aria-labelledby="journey-connect"
-              ><code>corr mcp setup codex</code></pre>
+              ><code>corr integrations setup codex</code></pre>
             </div>
             <p>
               에이전트에 로컬 stdio 서버를 등록합니다. 등록 후 클라이언트를

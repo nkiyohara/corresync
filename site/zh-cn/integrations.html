@@ -84,18 +84,25 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>AI 智能体集成</p>
-        <h1 id="page-title">
-          在常用的智能体中使用 Corresync。 <em
-          >封装方式和发布状态见下表。</em>
-        </h1>
+        <h1 id="page-title">将 Corresync <em>连接到 AI 智能体</em></h1>
         <p class="lede">
-          Corresync 通过 stdio 连接本机的 AI 智能体。下表分别列出直接 MCP
-          配置、Skill、原生封装、仓库源码和官方市场上架情况。客户端兼容不等于已在官方市场上架。
+          请在桌面应用中确认设置请求。请求涵盖本地 MCP 连接和随附的 Agent
+          Skill。
         </p>
         <div class="actions">
-          <a class="button primary" href="getting-started.html">配置检测到的智能体</a>
+          <a
+            class="button primary"
+            href="codex://new?prompt=Read%20https%3a%2f%2fcorresync.org%2fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2c%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2c%20stop%20and%20explain%20what%20I%20need%20to%20do.%0a"
+          >用 Codex 设置</a>
+          <a
+            class="button secondary"
+            href="claude://code/new?q=Read%20https%3a%2f%2fcorresync.org%2fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2c%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2c%20stop%20and%20explain%20what%20I%20need%20to%20do.%0a"
+          >用 Claude Code 设置</a>
           <a class="button secondary" href="#matrix">查看表格</a>
         </div>
+        <p class="fine-print">
+          <a href="getting-started.html#copy-setup-request">复制设置请求</a>
+        </p>
       </section>
 
       <section class="publication-snapshot" aria-labelledby="snapshot-title">
@@ -367,15 +374,10 @@
 
       <section class="final-cta" aria-labelledby="integrations-cta-title">
         <p class="eyebrow"><span aria-hidden="true"></span>开始使用</p>
-        <h2 id="integrations-cta-title">
-          运行 corr setup，检测并连接本机上的智能体
-        </h2>
-        <p>
-          此表仅供查阅。初次配置请运行 corr
-          setup，它只会提供经过审查的本地连接方式。
-        </p>
+        <h2 id="integrations-cta-title">在桌面智能体中继续设置</h2>
         <div class="actions centered">
-          <a class="button primary" href="getting-started.html">打开快速开始</a>
+          <a class="button primary" href="getting-started.html#agent-setup"
+          >使用 AI 智能体设置</a>
           <a class="button secondary" href="providers.html">查看各服务商的连接方式</a>
         </div>
       </section>

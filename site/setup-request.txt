@@ -1,1 +1,1 @@
-Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
+Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent, including installing and verifying the Corresync Agent Skill. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.

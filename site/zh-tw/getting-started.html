@@ -85,22 +85,39 @@
       </div>
     </header>
     <main id="main">
-      <section class="page-hero" aria-labelledby="page-title">
+      <section class="page-hero" id="agent-setup" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>開始使用</p>
-        <h1 id="page-title">從安裝到第一次查詢，<em>共四個步驟</em></h1>
+        <h1 id="page-title">使用 AI 代理<em>設定 Corresync</em></h1>
         <p class="lede">
-          安裝 <code>corr</code>，新增工作或個人帳號，把本機 MCP 註冊到 AI
-          代理，再查詢多個帳號。結果合併顯示時，各帳號的登入和授權仍然分開。Outlook
-          Web 在瀏覽器中登入；API
-          和標準協定的授權存放在作業系統鑰匙圈。MCP 只透過本機 stdio
-          通訊。
+          使用本機桌面代理安裝或更新 Corresync、新增帳號並安裝 Corresync Agent
+          Skill。請在應用程式中確認並送出請求，在瀏覽器中自行完成登入和多因素驗證。
         </p>
         <div class="actions">
-          <a class="button primary" href="#step-install">從第 1 步開始</a><a
+          <a
+            class="button primary"
+            href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+          >用 Codex 設定</a>
+          <a
             class="button secondary"
-            href="providers.html#check"
-          >先檢查是否支援</a>
+            href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+          >用 Claude Code 設定</a>
+          <a class="button secondary" href="#step-install">手動設定</a>
         </div>
+        <details class="setup-request">
+          <summary>複製設定請求</summary>
+          <div
+            class="cmd"
+            id="copy-setup-request"
+            data-copy
+            data-copy-label="Corresync 設定請求"
+          >
+            <pre
+              tabindex="0"
+              aria-label="Corresync 設定請求"
+            ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent, including installing and verifying the Corresync Agent Skill. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
+</code></pre>
+          </div>
+        </details>
       </section>
       <ol class="gs-steps">
         <li class="gs-step" id="step-install" aria-labelledby="install-title">
@@ -327,8 +344,12 @@ corr doctor --account personal</code></pre>
                   tabindex="0"
                   role="region"
                   aria-label="Codex 設定命令"
-                ><code>corr mcp setup codex</code></pre>
+                ><code>corr integrations setup codex</code></pre>
               </div>
+              <p>
+                執行 <code>corr integrations doctor codex</code> 驗證 MCP 連線和隨附的
+                Agent Skill。
+              </p>
             </div>
             <div class="client">
               <h3>Claude Code</h3>
@@ -337,8 +358,12 @@ corr doctor --account personal</code></pre>
                   tabindex="0"
                   role="region"
                   aria-label="Claude Code 設定命令"
-                ><code>corr mcp setup claude-code</code></pre>
+                ><code>corr integrations setup claude-code</code></pre>
               </div>
+              <p>
+                執行 <code>corr integrations doctor claude-code</code> 驗證 MCP
+                連線和隨附的 Agent Skill。
+              </p>
             </div>
             <div class="client">
               <h3>GitHub Copilot CLI</h3>

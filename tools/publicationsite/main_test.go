@@ -10,6 +10,9 @@ import (
 func TestRunGeneratesAndChecksEveryLocale(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "setup-request.txt"), []byte("Install & verify the Skill.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if err := run(root, false); err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +26,10 @@ func TestRunGeneratesAndChecksEveryLocale(t *testing.T) {
 			t.Fatal(err)
 		}
 		page := string(data)
-		for _, expected := range []string{locale.Title, `lang="` + locale.Language + `"`, "0.8.6", "0.9.0-rc.3"} {
+		for _, expected := range []string{locale.Title, `lang="` + locale.Language + `"`, "0.8.6", "0.9.0-rc.3",
+			"codex://new?prompt=Install%20%26%20verify%20the%20Skill.%0a",
+			"claude://code/new?q=Install%20%26%20verify%20the%20Skill.%0a",
+		} {
 			if !strings.Contains(page, expected) {
 				t.Fatalf("%s does not contain %q", path, expected)
 			}

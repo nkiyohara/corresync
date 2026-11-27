@@ -89,21 +89,46 @@
       </div>
     </header>
     <main id="main">
-      <section class="page-hero" aria-labelledby="page-title">
+      <section class="page-hero" id="agent-setup" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>시작하기</p>
-        <h1 id="page-title">
-          설치부터 첫 질문까지 <em>네 단계로 설정합니다</em>
-        </h1>
+        <h1 id="page-title">AI 에이전트로 <em>Corresync 설정</em></h1>
         <p class="lede">
-          바로 로그인하지 않습니다. 메일 주소의 공개 정보로 연결 방식을
-          찾고, 사용자가 고른 뒤 별도 명령으로 그 계정에만 로그인합니다.
+          이 컴퓨터의 데스크톱 에이전트가 Corresync를 설치하거나
+          업데이트하고, 계정을 추가하고, Corresync Agent Skill을 설치합니다.
+          앱에서 요청을 검토해 보내고, 브라우저 로그인과 다중 인증은 직접
+          완료하세요.
         </p>
+        <div class="actions">
+          <a
+            class="button primary"
+            href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+          >Codex로 설정</a>
+          <a
+            class="button secondary"
+            href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+          >Claude Code로 설정</a>
+        </div>
         <nav class="step-nav" aria-label="설정 단계">
           <a href="#step-install"><span>1</span>설치</a><a href="#step-account"><span
             >2</span>계정 선택</a><a href="#sign-in"><span>3</span>로그인</a><a
             href="#step-client"
           ><span>4</span>MCP 연결</a>
         </nav>
+        <details class="setup-request">
+          <summary>설정 요청 복사</summary>
+          <div
+            class="cmd"
+            id="copy-setup-request"
+            data-copy
+            data-copy-label="Corresync 설정 요청"
+          >
+            <pre
+              tabindex="0"
+              aria-label="Corresync 설정 요청"
+            ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent, including installing and verifying the Corresync Agent Skill. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
+</code></pre>
+          </div>
+        </details>
       </section>
       <section class="setup-step" id="step-install" aria-labelledby="install-title">
         <div class="step-copy">
@@ -305,8 +330,12 @@ scoop install corresync/corresync</code></pre>
                   tabindex="0"
                   role="region"
                   aria-labelledby="client-codex"
-                ><code>corr mcp setup codex</code></pre>
+                ><code>corr integrations setup codex</code></pre>
               </div>
+              <p>
+                <code>corr integrations doctor codex</code>로 MCP 연결과 번들 Agent Skill을
+                확인하세요.
+              </p>
             </article>
             <article>
               <h3 id="client-claude">Claude Code</h3>
@@ -315,8 +344,12 @@ scoop install corresync/corresync</code></pre>
                   tabindex="0"
                   role="region"
                   aria-labelledby="client-claude"
-                ><code>corr mcp setup claude-code</code></pre>
+                ><code>corr integrations setup claude-code</code></pre>
               </div>
+              <p>
+                <code>corr integrations doctor claude-code</code>로 MCP 연결과 번들 Agent
+                Skill을 확인하세요.
+              </p>
             </article>
             <article>
               <h3 id="client-copilot">GitHub Copilot CLI</h3>

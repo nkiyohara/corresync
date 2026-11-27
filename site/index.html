@@ -154,8 +154,8 @@
           <div class="install-head">
             <h2 id="install-title">Set up Corresync</h2>
             <p>
-              Use the AI agent you already have to install or update Corresync on this computer. You
-              review each step.
+              Your desktop agent can install or update Corresync and set up the bundled Agent Skill.
+              You review and approve changes.
             </p>
           </div>
           <div class="agent-setup">
@@ -168,13 +168,13 @@
               <a
                 id="setup-chatgpt"
                 class="button primary"
-                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
-              >Set up with ChatGPT</a>
+                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+              >Set up with Codex</a>
               <a
                 id="setup-claude"
                 class="button secondary"
-                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
-              >Set up with Claude</a>
+                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+              >Set up with Claude Code</a>
             </div>
             <p>
               Choose your desktop app. It opens with a setup request already filled in. Review the
@@ -199,7 +199,7 @@
                 <pre
                   tabindex="0"
                   aria-label="Corresync setup request"
-                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
+                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent, including installing and verifying the Corresync Agent Skill. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
 </code></pre>
               </div>
             </details>
@@ -407,10 +407,11 @@ corr auth login --account personal</code></pre>
                 tabindex="0"
                 role="region"
                 aria-labelledby="journey-connect"
-              ><code>corr mcp setup codex</code></pre>
+              ><code>corr integrations setup codex</code></pre>
             </div>
             <p>
-              Adds Corresync to your agent as a local stdio server. Restart the agent afterwards.
+              Adds the local MCP connection and the bundled Agent Skill. Restart the agent
+              afterwards.
             </p>
           </div>
           <div class="journey-step">
@@ -623,12 +624,14 @@ payload is approved.</span></code></pre>
         </div>
         <div class="agent-grid">
           <article>
-            <span class="agent-letter" aria-hidden="true">C</span><h3>Codex</h3><code>corr mcp setup
-              codex</code><p>Registration plus a bundled plugin and Agent Skill.</p>
+            <span class="agent-letter" aria-hidden="true">C</span><h3>Codex</h3><code>corr
+              integrations setup codex</code><p>
+              Registration plus a bundled plugin and Agent Skill.
+            </p>
           </article>
           <article>
-            <span class="agent-letter" aria-hidden="true">A</span><h3>Claude Code</h3><code>corr mcp
-              setup claude-code</code><p>User or project scope; plugin available.</p>
+            <span class="agent-letter" aria-hidden="true">A</span><h3>Claude Code</h3><code>corr
+              integrations setup claude-code</code><p>User or project scope; plugin available.</p>
           </article>
           <article>
             <span class="agent-letter" aria-hidden="true">GH</span><h3>GitHub Copilot CLI</h3><code
@@ -642,7 +645,7 @@ payload is approved.</span></code></pre>
           </article>
         </div>
         <p class="center-link">
-          <a href="getting-started.html#connect">Setup commands for each agent<span
+          <a href="getting-started.html#agent-setup">Setup commands for each agent<span
               aria-hidden="true"
             >
               →</span></a>

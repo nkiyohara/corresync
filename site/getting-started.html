@@ -94,21 +94,40 @@
     </header>
 
     <main id="main">
-      <section class="page-hero" aria-labelledby="page-title">
+      <section class="page-hero" id="agent-setup" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>Getting started</p>
-        <h1 id="page-title">Getting started <em>in four steps</em></h1>
+        <h1 id="page-title">Set up Corresync <em>with your AI agent</em></h1>
         <p class="lede">
-          Install <code>corr</code>, add your work or personal email and calendar accounts, register
-          the local MCP server with your agent, and ask a question that covers them. Each account
-          keeps its own sign-in, even when a search or agenda combines results. Outlook Web sign-in
-          happens in a browser; API and standards credentials are kept in your OS keyring. Agents
-          never receive the credentials Corresync manages. The MCP connection is local stdio, with
-          no hosted relay.
+          Use your local desktop agent to install or update Corresync, add your accounts, and
+          install the Corresync Agent Skill. Review and send the setup request in the app. Complete
+          browser sign-in and MFA yourself.
         </p>
         <div class="actions">
-          <a class="button primary" href="#step-install">Start at step 1</a>
-          <a class="button secondary" href="providers.html#check">Check your provider first</a>
+          <a
+            class="button primary"
+            href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+          >Set up with Codex</a>
+          <a
+            class="button secondary"
+            href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+          >Set up with Claude Code</a>
+          <a class="button secondary" href="#step-install">Manual setup</a>
         </div>
+        <details class="setup-request">
+          <summary>Copy the setup request</summary>
+          <div
+            class="cmd"
+            id="copy-setup-request"
+            data-copy
+            data-copy-label="Corresync setup request"
+          >
+            <pre
+              tabindex="0"
+              aria-label="Corresync setup request"
+            ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent, including installing and verifying the Corresync Agent Skill. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
+</code></pre>
+          </div>
+        </details>
       </section>
 
       <ol class="gs-steps">
@@ -369,9 +388,9 @@ corr doctor --account personal</code></pre>
             <div>
               <h2 id="connect-title">Connect your agent</h2>
               <p>
-                One command adds Corresync as a local stdio MCP server to the agent’s own
-                configuration, using absolute paths and no remote endpoint. Restart the agent
-                afterwards.
+                For Codex and Claude Code, install the bundled Agent Skill with the local MCP
+                connection. The other commands below register a local stdio MCP server. Restart your
+                agent afterwards.
               </p>
             </div>
           </header>
@@ -383,9 +402,12 @@ corr doctor --account personal</code></pre>
                   tabindex="0"
                   role="region"
                   aria-label="Codex setup command"
-                ><code>corr mcp setup codex</code></pre>
+                ><code>corr integrations setup codex</code></pre>
               </div>
-              <p>Verify with <code>codex mcp get corresync</code>.</p>
+              <p>
+                Verify the MCP connection and the bundled Agent Skill with <code>corr integrations
+                  doctor codex</code>.
+              </p>
             </div>
             <div class="client">
               <h3>Claude Code</h3>
@@ -394,9 +416,12 @@ corr doctor --account personal</code></pre>
                   tabindex="0"
                   role="region"
                   aria-label="Claude Code setup command"
-                ><code>corr mcp setup claude-code</code></pre>
+                ><code>corr integrations setup claude-code</code></pre>
               </div>
-              <p>User or project scope; verify with <code>claude mcp get corresync</code>.</p>
+              <p>
+                Verify the MCP connection and the bundled Agent Skill with <code>corr integrations
+                  doctor claude-code</code>.
+              </p>
             </div>
             <div class="client">
               <h3>GitHub Copilot CLI</h3>
@@ -467,8 +492,7 @@ corr doctor --account personal</code></pre>
           </div>
           <p class="step-foot">
             Every client gets the same 72 tools and two read-only monitor resources. See
-            <a href="features.html#agents">what agents can and cannot do</a>. Codex and Claude Code
-            users can also install the bundled plugin and Agent Skill.
+            <a href="features.html#agents">what agents can and cannot do</a>.
           </p>
         </li>
 

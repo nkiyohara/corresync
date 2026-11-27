@@ -227,8 +227,10 @@ test("localized setup guides keep the verified install and MCP commands", async 
     "brew install nkiyohara/corresync/corresync",
     "scoop install corresync/corresync",
     "corr --version",
-    "corr mcp setup codex",
-    "corr mcp setup claude-code",
+    "corr integrations setup codex",
+    "corr integrations doctor codex",
+    "corr integrations setup claude-code",
+    "corr integrations doctor claude-code",
     "corr mcp setup github-copilot",
     "corr mcp setup gemini-cli",
     "corr mcp setup qwen-code",
@@ -239,12 +241,47 @@ test("localized setup guides keep the verified install and MCP commands", async 
   for (const path of pages) {
     const source = await readFile(new URL(path, `file://${__dirname}/`), "utf8");
     for (const command of commands) {
-      assert.ok(source.includes(command), `${path}: ${command}`);
+      assert.ok(source.replace(/\s+/g, " ").includes(command), `${path}: ${command}`);
     }
     assert.doesNotMatch(source, /corr mcp setup (?:cursor|vscode|opencode)/, path);
   }
 });
 
+
+test("localized setup entry points hand off the same Skill installation request", async () => {
+  const readSiteFile = (file) => readFile(new URL(file, `file://${__dirname}/`), "utf8");
+  const [request, instructions] = await Promise.all([
+    readSiteFile("setup-request.txt"),
+    readSiteFile("setup-instructions.txt"),
+  ]);
+  assert.match(request, /installing and verifying the Corresync Agent Skill/);
+  for (const instruction of [
+    "corr integrations plan HOST",
+    "corr integrations setup HOST",
+    "corr integrations doctor HOST",
+  ]) {
+    assert.ok(instructions.includes(instruction), instruction);
+  }
+
+  for (const locale of ["", "ja/", "zh-cn/", "zh-tw/", "ko/"]) {
+    for (const page of ["index", "getting-started", "integrations"]) {
+      const path = `${locale}${page}.html`;
+      const source = await readSiteFile(path);
+      for (const [scheme, key] of [["codex", "prompt"], ["claude", "q"]]) {
+        const link = source.match(new RegExp(`href="(${scheme}://[^"]+)"`))?.[1];
+        assert.ok(link, `${path}: ${scheme} setup link`);
+        assert.equal(new URL(link).searchParams.get(key), request, path);
+      }
+      if (page !== "integrations") {
+        assert.ok(source.includes(`<code>${request}</code>`), `${path}: copy fallback`);
+      }
+    }
+    for (const page of ["features", "providers", "google-oauth"]) {
+      const path = `${locale}${page}.html`;
+      assert.match(await readSiteFile(path), /href="getting-started\.html#agent-setup"/, path);
+    }
+  }
+});
 
 test("the browser renders the current Worker response contract", async () => {
   const { handleRequest } = await import("../web/discovery-worker/src/worker.mjs");

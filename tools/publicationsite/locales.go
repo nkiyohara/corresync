@@ -23,7 +23,9 @@ type copy struct {
 	HeroLead             string
 	HeroEmphasis         string
 	HeroLede             string
-	HeroStart            string
+	HeroCodex            string
+	HeroClaude           string
+	HeroCopyRequest      string
 	HeroRead             string
 	SnapshotEyebrow      string
 	SnapshotTitle        string
@@ -56,7 +58,6 @@ type copy struct {
 	BoundaryDetail       string
 	CTAeyebrow           string
 	CTATitle             string
-	CTACopy              string
 	CTAStart             string
 	CTAProviders         string
 	FooterCopy           string
@@ -97,9 +98,9 @@ func englishCopy() copy {
 		ImageAlt:    "Corresync mark beside the words: one local MCP for mail, calendars, and tasks — provider-neutral, preview before commit.",
 		Skip:        "Skip to content", HomeAria: "Corresync home", PrimaryAria: "Primary", LanguageAria: "Language", FooterAria: "Footer",
 		NavHome: "Home", NavStart: "Getting started", NavProviders: "Providers", NavFeatures: "Features", NavIntegrations: "Integrations", NavSafety: "Safety",
-		HeroEyebrow: "Agent integrations", HeroLead: "How Corresync is packaged", HeroEmphasis: "for each agent",
-		HeroLede:  "Corresync connects to local AI agents over stdio. The table below lists direct MCP setup, Skills, native packages, what is in the repository, and what is actually published in a marketplace. A client that works with Corresync does not mean there is an official listing.",
-		HeroStart: "Set up detected agents", HeroRead: "See the table",
+		HeroEyebrow: "Agent integrations", HeroLead: "Connect Corresync", HeroEmphasis: "to your AI agent",
+		HeroLede:  "Review the setup request in your desktop app. It covers the local MCP connection and the bundled Agent Skill.",
+		HeroCodex: "Set up with Codex", HeroClaude: "Set up with Claude Code", HeroCopyRequest: "Copy the setup request", HeroRead: "See the table",
 		SnapshotEyebrow: "Versions", SnapshotTitle: "Current versions",
 		SnapshotCopy: "The source bundle can be newer than the latest stable release, and an external registry can still show an older verified record, so the three are listed separately.",
 		SourceLabel:  "Source bundle", StableLabel: "Latest stable release", RegistryLabel: "MCP Registry observed",
@@ -113,8 +114,8 @@ func englishCopy() copy {
 		BoundaryEyebrow: "Local only", BoundaryTitle: "A listing does not enable hosted agents or tunnels",
 		BoundaryCopy:   "Corresync runs one local stdio server and keeps account state on your computer. Hosted ChatGPT, cloud agents, Kiro Web, and remote sandboxes cannot reach it just because a plugin format exists for them.",
 		BoundaryDetail: "A hosted relay or private MCP tunnel would add a new path for your data. It would need its own architecture decision, consent, privacy disclosure, revocation design, and security review.",
-		CTAeyebrow:     "Setup", CTATitle: "corr setup finds and connects the agents on this computer",
-		CTACopy: "The table is for reference. Start with the guided command; it only offers reviewed local setups.", CTAStart: "Open getting started", CTAProviders: "See provider routes",
+		CTAeyebrow:     "Setup", CTATitle: "Continue setup in your desktop agent",
+		CTAStart: "Set up with your AI agent", CTAProviders: "See provider routes",
 		FooterCopy:    "Independent local-first mail, calendar, and task tooling. Not affiliated with or endorsed by any provider or agent vendor named here.",
 		FooterPrivacy: "Privacy", FooterTerms: "Terms", FooterSource: "GitHub source", FooterSecurity: "Security", FooterReleases: "Releases",
 		NoVersion: "Not claimed", AutomaticReleasePath: "Verified release automation", StableOnlyPath: "Stable tags only", SourcePath: "Versioned repository source", ManualPath: "Direct setup; directory pending", ListSeparator: ", ",
@@ -132,9 +133,9 @@ func japaneseCopy() copy {
 		ImageAlt:    "Corresyncのロゴと、ローカルで動くMCPサーバーであることを示す説明。",
 		Skip:        "本文へ移動", HomeAria: "Corresync ホーム", PrimaryAria: "メインメニュー", LanguageAria: "言語", FooterAria: "フッター",
 		NavHome: "ホーム", NavStart: "はじめる", NavProviders: "対応サービス", NavFeatures: "できること", NavIntegrations: "AI連携", NavSafety: "安全性",
-		HeroEyebrow: "AI連携", HeroLead: "AIエージェントとの連携", HeroEmphasis: "導入方法と公開状況",
-		HeroLede:  "Corresyncは、このコンピューター上のAIエージェントとstdioで接続します。この表では、MCPの直接設定、Skill、専用パッケージ、リポジトリでの提供、公式マーケットへの掲載を分けて表示しています。対応していることと、公式に掲載されていることは別です。",
-		HeroStart: "検出したエージェントを設定", HeroRead: "対応表",
+		HeroEyebrow: "AI連携", HeroLead: "Corresyncを", HeroEmphasis: "AIエージェントに接続",
+		HeroLede:  "デスクトップアプリで依頼内容を確認してください。ローカルのMCP接続と同梱のAgent Skillをセットアップします。",
+		HeroCodex: "Codex で設定", HeroClaude: "Claude Code で設定", HeroCopyRequest: "セットアップ依頼をコピー", HeroRead: "対応表",
 		SnapshotEyebrow: "バージョン", SnapshotTitle: "3つのバージョン番号の意味",
 		SnapshotCopy: "開発中のソースは最新の安定版より新しいことがあり、外部のレジストリには確認済みの古い版が表示されたままのことがあります。そのため3つを分けて表示しています。",
 		SourceLabel:  "ソース内のパッケージ", StableLabel: "最新の安定版", RegistryLabel: "MCP Registryで確認した版",
@@ -148,8 +149,8 @@ func japaneseCopy() copy {
 		BoundaryEyebrow: "ローカルでの動作", BoundaryTitle: "掲載されても、ホスト型のエージェントや非公開トンネルから使えるようにはなりません",
 		BoundaryCopy:   "Corresyncが提供するのは、ローカルのstdioサーバーとローカルのアカウント状態だけです。プラグインの形式があっても、ChatGPTのホスト環境、クラウドのエージェント、Kiro Web、リモートのサンドボックスからは接続できません。",
 		BoundaryDetail: "ホスト型のリレーや非公開のMCPトンネルを使うと、新しいデータの通り道ができます。導入するには、別途の設計判断、利用者の同意、プライバシーに関する開示、取り消しの仕組み、セキュリティ審査が必要です。",
-		CTAeyebrow:     "はじめ方", CTATitle: "corr setupで、このコンピューターのエージェントを検出して接続できます",
-		CTACopy: "対応表は参照用です。まずはガイド付き設定から始めてください。検証済みのローカルでの接続方法だけが表示されます。", CTAStart: "スタートガイド", CTAProviders: "プロバイダーの接続方法",
+		CTAeyebrow:     "はじめ方", CTATitle: "デスクトップのAIでセットアップ",
+		CTAStart: "AIにセットアップを任せる", CTAProviders: "プロバイダーの接続方法",
 		FooterCopy:    "独立したローカルファーストのメール・カレンダー・タスクツールです。記載した企業やサービスの公式製品ではありません。",
 		FooterPrivacy: "プライバシー", FooterTerms: "利用規約", FooterSource: "ソースコード", FooterSecurity: "脆弱性の報告", FooterReleases: "リリース",
 		NoVersion: "表明なし", AutomaticReleasePath: "検証済みリリースから自動", StableOnlyPath: "安定版タグのみ", SourcePath: "バージョン付きのリポジトリソース", ManualPath: "直接設定可・掲載は準備中", ListSeparator: "・",
@@ -167,9 +168,9 @@ func simplifiedChineseCopy() copy {
 		ImageAlt:    "Corresync 标志和本地 MCP 服务器说明。",
 		Skip:        "跳到正文", HomeAria: "Corresync 首页", PrimaryAria: "主导航", LanguageAria: "语言", FooterAria: "页脚",
 		NavHome: "首页", NavStart: "快速开始", NavProviders: "支持服务", NavFeatures: "功能", NavIntegrations: "AI 集成", NavSafety: "安全",
-		HeroEyebrow: "AI 智能体集成", HeroLead: "在常用的智能体中使用 Corresync。", HeroEmphasis: "封装方式和发布状态见下表。",
-		HeroLede:  "Corresync 通过 stdio 连接本机的 AI 智能体。下表分别列出直接 MCP 配置、Skill、原生封装、仓库源码和官方市场上架情况。客户端兼容不等于已在官方市场上架。",
-		HeroStart: "配置检测到的智能体", HeroRead: "查看表格",
+		HeroEyebrow: "AI 智能体集成", HeroLead: "将 Corresync", HeroEmphasis: "连接到 AI 智能体",
+		HeroLede:  "请在桌面应用中确认设置请求。请求涵盖本地 MCP 连接和随附的 Agent Skill。",
+		HeroCodex: "用 Codex 设置", HeroClaude: "用 Claude Code 设置", HeroCopyRequest: "复制设置请求", HeroRead: "查看表格",
 		SnapshotEyebrow: "版本", SnapshotTitle: "三个版本号",
 		SnapshotCopy: "仓库源码可能比最新稳定版更新，外部注册表也可能还显示之前核验过的旧版本，所以三者分开显示。",
 		SourceLabel:  "源码封装", StableLabel: "最新稳定版", RegistryLabel: "MCP Registry 上的版本",
@@ -183,8 +184,8 @@ func simplifiedChineseCopy() copy {
 		BoundaryEyebrow: "只在本地运行", BoundaryTitle: "上架目录不会启用云端智能体或私有隧道",
 		BoundaryCopy:   "Corresync 只提供本地 stdio 服务和本地账号状态。即使有对应的插件格式，托管版 ChatGPT、云端智能体、Kiro Web 和远程沙箱也无法访问它。",
 		BoundaryDetail: "托管中继或私有 MCP 隧道会带来新的数据路径，需要单独的架构决策、同意、隐私说明、撤销机制和安全审查。",
-		CTAeyebrow:     "开始使用", CTATitle: "运行 corr setup，检测并连接本机上的智能体",
-		CTACopy: "此表仅供查阅。初次配置请运行 corr setup，它只会提供经过审查的本地连接方式。", CTAStart: "打开快速开始", CTAProviders: "查看各服务商的连接方式",
+		CTAeyebrow:     "开始使用", CTATitle: "在桌面智能体中继续设置",
+		CTAStart: "使用 AI 智能体设置", CTAProviders: "查看各服务商的连接方式",
 		FooterCopy:    "独立开发的本地邮件、日历和任务工具，与本页提到的服务商或 AI 智能体厂商没有隶属或背书关系。",
 		FooterPrivacy: "隐私", FooterTerms: "条款", FooterSource: "源代码", FooterSecurity: "安全报告", FooterReleases: "发布",
 		NoVersion: "未声明", AutomaticReleasePath: "验证发布后自动提供", StableOnlyPath: "仅稳定版标签", SourcePath: "带版本的仓库源码", ManualPath: "可直接配置，目录待上架", ListSeparator: "、",
@@ -202,9 +203,9 @@ func traditionalChineseCopy() copy {
 		ImageAlt:    "Corresync 標誌與本機 MCP 伺服器說明。",
 		Skip:        "跳到主要內容", HomeAria: "Corresync 首頁", PrimaryAria: "主要導覽", LanguageAria: "語言", FooterAria: "頁尾",
 		NavHome: "首頁", NavStart: "開始使用", NavProviders: "支援服務", NavFeatures: "功能", NavIntegrations: "AI 整合", NavSafety: "安全",
-		HeroEyebrow: "AI 代理整合", HeroLead: "在常用的 AI 代理中使用 Corresync。", HeroEmphasis: "封裝方式和發布狀態請見下表。",
-		HeroLede:  "Corresync 透過 stdio 連接本機的 AI 代理。下表分別列出直接 MCP 設定、Skill、原生封裝、儲存庫原始碼和官方市集上架情況。用戶端相容不代表已在官方市集上架。",
-		HeroStart: "設定偵測到的代理", HeroRead: "查看表格",
+		HeroEyebrow: "AI 代理整合", HeroLead: "將 Corresync", HeroEmphasis: "連接到 AI 代理",
+		HeroLede:  "請在桌面應用程式中確認設定請求。請求涵蓋本機 MCP 連線和隨附的 Agent Skill。",
+		HeroCodex: "用 Codex 設定", HeroClaude: "用 Claude Code 設定", HeroCopyRequest: "複製設定請求", HeroRead: "查看表格",
 		SnapshotEyebrow: "版本", SnapshotTitle: "三個版本號",
 		SnapshotCopy: "儲存庫原始碼可能比最新穩定版還新，外部登錄檔也可能仍顯示先前核對過的舊版本，所以三者分開顯示。",
 		SourceLabel:  "原始碼封裝", StableLabel: "最新穩定版", RegistryLabel: "MCP Registry 上的版本",
@@ -218,8 +219,8 @@ func traditionalChineseCopy() copy {
 		BoundaryEyebrow: "只在本機執行", BoundaryTitle: "上架目錄不會啟用雲端代理或私人通道",
 		BoundaryCopy:   "Corresync 只提供本機 stdio 服務和本機帳號狀態。即使有對應的外掛格式，託管版 ChatGPT、雲端代理、Kiro Web 和遠端沙箱也無法存取它。",
 		BoundaryDetail: "託管中繼或私人 MCP 通道會產生新的資料路徑，需要另外的架構決策、同意、隱私揭露、撤銷機制和安全審查。",
-		CTAeyebrow:     "開始使用", CTATitle: "執行 corr setup，偵測並連接這台電腦上的 AI 代理",
-		CTACopy: "此表僅供查閱。第一次設定請執行 corr setup，它只會提供經過審查的本機連線方式。", CTAStart: "開啟入門說明", CTAProviders: "查看各服務的連線方式",
+		CTAeyebrow:     "開始使用", CTATitle: "在桌面代理中繼續設定",
+		CTAStart: "使用 AI 代理設定", CTAProviders: "查看各服務的連線方式",
 		FooterCopy:    "獨立開發的本機郵件、行事曆與待辦工具，與這裡列出的服務商或 AI 代理廠商沒有隸屬或背書關係。",
 		FooterPrivacy: "隱私", FooterTerms: "條款", FooterSource: "原始碼", FooterSecurity: "安全報告", FooterReleases: "發布",
 		NoVersion: "未聲明", AutomaticReleasePath: "驗證發布後自動提供", StableOnlyPath: "僅穩定版標籤", SourcePath: "含版本的儲存庫原始碼", ManualPath: "可直接設定，目錄待上架", ListSeparator: "、",
@@ -237,9 +238,9 @@ func koreanCopy() copy {
 		ImageAlt:    "Corresync 로고와 로컬 MCP 서버 설명.",
 		Skip:        "본문으로 이동", HomeAria: "Corresync 홈", PrimaryAria: "주 메뉴", LanguageAria: "언어", FooterAria: "바닥글",
 		NavHome: "홈", NavStart: "시작하기", NavProviders: "지원 서비스", NavFeatures: "기능", NavIntegrations: "AI 연동", NavSafety: "보안",
-		HeroEyebrow: "AI 에이전트 연동", HeroLead: "평소 쓰는 에이전트에서 Corresync를 사용할 수 있습니다.", HeroEmphasis: "패키지 형식과 배포 상태를 확인하세요.",
-		HeroLede:  "Corresync는 stdio로 로컬 AI 에이전트와 연결됩니다. 아래 표는 MCP 직접 설정, Skill, 네이티브 패키지, 저장소 제공, 공식 마켓 등록을 따로 표시합니다. 호환된다고 해서 공식 마켓에 등록된 것은 아닙니다.",
-		HeroStart: "감지된 에이전트 설정", HeroRead: "표 보기",
+		HeroEyebrow: "AI 에이전트 연동", HeroLead: "Corresync를", HeroEmphasis: "AI 에이전트에 연결",
+		HeroLede:  "데스크톱 앱에서 설정 요청을 검토하세요. 요청에는 로컬 MCP 연결과 번들 Agent Skill 설정이 포함됩니다.",
+		HeroCodex: "Codex로 설정", HeroClaude: "Claude Code로 설정", HeroCopyRequest: "설정 요청 복사", HeroRead: "표 보기",
 		SnapshotEyebrow: "버전", SnapshotTitle: "세 가지 버전 번호",
 		SnapshotCopy: "저장소의 소스는 최신 안정판보다 앞설 수 있고, 외부 레지스트리에는 예전에 확인한 버전이 남아 있을 수 있습니다. 그래서 세 값을 따로 표시합니다.",
 		SourceLabel:  "소스 패키지", StableLabel: "최신 안정판", RegistryLabel: "MCP Registry에서 확인한 버전",
@@ -253,8 +254,8 @@ func koreanCopy() copy {
 		BoundaryEyebrow: "로컬 실행", BoundaryTitle: "마켓에 등록돼도 호스팅 에이전트나 비공개 터널이 켜지지는 않습니다.",
 		BoundaryCopy:   "Corresync는 로컬 stdio 서버와 로컬 계정 상태만 제공합니다. 플러그인 형식이 있더라도 호스팅 ChatGPT, 클라우드 에이전트, Kiro Web, 원격 샌드박스에서는 접근할 수 없습니다.",
 		BoundaryDetail: "호스팅 릴레이나 비공개 MCP 터널을 쓰면 데이터 경로가 새로 생깁니다. 그러려면 별도의 아키텍처 결정, 동의, 개인정보 고지, 철회 방법, 보안 검토가 필요합니다.",
-		CTAeyebrow:     "시작하기", CTATitle: "corr setup을 실행하면 이 컴퓨터의 에이전트를 찾아 연결합니다.",
-		CTACopy: "이 표는 참고용입니다. 처음에는 corr setup부터 실행하세요. 검토된 로컬 연결 방법만 제안합니다.", CTAStart: "시작 안내 열기", CTAProviders: "서비스별 연결 방식 보기",
+		CTAeyebrow:     "시작하기", CTATitle: "데스크톱 에이전트에서 설정 계속하기",
+		CTAStart: "AI 에이전트로 설정", CTAProviders: "서비스별 연결 방식 보기",
 		FooterCopy:    "독립적으로 개발한 로컬 메일·캘린더·할 일 도구입니다. 이 페이지에 나오는 서비스나 AI 에이전트 업체와 제휴 관계가 없으며 보증을 받지도 않았습니다.",
 		FooterPrivacy: "개인정보", FooterTerms: "이용 약관", FooterSource: "소스 코드", FooterSecurity: "보안 문제 신고", FooterReleases: "릴리스",
 		NoVersion: "표시 안 함", AutomaticReleasePath: "검증된 릴리스에서 자동 제공", StableOnlyPath: "안정판 태그만", SourcePath: "버전이 붙은 저장소 소스", ManualPath: "직접 설정 가능·목록 미등록", ListSeparator: " · ",

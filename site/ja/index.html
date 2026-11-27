@@ -152,7 +152,8 @@
           <div class="install-head">
             <h2 id="install-title">セットアップ</h2>
             <p>
-              手元のAIエージェントを使って、このコンピューターにCorresyncをインストール・更新できます。各手順は自分で確認できます。
+              手元のAIエージェントに、Corresyncのインストール・更新と同梱のAgent
+              Skillの導入を任せられます。変更は自分で確認して承認します。
             </p>
           </div>
           <div class="agent-setup">
@@ -163,13 +164,13 @@
               <a
                 id="setup-chatgpt"
                 class="button primary"
-                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
-              >ChatGPT でセットアップ</a>
+                href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+              >Codex で設定</a>
               <a
                 id="setup-claude"
                 class="button secondary"
-                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
-              >Claude でセットアップ</a>
+                href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+              >Claude Code で設定</a>
             </div>
             <p>
               使っているデスクトップアプリのボタンを押すと、セットアップ依頼が入力された状態でアプリが開きます。内容を確認してから自分で送信してください。
@@ -189,7 +190,7 @@
                 <pre
                   tabindex="0"
                   aria-label="Corresync setup request"
-                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
+                ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent, including installing and verifying the Corresync Agent Skill. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
 </code></pre>
               </div>
             </details>
@@ -431,7 +432,7 @@ corr auth login --account personal</code></pre>
                 tabindex="0"
                 role="region"
                 aria-labelledby="journey-connect"
-              ><code>corr mcp setup codex</code></pre>
+              ><code>corr integrations setup codex</code></pre>
             </div>
             <p>
               エージェントにローカルのstdioサーバーを登録します。登録後にクライアントを再起動してください。
@@ -644,12 +645,14 @@ corr auth login --account personal</code></pre>
         </div>
         <div class="agent-grid">
           <article>
-            <span class="agent-letter" aria-hidden="true">C</span><h3>Codex</h3><code>corr mcp setup
-              codex</code><p>MCPの登録に加えて、PluginとAgent Skillも入ります。</p>
+            <span class="agent-letter" aria-hidden="true">C</span><h3>Codex</h3><code>corr
+              integrations setup codex</code><p>
+              MCPの登録に加えて、PluginとAgent Skillも入ります。
+            </p>
           </article>
           <article>
-            <span class="agent-letter" aria-hidden="true">A</span><h3>Claude Code</h3><code>corr mcp
-              setup claude-code</code><p>
+            <span class="agent-letter" aria-hidden="true">A</span><h3>Claude Code</h3><code>corr
+              integrations setup claude-code</code><p>
               ユーザー単位かプロジェクト単位で登録します。
             </p>
           </article>
@@ -669,7 +672,7 @@ corr auth login --account personal</code></pre>
           </article>
         </div>
         <p class="center-link">
-          <a href="getting-started.html#connect">クライアント別のコマンド<span
+          <a href="getting-started.html#agent-setup">クライアント別のコマンド<span
               aria-hidden="true"
             >
               →</span></a>

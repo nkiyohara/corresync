@@ -93,17 +93,25 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>AI連携</p>
-        <h1 id="page-title">
-          AIエージェントとの連携 <em>導入方法と公開状況</em>
-        </h1>
+        <h1 id="page-title">Corresyncを <em>AIエージェントに接続</em></h1>
         <p class="lede">
-          Corresyncは、このコンピューター上のAIエージェントとstdioで接続します。この表では、MCPの直接設定、Skill、専用パッケージ、リポジトリでの提供、公式マーケットへの掲載を分けて表示しています。対応していることと、公式に掲載されていることは別です。
+          デスクトップアプリで依頼内容を確認してください。ローカルのMCP接続と同梱のAgent
+          Skillをセットアップします。
         </p>
         <div class="actions">
-          <a class="button primary" href="getting-started.html"
-          >検出したエージェントを設定</a>
+          <a
+            class="button primary"
+            href="codex://new?prompt=Read%20https%3a%2f%2fcorresync.org%2fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2c%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2c%20stop%20and%20explain%20what%20I%20need%20to%20do.%0a"
+          >Codex で設定</a>
+          <a
+            class="button secondary"
+            href="claude://code/new?q=Read%20https%3a%2f%2fcorresync.org%2fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2c%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2c%20stop%20and%20explain%20what%20I%20need%20to%20do.%0a"
+          >Claude Code で設定</a>
           <a class="button secondary" href="#matrix">対応表</a>
         </div>
+        <p class="fine-print">
+          <a href="getting-started.html#copy-setup-request">セットアップ依頼をコピー</a>
+        </p>
       </section>
 
       <section class="publication-snapshot" aria-labelledby="snapshot-title">
@@ -379,15 +387,10 @@
 
       <section class="final-cta" aria-labelledby="integrations-cta-title">
         <p class="eyebrow"><span aria-hidden="true"></span>はじめ方</p>
-        <h2 id="integrations-cta-title">
-          corr
-          setupで、このコンピューターのエージェントを検出して接続できます
-        </h2>
-        <p>
-          対応表は参照用です。まずはガイド付き設定から始めてください。検証済みのローカルでの接続方法だけが表示されます。
-        </p>
+        <h2 id="integrations-cta-title">デスクトップのAIでセットアップ</h2>
         <div class="actions centered">
-          <a class="button primary" href="getting-started.html">スタートガイド</a>
+          <a class="button primary" href="getting-started.html#agent-setup"
+          >AIにセットアップを任せる</a>
           <a class="button secondary" href="providers.html">プロバイダーの接続方法</a>
         </div>
       </section>
