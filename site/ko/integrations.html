@@ -87,19 +87,25 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>AI 에이전트 연동</p>
-        <h1 id="page-title">
-          평소 쓰는 에이전트에서 Corresync를 사용할 수 있습니다. <em>패키지
-            형식과 배포 상태를 확인하세요.</em>
-        </h1>
+        <h1 id="page-title">Corresync를 <em>AI 에이전트에 연결</em></h1>
         <p class="lede">
-          Corresync는 stdio로 로컬 AI 에이전트와 연결됩니다. 아래 표는 MCP 직접
-          설정, Skill, 네이티브 패키지, 저장소 제공, 공식 마켓 등록을 따로
-          표시합니다. 호환된다고 해서 공식 마켓에 등록된 것은 아닙니다.
+          데스크톱 앱에서 설정 요청을 검토하세요. 요청에는 로컬 MCP 연결과
+          번들 Agent Skill 설정이 포함됩니다.
         </p>
         <div class="actions">
-          <a class="button primary" href="getting-started.html">감지된 에이전트 설정</a>
+          <a
+            class="button primary"
+            href="codex://new?prompt=Read%20https%3a%2f%2fcorresync.org%2fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2c%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2c%20stop%20and%20explain%20what%20I%20need%20to%20do.%0a"
+          >Codex로 설정</a>
+          <a
+            class="button secondary"
+            href="claude://code/new?q=Read%20https%3a%2f%2fcorresync.org%2fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2c%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2c%20stop%20and%20explain%20what%20I%20need%20to%20do.%0a"
+          >Claude Code로 설정</a>
           <a class="button secondary" href="#matrix">표 보기</a>
         </div>
+        <p class="fine-print">
+          <a href="getting-started.html#copy-setup-request">설정 요청 복사</a>
+        </p>
       </section>
 
       <section class="publication-snapshot" aria-labelledby="snapshot-title">
@@ -382,15 +388,10 @@
 
       <section class="final-cta" aria-labelledby="integrations-cta-title">
         <p class="eyebrow"><span aria-hidden="true"></span>시작하기</p>
-        <h2 id="integrations-cta-title">
-          corr setup을 실행하면 이 컴퓨터의 에이전트를 찾아 연결합니다.
-        </h2>
-        <p>
-          이 표는 참고용입니다. 처음에는 corr setup부터 실행하세요. 검토된
-          로컬 연결 방법만 제안합니다.
-        </p>
+        <h2 id="integrations-cta-title">데스크톱 에이전트에서 설정 계속하기</h2>
         <div class="actions centered">
-          <a class="button primary" href="getting-started.html">시작 안내 열기</a>
+          <a class="button primary" href="getting-started.html#agent-setup"
+          >AI 에이전트로 설정</a>
           <a class="button secondary" href="providers.html">서비스별 연결 방식 보기</a>
         </div>
       </section>

@@ -65,9 +65,11 @@
         <h1 id="page-title">{{.HeroLead}} <em>{{.HeroEmphasis}}</em></h1>
         <p class="lede">{{.HeroLede}}</p>
         <div class="actions">
-          <a class="button primary" href="getting-started.html">{{.HeroStart}}</a>
+          <a class="button primary" href="codex://new?prompt={{.SetupRequest}}">{{.HeroCodex}}</a>
+          <a class="button secondary" href="claude://code/new?q={{.SetupRequest}}">{{.HeroClaude}}</a>
           <a class="button secondary" href="#matrix">{{.HeroRead}}</a>
         </div>
+        <p class="fine-print"><a href="getting-started.html#copy-setup-request">{{.HeroCopyRequest}}</a></p>
       </section>
 
       <section class="publication-snapshot" aria-labelledby="snapshot-title">
@@ -138,9 +140,8 @@
       <section class="final-cta" aria-labelledby="integrations-cta-title">
         <p class="eyebrow"><span aria-hidden="true"></span>{{.CTAeyebrow}}</p>
         <h2 id="integrations-cta-title">{{.CTATitle}}</h2>
-        <p>{{.CTACopy}}</p>
         <div class="actions centered">
-          <a class="button primary" href="getting-started.html">{{.CTAStart}}</a>
+          <a class="button primary" href="getting-started.html#agent-setup">{{.CTAStart}}</a>
           <a class="button secondary" href="providers.html">{{.CTAProviders}}</a>
         </div>
       </section>

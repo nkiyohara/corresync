@@ -90,7 +90,7 @@
     "providers/jmap": { href: "#jmap", label: "See JMAP" },
     "providers/imap-smtp": { href: "#imap-smtp", label: "See IMAP and SMTP" },
     "providers/caldav": { href: "#caldav", label: "See CalDAV" },
-    "getting-started/install": { href: "getting-started.html#step-install", label: "Install Corresync" },
+    "getting-started/install": { href: "getting-started.html#agent-setup", label: "Set up with your AI agent" },
     "getting-started/sign-in": { href: "getting-started.html#sign-in", label: "See the setup steps" },
   });
   const evidenceNames = Object.freeze({
@@ -221,7 +221,7 @@
       "providers/jmap": { href: "#jmap", label: "JMAPを見る" },
       "providers/imap-smtp": { href: "#imap-smtp", label: "IMAP / SMTPを見る" },
       "providers/caldav": { href: "#caldav", label: "CalDAVを見る" },
-      "getting-started/install": { href: "getting-started.html#step-install", label: "Corresyncをインストール" },
+      "getting-started/install": { href: "getting-started.html#agent-setup", label: "AIにセットアップを任せる" },
       "getting-started/sign-in": { href: "getting-started.html#sign-in", label: "設定手順を見る" },
     }),
     evidenceNames: Object.freeze({
@@ -348,7 +348,7 @@
       "providers/jmap": { href: "#jmap", label: "查看 JMAP" },
       "providers/imap-smtp": { href: "#imap-smtp", label: "查看 IMAP / SMTP" },
       "providers/caldav": { href: "#caldav", label: "查看 CalDAV" },
-      "getting-started/install": { href: "getting-started.html#step-install", label: "安装 Corresync" },
+      "getting-started/install": { href: "getting-started.html#agent-setup", label: "使用 AI 智能体设置" },
       "getting-started/sign-in": { href: "getting-started.html#sign-in", label: "查看设置步骤" },
     }),
     evidenceNames: Object.freeze({
@@ -466,7 +466,7 @@
       "providers/jmap": { href: "#jmap", label: "查看 JMAP" },
       "providers/imap-smtp": { href: "#imap-smtp", label: "查看 IMAP / SMTP" },
       "providers/caldav": { href: "#caldav", label: "查看 CalDAV" },
-      "getting-started/install": { href: "getting-started.html#step-install", label: "安裝 Corresync" },
+      "getting-started/install": { href: "getting-started.html#agent-setup", label: "使用 AI 代理設定" },
       "getting-started/sign-in": { href: "getting-started.html#sign-in", label: "查看設定步驟" },
     }),
     evidenceNames: Object.freeze({
@@ -546,7 +546,7 @@
       "providers/apple-icloud": { href: "#icloud", label: "iCloud 설정 보기" },
       "providers/microsoft-owa": { href: "#microsoft-owa", label: "Outlook Web 보기" }, "providers/microsoft-graph": { href: "#microsoft-graph", label: "Microsoft Graph 보기" },
       "providers/jmap": { href: "#jmap", label: "JMAP 보기" }, "providers/imap-smtp": { href: "#imap-smtp", label: "IMAP / SMTP 보기" },
-      "providers/caldav": { href: "#caldav", label: "CalDAV 보기" }, "getting-started/install": { href: "getting-started.html#step-install", label: "Corresync 설치" },
+      "providers/caldav": { href: "#caldav", label: "CalDAV 보기" }, "getting-started/install": { href: "getting-started.html#agent-setup", label: "AI 에이전트로 설정" },
       "getting-started/sign-in": { href: "getting-started.html#sign-in", label: "설정 방법 보기" },
     }),
     evidenceNames: Object.freeze({

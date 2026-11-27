@@ -101,22 +101,39 @@
     </header>
 
     <main id="main">
-      <section class="page-hero" aria-labelledby="page-title">
+      <section class="page-hero" id="agent-setup" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>スタートガイド</p>
-        <h1 id="page-title">
-          インストールから最初の質問まで<em>4つの手順</em>
-        </h1>
+        <h1 id="page-title">Corresyncを<em>AIでセットアップ</em></h1>
         <p class="lede">
-          <code
-          >corr</code>をインストールし、仕事用や個人用のアカウントを追加して、ローカルのMCPサーバーをエージェントに登録します。複数のアカウントをまとめて検索しても、サインインと権限はアカウントごとに別です。Outlook
-          Webのサインインはブラウザが、APIやオープン標準で使う認可情報はOSキーチェーンが管理します。MCPはこのコンピューター上のstdioだけで動きます。
+          このコンピューター上のAIに、Corresyncのインストール・更新、アカウント追加、Agent
+          Skillの導入を任せられます。アプリで依頼内容を確認して送信し、ブラウザでのサインインと多要素認証は自分で行ってください。
         </p>
         <div class="actions">
-          <a class="button primary" href="#step-install">手順1から始める</a><a
+          <a
+            class="button primary"
+            href="codex://new?prompt=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+          >Codex で設定</a>
+          <a
             class="button secondary"
-            href="providers.html#check"
-          >先に対応状況を確認</a>
+            href="claude://code/new?q=Read%20https%3A%2F%2Fcorresync.org%2Fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2C%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2C%20stop%20and%20explain%20what%20I%20need%20to%20do.%0A"
+          >Claude Code で設定</a>
+          <a class="button secondary" href="#step-install">手動で設定する</a>
         </div>
+        <details class="setup-request">
+          <summary>セットアップ依頼をコピー</summary>
+          <div
+            class="cmd"
+            id="copy-setup-request"
+            data-copy
+            data-copy-label="Corresyncのセットアップ依頼"
+          >
+            <pre
+              tabindex="0"
+              aria-label="Corresyncのセットアップ依頼"
+            ><code>Read https://corresync.org/setup-instructions.txt and follow it to install or update Corresync on this computer and connect it to this desktop agent, including installing and verifying the Corresync Agent Skill. If you cannot read the instructions or run commands on this computer, stop and explain what I need to do.
+</code></pre>
+          </div>
+        </details>
       </section>
 
       <ol class="gs-steps">
@@ -401,9 +418,12 @@ corr doctor --account personal</code></pre>
                   tabindex="0"
                   role="region"
                   aria-label="Codex設定コマンド"
-                ><code>corr mcp setup codex</code></pre>
+                ><code>corr integrations setup codex</code></pre>
               </div>
-              <p><code>codex mcp get corresync</code>で確認できます。</p>
+              <p>
+                <code>corr integrations doctor codex</code>でMCP接続と同梱のAgent
+                Skillを確認できます。
+              </p>
             </div>
             <div class="client">
               <h3>Claude Code</h3>
@@ -412,9 +432,12 @@ corr doctor --account personal</code></pre>
                   tabindex="0"
                   role="region"
                   aria-label="Claude Code設定コマンド"
-                ><code>corr mcp setup claude-code</code></pre>
+                ><code>corr integrations setup claude-code</code></pre>
               </div>
-              <p>ユーザー単位かプロジェクト単位で登録できます。</p>
+              <p>
+                <code>corr integrations doctor claude-code</code>でMCP接続と同梱のAgent
+                Skillを確認できます。
+              </p>
             </div>
             <div class="client">
               <h3>GitHub Copilot CLI</h3>

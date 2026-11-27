@@ -133,8 +133,8 @@ jobs:
           grep -Fq 'irm https://corresync.org/install.ps1 | iex' site/index.html
           grep -Fq 'irm https://corresync.org/install.ps1 | iex' site/getting-started.html
           grep -Fq 'winget install --id nkiyohara.Corresync --exact' site/getting-started.html
-          grep -Fq 'corr mcp setup codex' site/index.html
-          grep -Fq 'corr mcp setup claude-code' site/getting-started.html
+          grep -Fq 'corr integrations setup codex' site/index.html
+          grep -Fq 'corr integrations setup claude-code' site/getting-started.html
           grep -Fq 'corr mcp setup github-copilot' site/getting-started.html
           grep -Fq 'corr mcp setup gemini-cli' site/getting-started.html
           grep -Fq 'corr mcp setup qwen-code' site/getting-started.html

@@ -51,6 +51,7 @@ type pageData struct {
 	SourceVersion   string
 	StableVersion   string
 	RegistryVersion string
+	SetupRequest    string
 	Channels        []channelRow
 }
 
@@ -65,6 +66,10 @@ func main() {
 }
 
 func run(root string, check bool) error {
+	request, err := os.ReadFile(filepath.Join(root, "setup-request.txt")) // #nosec G304 -- fixed setup request under the selected site root.
+	if err != nil {
+		return fmt.Errorf("read agent setup request: %w", err)
+	}
 	tmpl, err := template.New("page").Parse(pageTemplate)
 	if err != nil {
 		return fmt.Errorf("parse page template: %w", err)
@@ -82,6 +87,7 @@ func run(root string, check bool) error {
 		if err != nil {
 			return err
 		}
+		data.SetupRequest = string(request)
 		var rendered bytes.Buffer
 		if err := tmpl.Execute(&rendered, data); err != nil {
 			return fmt.Errorf("render %s page: %w", locale.Language, err)

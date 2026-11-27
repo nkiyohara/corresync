@@ -92,17 +92,25 @@
     <main id="main">
       <section class="page-hero" aria-labelledby="page-title">
         <p class="eyebrow"><span aria-hidden="true"></span>Agent integrations</p>
-        <h1 id="page-title">How Corresync is packaged <em>for each agent</em></h1>
+        <h1 id="page-title">Connect Corresync <em>to your AI agent</em></h1>
         <p class="lede">
-          Corresync connects to local AI agents over stdio. The table below lists direct MCP setup,
-          Skills, native packages, what is in the repository, and what is actually published in a
-          marketplace. A client that works with Corresync does not mean there is an official
-          listing.
+          Review the setup request in your desktop app. It covers the local MCP connection and the
+          bundled Agent Skill.
         </p>
         <div class="actions">
-          <a class="button primary" href="getting-started.html">Set up detected agents</a>
+          <a
+            class="button primary"
+            href="codex://new?prompt=Read%20https%3a%2f%2fcorresync.org%2fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2c%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2c%20stop%20and%20explain%20what%20I%20need%20to%20do.%0a"
+          >Set up with Codex</a>
+          <a
+            class="button secondary"
+            href="claude://code/new?q=Read%20https%3a%2f%2fcorresync.org%2fsetup-instructions.txt%20and%20follow%20it%20to%20install%20or%20update%20Corresync%20on%20this%20computer%20and%20connect%20it%20to%20this%20desktop%20agent%2c%20including%20installing%20and%20verifying%20the%20Corresync%20Agent%20Skill.%20If%20you%20cannot%20read%20the%20instructions%20or%20run%20commands%20on%20this%20computer%2c%20stop%20and%20explain%20what%20I%20need%20to%20do.%0a"
+          >Set up with Claude Code</a>
           <a class="button secondary" href="#matrix">See the table</a>
         </div>
+        <p class="fine-print">
+          <a href="getting-started.html#copy-setup-request">Copy the setup request</a>
+        </p>
       </section>
 
       <section class="publication-snapshot" aria-labelledby="snapshot-title">
@@ -378,15 +386,10 @@
 
       <section class="final-cta" aria-labelledby="integrations-cta-title">
         <p class="eyebrow"><span aria-hidden="true"></span>Setup</p>
-        <h2 id="integrations-cta-title">
-          corr setup finds and connects the agents on this computer
-        </h2>
-        <p>
-          The table is for reference. Start with the guided command; it only offers reviewed local
-          setups.
-        </p>
+        <h2 id="integrations-cta-title">Continue setup in your desktop agent</h2>
         <div class="actions centered">
-          <a class="button primary" href="getting-started.html">Open getting started</a>
+          <a class="button primary" href="getting-started.html#agent-setup"
+          >Set up with your AI agent</a>
           <a class="button secondary" href="providers.html">See provider routes</a>
         </div>
       </section>
