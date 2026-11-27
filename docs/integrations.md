@@ -187,3 +187,14 @@ layout. They are suitable for private local diagnostics and structured setup,
 not for public issue reports. JSON contains no environment values, file
 contents, tokens, provider credentials, mail, calendar data, or agent
 conversations.
+
+## Refresh after upgrading
+
+Release builds carry the matching Skill and native package metadata inside
+the executable. On an interactive command, Corresync offers a preview for
+installed older managed packages in user scope and in the current project.
+Accept to apply and verify the update. A declined offer stays dismissed for
+that release, host, scope, project and configuration. Edited managed files
+require manual review. Use the existing scoped doctor and repair commands
+for other configurations or projects. MCP and noninteractive commands do
+not present the offer. Reload the host when prompted.

@@ -90,17 +90,17 @@ func resolveSkillDescriptor(environment Environment, request Request) (skillDesc
 	if descriptor.directoryMode == 0 {
 		descriptor.directoryMode = 0o700
 	}
-	if err := validateBundleRoot(environment.BundleDirectory); err != nil {
+	if err := environment.validateBundle(); err != nil {
 		return descriptor, true, err
 	}
 	if err := validateTargetParents(filepath.Join(descriptor.targetRoot, "SKILL.md"), request, environment); err != nil {
 		return descriptor, true, err
 	}
-	data, err := readPackageSource(environment.BundleDirectory, "plugins/corresync/skills/corresync/SKILL.md")
+	data, err := environment.readBundleFile("plugins/corresync/skills/corresync/SKILL.md")
 	if err != nil {
 		return descriptor, true, err
 	}
-	manifest, err := readPackageSource(environment.BundleDirectory, "plugins/corresync/.codex-plugin/plugin.json")
+	manifest, err := environment.readBundleFile("plugins/corresync/.codex-plugin/plugin.json")
 	if err != nil {
 		return descriptor, true, err
 	}
@@ -152,6 +152,11 @@ func (SkillStore) Inspect(descriptor skillDescriptor) (ComponentInspection, erro
 		return component, nil //nolint:nilerr // Invalid ownership is represented by the typed component state.
 	}
 	component.Version = marker.Version
+	if fileFingerprint(skillData) != marker.SourceSHA256 {
+		component.State = StateNameConflict
+		component.Detail = "The installed Skill has local changes."
+		return component, nil
+	}
 	if !slices.Contains(marker.Hosts, descriptor.host) {
 		component.State = StateAbsent
 		component.Detail = "The shared portable Skill exists but is not registered for this host."
@@ -187,6 +192,9 @@ func (SkillStore) Install(ctx context.Context, descriptor skillDescriptor, expec
 	if inspection.Fingerprint != expectedFingerprint {
 		return errors.New("portable Skill changed after preview")
 	}
+	if inspection.State == StateNameConflict {
+		return errors.New(inspection.Detail)
+	}
 	hosts := []agenthost.ID{descriptor.host}
 	if inspection.State != StateAbsent || inspection.Fingerprint != absentFileFingerprint(descriptor.targetRoot) {
 		markerData, _, _, readErr := readSkillTree(descriptor.targetRoot)
@@ -221,6 +229,9 @@ func (SkillStore) Remove(ctx context.Context, descriptor skillDescriptor, expect
 	}
 	if inspection.Fingerprint != expectedFingerprint {
 		return errors.New("portable Skill changed after preview")
+	}
+	if inspection.State == StateNameConflict {
+		return errors.New(inspection.Detail)
 	}
 	if inspection.State == StateAbsent {
 		return nil

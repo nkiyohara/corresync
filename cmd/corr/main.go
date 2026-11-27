@@ -135,6 +135,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		if result.Status == updatecheck.InstallStatusUpdated {
 			return app.runUpdatedCommand(executionContext, nil, result)
 		}
+		app.offerSkillUpdates()
 		arguments = []string{"--help"}
 	}
 
@@ -194,6 +195,7 @@ func run(executionContext context.Context, arguments []string, stdout, stderr io
 		if result.Status == updatecheck.InstallStatusUpdated {
 			return app.runUpdatedCommand(executionContext, arguments, result)
 		}
+		app.offerSkillUpdates()
 	}
 	if err := parsed.Run(app); err != nil {
 		root := rootCommand(arguments)
