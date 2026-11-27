@@ -9,12 +9,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"charm.land/huh/v2"
 
 	"github.com/nkiyohara/corresync/internal/agenthost"
 	"github.com/nkiyohara/corresync/internal/integrationlifecycle"
+	plugin "github.com/nkiyohara/corresync/plugins/corresync"
 )
 
 type integrationTargetFlags struct {
@@ -375,6 +377,17 @@ func prepareIntegrationLifecycle(
 	if err != nil {
 		return integrationlifecycle.Engine{}, nil, fmt.Errorf("resolve native integration packages: %w", err)
 	}
+	// Use this binary's own payload for its own release, including standalone
+	// upgrades that leave old files beside the replaced executable.
+	if current := app.executableGeneration.info; current != nil && releaseChannel(app.info.Version) != "" {
+		if target, targetErr := os.Stat(executable); targetErr == nil && os.SameFile(current, target) { // #nosec G703 -- inspect the selected installation and its reviewed paths.
+			environment.BundleFiles, err = plugin.ReleaseFiles(strings.TrimPrefix(app.info.Version, "v"))
+			if err != nil {
+				return integrationlifecycle.Engine{}, nil, err
+			}
+			bundleDirectory = executable
+		}
+	}
 	if bundleDirectory != "" {
 		environment.BundleDirectory = bundleDirectory
 		environment.ManagedDirectory = filepath.Join(environment.ConfigDirectory, "corresync", "integration-packages")
@@ -446,7 +459,7 @@ func findIntegrationBundleDirectory(executable string) (string, error) {
 			"plugins/corresync/.codex-plugin/plugin.json",
 			"integrations/gemini-cli/corresync/gemini-extension.json",
 		} {
-			info, statErr := os.Lstat(filepath.Join(candidate, filepath.FromSlash(relative)))
+			info, statErr := os.Lstat(filepath.Join(candidate, filepath.FromSlash(relative))) // #nosec G703 -- inspect the selected installation and its reviewed paths.
 			if statErr != nil || !info.Mode().IsRegular() || integrationlifecycle.IsSymlinkOrReparsePoint(info) {
 				valid = false
 				break
@@ -479,7 +492,7 @@ func verifyIntegrationExecutable(path string) (string, error) {
 	if err := verifyIntegrationExecutableParents(resolved); err != nil {
 		return "", err
 	}
-	info, err := os.Lstat(resolved)
+	info, err := os.Lstat(resolved) // #nosec G703 -- inspect the selected installation and its reviewed paths.
 	if err != nil {
 		return "", fmt.Errorf("inspect Corresync executable %s: %w", resolved, err)
 	}
@@ -497,7 +510,7 @@ func verifyIntegrationExecutable(path string) (string, error) {
 
 func verifyIntegrationExecutableParents(path string) error {
 	for directory := filepath.Dir(path); ; directory = filepath.Dir(directory) {
-		info, err := os.Lstat(directory)
+		info, err := os.Lstat(directory) // #nosec G703 -- inspect the selected installation and its reviewed paths.
 		if err != nil {
 			return fmt.Errorf("inspect Corresync executable parent %s: %w", directory, err)
 		}

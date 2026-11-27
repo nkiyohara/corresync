@@ -154,11 +154,11 @@ account stays signed in, and a later read can succeed in the same daemon once
 the provider is reachable. Do not ask the user to sign in for it.
 
 The action's additive `nextAction.mcpTool` names `account_sign_in`. That tool
-takes only the account alias and works only for an account whose current
-connection settings a person has already signed in to once with
-`corr auth login`; after the account is added or any route changes, it returns
-`unavailable` with reason `cli_sign_in_required` until the person signs in from
-the CLI again. Corresync asks the person through MCP form elicitation with a
+takes only the account alias. On a supported desktop the first sign-in after
+adding an account or changing its connection settings also requires confirmation
+in a separate local Corresync dialog before opening the provider or reading a
+saved credential. Without that dialog the first sign-in requires the CLI.
+Corresync asks the person through MCP form elicitation with a
 prompt it writes itself from the configured alias and address and, for each
 enabled service, the provider, the exact sign-in host (or server host for a
 saved credential), and any OAuth client ID; no tool argument or provider text
@@ -166,7 +166,8 @@ reaches it. Only an
 explicit accept starts the same browser sign-in as `corr auth login`. The tool
 returns at once with one of:
 
-- `started`: the browser is open; the daemon finishes the session itself or
+- `started`: the local confirmation or provider flow is starting. The daemon
+  finishes the session itself or
   closes the browser at `expiresAt`. Check `account_status`; do not call again.
 - `already_signed_in`: retry the original read once.
 - `in_progress`: a prompt or sign-in for this account is already pending.

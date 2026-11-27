@@ -4,6 +4,21 @@
 - Date: 2026-11-25
 - Related: ADR 0002, ADR 0003, ADR 0012, ADR 0020, ADR 0036, ADR 0038, issue #45
 
+## Amendment for issue #234 (2026-11-27)
+
+For first sign-in and after a connection change, a daemon-owned desktop
+confirmation can now verify the destination. The original CLI-only decision
+below remains the fallback on hosts without a supported dialog. The existing
+MCP form is still required. Its one-use ticket binds the account ID, alias and
+route digest. After acceptance the daemon shows the reviewed account, address
+and service destinations in a separate plain-text OS dialog, with cancel as
+the default. A positive local answer gates browser and credential access.
+A client fabricating an MCP acceptance can show this dialog but cannot answer
+it through MCP. The timeout and logout cancel the dialog as well as the login.
+Only completed authentication records the reviewed route digest. Failures use
+the existing cooldown. Supported helpers are Zenity or X11 xmessage on Linux,
+osascript on macOS and Windows PowerShell's Windows Forms dialog on Windows.
+
 ## Context
 
 Until now an MCP client could never start a sign-in. When a session was

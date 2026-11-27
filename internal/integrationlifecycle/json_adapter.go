@@ -12,6 +12,7 @@ import (
 )
 
 type Environment struct {
+	BundleFiles          map[string][]byte
 	ClaudeConfigOverride bool
 	HomeDirectory        string
 	ConfigDirectory      string

@@ -23,8 +23,9 @@ ask a question. See
 ## Signing in from an MCP client
 
 MCP can request a sign-in; it starts only after the user approves it in the MCP
-client. This works only for an account you have already signed in to once with
-`corr auth login`, and again after any change to its connection settings.
+client. For new or changed settings, also review the destinations on the
+Corresync host. If a local confirmation dialog is unavailable, sign in once
+with `corr auth login` to verify the current settings.
 When a tool reports that an account needs sign-in, an agent may call
 `account_sign_in` with that account alias. Corresync then asks you, in the MCP
 client's own confirmation prompt, whether to sign in. The prompt is written by

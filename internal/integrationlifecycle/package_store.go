@@ -37,6 +37,7 @@ type packageDescriptor struct {
 	installSource     string
 	version           string
 	sourceFingerprint string
+	fileOrder         []string
 	files             map[string][]byte
 }
 
@@ -67,7 +68,7 @@ func (PackageStore) Describe(environment Environment, host agenthost.ID) (packag
 			return descriptor, true, errors.New("integration bundle and managed package directories must be clean and absolute")
 		}
 	}
-	if err := validateBundleRoot(environment.BundleDirectory); err != nil {
+	if err := environment.validateBundle(); err != nil {
 		return descriptor, true, err
 	}
 	var sourceFiles []string
@@ -98,7 +99,7 @@ func (PackageStore) Describe(environment Environment, host agenthost.ID) (packag
 	descriptor.files = make(map[string][]byte, len(sourceFiles)+1)
 	hash := sha256.New()
 	for _, relative := range sourceFiles {
-		data, err := readPackageSource(environment.BundleDirectory, relative)
+		data, err := environment.readBundleFile(relative)
 		if err != nil {
 			return descriptor, true, fmt.Errorf("read integration package source %s: %w", relative, err)
 		}
@@ -112,6 +113,7 @@ func (PackageStore) Describe(environment Environment, host agenthost.ID) (packag
 				return descriptor, true, err
 			}
 		}
+		descriptor.fileOrder = append(descriptor.fileOrder, stagedRelative)
 		descriptor.files[stagedRelative] = data
 		_, _ = io.WriteString(hash, stagedRelative)
 		_, _ = hash.Write([]byte{0})
@@ -124,6 +126,24 @@ func (PackageStore) Describe(environment Environment, host agenthost.ID) (packag
 	}
 	descriptor.sourceFingerprint = hex.EncodeToString(hash.Sum(nil))
 	return descriptor, true, nil
+}
+
+func (environment Environment) validateBundle() error {
+	if environment.BundleFiles != nil {
+		return nil
+	}
+	return validateBundleRoot(environment.BundleDirectory)
+}
+
+func (environment Environment) readBundleFile(relative string) ([]byte, error) {
+	if environment.BundleFiles != nil {
+		data, ok := environment.BundleFiles[relative]
+		if !ok {
+			return nil, errors.New("missing embedded integration file")
+		}
+		return data, nil
+	}
+	return readPackageSource(environment.BundleDirectory, relative)
 }
 
 func validateBundleRoot(root string) error {
@@ -329,7 +349,7 @@ func (PackageStore) Stage(ctx context.Context, descriptor packageDescriptor, exp
 	}
 	_, _, targetFingerprint, err := (PackageStore{}).InspectTarget(descriptor)
 	if err != nil {
-		return err
+		return fmt.Errorf("managed package target changed after preview or is unsafe: %w", err)
 	}
 	if targetFingerprint != expectedTargetFingerprint {
 		return errors.New("managed package target changed after preview")
@@ -541,6 +561,24 @@ func packageTreeFingerprint(descriptor packageDescriptor, marker []byte) (string
 	})
 	if err != nil {
 		return "", false, err
+	}
+	var recorded packageMarker
+	if err := json.Unmarshal(marker, &recorded); err != nil {
+		return "", false, err
+	}
+	installed := sha256.New()
+	for _, name := range descriptor.fileOrder {
+		data, ok := actual[name]
+		if !ok {
+			return "", false, errors.New("managed package file is missing")
+		}
+		_, _ = io.WriteString(installed, name)
+		_, _ = installed.Write([]byte{0})
+		_, _ = installed.Write(data)
+		_, _ = installed.Write([]byte{0})
+	}
+	if hex.EncodeToString(installed.Sum(nil)) != recorded.SourceSHA256 {
+		return "", false, errors.New("managed package has local changes")
 	}
 	keys := make([]string, 0, len(actual))
 	for name := range actual {

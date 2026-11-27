@@ -159,3 +159,39 @@ func TestPortableSkillFailsClosedOnPostPreviewChange(t *testing.T) {
 		t.Fatalf("Install() error = %v", err)
 	}
 }
+
+func TestSkillUpgradeKeepsEditedCopiesAndRefreshesOldRelease(t *testing.T) {
+	environment := packageEnvironment(t)
+	request := skillRequest(agenthost.IDVSCode, agenthost.ScopeUser, environment)
+	engine := Engine{Catalog: agenthost.DefaultCatalog(), Environment: environment}
+	install, err := engine.Plan(t.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result, err := engine.Apply(t.Context(), request, install); err != nil || !result.Verified {
+		t.Fatalf("install: %v %v", result, err)
+	}
+	descriptor, _, err := resolveSkillDescriptor(environment, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine.Environment.BundleFiles = map[string][]byte{
+		"plugins/corresync/.codex-plugin/plugin.json": []byte(`{"version":"99.0.0"}`),
+		"plugins/corresync/skills/corresync/SKILL.md": []byte("updated instructions"),
+	}
+	request.Operation = OperationRepair
+	upgrade, err := engine.Plan(t.Context(), request)
+	if err != nil || !upgrade.SkillUpgrade() {
+		t.Fatalf("upgrade: %+v %v", upgrade, err)
+	}
+	if result, err := engine.Apply(t.Context(), request, upgrade); err != nil || !result.Verified {
+		t.Fatalf("apply: %v %v", result, err)
+	}
+	if err := os.WriteFile(filepath.Join(descriptor.targetRoot, "SKILL.md"), []byte("edited"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	edited, err := engine.Plan(t.Context(), request)
+	if err != nil || !edited.Blocked || edited.SkillUpgrade() {
+		t.Fatalf("edited: %+v %v", edited, err)
+	}
+}

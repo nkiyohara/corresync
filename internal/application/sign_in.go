@@ -114,11 +114,11 @@ type AccountSignInResult struct {
 }
 
 var accountSignInGuidance = map[AccountSignInStatus]string{
-	AccountSignInStarted: "The person approved the request and Corresync opened the same browser sign-in as `corr auth login` on its host. " +
+	AccountSignInStarted: "The person approved the request and Corresync started the sign-in flow on its host. For new or changed settings, the person must first confirm the displayed destinations in the local Corresync dialog. " +
 		"The person completes password, MFA, and consent in that browser; nothing is entered in chat. " +
 		"Corresync finishes the session itself when the browser sign-in completes or expires at expiresAt. " +
 		"Check account_status for this account; when the requested service is authenticated, retry the original read once. Do not call account_sign_in again for this account.",
-	AccountSignInAlreadySignedIn: "This account already has an active session. Retry the original read once; do not call account_sign_in again.",
+	AccountSignInAlreadySignedIn: "This account already has an active session. Check account_status for the requested service, then retry the original read once; do not call account_sign_in again.",
 	AccountSignInDeclined: "The person declined or cancelled this sign-in request, or declined one recently. Nothing was started. " +
 		"Do not ask again and do not call account_sign_in again; tell the person they can run the nextAction command themselves.",
 	AccountSignInUnavailable: "Corresync could not ask for or start this sign-in from this MCP client. Nothing was started. " +

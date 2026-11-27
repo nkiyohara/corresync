@@ -132,10 +132,10 @@ single-user tool, not a remote gateway or tenant administration service.
   non-interactive setup cannot launch it.
 - MCP can request a sign-in; it starts only after the user approves it in the
   MCP client ([ADR 0039](adr/0039-user-approved-sign-in-from-mcp.md)). Only
-  `account_sign_in` can ask, and only for an account whose current connection
-  settings a person already signed in to from the CLI; adding or changing an
-  account, through MCP or the CLI, requires a CLI sign-in again, so MCP cannot
-  choose the destination. The server-authored prompt names the alias, address,
+  `account_sign_in` can ask. For new or changed settings, a second confirmation
+  on the host gates all provider access. A completed CLI sign-in or a
+  completed sign-in after local desktop review verifies the destination.
+  The server-authored prompt names the alias, address,
   services, and each exact sign-in host and OAuth client ID in plain ASCII. The
   daemon accepts the approved start only through its separate MCP approval
   method with a one-use, caller-bound ticket. One prompt and one running
@@ -146,7 +146,7 @@ single-user tool, not a remote gateway or tenant administration service.
   request for this account; they do not prove a person produced it. A client
   that shows elicitation requests or `input_required` results to the model, or
   lets the model fill the retried call, lets the model approve, and Corresync
-  cannot detect that. The person is then still protected by the CLI-verified
+  cannot detect that. The person is then still protected by the locally verified
   destination (the verifying `corr auth login` shows every sign-in host and
   says when it is the first sign-in with given settings; it does not ask),
   credentials and MFA typed by a person in the browser, the cool-down, and the

@@ -295,3 +295,36 @@ func slicesContainAll(values []Component, expected ...Component) bool {
 	}
 	return true
 }
+
+func TestNativeSkillRefreshUsesNewReleaseAndPreservesEdits(t *testing.T) {
+	environment := packageEnvironment(t)
+	store := PackageStore{}
+	old, _, err := store.Describe(environment, agenthost.IDGeminiCLI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Stage(t.Context(), old, old.sourceFingerprint, absentFileFingerprint(old.targetRoot)); err != nil {
+		t.Fatal(err)
+	}
+	environment.BundleFiles = map[string][]byte{
+		"integrations/gemini-cli/corresync/gemini-extension.json":     []byte(`{"name":"corresync","version":"1.2.4"}`),
+		"integrations/gemini-cli/corresync/skills/corresync/SKILL.md": []byte("new instructions"),
+	}
+	next, _, err := store.Describe(environment, agenthost.IDGeminiCLI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, version, fingerprint, err := store.InspectTarget(next)
+	if err != nil || state != StateVersionDrift || version != old.version {
+		t.Fatalf("upgrade state %v %v %v", state, version, err)
+	}
+	if err := store.Stage(t.Context(), next, next.sourceFingerprint, fingerprint); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(next.targetRoot, "skills", "corresync", "SKILL.md"), []byte("local instructions"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if state, _, _, err := store.InspectTarget(next); err == nil || state != StateNameConflict {
+		t.Fatalf("local edit state %v %v", state, err)
+	}
+}

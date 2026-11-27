@@ -128,6 +128,7 @@ func addAccountSignInTool(
 		Title: "Ask the person to approve an account sign-in",
 		Description: "Use only after a Corresync result says this exact account needs sign-in. Corresync itself asks the person, in this MCP client's own confirmation prompt, " +
 			"whether to open the same browser sign-in as `corr auth login --account ALIAS`; nothing starts unless the person explicitly accepts. " +
+			"For a first sign-in or changed settings, the person also reviews the destinations in a local Corresync dialog. " +
 			"Passwords, MFA, and consent stay in that browser and never pass through MCP. Returns immediately with started, already_signed_in, declined, unavailable, or in_progress; " +
 			"after started, check account_status instead of calling again. On declined or unavailable, show the person the returned command and stop. " +
 			"Logout, browser clearing, and account changes are not available here.",

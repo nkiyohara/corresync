@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/nkiyohara/corresync/internal/application"
@@ -29,6 +30,9 @@ var signInStateCaller = domain.Caller{Surface: "daemon", Instance: "sign-in-stat
 // signInApproval is one reserved approval prompt for one account and one MCP
 // caller. At most one exists per account.
 type signInApproval struct {
+	digest    string
+	alias     string
+	notice    string
 	ticket    string
 	caller    domain.Caller
 	expiresAt time.Time
@@ -44,6 +48,9 @@ type signInCooldown struct {
 
 // mcpSignInRun is one daemon-owned sign-in started after MCP approval.
 type mcpSignInRun struct {
+	review localSignInReview
+	notice string
+	digest string
 	alias  string
 	endsAt time.Time
 	cancel context.CancelFunc
@@ -53,7 +60,7 @@ type mcpSignInRun struct {
 // signInCoordinator holds the daemon-owned state for interactive sign-ins:
 // running visible logins from either surface, pending MCP approval prompts,
 // persisted per-account cool-downs, and the persisted record of connection
-// settings verified by a CLI-started sign-in. It is guarded by
+// settings verified by a locally reviewed sign-in. It is guarded by
 // sessionBackend.mu.
 type signInCoordinator struct {
 	running   map[domain.AccountID]int
@@ -66,6 +73,7 @@ type signInCoordinator struct {
 	stateFailedUntil time.Time
 	files            signInStateFiles
 	now              func() time.Time
+	review           localSignInReview
 	display          func() error
 	audit            application.AuditRecorder
 	newTicket        func() (string, error)
@@ -80,6 +88,7 @@ func newSignInCoordinator() *signInCoordinator {
 		mcpRuns:   make(map[domain.AccountID]*mcpSignInRun),
 		now:       time.Now,
 		display:   browser.RequireGraphicalSession,
+		review:    desktopSignInReview(),
 		newTicket: newSignInTicket,
 	}
 }
@@ -204,9 +213,9 @@ func (backend *sessionBackend) persistSignInCooldownsLocked() {
 	}
 }
 
-// recordCLISignInLocked marks the account's current connection settings as
-// verified by a sign-in that a person started from the CLI.
-func (backend *sessionBackend) recordCLISignInLocked(accountID domain.AccountID) {
+// recordVerifiedSignInLocked marks the account's current connection settings as
+// verified by CLI sign-in or independent local desktop review.
+func (backend *sessionBackend) recordVerifiedSignInLocked(accountID domain.AccountID) {
 	_, configured, exists := backend.configuration.AccountByID(accountID)
 	if !exists {
 		return
@@ -225,9 +234,9 @@ func (backend *sessionBackend) recordCLISignInLocked(accountID domain.AccountID)
 	}
 }
 
-// cliVerifiedLocked reports whether the account's current settings match the
-// record of its last CLI-completed sign-in.
-func (backend *sessionBackend) cliVerifiedLocked(accountID domain.AccountID) bool {
+// signInVerifiedLocked reports whether the account's current settings match the
+// record of its last locally verified sign-in.
+func (backend *sessionBackend) signInVerifiedLocked(accountID domain.AccountID) bool {
 	_, configured, exists := backend.configuration.AccountByID(accountID)
 	if !exists {
 		return false
@@ -257,8 +266,8 @@ func (backend *sessionBackend) errBehindMCPSignIn(action string) error {
 }
 
 // SignInVerified answers the CLI's question whether the account's current
-// connection settings completed a CLI-started sign-in before. Only the CLI
-// surface may ask; MCP learns the same fact only as cli_sign_in_required.
+// connection settings completed local verification before. Only the CLI
+// surface may query the record directly.
 func (backend *sessionBackend) SignInVerified(
 	_ context.Context,
 	accountID domain.AccountID,
@@ -281,7 +290,7 @@ func (backend *sessionBackend) SignInVerified(
 	if _, _, exists := backend.configuration.AccountByID(accountID); !exists {
 		return daemonapi.SignInVerifiedResult{}, fmt.Errorf("account %q is not configured", accountID)
 	}
-	return daemonapi.SignInVerifiedResult{Account: accountID, Verified: backend.cliVerifiedLocked(accountID)}, nil
+	return daemonapi.SignInVerifiedResult{Account: accountID, Verified: backend.signInVerifiedLocked(accountID)}, nil
 }
 
 // mcpSignInRunning reports whether any MCP-started sign-in is running.
@@ -463,7 +472,7 @@ func (backend *sessionBackend) RequestAccountSignIn(
 		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonRecentlyUnfinished
 	case now.Before(coordinator.stateFailedUntil):
 		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonStateUnavailable
-	case !backend.cliVerifiedLocked(accountID):
+	case !backend.signInVerifiedLocked(accountID) && coordinator.review == nil:
 		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonCLISignInRequired
 	case !application.AccountSignInAliasDisplayable(alias):
 		status, reason = application.AccountSignInUnavailable, application.AccountSignInReasonAliasNotDisplayable
@@ -520,7 +529,21 @@ func (backend *sessionBackend) RequestAccountSignIn(
 		backend.mu.Unlock()
 		return application.AccountSignInRequest{}, err
 	}
+	digest, err := signInRouteDigest(configured)
+	if err != nil {
+		backend.mu.Unlock()
+		return application.AccountSignInRequest{}, err
+	}
+	var notice strings.Builder
+	if !backend.signInVerifiedLocked(accountID) {
+		if _, err := writeSignInDestination(&notice, 120, alias, configured, routes, nil); err != nil {
+			backend.mu.Unlock()
+			return application.AccountSignInRequest{}, err
+		}
+		notice.WriteString("\nThese connection settings have not been verified. Continue only if you recognize every destination above.")
+	}
 	coordinator.approvals[accountID] = signInApproval{
+		digest: digest, alias: alias, notice: notice.String(),
 		ticket: ticket, caller: caller, expiresAt: approval.ExpiresAt,
 	}
 	backend.persistSignInCooldownsLocked()
@@ -709,7 +732,9 @@ func (backend *sessionBackend) ResolveAccountSignIn(
 		reason := application.AccountSignInReasonSignInRunning
 		return finish(application.AccountSignInInProgress, reason, nil, approved, signInDeniedEvent(reason))
 	}
-	if !backend.cliVerifiedLocked(accountID) {
+	digest, digestErr := signInRouteDigest(configured)
+	if digestErr != nil || digest != approval.digest || alias != approval.alias ||
+		(!backend.signInVerifiedLocked(accountID) && (approval.notice == "" || coordinator.review == nil)) {
 		backend.mu.Unlock()
 		reason := application.AccountSignInReasonCLISignInRequired
 		return finish(application.AccountSignInUnavailable, reason, nil, approved, signInDeniedEvent(reason))
@@ -726,7 +751,7 @@ func (backend *sessionBackend) ResolveAccountSignIn(
 	}
 	expiresAt := now.Add(timeout).UTC()
 	runContext, cancel := context.WithTimeout(backend.lifecycle, timeout)
-	run := &mcpSignInRun{alias: alias, endsAt: expiresAt, cancel: cancel, done: make(chan struct{})}
+	run := &mcpSignInRun{review: coordinator.review, notice: approval.notice, digest: digest, alias: alias, endsAt: expiresAt, cancel: cancel, done: make(chan struct{})}
 	coordinator.mcpRuns[accountID] = run
 	backend.beginInteractiveLoginLocked(accountID)
 	backend.active.Add(1)
@@ -768,7 +793,22 @@ func (backend *sessionBackend) runApprovedSignIn(
 	defer close(run.done)
 	defer run.cancel()
 	backend.activationMu.Lock()
-	_, err := backend.activateAccountHeld(ctx, accountID)
+	var err error
+	if run.notice != "" {
+		err = run.review(ctx, run.notice)
+	}
+	if err == nil {
+		backend.mu.Lock()
+		alias, configured, exists := backend.configuration.AccountByID(accountID)
+		digest, digestErr := signInRouteDigest(configured)
+		backend.mu.Unlock()
+		if !exists || digestErr != nil || digest != run.digest || alias != run.alias {
+			err = errInvalidSignInApproval
+		}
+	}
+	if err == nil {
+		_, err = backend.activateAccountHeld(ctx, accountID)
+	}
 	backend.activationMu.Unlock()
 
 	backend.mu.Lock()
@@ -779,6 +819,11 @@ func (backend *sessionBackend) runApprovedSignIn(
 	}
 	if err != nil {
 		backend.setSignInCooldownLocked(accountID, false)
+	} else if run.notice != "" {
+		_, configured, exists := backend.configuration.AccountByID(accountID)
+		if digest, digestErr := signInRouteDigest(configured); exists && digestErr == nil && digest == run.digest {
+			backend.recordVerifiedSignInLocked(accountID)
+		}
 	}
 	backend.mu.Unlock()
 
